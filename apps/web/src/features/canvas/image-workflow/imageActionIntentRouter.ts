@@ -12,6 +12,7 @@ import {
 } from '../execution'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
+import { i18n } from '../../../shared/i18n'
 import {
   ACTIVE_NODE_PANEL_KIND,
   type ActiveNodePanel,
@@ -82,11 +83,11 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
       const entered = options.enterFlowExpandMode(nodeId)
       options.clearActiveNodePanel()
       options.hideStrengthControl()
-      if (!entered) options.onWarning('当前图片不可扩图')
+      if (!entered) options.onWarning(i18n.global.t('canvas.tools.cannotOutpaint'))
       return
     }
     if (
-      actionMode === IMAGE_ACTION_MODE.partialEdit ||
+      actionMode === IMAGE_ACTION_MODE.inpaint ||
       actionMode === IMAGE_ACTION_MODE.localImageEditor
     ) {
       options.cancelFlowExpandMode()
@@ -95,18 +96,18 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
       options.clearActiveNodePanel()
       options.hideStrengthControl()
       if (!entered) {
-        options.onWarning(
+        const warningKey =
           actionMode === IMAGE_ACTION_MODE.localImageEditor
-            ? '当前图片不可编辑'
-            : '当前图片不可局部重绘',
-        )
+            ? 'canvas.tools.imageNotEditable'
+            : 'canvas.tools.cannotInpaint'
+        options.onWarning(i18n.global.t(warningKey))
       } else {
         void options.focusImageEditorAndShowChrome(nodeId)
       }
       return
     }
     if (!isImageTaskAction(action)) {
-      options.onWarning('当前图片工具不可执行')
+      options.onWarning(i18n.global.t('canvas.tools.actionUnavailable'))
       return
     }
     if (

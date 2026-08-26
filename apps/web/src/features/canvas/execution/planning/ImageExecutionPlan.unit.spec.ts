@@ -154,7 +154,7 @@ describe('ImageExecutionPlan', () => {
     })
 
     expect(() => planner.planFusionPromptGeneration('fusion-1', '', 9, '16:9')).toThrow(
-      '生成数量无效',
+      'Invalid number of images.',
     )
   })
 
@@ -178,7 +178,7 @@ describe('ImageExecutionPlan', () => {
       edges: [],
     }))
 
-    const plan = planner.planImageDirectAction('image-1', 'remove-bg')
+    const plan = planner.planImageDirectAction('image-1', 'cutout')
 
     expect(plan.source).toEqual({ url: 'https://example.com/source.png', ratio: 0.75 })
     expect(plan.outputResolution).toBe('2k')
@@ -206,8 +206,8 @@ describe('ImageExecutionPlan', () => {
       edges: [],
     }))
 
-    expect(() => planner.planImageDirectAction('image-empty', 'remove-bg')).toThrow(
-      '图片节点不存在或缺少 URL',
+    expect(() => planner.planImageDirectAction('image-empty', 'cutout')).toThrow(
+      'Image node not found or missing an image URL.',
     )
   })
 
@@ -227,13 +227,13 @@ describe('ImageExecutionPlan', () => {
         prompt: '   ',
         maskDataUrl: 'data:image/png;base64,mask',
       }),
-    ).toThrow('请输入 Prompt')
+    ).toThrow('Enter a prompt first.')
     expect(() =>
       planner.planImageInpaintAction('image-1', {
         prompt: 'redraw',
         maskDataUrl: '   ',
       }),
-    ).toThrow('请先标记局部重绘区域')
+    ).toThrow('Mark the area to inpaint first.')
   })
 
   it('plans image-fill actions as single-output tasks without inpaint references', () => {
@@ -277,7 +277,7 @@ describe('ImageExecutionPlan', () => {
         frameRect: { left: 0, top: 0, width: 100, height: 100 },
         originalImageRect: { left: 0, top: 0, width: 100, height: 100 },
       }),
-    ).toThrow('请先拖动扩图框')
+    ).toThrow('Drag the outpaint frame first.')
   })
 
   it('normalizes prompt aspect ratios for image and text prompt plans', () => {

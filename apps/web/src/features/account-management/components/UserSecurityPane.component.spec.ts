@@ -1,7 +1,7 @@
 import PrimeVue from 'primevue/config'
 import { defineComponent, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { primeVueTestOptions } from '../../../test/primeVue'
+import { userPrimeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen } from '../../../test/render'
 import UserSecurityPane from './UserSecurityPane.vue'
 
@@ -33,12 +33,12 @@ describe('UserSecurityPane', () => {
   it('keeps the user-shell primary action visual contract', () => {
     renderWithUser(UserSecurityPane, {
       global: {
-        plugins: [[PrimeVue, primeVueTestOptions]],
+        plugins: [[PrimeVue, userPrimeVueTestOptions]],
         stubs: { Password: PasswordStub },
       },
     })
 
-    const submitButton = screen.getByRole('button', { name: '确认更新密码' })
+    const submitButton = screen.getByRole('button', { name: 'Update password' })
     expect(submitButton).not.toHaveClass('p-button')
     expect(submitButton).toHaveClass('bg-ib-creative-accent-hover', 'text-ib-text-inverse')
   })

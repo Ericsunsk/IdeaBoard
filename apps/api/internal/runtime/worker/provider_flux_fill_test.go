@@ -98,7 +98,7 @@ func TestCallFluxFillInpaintUsesMaskURLAndConfiguredSystemPrompt(t *testing.T) {
 		Seed:         7,
 		ImageRefs:    []string{inputURL},
 		MaskRefs:     []string{maskURL},
-	}, workflow.RuntimeOperationPartialEdit, time.Second)
+	}, workflow.RuntimeOperationInpaint, time.Second)
 	if err != nil {
 		t.Fatalf("callFluxFill: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestCallFluxFillHTTPErrorRetryClassification(t *testing.T) {
 				SystemPrompt: "仅编辑蒙版区域",
 				ImageRefs:    []string{"https://media.ideaboard.art/source.png"},
 				MaskRefs:     []string{"https://media.ideaboard.art/mask.png"},
-			}, workflow.RuntimeOperationPartialEdit, time.Second)
+			}, workflow.RuntimeOperationInpaint, time.Second)
 			if err == nil {
 				t.Fatal("expected provider error")
 			}
@@ -171,7 +171,7 @@ func TestCallFluxFillNetworkErrorIsRetryable(t *testing.T) {
 		SystemPrompt: "仅编辑蒙版区域",
 		ImageRefs:    []string{"https://media.ideaboard.art/source.png"},
 		MaskRefs:     []string{"https://media.ideaboard.art/mask.png"},
-	}, workflow.RuntimeOperationPartialEdit, time.Second)
+	}, workflow.RuntimeOperationInpaint, time.Second)
 	if err == nil {
 		t.Fatal("expected network error")
 	}
@@ -194,7 +194,7 @@ func TestFluxFillTimedOutInvocationIsNotRetried(t *testing.T) {
 	orchestrator := newProviderBatchOrchestrator(func(ctx context.Context, request providerRequest) (providerCallResult, error) {
 		return executor.callFluxFill(ctx, &accounts.ApiAccount{
 			ProxyURL: server.URL,
-		}, request, workflow.RuntimeOperationPartialEdit, 10*time.Millisecond)
+		}, request, workflow.RuntimeOperationInpaint, 10*time.Millisecond)
 	})
 	orchestrator.wait = func(context.Context, time.Duration) error { return nil }
 
@@ -242,7 +242,7 @@ func TestFluxFillFollowsModalResultRedirect(t *testing.T) {
 		SystemPrompt: "仅编辑蒙版区域",
 		ImageRefs:    []string{"https://media.ideaboard.art/source.png"},
 		MaskRefs:     []string{"https://media.ideaboard.art/mask.png"},
-	}, workflow.RuntimeOperationPartialEdit, time.Second)
+	}, workflow.RuntimeOperationInpaint, time.Second)
 	if err != nil {
 		t.Fatalf("callFluxFill: %v", err)
 	}

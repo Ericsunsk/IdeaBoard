@@ -1,7 +1,7 @@
 import { defineComponent, ref } from 'vue'
 import PrimeVue from 'primevue/config'
 import { describe, expect, it } from 'vitest'
-import { primeVueTestOptions } from '../../../../test/primeVue'
+import { adminPrimeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen } from '../../../../test/render'
 import AdminRowActionsPopover from './AdminRowActionsPopover.vue'
 
@@ -38,7 +38,7 @@ const Harness = defineComponent({
 describe('AdminRowActionsPopover', () => {
   it('keeps disabled and destructive row actions stable through the shared Popover', async () => {
     const { user } = renderWithUser(Harness, {
-      global: { plugins: [[PrimeVue, primeVueTestOptions]] },
+      global: { plugins: [[PrimeVue, adminPrimeVueTestOptions]] },
     })
 
     await user.click(screen.getByRole('button', { name: '打开操作' }))

@@ -58,11 +58,12 @@
       />
     </div>
 
-    <div v-else class="editing-controls-empty-state">选择一个编辑图层</div>
+    <div v-else class="editing-controls-empty-state">{{ t("canvas.imageEditor.selectEditingLayer") }}</div>
   </section>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type {
   ImageEditorAdjustmentWholeParams,
   ImageEditorAdjustmentLayer,
@@ -85,6 +86,8 @@ const emit = defineEmits<{
   (e: 'update-param', key: ImageEditorParamKey, value: ImageEditorParamValue): void
   (e: 'update-params', value: ImageEditorAdjustmentWholeParams): void
 }>()
+
+const { t } = useI18n()
 
 const ranges = IMAGE_ADJUSTMENT_DEFINITIONS
 </script>

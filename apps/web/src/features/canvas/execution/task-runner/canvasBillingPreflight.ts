@@ -1,4 +1,5 @@
 import type { ApiClientError } from '../../../../shared/api/client'
+import { i18n } from '../../../../shared/i18n'
 
 export type CanvasBillingPreflightFailureKind =
   'insufficient-credits' | 'network' | 'pricing-unavailable'
@@ -14,19 +15,25 @@ export class CanvasBillingPreflightError extends Error {
 }
 
 export function insufficientCreditsPreflightError(): CanvasBillingPreflightError {
-  return new CanvasBillingPreflightError('insufficient-credits', 'Idea不足')
+  return new CanvasBillingPreflightError(
+    'insufficient-credits',
+    i18n.global.t('errorCodes.insufficient_credits'),
+  )
 }
 
 export function mapCanvasBillingRequestError(error: unknown): Error {
   const apiError = error as ApiClientError
   if (apiError?.code === 'insufficient_credits') return insufficientCreditsPreflightError()
   if (apiError?.code === 'pricing_unavailable') {
-    return new CanvasBillingPreflightError('pricing-unavailable', '暂时无法获取报价，请重试')
+    return new CanvasBillingPreflightError(
+      'pricing-unavailable',
+      i18n.global.t('errorCodes.pricing_unavailable'),
+    )
   }
   if (apiError?.status == null && apiError?.code == null) {
-    return new CanvasBillingPreflightError('network', '网络错误，请重试')
+    return new CanvasBillingPreflightError('network', i18n.global.t('common.errors.requestIncomplete'))
   }
-  return error instanceof Error ? error : new Error('请求失败')
+  return error instanceof Error ? error : new Error(i18n.global.t('common.errors.requestIncomplete'))
 }
 
 export function isCanvasBillingPreflightError(

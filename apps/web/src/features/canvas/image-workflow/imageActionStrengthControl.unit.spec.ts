@@ -68,7 +68,7 @@ describe('useFlowImageActionStrengthControl', () => {
   it('keeps ordinary pointer down as a pending click without committing strength', () => {
     const onCommit = vi.fn()
     const control = useFlowImageActionStrengthControl({ onCommit })
-    const action = IMAGE_NODE_ACTION.styleVariation
+    const action = IMAGE_NODE_ACTION.variations
     const { trigger } = bindRange(control, action)
 
     trigger.dispatchEvent(createPointerEvent('pointerdown'))
@@ -85,7 +85,7 @@ describe('useFlowImageActionStrengthControl', () => {
   it('clamps same-gesture strength drags to the native range bounds', () => {
     const onCommit = vi.fn()
     const control = useFlowImageActionStrengthControl({ onCommit })
-    const action = IMAGE_NODE_ACTION.styleVariation
+    const action = IMAGE_NODE_ACTION.variations
     const { input, trigger } = bindRange(control, action)
     stubRangeBounds(input, { left: 100, width: 200 })
 
@@ -108,7 +108,7 @@ describe('useFlowImageActionStrengthControl', () => {
   it('drags the visible strength range during the same long-press gesture', () => {
     const onCommit = vi.fn()
     const control = useFlowImageActionStrengthControl({ onCommit })
-    const action = IMAGE_NODE_ACTION.styleVariation
+    const action = IMAGE_NODE_ACTION.variations
     const { input, trigger } = bindRange(control, action, 35)
     const onChange = vi.fn()
     input.addEventListener('change', onChange)
@@ -138,7 +138,7 @@ describe('useFlowImageActionStrengthControl', () => {
     const onCommit = vi.fn()
     const onCancel = vi.fn()
     const control = useFlowImageActionStrengthControl({ onCommit, onCancel })
-    const action = IMAGE_NODE_ACTION.styleVariation
+    const action = IMAGE_NODE_ACTION.variations
     const { input, trigger } = bindRange(control, action, 35)
     stubRangeBounds(input, { left: 100, width: 200 })
 
@@ -182,7 +182,7 @@ describe('useFlowImageActionStrengthControl', () => {
   it('clears stale strength click suppression on the next ordinary trigger press', () => {
     const onCommit = vi.fn()
     const control = useFlowImageActionStrengthControl({ onCommit })
-    const action = IMAGE_NODE_ACTION.styleVariation
+    const action = IMAGE_NODE_ACTION.variations
     const { input, trigger } = bindRange(control, action)
     stubRangeBounds(input, { left: 100, width: 200 })
 
@@ -224,7 +224,7 @@ describe('useFlowImageActionStrengthControl', () => {
     const onCommit = vi.fn()
     const onCancel = vi.fn()
     const control = useFlowImageActionStrengthControl({ onCommit, onCancel })
-    const action = IMAGE_NODE_ACTION.styleVariation
+    const action = IMAGE_NODE_ACTION.variations
     const { input, trigger } = bindRange(control, action, 35)
     stubRangeBounds(input, { left: 100, width: 200 })
 
@@ -244,7 +244,7 @@ describe('useFlowImageActionStrengthControl', () => {
   it('clears pending long press and suppression when hidden', () => {
     const onCommit = vi.fn()
     const control = useFlowImageActionStrengthControl({ onCommit })
-    const action = IMAGE_NODE_ACTION.styleVariation
+    const action = IMAGE_NODE_ACTION.variations
     const { trigger } = bindRange(control, action)
 
     trigger.dispatchEvent(createPointerEvent('pointerdown'))

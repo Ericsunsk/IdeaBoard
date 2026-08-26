@@ -1,4 +1,9 @@
-import { isTaskResultPendingError, TaskCancelledError } from '../../../../shared/api/taskEvents'
+import {
+  isTaskResultPendingError,
+  TaskCancelledError,
+  TaskResultPendingError,
+} from '../../../../shared/api/taskEvents'
+import { i18n } from '../../../../shared/i18n'
 import {
   IMAGE_GENERATION_FAILURE_MESSAGE,
   IMAGE_GENERATION_SUCCESS_MESSAGE,
@@ -67,7 +72,12 @@ export type PendingImageWorkflowRunnerOptions = {
   onError?: (error: unknown) => boolean
 }
 
-function errorMessage(): string {
+/** Presentation boundary: transport errors carry a kind; copy is resolved here. */
+export function taskExecutionWarning(error: unknown): string {
+  if (error instanceof TaskResultPendingError) {
+    return i18n.global.t(error.kind === 'timeout' ? 'canvas.task.progressTimeout' : 'canvas.task.stillProcessing')
+  }
+  if (error instanceof TaskCancelledError) return i18n.global.t('canvas.task.cancelled')
   return IMAGE_GENERATION_FAILURE_MESSAGE
 }
 
@@ -126,7 +136,7 @@ export function createPendingImageWorkflowRunner(
         throw error
       }
     }
-    throw new Error('网络错误，请重试')
+    throw new Error(i18n.global.t('canvas.execution.networkRetry'))
   }
 
   async function execute(intent: PendingImageWorkflowIntent): Promise<void> {
@@ -193,12 +203,15 @@ export function createPendingImageWorkflowRunner(
       if (successCount > 0) {
         options.onSuccess(IMAGE_GENERATION_SUCCESS_MESSAGE)
       }
-      if (pending.length > 0) options.onWarning('任务进行中，稍后可在画布上查看结果')
-      if (failures.length > 0) {
-        const firstFailure = failures[0]
-        const handled =
-          firstFailure?.status === 'rejected' && options.onError?.(firstFailure.reason)
-        if (!handled) options.onWarning(errorMessage())
+      if (pending.length > 0) {
+        options.onWarning(i18n.global.t('canvas.execution.tasksInProgress'))
+      }
+      const firstFailure = failures.find(
+        (attempt): attempt is PromiseRejectedResult => attempt.status === 'rejected',
+      )
+      if (firstFailure) {
+        const handled = options.onError?.(firstFailure.reason)
+        if (!handled) options.onWarning(taskExecutionWarning(firstFailure.reason))
       }
     } catch (error) {
       const release =
@@ -211,7 +224,7 @@ export function createPendingImageWorkflowRunner(
       const handled =
         options.executionCore.isAttachmentCurrent(intent.attachment) && options.onError?.(error)
       if (!handled && options.executionCore.isAttachmentCurrent(intent.attachment)) {
-        options.onWarning(errorMessage())
+        options.onWarning(taskExecutionWarning(error))
       }
     }
   }

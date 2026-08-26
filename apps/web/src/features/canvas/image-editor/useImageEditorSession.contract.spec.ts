@@ -66,12 +66,12 @@ describe('useImageEditorSession', () => {
 
     const [secondPaintLayer, firstPaintLayer, sourceLayer] = session.imageEditorLayers.value
     expect(secondPaintLayer?.type).toBe('paint')
-    expect(secondPaintLayer?.name).toBe('图层 2')
+    expect(secondPaintLayer?.name).toBe('Layer 2')
     expect(secondPaintLayer?.type === 'paint' ? secondPaintLayer.content : null).toEqual({
       kind: 'empty',
     })
     expect(firstPaintLayer?.type).toBe('paint')
-    expect(firstPaintLayer?.name).toBe('图层 1')
+    expect(firstPaintLayer?.name).toBe('Layer 1')
     expect(sourceLayer?.type).toBe('source')
     expect(session.selectedImageEditorLayerId.value).toBe(secondPaintLayer?.id)
   })
@@ -84,7 +84,7 @@ describe('useImageEditorSession', () => {
 
     const [paintLayer, sourceLayer] = session.imageEditorLayers.value
     expect(paintLayer?.type).toBe('paint')
-    expect(paintLayer?.name).toBe('图层 1')
+    expect(paintLayer?.name).toBe('Layer 1')
     expect(sourceLayer?.type).toBe('source')
     expect(session.selectedImageEditorLayerId.value).toBe(paintLayer?.id)
   })
@@ -99,7 +99,7 @@ describe('useImageEditorSession', () => {
     const [copyLayer, originalLayer] = session.imageEditorLayers.value
     expect(copyLayer?.type).toBe('adjustment')
     expect(copyLayer?.id).not.toBe(originalLayer?.id)
-    expect(copyLayer?.name).toBe('色相/饱和度 1 副本')
+    expect(copyLayer?.name).toBe('Hue/Saturation 1 copy')
     expect(originalLayer?.type).toBe('adjustment')
     expect(session.selectedImageEditorLayerId.value).toBe(copyLayer?.id)
   })
@@ -112,7 +112,7 @@ describe('useImageEditorSession', () => {
 
     const [copyLayer, originalLayer] = session.imageEditorLayers.value
     expect(copyLayer?.type).toBe('paint')
-    expect(copyLayer?.name).toBe('图层 1 副本')
+    expect(copyLayer?.name).toBe('Layer 1 copy')
     expect(copyLayer?.id).not.toBe(originalLayer?.id)
     expect(copyLayer?.type === 'paint' ? copyLayer.content : null).toEqual({ kind: 'empty' })
   })
@@ -128,7 +128,7 @@ describe('useImageEditorSession', () => {
 
     const mergedLayer = session.imageEditorLayers.value[0]
     expect(mergedLayer?.type).toBe('merged')
-    expect(mergedLayer?.name).toBe('合并图层 1')
+    expect(mergedLayer?.name).toBe('Merged layer 1')
     expect(session.selectedImageEditorLayerId.value).toBe(mergedLayer?.id)
     expect(
       flattenVisibleImageEditorAdjustmentLayers(session.imageEditorLayers.value).map(

@@ -204,7 +204,7 @@ describe('worker image adjustment backend', () => {
       requestId,
       error: {
         code: 'cancelled',
-        message: '图像处理已取消',
+        message: 'Image processing cancelled',
       },
     })
     expect(responses.some((response) => response.type === 'success')).toBe(false)

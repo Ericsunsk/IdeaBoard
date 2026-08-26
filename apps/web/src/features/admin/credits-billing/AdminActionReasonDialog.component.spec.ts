@@ -1,6 +1,6 @@
 import PrimeVue from 'primevue/config'
 import { describe, expect, it, vi } from 'vitest'
-import { primeVueTestOptions } from '../../../test/primeVue'
+import { adminPrimeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen } from '../../../test/render'
 import AdminActionReasonDialog from './AdminActionReasonDialog.vue'
 
@@ -17,7 +17,7 @@ function renderDialog(visible = true) {
         'onUpdate:visible': onVisibleUpdate,
       },
       global: {
-        plugins: [[PrimeVue, primeVueTestOptions]],
+        plugins: [[PrimeVue, adminPrimeVueTestOptions]],
         stubs: { transition: false },
       },
     }),

@@ -4,8 +4,8 @@
       <NodeToolIconButton
         class="image-mask-editor-tool-btn"
         :active="drawMode === 'paint'"
-        aria-label="画笔"
-        tooltip="画笔"
+        :aria-label="t('canvas.maskEditor.brushTool')"
+        :tooltip="t('canvas.maskEditor.brushTool')"
         @click="emit('set-draw-mode', 'paint')"
       >
         <EditPencil />
@@ -13,8 +13,8 @@
       <NodeToolIconButton
         class="image-mask-editor-tool-btn"
         :active="drawMode === 'erase'"
-        aria-label="橡皮擦"
-        tooltip="橡皮擦"
+        :aria-label="t('canvas.maskEditor.eraserTool')"
+        :tooltip="t('canvas.maskEditor.eraserTool')"
         @click="emit('set-draw-mode', 'erase')"
       >
         <Erase />
@@ -26,7 +26,7 @@
       >
         <section class="editing-controls-section">
           <label class="editing-controls-field image-mask-editor-field">
-            <span class="editing-controls-label image-mask-editor-field-label">笔刷大小</span>
+            <span class="editing-controls-label image-mask-editor-field-label">{{ t("canvas.maskEditor.brushSizeLabel") }}</span>
             <div class="editing-controls-range-row">
               <div
                 class="editing-controls-range-wrap"
@@ -56,7 +56,7 @@
         </section>
         <section class="editing-controls-section">
           <label class="editing-controls-field image-mask-editor-field">
-            <span class="editing-controls-label image-mask-editor-field-label">蒙版</span>
+            <span class="editing-controls-label image-mask-editor-field-label">{{ t("canvas.maskEditor.maskOpacityLabel") }}</span>
             <div class="editing-controls-range-row">
               <div
                 class="editing-controls-range-wrap"
@@ -88,8 +88,8 @@
       <div class="image-mask-editor-right-actions node-tool-surface">
         <NodeToolIconButton
           class="image-mask-editor-tool-btn"
-          aria-label="清空蒙版"
-          tooltip="清空蒙版"
+          :aria-label="t('canvas.maskEditor.clearMask')"
+          :tooltip="t('canvas.maskEditor.clearMask')"
           @click="emit('clear-mask')"
         >
           <XmarkCircle />
@@ -97,8 +97,8 @@
         <NodeToolIconButton
           class="image-mask-editor-tool-btn"
           :disabled="!canUndo"
-          aria-label="回退"
-          tooltip="回退"
+          :aria-label="t('canvas.maskEditor.undo')"
+          :tooltip="t('canvas.maskEditor.undo')"
           @click="emit('undo-mask')"
         >
           <Undo />
@@ -106,8 +106,8 @@
         <NodeToolIconButton
           class="image-mask-editor-tool-btn"
           :disabled="!canRedo"
-          aria-label="前进"
-          tooltip="前进"
+          :aria-label="t('canvas.maskEditor.redo')"
+          :tooltip="t('canvas.maskEditor.redo')"
           @click="emit('redo-mask')"
         >
           <Redo />
@@ -117,7 +117,7 @@
         v-model="promptDraft"
         class="image-mask-editor-composer"
         variant="floating"
-        placeholder="描述如何重绘选区"
+        :placeholder="t('canvas.tools.maskPromptPlaceholder')"
         :disabled="directGenerating"
         :output-count="1"
         :show-aspect-ratio="false"
@@ -131,6 +131,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { ref } from 'vue'
 import { EditPencil, Erase, Redo, XmarkCircle, Undo } from '@iconoir/vue'
 import type { ImageMaskDrawMode } from '../types'
@@ -172,8 +173,10 @@ const emit = defineEmits<{
   (e: 'submit', prompt: string): void
 }>()
 
+const { t } = useI18n()
+
 const promptDraft = ref('')
-const billingQuote = useCanvasBillingQuote(() => WORKFLOW_FEATURE.partialEdit)
+const billingQuote = useCanvasBillingQuote(() => WORKFLOW_FEATURE.inpaint)
 
 function onBrushSizeInput(event: Event) {
   const target = event.target as HTMLInputElement | null

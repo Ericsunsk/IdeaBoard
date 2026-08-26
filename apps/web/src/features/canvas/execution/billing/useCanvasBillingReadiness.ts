@@ -14,6 +14,8 @@ import {
 } from '../../../../shared/domain/workflowFeatures'
 import type { SubmitTaskReadinessData } from '../../../../shared/api/task'
 import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
+import { i18n } from '../../../../shared/i18n'
+import { readinessErrorCopy } from '../../../../shared/errors/errorCatalog'
 import { fetchCanvasBillingReadiness } from './canvasBillingReadinessResource'
 import { subscribeCanvasTaskReadiness } from './taskReadinessEvents'
 
@@ -55,19 +57,6 @@ export const canvasBillingReadinessKey: InjectionKey<CanvasBillingReadinessStore
   'canvas-billing-readiness',
 )
 
-function normalizeBlockedReason(message: string | undefined, fallback: string): string {
-  const normalized = `${message ?? ''}`.trim()
-  if (!normalized) return fallback
-  if (/Idea.*不足|余额.*不足|insufficient/i.test(normalized)) return 'Idea不足'
-  if (/未配置|不存在/.test(normalized) && /SKU|价格|计价|Idea/.test(normalized)) {
-    return '价格未配置'
-  }
-  if (/停用|禁用|未启用/.test(normalized) && /价格|计价|SKU/.test(normalized)) {
-    return '价格已停用'
-  }
-  return normalized
-}
-
 function isWorkflowFeature(value: string | undefined): value is WorkflowFeature {
   return WORKFLOW_FEATURE_SLUGS.includes(value as WorkflowFeature)
 }
@@ -108,21 +97,24 @@ export function createCanvasBillingReadinessStore(
         availableCredits: billing.available_credits,
         priceVersionId: billing.price_version_id,
         sufficient: false,
-        reason: `Idea不足（需要 ${formatIdeaAmount(billing.total_credits)}，当前 ${formatIdeaAmount(billing.available_credits)}）`,
+        reason: i18n.global.t('billing.insufficientBalanceDetail', {
+          required: formatIdeaAmount(billing.total_credits),
+          available: formatIdeaAmount(billing.available_credits),
+        }),
       }
     }
     if (!readiness.ready) {
       return {
         feature,
         status: 'blocked',
-        reason: normalizeBlockedReason(readiness.message, '当前操作暂不可用'),
+        reason: readinessErrorCopy(readiness.error_code),
       }
     }
     if (!billing) {
       return {
         feature,
         status: 'error',
-        reason: 'Idea计费信息暂不可用',
+        reason: i18n.global.t('common.errors.billingInfoUnavailable'),
       }
     }
     return {
@@ -165,14 +157,12 @@ export function createCanvasBillingReadinessStore(
     states.set(stateKey, { ...previous, status: 'loading', reason: undefined })
     const request = fetchReadiness(feature, requestOptions.request)
       .then((readiness) => applyReadinessForKey(stateKey, readiness))
-      .catch((error: unknown) => {
+      .catch(() => {
         states.set(stateKey, {
           feature,
           status: 'error',
-          reason: normalizeBlockedReason(
-            error instanceof Error ? error.message : undefined,
-            'Idea计费信息暂不可用',
-          ),
+          // Transport failures carry no user-safe detail; show the generic copy.
+          reason: i18n.global.t('common.errors.billingInfoUnavailable'),
         })
       })
       .finally(() => {

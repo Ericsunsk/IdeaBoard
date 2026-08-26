@@ -25,8 +25,8 @@ describe('ImageMaskEditorChrome', () => {
     renderChrome()
 
     for (const slider of [
-      screen.getByRole('slider', { name: /^笔刷大小/ }),
-      screen.getByRole('slider', { name: /^蒙版/ }),
+      screen.getByRole('slider', { name: /^Brush size/ }),
+      screen.getByRole('slider', { name: /^Mask/ }),
     ]) {
       const trackBackground = slider.parentElement?.style.getPropertyValue(
         '--canvas-range-track-background',

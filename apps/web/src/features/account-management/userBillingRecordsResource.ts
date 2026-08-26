@@ -5,6 +5,7 @@ import type {
   ListUserBillingRecordsParams,
 } from '../../shared/api/generated-query/model'
 import { resolveApiData } from '../../shared/api/apiResponse'
+import { i18n } from '../../shared/i18n'
 
 export type UserBillingRecord = BillingRecord
 export type UserBillingRecordPage = BillingRecordPage
@@ -17,5 +18,5 @@ export async function fetchUserBillingRecords(
   params: ListUserBillingRecordsParams,
   signal?: AbortSignal,
 ): Promise<UserBillingRecordPage> {
-  return resolveApiData(listUserBillingRecords(params, { signal }), '加载账单记录失败')
+  return resolveApiData(listUserBillingRecords(params, { signal }), i18n.global.t('account.errors.billingLoadFailed'))
 }

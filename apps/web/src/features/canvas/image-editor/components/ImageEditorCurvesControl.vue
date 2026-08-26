@@ -2,27 +2,27 @@
   <div class="editing-controls-stack image-editor-curves">
     <div class="editing-controls-toolbar image-editor-curves__toolbar">
       <label class="editing-controls-field image-editor-curves__select-label">
-        <span class="editing-controls-label">预设</span>
+        <span class="editing-controls-label">{{ t("canvas.imageEditor.presetLabel") }}</span>
         <select
           name="image-editor-curve-preset"
           class="editing-controls-control editing-controls-select"
           :value="selectedPresetId"
-          aria-label="曲线预设"
+          :aria-label="t('canvas.imageEditor.curvesPresetAria')"
           @change="onPresetChange"
         >
-          <option value="custom">自定</option>
+          <option value="custom">{{ t("canvas.imageEditor.customPresetOption") }}</option>
           <option v-for="preset in curvePresets" :key="preset.id" :value="preset.id">
             {{ preset.label }}
           </option>
         </select>
       </label>
       <label class="editing-controls-field image-editor-curves__select-label">
-        <span class="editing-controls-label">通道</span>
+        <span class="editing-controls-label">{{ t("canvas.imageEditor.channelLabel") }}</span>
         <select
           name="image-editor-curve-channel"
           class="editing-controls-control editing-controls-select"
           :value="activeChannel"
-          aria-label="曲线通道"
+          :aria-label="t('canvas.imageEditor.curvesChannelAria')"
           @change="onChannelChange"
         >
           <option v-for="channel in curveChannels" :key="channel.id" :value="channel.id">
@@ -47,7 +47,7 @@
 
     <div class="editing-controls-fields image-editor-curves__fields">
       <label class="editing-controls-field image-editor-curves__field">
-        <span class="editing-controls-label">输入</span>
+        <span class="editing-controls-label">{{ t("canvas.imageEditor.inputLabel") }}</span>
         <input
           name="image-editor-curve-input"
           class="editing-controls-control editing-controls-number-input"
@@ -61,7 +61,7 @@
         />
       </label>
       <label class="editing-controls-field image-editor-curves__field">
-        <span class="editing-controls-label">输出</span>
+        <span class="editing-controls-label">{{ t("canvas.imageEditor.outputLabel") }}</span>
         <input
           name="image-editor-curve-output"
           class="editing-controls-control editing-controls-number-input"
@@ -78,6 +78,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import './styles/image-editor-curves.css'
 import { computed, ref, watch } from 'vue'
 import type { ImageEditorCurveChannel, ImageEditorCurvesParams } from '../types'
@@ -108,11 +109,13 @@ const emit = defineEmits<{
   (e: 'update:params', value: ImageEditorCurvesParams): void
 }>()
 
+const { t } = useI18n()
+
 const curveChannels: Array<{ id: ImageEditorCurveChannel; label: string }> = [
   { id: 'rgb', label: 'RGB' },
-  { id: 'red', label: '红' },
-  { id: 'green', label: '绿' },
-  { id: 'blue', label: '蓝' },
+  { id: 'red', label: t('canvas.imageEditor.channels.red') },
+  { id: 'green', label: t('canvas.imageEditor.channels.green') },
+  { id: 'blue', label: t('canvas.imageEditor.channels.blue') },
 ]
 
 const activeChannel = ref<ImageEditorCurveChannel>('rgb')

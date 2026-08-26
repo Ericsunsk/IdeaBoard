@@ -1,5 +1,6 @@
 import { computed, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
+import { i18n } from '../../../shared/i18n'
 import {
   getCanvasNodePrimaryOutputPort,
   getCanvasNodeRequiredInputPorts,
@@ -243,8 +244,12 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
         return {
           label:
             disconnectedPorts.length === 1
-              ? `连接 ${missingLabels[0]}`
-              : `连接 ${disconnectedPorts.length} 个输入`,
+              ? i18n.global.t('canvas.edges.connectRequiredInputLabel', {
+                  label: missingLabels[0],
+                })
+              : i18n.global.t('canvas.edges.connectRequiredInputsLabel', {
+                  count: disconnectedPorts.length,
+                }),
           disabled: true,
         }
       }
@@ -257,8 +262,8 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
         return {
           label:
             pendingPorts.length === 1
-              ? `等待 ${pendingLabels[0]}`
-              : `等待 ${pendingPorts.length} 个输入`,
+              ? i18n.global.t('canvas.edges.waitForInputLabel', { label: pendingLabels[0] })
+              : i18n.global.t('canvas.edges.waitForInputsLabel', { count: pendingPorts.length }),
           disabled: true,
         }
       }

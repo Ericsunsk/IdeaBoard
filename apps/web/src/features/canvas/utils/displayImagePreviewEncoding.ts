@@ -27,7 +27,7 @@ export function resolvePreviewMimeType(
   sourceMime: string,
   hasTransparentPixels: boolean | null,
 ): PreviewMimeType {
-  // Prefer PNG for alpha previews so remove-bg results are not obscured by lossy edge artifacts.
+  // Prefer PNG for alpha previews so cutout results are not obscured by lossy edge artifacts.
   if (hasTransparentPixels === true) return PNG_PREVIEW_MIME_TYPE
   if (hasTransparentPixels === false) return WEBP_PREVIEW_MIME_TYPE
   return sourceMime.trim().toLowerCase() === PNG_PREVIEW_MIME_TYPE

@@ -18,7 +18,7 @@
       :zoomable="true"
       :inverse-pan="false"
       :zoom-step="1"
-      aria-label="画布小地图"
+:aria-label="t('canvas.minimap.label')"
       @click="onMiniMapClick"
     />
     <svg
@@ -48,6 +48,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getBoundsofRects, getRectOfNodes, useVueFlow } from '@vue-flow/core'
 import { MiniMap } from '@vue-flow/minimap'
 import '@vue-flow/minimap/dist/style.css'
@@ -97,6 +98,7 @@ type MiniMapOverlayDragPayload = {
   started: boolean
 }
 
+const { t } = useI18n()
 const { dimensions, getNodesInitialized, viewport } = useVueFlow()
 const viewportOverlaySvg = ref<SVGSVGElement | null>(null)
 const dragViewBoxOverride = ref<MiniMapRect | null>(null)

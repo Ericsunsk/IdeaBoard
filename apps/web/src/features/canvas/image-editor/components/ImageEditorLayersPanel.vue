@@ -1,6 +1,6 @@
 <template>
   <section class="image-editor-panel image-editor-layers-panel">
-    <div class="image-editor-layers-panel__list app-scrollbar" role="listbox" aria-label="图层">
+    <div class="image-editor-layers-panel__list app-scrollbar" role="listbox" :aria-label="t('canvas.imageEditor.layersListLabel')">
       <div
         v-for="layer in layers"
         :key="layer.id"
@@ -24,13 +24,13 @@
           v-else
           type="button"
           class="image-editor-layer-row__visibility node-tool-tooltip-trigger"
-          :aria-label="layer.visible ? '隐藏图层' : '显示图层'"
+          :aria-label="layer.visible ? t('canvas.imageEditor.hideLayer') : t('canvas.imageEditor.showLayer')"
           @click.stop="onToggleVisibility(layer)"
         >
           <Eye v-if="layer.visible" class="image-editor-layer-row__icon" />
           <EyeClosed v-else class="image-editor-layer-row__icon" />
           <span class="node-tool-tooltip" aria-hidden="true">
-            {{ layer.visible ? '隐藏图层' : '显示图层' }}
+            {{ layer.visible ? t('canvas.imageEditor.hideLayer') : t('canvas.imageEditor.showLayer') }}
           </span>
         </button>
       </div>
@@ -39,6 +39,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import './styles/image-editor-panel.css'
 import type { Component } from 'vue'
 import {
@@ -65,6 +66,8 @@ const emit = defineEmits<{
   (e: 'select-layer', layerId: string): void
   (e: 'set-layer-visible', layerId: string, visible: boolean): void
 }>()
+
+const { t } = useI18n()
 
 function onToggleVisibility(layer: ImageEditorLayer) {
   if (layer.type === 'source') return

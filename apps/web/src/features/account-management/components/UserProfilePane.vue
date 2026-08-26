@@ -1,6 +1,6 @@
 <template>
-  <AccountManagementPane title="个人资料">
-    <section class="min-w-0" aria-label="账户资料概览">
+  <AccountManagementPane :title="t('account.tabs.profile')">
+    <section class="min-w-0" :aria-label="t('account.profile.overviewAria')">
       <div class="flex min-w-0 items-center gap-5 max-[520px]:items-start">
         <div
           class="relative size-[88px] shrink-0 overflow-visible rounded-[var(--radius-ib-pill)] bg-ib-surface-raised shadow-[var(--shadow-ib-control)] max-[520px]:size-20"
@@ -10,8 +10,8 @@
             class="group relative flex h-full w-full cursor-pointer items-center justify-center overflow-hidden rounded-[var(--radius-ib-pill)] border-0 bg-transparent p-0 text-ib-text-inverse outline-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:shadow-[var(--shadow-ib-focus)] disabled:cursor-wait"
             :disabled="avatarUploading"
             :aria-busy="avatarUploading"
-            aria-label="更换头像"
-            title="更换头像"
+            :aria-label="t('account.profile.changeAvatar')"
+            :title="t('account.profile.changeAvatar')"
             @click="openAvatarPicker"
           >
             <Avatar
@@ -64,14 +64,14 @@
             {{ userStore.user?.display_name }}
           </p>
           <div class="mt-3 flex min-w-0 flex-wrap items-center gap-2">
-            <Tag v-if="isUserBanned" value="已封禁" severity="danger" rounded />
+            <Tag v-if="isUserBanned" :value="t('account.profile.banned')" severity="danger" rounded />
             <Tag :value="userRoleLabel" :severity="userRoleSeverity" rounded />
           </div>
         </div>
       </div>
     </section>
 
-    <section class="min-w-0" aria-label="账号信息">
+    <section class="min-w-0" :aria-label="t('account.profile.accountInfoAria')">
       <dl class="m-0 border-y border-ib-border-soft">
         <div
           v-for="field in profileFields"
@@ -98,6 +98,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Camera } from '@iconoir/vue'
 import Avatar from 'primevue/avatar'
 import Tag from 'primevue/tag'
@@ -112,6 +113,7 @@ type ProfileField = {
   mono?: boolean
 }
 
+const { t } = useI18n()
 const userStore = useUserStore()
 const { uploading: avatarUploading, handleFileChange: onAvatarFileChange } =
   useAvatarUploadWorkflow()
@@ -120,7 +122,9 @@ const avatarInputRef = ref<HTMLInputElement | null>(null)
 const formattedJoinedAt = computed(() => formatDateWithDots(userStore.user?.created_at))
 const formattedUpdatedAt = computed(() => formatDateWithDots(userStore.user?.updated_at))
 const isUserBanned = computed(() => userStore.user?.status === 0)
-const userRoleLabel = computed(() => (userStore.user?.role === 'admin' ? '管理员' : '创作者'))
+const userRoleLabel = computed(() =>
+  userStore.user?.role === 'admin' ? t('account.profile.roleAdmin') : t('account.profile.roleCreator'),
+)
 const userRoleSeverity = computed<TagSeverity>(() =>
   userStore.user?.role === 'admin' ? 'info' : 'secondary',
 )
@@ -130,16 +134,16 @@ const userInitial = computed(() => {
 })
 const profileFields = computed<ProfileField[]>(() => [
   {
-    label: '存储命名空间',
+    label: t('account.profile.storageNamespace'),
     value: userStore.user?.storage_namespace || '-',
     mono: true,
   },
   {
-    label: '加入时间',
+    label: t('account.profile.joinedAt'),
     value: formattedJoinedAt.value,
   },
   {
-    label: '最近更新',
+    label: t('account.profile.lastUpdated'),
     value: formattedUpdatedAt.value,
   },
 ])

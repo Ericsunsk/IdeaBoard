@@ -1,17 +1,17 @@
 <template>
-  <AccountManagementPane title="账单记录">
+  <AccountManagementPane :title="t('account.tabs.billingTransactions')">
     <DataTableFrame
       :value="tableRows"
       data-key="record_id"
       scrollable
       :table-style="{ minWidth: '720px' }"
-      table-aria-label="账单记录表格"
-      scroll-aria-label="账单记录表格"
+      :table-aria-label="t('account.billingRecords.tableAria')"
+      :scroll-aria-label="t('account.billingRecords.tableAria')"
       :frame-class="accountDataTableFrameClass"
-      empty-title="暂无账单记录"
-      empty-description="Idea 收支记录会显示在这里"
+      :empty-title="t('account.billingRecords.emptyTitle')"
+      :empty-description="t('account.billingRecords.emptyDescription')"
     >
-      <Column field="occurred_at" header="交易时间" :style="{ width: '190px' }">
+      <Column field="occurred_at" :header="t('account.billingRecords.columnTime')" :style="{ width: '190px' }">
         <template #body="{ data }">
           <Skeleton v-if="isSkeletonRow(data)" data-testid="billing-skeleton-row" width="8rem" />
           <time v-else class="whitespace-nowrap font-mono text-[13px] text-ib-text-muted">
@@ -20,16 +20,20 @@
         </template>
       </Column>
 
-      <Column field="title" header="记录内容" :style="{ minWidth: '220px' }">
+      <Column field="title" :header="t('account.billingRecords.columnDescription')" :style="{ minWidth: '220px' }">
         <template #body="{ data }">
           <Skeleton v-if="isSkeletonRow(data)" width="7rem" />
-          <span v-else class="block max-w-[320px] truncate font-semibold" :title="data.title">
-            {{ data.title }}
+          <span
+            v-else
+            class="block max-w-[320px] truncate font-semibold"
+            :title="recordDescription(data)"
+          >
+            {{ recordDescription(data) }}
           </span>
         </template>
       </Column>
 
-      <Column field="credit_delta" header="Idea 变动" :style="{ width: '140px' }">
+      <Column field="credit_delta" :header="t('account.billingRecords.columnCreditChange')" :style="{ width: '140px' }">
         <template #body="{ data }">
           <Skeleton v-if="isSkeletonRow(data)" width="4rem" />
           <span v-else class="font-mono font-bold" :class="amountTone(data)">
@@ -38,7 +42,7 @@
         </template>
       </Column>
 
-      <Column field="available_credits_after" header="可用余额" :style="{ width: '140px' }">
+      <Column field="available_credits_after" :header="t('account.billingRecords.columnBalanceAfter')" :style="{ width: '140px' }">
         <template #body="{ data }">
           <Skeleton v-if="isSkeletonRow(data)" width="5rem" />
           <span v-else class="font-mono font-semibold text-ib-text-muted">
@@ -53,10 +57,10 @@
           class="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center"
           role="alert"
         >
-          <p class="m-0 font-semibold text-ib-danger">账单加载失败</p>
+          <p class="m-0 font-semibold text-ib-danger">{{ t('account.billingRecords.loadFailed') }}</p>
           <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(initialError) }}</p>
           <Button
-            label="重新加载"
+            :label="t('account.reload')"
             severity="secondary"
             size="small"
             text
@@ -69,14 +73,14 @@
           class="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center"
           role="status"
         >
-          <span class="font-semibold text-ib-text">暂无账单记录</span>
-          <span class="mt-1 text-sm text-ib-text-subtle">Idea 收支记录会显示在这里</span>
+          <span class="font-semibold text-ib-text">{{ t('account.billingRecords.emptyTitle') }}</span>
+          <span class="mt-1 text-sm text-ib-text-subtle">{{ t('account.billingRecords.emptyDescription') }}</span>
         </div>
       </template>
 
       <template #after>
-        <p v-if="isInitialPending" class="sr-only" role="status" aria-label="正在加载账单记录">
-          正在加载账单记录
+        <p v-if="isInitialPending" class="sr-only" role="status" :aria-label="t('account.billingRecords.loading')">
+          {{ t('account.billingRecords.loading') }}
         </p>
 
         <div
@@ -85,14 +89,14 @@
           role="alert"
         >
           <span class="text-sm text-ib-danger">{{ errorMessage(loadMoreError) }}</span>
-          <Button label="重试加载" severity="secondary" size="small" text @click="loadMore()" />
+          <Button :label="t('account.billingRecords.retryLoad')" severity="secondary" size="small" text @click="loadMore()" />
         </div>
         <div
           v-else-if="hasNextPage"
           class="flex justify-center border-t border-ib-border-soft px-4 py-3"
         >
           <Button
-            label="加载更多"
+            :label="t('account.billingRecords.loadMore')"
             severity="secondary"
             size="small"
             outlined
@@ -107,10 +111,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Skeleton from 'primevue/skeleton'
 import DataTableFrame from '../../../shared/components/DataTableFrame.vue'
+import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import type { UserBillingRecord } from '../userBillingRecordsResource'
 import { useUserBillingRecords } from '../useUserBillingRecords'
 import AccountManagementPane from './AccountManagementPane.vue'
@@ -123,6 +129,7 @@ type BillingSkeletonRow = {
 type BillingTableRow = UserBillingRecord | BillingSkeletonRow
 
 const props = defineProps<{ active: boolean }>()
+const { t } = useI18n()
 const {
   records,
   isInitialPending,
@@ -134,7 +141,7 @@ const {
   loadMore,
 } = useUserBillingRecords(() => props.active)
 
-const numberFormatter = new Intl.NumberFormat('zh-CN')
+const numberFormatter = new Intl.NumberFormat('en-US')
 const skeletonRows: BillingSkeletonRow[] = Array.from({ length: 5 }, (_, index) => ({
   record_id: `billing-skeleton-${index}`,
   isSkeleton: true,
@@ -163,9 +170,25 @@ function amountTone(record: UserBillingRecord): string {
   return 'text-ib-text'
 }
 
+// Backend titles are Chinese protocol data; User copy resolves from the stable kind enum instead.
+const BILLING_KIND_COPY_KEY_MAP: Partial<Record<UserBillingRecord['kind'], string>> = {
+  usage: 'account.billingRecords.kinds.usage',
+  reward: 'account.billingRecords.kinds.reward',
+  top_up: 'account.billingRecords.kinds.topUp',
+  system_grant: 'account.billingRecords.kinds.systemGrant',
+  system_adjustment: 'account.billingRecords.kinds.systemAdjustment',
+}
+
+function recordDescription(record: UserBillingRecord): string {
+  const key = BILLING_KIND_COPY_KEY_MAP[record.kind]
+  // ai_usage keeps the pricing-config display name (e.g. the SKU label shown before purchase).
+  if (!key) return record.title
+  return t(key)
+}
+
 function formatLocalDateTime(value: string): string {
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '时间未知'
+  if (Number.isNaN(date.getTime())) return t('account.billingRecords.unknownTime')
 
   return [
     `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
@@ -178,6 +201,6 @@ function pad(value: number): string {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : '网络错误，请重试'
+  return userFacingErrorCopy(error, t('account.errors.networkRetry'))
 }
 </script>

@@ -1,4 +1,5 @@
 import type { Connection, Edge, Node } from '@vue-flow/core'
+import { i18n } from '../../../shared/i18n'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
@@ -50,7 +51,7 @@ export function createCanvasConnectionCommandLifecycle(
       ? options.normalizeConnection(connection, existingEdges)
       : connection
     if (!resolvedConnection || !options.isValidConnection(resolvedConnection)) {
-      options.onWarning('该连线不符合当前连接语义')
+      options.onWarning(i18n.global.t('canvas.edges.connectionSemanticsWarning'))
       return null
     }
     if (!resolvedConnection.source || !resolvedConnection.target) return null
@@ -95,7 +96,7 @@ export function createCanvasConnectionCommandLifecycle(
     const existingEdges = options.readEdges()
     const nextConnection = createNextCanvasConnection(resolvedConnection, existingEdges)
     if (!nextConnection) {
-      options.onWarning('连线未能写入画布，请刷新后重试')
+      options.onWarning(i18n.global.t('canvas.edges.connectionWriteFailedWarning'))
       return false
     }
 
@@ -121,7 +122,7 @@ export function createCanvasConnectionCommandLifecycle(
       policy: { allowsMultipleTargetConnections },
     })
     if (!replacement) {
-      options.onWarning('连线未能写入画布，请刷新后重试')
+      options.onWarning(i18n.global.t('canvas.edges.connectionWriteFailedWarning'))
       return false
     }
     let summary: CanvasGraphTransactionSummary
@@ -132,7 +133,7 @@ export function createCanvasConnectionCommandLifecycle(
       })
     } catch (error) {
       console.error('[Canvas] Failed to commit connection transaction', error)
-      options.onWarning('连线未能写入画布，请刷新后重试')
+      options.onWarning(i18n.global.t('canvas.edges.connectionWriteFailedWarning'))
       return false
     }
     if (!summary.didChange) return false

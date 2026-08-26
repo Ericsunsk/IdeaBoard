@@ -28,8 +28,8 @@
         <button
           type="button"
           :class="canvasChromeActionControlClass"
-          aria-label="分享功能稍后接入"
-          title="分享功能稍后接入"
+          :aria-label="t('canvas.chrome.shareComingSoon')"
+          :title="t('canvas.chrome.shareComingSoon')"
           disabled
           @mousedown.stop
         >
@@ -38,7 +38,7 @@
         <button
           :class="[canvasChromeExportControlClass, { 'is-active': !status.exportDisabled }]"
           type="button"
-          aria-label="导出"
+          :aria-label="t('canvas.chrome.export')"
           :disabled="status.exportDisabled"
           @mousedown.stop
           @click="emit('export')"
@@ -58,7 +58,7 @@
     <button
       type="button"
       :class="[canvasChromeRoundControlClass, { 'is-active': tools.activeTool === 'select' }]"
-      aria-label="选择 (V)"
+:aria-label="t('canvas.chrome.selectTool')"
       :aria-pressed="tools.activeTool === 'select'"
       @click="emit('select-tool', 'select')"
     >
@@ -67,7 +67,7 @@
     <button
       type="button"
       :class="[canvasChromeRoundControlClass, { 'is-active': tools.activeTool === 'hand' }]"
-      aria-label="抓手 (H)"
+:aria-label="t('canvas.chrome.handTool')"
       :aria-pressed="tools.activeTool === 'hand'"
       @click="emit('select-tool', 'hand')"
     >
@@ -87,9 +87,9 @@
     <button
       type="button"
       :class="[canvasChromeRoundControlClass, { 'is-active': tools.minimapEnabled }]"
-      aria-label="小地图"
+      :aria-label="t('canvas.minimap.label')"
       :aria-pressed="tools.minimapEnabled"
-      title="小地图"
+      :title="t('canvas.minimap.label')"
       @click="emit('toggle-minimap')"
     >
       <Map class="canvas-chrome-icon" />
@@ -117,7 +117,7 @@
       <button
         type="button"
         class="canvas-chrome-status-button"
-        aria-label="缩小"
+:aria-label="t('canvas.viewport.zoomOut')"
         @click="emit('zoom-out')"
       >
         <Minus class="size-4" />
@@ -130,7 +130,7 @@
       <button
         type="button"
         class="canvas-chrome-status-button"
-        aria-label="放大"
+:aria-label="t('canvas.viewport.zoomIn')"
         @click="emit('zoom-in')"
       >
         <Plus class="size-4" />
@@ -140,6 +140,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import {
   Bookmark,
   BookmarkSolid,
@@ -190,6 +191,8 @@ const emit = defineEmits<{
   'zoom-out': []
   'zoom-in': []
 }>()
+
+const { t } = useI18n()
 
 const canvasChromeRoundControlClass = createPageChromeRoundControlClass('canvas-chrome-icon-button')
 const canvasChromeActionControlClass = createPageChromeRoundControlClass(

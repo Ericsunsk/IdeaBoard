@@ -12,6 +12,7 @@ import {
   imageEditorChannelToPlotPercent,
   imageEditorPlotPercentToChannel,
 } from './imageEditorChannelScale'
+import { i18n } from '../../../../shared/i18n'
 
 export const IMAGE_EDITOR_CURVE_CHANNELS: readonly ImageEditorCurveChannel[] = [
   'rgb',
@@ -50,26 +51,26 @@ export type ImageEditorCurvePreset = {
 export const IMAGE_EDITOR_CURVE_PRESETS: readonly ImageEditorCurvePreset[] = [
   {
     id: 'linear',
-    label: '线性',
+    label: i18n.global.t('canvas.imageEditor.curvesPresets.linear'),
     channels: {},
   },
   {
     id: 'brighten',
-    label: '提亮',
+    label: i18n.global.t('canvas.imageEditor.curvesPresets.brighten'),
     channels: {
       rgb: [{ id: 'preset:brighten:midtone', input: 50, output: 63 }],
     },
   },
   {
     id: 'darken',
-    label: '压暗',
+    label: i18n.global.t('canvas.imageEditor.curvesPresets.darken'),
     channels: {
       rgb: [{ id: 'preset:darken:midtone', input: 50, output: 38 }],
     },
   },
   {
     id: 'soft-contrast',
-    label: '柔和对比',
+    label: i18n.global.t('canvas.imageEditor.curvesPresets.softContrast'),
     channels: {
       rgb: [
         { id: 'preset:soft-contrast:shadow', input: 28, output: 23 },
@@ -79,7 +80,7 @@ export const IMAGE_EDITOR_CURVE_PRESETS: readonly ImageEditorCurvePreset[] = [
   },
   {
     id: 'strong-contrast',
-    label: '强对比',
+    label: i18n.global.t('canvas.imageEditor.curvesPresets.strongContrast'),
     channels: {
       rgb: [
         { id: 'preset:strong-contrast:shadow', input: 22, output: 14 },
@@ -89,7 +90,7 @@ export const IMAGE_EDITOR_CURVE_PRESETS: readonly ImageEditorCurvePreset[] = [
   },
   {
     id: 'matte',
-    label: '哑光',
+    label: i18n.global.t('canvas.imageEditor.curvesPresets.matte'),
     channels: {
       rgb: [
         { id: IMAGE_EDITOR_CURVE_ENDPOINT_BLACK_ID, input: 0, output: 12 },

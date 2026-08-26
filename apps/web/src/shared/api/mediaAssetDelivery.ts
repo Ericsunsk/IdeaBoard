@@ -11,6 +11,7 @@ import { resolveAssetUrl } from '../config/runtimeUrls'
 import { requireApiData } from './apiResponse'
 import { api } from './client'
 import { subscribeUserEvent } from './userEventStream'
+import { i18n } from '../i18n'
 import {
   getGetUserMediaAssetMetadataUrl,
   getGetUserMediaAssetOriginalContentUrl,
@@ -138,7 +139,8 @@ export async function getMediaAssetMetadata(
   assetId: number,
   options: { signal?: AbortSignal; force?: boolean; ensureTier?: MediaAssetDeliveryTier } = {},
 ): Promise<MediaAssetDeliveryMetadata> {
-  if (!Number.isInteger(assetId) || assetId <= 0) throw new Error('媒体引用无效')
+  if (!Number.isInteger(assetId) || assetId <= 0)
+    throw new Error(i18n.global.t('common.errors.mediaInvalid'))
   const ensureKey = options.ensureTier ? `${assetId}:${options.ensureTier}` : ''
   const requestKey = ensureKey || String(assetId)
   const needsEnsure = Boolean(ensureKey && !ensuredTiers.has(ensureKey))
@@ -156,7 +158,7 @@ export async function getMediaAssetMetadata(
       }`,
       { method: 'GET', signal: options.signal },
     )
-    .then((response) => requireApiData(response, '读取媒体信息失败'))
+    .then((response) => requireApiData(response, i18n.global.t('common.errors.mediaInfoLoadFailed')))
     .then((metadata) => {
       metadataCache.set(assetId, { value: metadata, expiresAt: resolveMetadataExpiry(metadata) })
       if (ensureKey) ensuredTiers.add(ensureKey)

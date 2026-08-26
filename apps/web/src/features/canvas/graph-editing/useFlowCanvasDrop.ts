@@ -8,6 +8,8 @@ import {
   type CanvasLibraryImportDescriptor,
 } from '../../library/libraryTransfer'
 import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
+import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
+import { i18n } from '../../../shared/i18n'
 
 type UseFlowCanvasDropOptions = {
   browser: {
@@ -51,8 +53,7 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     try {
       await options.createImageNodeFromFile(point, file)
     } catch (error) {
-      const msg = error instanceof Error ? error.message : '上传失败'
-      options.onWarning(msg)
+      options.onWarning(userFacingErrorCopy(error, i18n.global.t('canvas.session.uploadFailed')))
     }
   }
 

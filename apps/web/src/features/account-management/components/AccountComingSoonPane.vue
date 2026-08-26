@@ -1,8 +1,8 @@
 <template>
-  <AccountManagementPane :title="title">
+  <AccountManagementPane :title="t(titleKey)">
     <section
       class="flex min-h-[420px] items-center py-8 max-[640px]:min-h-[320px]"
-      :aria-label="`${title}即将上线`"
+      :aria-label="t('account.comingSoonAria', { title: t(titleKey) })"
     >
       <div class="max-w-[520px] border-l-2 border-ib-creative-accent pl-6 max-[520px]:pl-5">
         <span
@@ -11,11 +11,11 @@
         >
           <component :is="icon" class="size-5" />
         </span>
-        <p class="mt-5 mb-0 text-xs font-semibold text-ib-text-subtle">{{ category }}</p>
+        <p class="mt-5 mb-0 text-xs font-semibold text-ib-text-subtle">{{ t(categoryKey) }}</p>
         <span
           class="mt-1.5 inline-flex h-6 items-center rounded-[var(--radius-ib-pill)] border border-ib-border-soft bg-ib-surface px-2.5 text-xs font-semibold text-ib-text-muted"
         >
-          即将上线
+          {{ t('account.comingSoon') }}
         </span>
       </div>
     </section>
@@ -24,11 +24,14 @@
 
 <script setup lang="ts">
 import type { Component } from 'vue'
+import { useI18n } from 'vue-i18n'
 import AccountManagementPane from './AccountManagementPane.vue'
 
 defineProps<{
-  category: string
-  title: string
+  categoryKey: string
+  titleKey: string
   icon: Component
 }>()
+
+const { t } = useI18n()
 </script>

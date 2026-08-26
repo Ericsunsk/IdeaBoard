@@ -27,7 +27,7 @@ describe('createApiError', () => {
       code: 503,
       status: 503,
       hasSafeDisplayMessage: false,
-      message: '请求失败',
+      message: 'The request could not be completed.',
       msg: '',
     })
   })

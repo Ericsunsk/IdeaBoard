@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
-import { CANVAS_NODE_MENU_ITEMS } from '../config/canvasNodeRegistry'
+import { getCanvasNodeKindMenuItems } from '../config/canvasNodeRegistry'
 
 type CanvasNodeContextMenuSnapshot = {
   visible: boolean
@@ -19,10 +19,7 @@ export function useCanvasNodeContextMenu() {
     flowY: 0,
   })
 
-  const canvasNodeMenuItems = CANVAS_NODE_MENU_ITEMS.map((item) => ({
-    key: item.key,
-    label: item.label.replace('+ ', '').replace(' 节点', ''),
-  }))
+  const canvasNodeMenuItems = getCanvasNodeKindMenuItems()
 
   function close() {
     nodeContextMenu.value.visible = false

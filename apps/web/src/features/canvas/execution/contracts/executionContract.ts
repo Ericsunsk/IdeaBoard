@@ -4,11 +4,11 @@ import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 
 export const EXECUTION_FEATURE = {
   promptGeneration: WORKFLOW_FEATURE.promptGeneration,
-  partialEdit: WORKFLOW_FEATURE.partialEdit,
-  removeBg: WORKFLOW_FEATURE.removeBg,
+  inpaint: WORKFLOW_FEATURE.inpaint,
+  cutout: WORKFLOW_FEATURE.cutout,
   styleFusion: WORKFLOW_FEATURE.styleFusion,
-  sketchToImage: WORKFLOW_FEATURE.sketchToImage,
-  styleVariation: WORKFLOW_FEATURE.styleVariation,
+  render: WORKFLOW_FEATURE.render,
+  variations: WORKFLOW_FEATURE.variations,
   hdUpscale: WORKFLOW_FEATURE.hdUpscale,
   outpaint: WORKFLOW_FEATURE.outpaint,
 } as const
@@ -25,21 +25,21 @@ export const EXECUTION_META = {
   [EXECUTION_FEATURE.promptGeneration]: {
     feature: EXECUTION_FEATURE.promptGeneration,
   },
-  [EXECUTION_FEATURE.partialEdit]: {
-    feature: EXECUTION_FEATURE.partialEdit,
+  [EXECUTION_FEATURE.inpaint]: {
+    feature: EXECUTION_FEATURE.inpaint,
   },
   [EXECUTION_FEATURE.styleFusion]: {
     feature: EXECUTION_FEATURE.styleFusion,
     promptPrefix: '[style-fusion]',
   },
-  [EXECUTION_FEATURE.sketchToImage]: {
-    feature: EXECUTION_FEATURE.sketchToImage,
+  [EXECUTION_FEATURE.render]: {
+    feature: EXECUTION_FEATURE.render,
   },
-  [EXECUTION_FEATURE.styleVariation]: {
-    feature: EXECUTION_FEATURE.styleVariation,
+  [EXECUTION_FEATURE.variations]: {
+    feature: EXECUTION_FEATURE.variations,
   },
-  [EXECUTION_FEATURE.removeBg]: {
-    feature: EXECUTION_FEATURE.removeBg,
+  [EXECUTION_FEATURE.cutout]: {
+    feature: EXECUTION_FEATURE.cutout,
   },
   [EXECUTION_FEATURE.hdUpscale]: {
     feature: EXECUTION_FEATURE.hdUpscale,
@@ -50,7 +50,7 @@ export const EXECUTION_META = {
   },
 } as const satisfies Record<ExecutionFeature, ExecutionMetaEntry>
 
-export const EXECUTION_PARTIAL_EDIT_META = EXECUTION_META[EXECUTION_FEATURE.partialEdit]
+export const EXECUTION_PARTIAL_EDIT_META = EXECUTION_META[EXECUTION_FEATURE.inpaint]
 
 export const EXECUTION_FUSION_META = EXECUTION_META[EXECUTION_FEATURE.styleFusion]
 

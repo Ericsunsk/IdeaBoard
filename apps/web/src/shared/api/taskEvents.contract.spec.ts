@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiResponseTaskData, Task } from './generated-query/model'
 import {
   TaskCancelledError,
-  TaskResultPendingError,
   waitTaskImageResultsWithSse,
 } from './taskEvents'
 import { subscribeUserCreditsInvalidation } from '../query/userCreditsInvalidation'
@@ -201,7 +200,7 @@ describe('waitTaskImageResultsWithSse', () => {
     expect(MockEventSource.instances).toHaveLength(1)
     MockEventSource.instances[0]?.emit('task.updated', 'not-json')
 
-    await expect(result).rejects.toThrow('任务进度数据异常，请稍后重试')
+    await expect(result).rejects.toThrow('Malformed task event payload')
     expect(mocks.getTask).not.toHaveBeenCalled()
     expect(MockEventSource.instances[0]?.closed).toBe(true)
   })
@@ -231,8 +230,7 @@ describe('waitTaskImageResultsWithSse', () => {
     const result = waitTaskImageResultsWithSse('task-1')
     MockEventSource.instances[0]?.emit('task.updated', { task_id: 'task-1', status: 'failed' })
 
-    await expect(result).rejects.toThrow(TaskResultPendingError)
-    await expect(result).rejects.toThrow('图片生成失败')
+    await expect(result).rejects.toMatchObject({ kind: 'pending' })
     expect(mocks.getTask).toHaveBeenCalledOnce()
     expect(MockEventSource.instances[0]?.closed).toBe(true)
   })
@@ -312,7 +310,6 @@ describe('waitTaskImageResultsWithSse', () => {
 
     const result = waitTaskImageResultsWithSse('task-1')
 
-    await expect(result).rejects.toThrow(TaskResultPendingError)
-    await expect(result).rejects.toThrow('图片生成失败')
+    await expect(result).rejects.toMatchObject({ kind: 'pending' })
   })
 })

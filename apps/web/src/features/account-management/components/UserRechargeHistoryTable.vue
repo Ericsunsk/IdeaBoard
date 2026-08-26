@@ -1,16 +1,16 @@
 <template>
   <section class="grid min-w-0 gap-3" aria-labelledby="recharge-history-heading">
-    <h3 id="recharge-history-heading" class="m-0 text-lg font-bold text-ib-text">充值记录</h3>
+    <h3 id="recharge-history-heading" class="m-0 text-lg font-bold text-ib-text">{{ t('account.topUp.historyTitle') }}</h3>
     <DataTableFrame
       :value="tableRows"
       scrollable
       :table-style="{ minWidth: '720px' }"
-      table-aria-label="充值记录表格"
-      scroll-aria-label="充值记录表格"
+      :table-aria-label="t('account.topUp.historyTableAria')"
+      :scroll-aria-label="t('account.topUp.historyTableAria')"
       frame-class="rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-control)]"
-      empty-title="暂无充值记录"
+      :empty-title="t('account.topUp.historyEmptyTitle')"
     >
-      <Column field="occurred_at" header="时间" :style="{ width: '180px' }">
+      <Column field="occurred_at" :header="t('account.topUp.columnTime')" :style="{ width: '180px' }">
         <template #body="{ data }"
           ><Skeleton v-if="isSkeleton(data)" width="8rem" /><time
             v-else
@@ -28,16 +28,16 @@
           ></template
         >
       </Column>
-      <Column field="paid_amount_minor" header="实付金额" :style="{ width: '170px' }">
+      <Column field="paid_amount_minor" :header="t('account.topUp.columnPaid')" :style="{ width: '170px' }">
         <template #body="{ data }"
           ><Skeleton v-if="isSkeleton(data)" width="6rem" /><span
             v-else-if="data.paid_amount_minor !== undefined && data.paid_currency"
             class="whitespace-nowrap font-mono font-semibold text-ib-text-muted"
             >{{ formatCurrencyMinor(data.paid_amount_minor, data.paid_currency) }}</span
-          ><span v-else class="font-semibold text-ib-text-subtle">未支付</span></template
+          ><span v-else class="font-semibold text-ib-text-subtle">{{ t('account.topUp.unpaid') }}</span></template
         >
       </Column>
-      <Column field="status" header="状态" :style="{ width: '190px' }">
+      <Column field="status" :header="t('account.topUp.columnStatus')" :style="{ width: '190px' }">
         <template #body="{ data }"
           ><Skeleton v-if="isSkeleton(data)" width="4rem" /><span
             v-else
@@ -47,7 +47,7 @@
           ></template
         >
       </Column>
-      <Column header="收据" :style="{ width: '100px' }">
+      <Column :header="t('account.topUp.columnReceipt')" :style="{ width: '100px' }">
         <template #body="{ data }"
           ><Skeleton v-if="isSkeleton(data)" width="3rem" /><a
             v-else-if="data.receipt_url"
@@ -55,7 +55,7 @@
             target="_blank"
             rel="noopener noreferrer"
             class="font-semibold text-ib-creative-accent-pressed"
-            >查看收据</a
+            >{{ t('account.topUp.viewReceipt') }}</a
           ><span v-else class="text-ib-text-subtle">—</span></template
         >
       </Column>
@@ -66,9 +66,9 @@
           class="flex min-h-40 flex-col items-center justify-center px-6 py-10 text-center"
           role="alert"
         >
-          <p class="m-0 font-semibold text-ib-danger">充值记录加载失败</p>
+          <p class="m-0 font-semibold text-ib-danger">{{ t('account.errors.historyLoadFailed') }}</p>
           <Button
-            label="重新加载"
+            :label="t('account.reload')"
             severity="secondary"
             size="small"
             text
@@ -81,22 +81,22 @@
           class="flex min-h-40 items-center justify-center px-6 py-10 text-center"
           role="status"
         >
-          <span class="font-semibold text-ib-text">暂无充值记录</span>
+          <span class="font-semibold text-ib-text">{{ t('account.topUp.historyEmptyTitle') }}</span>
         </div>
       </template>
 
       <template #after>
-        <p v-if="initialPending" class="sr-only" role="status" aria-label="正在加载充值记录">
-          正在加载充值记录
+        <p v-if="initialPending" class="sr-only" role="status" :aria-label="t('account.topUp.loadingHistory')">
+          {{ t('account.topUp.loadingHistory') }}
         </p>
         <div
           v-if="loadMoreError"
           class="flex items-center justify-center gap-3 border-t border-ib-border-soft px-4 py-3"
           role="alert"
         >
-          <span class="text-sm text-ib-danger">加载更多失败</span>
+          <span class="text-sm text-ib-danger">{{ t('account.topUp.loadMoreFailed') }}</span>
           <Button
-            label="重试加载"
+            :label="t('account.topUp.retryLoad')"
             severity="secondary"
             size="small"
             text
@@ -108,7 +108,7 @@
           class="flex justify-center border-t border-ib-border-soft px-4 py-3"
         >
           <Button
-            label="加载更多"
+            :label="t('account.topUp.loadMore')"
             severity="secondary"
             size="small"
             outlined
@@ -123,6 +123,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Skeleton from 'primevue/skeleton'
@@ -142,6 +143,7 @@ const props = defineProps<{
   fetchingNextPage: boolean
 }>()
 const emit = defineEmits<{ retry: []; 'load-more': [] }>()
+const { t } = useI18n()
 const ideaFormatter = new Intl.NumberFormat('en-US')
 const skeletonRows: SkeletonRow[] = Array.from({ length: 4 }, (_, index) => ({
   occurred_at: `recharge-skeleton-${index}`,
@@ -152,16 +154,18 @@ function isSkeleton(row: TableRow): row is SkeletonRow {
   return 'skeleton' in row
 }
 function rechargeStatusLabel(item: UserRechargeHistoryItem): string {
-  if (item.status === 'cancelled') return '已放弃'
-  if (item.status === 'refunded') return '已退款'
+  if (item.status === 'cancelled') return t('account.topUp.statusHistoryCancelled')
+  if (item.status === 'refunded') return t('account.topUp.statusHistoryRefunded')
   if (item.refunded_amount_minor && item.paid_currency) {
-    return `已到账 · 已退 ${formatCurrencyMinor(item.refunded_amount_minor, item.paid_currency)}`
+    return t('account.topUp.statusHistoryCreditedWithRefund', {
+      refunded: formatCurrencyMinor(item.refunded_amount_minor, item.paid_currency),
+    })
   }
-  return '已到账'
+  return t('account.topUp.statusHistoryCredited')
 }
 function formatDateTime(value: string): string {
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '时间未知'
+  if (Number.isNaN(date.getTime())) return t('account.topUp.unknownTime')
   const pad = (part: number) => String(part).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }

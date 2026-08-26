@@ -23,8 +23,8 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 			Models:       []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
 		}}},
 		Prompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
-			workflow.FeatureSlugPartialEdit: {Prompt: "system"},
-			workflow.FeatureSlugOutpaint:    {Prompt: "system"},
+			workflow.FeatureSlugInpaint:  {Prompt: "system"},
+			workflow.FeatureSlugOutpaint: {Prompt: "system"},
 		}},
 		Media: testSubmitMediaValidator{},
 	})
@@ -34,14 +34,14 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 		images  []string
 		params  map[string]interface{}
 	}{
-		{feature: workflow.FeatureSlugSketchToImage, images: []string{"https://example.com/sketch.png"}},
+		{feature: workflow.FeatureSlugRender, images: []string{"https://example.com/sketch.png"}},
 		{
-			feature: workflow.FeatureSlugStyleVariation,
+			feature: workflow.FeatureSlugVariations,
 			images:  []string{"https://example.com/style.png"},
 			params:  map[string]interface{}{"variation": map[string]interface{}{"strength": 0.5}},
 		},
 		{
-			feature: workflow.FeatureSlugPartialEdit,
+			feature: workflow.FeatureSlugInpaint,
 			images:  []string{"https://example.com/inpaint.png"},
 			params: map[string]interface{}{
 				"mask_image_url":        "https://example.com/mask.png",
@@ -51,7 +51,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 				"custom_height":         768,
 			},
 		},
-		{feature: workflow.FeatureSlugRemoveBg, images: []string{"https://example.com/remove.png"}},
+		{feature: workflow.FeatureSlugCutout, images: []string{"https://example.com/remove.png"}},
 		{
 			feature: workflow.FeatureSlugStyleFusion,
 			images:  []string{"https://example.com/a.png", "https://example.com/b.png"},
@@ -81,7 +81,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 	for _, tt := range tests {
 		t.Run(tt.feature, func(t *testing.T) {
 			outputCount := 2
-			if tt.feature == workflow.FeatureSlugRemoveBg || tt.feature == workflow.FeatureSlugHDUpscale || tt.feature == workflow.FeatureSlugPartialEdit || tt.feature == workflow.FeatureSlugOutpaint {
+			if tt.feature == workflow.FeatureSlugCutout || tt.feature == workflow.FeatureSlugHDUpscale || tt.feature == workflow.FeatureSlugInpaint || tt.feature == workflow.FeatureSlugOutpaint {
 				outputCount = 1
 			}
 			requestParams := map[string]interface{}{"output_count": outputCount}
@@ -106,7 +106,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 			}
 
 			wantQuantity := int64(2)
-			if tt.feature == workflow.FeatureSlugRemoveBg || tt.feature == workflow.FeatureSlugHDUpscale || tt.feature == workflow.FeatureSlugPartialEdit || tt.feature == workflow.FeatureSlugOutpaint {
+			if tt.feature == workflow.FeatureSlugCutout || tt.feature == workflow.FeatureSlugHDUpscale || tt.feature == workflow.FeatureSlugInpaint || tt.feature == workflow.FeatureSlugOutpaint {
 				wantQuantity = 1
 			}
 			billingRequest := canonical.BillingRequest()
@@ -170,7 +170,7 @@ func TestTaskIntakeRejectsDedicatedImageTransformGenerationControls(t *testing.T
 		Media: testSubmitMediaValidator{},
 	})
 
-	for _, feature := range []string{workflow.FeatureSlugRemoveBg, workflow.FeatureSlugHDUpscale} {
+	for _, feature := range []string{workflow.FeatureSlugCutout, workflow.FeatureSlugHDUpscale} {
 		t.Run(feature, func(t *testing.T) {
 			params := map[string]interface{}{
 				"output_count":      99,
@@ -199,11 +199,11 @@ func TestTaskIntakeAllowsModelessRemoveBackgroundAccount(t *testing.T) {
 	})
 
 	if _, err := intake.Compile(t.Context(), 42, &tasks.SubmitTaskRequest{
-		Feature:        workflow.FeatureSlugRemoveBg,
+		Feature:        workflow.FeatureSlugCutout,
 		ImageURLs:      []string{"https://example.com/source.png"},
-		ClientActionID: "modeless-remove-bg",
+		ClientActionID: "modeless-cutout",
 	}); err != nil {
-		t.Fatalf("model-less remove-bg account rejected: %v", err)
+		t.Fatalf("model-less cutout account rejected: %v", err)
 	}
 }
 
@@ -215,14 +215,14 @@ func TestTaskIntakeReadinessDoesNotRequireExecutionMedia(t *testing.T) {
 			Models:       []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 		}}},
 		Prompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
-			workflow.FeatureSlugPartialEdit: {Prompt: "system"},
+			workflow.FeatureSlugInpaint: {Prompt: "system"},
 		}},
 	})
 
-	for _, feature := range []string{workflow.FeatureSlugPartialEdit, workflow.FeatureSlugRemoveBg} {
+	for _, feature := range []string{workflow.FeatureSlugInpaint, workflow.FeatureSlugCutout} {
 		t.Run(feature, func(t *testing.T) {
 			params := map[string]interface{}{"output_count": 1}
-			if feature == workflow.FeatureSlugPartialEdit {
+			if feature == workflow.FeatureSlugInpaint {
 				params["original_image_width"] = 1024
 				params["original_image_height"] = 768
 				params["custom_width"] = 1024
@@ -250,7 +250,7 @@ func TestTaskIntakePersistsProviderIndependentGenerationSnapshot(t *testing.T) {
 		Media: testSubmitMediaValidator{},
 	})
 	canonical, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
-		Prompt: "draw a chair", Feature: workflow.FeatureSlugSketchToImage,
+		Prompt: "draw a chair", Feature: workflow.FeatureSlugRender,
 		ImageURLs:      []string{"https://example.com/sketch.png"},
 		ClientActionID: "snapshot-intake", Params: map[string]interface{}{"output_count": 2},
 	})
@@ -265,7 +265,7 @@ func TestTaskIntakePersistsProviderIndependentGenerationSnapshot(t *testing.T) {
 		t.Fatal("expected generation snapshot in canonical params")
 	}
 	snapshot := params.Generation
-	if snapshot.Feature != workflow.FeatureSlugSketchToImage || snapshot.UserPrompt != "draw a chair" || snapshot.CompiledPrompt != canonical.Prompt() {
+	if snapshot.Feature != workflow.FeatureSlugRender || snapshot.UserPrompt != "draw a chair" || snapshot.CompiledPrompt != canonical.Prompt() {
 		t.Fatalf("generation snapshot=%+v canonical prompt=%q", snapshot, canonical.Prompt())
 	}
 	if snapshot.RequestedOutputCount != 2 || snapshot.TemplateFingerprint == "" || snapshot.TemplateVersion != "" {
@@ -286,7 +286,7 @@ func TestTaskIntakePrepareMediaPreservesCompiledExecutionPlan(t *testing.T) {
 		MediaPreparer: preparer,
 	})
 	canonical, err := intake.Compile(t.Context(), 42, &tasks.SubmitTaskRequest{
-		Prompt: "draw from reference", Feature: workflow.FeatureSlugSketchToImage,
+		Prompt: "draw from reference", Feature: workflow.FeatureSlugRender,
 		ImageURLs: []string{"https://example.com/reference.png"}, ClientActionID: "plan-media-prepare",
 	})
 	if err != nil {
@@ -328,7 +328,7 @@ func TestTaskIntakePrepareMediaFailsClosedWithoutPreparer(t *testing.T) {
 		Media: testSubmitMediaValidator{},
 	})
 	canonical, err := intake.Compile(t.Context(), 42, &tasks.SubmitTaskRequest{
-		Prompt: "draw from reference", Feature: workflow.FeatureSlugSketchToImage,
+		Prompt: "draw from reference", Feature: workflow.FeatureSlugRender,
 		ImageURLs: []string{"https://example.com/reference.png"}, ClientActionID: "missing-media-preparer",
 	})
 	if err != nil {
@@ -422,7 +422,7 @@ func TestTaskIntakeRequiresImageFillSystemPrompt(t *testing.T) {
 		params  map[string]interface{}
 	}{
 		{
-			feature: workflow.FeatureSlugPartialEdit,
+			feature: workflow.FeatureSlugInpaint,
 			params: map[string]interface{}{
 				"original_image_width": 1024, "original_image_height": 768,
 				"custom_width": 1024, "custom_height": 768,

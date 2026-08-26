@@ -6,6 +6,7 @@ import type {
   SearchCatalogProvider,
 } from '../../shared/api/generated-query/model'
 import { resolveApiData, resolveApiOk } from '../../shared/api/apiResponse'
+import { i18n } from '../../shared/i18n'
 
 export type SearchPage = SearchResults
 export const MAX_SEARCH_QUERY_RUNES = 200
@@ -58,7 +59,7 @@ export async function searchInspiration(input: {
       },
       { signal: input.signal },
     ),
-    '搜索灵感失败',
+    i18n.global.t('search.loadFailed'),
   ).finally(() => {
     if (inFlightRequests.get(key)?.promise === request) inFlightRequests.delete(key)
   })
@@ -89,13 +90,13 @@ export async function extractVisionSearch(input: {
         headers: { 'Idempotency-Key': input.idempotencyKey },
       },
     ),
-    '视觉搜索失败',
+    i18n.global.t('search.visionSearchFailed'),
   )
 }
 
 export async function reportSearchImageFailure(provider: SearchCatalogProvider): Promise<void> {
   try {
-    await resolveApiOk(recordSearchImageFailure({ provider }), '上报图片加载失败指标失败')
+    await resolveApiOk(recordSearchImageFailure({ provider }), i18n.global.t('search.reportImageFailureFailed'))
   } catch (error) {
     if (import.meta.env.DEV) console.debug('search image failure metric unavailable', error)
   }

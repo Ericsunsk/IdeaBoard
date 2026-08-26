@@ -1,4 +1,5 @@
 import { useAppToast } from '../../../shared/composables/useAppToast'
+import { i18n } from '../../../shared/i18n'
 
 type CanvasToast = Pick<
   ReturnType<typeof useAppToast>,
@@ -41,11 +42,11 @@ export function createCanvasFeedback(
     appToast.warning(message)
   }
   const insufficientCredits = () => {
-    appToast.warning('Idea不足', {
+    appToast.warning(i18n.global.t('billing.insufficientCredits'), {
       id: insufficientCreditsToastId,
       duration: 6000,
       action: {
-        label: '立即充值',
+        label: i18n.global.t('billing.rechargeNow'),
         onClick: () => {
           openRecharge()
           appToast.dismiss(insufficientCreditsToastId)

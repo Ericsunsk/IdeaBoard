@@ -1,5 +1,7 @@
 import Compressor from 'compressorjs'
 import { getFileExtension, isSupportedUploadImageFile } from '../utils/imageUploadSupport'
+import { userFacingErrorCopy } from '../errors/errorCatalog'
+import { i18n } from '../i18n'
 
 export type ImageAssetCompressionPolicy = 'default' | 'none'
 
@@ -87,14 +89,14 @@ function readImageDimensions(file: File): Promise<{ width: number; height: numbe
       const height = Math.max(1, Math.round(image.naturalHeight || image.height || 0))
       URL.revokeObjectURL(objectUrl)
       if (!width || !height) {
-        reject(new Error('无法读取图片尺寸'))
+        reject(new Error(i18n.global.t('common.errors.readImageSizeFailed')))
         return
       }
       resolve({ width, height })
     }
     image.onerror = () => {
       URL.revokeObjectURL(objectUrl)
-      reject(new Error('无法解析图片内容'))
+      reject(new Error(i18n.global.t('common.errors.parseImageFailed')))
     }
     image.src = objectUrl
   })
@@ -111,7 +113,7 @@ function compressImageFile(file: File): Promise<File> {
       mimeType,
       success: (result) => {
         if (!(result instanceof Blob)) {
-          reject(new Error('压缩失败：无效输出'))
+          reject(new Error(i18n.global.t('common.errors.compressInvalidOutput')))
           return
         }
         const outputMimeType = normalizeMime(result.type || mimeType) || mimeType
@@ -161,15 +163,15 @@ export async function prepareImageAssetForUpload(
   options: PrepareImageAssetOptions = {},
 ): Promise<PreparedImageAsset> {
   if (!isSupportedUploadImageFile(file)) {
-    throw new Error('不支持的图片格式')
+    throw new Error(i18n.global.t('common.errors.unsupportedImageFormat'))
   }
   const warnings: string[] = []
   let dimensions: { width: number; height: number } | undefined
   try {
     dimensions = await readImageDimensions(file)
   } catch (error) {
-    const reason = error instanceof Error ? error.message : '未知错误'
-    warnings.push(`无法读取图片尺寸，已跳过上传前压缩：${reason}`)
+    const reason = userFacingErrorCopy(error, i18n.global.t('canvas.session.unknownError'))
+    warnings.push(`${i18n.global.t('canvas.session.readImageSizeSkipCompression')}: ${reason}`)
     return buildUncompressedAsset(file, warnings)
   }
   const compressionPolicy = options.compressionPolicy ?? 'default'
@@ -199,8 +201,8 @@ export async function prepareImageAssetForUpload(
       compressed: true,
     }
   } catch (error) {
-    const reason = error instanceof Error ? error.message : '未知错误'
-    warnings.push(`图片压缩失败，已降级原图上传：${reason}`)
+    const reason = userFacingErrorCopy(error, i18n.global.t('canvas.session.unknownError'))
+    warnings.push(`${i18n.global.t('canvas.session.compressFallbackOriginal')}: ${reason}`)
     return buildUncompressedAsset(file, warnings, dimensions)
   }
 }

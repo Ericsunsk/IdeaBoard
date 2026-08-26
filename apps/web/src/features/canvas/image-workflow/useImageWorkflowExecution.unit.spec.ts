@@ -1,3 +1,4 @@
+import { i18n } from '../../../shared/i18n'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { useImageWorkflowExecution } from './useImageWorkflowExecution'
@@ -86,13 +87,15 @@ describe('useImageWorkflowExecution', () => {
   it('retries provider availability after the degraded generation cooldown expires', async () => {
     const { runtime, feedback } = createRuntime()
 
-    mocks.executionOptions?.onWarning('provider unavailable')
+    mocks.executionOptions?.onWarning(i18n.global.t('canvas.execution.generationUnavailable'))
 
     expect(runtime.isGenerationAvailable()).toBe(false)
     await runtime.runPromptGeneration('prompt-1', [], 'draw this', 1, 'auto')
 
     expect(mocks.workflow.executeImageWorkflow).not.toHaveBeenCalled()
-    expect(feedback.warning).toHaveBeenCalledWith('provider unavailable')
+    expect(feedback.warning).toHaveBeenCalledWith(
+      i18n.global.t('canvas.execution.generationUnavailable'),
+    )
 
     vi.setSystemTime(15_001)
 

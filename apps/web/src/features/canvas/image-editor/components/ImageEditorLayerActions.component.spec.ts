@@ -52,10 +52,10 @@ describe('ImageEditorLayerActions', () => {
 
     vi.advanceTimersByTime(1)
 
-    expect(await screen.findByRole('status')).toHaveTextContent('渲染调整')
+    expect(await screen.findByRole('status')).toHaveTextContent('Rendering adjustments')
     expect(screen.getByRole('status')).toHaveTextContent('25%')
 
-    await user.click(screen.getByRole('button', { name: '取消应用' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel apply' }))
 
     expect(onCancelApply).toHaveBeenCalledTimes(1)
   })
@@ -77,6 +77,6 @@ describe('ImageEditorLayerActions', () => {
     renderLayerActions()
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '取消应用' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel apply' })).not.toBeInTheDocument()
   })
 })

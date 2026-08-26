@@ -37,11 +37,11 @@ func (noOpRiverTxClient) InsertTx(
 	return nil, nil
 }
 
-func TestBilledStyleVariationSubmissionSucceedsAsRuntimeRole(t *testing.T) {
+func TestBilledVariationsSubmissionSucceedsAsRuntimeRole(t *testing.T) {
 	db, ownerPool := testdb.OpenWithPool(t)
 	ownerCredits := credits.NewService(ownerPool)
 	ownerBilling := billing.NewService(ownerPool)
-	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugStyleVariation, "1k", 1)
+	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugVariations, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ SELECT has_table_privilege(current_user, 'task_submission_claims', 'SELECT'),
 		submissionRiverTestMaxAttempts,
 		taskbilling.NewService(billing.NewService(runtimePool), credits.NewService(runtimePool)),
 	)
-	task := newBilledAIImageTask("task_style_variation_runtime_role", "style-variation-runtime-role", request)
+	task := newBilledAIImageTask("task_style_variation_runtime_role", "variations-runtime-role", request)
 
 	result, err := store.SubmitTask(t.Context(), canonicalRequestForTest(task))
 	if err != nil {
@@ -282,7 +282,7 @@ func TestBilledDuplicateRejectsDifferentProductForSameClientAction(t *testing.T)
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
 	firstRequest := seedPatternBillingProduct(t, billingService, 25)
-	secondRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugStyleVariation, "1k", 1)
+	secondRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugVariations, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
 	}

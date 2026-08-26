@@ -3,7 +3,7 @@ import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import { createAdminPromptConfigResource } from './promptConfigResource'
 import type { FeaturePrompt } from './promptConfigResource'
 
-const featureSlug = 'style-variation'
+const featureSlug = 'variations'
 
 describe('feature prompt resource', () => {
   it('maps the canonical feature-prompts API behind the Admin resource seam', async () => {

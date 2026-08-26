@@ -1,3 +1,5 @@
+import { processingCancelledError } from './processingCancelled'
+import { i18n } from '../../../../shared/i18n'
 import { canvasToBlob } from '../../services/flowMediaIO'
 import { detectCanvasTransparency } from '../../utils/displayImagePreviewEncoding'
 import { createCpuImageAdjustmentPlanExecutor } from './cpuPlanExecutor'
@@ -41,12 +43,12 @@ class MainThreadImageProcessingBackend implements ImageProcessingBackend {
   }
 
   async renderFinal(input: ImageProcessingBackendFinalInput): Promise<RenderFinalOutput> {
-    if (input.plan.length === 0) throw new Error('没有可应用的编辑图层')
-    if (input.context.signal.aborted) throw new Error('图像处理已取消')
+    if (input.plan.length === 0) throw new Error(i18n.global.t('canvas.tools.noEditableLayers'))
+    if (input.context.signal.aborted) throw processingCancelledError()
 
     input.context.reportProgress({ phase: 'decode' })
     const source = await this.sourceCache.getFullSizeSource(input.source.url)
-    if (!source) throw new Error('读取图片失败')
+    if (!source) throw new Error(i18n.global.t('canvas.imageEditor.errors.readImageFailed'))
 
     try {
       input.context.reportProgress({ phase: 'render' })
@@ -57,7 +59,7 @@ class MainThreadImageProcessingBackend implements ImageProcessingBackend {
         signal: input.context.signal,
         onProgress: input.context.reportProgress,
       })
-      if (input.context.signal.aborted) throw new Error('图像处理已取消')
+      if (input.context.signal.aborted) throw processingCancelledError()
       source.context.putImageData(adjustedImageData, 0, 0)
 
       input.context.reportProgress({ phase: 'encode' })
@@ -71,7 +73,7 @@ class MainThreadImageProcessingBackend implements ImageProcessingBackend {
         title: input.source.title,
         mimeType: outputMime,
       })
-      if (input.context.signal.aborted) throw new Error('图像处理已取消')
+      if (input.context.signal.aborted) throw processingCancelledError()
 
       input.context.reportProgress({ phase: 'complete' })
       return {
@@ -86,13 +88,13 @@ class MainThreadImageProcessingBackend implements ImageProcessingBackend {
   }
 
   async renderPreview(input: ImageProcessingBackendPreviewInput): Promise<RenderPreviewOutput> {
-    if (input.context.signal.aborted) throw new Error('图像处理已取消')
+    if (input.context.signal.aborted) throw processingCancelledError()
 
     input.context.reportProgress({ phase: 'decode' })
     const source = await this.sourceCache.getFullSizeSource(input.source.url, {
       maxSide: resolvePreviewMaxSide(input.sizeStrategy),
     })
-    if (!source) throw new Error('读取图片失败')
+    if (!source) throw new Error(i18n.global.t('canvas.imageEditor.errors.readImageFailed'))
 
     input.context.reportProgress({ phase: 'render' })
     const sourceImageData = readImageSourceImageData(source)
@@ -105,7 +107,7 @@ class MainThreadImageProcessingBackend implements ImageProcessingBackend {
             onProgress: input.context.reportProgress,
           })
         : cloneImageDataForPreview(sourceImageData)
-    if (input.context.signal.aborted) throw new Error('图像处理已取消')
+    if (input.context.signal.aborted) throw processingCancelledError()
 
     input.context.reportProgress({ phase: 'complete' })
     return {

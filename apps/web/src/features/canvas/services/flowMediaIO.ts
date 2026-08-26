@@ -1,4 +1,5 @@
 /** Shared media URL/Blob/Canvas utilities used across canvas services. */
+import { i18n } from '../../../shared/i18n'
 import { USER_DOWNLOAD_ENDPOINT } from '../../../shared/constants/media'
 import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../shared/config/runtimeUrls'
 import { uploadApi } from '../../../shared/api/upload'
@@ -91,7 +92,7 @@ export async function uploadCanvasBlob(
 ): Promise<string> {
   const normalizedBoardId = `${boardId ?? ''}`.trim()
   if (!normalizedBoardId) {
-    throw new Error('缺少 boardId，无法上传图片')
+    throw new Error(i18n.global.t('canvas.session.missingBoardIdUpload'))
   }
   const file = new File([blob], fileName, { type: blob.type || 'image/png' })
   return (await uploadApi.upload(file, normalizedBoardId)).url

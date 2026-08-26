@@ -110,7 +110,7 @@ func (r *FeaturePromptRepository) SaveConfig(ctx context.Context, slug, prompt s
 }
 
 func isPromptConfigurableFeature(slug string) bool {
-	return slug != workflow.FeatureSlugRemoveBg
+	return slug != workflow.FeatureSlugCutout
 }
 
 func defaultFeaturePromptConfig(slug string) FeaturePromptConfig {

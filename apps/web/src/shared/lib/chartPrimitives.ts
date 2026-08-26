@@ -7,6 +7,7 @@ import type {
   TooltipItem,
 } from 'chart.js'
 import { markRaw } from 'vue'
+import { i18n } from '../i18n'
 
 export type ChartData = ChartJsData<ChartType, unknown[], string>
 export type ChartOptions = ChartJsOptions<ChartType>
@@ -34,7 +35,7 @@ export function createChartEmptyStatePlugin(input: ChartEmptyStatePluginInput): 
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText(
-        input.text ?? '暂无数据',
+        input.text ?? i18n.global.t('common.states.noData'),
         (chartArea.left + chartArea.right) / 2,
         (chartArea.top + chartArea.bottom) / 2,
       )

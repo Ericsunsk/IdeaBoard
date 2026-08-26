@@ -1,12 +1,12 @@
 <template>
-  <section :class="accountMainContentClass" aria-label="账户管理">
+  <section :class="accountMainContentClass" :aria-label="t('account.dialog.title')">
     <Button
       type="button"
       text
       rounded
       :disabled="logoutLoading"
       :class="accountCloseButtonClass"
-      aria-label="关闭账户管理"
+      :aria-label="t('account.dialog.close')"
       @click="emit('close')"
     >
       <Xmark class="h-4 w-4" />
@@ -32,7 +32,7 @@
 
       <nav
         class="grid min-w-0 gap-5 max-[820px]:grid-cols-3 max-[820px]:gap-3 max-[640px]:grid-cols-1"
-        aria-label="账户管理导航"
+        :aria-label="t('account.dialog.navigation')"
       >
         <section
           v-for="group in navGroups"
@@ -44,7 +44,7 @@
             :id="`account-nav-${group.key}`"
             class="mb-2 px-2 text-[12px] leading-5 font-semibold tracking-normal text-ib-text-subtle"
           >
-            {{ group.label }}
+            {{ t(group.labelKey) }}
           </p>
           <div class="grid gap-1.5 max-[640px]:grid-cols-2">
             <Button
@@ -57,7 +57,7 @@
               @click="activeTab = item.key"
             >
               <component :is="item.icon" class="h-4 w-4 shrink-0" />
-              <span class="truncate">{{ item.label }}</span>
+              <span class="truncate">{{ t(item.labelKey) }}</span>
             </Button>
           </div>
         </section>
@@ -69,11 +69,11 @@
           text
           :disabled="logoutLoading"
           :class="accountLogoutButtonClass"
-          :aria-label="logoutLoading ? '正在退出登录' : '退出登录'"
+          :aria-label="logoutLoading ? t('account.signingOut') : t('account.signOut')"
           @click="handleLogout"
         >
           <LogOut class="h-4 w-4 shrink-0" />
-          <span class="truncate">{{ logoutLoading ? '退出中...' : '退出登录' }}</span>
+          <span class="truncate">{{ logoutLoading ? t('account.signingOut') : t('account.signOut') }}</span>
         </Button>
       </div>
     </aside>
@@ -102,6 +102,7 @@
 <script setup lang="ts">
 import { useUserStore } from '../../auth/session/authSession'
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import { LogOut, Xmark } from '@iconoir/vue'
 import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
@@ -142,6 +143,7 @@ const emit = defineEmits<{
   close: []
   'update:busy': [busy: boolean]
 }>()
+const { t } = useI18n()
 const paymentReturn = computed(() => props.paymentReturn)
 const userStore = useUserStore()
 const { fallbackText, logoURL, projectName } = useSiteBranding()

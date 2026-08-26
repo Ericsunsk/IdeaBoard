@@ -44,7 +44,7 @@ describe('useMaskEditorChromeActions', () => {
 
     expect(harness.commitMaskEditorMode).toHaveBeenCalledTimes(1)
     expect(harness.getCommittedMaskData).toHaveBeenCalledWith('node-1')
-    expect(harness.onWarning).toHaveBeenCalledWith('请先标记局部重绘区域')
+    expect(harness.onWarning).toHaveBeenCalledWith('Mark the area to inpaint first.')
     expect(harness.clearActiveNodePanel).not.toHaveBeenCalled()
     expect(harness.hideStrengthControl).not.toHaveBeenCalled()
     expect(harness.runInpaintAction).not.toHaveBeenCalled()

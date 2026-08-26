@@ -32,7 +32,7 @@ describe('chart primitives', () => {
       ctx: context,
       chartArea: { left: 0, right: 100, top: 0, bottom: 50 },
     })
-    expect(fillText).toHaveBeenCalledWith('暂无数据', 50, 25)
+    expect(fillText).toHaveBeenCalledWith('No data', 50, 25)
 
     fillText.mockClear()
     afterDraw({

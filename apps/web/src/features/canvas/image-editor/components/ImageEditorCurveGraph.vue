@@ -3,7 +3,7 @@
     ref="graphRef"
     class="image-editor-curves__graph"
     role="group"
-    aria-label="曲线图"
+    :aria-label="t('canvas.imageEditor.curveGraphAria')"
     @pointerdown="onGraphPointerDown"
   >
     <div class="image-editor-curves__plot" aria-hidden="true">
@@ -43,7 +43,7 @@
       :class="{ active: selectedPointId === point.id }"
       :data-point-id="point.id"
       :style="resolvePointStyle(point)"
-      :aria-label="`曲线点 输入 ${point.input} 输出 ${point.output}`"
+      :aria-label="t('canvas.imageEditor.curvePointAria', { input: point.input, output: point.output })"
       :aria-keyshortcuts="point.endpoint ? undefined : 'Delete Backspace'"
       @pointerdown.stop="onPointPointerDown(point.id, $event)"
       @keydown="onPointKeydown(point, $event)"
@@ -53,12 +53,11 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { nextTick, ref, useId, watch, type ComponentPublicInstance } from 'vue'
 import { usePointerDragSession } from '../../utils/interaction/usePointerDragSession'
 import type { ImageEditorCurveChannel } from '../types'
 import type { NormalizedCurveChannelPoint } from '../utils/imageEditorCurves'
-
-type PointerPosition = Pick<PointerEvent, 'clientX' | 'clientY'>
 
 const props = defineProps<{
   activeCurvePath: string
@@ -75,6 +74,10 @@ const emit = defineEmits<{
   (e: 'remove-point', pointId: string): void
   (e: 'select-point', pointId: string): void
 }>()
+
+const { t } = useI18n()
+
+type PointerPosition = Pick<PointerEvent, 'clientX' | 'clientY'>
 
 const CURVE_POINT_HIT_RADIUS_PX = 7
 const USER_POINT_MIN_INPUT = 1

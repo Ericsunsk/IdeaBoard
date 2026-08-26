@@ -1,3 +1,4 @@
+import { i18n } from '../../../../shared/i18n'
 import type { ImageEditorLevelsParams } from '../types'
 import {
   IMAGE_EDITOR_CHANNEL_MAX,
@@ -130,21 +131,27 @@ export function createLevelsMarkers(params: ImageEditorLevelsParams): ImageEdito
     {
       id: 'shadows',
       position: handles.shadows,
-      ariaLabel: `黑场 ${formatMarkerValue(handles.shadows)}`,
+      ariaLabel: i18n.global.t('canvas.imageEditor.shadowsMarkerAria', {
+        value: formatMarkerValue(handles.shadows),
+      }),
       ariaValueMin: constraints.shadows.min,
       ariaValueMax: constraints.shadows.max,
     },
     {
       id: 'midtones',
       position: handles.midtones,
-      ariaLabel: `中点 ${formatMarkerValue(handles.midtones)}`,
+      ariaLabel: i18n.global.t('canvas.imageEditor.midtonesMarkerAria', {
+        value: formatMarkerValue(handles.midtones),
+      }),
       ariaValueMin: constraints.midtones.min,
       ariaValueMax: constraints.midtones.max,
     },
     {
       id: 'highlights',
       position: handles.highlights,
-      ariaLabel: `白场 ${formatMarkerValue(handles.highlights)}`,
+      ariaLabel: i18n.global.t('canvas.imageEditor.highlightsMarkerAria', {
+        value: formatMarkerValue(handles.highlights),
+      }),
       ariaValueMin: constraints.highlights.min,
       ariaValueMax: constraints.highlights.max,
     },

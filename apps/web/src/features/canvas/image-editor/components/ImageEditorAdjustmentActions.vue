@@ -15,6 +15,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { Component } from 'vue'
 import { Brightness, ColorFilter, PrecisionTool, ReportsSolid, SineWave } from '@iconoir/vue'
 import type { ImageAdjustmentKind } from '../types'
@@ -28,16 +29,18 @@ const emit = defineEmits<{
   (e: 'select-adjustment', kind: ImageAdjustmentKind): void
 }>()
 
+const { t } = useI18n()
+
 const actionItems: Array<{
   kind: ImageAdjustmentKind
   label: string
   icon: Component
 }> = [
-  { kind: 'threshold', label: '阈值', icon: Brightness },
-  { kind: 'hsl', label: '色相/饱和度', icon: ColorFilter },
-  { kind: 'sharpen', label: '锐化', icon: PrecisionTool },
-  { kind: 'curves', label: '曲线', icon: SineWave },
-  { kind: 'levels', label: '色阶', icon: ReportsSolid },
+  { kind: 'threshold', label: t('canvas.imageEditor.adjustments.threshold'), icon: Brightness },
+  { kind: 'hsl', label: t('canvas.imageEditor.adjustments.hsl'), icon: ColorFilter },
+  { kind: 'sharpen', label: t('canvas.imageEditor.adjustments.sharpen'), icon: PrecisionTool },
+  { kind: 'curves', label: t('canvas.imageEditor.adjustments.curves'), icon: SineWave },
+  { kind: 'levels', label: t('canvas.imageEditor.adjustments.levels'), icon: ReportsSolid },
 ]
 </script>
 

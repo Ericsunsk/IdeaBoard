@@ -83,7 +83,7 @@ describe('useFlowBoardHeaderActions', () => {
     await header.onConfirmBoardRename()
 
     expect(rename).toHaveBeenCalledWith({ boardId: 'board-a', nextName: 'New Board' })
-    expect(message.error).toHaveBeenCalledWith('重命名同步失败，已恢复原名称')
+    expect(message.error).toHaveBeenCalledWith('Rename sync failed. Original name restored.')
   })
 
   it('offers reload recovery when rename rollback fails', async () => {
@@ -102,7 +102,9 @@ describe('useFlowBoardHeaderActions', () => {
     header.boardNameDraft.value = 'New Board'
     await header.onConfirmBoardRename()
 
-    expect(message.error).toHaveBeenCalledWith('重命名同步失败，无法恢复原名称，请重新加载画布列表')
+    expect(message.error).toHaveBeenCalledWith(
+      'Rename sync failed. Original name could not be restored. Please reload the canvas list.',
+    )
     expect(header.catalogRecovery.value).toEqual({
       status: 'reload-required',
       boardId: 'board-a',
@@ -115,7 +117,7 @@ describe('useFlowBoardHeaderActions', () => {
       rollbackBoardIds: ['board-a'],
     })
     expect(header.catalogRecovery.value).toEqual({ status: 'idle' })
-    expect(message.success).toHaveBeenCalledWith('画布列表已重新加载')
+    expect(message.success).toHaveBeenCalledWith('Canvas list reloaded.')
   })
 
   it('reports remote conflict hydrate success without claiming the old name was restored', async () => {
@@ -133,7 +135,7 @@ describe('useFlowBoardHeaderActions', () => {
     header.boardNameDraft.value = 'Taken'
     await header.onConfirmBoardRename()
 
-    expect(message.error).toHaveBeenCalledWith('名称冲突，已重新加载画布列表')
+    expect(message.error).toHaveBeenCalledWith('Name conflict. Canvas list reloaded.')
     expect(header.catalogRecovery.value).toEqual({ status: 'idle' })
   })
 
@@ -154,7 +156,7 @@ describe('useFlowBoardHeaderActions', () => {
     await vi.waitFor(() => expect(header.isRenamePending.value).toBe(true))
     header.startBoardRename()
 
-    expect(message.warning).toHaveBeenCalledWith('画布名称正在同步，请稍后再改名')
+    expect(message.warning).toHaveBeenCalledWith('Canvas name is syncing. Try renaming again shortly.')
     resolveRename({ ok: true, board: board('board-a', 'New Board') })
     await task
     expect(header.isRenamePending.value).toBe(false)
@@ -176,7 +178,7 @@ describe('useFlowBoardHeaderActions', () => {
     await header.onConfirmBoardRename()
 
     expect(message.error).toHaveBeenCalledWith(
-      '名称冲突，已恢复原名称，但远端列表刷新失败，请重新加载',
+      'Name conflict. Original name restored, but the remote list refresh failed. Please reload.',
     )
     expect(header.catalogRecovery.value).toEqual({
       status: 'reload-required',

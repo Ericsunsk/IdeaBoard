@@ -1,4 +1,5 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
+import { i18n } from '../../../../shared/i18n'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
 import type { PendingImageExecutionLease } from '../../execution/pending-execution'
@@ -66,12 +67,12 @@ type PendingGroupJoin = {
 export type CanvasSelectionGroupAction =
   | {
       kind: 'group'
-      label: '组合'
+      label: string
       nodeIds: CanvasGraphNodeId[]
     }
   | {
       kind: 'ungroup'
-      label: '解组'
+      label: string
       groupId: CanvasGraphGroupId
       nodeIds: CanvasGraphNodeId[]
     }
@@ -383,7 +384,7 @@ export function useCanvasGroupRuntime(
       summary = transaction.moveNodeToGroup(nodeId, pending.groupId).commit()
     } catch (_error) {
       transaction.cancel()
-      options.onWarning('组合关系更新失败，请刷新画布后重试')
+      options.onWarning(i18n.global.t('canvas.groupOps.updateFailed'))
       return false
     }
     if (!summary.didChange) return false
@@ -432,7 +433,7 @@ export function useCanvasGroupRuntime(
       const nodeIds = selectedGroup.nodeIds.filter(isCanvasGraphNodeId)
       return {
         kind: 'ungroup',
-        label: '解组',
+        label: i18n.global.t('canvas.controls.ungroupSelection'),
         groupId: selectedGroup.id as CanvasGraphGroupId,
         nodeIds,
       }
@@ -446,7 +447,7 @@ export function useCanvasGroupRuntime(
     if (matchingGroups.length === 1) {
       return {
         kind: 'ungroup',
-        label: '解组',
+        label: i18n.global.t('canvas.controls.ungroupSelection'),
         groupId: matchingGroups[0].id,
         nodeIds: selectedNodeIds,
       }
@@ -458,7 +459,7 @@ export function useCanvasGroupRuntime(
 
     return {
       kind: 'group',
-      label: '组合',
+      label: i18n.global.t('canvas.controls.groupSelection'),
       nodeIds: selectedNodeIds,
     }
   }
@@ -477,7 +478,7 @@ export function useCanvasGroupRuntime(
       CANVAS_GROUP_FRAME_PADDING_PX,
     )
     if (!bounds) {
-      options.onWarning('组合失败，请刷新画布后重试')
+      options.onWarning(i18n.global.t('canvas.groupOps.groupFailed'))
       return false
     }
 
@@ -487,7 +488,7 @@ export function useCanvasGroupRuntime(
       summary = transaction.createGroup(action.nodeIds, canvasRectToGroupGeometry(bounds)).commit()
     } catch (_error) {
       transaction.cancel()
-      options.onWarning('组合失败，请刷新画布后重试')
+      options.onWarning(i18n.global.t('canvas.groupOps.groupFailed'))
       return false
     }
     if (!summary.didChange) return false
@@ -511,7 +512,7 @@ export function useCanvasGroupRuntime(
       didChange = transaction.ungroup(action.groupId).commit().didChange
     } catch (_error) {
       transaction.cancel()
-      options.onWarning('解组失败，请刷新画布后重试')
+      options.onWarning(i18n.global.t('canvas.groupOps.ungroupFailed'))
       return false
     }
     if (!didChange) return false
@@ -646,7 +647,7 @@ export function useCanvasGroupRuntime(
         createPositionChanges(drag.startPositions, { x: 0, y: 0 }, false),
       )
       clearPreviewGroupBounds(drag.groupId)
-      options.onWarning('组合移动失败，请刷新画布后重试')
+      options.onWarning(i18n.global.t('canvas.groupOps.moveFailed'))
       return false
     }
     options.graphAdapter.applyNodeChanges(createPositionChanges(drag.startPositions, delta, false))
@@ -744,7 +745,7 @@ export function useCanvasGroupRuntime(
     } catch (_error) {
       resize.transaction.cancel()
       clearPreviewGroupBounds(resize.groupId)
-      options.onWarning('组合边界更新失败，请刷新画布后重试')
+      options.onWarning(i18n.global.t('canvas.groupOps.boundsUpdateFailed'))
       return false
     }
     clearPreviewGroupBounds(resize.groupId)
@@ -867,7 +868,7 @@ export function useCanvasGroupRuntime(
     try {
       stageNodeMembershipReconciliation(store, transaction, nodeIds, positions)
     } catch (_error) {
-      options.onWarning('组合关系更新失败，请刷新画布后重试')
+      options.onWarning(i18n.global.t('canvas.groupOps.updateFailed'))
       return
     }
     return () => {

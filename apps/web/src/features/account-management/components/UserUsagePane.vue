@@ -1,7 +1,7 @@
 <template>
-  <AccountManagementPane title="用量统计">
+  <AccountManagementPane :title="t('account.tabs.usage')">
     <template v-if="isInitialPending">
-      <section :class="summaryPanelClass" aria-label="正在加载用量统计">
+      <section :class="summaryPanelClass" :aria-label="t('account.usage.loading')">
         <div :class="summaryGridClass">
           <article
             v-for="metric in summaryCellDefinitions"
@@ -21,7 +21,7 @@
       class="rounded-[var(--radius-ib-panel)] border border-ib-danger/25 bg-ib-surface p-5"
       role="alert"
     >
-      <p class="m-0 font-semibold text-ib-danger">用量统计加载失败</p>
+      <p class="m-0 font-semibold text-ib-danger">{{ t('account.errors.usageLoadFailed') }}</p>
       <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(error) }}</p>
       <Button
         type="button"
@@ -29,12 +29,12 @@
         class="!mt-3 !px-0 !font-semibold !text-ib-creative-accent-pressed"
         @click="retry()"
       >
-        重新加载
+        {{ t('account.reload') }}
       </Button>
     </section>
 
     <template v-else-if="usage">
-      <section :class="summaryPanelClass" aria-label="用量摘要">
+      <section :class="summaryPanelClass" :aria-label="t('account.usage.summaryAria')">
         <div :class="summaryGridClass">
           <article
             v-for="metric in metrics"
@@ -55,10 +55,10 @@
     <RangedLineChartCard
       v-if="isInitialPending || usage"
       v-model="selectedRange"
-      title="Idea消耗"
+      :title="t('account.usage.chartTitle')"
       title-tag="h3"
       :ranges="rangeOptions"
-      range-aria-label="趋势时间范围"
+      :range-aria-label="t('account.usage.rangeAria')"
       :data="trendChart.data"
       :options="trendChart.options"
       :plugins="trendChartPlugins"
@@ -67,7 +67,11 @@
       size="hero"
       class="min-w-0"
       role="region"
-      :aria-label="isInitialPending ? '正在加载Idea消耗趋势' : 'Idea消耗趋势'"
+      :aria-label="
+        isInitialPending
+          ? t('account.usage.trendLoadingAria')
+          : t('account.usage.trendAria', { range: displayRangeText })
+      "
     >
       <template #before-chart>
         <template v-if="!isInitialPending">
@@ -76,7 +80,7 @@
             class="mt-3 mb-0 text-[12px] font-semibold text-ib-text-subtle"
             aria-live="polite"
           >
-            正在加载{{ selectedRangeText }}趋势…
+            {{ t('account.usage.loadingRangeTrend', { range: selectedRangeText }) }}
           </p>
           <div
             v-if="error"
@@ -90,7 +94,7 @@
               class="!shrink-0 !p-0 !text-sm !font-semibold !text-ib-creative-accent-pressed"
               @click="retry()"
             >
-              重试当前范围
+              {{ t('account.usage.retryCurrentRange') }}
             </Button>
           </div>
         </template>
@@ -108,13 +112,13 @@
         <table v-if="!isInitialPending" class="sr-only">
           <caption :id="trendDetailsCaptionId">
             {{
-              displayRangeText
-            }}Idea消耗明细
+              t('account.usage.detailsCaption', { range: displayRangeText })
+            }}
           </caption>
           <thead>
             <tr>
-              <th scope="col">日期</th>
-              <th scope="col">Idea消耗</th>
+              <th scope="col">{{ t('account.usage.columnDate') }}</th>
+              <th scope="col">{{ t('account.usage.columnCreditsUsed') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -131,9 +135,11 @@
 
 <script setup lang="ts">
 import { computed, markRaw, ref, useId } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import RangedLineChartCard from '../../../shared/components/RangedLineChartCard.vue'
 import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
+import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { useUserUsage } from '../useUserUsage'
 import { DEFAULT_USER_USAGE_RANGE, type UserUsageRange } from '../userUsageResource'
 import {
@@ -144,13 +150,14 @@ import {
 import AccountManagementPane from './AccountManagementPane.vue'
 
 const props = defineProps<{ active: boolean }>()
+const { t } = useI18n()
 const selectedRange = ref<UserUsageRange>(DEFAULT_USER_USAGE_RANGE)
 const { usage, displayRange, isInitialPending, isSwitching, error, retry } = useUserUsage(
   selectedRange,
   () => props.active,
 )
 
-const numberFormatter = new Intl.NumberFormat('zh-CN')
+const numberFormatter = new Intl.NumberFormat('en-US')
 const summaryPanelClass =
   'overflow-hidden rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-control)]'
 const summaryGridClass = 'grid grid-cols-5 max-[640px]:grid-cols-2'
@@ -160,30 +167,30 @@ const trendChartPlugins = markRaw(createUserUsageChartPlugins(trendChartTheme))
 const trendDetailsCaptionId = useId()
 
 const rangeOptions = [
-  { key: '7d', label: '周', days: 7 },
-  { key: '30d', label: '月', days: 30 },
-  { key: '1y', label: '年', days: 365 },
+  { key: '7d', label: t('account.usage.rangeWeek'), days: 7 },
+  { key: '30d', label: t('account.usage.rangeMonth'), days: 30 },
+  { key: '1y', label: t('account.usage.rangeYear'), days: 365 },
 ] satisfies Array<{ key: UserUsageRange; label: string; days: number }>
 
 const summaryCellDefinitions = [
   {
-    label: '总消耗',
+    label: t('account.usage.metricTotalUsed'),
     cellClass: 'border-r border-ib-border-soft max-[640px]:border-b',
   },
   {
-    label: '历史单日峰值',
+    label: t('account.usage.metricPeakDaily'),
     cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r-0',
   },
   {
-    label: '日均消耗',
+    label: t('account.usage.metricAvgDaily'),
     cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r',
   },
   {
-    label: '调用次数',
+    label: t('account.usage.metricTasks'),
     cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r-0',
   },
   {
-    label: '累计活跃天数',
+    label: t('account.usage.metricActiveDays'),
     cellClass: 'max-[640px]:col-span-2',
   },
 ] as const
@@ -204,14 +211,17 @@ const trendRows = computed(() => usage.value?.trend || [])
 const trendChart = computed(() => buildUserUsageTrendChart(trendRows.value, trendChartTheme))
 const displayRangeText = computed(() => rangeText(displayRange.value ?? selectedRange.value))
 const selectedRangeText = computed(() => rangeText(selectedRange.value))
+const trendCanvasAriaLabel = computed(() =>
+  t('account.usage.trendAria', { range: displayRangeText.value }),
+)
 const trendCanvasProps = computed(() => ({
   role: 'img',
-  'aria-label': `${displayRangeText.value}Idea消耗趋势`,
+  'aria-label': trendCanvasAriaLabel.value,
   'aria-describedby': trendDetailsCaptionId,
 }))
 
 function rangeText(value: UserUsageRange) {
-  return `最近 ${rangeDays(value)} 天`
+  return t('account.usage.lastDays', { days: rangeDays(value) })
 }
 
 function rangeDays(value: UserUsageRange) {
@@ -223,6 +233,6 @@ function formatNumber(value: number) {
 }
 
 function errorMessage(value: unknown) {
-  return value instanceof Error ? value.message : '请稍后重试'
+  return userFacingErrorCopy(value, t('account.usage.genericError'))
 }
 </script>

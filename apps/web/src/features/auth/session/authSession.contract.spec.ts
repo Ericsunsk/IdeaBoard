@@ -9,11 +9,9 @@ function makeUser(overrides: TestUserOverrides = {}): User {
   const ordinal = overrides.ordinal ?? 1
   return {
     public_id:
-      overrides.public_id ??
-      `00000000-0000-4000-8000-${String(ordinal).padStart(12, '0')}`,
+      overrides.public_id ?? `00000000-0000-4000-8000-${String(ordinal).padStart(12, '0')}`,
     display_name: overrides.display_name ?? `User ${ordinal}`,
-    storage_namespace:
-      overrides.storage_namespace ?? `USER${String(ordinal).padStart(4, '0')}`,
+    storage_namespace: overrides.storage_namespace ?? `USER${String(ordinal).padStart(4, '0')}`,
     avatar: overrides.avatar ?? '',
     role: overrides.role ?? 'user',
     status: overrides.status ?? 1,
@@ -43,10 +41,7 @@ async function getFreshUserStore() {
   vi.doMock('../../../shared/auth/client', () => ({
     authClient,
     normalizeCanonicalEmail: (email: string) => email.trim().toLowerCase(),
-    extractBetterAuthErrorMessage: (error: unknown, fallback: string) =>
-      error && typeof error === 'object' && 'message' in error
-        ? String((error as { message?: unknown }).message || fallback)
-        : fallback,
+    resolveBetterAuthErrorMessage: (_error: unknown, fallback: string) => fallback,
   }))
 
   const [{ useUserStore }, { queryClient }] = await Promise.all([
@@ -115,7 +110,7 @@ describe('useUserStore auth cache handling', () => {
     vi.mocked(getUserInfo).mockRejectedValue({ status: 500 })
 
     await expect(store.login('alice@example.com', 'secret-password')).rejects.toThrow(
-      '登录状态恢复失败',
+      'You are signed in, but we could not load your account.',
     )
     expect(store.user).toBeNull()
     expect(localStorage.getItem('user')).toBeNull()
@@ -159,7 +154,13 @@ describe('useUserStore auth cache handling', () => {
     store.setAuth(makeUser({ ordinal: 1, public_id: '00000000-0000-4000-8000-000000000001' }))
     queryClient.setQueryData(['user', 'boards'], { owner: 1 })
 
-    store.setAuth(makeUser({ ordinal: 1, public_id: '00000000-0000-4000-8000-000000000001', avatar: '/avatar.png' }))
+    store.setAuth(
+      makeUser({
+        ordinal: 1,
+        public_id: '00000000-0000-4000-8000-000000000001',
+        avatar: '/avatar.png',
+      }),
+    )
 
     expect(queryClient.getQueryData(['user', 'boards'])).toEqual({ owner: 1 })
   })

@@ -1,7 +1,7 @@
 import PrimeVue from 'primevue/config'
 import { describe, expect, it } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
-import { primeVueTestOptions } from '../../../../test/primeVue'
+import { adminPrimeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import RewardCodeRedemptionsDialog from './RewardCodeRedemptionsDialog.vue'
 import type { RewardCode } from './rewardCodeAdminResource'
@@ -284,7 +284,7 @@ function renderDialog(overrides: Record<string, unknown> = {}) {
       rewardCode: makeRewardCode(),
       ...overrides,
     },
-    global: { plugins: [[PrimeVue, primeVueTestOptions]] },
+    global: { plugins: [[PrimeVue, adminPrimeVueTestOptions]] },
   })
 }
 

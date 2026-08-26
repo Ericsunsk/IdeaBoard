@@ -43,7 +43,7 @@
               'is-drag-over': addSlotDragOver,
             }"
             type="button"
-            aria-label="添加图片输入"
+            :aria-label="t('canvas.controls.addImageInput')"
             @mousedown.stop
             @pointerdown.stop
             @click.stop="emit('input-image-open')"
@@ -53,7 +53,7 @@
             @drop.stop.prevent="onAddSlotDrop"
           >
             <Plus class="size-4" />
-            <span class="node-tool-tooltip" aria-hidden="true">添加图片输入</span>
+            <span class="node-tool-tooltip" aria-hidden="true">{{ t('canvas.controls.addImageInput') }}</span>
           </button>
         </div>
         <PromptTextComposer
@@ -79,6 +79,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChatLines, Plus } from '@iconoir/vue'
 import { requireImageNodeOutputCount, type PromptNodeItem } from '../../../../canvas-board/domain'
 import type { PromptNodeUiState } from '../../../types/canvasNodeUi'
@@ -118,6 +119,8 @@ const emit = defineEmits<{
   (e: 'input-image-remove', value: PromptNodeItem['inputImages'][number]): void
   (e: 'generate'): void
 }>()
+
+const { t } = useI18n()
 
 const thumbsRef = ref<HTMLElement | null>(null)
 const maxInputImages = 4

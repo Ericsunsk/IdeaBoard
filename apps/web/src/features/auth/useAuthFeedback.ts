@@ -1,6 +1,7 @@
 import type { AsyncActionFeedback } from '../../shared/composables/useAsyncAction'
-import { extractBetterAuthErrorMessage } from '../../shared/auth/client'
 import { useAppToast } from '../../shared/composables/useAppToast'
+import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
+import { i18n } from '../../shared/i18n'
 
 type AuthToast = Pick<ReturnType<typeof useAppToast>, 'success' | 'error'>
 
@@ -14,30 +15,28 @@ export function createAuthFeedback(appToast: AuthToast): AuthFeedback {
   return {
     login: {
       success() {
-        appToast.success('登录成功')
+        appToast.success(i18n.global.t('auth.toasts.signedIn'))
       },
       error(error) {
-        appToast.error(
-          error instanceof Error && error.message ? error.message : '登录失败，请稍后重试',
-        )
+        appToast.error(userFacingErrorCopy(error, i18n.global.t('auth.errors.signInFailed')))
       },
     },
     register: {
       success() {
-        appToast.success('注册成功')
+        appToast.success(i18n.global.t('auth.toasts.signedUp'))
       },
       error(error) {
-        appToast.error(
-          error instanceof Error && error.message ? error.message : '注册失败，请稍后重试',
-        )
+        appToast.error(userFacingErrorCopy(error, i18n.global.t('auth.errors.signUpFailed')))
       },
     },
     stopImpersonating: {
       success() {
-        appToast.success('已退出伪装身份')
+        appToast.success(i18n.global.t('auth.toasts.impersonationEnded'))
       },
       error(error) {
-        appToast.error(extractBetterAuthErrorMessage(error, '退出伪装失败，请重新登录管理员账号'))
+        appToast.error(
+          userFacingErrorCopy(error, i18n.global.t('auth.errors.stopImpersonatingRetryAsAdmin')),
+        )
       },
     },
   }

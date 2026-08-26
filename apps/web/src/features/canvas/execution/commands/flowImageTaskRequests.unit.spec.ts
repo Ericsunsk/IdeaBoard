@@ -22,7 +22,7 @@ import {
   buildImageExecutionTaskRequest,
   buildImageActionReadinessRequest,
   buildImageInpaintTaskRequest,
-  buildPartialEditReadinessRequest,
+  buildInpaintReadinessRequest,
   buildCanvasExtendReadinessRequest,
   buildPreparedImageInpaintTaskRequest,
   buildPromptGenerationTaskRequest,
@@ -42,9 +42,9 @@ describe('flowImageTaskRequests', () => {
   })
 
   it('builds task readiness requests from the execution contract', () => {
-    expect(buildImageActionReadinessRequest(IMAGE_NODE_ACTION.styleVariation)).toMatchObject({
+    expect(buildImageActionReadinessRequest(IMAGE_NODE_ACTION.variations)).toMatchObject({
       prompt: '',
-      feature: EXECUTION_FEATURE.styleVariation,
+      feature: EXECUTION_FEATURE.variations,
       params: {
         variation: {
           strength: 50,
@@ -61,7 +61,7 @@ describe('flowImageTaskRequests', () => {
       },
     })
     expect(
-      buildImageActionReadinessRequest(IMAGE_NODE_ACTION.styleVariation, {
+      buildImageActionReadinessRequest(IMAGE_NODE_ACTION.variations, {
         outputCount: 4,
         outputResolution: '4k',
       }),
@@ -72,7 +72,7 @@ describe('flowImageTaskRequests', () => {
       },
     })
     expect(
-      buildImageActionReadinessRequest(IMAGE_NODE_ACTION.removeBg, {
+      buildImageActionReadinessRequest(IMAGE_NODE_ACTION.cutout, {
         outputCount: 4,
         outputResolution: '4k',
       }),
@@ -82,9 +82,9 @@ describe('flowImageTaskRequests', () => {
   })
 
   it('builds valid quote-only image-fill readiness placeholders', () => {
-    expect(buildPartialEditReadinessRequest()).toMatchObject({
-      prompt: '局部重绘',
-      feature: EXECUTION_FEATURE.partialEdit,
+    expect(buildInpaintReadinessRequest()).toMatchObject({
+      prompt: '[inpaint] submit readiness',
+      feature: EXECUTION_FEATURE.inpaint,
       params: {
         output_count: 1,
         output_resolution: 'default',
@@ -127,7 +127,7 @@ describe('flowImageTaskRequests', () => {
   it('builds style variation params under the nested variation contract', () => {
     const request = buildDirectActionTaskRequest({
       source,
-      action: IMAGE_NODE_ACTION.styleVariation,
+      action: IMAGE_NODE_ACTION.variations,
       imageSize: { width: 1024, height: 1024 },
       prompt: 'vary style',
       outputCount: 1,
@@ -152,18 +152,18 @@ describe('flowImageTaskRequests', () => {
     expect(() =>
       buildDirectActionTaskRequest({
         source: { url: '   ', ratio: 1 },
-        action: IMAGE_NODE_ACTION.removeBg,
+        action: IMAGE_NODE_ACTION.cutout,
         imageSize: null,
         prompt: '',
         outputCount: 1,
       }),
-    ).toThrow('图片缺少 URL')
+    ).toThrow('The image is missing a URL.')
   })
 
-  it('keeps remove-bg submit params limited to image sizing', () => {
+  it('keeps cutout submit params limited to image sizing', () => {
     const request = buildDirectActionTaskRequest({
       source,
-      action: IMAGE_NODE_ACTION.removeBg,
+      action: IMAGE_NODE_ACTION.cutout,
       imageSize: { width: 1024, height: 1024 },
       prompt: '',
       outputCount: 1,
@@ -212,7 +212,7 @@ describe('flowImageTaskRequests', () => {
     const requests = [
       buildDirectActionTaskRequest({
         source,
-        action: IMAGE_NODE_ACTION.styleVariation,
+        action: IMAGE_NODE_ACTION.variations,
         imageSize: null,
         prompt,
         outputCount: 4,
@@ -220,14 +220,14 @@ describe('flowImageTaskRequests', () => {
       }),
       buildDirectActionTaskRequest({
         source,
-        action: IMAGE_NODE_ACTION.sketchToImage,
+        action: IMAGE_NODE_ACTION.render,
         imageSize: null,
         prompt,
         outputCount: 4,
       }),
       buildDirectActionTaskRequest({
         source,
-        action: IMAGE_NODE_ACTION.removeBg,
+        action: IMAGE_NODE_ACTION.cutout,
         imageSize: null,
         prompt,
         outputCount: 4,
@@ -242,9 +242,9 @@ describe('flowImageTaskRequests', () => {
     ]
 
     expect(requests.map((request) => request.feature)).toEqual([
-      EXECUTION_FEATURE.styleVariation,
-      EXECUTION_FEATURE.sketchToImage,
-      EXECUTION_FEATURE.removeBg,
+      EXECUTION_FEATURE.variations,
+      EXECUTION_FEATURE.render,
+      EXECUTION_FEATURE.cutout,
       EXECUTION_FEATURE.hdUpscale,
     ])
     for (const request of requests) {
@@ -257,9 +257,9 @@ describe('flowImageTaskRequests', () => {
       }
       expect(request.prompt).toBe('preserve the subject')
       expect(request.params?.output_count).toBe(
-        request.feature === EXECUTION_FEATURE.removeBg ? 1 : 4,
+        request.feature === EXECUTION_FEATURE.cutout ? 1 : 4,
       )
-      if (request.feature === EXECUTION_FEATURE.removeBg) {
+      if (request.feature === EXECUTION_FEATURE.cutout) {
         expect(request.params?.output_resolution).toBe('default')
       }
     }
@@ -429,7 +429,7 @@ describe('flowImageTaskRequests', () => {
       kind: 'image-action',
       sourceNodeId: 'image-1',
       source,
-      action: IMAGE_NODE_ACTION.removeBg,
+      action: IMAGE_NODE_ACTION.cutout,
       prompt: '',
       outputCount: 1,
       resultOptions: {},
@@ -474,7 +474,7 @@ describe('flowImageTaskRequests', () => {
       resultOptions: {},
     }
 
-    expect(buildImageExecutionTaskRequest(actionPlan).feature).toBe(EXECUTION_FEATURE.removeBg)
+    expect(buildImageExecutionTaskRequest(actionPlan).feature).toBe(EXECUTION_FEATURE.cutout)
     expect(buildImageExecutionTaskRequest(textPlan)).toMatchObject({
       feature: EXECUTION_FEATURE.promptGeneration,
     })
@@ -519,7 +519,7 @@ describe('flowImageTaskRequests', () => {
         imageSize: { width: 900, height: 600 },
       }),
     ).toMatchObject({
-      feature: EXECUTION_FEATURE.partialEdit,
+      feature: EXECUTION_FEATURE.inpaint,
       params: {
         output_count: 1,
         original_image_url: source.url,

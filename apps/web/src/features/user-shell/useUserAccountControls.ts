@@ -6,6 +6,8 @@ import type {
   UserIdeaBalanceControl,
 } from '../../shared/components/userAccountMenu.types'
 import { ADMIN_ROOT_PATH, HOME_PATH } from '../../shared/constants/routePaths'
+import { i18n } from '../../shared/i18n'
+import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
 import { formatIdeaAmount } from '../../shared/utils/ideaCurrency'
 import {
   defaultAccountManagementTab,
@@ -65,7 +67,7 @@ export function useUserAccountControls(options: UseUserAccountControlsOptions) {
       return {
         status: 'anonymous',
         displayValue: '',
-        ariaLabel: 'Idea 标识',
+        ariaLabel: i18n.global.t('auth.credits.badgeAriaLabel'),
       }
     }
     const command = () => openAccount('billing')
@@ -74,16 +76,19 @@ export function useUserAccountControls(options: UseUserAccountControlsOptions) {
       case 'loading':
         return {
           status: 'loading',
-          displayValue: '加载中',
-          ariaLabel: 'Idea余额 加载中',
+          displayValue: i18n.global.t('common.actions.loading'),
+          ariaLabel: i18n.global.t('auth.credits.loadingAriaLabel'),
           command,
         }
       case 'error':
         return {
           status: 'error',
           displayValue: '--',
-          ariaLabel: 'Idea余额加载失败，点击查看账户',
-          errorMessage: state.error.message || 'Idea余额加载失败',
+          ariaLabel: i18n.global.t('auth.credits.errorAriaLabel'),
+          errorMessage: userFacingErrorCopy(
+            state.error,
+            i18n.global.t('common.errors.billingInfoUnavailable'),
+          ),
           command,
         }
       case 'ready': {
@@ -92,7 +97,9 @@ export function useUserAccountControls(options: UseUserAccountControlsOptions) {
           status: 'ready',
           availableIdeas,
           displayValue: formatIdeaValue(availableIdeas),
-          ariaLabel: `Idea余额 ${formatIdeaAmount(availableIdeas)}`,
+          ariaLabel: i18n.global.t('auth.credits.balanceAriaLabel', {
+            amount: formatIdeaAmount(availableIdeas),
+          }),
           command,
         }
       }
@@ -103,25 +110,42 @@ export function useUserAccountControls(options: UseUserAccountControlsOptions) {
   const menuItems = computed<UserAccountMenuItem[]>(() => {
     if (!userStore.user) {
       const guestItems: UserAccountMenuItem[] = [
-        { key: 'login', label: '登录', command: () => openLogin() },
-        { key: 'register', label: '免费注册', command: () => openRegister() },
+        { key: 'login', label: i18n.global.t('auth.signIn'), command: () => openLogin() },
+        { key: 'register', label: i18n.global.t('auth.signUpFree'), command: () => openRegister() },
       ]
       if (options.showHome ?? true) {
-        guestItems.push({ key: 'home', label: '返回首页', command: () => void goHome() })
+        guestItems.push({
+          key: 'home',
+          label: i18n.global.t('auth.menu.home'),
+          command: () => void goHome(),
+        })
       }
       return guestItems
     }
 
     const items: UserAccountMenuItem[] = [
-      { key: 'profile', label: '账户管理', command: () => openAccount() },
+      { key: 'profile', label: i18n.global.t('auth.menu.account'), command: () => openAccount() },
     ]
     if (canAccessAdmin(userStore.user)) {
-      items.push({ key: 'admin', label: '管理后台', command: () => void goAdmin() })
+      items.push({
+        key: 'admin',
+        label: i18n.global.t('auth.menu.console'),
+        command: () => void goAdmin(),
+      })
     }
     if (options.showHome ?? true) {
-      items.push({ key: 'home', label: '返回首页', command: () => void goHome() })
+      items.push({
+        key: 'home',
+        label: i18n.global.t('auth.menu.home'),
+        command: () => void goHome(),
+      })
     }
-    items.push({ key: 'logout', label: '退出登录', tone: 'danger', command: () => void logout() })
+    items.push({
+      key: 'logout',
+      label: i18n.global.t('auth.signOut'),
+      tone: 'danger',
+      command: () => void logout(),
+    })
     return items
   })
 

@@ -23,14 +23,15 @@ type AccountTabPane = {
 
 type AccountTabDefinition = {
   key: string
-  label: string
+  /** Locale key; copy resolves in the rendering component so it never freezes at import. */
+  labelKey: string
   icon: Component
   pane: AccountTabPane
 }
 
 type AccountTabGroupDefinition = {
   key: string
-  label: string
+  labelKey: string
   tabs: readonly AccountTabDefinition[]
 }
 
@@ -44,8 +45,8 @@ function activeQueryPane(component: Component): AccountTabPane {
 const comingSoonPane: AccountTabPane = {
   component: AccountComingSoonPane,
   props: ({ group, tab }) => ({
-    category: group.label,
-    title: tab.label,
+    categoryKey: group.labelKey,
+    titleKey: tab.labelKey,
     icon: tab.icon,
   }),
 }
@@ -53,57 +54,46 @@ const comingSoonPane: AccountTabPane = {
 export const accountTabRegistry = [
   {
     key: 'account',
-    label: '账户设置',
+    labelKey: 'account.groups.general',
     tabs: [
       {
         key: 'profile',
-        label: '个人资料',
+        labelKey: 'account.tabs.profile',
         icon: User,
         pane: { component: UserProfilePane, props: () => ({}) },
       },
       {
         key: 'security',
-        label: '账号安全',
+        labelKey: 'account.tabs.security',
         icon: Lock,
         pane: { component: UserSecurityPane, props: () => ({}) },
       },
     ],
   },
   {
-    key: 'subscription',
-    label: '订阅与套餐',
+    key: 'billing',
+    labelKey: 'account.groups.billing',
     tabs: [
       {
         key: 'recharge',
-        label: '充值积分',
+        labelKey: 'account.tabs.topUp',
         icon: Coins,
         pane: {
           component: UserRechargePane,
           props: ({ active, paymentReturn }) => ({ active, paymentReturn }),
         },
       },
-      { key: 'subscriptions', label: '订阅套餐', icon: CreditCard, pane: comingSoonPane },
-    ],
-  },
-  {
-    key: 'benefits',
-    label: '权益和账单',
-    tabs: [
-      {
-        key: 'rewards',
-        label: '奖励中心',
-        icon: Gift,
-        pane: { component: UserRewardsPane, props: () => ({}) },
-      },
+      { key: 'subscriptions', labelKey: 'account.tabs.plans', icon: CreditCard, pane: comingSoonPane },
+      { key: 'rewards', labelKey: 'account.tabs.rewards', icon: Gift, pane: { component: UserRewardsPane, props: () => ({}) } },
       {
         key: 'billing',
-        label: '账单记录',
+        labelKey: 'account.tabs.billingTransactions',
         icon: Page,
         pane: activeQueryPane(UserBillingRecordsPane),
       },
       {
         key: 'usage',
-        label: '用量统计',
+        labelKey: 'account.tabs.usage',
         icon: StatsUpSquare,
         pane: activeQueryPane(UserUsagePane),
       },

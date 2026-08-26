@@ -2,6 +2,7 @@ import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
 import type { TaskImageResult } from '../../../../shared/query/taskResult'
+import { i18n } from '../../../../shared/i18n'
 import type { CanvasGraphStore } from '../../graph-runtime'
 import type { CanvasRendererMetricsPort } from '../../vue-flow-adapter'
 import { loadImageSizeFromUrl } from '../media/imageSize'
@@ -104,7 +105,7 @@ export function useCanvasExecutionWorkspace(
       await options.flushAutosave?.({ silent: true })
     } catch (error) {
       console.warn('[canvas] flush pending task snapshot failed', error)
-      options.onWarning('画布保存失败，刷新页面后任务进度可能丢失')
+      options.onWarning(i18n.global.t('canvas.execution.canvasSaveFailedProgressLost'))
     }
   }
 

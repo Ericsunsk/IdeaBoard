@@ -22,7 +22,7 @@ function renderControls(disabled = false) {
 describe('PromptComposerControls output options', () => {
   it('preserves count selection and existing style hooks', async () => {
     const view = renderControls()
-    const trigger = screen.getByRole('button', { name: '输出张数' })
+    const trigger = screen.getByRole('button', { name: 'Output count' })
 
     expect(trigger).toHaveClass('image-node-output-count', 'node-tool-output-count')
     await view.user.click(trigger)
@@ -38,7 +38,7 @@ describe('PromptComposerControls output options', () => {
   it('formats resolution options as radio menu items', async () => {
     const view = renderControls()
 
-    await view.user.click(screen.getByRole('button', { name: '输出清晰度' }))
+    await view.user.click(screen.getByRole('button', { name: 'Output resolution' }))
 
     expect(screen.getByRole('menuitemradio', { name: '1K' })).toHaveAttribute(
       'aria-checked',
@@ -53,7 +53,7 @@ describe('PromptComposerControls output options', () => {
 
   it('disables output triggers with the composer', () => {
     renderControls(true)
-    expect(screen.getByRole('button', { name: '输出张数' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: '输出清晰度' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Output count' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Output resolution' })).toBeDisabled()
   })
 })

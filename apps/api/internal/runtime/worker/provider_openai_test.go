@@ -113,7 +113,7 @@ func readMultipartRequest(t *testing.T, r *http.Request) multipartRequestCapture
 	return capture
 }
 
-func TestCallOpenAIUsesEditEndpointForStyleVariation(t *testing.T) {
+func TestCallOpenAIUsesEditEndpointForVariations(t *testing.T) {
 	var gotPath string
 	var gotContentType string
 	var gotMultipart multipartRequestCapture
@@ -142,7 +142,7 @@ func TestCallOpenAIUsesEditEndpointForStyleVariation(t *testing.T) {
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	params := map[string]interface{}{
-		"feature":            "style-variation",
+		"feature":            "variations",
 		"image_urls":         []interface{}{server.URL + "/source.png"},
 		"variation_strength": 22,
 	}
@@ -272,7 +272,7 @@ func TestCallOpenAIRequestsOutputCountAndReturnsMultipleImages(t *testing.T) {
 	}
 }
 
-func TestCallOpenAIStyleVariationUsesEditEndpointAndMultipartImage(t *testing.T) {
+func TestCallOpenAIVariationsUsesEditEndpointAndMultipartImage(t *testing.T) {
 	var gotPath string
 	var gotMultipart multipartRequestCapture
 	imageBytes := buildTinyPNGBytes(t)
@@ -299,7 +299,7 @@ func TestCallOpenAIStyleVariationUsesEditEndpointAndMultipartImage(t *testing.T)
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	params := map[string]interface{}{
-		"feature":    "style-variation",
+		"feature":    "variations",
 		"image_urls": []interface{}{server.URL + "/source.png"},
 		"variation": map[string]interface{}{
 			"strength": 42,
@@ -380,7 +380,7 @@ func TestCallOpenAIStyleFusionUsesEditEndpointAndTwoImageParts(t *testing.T) {
 	}
 }
 
-func TestCallOpenAIStyleVariationDataURLUsesMultipartWithoutLegacyImageFields(t *testing.T) {
+func TestCallOpenAIVariationsDataURLUsesMultipartWithoutLegacyImageFields(t *testing.T) {
 	var gotPath string
 	var gotMultipart multipartRequestCapture
 
@@ -402,7 +402,7 @@ func TestCallOpenAIStyleVariationDataURLUsesMultipartWithoutLegacyImageFields(t 
 	}
 	dataURL := buildTinyPNGDataURL(t)
 	params := map[string]interface{}{
-		"feature":    "style-variation",
+		"feature":    "variations",
 		"image_urls": []interface{}{dataURL},
 		"variation": map[string]interface{}{
 			"strength": 5,
@@ -428,7 +428,7 @@ func TestCallOpenAIStyleVariationDataURLUsesMultipartWithoutLegacyImageFields(t 
 	}
 }
 
-func TestCallOpenAIStyleVariationFlattensNestedContractParams(t *testing.T) {
+func TestCallOpenAIVariationsFlattensNestedContractParams(t *testing.T) {
 	var gotBody map[string]interface{}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -451,7 +451,7 @@ func TestCallOpenAIStyleVariationFlattensNestedContractParams(t *testing.T) {
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	params := map[string]interface{}{
-		"feature": "style-variation",
+		"feature": "variations",
 		"variation": map[string]interface{}{
 			"strength": 5,
 		},
@@ -468,7 +468,7 @@ func TestCallOpenAIStyleVariationFlattensNestedContractParams(t *testing.T) {
 	}
 }
 
-func TestCallOpenAIPartialEditUsesEditEndpointAndMultipartFiles(t *testing.T) {
+func TestCallOpenAIInpaintUsesEditEndpointAndMultipartFiles(t *testing.T) {
 	var gotPath string
 	var gotMultipart multipartRequestCapture
 
@@ -489,7 +489,7 @@ func TestCallOpenAIPartialEditUsesEditEndpointAndMultipartFiles(t *testing.T) {
 	maskDataURL := buildTinyPNGDataURL(t)
 	sourceDataURL := buildTinyPNGDataURL(t)
 	params := map[string]interface{}{
-		"feature":            "partial-edit",
+		"feature":            "inpaint",
 		"image_urls":         []interface{}{maskDataURL},
 		"original_image_url": sourceDataURL,
 		"mask_image_url":     maskDataURL,
@@ -514,7 +514,7 @@ func TestCallOpenAIPartialEditUsesEditEndpointAndMultipartFiles(t *testing.T) {
 	}
 }
 
-func TestCallOpenAIPartialEditNormalizesWebPDataURLToPNGMultipart(t *testing.T) {
+func TestCallOpenAIInpaintNormalizesWebPDataURLToPNGMultipart(t *testing.T) {
 	var gotMultipart multipartRequestCapture
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -533,7 +533,7 @@ func TestCallOpenAIPartialEditNormalizesWebPDataURLToPNGMultipart(t *testing.T) 
 	sourceWebPDataURL := "data:image/webp;base64," + tinyWebPBase64
 	maskDataURL := buildTinyPNGDataURL(t)
 	params := map[string]interface{}{
-		"feature":            "partial-edit",
+		"feature":            "inpaint",
 		"image_urls":         []interface{}{sourceWebPDataURL},
 		"original_image_url": sourceWebPDataURL,
 		"mask_image_url":     maskDataURL,
@@ -561,7 +561,7 @@ func TestCallOpenAIPartialEditNormalizesWebPDataURLToPNGMultipart(t *testing.T) 
 	}
 }
 
-func TestCallOpenAIPartialEditNormalizesWebPURLToPNGMultipart(t *testing.T) {
+func TestCallOpenAIInpaintNormalizesWebPURLToPNGMultipart(t *testing.T) {
 	var gotMultipart multipartRequestCapture
 	webpBytes := buildTinyWebPBytes(t)
 
@@ -588,7 +588,7 @@ func TestCallOpenAIPartialEditNormalizesWebPURLToPNGMultipart(t *testing.T) {
 	sourceURL := server.URL + "/source.webp"
 	maskDataURL := buildTinyPNGDataURL(t)
 	params := map[string]interface{}{
-		"feature":            "partial-edit",
+		"feature":            "inpaint",
 		"image_urls":         []interface{}{sourceURL},
 		"original_image_url": sourceURL,
 		"mask_image_url":     maskDataURL,
@@ -760,16 +760,16 @@ func TestOpenAIEndpointSelectionConsumesRuntimeInvocation(t *testing.T) {
 	if !usesEditEndpoint(workflow.RuntimeOperationOutpaint, workflow.RuntimeInvocationEdit) {
 		t.Fatalf("expected outpaint to use edit endpoint")
 	}
-	if !usesEditEndpoint(workflow.RuntimeOperationPartialEdit, workflow.RuntimeInvocationEdit) {
-		t.Fatalf("expected partial-edit to use edit endpoint")
+	if !usesEditEndpoint(workflow.RuntimeOperationInpaint, workflow.RuntimeInvocationEdit) {
+		t.Fatalf("expected inpaint to use edit endpoint")
 	}
 	if usesEditEndpoint(workflow.RuntimeOperationImageUpscale, workflow.RuntimeInvocationTransform) {
 		t.Fatalf("expected transform invocation to stay out of the edit endpoint")
 	}
 	for _, operation := range []workflow.RuntimeOperation{
 		workflow.RuntimeOperationStyleFusion,
-		workflow.RuntimeOperationStyleVariation,
-		workflow.RuntimeOperationSketchToImage,
+		workflow.RuntimeOperationVariations,
+		workflow.RuntimeOperationRender,
 	} {
 		if !usesEditEndpoint(operation, workflow.RuntimeInvocationEdit) {
 			t.Fatalf("expected %s to use edit endpoint", operation)
@@ -780,14 +780,14 @@ func TestOpenAIEndpointSelectionConsumesRuntimeInvocation(t *testing.T) {
 func TestReadOpenAIProviderParamsDerivesEditMask(t *testing.T) {
 	maskURL := "https://img.example/mask.png"
 	req := newProviderRequest("prompt", 1024, 1024, map[string]interface{}{
-		"feature":        "partial-edit",
+		"feature":        "inpaint",
 		"image_urls":     []interface{}{"https://img.example/source.png"},
 		"mask_image_url": maskURL,
-	}, "gpt-image-1", resolvedProviderRequestFacts{}, workflow.RuntimeOperationPartialEdit, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsNone)
+	}, "gpt-image-1", resolvedProviderRequestFacts{}, workflow.RuntimeOperationInpaint, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsNone)
 
 	params := readOpenAIProviderParams(req)
 	if !params.useEditEndpoint() {
-		t.Fatalf("expected partial-edit image request to use edit endpoint")
+		t.Fatalf("expected inpaint image request to use edit endpoint")
 	}
 	if params.MaskImageRef != maskURL {
 		t.Fatalf("mask ref = %q, want %q", params.MaskImageRef, maskURL)

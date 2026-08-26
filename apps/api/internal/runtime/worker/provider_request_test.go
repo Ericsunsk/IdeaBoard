@@ -101,7 +101,7 @@ func TestProviderRequestShapesOnlyDeclaredRuntimeControlContract(t *testing.T) {
 	}
 
 	variation := newProviderRequest(
-		"", 0, 0, params, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationStyleVariation,
+		"", 0, 0, params, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationVariations,
 		workflow.RuntimeInvocationEdit, workflow.RuntimeControlsVariation,
 	)
 	if variation.OpenAI.VariationStrength == nil || *variation.OpenAI.VariationStrength != 40 || variation.Scale != 0 {
@@ -202,7 +202,7 @@ func TestProviderRuntimeAdapterForUsesProtocolAndRuntimeOperation(t *testing.T) 
 		wantErr   bool
 	}{
 		{name: "model prompt", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationPromptGeneration, want: providerRuntimeAdapterModelImage},
-		{name: "image fill on model protocol", apiType: workflow.ProviderGoogleAI, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationPartialEdit, wantErr: true},
+		{name: "image fill on model protocol", apiType: workflow.ProviderGoogleAI, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationInpaint, wantErr: true},
 		{name: "background removal", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationBackgroundRemoval, want: providerRuntimeAdapterBackgroundRemoval},
 		{name: "upscale", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationImageUpscale, want: providerRuntimeAdapterImageUpscale},
 		{name: "self-hosted flux fill", apiType: workflow.ProviderSelfHosted, protocol: providerendpoints.ProtocolFluxFillJSONImage, operation: workflow.RuntimeOperationOutpaint, want: providerRuntimeAdapterFluxFill},
@@ -313,7 +313,7 @@ func TestCallDrawingAPIRejectsProtocolOperationMismatchBeforeProviderIO(t *testi
 func TestParseAndNormalizeTaskParamsRejectsFactsForgedAroundValidPlan(t *testing.T) {
 	base := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       workflow.FeatureSlugStyleVariation,
+		Feature:       workflow.FeatureSlugVariations,
 		Media: &tasks.MediaInputs{
 			Inputs: []tasks.MediaRef{{AssetID: 1, Role: "input"}},
 		},
@@ -363,7 +363,7 @@ func TestParseAndNormalizeTaskParamsRejectsCanonicalControlsOutsidePlanContract(
 	})
 	tests := map[string]func(*tasks.WorkflowTaskParams){
 		"variation": func(params *tasks.WorkflowTaskParams) {
-			params.Variation = &tasks.StyleVariationParams{Strength: 40}
+			params.Variation = &tasks.VariationsParams{Strength: 40}
 		},
 		"extend": func(params *tasks.WorkflowTaskParams) {
 			params.Extend = &tasks.OutpaintParams{TargetWidth: 768, TargetHeight: 480}
@@ -400,7 +400,7 @@ func TestPrepareProviderExecutionCompletesPreflightBeforeLocalMediaIO(t *testing
 	useMask := true
 	raw := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       workflow.FeatureSlugPartialEdit,
+		Feature:       workflow.FeatureSlugInpaint,
 		Media: &tasks.MediaInputs{
 			Original: &tasks.MediaRef{AssetID: 1, Role: "original"},
 			Mask:     &tasks.MediaRef{AssetID: 2, Role: "mask"},
@@ -435,7 +435,7 @@ func TestPrepareProviderExecutionCompletesPreflightBeforeLocalMediaIO(t *testing
 	if unmarshalErr != nil {
 		t.Fatal(unmarshalErr)
 	}
-	forged.Variation = &tasks.StyleVariationParams{Strength: 40}
+	forged.Variation = &tasks.VariationsParams{Strength: 40}
 	forgedRaw, marshalErr := json.Marshal(forged)
 	if marshalErr != nil {
 		t.Fatal(marshalErr)
@@ -581,7 +581,7 @@ func TestProviderTaskParamsPreferCanonicalFeature(t *testing.T) {
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
 		Feature:       "style-fusion",
 		Extra: map[string]interface{}{
-			"feature": "partial-edit",
+			"feature": "inpaint",
 		},
 	}, nil)
 

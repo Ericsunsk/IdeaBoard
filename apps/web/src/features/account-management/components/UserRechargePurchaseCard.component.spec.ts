@@ -24,7 +24,7 @@ describe('UserRechargePurchaseCard', () => {
       },
     })
 
-    expect(screen.getByText('暂时无法充值')).toBeVisible()
-    expect(screen.getByText(/银行卡 Dispute 处理中/)).toBeVisible()
+    expect(screen.getByText('Top-up unavailable')).toBeVisible()
+    expect(screen.getByText(/card dispute is in progress/i)).toBeVisible()
   })
 })

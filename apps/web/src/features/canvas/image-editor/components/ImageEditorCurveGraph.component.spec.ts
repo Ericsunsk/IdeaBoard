@@ -57,7 +57,7 @@ function renderCurveGraph(
   })
 
   const result = renderWithUser(Harness)
-  const graph = screen.getByRole('group', { name: '曲线图' })
+  const graph = screen.getByRole('group', { name: 'Curves graph' })
   stubPointerTarget(graph, { right: 100, bottom: 100, width: 100, height: 100 })
 
   return {
@@ -195,7 +195,7 @@ describe('ImageEditorCurveGraph', () => {
       points: normalizeCurveChannelPoints([{ id: 'mid', input: 50, output: 50 }]),
       selectedPointId: 'mid',
     })
-    const midPoint = screen.getByRole('button', { name: '曲线点 输入 50 输出 50' })
+    const midPoint = screen.getByRole('button', { name: 'Curve point In 50 Out 50' })
     const arrowEvent = new KeyboardEvent('keydown', {
       key: 'ArrowUp',
       bubbles: true,
@@ -221,7 +221,7 @@ describe('ImageEditorCurveGraph', () => {
     const { events, graph } = renderCurveGraph({
       points: normalizeCurveChannelPoints([{ id: 'mid', input: 50, output: 50 }]),
     })
-    const midPoint = screen.getByRole('button', { name: '曲线点 输入 50 输出 50' })
+    const midPoint = screen.getByRole('button', { name: 'Curve point In 50 Out 50' })
     const bubbledKeydown = vi.fn()
     graph.addEventListener('keydown', bubbledKeydown)
 

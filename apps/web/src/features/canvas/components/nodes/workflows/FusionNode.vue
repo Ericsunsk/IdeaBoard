@@ -36,7 +36,7 @@
           v-model="promptDraft"
           allow-empty
           offset="8px"
-          placeholder="输入融合提示词"
+          :placeholder="t('canvas.controls.fusionPlaceholder')"
           :aspect-ratio="aspectRatio"
           :output-resolution="node.outputResolution"
           :output-count="outputCountValue"
@@ -53,6 +53,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { computed, ref, watch } from 'vue'
 import { Keyframes } from '@iconoir/vue'
 import { requireImageNodeOutputCount, type FusionNodeItem } from '../../../../canvas-board/domain'
@@ -92,6 +93,8 @@ const emit = defineEmits<{
   (e: 'contextmenu', event: MouseEvent): void
   (e: 'prompt-generate', prompt: string, outputCount: number, aspectRatio: PromptAspectRatio): void
 }>()
+
+const { t } = useI18n()
 
 const promptDraft = ref('')
 const visibleInputImages = computed(() => props.node.inputImages)

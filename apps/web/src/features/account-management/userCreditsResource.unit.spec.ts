@@ -36,6 +36,6 @@ describe('userCreditsResource', () => {
   it('uses the resource fallback when API feedback contains sensitive details', async () => {
     generated.getUserCreditWallet.mockResolvedValue({ code: 500, msg: 'api_key=exposed' })
 
-    await expect(fetchUserCreditWallet()).rejects.toThrow('加载Idea余额失败')
+    await expect(fetchUserCreditWallet()).rejects.toThrow('Could not load your Ideas balance.')
   })
 })

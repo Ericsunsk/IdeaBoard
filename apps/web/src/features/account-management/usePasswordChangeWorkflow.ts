@@ -6,6 +6,7 @@ import { type AsyncActionFeedback, useAsyncAction } from '../../shared/composabl
 import { getPasswordLengthError } from '../../shared/auth/passwordPolicy'
 import { USER_LOGIN_PATH } from '../../shared/constants/routePaths'
 import { markRequiredError } from '../../shared/utils/formValidation'
+import { i18n } from '../../shared/i18n'
 import { type ProfileFeedback, useProfileFeedback } from './useProfileFeedback'
 
 export type PasswordField = 'oldPassword' | 'newPassword' | 'confirmPassword'
@@ -55,15 +56,21 @@ export function usePasswordChangeWorkflow(deps: PasswordChangeWorkflowDependenci
     const value = form.value[field]
 
     if (field === 'oldPassword' && !value.trim()) {
-      return markRequiredError('请输入当前原密码')
+      return markRequiredError(i18n.global.t('account.security.errors.enterCurrentPassword'))
     }
     if (field === 'newPassword') {
-      if (!value.trim()) return markRequiredError('请输入新密码')
+      if (!value.trim()) {
+        return markRequiredError(i18n.global.t('account.security.errors.enterNewPassword'))
+      }
       return getPasswordLengthError(value)
     }
     if (field === 'confirmPassword') {
-      if (!value.trim()) return markRequiredError('请确认新密码')
-      if (value !== form.value.newPassword) return '两次输入密码不一致'
+      if (!value.trim()) {
+        return markRequiredError(i18n.global.t('account.security.errors.confirmNewPassword'))
+      }
+      if (value !== form.value.newPassword) {
+        return i18n.global.t('account.security.errors.mismatch')
+      }
     }
     return ''
   }
@@ -104,7 +111,9 @@ export function usePasswordChangeWorkflow(deps: PasswordChangeWorkflowDependenci
         resetForm()
         const isLoggedOut = await userStore.logout()
         if (!isLoggedOut) {
-          throw new Error('密码已更新，但退出登录失败，请手动退出后重新登录')
+          throw new Error(
+            i18n.global.t('account.security.errors.logoutAfterChangeFailed'),
+          )
         }
         await router.replace(USER_LOGIN_PATH)
         return true

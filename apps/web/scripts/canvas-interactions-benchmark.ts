@@ -770,9 +770,9 @@ async function installMockApiRoutes(context: BrowserContext, fixture: BenchmarkF
         msg: 'ok',
         data: {
           ready: true,
-          feature: 'sketch-to-image',
+          feature: 'render',
           billing: {
-            sku: 'ai.image.sketch-to-image',
+            sku: 'ai.image.render',
             display_name: 'Sketch to image',
             price_version_id: 1,
             price_version: 1,
@@ -1015,7 +1015,7 @@ async function runInteraction(
 }
 
 async function runNodeDrag(page: Page): Promise<{ eventCount: number; positionChanges: number }> {
-  await page.getByRole('button', { name: '选择 (V)' }).click()
+  await page.getByRole('button', { name: 'Select (V)' }).click()
   const node = page.locator('.vue-flow__node').first()
   await node.waitFor({ state: 'visible', timeout: 10_000 })
   const box = await node.boundingBox()
@@ -1036,7 +1036,7 @@ async function runNodeDrag(page: Page): Promise<{ eventCount: number; positionCh
 }
 
 async function runViewportPan(page: Page): Promise<{ eventCount: number }> {
-  await page.getByRole('button', { name: '抓手 (H)' }).click()
+  await page.getByRole('button', { name: 'Hand (H)' }).click()
   await page.waitForTimeout(50)
   const paneBox = await getPaneBox(page)
   const steps = 30
@@ -1054,8 +1054,8 @@ async function runViewportPan(page: Page): Promise<{ eventCount: number }> {
 }
 
 async function runViewportZoom(page: Page): Promise<{ eventCount: number }> {
-  const zoomIn = page.getByRole('button', { name: '放大' })
-  const zoomOut = page.getByRole('button', { name: '缩小' })
+  const zoomIn = page.getByRole('button', { name: 'Zoom In' })
+  const zoomOut = page.getByRole('button', { name: 'Zoom Out' })
   const clicksPerDirection = 6
 
   for (let index = 0; index < clicksPerDirection; index += 1) {

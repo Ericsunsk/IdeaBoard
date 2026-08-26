@@ -6,7 +6,7 @@
 ## 1. 文档边界
 
 - `feature_prompts` 保存每个 Prompt-driven Feature 当前生效的一份 `System Prompt`，是运行时事实源。
-- `partial-edit` 和 `outpaint` 的模板由 baseline 写入数据库；其他模板仍是 `Recommended Baseline`。
+- `inpaint` 和 `outpaint` 的模板由 baseline 写入数据库；其他模板仍是 `Recommended Baseline`。
 - 每个 Prompt-driven Feature 只有一份当前模板；模板按原值更新，不在本文设计 version、revision 或 history。
 - 图片、mask、多参考图、尺寸、模型、质量、输出数量和上传协议由运行时提供，不写成 Prompt 变量。
 
@@ -24,13 +24,13 @@
 
 ### 2.2 Image Node
 
-对应 Feature：`sketch-to-image`、`style-variation`、`remove-bg`、`hd-upscale`、
-`partial-edit`、`outpaint`。
+对应 Feature：`render`、`variations`、`cutout`、`hd-upscale`、
+`inpaint`、`outpaint`。
 
 - 图片是主输入。
 - Prompt-driven Image Feature 的用户文字只能作为显式辅助要求；没有辅助文字时仍按图片和结构化控制执行。
-- `style-variation` 的 `variation_strength` 控制变化幅度。
-- `remove-bg` 与 `hd-upscale` 由 Modal 专用端点处理，不读取用户文字或 System Prompt；HD 只接受结构化 `hd.scale`。
+- `variations` 的 `variation_strength` 控制变化幅度。
+- `cutout` 与 `hd-upscale` 由 Modal 专用端点处理，不读取用户文字或 System Prompt；HD 只接受结构化 `hd.scale`。
 - Prompt-driven Image Feature 保持自己的 Prompt Contract，不归入 Prompt Node 或其他功能。
 
 ### 2.3 Fusion Node
@@ -73,10 +73,10 @@
 | Feature | 允许的变量 |
 | --- | --- |
 | `prompt-generation` | `{{user_prompt}}` |
-| `partial-edit` | `{{user_prompt}}` |
-| `sketch-to-image` | `{{user_prompt}}` |
-| `style-variation` | `{{user_prompt}}`、`{{variation_strength}}` |
-| `remove-bg` | 无（由 Modal 专用端点处理） |
+| `inpaint` | `{{user_prompt}}` |
+| `render` | `{{user_prompt}}` |
+| `variations` | `{{user_prompt}}`、`{{variation_strength}}` |
+| `cutout` | 无（由 Modal 专用端点处理） |
 | `hd-upscale` | 无（由 Modal 专用端点处理） |
 | `outpaint` | `{{user_prompt}}` |
 | `style-fusion` | `{{user_prompt}}`、`{{fusion_input_weights}}` |
@@ -158,7 +158,7 @@ Do not combine multiple results into one image or output collages, comparison sh
 Do not output explanations, analysis, or prompt text; output images only.
 ```
 
-### 4.2 `style-variation` · Image Node
+### 4.2 `variations` · Image Node
 
 #### 中文版
 
@@ -204,7 +204,7 @@ variation_strength 表示变化倾向，不表示随机性、质量或输出数�
 
 ```text
 [ROLE]
-You are a style-variation image assistant.
+You are a variations image assistant.
 
 [OBJECTIVE]
 Extract the original image's visual style DNA and create a new complete work; the content distance from the original is determined by `variation_strength`.
@@ -240,7 +240,7 @@ At every `variation_strength`, preserve the original image's overall visual styl
 Return the requested number of independent, complete result images. Output images only; do not output explanations, analysis, or prompt text.
 ```
 
-### 4.3 `sketch-to-image` · Image Node
+### 4.3 `render` · Image Node
 
 #### 中文版
 
@@ -278,7 +278,7 @@ Return the requested number of independent, complete result images. Output image
 
 ```text
 [ROLE]
-You are a sketch-to-image assistant.
+You are a render assistant.
 
 [OBJECTIVE]
 Transform the input line art, hand drawing, sketch, or structural diagram into a complete, natural, presentable image.
@@ -382,7 +382,7 @@ Do not combine multiple results into one image or output collages, comparison sh
 Do not output explanations, analysis, or prompt text; output images only.
 ```
 
-### 4.5 `partial-edit` · Image Node
+### 4.5 `inpaint` · Image Node
 
 #### 中文版
 

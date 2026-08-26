@@ -1,6 +1,7 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { PaymentReturnContext } from './paymentReturnRoute'
+import { i18n } from '../../shared/i18n'
 import { userBillingRecordsQueryKeys } from './userBillingRecordsResource'
 import { userCreditsQueryKeys } from './userCreditsResource'
 import {
@@ -119,7 +120,7 @@ export function useUserRecharge(
 
   async function createCheckout(ideaQuantity: number) {
     const options = optionsQuery.data.value
-    if (!options) return Promise.reject(new Error('充值选项尚未加载完成'))
+    if (!options) return Promise.reject(new Error(i18n.global.t('account.errors.optionsNotReady')))
 
     const fingerprint = [ideaQuantity, options.terms.version, options.refund_policy.version].join(
       ':',

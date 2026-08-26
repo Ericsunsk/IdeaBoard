@@ -1,7 +1,7 @@
 import PrimeVue from 'primevue/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen, renderWithUser, waitFor } from '../../../../test/render'
-import { primeVueTestOptions } from '../../../../test/primeVue'
+import { adminPrimeVueTestOptions } from '../../../../test/primeVue'
 import StripeSettingsDialog from './StripeSettingsDialog.vue'
 import type { AdminStripeSettingsResource, StripeConfigurationSummary } from './stripeSettingsTypes'
 
@@ -40,7 +40,7 @@ function renderDialog(props: { visible?: boolean } = {}) {
       ...props,
     },
     global: {
-      plugins: [[PrimeVue, primeVueTestOptions]],
+      plugins: [[PrimeVue, adminPrimeVueTestOptions]],
       stubs: { transition: false },
     },
   })

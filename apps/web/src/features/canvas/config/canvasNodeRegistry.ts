@@ -4,18 +4,16 @@ import type {
   CanvasConnectionPort,
   CanvasExecutionOutputNodeType,
 } from '../../canvas-board/domain'
+import { i18n } from '../../../shared/i18n'
 
-interface CanvasNodeMenuItem {
-  key: CanvasCreatableNodeKind
-  label: string
-}
+export type ExecutionActionLabels = { ready: string; running: string }
 
-type ExecutionActionLabels = { ready: string; running: string }
+type ExecutionActionLabelKeys = { readyKey: string; runningKey: string }
 
 type CanvasNodeUiRegistryItem = {
   kind: CanvasConnectionNodeType
   defaultTitle: string
-  primaryAction?: ExecutionActionLabels
+  primaryAction?: ExecutionActionLabelKeys
 }
 
 const CANVAS_NODE_UI_REGISTRY = {
@@ -30,7 +28,10 @@ const CANVAS_NODE_UI_REGISTRY = {
   fusion: {
     kind: 'fusion',
     defaultTitle: 'Fusion',
-    primaryAction: { ready: '融合', running: '融合中...' },
+    primaryAction: {
+      readyKey: 'canvas.workflow.generate',
+      runningKey: 'canvas.node.processing',
+    },
   },
 } as const satisfies Record<CanvasConnectionNodeType, CanvasNodeUiRegistryItem>
 
@@ -47,9 +48,10 @@ export function getDefaultCanvasNodeTitle(nodeType: CanvasConnectionNodeType): s
 export function getCanvasNodeExecutionActionLabels(
   nodeType: CanvasExecutionOutputNodeType,
 ): ExecutionActionLabels {
-  const labels = getCanvasNodeUiRegistryItem(nodeType).primaryAction
-  if (!labels) throw new Error(`Canvas node ${nodeType} has no execution action labels`)
-  return labels
+  const keys = getCanvasNodeUiRegistryItem(nodeType).primaryAction
+  if (!keys) throw new Error(`Canvas node ${nodeType} has no execution action labels`)
+  // Resolved read-time so locale copy stays live; the registry only owns keys.
+  return { ready: i18n.global.t(keys.readyKey), running: i18n.global.t(keys.runningKey) }
 }
 
 export function formatCanvasNodePortLabel(port: CanvasConnectionPort): string {
@@ -58,7 +60,10 @@ export function formatCanvasNodePortLabel(port: CanvasConnectionPort): string {
   return port
 }
 
-export const CANVAS_NODE_MENU_ITEMS = CANVAS_NODE_UI_REGISTRY_LIST.map((item) => ({
-  key: item.kind,
-  label: `+ ${item.defaultTitle} 节点`,
-})) as readonly CanvasNodeMenuItem[]
+/** Menu copy resolved read-time; callers render through their own t(). */
+export function getCanvasNodeKindMenuItems(): readonly { key: CanvasCreatableNodeKind; label: string }[] {
+  return CANVAS_NODE_UI_REGISTRY_LIST.map((item) => ({
+    key: item.kind as CanvasCreatableNodeKind,
+    label: item.defaultTitle,
+  }))
+}

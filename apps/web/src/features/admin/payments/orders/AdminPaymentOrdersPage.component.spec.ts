@@ -1,6 +1,6 @@
 import PrimeVue from 'primevue/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { primeVueTestOptions } from '../../../../test/primeVue'
+import { adminPrimeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import AdminPaymentOrdersPage from './AdminPaymentOrdersPage.vue'
 
@@ -232,7 +232,7 @@ const orderNumber = 'IBP-20260803-ABCDEF123456'
 
 function renderPage() {
   return renderWithUser(AdminPaymentOrdersPage, {
-    global: { plugins: [[PrimeVue, primeVueTestOptions]] },
+    global: { plugins: [[PrimeVue, adminPrimeVueTestOptions]] },
   })
 }
 

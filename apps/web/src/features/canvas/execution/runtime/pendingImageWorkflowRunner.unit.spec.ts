@@ -76,12 +76,12 @@ describe('pendingImageWorkflowRunner', () => {
     await harness.runner.execute(harness.intent)
     expect(harness.transport.assertReady).toHaveBeenCalledWith(
       harness.intent.readinessRequest,
-      '图片生成失败',
+      'Image generation failed',
     )
     expect(harness.transport.submit).toHaveBeenCalledWith(
       harness.intent.taskRequest,
       'action-1',
-      '图片生成失败',
+      'Image generation failed',
     )
     expect(harness.pendingResults.attachPendingTaskIds).toHaveBeenCalledWith([
       { resultNodeId: 'image-1', resultIndex: 0, taskId: 'task-1', clientActionId: 'action-1' },

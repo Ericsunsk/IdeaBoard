@@ -127,7 +127,7 @@ describe('useCanvasGroupRuntime', () => {
 
     expect(harness.runtime.view.selectionGroupAction.value).toEqual({
       kind: 'group',
-      label: '组合',
+      label: 'Group',
       nodeIds: ['prompt-1', 'prompt-2'],
     })
     expect(harness.runtime.commands.groupSelectedNodes()).toBe(false)
@@ -143,7 +143,7 @@ describe('useCanvasGroupRuntime', () => {
     ])
     expect(harness.runtime.view.selectionGroupAction.value).toEqual({
       kind: 'group',
-      label: '组合',
+      label: 'Group',
       nodeIds: ['prompt-1', 'prompt-2'],
     })
 

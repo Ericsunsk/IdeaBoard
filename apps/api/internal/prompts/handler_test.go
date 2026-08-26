@@ -27,7 +27,7 @@ func newAdminFeaturePromptTestRouter(t testing.TB, handler *FeaturePromptHandler
 func TestSaveFeaturePromptAcceptsEmptyPrompt(t *testing.T) {
 	handler := NewFeaturePromptHandler(NewFeaturePromptRepository(testdb.Open(t)))
 	router := newAdminFeaturePromptTestRouter(t, handler)
-	request := httptest.NewRequest(http.MethodPut, "/admin/feature-prompts/style-variation", strings.NewReader(`{"prompt":""}`))
+	request := httptest.NewRequest(http.MethodPut, "/admin/feature-prompts/variations", strings.NewReader(`{"prompt":""}`))
 	request.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, request)
@@ -39,7 +39,7 @@ func TestSaveFeaturePromptAcceptsEmptyPrompt(t *testing.T) {
 func TestSaveFeaturePromptRejectsRuntimePolicyFields(t *testing.T) {
 	handler := NewFeaturePromptHandler(NewFeaturePromptRepository(testdb.Open(t)))
 	router := newAdminFeaturePromptTestRouter(t, handler)
-	request := httptest.NewRequest(http.MethodPut, "/admin/feature-prompts/style-variation", strings.NewReader(`{"prompt":"x","canonical_model":"legacy"}`))
+	request := httptest.NewRequest(http.MethodPut, "/admin/feature-prompts/variations", strings.NewReader(`{"prompt":"x","canonical_model":"legacy"}`))
 	request.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, request)

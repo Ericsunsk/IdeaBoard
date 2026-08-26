@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 import type { Connection, Edge, Node } from '@vue-flow/core'
+import { i18n } from '../../../shared/i18n'
 import { createCanvasNodeAt } from '../utils/canvasNodeFactory'
 import { getDefaultCanvasNodeTitle } from '../config/canvasNodeRegistry'
 import { isFlowConnectionAllowed, normalizeFlowConnection } from '../utils/flowConnectionAdapter'
@@ -156,7 +157,10 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
         (edge) => edge.target === connection.target && edge.targetHandle === 'in:image',
       ).length
       if (imageInputCount >= inputLimit) {
-        return `${getDefaultCanvasNodeTitle(targetKind)} 最多接入 ${inputLimit} 张图片`
+        return i18n.global.t('canvas.session.inputLimitExceeded', {
+          label: getDefaultCanvasNodeTitle(targetKind),
+          count: inputLimit,
+        })
       }
       return null
     },
@@ -185,7 +189,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     } catch (error) {
       transaction.cancel()
       console.error('[Canvas] Failed to create graph node', error)
-      options.onWarning('创建节点失败，请刷新画布后重试')
+      options.onWarning(i18n.global.t('canvas.session.createNodeFailed'))
       return null
     }
     return flowNodeId
@@ -223,7 +227,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     } catch (error) {
       transaction.cancel()
       console.error('[Canvas] Failed to update graph node', error)
-      options.onWarning('节点更新失败，请刷新画布后重试')
+      options.onWarning(i18n.global.t('canvas.session.updateNodeFailed'))
       return
     }
   }
@@ -273,7 +277,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     } catch (error) {
       transaction.cancel()
       console.error('[Canvas] Failed to mark execution nodes stale', error)
-      options.onWarning('节点状态更新失败，请刷新画布后重试')
+      options.onWarning(i18n.global.t('canvas.session.updateNodeStatusFailed'))
       return
     }
 

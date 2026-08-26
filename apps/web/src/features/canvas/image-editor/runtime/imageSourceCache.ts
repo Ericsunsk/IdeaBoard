@@ -1,3 +1,4 @@
+import { i18n } from '../../../../shared/i18n'
 import { resolveFetchUrl } from '../../services/flowMediaIO'
 import { isAnimatedImageBlob, releaseCanvas } from '../utils/imageAdjustmentMedia'
 
@@ -245,20 +246,20 @@ function createCacheError(code: ImageSourceCacheErrorCode) {
 function resolveCacheErrorMessage(code: ImageSourceCacheErrorCode) {
   switch (code) {
     case 'invalid-url':
-      return '图片地址无效'
+      return i18n.global.t('canvas.imageEditor.errors.invalidImageUrl')
     case 'fetch-failed':
-      return '读取图片失败'
+      return i18n.global.t('canvas.imageEditor.errors.readImageFailed')
     case 'not-image':
-      return '读取到的文件不是图片'
+      return i18n.global.t('canvas.imageEditor.errors.notAnImage')
     case 'animated-image':
-      return '暂不支持编辑动图'
+      return i18n.global.t('canvas.imageEditor.errors.animatedUnsupported')
     case 'too-large':
-      return '图片尺寸过大，暂不支持在浏览器内编辑'
+      return i18n.global.t('canvas.imageEditor.errors.tooLargeToEdit')
     case 'unsupported-canvas':
-      return '当前浏览器不支持图像处理'
+      return i18n.global.t('canvas.imageEditor.errors.unsupportedCanvas')
     case 'disposed':
-      return '图像源缓存已释放'
+      return i18n.global.t('canvas.imageEditor.errors.cacheDisposed')
     case 'decode-failed':
-      return '图片解码失败'
+      return i18n.global.t('canvas.imageEditor.errors.decodeFailed')
   }
 }

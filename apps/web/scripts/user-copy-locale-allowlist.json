@@ -1,0 +1,10 @@
+[
+  {
+    "path": "src/shared/composables/useSiteBranding.ts",
+    "reason": "validateSiteBrandingSetting messages are consumed only by features/admin branding settings."
+  },
+  {
+    "path": "src/shared/utils/errorMessages.ts",
+    "reason": "INTERNAL_ERROR_PATTERN matches backend Chinese transport messages to sanitize them; not User copy."
+  }
+]

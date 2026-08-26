@@ -124,7 +124,7 @@ describe('ImageSourceCache', () => {
 
     await expect(cache.getFullSizeSource('https://example.com/large.png')).rejects.toMatchObject({
       code: 'too-large',
-      message: '图片尺寸过大，暂不支持在浏览器内编辑',
+      message: 'The image is too large to edit in the browser.',
     })
   })
 
@@ -159,7 +159,7 @@ describe('ImageSourceCache', () => {
     await expect(cache.getFullSizeSource('https://example.com/animated.gif')).rejects.toMatchObject(
       {
         code: 'animated-image',
-        message: '暂不支持编辑动图',
+        message: 'Animated images are not supported for editing.',
       },
     )
     expect(createImageBitmapMock).not.toHaveBeenCalled()
@@ -214,7 +214,7 @@ describe('ImageSourceCache', () => {
 
     await expect(source).rejects.toMatchObject({
       code: 'disposed',
-      message: '图像源缓存已释放',
+      message: 'Image source cache has been disposed.',
     })
     expect(bitmap.close).toHaveBeenCalledTimes(1)
     expect(canvases.at(-1)?.width).toBe(0)

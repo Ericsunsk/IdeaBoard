@@ -7,7 +7,7 @@
       type="button"
       :class="{ active: visible }"
       :disabled="disabled"
-      :aria-label="ariaLabel"
+      :aria-label="resolvedAriaLabel"
       @click.stop="emit('toggle')"
     >
       <span
@@ -49,6 +49,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   PROMPT_ASPECT_RATIO_OPTIONS,
   normalizePromptAspectRatio,
@@ -66,7 +67,7 @@ const props = withDefaults(
   }>(),
   {
     disabled: false,
-    ariaLabel: '尺寸比例',
+    ariaLabel: undefined,
     tooltip: undefined,
   },
 )
@@ -76,8 +77,11 @@ const emit = defineEmits<{
   (e: 'select', value: PromptAspectRatio): void
 }>()
 
+const { t } = useI18n()
+
 const ratio = computed(() => normalizePromptAspectRatio(props.modelValue))
-const resolvedTooltip = computed(() => props.tooltip || '选择尺寸比例')
+const resolvedAriaLabel = computed(() => props.ariaLabel || t('canvas.controls.aspectRatioLabel'))
+const resolvedTooltip = computed(() => props.tooltip || t('canvas.controls.aspectRatioTooltip'))
 </script>
 
 <style scoped>

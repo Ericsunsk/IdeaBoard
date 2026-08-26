@@ -65,10 +65,10 @@ describe('ImageEditorThresholdControl', () => {
       makeImageData([0, 0, 0, 255, 255, 255, 255, 255]),
     )
 
-    const plot = screen.getByRole('group', { name: '阈值直方图' })
+    const plot = screen.getByRole('group', { name: 'Threshold histogram' })
     const histogram = plot.querySelector<SVGPathElement>('.image-editor-histogram-plot__histogram')
     const marker = plot.querySelector<HTMLElement>('.image-editor-histogram-plot__marker')
-    const slider = within(plot).getByRole('slider', { name: '阈值 64' }) as HTMLInputElement
+    const slider = within(plot).getByRole('slider', { name: 'Threshold 64' }) as HTMLInputElement
     const guideLine = plot.querySelector<SVGLineElement>('.image-editor-histogram-plot__guide-line')
 
     expect(histogram?.getAttribute('d')).toContain('L 0 0')
@@ -86,7 +86,7 @@ describe('ImageEditorThresholdControl', () => {
 
   it('updates threshold params from native histogram range and numeric input', () => {
     const { events } = renderThresholdControl({ threshold: 64, invert: true })
-    const slider = screen.getByRole('slider', { name: '阈值 64' })
+    const slider = screen.getByRole('slider', { name: 'Threshold 64' })
 
     updateInputValue(slider, '192')
 
@@ -95,7 +95,7 @@ describe('ImageEditorThresholdControl', () => {
       invert: true,
     })
 
-    const numberInput = screen.getByLabelText('阈值', {
+    const numberInput = screen.getByLabelText('Threshold', {
       selector: 'input[type="number"]',
     })
 
@@ -111,7 +111,7 @@ describe('ImageEditorThresholdControl', () => {
 
   it('updates threshold params from native range input in channel units', () => {
     const { events } = renderThresholdControl({ threshold: 64, invert: false })
-    const slider = screen.getByRole('slider', { name: '阈值 64' })
+    const slider = screen.getByRole('slider', { name: 'Threshold 64' })
 
     updateInputValue(slider, '65')
     expect(events.updateParams).toHaveBeenCalledWith({
@@ -128,11 +128,11 @@ describe('ImageEditorThresholdControl', () => {
 
   it('updates invert params without changing the normalized threshold', async () => {
     const { events, user } = renderThresholdControl({ threshold: Number.NaN, invert: false })
-    const invertButton = screen.getByRole('button', { name: '反转阈值输出' })
+    const invertButton = screen.getByRole('button', { name: 'Invert threshold output' })
 
     expect(invertButton).toHaveAttribute('aria-pressed', 'false')
     expect(invertButton).toHaveClass('editing-controls-toggle-button')
-    expect(invertButton.querySelector('.node-tool-tooltip')?.textContent?.trim()).toBe('反转')
+    expect(invertButton.querySelector('.node-tool-tooltip')?.textContent?.trim()).toBe('Invert')
 
     await user.click(invertButton)
 

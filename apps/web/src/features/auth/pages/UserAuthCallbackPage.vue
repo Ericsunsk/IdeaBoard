@@ -6,7 +6,7 @@
       <p class="m-0 text-sm leading-6 text-ib-text-muted">{{ message }}</p>
       <Button
         v-if="status === 'failed'"
-        label="返回登录"
+        :label="t('auth.backToSignIn')"
         severity="secondary"
         outlined
         @click="returnToLogin"
@@ -18,6 +18,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useUserStore } from '../session/authSession'
@@ -27,13 +28,16 @@ import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const { t } = useI18n()
 const status = ref<'loading' | 'failed'>('loading')
 const rawRedirect = Array.isArray(route.query.redirect) ? route.query.redirect[0] : route.query.redirect
 const safeRedirect =
   typeof rawRedirect === 'string' && isSafeInternalRedirectPath(rawRedirect) ? rawRedirect : undefined
-const title = computed(() => (status.value === 'loading' ? '正在完成登录' : '登录未完成'))
+const title = computed(() =>
+  status.value === 'loading' ? t('auth.oauth.completingTitle') : t('auth.oauth.failedTitle'),
+)
 const message = computed(() =>
-  status.value === 'loading' ? '正在恢复你的 Session...' : 'OAuth 登录失败，请重新尝试。',
+  status.value === 'loading' ? t('auth.oauth.completingMessage') : t('auth.oauth.failedMessage'),
 )
 
 async function returnToLogin() {

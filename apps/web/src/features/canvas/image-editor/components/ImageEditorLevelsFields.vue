@@ -24,6 +24,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { ImageEditorLevelsParams } from '../types'
 import {
   moveLevelsHandle,
@@ -41,10 +42,12 @@ const emit = defineEmits<{
   (e: 'update:params', value: ImageEditorLevelsParams): void
 }>()
 
+const { t } = useI18n()
+
 const levelFields = [
-  { key: 'shadows', ariaLabel: '黑场' },
-  { key: 'midtones', ariaLabel: '中点' },
-  { key: 'highlights', ariaLabel: '白场' },
+  { key: 'shadows', ariaLabel: t('canvas.imageEditor.params.shadows') },
+  { key: 'midtones', ariaLabel: t('canvas.imageEditor.params.midtones') },
+  { key: 'highlights', ariaLabel: t('canvas.imageEditor.params.highlights') },
 ] satisfies Array<{
   key: ImageEditorLevelsInputHandleId
   ariaLabel: string

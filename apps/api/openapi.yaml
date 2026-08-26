@@ -4239,11 +4239,11 @@ components:
       type: string
       enum:
         - prompt-generation
-        - partial-edit
-        - remove-bg
+        - inpaint
+        - cutout
         - style-fusion
-        - sketch-to-image
-        - style-variation
+        - render
+        - variations
         - hd-upscale
         - outpaint
 
@@ -4251,11 +4251,11 @@ components:
       type: string
       enum:
         - prompt-generation
-        - partial-edit
-        - remove-bg
+        - inpaint
+        - cutout
         - style-fusion
-        - sketch-to-image
-        - style-variation
+        - render
+        - variations
         - hd-upscale
         - outpaint
 
@@ -4303,7 +4303,7 @@ components:
           $ref: '#/components/schemas/OutputResolution'
         prompt_upsampling: { type: boolean }
         variation:
-          $ref: '#/components/schemas/StyleVariationParams'
+          $ref: '#/components/schemas/VariationsParams'
         extend:
           $ref: '#/components/schemas/OutpaintParams'
         hd:
@@ -4325,7 +4325,7 @@ components:
         controls:
           $ref: '#/components/schemas/GenerationControls'
         variation:
-          $ref: '#/components/schemas/StyleVariationParams'
+          $ref: '#/components/schemas/VariationsParams'
         extend:
           $ref: '#/components/schemas/OutpaintParams'
         hd:
@@ -4393,7 +4393,7 @@ components:
           minimum: 1
         prompt_upsampling: { type: boolean }
 
-    StyleVariationParams:
+    VariationsParams:
       type: object
       required: [strength]
       additionalProperties: false

@@ -1,6 +1,8 @@
 import { computed, onScopeDispose, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppToast } from '../../shared/composables/useAppToast'
+import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
+import { i18n } from '../../shared/i18n'
 import {
   createFolder,
   getLibraryAssets,
@@ -134,7 +136,10 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
       hasMore.value = page.hasMore
     } catch (error) {
       if (requestID !== assetRequestID || requestFolder !== selectedFolder.value) return
-      errorMessage.value = error instanceof Error ? error.message : '加载素材失败'
+      errorMessage.value = userFacingErrorCopy(
+        error,
+        i18n.global.t('library.errors.loadAssetsFailed'),
+      )
     } finally {
       if (requestID === assetRequestID) loading.value = false
     }
@@ -143,7 +148,12 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
   async function loadFolders() {
     errorMessage.value = ''
     const result = await folderFacts.load()
-    if (result.status === 'error') errorMessage.value = result.error.message
+    if (result.status === 'error') {
+      errorMessage.value = userFacingErrorCopy(
+        result.error,
+        i18n.global.t('library.errors.loadFoldersFailed'),
+      )
+    }
   }
 
   function selectFolder(key: string) {
@@ -190,7 +200,7 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
       toast.success('Folder deleted')
       return true
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '删除收藏夹失败')
+      toast.error(userFacingErrorCopy(error, i18n.global.t('library.errors.deleteFolderFailed')))
       return false
     }
   }
@@ -215,7 +225,7 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
       toast.success('Asset moved')
       return true
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '移动素材失败')
+      toast.error(userFacingErrorCopy(error, i18n.global.t('library.errors.moveAssetFailed')))
       return false
     }
   }
@@ -234,7 +244,7 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
       })
       toast.success('Removed from Library')
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '移除素材失败')
+      toast.error(userFacingErrorCopy(error, i18n.global.t('library.errors.removeAssetFailed')))
     }
   }
 

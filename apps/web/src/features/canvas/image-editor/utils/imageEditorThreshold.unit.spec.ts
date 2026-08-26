@@ -26,7 +26,7 @@ describe('imageEditorThreshold', () => {
       id: 'threshold',
       position: (128 / 255) * 100,
       value: 128,
-      ariaLabel: '阈值 128',
+      ariaLabel: 'Threshold 128',
     })
   })
 

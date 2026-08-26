@@ -10,6 +10,7 @@ import {
 import { shouldShowChartTimeTick, type ChartTimeTickDensity } from '../../shared/lib/chartTimeRange'
 import { resolveChartAnimation } from '../../shared/motion/chartMotion'
 import { formatIdeaAmount } from '../../shared/utils/ideaCurrency'
+import { i18n } from '../../shared/i18n'
 
 export type UserUsageTrendPoint = {
   date: string
@@ -61,7 +62,7 @@ export function buildUserUsageTrendChart(
     datasets: [
       {
         type: 'line',
-        label: 'Idea消耗',
+        label: i18n.global.t('account.usage.chartTitle'),
         data: values,
         hidden: values.every((value) => value <= 0),
         borderColor: theme.accent,
@@ -97,7 +98,10 @@ export function buildUserUsageTrendChart(
           padding: 10,
           displayColors: false,
           callbacks: {
-            label: (context) => `Idea消耗：${formatIdeaAmount(getParsedY(context))}`,
+            label: (context) =>
+            i18n.global.t('account.usage.tooltipLabel', {
+              amount: formatIdeaAmount(getParsedY(context)),
+            }),
           },
         },
       },

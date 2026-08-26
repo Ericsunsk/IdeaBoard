@@ -27,11 +27,11 @@
         class="prompt-text-composer-image-add node-input-thumbnail-add node-tool-output-count node-tool-button node-tool-tooltip-trigger"
         type="button"
         :disabled="disabled"
-        aria-label="添加图片输入"
+        :aria-label="t('canvas.controls.addImageInput')"
         @click="emit('image-input-open')"
       >
         <Plus class="prompt-text-composer-image-add-icon size-4" />
-        <span class="node-tool-tooltip" aria-hidden="true">添加图片输入</span>
+        <span class="node-tool-tooltip" aria-hidden="true">{{ t('canvas.controls.addImageInput') }}</span>
       </button>
     </div>
     <PromptComposerControls
@@ -63,19 +63,13 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Plus } from '@iconoir/vue'
 import type { PromptAspectRatio } from '../../../../canvas-board/domain'
 import type { OutputResolution } from '../../../../../shared/domain/generationContract'
 import type { CanvasBillingQuoteState } from '../../../execution'
 import NodeInputThumbnail from './NodeInputThumbnail.vue'
 import PromptComposerControls from './PromptComposerControls.vue'
-
-type PromptTextComposerImageInput = {
-  id: string
-  url: string
-  ratio?: number
-  mediaAssetId?: number
-}
 
 const props = withDefaults(
   defineProps<{
@@ -127,6 +121,15 @@ const emit = defineEmits<{
   (e: 'focus'): void
   (e: 'submit', prompt: string, outputCount: number, aspectRatio: PromptAspectRatio): void
 }>()
+
+const { t } = useI18n()
+
+type PromptTextComposerImageInput = {
+  id: string
+  url: string
+  ratio?: number
+  mediaAssetId?: number
+}
 
 type PromptTextComposerVariant = 'node' | 'floating'
 

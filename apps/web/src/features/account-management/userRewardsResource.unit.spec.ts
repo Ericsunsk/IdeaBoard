@@ -57,12 +57,12 @@ describe('userRewardsResource', () => {
   })
 
   it.each([
-    [400, '参数错误'],
-    [422, '兑换码无效或已失效'],
-    [409, '你已兑换过该奖励'],
-    [423, '当前账户无法兑换奖励'],
-    [429, '操作频繁，请稍后重试'],
-    [500, '网络错误，请重试'],
+    [400, 'Invalid request.'],
+    [422, 'This redemption code is invalid or has expired.'],
+    [409, 'You have already redeemed this reward.'],
+    [423, 'This account cannot redeem rewards right now.'],
+    [429, 'Too many attempts. Please try again later.'],
+    [500, 'Network error. Please try again.'],
   ])('maps redemption HTTP %d to stable user copy', async (status, message) => {
     generated.redeemUserReward.mockRejectedValue(
       Object.assign(new Error('unsafe upstream detail'), { status }),
@@ -74,6 +74,6 @@ describe('userRewardsResource', () => {
   it('maps redemption transport failures to stable user copy', async () => {
     generated.redeemUserReward.mockRejectedValue(new Error('fetch failed'))
 
-    await expect(redeemUserRewardCode('IDEA2026')).rejects.toThrow('网络错误，请重试')
+    await expect(redeemUserRewardCode('IDEA2026')).rejects.toThrow('Network error. Please try again.')
   })
 })

@@ -1,22 +1,43 @@
+import { i18n } from '../../shared/i18n'
+
 const MIN_IDEA_QUANTITY = 500
 const MAX_IDEA_QUANTITY = 500_000
 const integerPattern = /^\d+$/
+
+function integerQuantityLabel(value: number): string {
+  return value.toLocaleString('en-US')
+}
+
+function integerRangeError(): string {
+  return i18n.global.t('account.errors.quantityIntegerRange', {
+    min: integerQuantityLabel(MIN_IDEA_QUANTITY),
+    max: integerQuantityLabel(MAX_IDEA_QUANTITY),
+  })
+}
 
 export type IdeaQuantityParseResult = { ok: true; value: number } | { ok: false; error: string }
 
 export function parseIdeaQuantity(rawValue: string): IdeaQuantityParseResult {
   const value = rawValue.trim()
-  if (!value) return { ok: false, error: '请输入充值数量' }
+  if (!value) return { ok: false, error: i18n.global.t('account.errors.quantityRequired') }
   if (!integerPattern.test(value)) {
-    return { ok: false, error: '请输入 500–500,000 之间的整数' }
+    return { ok: false, error: integerRangeError() }
   }
 
   const quantity = Number(value)
   if (!Number.isSafeInteger(quantity)) {
-    return { ok: false, error: '请输入 500–500,000 之间的整数' }
+    return { ok: false, error: integerRangeError() }
   }
-  if (quantity < MIN_IDEA_QUANTITY) return { ok: false, error: '最少充值 500 Ideas' }
-  if (quantity > MAX_IDEA_QUANTITY) return { ok: false, error: '最多充值 500,000 Ideas' }
+  if (quantity < MIN_IDEA_QUANTITY) {
+    return { ok: false, error: i18n.global.t('account.errors.quantityBelowMin', {
+      min: integerQuantityLabel(MIN_IDEA_QUANTITY),
+    }) }
+  }
+  if (quantity > MAX_IDEA_QUANTITY) {
+    return { ok: false, error: i18n.global.t('account.errors.quantityAboveMax', {
+      max: integerQuantityLabel(MAX_IDEA_QUANTITY),
+    }) }
+  }
   return { ok: true, value: quantity }
 }
 

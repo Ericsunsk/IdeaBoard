@@ -1,6 +1,8 @@
 import type { AsyncActionFeedback } from '../../shared/composables/useAsyncAction'
 import { useAppToast } from '../../shared/composables/useAppToast'
-import { formatDisplayErrorMessage } from '../../shared/utils/errorMessages'
+import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
+import { formatIdeaAmount } from '../../shared/utils/ideaCurrency'
+import { i18n } from '../../shared/i18n'
 
 type ProfileToast = Pick<ReturnType<typeof useAppToast>, 'success' | 'info' | 'warning' | 'error'>
 
@@ -16,31 +18,41 @@ export type ProfileFeedback = {
 export function createProfileFeedback(appToast: ProfileToast): ProfileFeedback {
   return {
     invalidAvatarFile() {
-      appToast.warning('仅支持上传图片文件')
+      appToast.warning(i18n.global.t('account.toast.avatarFileUnsupported'))
     },
     logoutFailed() {
-      appToast.error('退出登录失败，请稍后重试')
+      appToast.error(i18n.global.t('account.toast.signOutFailed'))
     },
     rewardRedemptionSucceeded(creditedAmount, replayed) {
-      appToast.success(replayed ? '奖励已兑换，未重复发放' : `${creditedAmount} Ideas 已到账`)
+      appToast.success(
+        replayed
+          ? i18n.global.t('account.toast.rewardAlreadyRedeemed')
+          : i18n.global.t('account.toast.rewardCredited', {
+              amount: formatIdeaAmount(creditedAmount),
+            }),
+      )
     },
     rewardRedemptionFailed(error) {
-      appToast.error(formatDisplayErrorMessage(error, '网络错误，请重试'))
+      appToast.error(userFacingErrorCopy(error, i18n.global.t('account.errors.networkRetry')))
     },
     avatarUpload: {
       success() {
-        appToast.success('头像已更新')
+        appToast.success(i18n.global.t('account.toast.avatarUpdated'))
       },
       error(error) {
-        appToast.error(formatDisplayErrorMessage(error, '头像更新失败'))
+        appToast.error(
+          userFacingErrorCopy(error, i18n.global.t('account.toast.avatarUpdateFailed')),
+        )
       },
     },
     passwordChange: {
       success() {
-        appToast.success('密码更新成功，请重新登录')
+        appToast.success(i18n.global.t('account.toast.passwordUpdated'))
       },
       error(error) {
-        appToast.error(formatDisplayErrorMessage(error, '密码更新失败'))
+        appToast.error(
+          userFacingErrorCopy(error, i18n.global.t('account.toast.passwordUpdateFailed')),
+        )
       },
     },
   }

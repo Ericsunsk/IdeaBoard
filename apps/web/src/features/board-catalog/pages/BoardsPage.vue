@@ -49,11 +49,11 @@
       </section>
 
       <div v-if="catalogRecoveryBoardId" :class="boardCatalogClasses.recoveryState" role="alert">
-        <span :class="boardCatalogClasses.recoveryText">画布列表需要重新加载</span>
+        <span :class="boardCatalogClasses.recoveryText">{{ t('workspace.catalog.reloadRequired') }}</span>
         <Button
           unstyled
           type="button"
-          :label="isCatalogReloadPending ? '重新加载中...' : '重新加载'"
+          :label="isCatalogReloadPending ? t('workspace.catalog.reloading') : t('workspace.catalog.reload')"
           :disabled="isCatalogReloadPending"
           :class="boardCatalogClasses.recoveryButton"
           @click="reloadCatalog"
@@ -130,17 +130,21 @@
     >
       <div :class="boardCatalogClasses.deleteDialogShell">
         <h2 id="board-delete-dialog-title" :class="boardCatalogClasses.deleteDialogTitle">
-          删除画布
+          {{ t('workspace.deleteDialog.title') }}
         </h2>
         <p :class="boardCatalogClasses.deleteDialogDescription">
-          确认删除「{{ pendingDeleteBoard?.name || 'Untitled' }}」？此操作不可撤销。
+          {{
+            t('workspace.deleteDialog.description', {
+              name: pendingDeleteBoard?.name || 'Untitled',
+            })
+          }}
         </p>
 
         <div :class="boardCatalogClasses.deleteDialogFooter">
           <Button
             unstyled
             type="button"
-            label="取消"
+            :label="t('common.actions.cancel')"
             :disabled="isDeletePending"
             :class="boardCatalogClasses.deleteCancelButton"
             @click="requestDeleteDialogClose('close-control')"
@@ -148,7 +152,7 @@
           <Button
             unstyled
             type="button"
-            :label="isDeletePending ? '删除中...' : '删除'"
+            :label="isDeletePending ? t('workspace.deleteDialog.deleting') : t('common.actions.delete')"
             :disabled="isDeletePending"
             :class="boardCatalogClasses.deleteConfirmButton"
             @click="confirmDelete"
@@ -162,6 +166,7 @@
 <script setup lang="ts">
 import '../styles/board-surface-skin.css'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import BoardCard from '../components/BoardCard.vue'
 import {
   boardCatalogClasses,
@@ -187,6 +192,7 @@ import { useUserAccountControls } from '../../user-shell/useUserAccountControls'
 import { formatBoardCatalogDate, useBoardsCatalog } from '../boardsCatalog'
 
 const router = useRouter()
+const { t } = useI18n()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const { projectName } = useSiteBranding()

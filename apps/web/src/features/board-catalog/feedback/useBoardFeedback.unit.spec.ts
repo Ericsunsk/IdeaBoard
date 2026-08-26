@@ -40,22 +40,22 @@ describe('createBoardFeedback', () => {
     feedback.catalogReloaded()
 
     expect(appToast.warning.mock.calls.map(([message]) => message)).toEqual([
-      '名称已存在',
-      '画布名称不能为空',
+      'Name already exists',
+      'Canvas name cannot be empty',
     ])
     expect(appToast.error.mock.calls.map(([message]) => message)).toEqual([
-      '画布名称已存在，请重试',
-      '创建同步失败，请稍后重试',
-      '名称冲突，已重新加载画布列表',
-      '重命名同步失败，已恢复原名称',
-      '复制失败',
-      '复制后的画布名称已存在，请重试',
-      '复制同步失败，请稍后重试',
-      '删除失败，请稍后重试',
-      '删除失败',
-      '画布同步失败，请稍后重试',
+      'A canvas with this name already exists. Please try again.',
+      'Could not create the canvas. Please try again later.',
+      'Name conflict. The canvas list has been reloaded.',
+      'Rename sync failed. The original name has been restored.',
+      'Copy failed',
+      'A canvas with the copied name already exists. Please try again.',
+      'Copy sync failed. Please try again later.',
+      'Delete failed. Please try again later.',
+      'Delete failed',
+      'Canvas sync failed. Please try again later.',
     ])
-    expect(appToast.success).toHaveBeenCalledWith('画布列表已重新加载')
+    expect(appToast.success).toHaveBeenCalledWith('Canvas list reloaded')
   })
 })
 

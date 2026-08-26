@@ -17,7 +17,7 @@ describe('CanvasSelectionGroupActionButton', () => {
     const onActivate = vi.fn()
     const { container } = render(CanvasSelectionGroupActionButton, {
       props: {
-        action: { kind: 'group', label: '组合', nodeIds: ['prompt-1', 'prompt-2'] },
+        action: { kind: 'group', label: 'Group', nodeIds: ['prompt-1', 'prompt-2'] },
         position: { x: 420, y: 88 },
         onActivate,
       },
@@ -25,13 +25,13 @@ describe('CanvasSelectionGroupActionButton', () => {
     })
 
     const button = container.querySelector('button')
-    expect(button?.getAttribute('aria-label')).toBe('组合')
-    expect(button?.getAttribute('title')).toBe('组合')
+    expect(button?.getAttribute('aria-label')).toBe('Group')
+    expect(button?.getAttribute('title')).toBe('Group')
     expect(button?.getAttribute('class')).toContain('ib-round-control')
     expect(button?.getAttribute('class')).toContain('canvas-chrome-icon-button')
     expect(button?.style.left).toBe('420px')
     expect(button?.style.top).toBe('88px')
-    expect(container.querySelector('.node-tool-tooltip')?.textContent).toBe('组合')
+    expect(container.querySelector('.node-tool-tooltip')?.textContent).toBe('Group')
     expect(container.querySelector('[data-testid="group-action-transition"]')).toHaveAttribute(
       'data-transition-name',
       'ib-popover-motion',
@@ -46,7 +46,7 @@ describe('CanvasSelectionGroupActionButton', () => {
       props: {
         action: {
           kind: 'ungroup',
-          label: '解组',
+          label: 'Ungroup',
           groupId: 'group-1',
           nodeIds: ['prompt-1', 'prompt-2'],
         },
@@ -54,8 +54,8 @@ describe('CanvasSelectionGroupActionButton', () => {
       },
     })
 
-    expect(visible.container.querySelector('button')?.getAttribute('aria-label')).toBe('解组')
-    expect(visible.container.querySelector('.node-tool-tooltip')?.textContent).toBe('解组')
+    expect(visible.container.querySelector('button')?.getAttribute('aria-label')).toBe('Ungroup')
+    expect(visible.container.querySelector('.node-tool-tooltip')?.textContent).toBe('Ungroup')
     expect(visible.container.querySelector('button')?.style.left).toBe('270px')
     expect(visible.container.querySelector('button')?.style.top).toBe('88px')
 
@@ -74,7 +74,7 @@ describe('CanvasSelectionGroupActionButton', () => {
       props: {
         action: {
           kind: 'ungroup',
-          label: '解组',
+          label: 'Ungroup',
           groupId: 'group-1',
           nodeIds: [],
         },

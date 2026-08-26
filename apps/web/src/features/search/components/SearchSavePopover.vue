@@ -81,10 +81,12 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Popover from 'primevue/popover'
 import { Bookmark, Folder, Search } from '@iconoir/vue'
 import type { SearchResult } from '../searchResource'
 import { useAppToast } from '../../../shared/composables/useAppToast'
+import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { createPopoverMotionPt } from '../../../shared/motion/popoverMotion'
 import type { PopoverPassThroughOptions } from 'primevue/popover'
 import { useSearchLibraryCoordinator } from '../searchLibraryCoordinator'
@@ -114,6 +116,7 @@ const emit = defineEmits<{
 }>()
 
 const toast = useAppToast()
+const { t } = useI18n()
 const popover = ref<PrimePopover | null>(null)
 const searchInputRef = ref<HTMLInputElement>()
 const activeRequest = shallowRef<OpenRequest | null>(null)
@@ -213,7 +216,7 @@ async function handleUnsave(request: SearchSavePopoverRequest) {
     await library.removeReference(request.result.provider, request.result.id)
     toast.success('Removed from your Library')
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : '移除素材失败')
+    toast.error(userFacingErrorCopy(error, t('library.errors.removeAssetFailed')))
   } finally {
     saving.value = false
   }
@@ -281,7 +284,7 @@ async function persist(folderId?: number, newFolderName?: string) {
       newFolderName || folders.value.find((folder) => folder.id === folderId)?.name || 'Quick Saves'
     toast.success(`Saved to "${targetName}" in your Personal Library!`)
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : '保存素材失败')
+    toast.error(userFacingErrorCopy(error, t('library.errors.saveAssetFailed')))
   } finally {
     saving.value = false
   }

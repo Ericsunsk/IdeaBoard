@@ -9,6 +9,7 @@ import type {
   RewardRedemptionHistoryPage,
 } from '../../shared/api/generated-query/model'
 import { resolveApiData } from '../../shared/api/apiResponse'
+import { i18n } from '../../shared/i18n'
 
 export type UserRewardRedeemResult = RewardRedeemResult
 export type UserRewardRedemption = RewardRedemptionHistoryItem
@@ -20,7 +21,7 @@ export const userRewardRedemptionsQueryKeys = {
 
 export async function redeemUserRewardCode(code: string): Promise<UserRewardRedeemResult> {
   try {
-    return await resolveApiData(redeemUserReward({ code }), '网络错误，请重试')
+    return await resolveApiData(redeemUserReward({ code }), i18n.global.t('account.errors.networkRetry'))
   } catch (error) {
     throw new Error(rewardRedemptionErrorMessage(error), { cause: error })
   }
@@ -33,17 +34,17 @@ function rewardRedemptionErrorMessage(error: unknown): string {
       : 0
   switch (status) {
     case 400:
-      return '参数错误'
+      return i18n.global.t('account.errors.redeemInvalidRequest')
     case 422:
-      return '兑换码无效或已失效'
+      return i18n.global.t('account.errors.redeemCodeInvalid')
     case 409:
-      return '你已兑换过该奖励'
+      return i18n.global.t('account.errors.redeemAlreadyUsed')
     case 423:
-      return '当前账户无法兑换奖励'
+      return i18n.global.t('account.errors.redeemNotAllowed')
     case 429:
-      return '操作频繁，请稍后重试'
+      return i18n.global.t('account.errors.tooManyRequests')
     default:
-      return '网络错误，请重试'
+      return i18n.global.t('account.errors.networkRetry')
   }
 }
 
@@ -51,5 +52,8 @@ export async function fetchUserRewardRedemptions(
   params: ListUserRewardRedemptionsParams,
   signal?: AbortSignal,
 ): Promise<UserRewardRedemptionPage> {
-  return resolveApiData(listUserRewardRedemptions(params, { signal }), '加载兑换记录失败')
+  return resolveApiData(
+      listUserRewardRedemptions(params, { signal }),
+      i18n.global.t('account.errors.rewardsHistoryLoadFailed'),
+    )
 }

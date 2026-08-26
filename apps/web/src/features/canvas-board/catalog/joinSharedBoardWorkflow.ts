@@ -1,5 +1,6 @@
 import { joinBoardByShareToken } from '../../../shared/api/generated-query/boards/boards'
 import { resolveApiData } from '../../../shared/api/apiResponse'
+import { i18n } from '../../../shared/i18n'
 import { useCanvasBoardCatalog } from './canvasBoardCatalog'
 
 export interface JoinSharedCanvasBoardResult {
@@ -16,16 +17,16 @@ export async function joinSharedCanvasBoardByToken(
   token: string,
 ): Promise<JoinSharedCanvasBoardResult> {
   const boardCatalog = useCanvasBoardCatalog()
-  const normalizedToken = normalizeRequiredText(token, '缺少分享令牌')
+  const normalizedToken = normalizeRequiredText(token, i18n.global.t('workspace.joinSharedBoard.missingToken'))
   const data = await resolveApiData(
     joinBoardByShareToken({ token: normalizedToken }),
-    '加入共享画布失败',
+    i18n.global.t('workspace.joinSharedBoard.joinFailed'),
   )
-  const boardId = normalizeRequiredText(data.board?.board_id, '服务端未返回可用画布 ID')
+  const boardId = normalizeRequiredText(data.board?.board_id, i18n.global.t('workspace.joinSharedBoard.missingBoardId'))
 
   const hydrateResult = await boardCatalog.commands.hydrate()
   if (!hydrateResult.ok) {
-    throw new Error('画布同步失败，请稍后重试', { cause: hydrateResult.error })
+    throw new Error(i18n.global.t('workspace.joinSharedBoard.hydrateFailed'), { cause: hydrateResult.error })
   }
 
   return { boardId }

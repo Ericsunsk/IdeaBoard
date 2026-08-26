@@ -76,13 +76,13 @@ describe('UserUsagePane', () => {
 
     renderUsagePane()
 
-    expect(screen.getByRole('heading', { name: '用量统计' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Usage' })).toBeVisible()
     expect(screen.queryByText('Lifetime 数据 · Asia/Shanghai')).not.toBeInTheDocument()
-    expect(screen.getByRole('region', { name: '用量摘要' })).toHaveTextContent('1,234')
-    expect(screen.getByRole('region', { name: '用量摘要' })).toHaveTextContent('12.5')
-    expect(screen.getByRole('region', { name: '用量摘要' })).not.toHaveTextContent('Ideas')
-    expect(screen.getByText('调用次数')).toBeVisible()
-    expect(screen.getByText('累计活跃天数')).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Usage summary' })).toHaveTextContent('1,234')
+    expect(screen.getByRole('region', { name: 'Usage summary' })).toHaveTextContent('12.5')
+    expect(screen.getByRole('region', { name: 'Usage summary' })).not.toHaveTextContent('Ideas')
+    expect(screen.getByText('Tasks run')).toBeVisible()
+    expect(screen.getByText('Active days')).toBeVisible()
   })
 
   it('keeps the responsive 2x2 plus spanning-row contract without viewport font sizing', () => {
@@ -102,7 +102,7 @@ describe('UserUsagePane', () => {
 
     renderUsagePane()
 
-    const panel = screen.getByRole('region', { name: '用量摘要' })
+    const panel = screen.getByRole('region', { name: 'Usage summary' })
     const cells = panel.querySelectorAll('article')
     expect(cells).toHaveLength(5)
     expect(cells[0]).toHaveClass('max-[640px]:border-b')
@@ -133,13 +133,13 @@ describe('UserUsagePane', () => {
 
     renderUsagePane()
 
-    const summary = within(screen.getByRole('region', { name: '用量摘要' }))
-    expect(summary.getByText('总消耗')).toBeVisible()
+    const summary = within(screen.getByRole('region', { name: 'Usage summary' }))
+    expect(summary.getByText('Total used')).toBeVisible()
     expect(summary.getAllByText('0')).toHaveLength(5)
     expect(summary.queryByText('0 Ideas')).not.toBeInTheDocument()
     expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-points', '30')
     expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-datasets', '1')
-    const table = screen.getByRole('table', { name: '最近 30 天Idea消耗明细' })
+    const table = screen.getByRole('table', { name: 'Last 30 days ideas usage details' })
     expect(table).toHaveClass('sr-only')
     expect(table.querySelectorAll('tbody tr')).toHaveLength(30)
     expect(
@@ -147,7 +147,7 @@ describe('UserUsagePane', () => {
         (cell) => cell.textContent === '0 Ideas',
       ),
     ).toBe(true)
-    expect(screen.queryByText('暂无数据')).not.toBeInTheDocument()
+    expect(screen.queryByText('Nothing here yet')).not.toBeInTheDocument()
   })
 
   it('shows a local skeleton while the first request is pending', () => {
@@ -157,7 +157,7 @@ describe('UserUsagePane', () => {
 
     renderUsagePane()
 
-    const skeleton = screen.getByLabelText('正在加载用量统计')
+    const skeleton = screen.getByLabelText('Loading usage statistics…')
     expect(skeleton).toBeVisible()
     const cells = skeleton.querySelectorAll('article')
     expect(cells).toHaveLength(5)
@@ -169,11 +169,11 @@ describe('UserUsagePane', () => {
       'max-[640px]:p-4',
     )
     expect(cells[4]).toHaveClass('max-[640px]:col-span-2')
-    expect(screen.getByLabelText('正在加载Idea消耗趋势')).toBeVisible()
+    expect(screen.getByLabelText('Loading ideas-used trend…')).toBeVisible()
     const trendSkeleton = screen.getByTestId('usage-trend-skeleton')
     expect(trendSkeleton).toHaveClass('h-full')
     expect(trendSkeleton.parentElement).toHaveClass('h-[240px]', 'md:h-[278px]')
-    expect(screen.queryByRole('region', { name: '用量摘要' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Usage summary' })).not.toBeInTheDocument()
   })
 
   it('uses identical cell wrapper heights while loading and loaded', () => {
@@ -182,7 +182,7 @@ describe('UserUsagePane', () => {
     usageState.error.value = null
     renderUsagePane()
     const loadingClasses = Array.from(
-      screen.getByLabelText('正在加载用量统计').querySelectorAll('article'),
+      screen.getByLabelText('Loading usage statistics…').querySelectorAll('article'),
     ).map((cell) => cell.className)
     cleanup()
 
@@ -200,7 +200,7 @@ describe('UserUsagePane', () => {
     usageState.isInitialPending.value = false
     renderUsagePane()
     const loadedClasses = Array.from(
-      screen.getByRole('region', { name: '用量摘要' }).querySelectorAll('article'),
+      screen.getByRole('region', { name: 'Usage summary' }).querySelectorAll('article'),
     ).map((cell) => cell.className)
 
     expect(loadedClasses).toEqual(loadingClasses)
@@ -228,16 +228,16 @@ describe('UserUsagePane', () => {
 
     renderUsagePane()
 
-    expect(screen.getByRole('region', { name: 'Idea消耗趋势' })).toBeVisible()
-    expect(screen.getByRole('button', { name: '月' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('region', { name: 'Last 30 days ideas-used trend' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Month' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByTestId('usage-trend-chart')).toHaveClass('h-full', 'w-full', 'min-w-0')
     expect(screen.getByTestId('usage-trend-chart').parentElement).toHaveClass(
       'h-[240px]',
       'md:h-[278px]',
     )
     expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-points', '30')
-    const chartImage = screen.getByRole('img', { name: '最近 30 天Idea消耗趋势' })
-    const table = screen.getByRole('table', { name: '最近 30 天Idea消耗明细' })
+    const chartImage = screen.getByRole('img', { name: 'Last 30 days ideas-used trend' })
+    const table = screen.getByRole('table', { name: 'Last 30 days ideas usage details' })
     expect(chartImage).toHaveAttribute('aria-describedby', table.querySelector('caption')?.id)
     expect(table.querySelectorAll('tbody tr')).toHaveLength(30)
     expect(table).toHaveTextContent('2026-07-30')
@@ -252,8 +252,8 @@ describe('UserUsagePane', () => {
 
     const { user } = renderUsagePane()
 
-    expect(screen.getByRole('alert')).toHaveTextContent('网络异常')
-    await user.click(screen.getByRole('button', { name: '重新加载' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Please try again later.')
+    await user.click(screen.getByRole('button', { name: 'Reload' }))
     expect(usageState.retry).toHaveBeenCalledOnce()
   })
 
@@ -275,30 +275,30 @@ describe('UserUsagePane', () => {
     usageState.error.value = null
 
     const { user } = renderUsagePane()
-    const group = screen.getByRole('group', { name: '趋势时间范围' })
+    const group = screen.getByRole('group', { name: 'Trend time range' })
     expect(group).toHaveClass('p-selectbutton')
-    const trendSection = screen.getByRole('region', { name: 'Idea消耗趋势' })
-    const chartHeading = screen.getByRole('heading', { name: 'Idea消耗' })
+    const trendSection = screen.getByRole('region', { name: 'Last 30 days ideas-used trend' })
+    const chartHeading = screen.getByRole('heading', { name: 'Ideas used' })
     const trendHeader = chartHeading.parentElement?.parentElement
     if (!trendHeader) throw new Error('ChartCard header is missing')
     expect(trendHeader).toHaveClass('flex', 'flex-wrap', 'items-start', 'justify-between', 'gap-3')
     expect(trendHeader).toContainElement(group)
     expect(trendSection).toContainElement(trendHeader)
     expect(chartHeading).toBeVisible()
-    expect(
-      screen.getByRole('heading', { name: '用量统计' }).closest('header'),
-    ).not.toContainElement(group)
-    const month = screen.getByRole('button', { name: '月' })
+    expect(screen.getByRole('heading', { name: 'Usage' }).closest('header')).not.toContainElement(
+      group,
+    )
+    const month = screen.getByRole('button', { name: 'Month' })
     expect(month).toHaveAttribute('aria-pressed', 'true')
     expect(month).toHaveClass('p-togglebutton-sm')
 
-    const year = screen.getByRole('button', { name: '年' })
+    const year = screen.getByRole('button', { name: 'Year' })
     year.focus()
     await user.keyboard('{Enter}')
     expect(year).toHaveAttribute('aria-pressed', 'true')
     expect(selectedRangeRef?.value).toBe('1y')
 
-    const week = screen.getByRole('button', { name: '周' })
+    const week = screen.getByRole('button', { name: 'Week' })
     week.focus()
     await user.keyboard(' ')
     expect(week).toHaveAttribute('aria-pressed', 'true')
@@ -325,12 +325,12 @@ describe('UserUsagePane', () => {
 
     const { user } = renderUsagePane()
 
-    expect(screen.getByRole('region', { name: '用量摘要' })).toHaveTextContent('99')
+    expect(screen.getByRole('region', { name: 'Usage summary' })).toHaveTextContent('99')
     expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-points', '30')
-    expect(screen.getByRole('button', { name: '月' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Month' })).toHaveAttribute('aria-pressed', 'true')
     const alert = screen.getByRole('alert')
-    expect(alert).toHaveTextContent('周趋势加载失败')
-    await user.click(screen.getByRole('button', { name: '重试当前范围' }))
+    expect(alert).toHaveTextContent('Please try again later.')
+    await user.click(screen.getByRole('button', { name: 'Retry current range' }))
     expect(usageState.retry).toHaveBeenCalledOnce()
   })
 })

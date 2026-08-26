@@ -1,4 +1,5 @@
 import { uploadApi } from '../../../../shared/api/upload'
+import { i18n } from '../../../../shared/i18n'
 import { isDataUrl } from '../../services/flowMediaIO'
 
 interface EnsureFlowMaskImageUrlOptions {
@@ -21,7 +22,7 @@ export async function ensureFlowMaskImageUrl(
 
   const boardId = options.boardId?.trim() ?? ''
   if (!boardId) {
-    throw new Error('缺少 boardId，无法上传蒙版')
+    throw new Error(i18n.global.t('canvas.execution.missingBoardIdMask'))
   }
   const file = await dataUrlToFile(next, `flow-mask-${Date.now()}.png`)
   return (await uploadApi.upload(file, boardId)).url

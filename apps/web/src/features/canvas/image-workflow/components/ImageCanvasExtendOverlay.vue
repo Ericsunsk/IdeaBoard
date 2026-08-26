@@ -26,7 +26,7 @@
           v-model="promptDraft"
           class="image-node-expand-composer"
           offset="10px"
-          placeholder="输入扩图提示词"
+          :placeholder="outpaintPromptPlaceholder"
           :allow-empty="true"
           :output-count="1"
           :show-output-count="false"
@@ -49,6 +49,7 @@ import {
 import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 import { useCanvasBillingQuote } from '../../execution'
 import { buildCanvasExtendReadinessRequest } from '../../execution/commands/flowImageTaskRequests'
+import { i18n } from '../../../../shared/i18n'
 
 const props = defineProps<{
   overlayStyle: Record<string, string>
@@ -65,6 +66,7 @@ const emit = defineEmits<{
 
 const promptDraft = ref('')
 const anchors = CANVAS_EXTEND_DRAG_ANCHORS
+const outpaintPromptPlaceholder = i18n.global.t('canvas.tools.outpaintPromptPlaceholder')
 const billingQuote = useCanvasBillingQuote(
   () => WORKFLOW_FEATURE.outpaint,
   () => true,

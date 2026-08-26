@@ -12,8 +12,8 @@ import (
 
 func TestBillableItemRegistryRejectsDuplicateSKUs(t *testing.T) {
 	_, err := NewBillableItemRegistry([]BillableItemDefinition{
-		{SKU: "ai-image:partial-edit", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "局部重绘"},
-		{SKU: "AI-IMAGE:PARTIAL-EDIT", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "重复项"},
+		{SKU: "ai-image:inpaint", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "局部重绘"},
+		{SKU: "AI-IMAGE:INPAINT", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "重复项"},
 	})
 
 	if !errors.Is(err, ErrDuplicateBillableItem) {
@@ -23,8 +23,8 @@ func TestBillableItemRegistryRejectsDuplicateSKUs(t *testing.T) {
 
 func TestBillableItemRegistryReturnsDeterministicCopies(t *testing.T) {
 	registry, err := NewBillableItemRegistry([]BillableItemDefinition{
-		{SKU: "ai-image:remove-bg", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "抠图", SortOrder: 20, PricingVariants: []OutputResolution{OutputResolutionDefault}},
-		{SKU: "ai-image:partial-edit", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "局部重绘", SortOrder: 10},
+		{SKU: "ai-image:cutout", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "抠图", SortOrder: 20, PricingVariants: []OutputResolution{OutputResolutionDefault}},
+		{SKU: "ai-image:inpaint", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "局部重绘", SortOrder: 10},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -35,13 +35,13 @@ func TestBillableItemRegistryReturnsDeterministicCopies(t *testing.T) {
 	first[0].PricingVariants[0] = OutputResolution1K
 	second := registry.Items()
 
-	if got := string(second[0].SKU); got != "ai-image:partial-edit" {
+	if got := string(second[0].SKU); got != "ai-image:inpaint" {
 		t.Fatalf("expected registry order by sort order, got %q", got)
 	}
 	if got := second[0].DisplayName; got != "局部重绘" {
 		t.Fatalf("registry leaked caller mutation: %q", got)
 	}
-	removeBg, _ := registry.Find("ai-image:remove-bg")
+	removeBg, _ := registry.Find("ai-image:cutout")
 	if removeBg.PricingVariants[0] != OutputResolutionDefault {
 		t.Fatalf("registry leaked pricing variants mutation: %v", removeBg.PricingVariants)
 	}
@@ -79,8 +79,8 @@ func TestBillableCatalogMergesRegistryAndPersistedFacts(t *testing.T) {
 	activePriceTwo := PriceInfo{PriceVersionID: 14, Version: 1, OutputResolution: OutputResolution1K, UnitCredits: 12, CreatedAt: now}
 	archivedPrice := PriceInfo{PriceVersionID: 13, Version: 3, OutputResolution: OutputResolution1K, UnitCredits: 50, CreatedAt: now}
 	registry, err := NewBillableItemRegistry([]BillableItemDefinition{
-		{SKU: "ai-image:partial-edit", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "局部重绘", Description: "只修改选区", SortOrder: 10},
-		{SKU: "ai-image:remove-bg", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "抠图", SortOrder: 20, PricingVariants: []OutputResolution{OutputResolutionDefault}},
+		{SKU: "ai-image:inpaint", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "局部重绘", Description: "只修改选区", SortOrder: 10},
+		{SKU: "ai-image:cutout", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "抠图", SortOrder: 20, PricingVariants: []OutputResolution{OutputResolutionDefault}},
 		{SKU: "ai-image:hd-upscale", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "HD", SortOrder: 30},
 		{SKU: "ai-image:outpaint", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "扩图", SortOrder: 40},
 	})
@@ -88,8 +88,8 @@ func TestBillableCatalogMergesRegistryAndPersistedFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	facts := catalogFactReaderStub{items: []CatalogItem{
-		{SKU: "ai-image:partial-edit", Enabled: true, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolution1K: activePrice}, UpdatedAt: now},
-		{SKU: "ai-image:remove-bg", Enabled: false, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolutionDefault: disabledPrice}, UpdatedAt: now},
+		{SKU: "ai-image:inpaint", Enabled: true, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolution1K: activePrice}, UpdatedAt: now},
+		{SKU: "ai-image:cutout", Enabled: false, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolutionDefault: disabledPrice}, UpdatedAt: now},
 		{SKU: "ai-image:outpaint", Enabled: true, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolution1K: activePriceTwo}, UpdatedAt: now},
 		{SKU: "legacy:removed", DisplayName: "旧功能", Description: "已从 Registry 移除", Enabled: true, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolution1K: archivedPrice}, UpdatedAt: now},
 	}}
@@ -102,8 +102,8 @@ func TestBillableCatalogMergesRegistryAndPersistedFacts(t *testing.T) {
 	if len(items) != 5 {
 		t.Fatalf("expected five catalog cards, got %d", len(items))
 	}
-	assertCatalogCard(t, items[0], "ai-image:partial-edit", BillableItemStatusActive, "局部重绘")
-	assertCatalogCard(t, items[1], "ai-image:remove-bg", BillableItemStatusDisabled, "抠图")
+	assertCatalogCard(t, items[0], "ai-image:inpaint", BillableItemStatusActive, "局部重绘")
+	assertCatalogCard(t, items[1], "ai-image:cutout", BillableItemStatusDisabled, "抠图")
 	assertCatalogCard(t, items[2], "ai-image:hd-upscale", BillableItemStatusUnpriced, "HD")
 	assertCatalogCard(t, items[3], "ai-image:outpaint", BillableItemStatusActive, "扩图")
 	assertCatalogCard(t, items[4], "legacy:removed", BillableItemStatusArchived, "旧功能")
@@ -151,7 +151,7 @@ func (s *catalogFactReaderStub) QuoteAtResolutionInTx(context.Context, pgx.Tx, s
 
 func TestBillableCatalogPublishesOnlyRegisteredItems(t *testing.T) {
 	registry, err := NewBillableItemRegistry([]BillableItemDefinition{{
-		SKU: "ai-image:partial-edit", Namespace: "ai-image", ProductKind: "workflow-feature",
+		SKU: "ai-image:inpaint", Namespace: "ai-image", ProductKind: "workflow-feature",
 		DisplayName: "局部重绘", Description: "只修改选区",
 	}})
 	if err != nil {
@@ -160,11 +160,11 @@ func TestBillableCatalogPublishesOnlyRegisteredItems(t *testing.T) {
 	store := &catalogFactReaderStub{}
 	catalog := NewBillableItemCatalog(registry, store)
 
-	prices, err := catalog.PublishPrices(t.Context(), "AI-IMAGE:PARTIAL-EDIT", map[OutputResolution]int64{OutputResolution1K: 0}, 9)
+	prices, err := catalog.PublishPrices(t.Context(), "AI-IMAGE:INPAINT", map[OutputResolution]int64{OutputResolution1K: 0}, 9)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if prices[OutputResolution1K].UnitCredits != 0 || store.publishInput.Definition.SKU != "ai-image:partial-edit" || store.publishInput.ActorID != 9 {
+	if prices[OutputResolution1K].UnitCredits != 0 || store.publishInput.Definition.SKU != "ai-image:inpaint" || store.publishInput.ActorID != 9 {
 		t.Fatalf("publish input = %+v prices = %+v", store.publishInput, prices)
 	}
 	if _, err := catalog.PublishPrices(t.Context(), "ai-image:unknown", map[OutputResolution]int64{OutputResolution1K: 1}, 9); !errors.Is(err, ErrSKUNotFound) {
@@ -174,7 +174,7 @@ func TestBillableCatalogPublishesOnlyRegisteredItems(t *testing.T) {
 
 func TestBillableCatalogOnlyDeletesRegistryAbsentItems(t *testing.T) {
 	registry, err := NewBillableItemRegistry([]BillableItemDefinition{{
-		SKU: "ai-image:partial-edit", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "局部重绘",
+		SKU: "ai-image:inpaint", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "局部重绘",
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -182,7 +182,7 @@ func TestBillableCatalogOnlyDeletesRegistryAbsentItems(t *testing.T) {
 	store := &catalogFactReaderStub{}
 	catalog := NewBillableItemCatalog(registry, store)
 
-	if _, err := catalog.DeleteArchived(t.Context(), "ai-image:partial-edit", 9); !errors.Is(err, ErrItemNotArchived) {
+	if _, err := catalog.DeleteArchived(t.Context(), "ai-image:inpaint", 9); !errors.Is(err, ErrItemNotArchived) {
 		t.Fatalf("registered delete error = %v", err)
 	}
 	result, err := catalog.DeleteArchived(t.Context(), "legacy:removed", 9)

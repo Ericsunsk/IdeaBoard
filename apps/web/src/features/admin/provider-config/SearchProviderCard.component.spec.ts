@@ -1,7 +1,7 @@
 import { defineComponent } from 'vue'
 import PrimeVue from 'primevue/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { primeVueTestOptions } from '../../../test/primeVue'
+import { adminPrimeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen } from '../../../test/render'
 import SearchProviderCard from './SearchProviderCard.vue'
 import * as searchProviderResource from './searchProviderResource'
@@ -51,7 +51,7 @@ describe('SearchProviderCard', () => {
 
   it('renders minimal logo tiles and opens configuration dialog on click', async () => {
     const { user } = renderWithUser(Harness, {
-      global: { plugins: [[PrimeVue, primeVueTestOptions]] },
+      global: { plugins: [[PrimeVue, adminPrimeVueTestOptions]] },
     })
 
     expect(await screen.findByText('启用')).toBeInTheDocument()
@@ -73,7 +73,7 @@ describe('SearchProviderCard', () => {
 
   it('renders Vision-specific fields in the dialog', async () => {
     const { user } = renderWithUser(Harness, {
-      global: { plugins: [[PrimeVue, primeVueTestOptions]] },
+      global: { plugins: [[PrimeVue, adminPrimeVueTestOptions]] },
     })
 
     const visionBtn = await screen.findByRole('button', { name: 'Vision Search' })
@@ -87,7 +87,7 @@ describe('SearchProviderCard', () => {
 
   it('requires saving draft configuration before testing and never saves from the test action', async () => {
     const { user } = renderWithUser(Harness, {
-      global: { plugins: [[PrimeVue, primeVueTestOptions]] },
+      global: { plugins: [[PrimeVue, adminPrimeVueTestOptions]] },
     })
 
     await user.click(await screen.findByRole('button', { name: 'Unsplash' }))
@@ -104,7 +104,7 @@ describe('SearchProviderCard', () => {
 
   it('tests saved configuration without saving or changing the enabled draft', async () => {
     const { user } = renderWithUser(Harness, {
-      global: { plugins: [[PrimeVue, primeVueTestOptions]] },
+      global: { plugins: [[PrimeVue, adminPrimeVueTestOptions]] },
     })
 
     await user.click(await screen.findByRole('button', { name: 'Unsplash' }))
@@ -116,7 +116,7 @@ describe('SearchProviderCard', () => {
 
   it('discards draft values when the dialog is cancelled', async () => {
     const { user } = renderWithUser(Harness, {
-      global: { plugins: [[PrimeVue, primeVueTestOptions]] },
+      global: { plugins: [[PrimeVue, adminPrimeVueTestOptions]] },
     })
 
     await user.click(await screen.findByRole('button', { name: 'Unsplash' }))
@@ -132,7 +132,7 @@ describe('SearchProviderCard', () => {
   it('does not save draft configuration when a connection test fails', async () => {
     vi.mocked(searchProviderResource.testSearchProvider).mockRejectedValueOnce(new Error('连接失败'))
     const { user } = renderWithUser(Harness, {
-      global: { plugins: [[PrimeVue, primeVueTestOptions]] },
+      global: { plugins: [[PrimeVue, adminPrimeVueTestOptions]] },
     })
 
     await user.click(await screen.findByRole('button', { name: 'Unsplash' }))

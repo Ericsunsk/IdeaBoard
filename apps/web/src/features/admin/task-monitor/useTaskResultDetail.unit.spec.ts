@@ -141,7 +141,7 @@ function makeTaskDetail(
     prompt: '',
     user_prompt: '',
     params: '{}',
-    feature_slug: 'sketch-to-image',
+    feature_slug: 'render',
     priority: 2,
     status: 'completed',
     retry_count: 0,

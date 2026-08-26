@@ -1,5 +1,6 @@
 import { inject, type InjectionKey } from 'vue'
 import { resolveApiData } from '../../shared/api/apiResponse'
+import { i18n } from '../../shared/i18n'
 import {
   abandonUserPendingPaymentOrder,
   continueUserPendingPaymentOrder,
@@ -61,19 +62,19 @@ export const userPaymentsContextKey: InjectionKey<UserPaymentsContext> =
 
 const productionResource: UserPaymentsResource = {
   getPurchaseOptions: (signal) =>
-    resolveApiData(getUserPaymentPurchaseOptions({ signal }), '加载充值选项失败'),
+    resolveApiData(getUserPaymentPurchaseOptions({ signal }), i18n.global.t('account.errors.optionsLoadFailed')),
   createCheckout: (request) =>
-    resolveApiData(createUserPaymentCheckoutSession(request), '创建支付页面失败'),
+    resolveApiData(createUserPaymentCheckoutSession(request), i18n.global.t('account.errors.checkoutCreateFailed')),
   getReturnStatus: (publicToken, signal) =>
-    resolveApiData(getUserPaymentOrderReturnStatus(publicToken, { signal }), '加载订单状态失败'),
+    resolveApiData(getUserPaymentOrderReturnStatus(publicToken, { signal }), i18n.global.t('account.errors.orderStatusLoadFailed')),
   listPendingOrders: (signal) =>
-    resolveApiData(listUserPendingPaymentOrders({ signal }), '加载待支付订单失败'),
+    resolveApiData(listUserPendingPaymentOrders({ signal }), i18n.global.t('account.errors.pendingOrdersLoadFailed')),
   continuePendingOrder: (publicToken) =>
-    resolveApiData(continueUserPendingPaymentOrder(publicToken), '继续支付失败'),
+    resolveApiData(continueUserPendingPaymentOrder(publicToken), i18n.global.t('account.errors.continuePaymentFailed')),
   abandonPendingOrder: (publicToken) =>
-    resolveApiData(abandonUserPendingPaymentOrder(publicToken), '放弃待支付订单失败'),
+    resolveApiData(abandonUserPendingPaymentOrder(publicToken), i18n.global.t('account.errors.abandonOrderFailed')),
   listRecharges: (params, signal) =>
-    resolveApiData(listUserPaymentRecharges(params, { signal }), '加载充值记录失败'),
+    resolveApiData(listUserPaymentRecharges(params, { signal }), i18n.global.t('account.errors.historyLoadFailed')),
   subscribe: (listener) => subscribeToUserPaymentEvents(listener),
 }
 

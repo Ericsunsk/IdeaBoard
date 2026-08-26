@@ -1,7 +1,7 @@
 import PrimeVue from 'primevue/config'
 import { describe, expect, it, vi } from 'vitest'
 import { h } from 'vue'
-import { primeVueTestOptions } from '../../../../test/primeVue'
+import { adminPrimeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen, within } from '../../../../test/render'
 import AdminDialogShell from './AdminDialogShell.vue'
 
@@ -33,7 +33,7 @@ function renderShell(
         footer: '<button type="button">取消</button><button type="button">保存</button>',
       },
       global: {
-        plugins: [[PrimeVue, primeVueTestOptions]],
+        plugins: [[PrimeVue, adminPrimeVueTestOptions]],
         stubs: { transition: false },
       },
     }),
@@ -50,7 +50,7 @@ describe('AdminDialogShell', () => {
         onReset,
       },
       global: {
-        plugins: [[PrimeVue, primeVueTestOptions]],
+        plugins: [[PrimeVue, adminPrimeVueTestOptions]],
         stubs: { transition: false },
       },
     })
@@ -145,7 +145,7 @@ describe('AdminDialogShell', () => {
           h('button', { type: 'button', onClick: requestClose }, '取消'),
       },
       global: {
-        plugins: [[PrimeVue, primeVueTestOptions]],
+        plugins: [[PrimeVue, adminPrimeVueTestOptions]],
         stubs: { transition: false },
       },
     })

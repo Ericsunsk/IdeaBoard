@@ -1,7 +1,7 @@
 import { defineComponent, ref } from 'vue'
 import PrimeVue from 'primevue/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { primeVueTestOptions } from '../../../test/primeVue'
+import { adminPrimeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen } from '../../../test/render'
 import AdminLogoPickerPopover from './AdminLogoPickerPopover.vue'
 import {
@@ -69,7 +69,7 @@ describe('AdminLogoPickerPopover', () => {
 
   it('renders brand logos, supports category filtering and logo picking', async () => {
     const { user } = renderWithUser(Harness, {
-      global: { plugins: [[PrimeVue, primeVueTestOptions]] },
+      global: { plugins: [[PrimeVue, adminPrimeVueTestOptions]] },
     })
 
     await user.click(screen.getByRole('button', { name: '打开 Logo 选择器' }))
@@ -106,7 +106,7 @@ describe('AdminLogoPickerPopover', () => {
   it('keeps the current logo when the server mutation fails', async () => {
     logoResource.save.mockRejectedValueOnce(new Error('保存失败'))
     const { user } = renderWithUser(Harness, {
-      global: { plugins: [[PrimeVue, primeVueTestOptions]] },
+      global: { plugins: [[PrimeVue, adminPrimeVueTestOptions]] },
     })
 
     await user.click(screen.getByRole('button', { name: '打开 Logo 选择器' }))

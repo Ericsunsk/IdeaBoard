@@ -252,7 +252,7 @@ describe('image adjustment plan executor', () => {
         plan: createChannelLutPlan(),
         signal: controller.signal,
       }),
-    ).rejects.toThrow('图像处理已取消')
+    ).rejects.toThrow('Image processing cancelled')
 
     expect(pixelValues(source)).toEqual([10, 20, 30, 255, 40, 50, 60, 255])
     expect(executeWorkerImageAdjustmentPlanMock).not.toHaveBeenCalled()

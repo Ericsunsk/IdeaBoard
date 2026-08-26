@@ -1,3 +1,4 @@
+import { i18n } from '../../../shared/i18n'
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { IMAGE_NODE_ACTION } from '../config/imageActionRegistry'
@@ -10,7 +11,7 @@ const mocks = vi.hoisted(() => {
     kind: 'image-action',
     sourceNodeId: 'image-1',
     source: { url: 'https://example.com/source.png', ratio: 1 },
-    action: 'remove-bg',
+    action: 'cutout',
     resultOptions: {},
   }
   return {
@@ -148,12 +149,12 @@ describe('useCanvasImageWorkflow', () => {
     const workflow = useCanvasImageWorkflow(options as never)
     const handlers = workflow.commands.interactions
 
-    handlers.onFlowImageDirectAction('image-1', IMAGE_NODE_ACTION.removeBg)
+    handlers.onFlowImageDirectAction('image-1', IMAGE_NODE_ACTION.cutout)
     await vi.waitFor(() => expect(mocks.execution.executeImageWorkflow).toHaveBeenCalledOnce())
 
     expect(mocks.planner.planImageDirectAction).toHaveBeenCalledWith(
       'image-1',
-      IMAGE_NODE_ACTION.removeBg,
+      IMAGE_NODE_ACTION.cutout,
       {
         prompt: '',
         outputCount: 1,
@@ -167,12 +168,12 @@ describe('useCanvasImageWorkflow', () => {
     const workflow = useCanvasImageWorkflow(options as never)
     const handlers = workflow.commands.interactions
 
-    handlers.onFlowImageDirectAction('image-1', IMAGE_NODE_ACTION.styleVariation)
+    handlers.onFlowImageDirectAction('image-1', IMAGE_NODE_ACTION.variations)
     await vi.waitFor(() => expect(mocks.execution.executeImageWorkflow).toHaveBeenCalledOnce())
 
     expect(mocks.planner.planImageDirectAction).toHaveBeenCalledWith(
       'image-1',
-      IMAGE_NODE_ACTION.styleVariation,
+      IMAGE_NODE_ACTION.variations,
       {
         strength: 50,
         prompt: '',
@@ -188,7 +189,7 @@ describe('useCanvasImageWorkflow', () => {
 
     handlers.onFlowImageDirectAction(
       'image-1',
-      IMAGE_NODE_ACTION.styleVariation,
+      IMAGE_NODE_ACTION.variations,
       'soft watercolor',
       4,
       72,
@@ -196,7 +197,7 @@ describe('useCanvasImageWorkflow', () => {
     await vi.waitFor(() => expect(mocks.execution.executeImageWorkflow).toHaveBeenCalledOnce())
     expect(mocks.planner.planImageDirectAction).toHaveBeenLastCalledWith(
       'image-1',
-      IMAGE_NODE_ACTION.styleVariation,
+      IMAGE_NODE_ACTION.variations,
       { prompt: 'soft watercolor', outputCount: 4, strength: 72 },
     )
 
@@ -274,10 +275,12 @@ describe('useCanvasImageWorkflow', () => {
       const workflow = useCanvasImageWorkflow(options as never)
       const handlers = workflow.commands.interactions
 
-      mocks.executionOptions?.onWarning('provider unavailable')
+      mocks.executionOptions?.onWarning(i18n.global.t('canvas.execution.generationUnavailable'))
       handlers.onFlowPromptGenerate('prompt-1', 'Keep editing', 1, 'auto')
 
-      expect(feedback.taskExecution.warning).toHaveBeenCalledWith('provider unavailable')
+      expect(feedback.taskExecution.warning).toHaveBeenCalledWith(
+      i18n.global.t('canvas.execution.generationUnavailable'),
+    )
       expect(mocks.planner.planPromptGeneration).not.toHaveBeenCalled()
       expect(mocks.execution.executeImageWorkflow).not.toHaveBeenCalled()
     } finally {

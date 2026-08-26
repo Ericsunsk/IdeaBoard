@@ -28,7 +28,7 @@ type FeaturePromptMergePolicy struct {
 type featurePromptVariableProvider func(map[string]interface{}) map[string]interface{}
 
 var featurePromptVariableProviders = map[string]featurePromptVariableProvider{
-	workflow.FeatureSlugStyleVariation: styleVariationPromptVariables,
+	workflow.FeatureSlugVariations: variationsPromptVariables,
 }
 
 var featurePromptBindings = map[string][]promptTemplateBinding{
@@ -51,11 +51,11 @@ var defaultPromptMergePolicy = FeaturePromptMergePolicy{
 // Their optional text must be requested explicitly by each System Prompt
 // instead of being appended implicitly when an operator omits the placeholder.
 var imageNodeFeatureSlugs = map[string]struct{}{
-	workflow.FeatureSlugPartialEdit:    {},
-	workflow.FeatureSlugSketchToImage:  {},
-	workflow.FeatureSlugStyleVariation: {},
-	workflow.FeatureSlugRemoveBg:       {},
-	workflow.FeatureSlugOutpaint:       {},
+	workflow.FeatureSlugInpaint:    {},
+	workflow.FeatureSlugRender:     {},
+	workflow.FeatureSlugVariations: {},
+	workflow.FeatureSlugCutout:     {},
+	workflow.FeatureSlugOutpaint:   {},
 }
 
 func DefaultFeaturePromptMergePolicy(featureSlug string) FeaturePromptMergePolicy {
@@ -110,8 +110,8 @@ func readStyleFusionInputWeightsPromptParam(params map[string]interface{}, _ str
 	return workflow.ReadStyleFusionInputWeights(params)
 }
 
-func styleVariationPromptVariables(params map[string]interface{}) map[string]interface{} {
-	contract, ok := workflow.ReadStyleVariationPromptContract(params)
+func variationsPromptVariables(params map[string]interface{}) map[string]interface{} {
+	contract, ok := workflow.ReadVariationsPromptContract(params)
 	if !ok {
 		return nil
 	}

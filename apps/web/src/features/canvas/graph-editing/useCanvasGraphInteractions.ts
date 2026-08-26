@@ -1,5 +1,6 @@
 import type { Edge, Elements, Node } from '@vue-flow/core'
 import { computed, ref, type Ref } from 'vue'
+import { i18n } from '../../../shared/i18n'
 import {
   resolveImageNodeFrameSize,
   type CanvasNodeItem,
@@ -206,7 +207,7 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
     } catch (error) {
       transaction.cancel()
       console.error('[Canvas] Failed to append image node', error)
-      options.feedback.operationWarning('添加图片失败，请刷新画布后重试')
+      options.feedback.operationWarning(i18n.global.t('canvas.session.addImageFailed'))
       return
     }
     options.graphAdapter.addNodes(createImageFlowNode(image), createFlowGraphCommandOptions())
@@ -219,7 +220,7 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
       return record ? resolveExportEntries(record.snapshot) : []
     })
     if (entries.length === 0) {
-      options.feedback.operationWarning('当前选中节点没有可导出的图片')
+      options.feedback.operationWarning(i18n.global.t('canvas.session.noExportableImages'))
       return
     }
     exportLoading?.destroy()
@@ -322,7 +323,7 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
     } catch (error) {
       transaction.cancel()
       console.error('[Canvas] Failed to duplicate image nodes', error)
-      options.feedback.operationWarning('复制图片失败，请刷新画布后重试')
+      options.feedback.operationWarning(i18n.global.t('canvas.session.duplicateImagesFailed'))
       return
     }
     options.graphAdapter.replaceNodes(

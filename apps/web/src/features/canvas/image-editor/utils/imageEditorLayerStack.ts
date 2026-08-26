@@ -23,6 +23,7 @@ import {
 import { normalizeCurvesParams } from './imageEditorCurves'
 import { clampLevelsHandles } from './imageEditorLevels'
 import { normalizeThresholdAdjustment } from './imageEditorThreshold'
+import { i18n } from '../../../../shared/i18n'
 
 export const SOURCE_LAYER_ID = 'source'
 
@@ -35,7 +36,7 @@ const DEFAULT_ADJUSTMENT_LAYER_BY_KIND: {
     id: 'adjustment:hsl',
     type: 'adjustment',
     kind: 'hsl',
-    name: '色相/饱和度 1',
+    name: `${i18n.global.t('canvas.imageEditor.adjustments.hsl')} 1`,
     visible: true,
     params: getImageAdjustmentDefaultParams('hsl'),
   },
@@ -43,7 +44,7 @@ const DEFAULT_ADJUSTMENT_LAYER_BY_KIND: {
     id: 'adjustment:threshold',
     type: 'adjustment',
     kind: 'threshold',
-    name: '阈值 1',
+    name: `${i18n.global.t('canvas.imageEditor.adjustments.threshold')} 1`,
     visible: true,
     params: getImageAdjustmentDefaultParams('threshold'),
   },
@@ -51,7 +52,7 @@ const DEFAULT_ADJUSTMENT_LAYER_BY_KIND: {
     id: 'adjustment:curves',
     type: 'adjustment',
     kind: 'curves',
-    name: '曲线 1',
+    name: `${i18n.global.t('canvas.imageEditor.adjustments.curves')} 1`,
     visible: true,
     params: getImageAdjustmentDefaultParams('curves'),
   },
@@ -59,7 +60,7 @@ const DEFAULT_ADJUSTMENT_LAYER_BY_KIND: {
     id: 'adjustment:levels',
     type: 'adjustment',
     kind: 'levels',
-    name: '色阶 1',
+    name: `${i18n.global.t('canvas.imageEditor.adjustments.levels')} 1`,
     visible: true,
     params: getImageAdjustmentDefaultParams('levels'),
   },
@@ -67,7 +68,7 @@ const DEFAULT_ADJUSTMENT_LAYER_BY_KIND: {
     id: 'adjustment:sharpen',
     type: 'adjustment',
     kind: 'sharpen',
-    name: '锐化 1',
+    name: `${i18n.global.t('canvas.imageEditor.adjustments.sharpen')} 1`,
     visible: true,
     params: getImageAdjustmentDefaultParams('sharpen'),
   },
@@ -91,7 +92,7 @@ export type ImageEditorLayerCommand =
 
 export function createInitialLayerStack(): ImageEditorLayerStack {
   return {
-    layers: [{ id: SOURCE_LAYER_ID, type: 'source', name: '原图', visible: true }],
+    layers: [{ id: SOURCE_LAYER_ID, type: 'source', name: i18n.global.t('canvas.imageEditor.layerNames.source'), visible: true }],
     selectedLayerId: SOURCE_LAYER_ID,
   }
 }
@@ -329,14 +330,14 @@ function createNumberedLayerName(layers: readonly ImageEditorLayer[], prefix: st
 }
 
 function createCopyLayerName(layers: readonly ImageEditorLayer[], name: string) {
-  return createUniqueLayerName(layers, `${name} 副本`)
+  return createUniqueLayerName(layers, `${name} ${i18n.global.t('canvas.imageEditor.layerNames.copySuffix')}`)
 }
 
 function createPaintLayer(layers: readonly ImageEditorLayer[]): ImageEditorPaintLayer {
   return {
     id: createLayerId('paint'),
     type: 'paint',
-    name: createNumberedLayerName(layers, '图层'),
+    name: createNumberedLayerName(layers, i18n.global.t('canvas.imageEditor.layerNames.paint')),
     visible: true,
     content: { kind: 'empty' },
   }
@@ -385,7 +386,7 @@ function createMergedLayer(
   return {
     id: createLayerId('merged'),
     type: 'merged',
-    name: createNumberedLayerName(layers, '合并图层'),
+    name: createNumberedLayerName(layers, i18n.global.t('canvas.imageEditor.layerNames.merged')),
     visible: children.some((layer) => layer.visible),
     children: children.map((layer) => cloneEditableLayer(layer)),
   }

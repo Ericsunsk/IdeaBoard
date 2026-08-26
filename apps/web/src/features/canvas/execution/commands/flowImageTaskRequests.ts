@@ -23,6 +23,7 @@ import { buildPromptAspectRatioTaskParams } from '../contracts/promptAspectRatio
 import { assertRequestedOutputCount } from '../../../../shared/domain/generationContract'
 import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import type { PromptAspectRatio } from '../../../canvas-board/domain'
+import { i18n } from '../../../../shared/i18n'
 import {
   IMAGE_CANVAS_EXTEND_ACTION,
   IMAGE_HD_UPSCALE_ACTION,
@@ -35,7 +36,7 @@ import {
 
 function requireImageExecutionInputUrl(source: ImageExecutionInput): string {
   const url = `${source.url ?? ''}`.trim()
-  if (!url) throw new Error('图片缺少 URL')
+  if (!url) throw new Error(i18n.global.t('canvas.execution.imageMissingUrl'))
   return url
 }
 
@@ -66,7 +67,7 @@ function buildOutputBillingParams(
   options: ImageActionReadinessOptions = {},
   feature?: string,
 ) {
-  const isRemoveBg = feature === EXECUTION_FEATURE.removeBg
+  const isRemoveBg = feature === EXECUTION_FEATURE.cutout
   return {
     output_count: assertRequestedOutputCount(isRemoveBg ? 1 : (options.outputCount ?? 1)),
     output_resolution: isRemoveBg ? ('default' as const) : (options.outputResolution ?? '1k'),
@@ -92,9 +93,9 @@ function buildDirectActionReadinessRequest(
   })
 }
 
-export function buildPartialEditReadinessRequest(): SubmitTaskData {
+export function buildInpaintReadinessRequest(): SubmitTaskData {
   return buildExecutionTaskRequest({
-    prompt: '局部重绘',
+    prompt: '[inpaint] submit readiness',
     feature: EXECUTION_PARTIAL_EDIT_META.feature,
     params: {
       output_count: 1,
@@ -235,7 +236,7 @@ export function buildCanvasExtendTaskRequest(input: {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
   const prompt = `${input.prompt ?? ''}`.trim()
   const execution = requireImageActionExecution(IMAGE_CANVAS_EXTEND_ACTION)
-  if (!input.imageSize) throw new Error('扩图缺少原图尺寸')
+  if (!input.imageSize) throw new Error(i18n.global.t('canvas.execution.outpaintMissingOriginalSize'))
   const geometry = resolveCanvasExtendPixelGeometry(input.imageSize, input.frameRect, input.originalImageRect)
   return buildExecutionTaskRequest({
     prompt,

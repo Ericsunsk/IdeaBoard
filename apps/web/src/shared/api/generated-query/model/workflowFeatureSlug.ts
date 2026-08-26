@@ -9,11 +9,11 @@ export type WorkflowFeatureSlug = (typeof WorkflowFeatureSlug)[keyof typeof Work
 
 export const WorkflowFeatureSlug = {
   'prompt-generation': 'prompt-generation',
-  'partial-edit': 'partial-edit',
-  'remove-bg': 'remove-bg',
+  inpaint: 'inpaint',
+  cutout: 'cutout',
   'style-fusion': 'style-fusion',
-  'sketch-to-image': 'sketch-to-image',
-  'style-variation': 'style-variation',
+  render: 'render',
+  variations: 'variations',
   'hd-upscale': 'hd-upscale',
   outpaint: 'outpaint',
 } as const

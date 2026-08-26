@@ -1,4 +1,5 @@
 import { ref, shallowRef, type Ref, type ShallowRef } from 'vue'
+import { i18n } from '../../shared/i18n'
 import { getLibraryFolders, type LibraryFolderView } from './libraryResource'
 
 export type LibraryFolderFacts = {
@@ -130,7 +131,7 @@ export function createLibraryFolderFacts(
       .catch((cause): LibraryFolderLoadResult => {
         if (disposed) return { status: 'disposed' }
         if (requestRevision !== revision) return { status: 'stale' }
-        const nextError = cause instanceof Error ? cause : new Error('加载收藏夹失败')
+        const nextError = cause instanceof Error ? cause : new Error(i18n.global.t('library.errors.loadFoldersFailed'))
         return { status: 'error', error: nextError }
       })
     inFlight = request

@@ -1,4 +1,6 @@
 import { uploadApi } from '../../../shared/api/upload'
+import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
+import { i18n } from '../../../shared/i18n'
 import {
   rebuildCanvasBoardMediaRefs,
   type CanvasBoardSnapshot,
@@ -18,6 +20,10 @@ interface BoardSessionUploadLifecycleOptions {
   userUid: string
   boardId: string
   warning: (message: string) => void
+}
+
+function t(key: string, params?: Record<string, unknown>): string {
+  return i18n.global.t(key, params ?? {})
 }
 
 function parsePathname(raw: string): string | null {
@@ -121,7 +127,7 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
   async function fetchAndUploadStable(raw: string): Promise<{ url: string; mediaAssetId: number }> {
     const blob = await fetchImageBlob(raw)
     if (!blob.size) {
-      throw new Error('下载图片失败：响应为空')
+      throw new Error(t('canvas.session.downloadEmptyResponse'))
     }
     const file = new File([blob], filenameFromImageUrl(raw, blob.type || 'image/jpeg'), {
       type: blob.type || 'image/jpeg',
@@ -132,10 +138,10 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
     const stableUrl = uploaded.url.trim()
     const mediaAssetId = Number(uploaded.media_asset_id)
     if (!stableUrl || !isStableCanvasUrl(stableUrl)) {
-      throw new Error('上传图片失败：返回链接不是当前 board canvas uploads')
+      throw new Error(t('canvas.session.uploadUnstableUrl'))
     }
     if (!Number.isInteger(mediaAssetId) || mediaAssetId <= 0) {
-      throw new Error('上传图片失败：缺少媒体资产标识')
+      throw new Error(t('canvas.session.uploadMissingMediaAsset'))
     }
     return { url: stableUrl, mediaAssetId }
   }
@@ -145,25 +151,35 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
       try {
         const dataUrlResponse = await fetch(raw)
         if (!dataUrlResponse.ok) {
-          throw new Error(`读取图片失败：HTTP ${dataUrlResponse.status}`)
+          throw new Error(t('canvas.session.readImageHttpFailed', { code: dataUrlResponse.status }))
         }
         return await dataUrlResponse.blob()
       } catch (error) {
-        throw new Error(`读取图片失败：${error instanceof Error ? error.message : '未知错误'}`, {
-          cause: error,
-        })
+        throw new Error(
+          t('canvas.session.readImageFailed', {
+            reason: userFacingErrorCopy(error, t('canvas.session.unknownError')),
+          }),
+          {
+            cause: error,
+          },
+        )
       }
     }
     let response: Response
     try {
       response = await fetch(resolveFetchUrl(raw), { credentials: 'include' })
     } catch (error) {
-      throw new Error(`下载图片失败：${error instanceof Error ? error.message : '网络异常'}`, {
-        cause: error,
-      })
+      throw new Error(
+        t('canvas.session.downloadImageFailed', {
+          reason: userFacingErrorCopy(error, t('canvas.session.networkError')),
+        }),
+        {
+          cause: error,
+        },
+      )
     }
     if (!response.ok) {
-      throw new Error(`下载图片失败：HTTP ${response.status}`)
+      throw new Error(t('canvas.session.downloadImageHttpFailed', { code: response.status }))
     }
     return await response.blob()
   }
@@ -201,8 +217,8 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
             ref.set(uploaded.url)
             ref.setMediaAssetId?.(uploaded.mediaAssetId)
           } catch (error) {
-            const reason = error instanceof Error ? error.message : '未知错误'
-            throw new Error(`保存失败：${ref.path} 使用了不稳定图片链接，${reason}`, {
+            const reason = userFacingErrorCopy(error, t('canvas.session.unknownError'))
+            throw new Error(t('canvas.session.unstableImageLink', { path: ref.path, reason }), {
               cause: error,
             })
           }

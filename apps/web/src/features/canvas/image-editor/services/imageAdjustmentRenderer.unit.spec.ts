@@ -263,7 +263,7 @@ describe('renderImageAdjustmentFile', () => {
       renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, [
         { ...thresholdLayer, visible: false },
       ]),
-    ).rejects.toThrow('没有可应用的编辑图层')
+    ).rejects.toThrow('No editable layers to apply.')
   })
 
   it('rejects visually neutral adjustment stacks before loading the image', async () => {
@@ -271,7 +271,7 @@ describe('renderImageAdjustmentFile', () => {
       renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, [
         { ...hslLayer, params: { hue: 0, saturation: 0, lightness: 0 } },
       ]),
-    ).rejects.toThrow('没有可应用的编辑图层')
+    ).rejects.toThrow('No editable layers to apply.')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -304,7 +304,7 @@ describe('renderImageAdjustmentFile', () => {
 
     await expect(
       renderImageAdjustmentFile({ url: 'https://example.com/source.gif' }, [thresholdLayer]),
-    ).rejects.toThrow('暂不支持编辑动图')
+    ).rejects.toThrow('Animated images are not supported for editing.')
     expect(createImageBitmapMock).not.toHaveBeenCalled()
   })
 
@@ -318,7 +318,7 @@ describe('renderImageAdjustmentFile', () => {
 
     await expect(
       renderImageAdjustmentFile({ url: 'https://example.com/source.webp' }, [thresholdLayer]),
-    ).rejects.toThrow('暂不支持编辑动图')
+    ).rejects.toThrow('Animated images are not supported for editing.')
     expect(createImageBitmapMock).not.toHaveBeenCalled()
   })
 })

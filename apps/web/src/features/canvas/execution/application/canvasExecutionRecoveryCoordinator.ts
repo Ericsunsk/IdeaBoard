@@ -1,4 +1,5 @@
 import { isTaskResultPendingError, TaskCancelledError } from '../../../../shared/api/taskEvents'
+import { i18n } from '../../../../shared/i18n'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
 import {
   PendingImageMaterializationError,
@@ -63,7 +64,7 @@ export function createCanvasExecutionRecoveryCoordinator(
 
   function reportError(error: unknown): void {
     if (options.onError?.(error)) return
-    options.onWarning('图片结果恢复失败，请重试')
+    options.onWarning(i18n.global.t('canvas.execution.recoveryFailed'))
   }
 
   function hydratePendingLeases(snapshot?: CanvasBoardSnapshot): number {

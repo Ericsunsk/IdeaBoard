@@ -247,7 +247,7 @@ FROM publish_billing_price($1, $2, '', $3, 7)`, sku, displayName, amount).Scan(&
 INSERT INTO task_billing_snapshots (
   task_id, user_id, feature_slug, sku, display_name, price_version_id,
   price_version, unit_credits, quantity, total_credits, quoted_at, hold_transaction_id
-) VALUES ($1, $2, 'partial-edit', $3, $4, $5, $6, $7, 1, $7, $8, $9)`,
+) VALUES ($1, $2, 'inpaint', $3, $4, $5, $6, $7, 1, $7, $8, $9)`,
 		taskID, userID, sku, displayName, priceVersionID, priceVersion, amount, time.Now(), holdID,
 	); err != nil {
 		t.Fatal(err)

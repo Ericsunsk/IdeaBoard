@@ -189,7 +189,7 @@ describe('useCanvasGraphEditing', () => {
       outputStatus: 'ready',
     })
     expect(discardNodeEdits).toHaveBeenCalledWith('image-1')
-    expect(harness.feedback.operationSucceeded).toHaveBeenCalledWith('Image 节点输入已更新')
+    expect(harness.feedback.operationSucceeded).toHaveBeenCalledWith('Image node input updated.')
   })
 
   it('normalizes Canvas drop and media-input drop through the browser adapter', async () => {

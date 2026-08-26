@@ -3,6 +3,8 @@ import { useRouter, type Router } from 'vue-router'
 import { USER_SEARCH_PATH } from '../../shared/constants/routePaths'
 import { formatIdeaAmount } from '../../shared/utils/ideaCurrency'
 import { useAppToast } from '../../shared/composables/useAppToast'
+import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
+import { i18n } from '../../shared/i18n'
 import type { LibraryAssetView } from '../library/libraryResource'
 import type { SearchAuthAction } from './searchAuthContinuation'
 import {
@@ -66,7 +68,7 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
     if (hasPendingReferences.value) return 'Preparing references'
     if (state.value === 'extracting') return 'Searching'
     if (references.value.length === 0 || price.value === null) return 'Search'
-    return `Search · ${price.value === 0 ? '免费' : formatIdeaAmount(price.value)}`
+    return `Search · ${price.value === 0 ? i18n.global.t('search.priceFree') : formatIdeaAmount(price.value)}`
   })
   let extractionController: AbortController | null = null
   let priceController: AbortController | null = null
@@ -98,12 +100,12 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
   function submit(): Promise<void> {
     const query = normalizeSearchQuery(options.draftQuery.value)
     if (!isSearchQueryWithinLimit(query)) {
-      options.queryError.value = '搜索关键词不能超过 200 个字符'
+      options.queryError.value = i18n.global.t('search.queryTooLong')
       return Promise.resolve()
     }
     options.queryError.value = ''
     if (hasPendingReferences.value) {
-      options.queryError.value = '正在准备参考图，请稍候'
+      options.queryError.value = i18n.global.t('search.preparingReferences')
       return Promise.resolve()
     }
     if (references.value.length === 0) return Promise.resolve()
@@ -133,13 +135,13 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
         if (generation !== extractionGeneration) return
         if (extraction.status !== 'succeeded') {
           state.value = 'idle'
-          error.value = '搜索正在处理中，请稍后重试'
+          error.value = i18n.global.t('search.stillProcessing')
           return
         }
         const extractedQuery = extraction.query?.trim()
         if (!extractedQuery) {
           state.value = 'idle'
-          error.value = '视觉搜索结果无效，请重试'
+          error.value = i18n.global.t('search.invalidVisionResult')
           return
         }
         options.submittedQuery.value = extractedQuery
@@ -149,7 +151,7 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
       } catch (cause) {
         if (generation !== extractionGeneration || isAbortError(cause)) return
         state.value = 'idle'
-        error.value = cause instanceof Error ? cause.message : 'Vision Search failed'
+        error.value = userFacingErrorCopy(cause, i18n.global.t('search.visionSearchFailed'))
       } finally {
         if (extractionController === controller) extractionController = null
       }
@@ -286,14 +288,14 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
     } catch (cause) {
       if (isAbortError(cause) || !isCurrentPreparation()) return
       collection.fail(key)
-      options.queryError.value = '该图片无法作为搜索参考，请重试'
+      options.queryError.value = i18n.global.t('search.referenceNotUsable')
     } finally {
       if (decodeUrl && !collectionOwnsDecodeUrl) URL.revokeObjectURL(decodeUrl)
       if (isCurrentPreparation()) collection.finish(key)
       if (referencePreparationControllers.get(key) === controller) {
         referencePreparationControllers.delete(key)
       }
-      if (!hasPendingReferences.value && options.queryError.value === '正在准备参考图，请稍候') {
+      if (!hasPendingReferences.value && options.queryError.value === i18n.global.t('search.preparingReferences')) {
         options.queryError.value = ''
       }
     }

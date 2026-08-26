@@ -1,6 +1,7 @@
 import { getUserUsage } from '../../shared/api/generated-query/user-usage/user-usage'
 import type { GetUserUsageRange, UserUsage } from '../../shared/api/generated-query/model'
 import { resolveApiData } from '../../shared/api/apiResponse'
+import { i18n } from '../../shared/i18n'
 
 export type AccountUsage = UserUsage
 export type UserUsageRange = GetUserUsageRange
@@ -18,6 +19,6 @@ export async function fetchUserUsage(
 ): Promise<AccountUsage> {
   return resolveApiData(
     getUserUsage({ range }, signal ? { signal } : undefined),
-    '加载用量统计失败',
+    i18n.global.t('account.errors.usageLoadFailed'),
   )
 }

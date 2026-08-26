@@ -8,7 +8,7 @@
         option-value="key"
         :allow-empty="false"
         size="small"
-        :aria-label="rangeAriaLabel"
+        :aria-label="rangeAriaLabel ?? t('common.a11y.chartTimeRange')"
       />
     </template>
 
@@ -31,6 +31,7 @@
 
 <script setup lang="ts" generic="TRange extends string">
 import type { HTMLAttributes } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { Plugin } from 'chart.js'
 import Chart from 'primevue/chart'
 import SelectButton from 'primevue/selectbutton'
@@ -55,7 +56,7 @@ withDefaults(
   }>(),
   {
     titleTag: 'span',
-    rangeAriaLabel: '图表时间范围',
+    rangeAriaLabel: undefined,
     plugins: () => [],
     canvasProps: undefined,
     size: 'standard',
@@ -63,6 +64,8 @@ withDefaults(
     showChart: true,
   },
 )
+
+const { t } = useI18n()
 
 const selectedRange = defineModel<TRange>({ required: true })
 </script>

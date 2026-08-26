@@ -4,7 +4,7 @@ import { createDeferred } from '../../../test/deferred'
 import type { AdminPromptConfigResource, FeaturePrompt } from './promptConfigResource'
 import { createAdminPromptConfigWorkspace } from './promptConfigWorkspace'
 
-const featureSlug = 'style-variation'
+const featureSlug = 'variations'
 const featureTitle = '风格延展'
 
 const mockResource = {

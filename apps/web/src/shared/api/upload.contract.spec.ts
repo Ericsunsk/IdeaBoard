@@ -182,7 +182,7 @@ describe('uploadApi', () => {
 
     await expect(
       uploadApi.upload(new File(['image'], 'image.png', { type: 'image/png' }), 'board-1'),
-    ).rejects.toThrow('上传图片失败')
+    ).rejects.toThrow('Upload failed. Please try again.')
   })
 
   it('rejects board uploads that were not registered as media assets', async () => {
@@ -198,7 +198,7 @@ describe('uploadApi', () => {
 
     await expect(
       uploadApi.upload(new File(['image'], 'image.png', { type: 'image/png' }), 'board-1'),
-    ).rejects.toThrow('缺少媒体资产标识')
+    ).rejects.toThrow('The uploaded image could not be processed. Try again.')
   })
 
   it('adds a contextual fallback to sanitized transport errors without dropping metadata', async () => {
@@ -220,7 +220,7 @@ describe('uploadApi', () => {
     ).rejects.toMatchObject({
       code: 'upstream_failure',
       data: { retry: true },
-      message: '上传图片失败',
+      message: 'Upload failed. Please try again.',
       status: 503,
     })
   })
@@ -234,7 +234,7 @@ describe('uploadApi', () => {
 
     await expect(
       uploadApi.uploadAvatar(new File(['avatar'], 'avatar.png', { type: 'image/png' })),
-    ).rejects.toThrow('头像上传失败，请稍后重试')
+    ).rejects.toThrow('Avatar upload failed. Please try again.')
   })
 
 })

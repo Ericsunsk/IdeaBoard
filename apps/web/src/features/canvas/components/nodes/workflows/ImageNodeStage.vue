@@ -16,7 +16,7 @@
     :running="!!directGenerating || imageImportPending"
     :transparent="!!expandModeActive || isImageToolActive"
     :aria-busy="!!directGenerating || imageImportPending"
-    aria-label="图片节点输入与预览区域"
+    :aria-label="t('canvas.controls.stageLabel')"
     @dragover.stop="onStageDragOver"
     @drop.stop="onStageDrop"
     @contextmenu.prevent.stop="onStageContextMenu"
@@ -30,11 +30,11 @@
           :src="stageDisplayUrl || undefined"
           class="image-node-stage-image image-tool-stage-media"
           :class="{ 'is-dragging': dragging }"
-          alt="图片节点预览"
+          :alt="t('canvas.controls.stagePreviewAlt')"
           draggable="false"
           role="button"
           tabindex="0"
-          aria-label="图片节点预览，按 Enter 打开预览，按 Space 添加到画布"
+          :aria-label="t('canvas.controls.stagePreviewHint')"
           @dblclick="emit('append-to-canvas')"
           @keydown.enter.prevent="emit('open-preview')"
           @keydown.space.prevent="emit('append-to-canvas')"
@@ -44,16 +44,21 @@
         v-else-if="stageDisplayUrl"
         :src="stageDisplayUrl || undefined"
         class="image-node-stage-image"
-        alt="图片节点预览"
+        :alt="t('canvas.controls.stagePreviewAlt')"
         draggable="false"
         role="button"
         tabindex="0"
-        aria-label="图片节点预览，按 Enter 打开预览，按 Space 添加到画布"
+        :aria-label="t('canvas.controls.stagePreviewHint')"
         @dblclick="emit('append-to-canvas')"
         @keydown.enter.prevent="emit('open-preview')"
         @keydown.space.prevent="emit('append-to-canvas')"
       />
-      <div v-else class="image-node-stage-placeholder" role="status" aria-label="图片预览正在准备" />
+      <div
+        v-else
+        class="image-node-stage-placeholder"
+        role="status"
+        :aria-label="t('canvas.controls.preparingPreview')"
+      />
       <ImageCanvasExtendOverlay
         v-if="stageDisplayUrl && expandModeActive && expandOverlayStyle"
         :overlay-style="expandOverlayStyle"
@@ -67,17 +72,17 @@
       <div v-if="!libraryImport && !localUpload" class="image-node-stage-actions">
         <NodeActionButton
           variant="stage-ghost"
-          aria-label="打开图片预览"
+          :aria-label="t('canvas.controls.openPreview')"
           @click="emit('open-preview')"
-          >预览</NodeActionButton
+          >{{ t('canvas.node.preview') }}</NodeActionButton
         >
         <NodeActionButton
           v-if="!inputLocked"
           variant="stage-ghost"
-          aria-label="清空图片输入"
+          :aria-label="t('canvas.controls.clearImageInput')"
           @click="emit('reset')"
         >
-          清空
+          {{ t('canvas.controls.clear') }}
         </NodeActionButton>
       </div>
     </template>
@@ -90,7 +95,7 @@
       <span>Failed</span>
       <NodeActionButton
         variant="stage-ghost"
-        aria-label="重试导入图片"
+        :aria-label="t('canvas.controls.retryImageImport')"
         @click.stop="emit('retry-image-import')"
       >
         Retry
@@ -100,7 +105,7 @@
       v-else-if="imageImportPending && !displayImage"
       class="image-node-stage-pending"
       aria-busy="true"
-      aria-label="图片预览正在准备"
+      :aria-label="t('canvas.controls.preparingPreview')"
     />
     <button
       v-else-if="!displayImage && !emptyStateDisabled"
@@ -128,6 +133,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useElementVisibility } from '@vueuse/core'
 import { useCanvasViewportContext } from '../../../vue-flow-adapter/useCanvasViewportContext'
 import type { CanvasExtendDragAnchor } from '../../../image-workflow/useImageCanvasExtendOverlay'
@@ -211,14 +217,15 @@ const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl,
   isVisible: isStageVisible,
   keepPreviousOnSourceChange: true,
 })
+const { t } = useI18n()
 const emptyStateLabel = computed(() =>
-  props.inputLocked ? 'Waiting...' : '上传或拖拽图片作为输入',
+  props.inputLocked ? 'Waiting...' : t('canvas.controls.uploadOrDropImage'),
 )
 const emptyStateDisabled = computed(() => !!props.inputLocked || !!props.directGenerating)
 const emptyStageAriaLabel = computed(() => {
-  if (props.directGenerating) return '图片正在生成，暂时无法上传'
-  if (props.inputLocked) return '等待生成完成后可上传图片'
-  return '上传图片作为输入'
+  if (props.directGenerating) return t('canvas.controls.generatingUploadBlocked')
+  if (props.inputLocked) return t('canvas.controls.waitingToUpload')
+  return t('canvas.controls.uploadImageInput')
 })
 const emptyIconVariantComputed = computed(() => props.emptyIconVariant ?? 'image')
 defineExpose({

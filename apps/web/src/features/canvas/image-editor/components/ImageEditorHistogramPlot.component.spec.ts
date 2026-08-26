@@ -40,13 +40,14 @@ function renderHistogramPlot(
         h(ImageEditorHistogramPlot, {
           histogramPath: options.histogramPath ?? 'M 0 100 L 50 0 L 100 100 Z',
           markers: markers.value,
+          ariaLabel: 'Histogram controls',
           onUpdateMarker: events.updateMarker,
         })
     },
   })
 
   const result = renderWithUser(Harness)
-  const plot = screen.getByRole('group', { name: '直方图控制' })
+  const plot = screen.getByRole('group', { name: 'Histogram controls' })
   stubPointerTarget(plot, { right: 200, bottom: 100, width: 200, height: 100 })
 
   return {

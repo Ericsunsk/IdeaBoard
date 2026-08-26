@@ -17,14 +17,14 @@ import type { PendingImageWorkflowTaskTransport } from './pendingImageWorkflowRu
 vi.mock('../media/imageSize', () => ({
   loadImageSizeFromUrl: vi.fn(async () => ({ width: 1200, height: 800 })),
 }))
-vi.mock('../media/flowPartialEditMask', () => ({
-  prepareFlowPartialEditMask: vi.fn(async () => 'https://example.com/mask.png'),
+vi.mock('../media/flowInpaintMask', () => ({
+  prepareFlowInpaintMask: vi.fn(async () => 'https://example.com/mask.png'),
 }))
 
 const rendererMetrics = { readNodeMetrics: () => null }
 
 function imageActionPlan() {
-  return { kind: 'image-action', activationId: 'a', sourceNodeId: 'image-1', source: { url: 'https://example.com/a.png', ratio: 1 }, action: 'remove-bg', prompt: '', outputCount: 1, resultOptions: {} } as never
+  return { kind: 'image-action', activationId: 'a', sourceNodeId: 'image-1', source: { url: 'https://example.com/a.png', ratio: 1 }, action: 'cutout', prompt: '', outputCount: 1, resultOptions: {} } as never
 }
 
 function createPublicHarness(transport: PendingImageWorkflowTaskTransport) {
@@ -122,7 +122,7 @@ describe('useFlowImageWorkflowExecution', () => {
       cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(),
       taskTransport: { assertReady, submit: vi.fn(), resolve: vi.fn() },
     })
-    await execution.executeImageWorkflow({ kind: 'image-action', activationId: 'a', sourceNodeId: 'image-1', source: { url: 'https://example.com/a.png', ratio: 1 }, action: 'remove-bg', prompt: '', outputCount: 1, resultOptions: {} } as never)
+    await execution.executeImageWorkflow({ kind: 'image-action', activationId: 'a', sourceNodeId: 'image-1', source: { url: 'https://example.com/a.png', ratio: 1 }, action: 'cutout', prompt: '', outputCount: 1, resultOptions: {} } as never)
     expect(assertReady).toHaveBeenCalledOnce()
     expect(core.snapshot().executions).toEqual([])
   })
@@ -194,7 +194,7 @@ describe('useFlowImageWorkflowExecution', () => {
 
     const readinessRequest = assertReady.mock.calls[0]?.[0]
     expect(readinessRequest).toMatchObject({
-      feature: 'partial-edit',
+      feature: 'inpaint',
       params: {
         output_count: 1,
         original_image_url: 'https://example.com/a.png',

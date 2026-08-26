@@ -78,9 +78,9 @@ describe('canvas billing readiness store', () => {
         }),
     })
 
-    await store.ensureFeature(WORKFLOW_FEATURE.partialEdit)
+    await store.ensureFeature(WORKFLOW_FEATURE.inpaint)
 
-    expect(store.getFeatureState(WORKFLOW_FEATURE.partialEdit)).toMatchObject({
+    expect(store.getFeatureState(WORKFLOW_FEATURE.inpaint)).toMatchObject({
       status: 'ready',
       unitCredits: 4,
       availableCredits: 3,
@@ -88,21 +88,35 @@ describe('canvas billing readiness store', () => {
     })
   })
 
-  it.each([
-    ['SKU 价格未配置', '价格未配置'],
-    ['当前 SKU 价格已停用', '价格已停用'],
-  ])('maps server billing errors to compact Chinese reasons', async (message, reason) => {
+  it('classifies a blocked readiness through the shared error catalog', async () => {
+    const store = createCanvasBillingReadinessStore({
+      fetchReadiness: async () =>
+        makeReadiness(WORKFLOW_FEATURE.cutout, {
+          ready: false,
+          error_code: 'pricing_unavailable',
+        }),
+    })
+
+    await store.ensureFeature(WORKFLOW_FEATURE.cutout)
+
+    expect(store.getFeatureState(WORKFLOW_FEATURE.cutout)).toMatchObject({
+      status: 'blocked',
+      reason: 'Pricing is temporarily unavailable. Please try again shortly.',
+    })
+  })
+
+  it('falls back to billing-unavailable copy for transport failures', async () => {
     const store = createCanvasBillingReadinessStore({
       fetchReadiness: async () => {
-        throw new Error(message)
+        throw new Error('dial tcp refused')
       },
     })
 
-    await store.ensureFeature(WORKFLOW_FEATURE.removeBg)
+    await store.ensureFeature(WORKFLOW_FEATURE.cutout)
 
-    expect(store.getFeatureState(WORKFLOW_FEATURE.removeBg)).toMatchObject({
+    expect(store.getFeatureState(WORKFLOW_FEATURE.cutout)).toMatchObject({
       status: 'error',
-      reason,
+      reason: 'Billing information is unavailable right now.',
     })
   })
 })

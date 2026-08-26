@@ -1,3 +1,4 @@
+import { i18n } from '../../../../shared/i18n'
 import { canvasToBlob } from '../../services/flowMediaIO'
 import type {
   ImageEditorAdjustmentLayer,
@@ -38,7 +39,7 @@ export async function renderImageAdjustmentFile(
 ): Promise<File> {
   const plan = buildImageAdjustmentPlan(layers)
   if (plan.length === 0) {
-    throw new Error('没有可应用的编辑图层')
+    throw new Error(i18n.global.t('canvas.tools.noEditableLayers'))
   }
 
   const renderInput: RenderFinalInput = {
@@ -71,7 +72,7 @@ export async function renderImageEditorLayerStackFile(
   options.onProgress?.({ phase: 'decode' })
   const sourceCache = createImageSourceCache({ maxEntries: 1 })
   const sourceEntry = await sourceCache.getFullSizeSource(source.url)
-  if (!sourceEntry) throw new Error('读取图片失败')
+  if (!sourceEntry) throw new Error(i18n.global.t('canvas.imageEditor.errors.readImageFailed'))
 
   try {
     const rasterImages = await loadRasterContentImages(flattenImageEditorRasterContents(layers))
@@ -85,7 +86,7 @@ export async function renderImageEditorLayerStackFile(
     canvas.width = output.width
     canvas.height = output.height
     const context = canvas.getContext('2d')
-    if (!context) throw new Error('当前浏览器不支持图像处理')
+    if (!context) throw new Error(i18n.global.t('canvas.imageEditor.errors.unsupportedCanvas'))
     context.putImageData(output, 0, 0)
     const blob = await canvasToBlob(canvas, 'image/png')
     const fileName = createImageProcessingOutputFileName({
@@ -134,7 +135,7 @@ async function decodeRasterContentImageData(content: ImageEditorRasterContent): 
     canvas.width = content.width || bitmap.width
     canvas.height = content.height || bitmap.height
     const context = canvas.getContext('2d', { willReadFrequently: true })
-    if (!context) throw new Error('当前浏览器不支持图像处理')
+    if (!context) throw new Error(i18n.global.t('canvas.imageEditor.errors.unsupportedCanvas'))
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
     return context.getImageData(0, 0, canvas.width, canvas.height)
   } finally {

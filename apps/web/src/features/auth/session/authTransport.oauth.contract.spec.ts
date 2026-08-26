@@ -18,7 +18,7 @@ vi.mock('../../../shared/auth/client', () => ({
     },
     useSession: vi.fn(),
   },
-  extractBetterAuthErrorMessage: (_error: unknown, fallback: string) => fallback,
+  resolveBetterAuthErrorMessage: (_error: unknown, fallback: string) => fallback,
   normalizeCanonicalEmail: (email: string) => email.trim().toLowerCase(),
 }))
 

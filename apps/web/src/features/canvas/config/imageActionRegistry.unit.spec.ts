@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  IMAGE_ACTION_MENU_ITEMS,
+  getImageActionMenuItems,
   IMAGE_ACTION_MODE,
   IMAGE_ACTION_REGISTRY,
   IMAGE_ACTION_REGISTRY_LIST,
@@ -18,9 +18,9 @@ describe('imageActionRegistry', () => {
 
     expect(new Set(actions).size).toBe(actions.length)
     expect(actions).toEqual([
-      IMAGE_NODE_ACTION.removeBg,
-      IMAGE_NODE_ACTION.styleVariation,
-      IMAGE_NODE_ACTION.sketchToImage,
+      IMAGE_NODE_ACTION.cutout,
+      IMAGE_NODE_ACTION.variations,
+      IMAGE_NODE_ACTION.render,
       IMAGE_NODE_ACTION.hdUpscale,
       IMAGE_NODE_ACTION.outpaint,
       IMAGE_NODE_ACTION.imageInpaint,
@@ -28,16 +28,22 @@ describe('imageActionRegistry', () => {
     ])
   })
 
-  it('derives menu items from the registry', () => {
-    expect(IMAGE_ACTION_MENU_ITEMS).toEqual(
-      IMAGE_ACTION_REGISTRY_LIST.map((item) => ({
-        action: item.action,
-        label: item.label,
-        title: item.title,
-        icon: item.icon,
-        ...(isImageStrengthAction(item.action) ? { strengthAction: item.action } : {}),
-      })),
-    )
+  it('derives menu items from the registry with copy resolved read-time', () => {
+    const items = getImageActionMenuItems()
+    expect(items.map((item) => item.label)).toEqual([
+      'Cutout',
+      'Variations',
+      'Render',
+      'Upscale',
+      'Outpaint',
+      'Inpaint',
+      'Retouch',
+    ])
+    expect(
+      items
+        .filter((item) => isImageStrengthAction(item.action))
+        .map((item) => item.strengthAction),
+    ).toEqual([IMAGE_NODE_ACTION.variations, IMAGE_NODE_ACTION.hdUpscale])
   })
 
   it('does not expose submit authority fields that runtime does not consume', () => {
@@ -65,7 +71,7 @@ describe('imageActionRegistry', () => {
       IMAGE_ACTION_MODE.canvasExtend,
     )
     expect(IMAGE_ACTION_REGISTRY[IMAGE_NODE_ACTION.imageInpaint].mode).toBe(
-      IMAGE_ACTION_MODE.partialEdit,
+      IMAGE_ACTION_MODE.inpaint,
     )
     expect(IMAGE_ACTION_REGISTRY[IMAGE_NODE_ACTION.localImageEditor].mode).toBe(
       IMAGE_ACTION_MODE.localImageEditor,

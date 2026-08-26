@@ -1,3 +1,4 @@
+import { i18n } from '../../../../shared/i18n'
 import type {
   ImageAdjustmentKind,
   ImageEditorAdjustmentLayer,
@@ -98,27 +99,67 @@ type ImageAdjustmentDefinitionByKind = {
 }
 
 const HSL_RANGES = {
-  hue: { label: '色相', min: -180, max: 180, defaultValue: 0 },
-  saturation: { label: '饱和度', min: -100, max: 100, defaultValue: 0 },
-  lightness: { label: '明度', min: -100, max: 100, defaultValue: 0 },
+  hue: { label: i18n.global.t('canvas.imageEditor.params.hue'), min: -180, max: 180, defaultValue: 0 },
+  saturation: {
+    label: i18n.global.t('canvas.imageEditor.params.saturation'),
+    min: -100,
+    max: 100,
+    defaultValue: 0,
+  },
+  lightness: {
+    label: i18n.global.t('canvas.imageEditor.params.lightness'),
+    min: -100,
+    max: 100,
+    defaultValue: 0,
+  },
 } satisfies ImageAdjustmentRangeByKind['hsl']
 
 const THRESHOLD_RANGES = {
-  threshold: { label: '阈值', min: CHANNEL_MIN, max: CHANNEL_MAX, defaultValue: 128 },
+  threshold: {
+    label: i18n.global.t('canvas.imageEditor.params.threshold'),
+    min: CHANNEL_MIN,
+    max: CHANNEL_MAX,
+    defaultValue: 128,
+  },
 } satisfies ImageAdjustmentRangeByKind['threshold']
 
 const LEVELS_RANGES = {
-  shadows: { label: '黑场', min: CHANNEL_MIN, max: CHANNEL_MAX, defaultValue: 0 },
-  midtones: { label: '中点', min: CHANNEL_MIN, max: CHANNEL_MAX, defaultValue: 128 },
-  highlights: { label: '白场', min: CHANNEL_MIN, max: CHANNEL_MAX, defaultValue: 255 },
-  outputBlack: { label: '输出黑场', min: CHANNEL_MIN, max: CHANNEL_MAX, defaultValue: 0 },
-  outputWhite: { label: '输出白场', min: CHANNEL_MIN, max: CHANNEL_MAX, defaultValue: 255 },
+  shadows: { label: i18n.global.t('canvas.imageEditor.params.shadows'), min: CHANNEL_MIN, max: CHANNEL_MAX, defaultValue: 0 },
+  midtones: {
+    label: i18n.global.t('canvas.imageEditor.params.midtones'),
+    min: CHANNEL_MIN,
+    max: CHANNEL_MAX,
+    defaultValue: 128,
+  },
+  highlights: {
+    label: i18n.global.t('canvas.imageEditor.params.highlights'),
+    min: CHANNEL_MIN,
+    max: CHANNEL_MAX,
+    defaultValue: 255,
+  },
+  outputBlack: {
+    label: i18n.global.t('canvas.imageEditor.params.outputBlack'),
+    min: CHANNEL_MIN,
+    max: CHANNEL_MAX,
+    defaultValue: 0,
+  },
+  outputWhite: {
+    label: i18n.global.t('canvas.imageEditor.params.outputWhite'),
+    min: CHANNEL_MIN,
+    max: CHANNEL_MAX,
+    defaultValue: 255,
+  },
 } satisfies ImageAdjustmentRangeByKind['levels']
 
 const SHARPEN_RANGES = {
-  amount: { label: '数量', min: 0, max: 200, defaultValue: 0 },
-  radius: { label: '半径', min: 0.3, max: 5, defaultValue: 1 },
-  threshold: { label: '阈值', min: 0, max: 50, defaultValue: 4 },
+  amount: { label: i18n.global.t('canvas.imageEditor.params.amount'), min: 0, max: 200, defaultValue: 0 },
+  radius: { label: i18n.global.t('canvas.imageEditor.params.radius'), min: 0.3, max: 5, defaultValue: 1 },
+  threshold: {
+    label: i18n.global.t('canvas.imageEditor.params.threshold'),
+    min: 0,
+    max: 50,
+    defaultValue: 4,
+  },
 } satisfies ImageAdjustmentRangeByKind['sharpen']
 
 export const IMAGE_ADJUSTMENT_DEFINITIONS: ImageAdjustmentDefinitionByKind = {

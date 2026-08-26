@@ -21,7 +21,7 @@
         type="button"
         class="canvas-group-frame-resize-handle"
         :class="[`handle-${handle}`, resizeHandleKindClass(handle)]"
-        aria-label="调整组合边界"
+        :aria-label="t('canvas.controls.resizeGroupBounds')"
         @pointerdown.stop.prevent="onResizePointerDown($event, frame, handle)"
       />
     </div>
@@ -30,6 +30,7 @@
 
 <script setup lang="ts">
 import { computed, type CSSProperties } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { CanvasGroupFrame, CanvasGroupResizeHandle } from '../utils/canvasGroupGeometry'
 
 const props = defineProps<{
@@ -46,6 +47,8 @@ const emit = defineEmits<{
     },
   ): void
 }>()
+
+const { t } = useI18n()
 
 const resizeHandles: CanvasGroupResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 const selectedFrames = computed(() => props.frames.filter((frame) => frame.selected))

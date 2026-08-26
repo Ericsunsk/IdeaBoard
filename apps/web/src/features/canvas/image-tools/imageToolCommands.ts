@@ -3,8 +3,11 @@ import {
   renderImageEditorLayerStackFile,
 } from '../image-editor/services/imageAdjustmentRenderer'
 import { useMaskEditorChromeActions } from '../mask-editor/useMaskEditorChromeActions'
+import { isProcessingCancelled } from '../image-editor/runtime/processingCancelled'
 import { isCanvasGraphNodeId } from '../graph-runtime'
 import { IMAGE_GENERATION_SUCCESS_MESSAGE } from '../../../shared/constants/media'
+import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
+import { i18n } from '../../../shared/i18n'
 import type { ImageToolChromeCommands } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
 
@@ -17,7 +20,7 @@ export function createImageToolCommands(session: ImageToolSession) {
     const nodeId = session.imageEditorNodeId.value
     if (!nodeId || session.imageEditorMode.value !== 'adjust') return
     if (!isCanvasGraphNodeId(nodeId)) {
-      feedback.warning('图片节点未能写入画布')
+      feedback.warning(i18n.global.t('canvas.tools.nodeWriteFailed'))
       return
     }
 
@@ -25,13 +28,13 @@ export function createImageToolCommands(session: ImageToolSession) {
     const source = board.getImageNodeDisplayPayload(nodeId)
     const sourceNode = board.getImageNodeSnapshot(nodeId)
     if (!source || !sourceNode) {
-      feedback.warning('当前图片不可编辑')
+      feedback.warning(i18n.global.t('canvas.tools.imageNotEditable'))
       return
     }
 
     const layers = session.imageEditorSession.imageEditorLayers.value
     if (!hasRenderableImageEditorLayerStack(layers)) {
-      feedback.warning('没有可应用的编辑图层')
+      feedback.warning(i18n.global.t('canvas.tools.noEditableLayers'))
       return
     }
 
@@ -73,7 +76,7 @@ export function createImageToolCommands(session: ImageToolSession) {
         targetPort: 'image',
       })
       if (!didConnect) {
-        feedback.warning('图片已创建，但自动连线失败，请手动连接')
+        feedback.warning(i18n.global.t('canvas.tools.autoConnectFailed'))
         return
       }
       session.exitImageEditorMode({ runBeforeExit: false })
@@ -88,7 +91,7 @@ export function createImageToolCommands(session: ImageToolSession) {
       ) {
         return
       }
-      feedback.warning(error instanceof Error ? error.message : '应用编辑失败')
+      feedback.warning(userFacingErrorCopy(error, i18n.global.t('canvas.tools.applyEditFailed')))
     } finally {
       if (session.activeImageAdjustmentFinalScopeId.value === scopeId) {
         session.activeImageAdjustmentFinalScopeId.value = null
@@ -136,7 +139,5 @@ export function createImageToolCommands(session: ImageToolSession) {
 }
 
 function isImageAdjustmentFinalApplyCancelled(error: unknown) {
-  if (!(error instanceof Error)) return false
-  const message = error.message.toLowerCase()
-  return message === 'cancelled' || message.includes('已取消')
+  return isProcessingCancelled(error)
 }

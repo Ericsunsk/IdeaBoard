@@ -5,14 +5,14 @@
     aria-labelledby="pending-payment-orders-heading"
   >
     <h3 id="pending-payment-orders-heading" class="m-0 text-lg font-bold text-ib-text">
-      待支付订单
+      {{ t('account.topUp.pendingOrdersTitle') }}
     </h3>
 
     <div
       v-if="pending"
       class="grid gap-2 rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface p-4 shadow-[var(--shadow-ib-control)]"
       role="status"
-      aria-label="正在加载待支付订单"
+      :aria-label="t('account.topUp.pendingOrdersLoading')"
     >
       <Skeleton height="1.25rem" width="42%" />
       <Skeleton height="1rem" width="68%" />
@@ -23,10 +23,10 @@
       class="rounded-[var(--radius-ib-panel)] border border-ib-danger/25 bg-ib-surface p-4 shadow-[var(--shadow-ib-control)]"
       role="alert"
     >
-      <p class="m-0 font-semibold text-ib-danger">待支付订单加载失败</p>
+      <p class="m-0 font-semibold text-ib-danger">{{ t('account.errors.pendingOrdersLoadFailed') }}</p>
       <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(error) }}</p>
       <Button
-        label="重新加载"
+        :label="t('account.reload')"
         severity="secondary"
         size="small"
         text
@@ -61,7 +61,7 @@
           >
             <Button
               unstyled
-              label="继续支付"
+              :label="t('account.topUp.continuePayment')"
               size="small"
               :loading="isActionPending(item.public_token, 'continue')"
               :disabled="actionPending"
@@ -70,7 +70,7 @@
               @click="emit('continue', item.public_token)"
             />
             <Button
-              label="放弃订单"
+              :label="t('account.topUp.abandonOrder')"
               severity="secondary"
               size="small"
               outlined
@@ -89,7 +89,7 @@
         >
           <span class="text-sm font-semibold text-ib-danger">{{ errorMessage(actionError) }}</span>
           <Button
-            :label="actionTarget.kind === 'continue' ? '重试继续支付' : '重试放弃订单'"
+            :label="actionTarget.kind === 'continue' ? t('account.topUp.retryContinuePayment') : t('account.topUp.retryAbandonOrder')"
             severity="secondary"
             size="small"
             text
@@ -105,9 +105,11 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
 import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
+import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { accountButtonPt, accountPrimaryActionButtonClass } from './accountManagementUi'
 import type { UserPendingPaymentOrder } from '../userPaymentsResource'
 
@@ -127,6 +129,7 @@ const emit = defineEmits<{
   abandon: [publicToken: string]
 }>()
 
+const { t } = useI18n()
 const now = ref(Date.now())
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 
@@ -158,19 +161,21 @@ function retryAction(publicToken: string) {
 function statusText(item: UserPendingPaymentOrder) {
   switch (item.status) {
     case 'checkout_open':
-      return '待完成支付'
+      return t('account.topUp.statusCheckoutOpen')
     case 'async_payment_pending':
-      return '正在等待支付确认'
+      return t('account.topUp.statusAsyncPending')
     case 'paid_pending_credit':
-      return isCreditProcessingDelayed(item.updated_at) ? '到账处理中' : '支付已完成，正在到账'
+      return isCreditProcessingDelayed(item.updated_at)
+        ? t('account.topUp.statusCreditingDelayed')
+        : t('account.topUp.statusCrediting')
     case 'expired':
-      return '支付链接已过期'
+      return t('account.topUp.statusExpired')
     case 'cancelled':
-      return '订单已放弃'
+      return t('account.topUp.statusCancelled')
     case 'payment_failed':
-      return '支付未完成'
+      return t('account.topUp.statusPaymentFailed')
     case 'credited':
-      return 'Ideas 已到账'
+      return t('account.topUp.statusCredited')
   }
 }
 
@@ -189,16 +194,18 @@ function isCreditProcessingDelayed(updatedAt: string) {
 
 function expiryText(item: UserPendingPaymentOrder) {
   const date = new Date(item.expires_at)
-  if (Number.isNaN(date.getTime())) return '有效期未知'
-  const formatted = new Intl.DateTimeFormat('zh-CN', {
+  if (Number.isNaN(date.getTime())) return t('account.topUp.expiryUnknown')
+  const formatted = new Intl.DateTimeFormat('en-US', {
     dateStyle: 'medium',
     timeStyle: 'short',
     hour12: false,
   }).format(date)
-  return item.status === 'expired' ? `已于 ${formatted} 过期` : `有效至 ${formatted}`
+  return item.status === 'expired'
+    ? t('account.topUp.expiredAt', { time: formatted })
+    : t('account.topUp.expiresAt', { time: formatted })
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : '网络错误，请重试'
+  return userFacingErrorCopy(error, t('account.errors.networkRetry'))
 }
 </script>

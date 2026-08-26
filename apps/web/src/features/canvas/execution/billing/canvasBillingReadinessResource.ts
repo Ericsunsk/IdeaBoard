@@ -7,7 +7,7 @@ import {
 import {
   buildFusionTaskRequest,
   buildImageActionReadinessRequest,
-  buildPartialEditReadinessRequest,
+  buildInpaintReadinessRequest,
   buildPromptGenerationTaskRequest,
 } from '../commands/flowImageTaskRequests'
 import type { OutputResolution } from '../../../../shared/domain/generationContract'
@@ -18,8 +18,8 @@ import {
 
 function buildCanvasBillingReadinessRequest(feature: WorkflowFeature): SubmitTaskData {
   switch (feature) {
-    case WORKFLOW_FEATURE.partialEdit:
-      return buildPartialEditReadinessRequest()
+    case WORKFLOW_FEATURE.inpaint:
+      return buildInpaintReadinessRequest()
     case WORKFLOW_FEATURE.promptGeneration:
       return buildPromptGenerationTaskRequest({
         prompt: '',
@@ -28,9 +28,9 @@ function buildCanvasBillingReadinessRequest(feature: WorkflowFeature): SubmitTas
       })
     case WORKFLOW_FEATURE.styleFusion:
       throw new Error('Fusion readiness requires current image inputs')
-    case WORKFLOW_FEATURE.removeBg:
-    case WORKFLOW_FEATURE.styleVariation:
-    case WORKFLOW_FEATURE.sketchToImage:
+    case WORKFLOW_FEATURE.cutout:
+    case WORKFLOW_FEATURE.variations:
+    case WORKFLOW_FEATURE.render:
     case WORKFLOW_FEATURE.hdUpscale:
     case WORKFLOW_FEATURE.outpaint:
       return buildImageActionReadinessRequest(feature)

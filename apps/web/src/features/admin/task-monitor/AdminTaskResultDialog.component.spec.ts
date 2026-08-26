@@ -1,6 +1,6 @@
 import PrimeVue from 'primevue/config'
 import { describe, expect, it, vi } from 'vitest'
-import { primeVueTestOptions } from '../../../test/primeVue'
+import { adminPrimeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen } from '../../../test/render'
 import AdminTaskResultDialog from './AdminTaskResultDialog.vue'
 import { adminTaskStatuses } from './taskMonitorStatus'
@@ -23,7 +23,7 @@ function renderDialog(task: AdminTaskMonitorDetailModel, visible = true) {
   return renderWithUser(AdminTaskResultDialog, {
     props: { task, visible },
     global: {
-      plugins: [[PrimeVue, primeVueTestOptions]],
+      plugins: [[PrimeVue, adminPrimeVueTestOptions]],
       stubs: { transition: false },
     },
   })
@@ -221,7 +221,7 @@ describe('AdminTaskResultDialog', () => {
         onRetry: retry,
       },
       global: {
-        plugins: [[PrimeVue, primeVueTestOptions]],
+        plugins: [[PrimeVue, adminPrimeVueTestOptions]],
         stubs: { transition: false },
       },
     })
@@ -274,7 +274,7 @@ function makeTask(
     prompt: 'Prompt',
     user_prompt: '',
     params: '{}',
-    feature_slug: 'sketch-to-image',
+    feature_slug: 'render',
     priority: 2,
     status: adminTaskStatuses.completed,
     retry_count: 0,

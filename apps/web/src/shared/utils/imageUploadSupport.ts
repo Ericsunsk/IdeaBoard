@@ -3,6 +3,7 @@ import {
   SUPPORTED_IMAGE_UPLOAD_EXTENSIONS,
   SUPPORTED_IMAGE_UPLOAD_MIME_TYPES,
 } from '../constants/media'
+import { i18n } from '../i18n'
 
 const supportedUploadImageMimeTypes = new Set<string>(SUPPORTED_IMAGE_UPLOAD_MIME_TYPES)
 const supportedUploadImageExtensions = new Set<string>(SUPPORTED_IMAGE_UPLOAD_EXTENSIONS)
@@ -22,5 +23,7 @@ export function isSupportedUploadImageFile(file: File): boolean {
 }
 
 export function unsupportedUploadImageMessage(): string {
-  return `仅支持 ${IMAGE_UPLOAD_FORMAT_LABEL} 图片`
+  return i18n.global.t('common.errors.unsupportedImageFormat', {
+    formats: IMAGE_UPLOAD_FORMAT_LABEL,
+  })
 }

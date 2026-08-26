@@ -155,7 +155,7 @@ describe('FlowCanvasNode prompt rendering', () => {
         .querySelector<HTMLElement>('.flow-canvas-node')
         ?.style.getPropertyValue('--canvas-node-ui-scale'),
     ).toBe('1')
-    expect(view.getByLabelText('发送')).not.toBeDisabled()
+    expect(view.getByLabelText('Send')).not.toBeDisabled()
   })
 
   it('keeps the full prompt body for selected nodes at rest', () => {
@@ -206,7 +206,7 @@ describe('FlowCanvasNode prompt rendering', () => {
       generationAvailable: false,
     })
 
-    expect(view.getByLabelText('发送')).toBeDisabled()
+    expect(view.getByLabelText('Send')).toBeDisabled()
   })
 
   it('emits a semantic presentation intent when prompt text is edited', async () => {
@@ -222,7 +222,7 @@ describe('FlowCanvasNode prompt rendering', () => {
   it('emits a semantic presentation intent when prompt generation is requested', async () => {
     const view = renderFlowCanvasNode()
 
-    await fireEvent.click(view.getByLabelText('发送'))
+    await fireEvent.click(view.getByLabelText('Send'))
 
     expect(view.emitted('node-intent')).toContainEqual([
       {
@@ -260,7 +260,7 @@ describe('FlowCanvasNode image presentation', () => {
     expect(floatingControls?.querySelector('.image-action-menu')).not.toBeNull()
     expect(floatingControls?.querySelector('.image-node-prompt-composer')).not.toBeNull()
     expect(view.getByPlaceholderText('输入提示词改造这张图')).toBeVisible()
-    expect(view.getByLabelText('打开图片预览').closest('.node-floating-controls')).toBeNull()
+    expect(view.getByLabelText('Open image preview').closest('.node-floating-controls')).toBeNull()
   })
 
   it('uses image tools for the current draft without an independent submit button', async () => {
@@ -286,13 +286,13 @@ describe('FlowCanvasNode image presentation', () => {
 
     expect(view.queryByRole('button', { name: '发送' })).not.toBeInTheDocument()
 
-    await fireEvent.click(view.getByLabelText('风格延展'))
+    await fireEvent.click(view.getByLabelText('Variations'))
 
     expect(view.emitted('node-intent')).toContainEqual([
       {
         type: 'action-requested',
         nodeId: 'image-1',
-        action: IMAGE_NODE_ACTION.styleVariation,
+        action: IMAGE_NODE_ACTION.variations,
         prompt: '沿用当前草稿',
         outputCount: 1,
         strength: undefined,
@@ -314,9 +314,9 @@ describe('FlowCanvasNode image presentation', () => {
       },
     })
 
-    await fireEvent.click(view.getByLabelText('打开图片预览'))
-    await fireEvent.dblClick(view.getByAltText('图片节点预览'))
-    await fireEvent.click(view.getByLabelText('清空图片输入'))
+    await fireEvent.click(view.getByLabelText('Open image preview'))
+    await fireEvent.dblClick(view.getByAltText('Image node preview'))
+    await fireEvent.click(view.getByLabelText('Clear image input'))
 
     expect(view.emitted('node-intent')).toEqual(
       expect.arrayContaining([
@@ -341,7 +341,7 @@ describe('FlowCanvasNode image presentation', () => {
       },
     })
 
-    await fireEvent.click(view.getByLabelText('上传图片作为输入'))
+    await fireEvent.click(view.getByLabelText('Upload image as input'))
 
     expect(view.emitted('node-intent')).toContainEqual([
       { type: 'file-open-requested', nodeId: 'image-1' },
@@ -364,7 +364,7 @@ describe('FlowCanvasNode fusion presentation', () => {
       },
     })
 
-    const title = view.getByTitle('单击重命名')
+    const title = view.getByTitle('Click to rename')
     await fireEvent.click(title)
     title.textContent = '新的融合节点'
     await fireEvent.input(title)
@@ -417,13 +417,13 @@ describe('FlowCanvasNode fusion presentation', () => {
     const floatingControls = view.container.querySelector('.node-floating-controls')
 
     expect(floatingControls?.querySelector('.image-node-prompt-composer')).not.toBeNull()
-    expect(view.getByPlaceholderText('输入融合提示词')).toBeVisible()
+    expect(view.getByPlaceholderText('Enter fusion prompt')).toBeVisible()
 
     await fireEvent.drop(stage)
     await fireEvent.contextMenu(stage)
-    await fireEvent.click(view.getAllByLabelText('移除图片输入')[0]!)
-    await fireEvent.update(view.getByPlaceholderText('输入融合提示词'), '融合两张图片')
-    await fireEvent.click(view.getByLabelText('发送'))
+    await fireEvent.click(view.getAllByLabelText('Remove image input')[0]!)
+    await fireEvent.update(view.getByPlaceholderText('Enter fusion prompt'), '融合两张图片')
+    await fireEvent.click(view.getByLabelText('Send'))
 
     expect(view.emitted('node-intent')).toEqual(
       expect.arrayContaining([

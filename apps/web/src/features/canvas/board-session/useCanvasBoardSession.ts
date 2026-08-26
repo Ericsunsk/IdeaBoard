@@ -1,6 +1,7 @@
 import { computed, type ComputedRef } from 'vue'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import { isBoardNameConflictError } from '../../canvas-board/catalog/boardSync'
+import { i18n } from '../../../shared/i18n'
 import {
   createBoardSessionRepository,
   isBoardSessionRemoteSyncError,
@@ -19,7 +20,7 @@ type BoardSessionIdentity = {
 }
 
 function createAuthUnavailableError(): Error {
-  return new Error('保存失败：缺少用户信息，请重新登录后重试')
+  return new Error(i18n.global.t('canvas.session.saveAuthUnavailable'))
 }
 
 function normalizeBoardSessionIdentity(
@@ -111,7 +112,7 @@ export function useCanvasBoardSession(options: CanvasBoardSessionTestOptions): C
   ): Promise<CanvasBoardSessionSaveResult> {
     const boardId = currentBoardId.value
     if (!boardId) {
-      throw new Error('缺少 boardId，无法保存')
+      throw new Error(i18n.global.t('canvas.session.missingBoardIdSave'))
     }
     if (!exists(boardId)) {
       throw new Error('BOARD_NOT_FOUND')

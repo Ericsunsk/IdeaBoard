@@ -20,6 +20,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'
 import type { ImageEditorLevelsParams } from '../types'
 import { createImageEditorHistogram, sampleHistogramPath } from '../utils/imageEditorHistogram'
@@ -51,6 +52,8 @@ const emit = defineEmits<{
   (e: 'update:params', value: ImageEditorLevelsParams): void
 }>()
 
+const { t } = useI18n()
+
 const clampedParams = computed(() => clampLevelsHandles(props.params))
 const inputConstraints = computed(() => createLevelsInputConstraints(clampedParams.value))
 const outputConstraints = computed(() => createLevelsOutputConstraints(clampedParams.value))
@@ -72,7 +75,7 @@ const plotMarkers = computed<readonly ImageEditorHistogramPlotMarker[]>(() =>
     guideLineClassName: `is-${marker.id}`,
   })),
 )
-const plotAriaLabel = computed(() => '色阶直方图')
+const plotAriaLabel = computed(() => t('canvas.imageEditor.levelsHistogramAria'))
 
 function onMarkerUpdate(markerId: string, position: number) {
   if (!isLevelsHandleId(markerId)) return

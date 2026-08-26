@@ -33,14 +33,14 @@
         ref="avatarButtonRef"
         unstyled
         type="button"
-        title="账户菜单"
-        aria-label="账户菜单"
+        :title="t('auth.menu.title')"
+        :aria-label="t('auth.menu.title')"
         aria-haspopup="menu"
         :aria-expanded="isMenuOpen"
         :class="avatarButtonClass"
         @click="toggleMenu"
       >
-        <img v-if="avatarUrl" :src="avatarUrl" :class="avatarImageClass" alt="用户头像" />
+        <img v-if="avatarUrl" :src="avatarUrl" :class="avatarImageClass" :alt="t('auth.menu.avatarAlt')" />
         <div v-else :class="[avatarPlaceholderClass, 'bg-transparent']">
           <User :class="avatarIconClass" />
         </div>
@@ -73,6 +73,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { User } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Menu from 'primevue/menu'
@@ -119,6 +120,7 @@ const props = withDefaults(
   },
 )
 
+const { t } = useI18n()
 const avatarButtonRef = ref<AvatarButtonRef | null>(null)
 const {
   popupRef: menuRef,

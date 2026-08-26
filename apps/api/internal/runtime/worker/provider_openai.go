@@ -62,7 +62,7 @@ func (f openAIRequestFinalizer) apply(reqBody *openAIImageRequestBody) {
 	}
 	f.dropSingleImageFallbackForMultipleInputs(reqBody)
 	f.dropRedundantDataURLImageList(reqBody)
-	f.dropRedundantStyleVariationOriginalRef(reqBody)
+	f.dropRedundantVariationsOriginalRef(reqBody)
 }
 
 func (f openAIRequestFinalizer) dropSingleImageFallbackForMultipleInputs(reqBody *openAIImageRequestBody) {
@@ -81,7 +81,7 @@ func (f openAIRequestFinalizer) dropRedundantDataURLImageList(reqBody *openAIIma
 	}
 }
 
-func (f openAIRequestFinalizer) dropRedundantStyleVariationOriginalRef(reqBody *openAIImageRequestBody) {
+func (f openAIRequestFinalizer) dropRedundantVariationsOriginalRef(reqBody *openAIImageRequestBody) {
 	if !f.DropOriginalImageRef {
 		return
 	}

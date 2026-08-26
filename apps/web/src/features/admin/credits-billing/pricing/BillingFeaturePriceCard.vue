@@ -84,9 +84,9 @@ import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import {
-  getWorkflowFeatureRegistryItem,
-  WORKFLOW_FEATURE_GROUP_LIST,
-} from '../../../../shared/domain/workflowFeatureRegistry'
+  getAdminWorkflowFeatureGroupMeta,
+  getAdminWorkflowFeatureMeta,
+} from '../../shared/lib/workflowFeatureAdminMeta'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
 import {
   adminActionButtonClass,
@@ -124,10 +124,9 @@ const statusMeta = computed(() => statusPresentation[props.item.status])
 const workflowPresentation = computed(() => {
   const prefix = 'ai-image:'
   if (!props.item.sku.startsWith(prefix)) return null
-  const feature = getWorkflowFeatureRegistryItem(props.item.sku.slice(prefix.length))
+  const feature = getAdminWorkflowFeatureMeta(props.item.sku.slice(prefix.length))
   if (!feature) return null
-  const group = WORKFLOW_FEATURE_GROUP_LIST.find((item) => item.key === feature.groupKey)
-  if (!group) return null
+  const group = getAdminWorkflowFeatureGroupMeta(feature.groupKey)
   return { groupTitle: group.title }
 })
 const resolutions = computed(() => props.item.pricingVariants)

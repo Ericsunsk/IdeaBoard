@@ -63,9 +63,9 @@ type RuntimeOperation string
 
 const (
 	RuntimeOperationPromptGeneration  RuntimeOperation = "prompt-generation"
-	RuntimeOperationPartialEdit       RuntimeOperation = "partial-edit"
-	RuntimeOperationSketchToImage     RuntimeOperation = "sketch-to-image"
-	RuntimeOperationStyleVariation    RuntimeOperation = "style-variation"
+	RuntimeOperationInpaint           RuntimeOperation = "inpaint"
+	RuntimeOperationRender            RuntimeOperation = "render"
+	RuntimeOperationVariations        RuntimeOperation = "variations"
 	RuntimeOperationStyleFusion       RuntimeOperation = "style-fusion"
 	RuntimeOperationOutpaint          RuntimeOperation = "outpaint"
 	RuntimeOperationBackgroundRemoval RuntimeOperation = "background-removal"
@@ -272,19 +272,19 @@ var registeredImageFeatures = []registeredImageFeature{
 		PromptPolicyRequired, RuntimeOperationPromptGeneration, RuntimeInvocationGenerate,
 		ImageInputOptional, 4, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsNone,
 	)},
-	{slug: FeatureSlugPartialEdit, definition: imageFillDefinition(
-		PromptPolicyRequired, RuntimeOperationPartialEdit,
+	{slug: FeatureSlugInpaint, definition: imageFillDefinition(
+		PromptPolicyRequired, RuntimeOperationInpaint,
 		ImageInputRequired, MaskInputRequired, OriginalImageForwardWhenPresent, RuntimeControlsNone,
 	)},
-	{slug: FeatureSlugSketchToImage, definition: imageGenerationDefinition(
-		PromptPolicyOptional, RuntimeOperationSketchToImage, RuntimeInvocationEdit,
+	{slug: FeatureSlugRender, definition: imageGenerationDefinition(
+		PromptPolicyOptional, RuntimeOperationRender, RuntimeInvocationEdit,
 		ImageInputRequired, 16, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsNone,
 	)},
-	{slug: FeatureSlugStyleVariation, definition: imageGenerationDefinition(
-		PromptPolicyOptional, RuntimeOperationStyleVariation, RuntimeInvocationEdit,
+	{slug: FeatureSlugVariations, definition: imageGenerationDefinition(
+		PromptPolicyOptional, RuntimeOperationVariations, RuntimeInvocationEdit,
 		ImageInputRequired, 16, MaskInputIgnored, OriginalImageExcluded, RuntimeControlsVariation,
 	)},
-	{slug: FeatureSlugRemoveBg, definition: featureExecutionDefinition{
+	{slug: FeatureSlugCutout, definition: featureExecutionDefinition{
 		promptPolicy:           PromptPolicyIgnored,
 		outputCountPolicy:      OutputCountPolicyFixed,
 		outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
@@ -577,19 +577,19 @@ func durableFeatureDefinitionForV3(feature string) (durableFeatureDefinitionV3, 
 			PromptPolicyRequired, RuntimeOperationPromptGeneration, RuntimeInvocationGenerate,
 			ImageInputOptional, 4, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsNone,
 		), true
-	case FeatureSlugPartialEdit:
+	case FeatureSlugInpaint:
 		return durableImageFillDefinitionV3(
-			PromptPolicyRequired, RuntimeOperationPartialEdit,
+			PromptPolicyRequired, RuntimeOperationInpaint,
 			MaskInputRequired, RuntimeControlsNone,
 		), true
-	case FeatureSlugSketchToImage:
+	case FeatureSlugRender:
 		return durableImageGenerationDefinitionV3(
-			PromptPolicyOptional, RuntimeOperationSketchToImage, RuntimeInvocationEdit,
+			PromptPolicyOptional, RuntimeOperationRender, RuntimeInvocationEdit,
 			ImageInputRequired, 16, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsNone,
 		), true
-	case FeatureSlugStyleVariation:
+	case FeatureSlugVariations:
 		return durableImageGenerationDefinitionV3(
-			PromptPolicyOptional, RuntimeOperationStyleVariation, RuntimeInvocationEdit,
+			PromptPolicyOptional, RuntimeOperationVariations, RuntimeInvocationEdit,
 			ImageInputRequired, 16, MaskInputIgnored, OriginalImageExcluded, RuntimeControlsVariation,
 		), true
 	case FeatureSlugStyleFusion:
@@ -602,7 +602,7 @@ func durableFeatureDefinitionForV3(feature string) (durableFeatureDefinitionV3, 
 			PromptPolicyOptional, RuntimeOperationOutpaint,
 			MaskInputIgnored, RuntimeControlsExtend,
 		), true
-	case FeatureSlugRemoveBg:
+	case FeatureSlugCutout:
 		return durableFeatureDefinitionV3{
 			promptPolicy: PromptPolicyIgnored, outputCountPolicy: OutputCountPolicyFixed,
 			outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,

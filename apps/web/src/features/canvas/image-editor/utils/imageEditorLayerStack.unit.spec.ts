@@ -118,7 +118,7 @@ describe('imageEditorLayerStack', () => {
     expect(getSelectedAdjustment(updatedStack)).toMatchObject({
       id: 'adjustment:sharpen',
       kind: 'sharpen',
-      name: '锐化 1',
+      name: 'Sharpen 1',
       params: {
         amount: 200,
         radius: 5,

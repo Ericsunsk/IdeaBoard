@@ -1,4 +1,5 @@
 import { useAppToast } from '../../../shared/composables/useAppToast'
+import { i18n } from '../../../shared/i18n'
 import type {
   CanvasBoardCreateResult,
   CanvasBoardDeleteResult,
@@ -35,58 +36,69 @@ export type BoardFeedback = {
 }
 
 export function createBoardFeedback(appToast: BoardToast): BoardFeedback {
+  const t = i18n.global.t
   return {
     createFailed(result) {
       appToast.error(
-        result.reason === 'name-conflict' ? '画布名称已存在，请重试' : '创建同步失败，请稍后重试',
+        result.reason === 'name-conflict'
+          ? t('workspace.feedback.createNameConflict')
+          : t('workspace.feedback.createSyncFailed'),
       )
     },
     renameValidationFailed(result) {
-      appToast.warning(result.reason === 'local-name-conflict' ? '名称已存在' : '画布名称不能为空')
+      appToast.warning(
+        result.reason === 'local-name-conflict'
+          ? t('workspace.feedback.nameAlreadyExists')
+          : t('workspace.feedback.nameEmpty'),
+      )
     },
     renameSyncFailed(result) {
       if (result.reason === 'remote-name-conflict' && result.hydrate?.ok) {
-        appToast.error('名称冲突，已重新加载画布列表')
+        appToast.error(t('workspace.feedback.renameConflictReloaded'))
         return
       }
       if (result.reason === 'sync-failed' && result.rollback.ok) {
-        appToast.error('重命名同步失败，已恢复原名称')
+        appToast.error(t('workspace.feedback.renameSyncFailedRolledBack'))
         return
       }
       appToast.error(
         result.reason === 'remote-name-conflict'
-          ? '名称冲突且恢复未完成，请重新加载画布列表'
-          : '重命名同步失败且无法恢复，请重新加载画布列表',
+          ? t('workspace.feedback.renameConflictRecoveryIncomplete')
+          : t('workspace.feedback.renameSyncFailedNoRollback'),
       )
     },
     renamed() {
-      appToast.success('画布已重命名')
+      appToast.success(t('workspace.feedback.renamed'))
     },
     copyFailed(result) {
       if (result.reason === 'source-missing') {
-        appToast.error('复制失败')
+        appToast.error(t('workspace.feedback.copyFailed'))
         return
       }
       appToast.error(
         result.reason === 'name-conflict'
-          ? '复制后的画布名称已存在，请重试'
-          : '复制同步失败，请稍后重试',
+          ? t('workspace.feedback.duplicateNameConflict')
+          : t('workspace.feedback.duplicateSyncFailed'),
       )
     },
     copied() {
-      appToast.success('已复制画布')
+      appToast.success(t('workspace.feedback.duplicated'))
     },
     deleteFailed(result) {
-      appToast.error(result.reason === 'sync-failed' ? '删除失败，请稍后重试' : '删除失败')
+      appToast.error(
+        result.reason === 'sync-failed'
+          ? t('workspace.feedback.deleteSyncFailed')
+          : t('workspace.feedback.deleteFailed'),
+      )
     },
     deleted() {
-      appToast.success('已删除画布')
+      appToast.success(t('workspace.feedback.deleted'))
     },
     catalogSyncFailed() {
-      appToast.error('画布同步失败，请稍后重试')
+      appToast.error(t('workspace.feedback.syncFailedRetry'))
     },
     catalogReloaded() {
-      appToast.success('画布列表已重新加载')
+      appToast.success(t('workspace.feedback.reloaded'))
     },
   }
 }

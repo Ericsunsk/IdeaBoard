@@ -107,7 +107,7 @@ describe('Board Sync Coordinator', () => {
       snapshot: expect.any(Object),
       hasLocalDraftAdvanced: false,
     })
-    expect(harness.onSuccess).toHaveBeenCalledWith('已保存')
+    expect(harness.onSuccess).toHaveBeenCalledWith('Saved')
   })
 
   it('keeps dirty state and returns reconciliation when remote sync fails', async () => {
@@ -123,7 +123,9 @@ describe('Board Sync Coordinator', () => {
     expect(result.reconciliation?.snapshot.promptNodes[0]?.text).toBe('saved-locally')
     expect(harness.isDirty.value).toBe(true)
     expect(harness.saveStatus.value).toBe('retry')
-    expect(harness.onWarning).toHaveBeenCalledWith('已保存到本地，远端同步失败，将在网络恢复后重试')
+    expect(harness.onWarning).toHaveBeenCalledWith(
+      'Saved locally. Remote sync failed; it will retry once the network recovers.',
+    )
   })
 
   it('does not return a stale reconciliation after a route switch', async () => {
@@ -194,6 +196,8 @@ describe('Board Sync Coordinator', () => {
 
     const result = await harness.coordinator.loadInitialOrRouteBoard()
     expect(result).toEqual({ status: 'failed' })
-    expect(harness.onError).toHaveBeenCalledWith('画布数据校验失败，已保留当前画布，请稍后重试')
+    expect(harness.onError).toHaveBeenCalledWith(
+      'Canvas data validation failed. Your current canvas was kept. Please try again later.',
+    )
   })
 })

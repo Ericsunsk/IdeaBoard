@@ -1,5 +1,6 @@
 import { createBillingQuote } from '../../shared/api/generated-query/billing/billing'
 import { resolveApiData } from '../../shared/api/apiResponse'
+import { i18n } from '../../shared/i18n'
 
 const VISION_SEARCH_SKU = 'ai-search:vision'
 
@@ -13,7 +14,7 @@ export async function fetchVisionSearchPrice(signal?: AbortSignal): Promise<numb
       },
       { signal },
     ),
-    '视觉搜索价格暂不可用',
+    i18n.global.t('search.priceUnavailable'),
   )
   return quote.total_credits
 }

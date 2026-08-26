@@ -28,7 +28,7 @@ func TestValidateImageFillDimensions(t *testing.T) {
 		},
 		{
 			name:    "inpaint accepts matching four megapixel dimensions",
-			feature: workflow.FeatureSlugPartialEdit,
+			feature: workflow.FeatureSlugInpaint,
 			controls: &tasks.GenerationControls{
 				OriginalWidth: 2048, OriginalHeight: 2048,
 				CustomWidth: 2048, CustomHeight: 2048,
@@ -60,7 +60,7 @@ func TestValidateImageFillDimensions(t *testing.T) {
 		},
 		{
 			name:    "requires inpaint dimensions to match",
-			feature: workflow.FeatureSlugPartialEdit,
+			feature: workflow.FeatureSlugInpaint,
 			controls: &tasks.GenerationControls{
 				OriginalWidth: 1024, OriginalHeight: 768,
 				CustomWidth: 1024, CustomHeight: 776,
@@ -78,7 +78,7 @@ func TestValidateImageFillDimensions(t *testing.T) {
 		},
 		{
 			name:    "checks pixel limit after eight pixel alignment",
-			feature: workflow.FeatureSlugPartialEdit,
+			feature: workflow.FeatureSlugInpaint,
 			controls: &tasks.GenerationControls{
 				OriginalWidth: 2041, OriginalHeight: 2055,
 				CustomWidth: 2041, CustomHeight: 2055,
@@ -137,7 +137,7 @@ func TestTaskIntakeReadinessRejectsImageFillDimensionsBeforeProviderLookup(t *te
 	intake := NewTaskIntake(TaskIntakeDeps{Accounts: accountsStore})
 
 	_, err := intake.CompileReadiness(t.Context(), &tasks.SubmitTaskRequest{
-		Feature: workflow.FeatureSlugPartialEdit,
+		Feature: workflow.FeatureSlugInpaint,
 		Params: map[string]interface{}{
 			"original_image_width":  1024,
 			"original_image_height": 768,

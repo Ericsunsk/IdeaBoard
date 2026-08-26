@@ -7,6 +7,8 @@ CREATE TABLE users (
   avatar VARCHAR(1024) NOT NULL DEFAULT '',
   role VARCHAR(20) NOT NULL DEFAULT 'user',
   status SMALLINT NOT NULL DEFAULT 1,
+  last_login_ip VARCHAR(45),
+  last_login_country VARCHAR(2),
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   CONSTRAINT uq_users_public_id UNIQUE (public_id),
@@ -15,6 +17,8 @@ CREATE TABLE users (
   CONSTRAINT chk_users_role CHECK (role IN ('admin', 'user')),
   CONSTRAINT chk_users_display_name CHECK (length(btrim(display_name)) BETWEEN 1 AND 100),
   CONSTRAINT chk_users_status CHECK (status IN (0, 1)),
+  CONSTRAINT chk_users_last_login_ip CHECK (last_login_ip IS NULL OR last_login_ip <> ''),
+  CONSTRAINT chk_users_last_login_country CHECK (last_login_country IS NULL OR last_login_country ~ '^[A-Z]{2}$'),
   CONSTRAINT chk_users_storage_uid CHECK (storage_uid ~ '^[A-Z0-9]{6}$')
 );
 
@@ -1796,6 +1800,34 @@ CREATE TABLE system_configs (
   CONSTRAINT uq_system_configs_config_key UNIQUE (config_key)
 );
 
+-- Admin-managed presentation overrides are intentionally separate from
+-- system_configs: they are enumerable UI state, not runtime configuration.
+CREATE TABLE admin_brand_logo_overrides (
+  scope VARCHAR(32) NOT NULL,
+  target_key VARCHAR(128) NOT NULL,
+  logo_key VARCHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  CONSTRAINT pk_admin_brand_logo_overrides PRIMARY KEY (scope, target_key),
+  CONSTRAINT ck_admin_brand_logo_overrides_scope CHECK (
+    scope IN ('provider-endpoint', 'storage-profile', 'search-provider', 'oauth-provider')
+  ),
+  CONSTRAINT ck_admin_brand_logo_overrides_target_key CHECK (
+    target_key ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'
+  ),
+  CONSTRAINT ck_admin_brand_logo_overrides_logo_key CHECK (
+    logo_key IN (
+      'flux', 'midjourney', 'stability', 'fal', 'replicate', 'ideogram', 'recraft', 'runway',
+      'zhipu', 'aliyun', 'doubao', 'moonshot', 'minimax', 'baidu', 'tencent', 'lingyi',
+      'openai', 'gemini', 'anthropic', 'deepseek', 'cloudflare', 'siliconflow', 'mistral',
+      'groq', 'together', 'fireworks', 'huggingface', 'perplexity', 'cohere', 'novita',
+      'lepton', 'google', 'azure', 'bedrock', 'ollama', 'amazons3', 'cloudflare-r2',
+      'alibabacloud', 'tencent-cos', 'minio', 'unsplash', 'pexels', 'github', 'google-oauth',
+      'discord'
+    )
+  )
+);
+
 CREATE TABLE storage_profiles (
   profile_id VARCHAR(64) PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
@@ -1896,13 +1928,18 @@ CREATE INDEX idx_storage_profile_secret_versions_status ON storage_profile_secre
 -- Name: get_auth_runtime_settings(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION get_auth_runtime_settings() RETURNS TABLE(registration_enabled boolean)
+CREATE FUNCTION get_auth_runtime_settings() RETURNS TABLE(
+  registration_enabled boolean,
+  branding_project_name text,
+  branding_logo_url text
+)
     LANGUAGE plpgsql STABLE SECURITY DEFINER
     SET search_path TO 'public', 'pg_catalog', 'pg_temp'
     AS $$
 BEGIN
   RETURN QUERY
-  SELECT COALESCE(
+  SELECT
+    COALESCE(
       (
         SELECT lower(btrim(config.value)) = 'true'
         FROM system_configs AS config
@@ -1910,6 +1947,24 @@ BEGIN
         LIMIT 1
       ),
       FALSE
+    ),
+    COALESCE(
+      (
+        SELECT btrim(config.value)
+        FROM system_configs AS config
+        WHERE config.config_key = 'branding_project_name'
+        LIMIT 1
+      ),
+      'IdeaBoard'
+    ),
+    COALESCE(
+      (
+        SELECT btrim(config.value)
+        FROM system_configs AS config
+        WHERE config.config_key = 'branding_logo_url'
+        LIMIT 1
+      ),
+      ''
     );
 END;
 $$;
@@ -1950,7 +2005,7 @@ CREATE TABLE system_settings_admin_actions (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp(3) with time zone DEFAULT clock_timestamp() NOT NULL,
     CONSTRAINT ck_system_settings_admin_actions_metadata CHECK ((jsonb_typeof(metadata) = 'object'::text)),
-    CONSTRAINT ck_system_settings_admin_actions_type CHECK (((action_type)::text = ANY (ARRAY[('update_operational_settings'::character varying)::text, ('update_outbound_policy'::character varying)::text]))),
+    CONSTRAINT ck_system_settings_admin_actions_type CHECK (((action_type)::text = ANY (ARRAY[('update_operational_settings'::character varying)::text, ('update_outbound_policy'::character varying)::text, ('update_search_providers'::character varying)::text]))),
     CONSTRAINT system_settings_admin_actions_actor_id_check CHECK ((actor_id > 0))
 );
 
@@ -2359,7 +2414,6 @@ CREATE TABLE media_derivatives (
   last_attempt_at TIMESTAMPTZ(3),
   CONSTRAINT uq_media_derivatives_asset_tier UNIQUE (media_asset_id, tier),
   CONSTRAINT uq_media_derivatives_id_owner UNIQUE (id, owner_user_id),
-  CONSTRAINT uq_media_derivatives_storage_key UNIQUE (storage_profile_id, storage_key),
   CONSTRAINT ck_media_derivatives_tier CHECK (tier IN ('thumb', 'preview', 'large-preview')),
   CONSTRAINT ck_media_derivatives_format CHECK (format IN ('webp', 'jpeg', 'png')),
   CONSTRAINT ck_media_derivatives_status CHECK (status IN ('pending', 'processing', 'ready', 'failed', 'obsolete')),
@@ -2376,6 +2430,10 @@ CREATE TABLE media_derivatives (
 CREATE INDEX idx_media_derivatives_pending ON media_derivatives (status, updated_at, id)
   WHERE status IN ('pending', 'processing', 'failed');
 CREATE INDEX idx_media_derivatives_asset ON media_derivatives (media_asset_id, tier, format);
+
+CREATE UNIQUE INDEX uq_media_derivatives_storage_key
+  ON media_derivatives (storage_profile_id, storage_key)
+  WHERE btrim(storage_key) <> '';
 
 CREATE TABLE media_derivative_outbox (
   id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
@@ -2511,6 +2569,106 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER enforce_task_output_media_asset_owner BEFORE INSERT OR UPDATE OF task_id, media_asset_id ON task_outputs FOR EACH ROW EXECUTE FUNCTION enforce_task_output_media_asset_owner();
+CREATE TABLE library_folders (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  owner_user_id BIGINT NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  is_system BOOLEAN NOT NULL DEFAULT FALSE,
+  is_default BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  CONSTRAINT uq_library_folders_id_owner UNIQUE (id, owner_user_id),
+  CONSTRAINT ck_library_folders_name_not_blank CHECK (btrim(name) <> ''),
+  CONSTRAINT ck_library_folders_system_shape CHECK (NOT is_system OR is_default),
+  CONSTRAINT fk_library_folders_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX uq_library_folders_owner_name_ci
+  ON library_folders (owner_user_id, lower(name));
+
+CREATE INDEX idx_library_folders_owner_order
+  ON library_folders (owner_user_id, is_system DESC, is_default DESC, created_at ASC, id ASC);
+
+CREATE TABLE library_assets (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  owner_user_id BIGINT NOT NULL,
+  folder_id BIGINT NOT NULL,
+  provider VARCHAR(32) NOT NULL,
+  source_id VARCHAR(128) NOT NULL,
+  source_url TEXT NOT NULL,
+  preview_url TEXT NOT NULL,
+  original_url TEXT NOT NULL,
+  title VARCHAR(255) NOT NULL DEFAULT '',
+  author VARCHAR(255) NOT NULL DEFAULT '',
+  width INTEGER NOT NULL DEFAULT 0,
+  height INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  CONSTRAINT uq_library_assets_owner_provider_source UNIQUE (owner_user_id, provider, source_id),
+  CONSTRAINT ck_library_assets_provider CHECK (provider IN ('unsplash', 'pexels')),
+  CONSTRAINT ck_library_assets_source_id_not_blank CHECK (btrim(source_id) <> ''),
+  CONSTRAINT ck_library_assets_source_url_not_blank CHECK (btrim(source_url) <> ''),
+  CONSTRAINT ck_library_assets_preview_url_not_blank CHECK (btrim(preview_url) <> ''),
+  CONSTRAINT ck_library_assets_original_url_not_blank CHECK (btrim(original_url) <> ''),
+  CONSTRAINT ck_library_assets_dimensions CHECK (width >= 0 AND height >= 0),
+  CONSTRAINT fk_library_assets_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_library_assets_folder_owner FOREIGN KEY (folder_id, owner_user_id)
+    REFERENCES library_folders(id, owner_user_id) ON DELETE RESTRICT,
+  CONSTRAINT uq_library_assets_id_owner UNIQUE (id, owner_user_id)
+);
+
+CREATE INDEX idx_library_assets_owner_folder_order
+  ON library_assets (owner_user_id, folder_id, created_at DESC, id DESC);
+
+CREATE INDEX idx_library_assets_owner_order
+  ON library_assets (owner_user_id, created_at DESC, id DESC);
+
+-- A Library asset is URL-backed until a user imports it. This association is
+-- intentionally not a media_ref: only actual Canvas/Task use keeps Media
+-- alive, so unused imports remain reclaimable.
+CREATE TABLE library_asset_media_assets (
+  library_asset_id BIGINT PRIMARY KEY,
+  owner_user_id BIGINT NOT NULL,
+  media_asset_id BIGINT NOT NULL,
+  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  CONSTRAINT uq_library_asset_media_assets_media_asset UNIQUE (media_asset_id),
+  CONSTRAINT fk_library_asset_media_assets_library_owner FOREIGN KEY (library_asset_id, owner_user_id)
+    REFERENCES library_assets(id, owner_user_id) ON DELETE CASCADE,
+  CONSTRAINT fk_library_asset_media_assets_media_owner FOREIGN KEY (media_asset_id, owner_user_id)
+    REFERENCES media_assets(id, owner_user_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_library_asset_media_assets_owner ON library_asset_media_assets (owner_user_id, media_asset_id);
+CREATE TABLE ai_search_operations (
+  operation_id UUID PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  idempotency_key VARCHAR(160) NOT NULL,
+  request_hash CHAR(64) NOT NULL,
+  sku VARCHAR(128) NOT NULL,
+  price_version_id BIGINT NOT NULL,
+  unit_credits BIGINT NOT NULL,
+  hold_transaction_id TEXT NOT NULL REFERENCES credit_transactions(transaction_id) ON DELETE RESTRICT,
+  status VARCHAR(32) NOT NULL DEFAULT 'pending',
+  query TEXT NOT NULL DEFAULT '',
+  error_code VARCHAR(64) NOT NULL DEFAULT '',
+  error_message TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  settled_at TIMESTAMPTZ(3),
+  CONSTRAINT uq_ai_search_operations_user_key UNIQUE (user_id, idempotency_key),
+  CONSTRAINT ck_ai_search_operations_hash CHECK (request_hash ~ '^[0-9a-f]{64}$'),
+  CONSTRAINT ck_ai_search_operations_status CHECK (status IN ('pending', 'succeeded', 'failed', 'reconciliation_pending')),
+  CONSTRAINT ck_ai_search_operations_unit_credits CHECK (unit_credits > 0),
+  CONSTRAINT ck_ai_search_operations_settled_shape CHECK (
+    (status IN ('pending', 'reconciliation_pending') AND settled_at IS NULL)
+    OR (status IN ('succeeded', 'failed') AND settled_at IS NOT NULL)
+  )
+);
+
+CREATE INDEX idx_ai_search_operations_pending
+  ON ai_search_operations (status, created_at)
+  WHERE status IN ('pending', 'reconciliation_pending');
 CREATE TABLE task_daily_stats (
   id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
   stat_date DATE NOT NULL,
@@ -2596,7 +2754,7 @@ CREATE TABLE feature_prompts (
   updated_by BIGINT,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT ck_feature_prompts_feature_slug CHECK (feature_slug IN ('prompt-generation', 'partial-edit', 'sketch-to-image', 'style-variation', 'remove-bg', 'style-fusion', 'hd-upscale', 'outpaint')),
+  CONSTRAINT ck_feature_prompts_feature_slug CHECK (feature_slug IN ('prompt-generation', 'inpaint', 'render', 'variations', 'cutout', 'style-fusion', 'hd-upscale', 'outpaint')),
   CONSTRAINT fk_feature_prompts_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE TABLE boards (
@@ -4845,6 +5003,7 @@ CREATE TRIGGER set_task_daily_stat_backfills_updated_at BEFORE UPDATE ON task_da
 CREATE TRIGGER set_provider_endpoints_updated_at BEFORE UPDATE ON provider_endpoints FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_provider_endpoint_models_updated_at BEFORE UPDATE ON provider_endpoint_models FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_system_configs_updated_at BEFORE UPDATE ON system_configs FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER set_admin_brand_logo_overrides_updated_at BEFORE UPDATE ON admin_brand_logo_overrides FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_storage_profiles_updated_at BEFORE UPDATE ON storage_profiles FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_storage_profile_secret_versions_updated_at BEFORE UPDATE ON storage_profile_secret_versions FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_feature_prompts_updated_at BEFORE UPDATE ON feature_prompts FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -5340,7 +5499,7 @@ ON CONFLICT (config_key) DO NOTHING;
 INSERT INTO feature_prompts (feature_slug, prompt, updated_by)
 VALUES
   (
-    'partial-edit',
+    'inpaint',
     'Edit only the masked region according to the requested edit. Preserve all unmasked content. When removing an object, reconstruct the occluded background from surrounding visual evidence. Blend only a narrow boundary for seamless color and texture continuity. Maintain composition, perspective, lighting, identity, text, logos, and product structure wherever they are not masked.',
     NULL
   ),

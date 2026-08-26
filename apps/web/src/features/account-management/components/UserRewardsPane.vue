@@ -1,5 +1,5 @@
 <template>
-  <AccountManagementPane title="奖励中心">
+  <AccountManagementPane :title="t('account.tabs.rewards')">
     <section :class="accountCardPanelClass" aria-labelledby="reward-code-heading">
       <form class="grid gap-3" @submit.prevent="submitCode">
         <label
@@ -7,7 +7,7 @@
           for="account-reward-code"
           class="text-[13px] font-semibold text-ib-text-muted"
         >
-          输入兑换码
+          {{ t('account.rewards.codeLabel') }}
         </label>
         <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_112px] gap-3 max-[640px]:grid-cols-1">
           <InputText
@@ -20,12 +20,12 @@
             :spellcheck="false"
             :disabled="pending"
             :class="ibFormInputClass"
-            placeholder="请输入兑换码"
+            :placeholder="t('account.rewards.codePlaceholder')"
           />
           <Button
             unstyled
             type="submit"
-            label="兑换"
+            :label="t('account.rewards.redeem')"
             :disabled="!canSubmit"
             :loading="pending"
             :class="accountPrimaryActionButtonClass"
@@ -36,19 +36,19 @@
     </section>
 
     <section class="grid min-w-0 gap-3" aria-labelledby="reward-history-heading">
-      <h3 id="reward-history-heading" class="m-0 text-lg font-bold text-ib-text">兑换记录</h3>
+      <h3 id="reward-history-heading" class="m-0 text-lg font-bold text-ib-text">{{ t('account.rewards.historyTitle') }}</h3>
       <DataTableFrame
         :value="tableRows"
         data-key="id"
         scrollable
         :table-style="{ minWidth: '680px' }"
-        table-aria-label="兑换记录表格"
-        scroll-aria-label="兑换记录表格"
+        :table-aria-label="t('account.rewards.tableAria')"
+        :scroll-aria-label="t('account.rewards.tableAria')"
         :frame-class="accountDataTableFrameClass"
-        empty-title="暂无兑换记录"
-        empty-description="成功兑换的奖励会显示在这里"
+        :empty-title="t('account.rewards.emptyTitle')"
+        :empty-description="t('account.rewards.emptyDescription')"
       >
-        <Column field="redeemed_at" header="兑换时间" :style="{ width: '190px' }">
+        <Column field="redeemed_at" :header="t('account.rewards.columnRedeemedAt')" :style="{ width: '190px' }">
           <template #body="{ data }">
             <Skeleton v-if="isSkeletonRow(data)" width="8rem" />
             <time v-else class="whitespace-nowrap font-mono text-[13px] text-ib-text-muted">
@@ -57,7 +57,7 @@
           </template>
         </Column>
 
-        <Column field="reward_code_display_name" header="奖励内容" :style="{ minWidth: '220px' }">
+        <Column field="reward_code_display_name" :header="t('account.rewards.columnReward')" :style="{ minWidth: '220px' }">
           <template #body="{ data }">
             <Skeleton v-if="isSkeletonRow(data)" width="7rem" />
             <span
@@ -70,7 +70,7 @@
           </template>
         </Column>
 
-        <Column field="credited_amount" header="奖励" :style="{ width: '130px' }">
+        <Column field="credited_amount" :header="t('account.rewards.columnCredited')" :style="{ width: '130px' }">
           <template #body="{ data }">
             <Skeleton v-if="isSkeletonRow(data)" width="4rem" />
             <span v-else class="whitespace-nowrap font-mono font-bold text-ib-success">
@@ -79,7 +79,7 @@
           </template>
         </Column>
 
-        <Column field="masked_code_hint" header="兑换码" :style="{ width: '150px' }">
+        <Column field="masked_code_hint" :header="t('account.rewards.columnCode')" :style="{ width: '150px' }">
           <template #body="{ data }">
             <Skeleton v-if="isSkeletonRow(data)" width="5rem" />
             <span v-else class="whitespace-nowrap font-mono text-[13px] text-ib-text-muted">
@@ -94,12 +94,12 @@
             class="flex min-h-40 flex-col items-center justify-center px-6 py-10 text-center"
             role="alert"
           >
-            <p class="m-0 font-semibold text-ib-danger">兑换记录加载失败</p>
+            <p class="m-0 font-semibold text-ib-danger">{{ t('account.rewards.loadFailed') }}</p>
             <p class="mt-1 mb-0 text-sm text-ib-text-muted">
               {{ errorMessage(initialError) }}
             </p>
             <Button
-              label="重新加载"
+              :label="t('account.reload')"
               severity="secondary"
               size="small"
               text
@@ -112,14 +112,14 @@
             class="flex min-h-40 flex-col items-center justify-center px-6 py-10 text-center"
             role="status"
           >
-            <span class="font-semibold text-ib-text">暂无兑换记录</span>
-            <span class="mt-1 text-sm text-ib-text-subtle">成功兑换的奖励会显示在这里</span>
+            <span class="font-semibold text-ib-text">{{ t('account.rewards.emptyTitle') }}</span>
+            <span class="mt-1 text-sm text-ib-text-subtle">{{ t('account.rewards.emptyDescription') }}</span>
           </div>
         </template>
 
         <template #after>
-          <p v-if="isInitialPending" class="sr-only" role="status" aria-label="正在加载兑换记录">
-            正在加载兑换记录
+          <p v-if="isInitialPending" class="sr-only" role="status" :aria-label="t('account.rewards.loading')">
+            {{ t('account.rewards.loading') }}
           </p>
 
           <div
@@ -128,14 +128,14 @@
             role="alert"
           >
             <span class="text-sm text-ib-danger">{{ errorMessage(loadMoreError) }}</span>
-            <Button label="重试加载" severity="secondary" size="small" text @click="loadMore()" />
+            <Button :label="t('account.rewards.retryLoad')" severity="secondary" size="small" text @click="loadMore()" />
           </div>
           <div
             v-else-if="hasNextPage"
             class="flex justify-center border-t border-ib-border-soft px-4 py-3"
           >
             <Button
-              label="加载更多"
+              :label="t('account.rewards.loadMore')"
               severity="secondary"
               size="small"
               outlined
@@ -151,11 +151,13 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
 import Skeleton from 'primevue/skeleton'
 import DataTableFrame from '../../../shared/components/DataTableFrame.vue'
+import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { ibFormInputClass } from '../../../shared/theme/formControls'
 import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
 import { useProfileFeedback } from '../useProfileFeedback'
@@ -170,6 +172,7 @@ import {
   accountPrimaryActionButtonClass,
 } from './accountManagementUi'
 
+const { t } = useI18n()
 const code = ref('')
 const profileFeedback = useProfileFeedback()
 const { pending, redeem } = useUserRewardRedemption()
@@ -220,7 +223,7 @@ function formatCreditedAmount(value: number): string {
 
 function formatShanghaiDateTime(value: string): string {
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '时间未知'
+  if (Number.isNaN(date.getTime())) return t('account.rewards.unknownTime')
 
   const parts = Object.fromEntries(
     shanghaiDateTimeFormatter
@@ -232,7 +235,7 @@ function formatShanghaiDateTime(value: string): string {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : '网络错误，请重试'
+  return userFacingErrorCopy(error, t('account.errors.networkRetry'))
 }
 
 async function submitCode() {

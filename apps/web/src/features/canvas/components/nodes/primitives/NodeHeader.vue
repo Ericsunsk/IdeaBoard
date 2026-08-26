@@ -17,7 +17,7 @@
         :class="{ 'text-clip': isEditing }"
         :contenteditable="isEditing ? 'plaintext-only' : 'false'"
         spellcheck="false"
-        title="单击重命名"
+:title="t('canvas.controls.renameHint')"
         @click.stop="startEditing"
         @mousedown.stop
         @blur="commitTitle"
@@ -33,6 +33,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   title: string
@@ -46,6 +47,8 @@ const emit = defineEmits<{
   (e: 'delete'): void
   (e: 'update:title', value: string): void
 }>()
+
+const { t } = useI18n()
 
 const isEditing = ref(false)
 let draftTitle = ''

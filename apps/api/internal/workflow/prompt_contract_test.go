@@ -14,7 +14,7 @@ func TestNormalizeStructuredPromptContractParamsMovesFlatVariationParams(t *test
 		},
 	}
 
-	if err := NormalizeStructuredPromptContractParams(params, FeatureSlugStyleVariation); err != nil {
+	if err := NormalizeStructuredPromptContractParams(params, FeatureSlugVariations); err != nil {
 		t.Fatalf("NormalizeStructuredPromptContractParams returned error: %v", err)
 	}
 
@@ -141,8 +141,8 @@ func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 		{
 			name: "style variation",
 			params: &tasks.WorkflowTaskParams{
-				Feature:   FeatureSlugStyleVariation,
-				Variation: &tasks.StyleVariationParams{Strength: 42},
+				Feature:   FeatureSlugVariations,
+				Variation: &tasks.VariationsParams{Strength: 42},
 				Extra: map[string]interface{}{
 					"provider_hint":      "keep",
 					"variation_strength": 99,
@@ -151,7 +151,7 @@ func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 				},
 			},
 			want: map[string]interface{}{
-				"feature":            FeatureSlugStyleVariation,
+				"feature":            FeatureSlugVariations,
 				"variation":          map[string]interface{}{"strength": float64(42)},
 				"variation_strength": float64(42),
 				"provider_hint":      "keep",

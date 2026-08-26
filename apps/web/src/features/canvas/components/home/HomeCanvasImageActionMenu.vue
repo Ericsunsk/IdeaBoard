@@ -9,7 +9,7 @@
     <Transition v-bind="actionMenuMotion" appear>
       <div class="image-action-menu-inner">
         <div
-          v-for="item in IMAGE_ACTION_MENU_ITEMS"
+          v-for="item in actionMenuItems"
           :key="item.title"
           class="image-action-control"
           :class="{
@@ -43,7 +43,7 @@
             :style="getItemStrengthRangeStyle(item)"
             tabindex="-1"
             :aria-hidden="isStrengthActive(item) ? undefined : 'true'"
-            :aria-label="`${item.label}强度`"
+            :aria-label="t('canvas.controls.strengthLabel', { label: item.label })"
             @pointerdown.stop="onItemStrengthRangePointerDown(item, $event)"
             @input="onItemStrengthInput(item, $event)"
             @change="onItemStrengthChange(item, $event)"
@@ -58,6 +58,7 @@
 
 <script setup lang="ts">
 import { computed, watch, type ComponentPublicInstance } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   WORKFLOW_FEATURE_SLUGS,
   WORKFLOW_FEATURE,
@@ -65,7 +66,7 @@ import {
 } from '../../../../shared/domain/workflowFeatures'
 import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
 import {
-  IMAGE_ACTION_MENU_ITEMS,
+  getImageActionMenuItems,
   IMAGE_NODE_ACTION,
   type ImageActionMenuItem,
   type ImageNodeAction,
@@ -79,7 +80,7 @@ import {
 import type { ImageActionStrengthControl } from '../../image-tools'
 import {
   buildImageActionReadinessRequest,
-  buildPartialEditReadinessRequest,
+  buildInpaintReadinessRequest,
 } from '../../execution/commands/flowImageTaskRequests'
 import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import ImageActionMenuIcon from './ImageActionMenuIcon.vue'
@@ -97,13 +98,16 @@ const emit = defineEmits<{
   (event: 'action', action: ImageNodeAction, strength?: number): void
 }>()
 
+const { t } = useI18n()
+
+const actionMenuItems = computed(() => getImageActionMenuItems())
 const showStrengthControl = computed(() => props.strengthControl.visible)
 const billingStore = useCanvasBillingReadinessStore()
 const actionMenuMotion = createPopoverMotionTransition()
 const outputResolution = computed(() => props.outputResolution ?? '1k')
 
 function resolveItemBillingFeature(item: ImageActionMenuItem): WorkflowFeature | null {
-  if (item.action === IMAGE_NODE_ACTION.imageInpaint) return WORKFLOW_FEATURE.partialEdit
+  if (item.action === IMAGE_NODE_ACTION.imageInpaint) return WORKFLOW_FEATURE.inpaint
   return WORKFLOW_FEATURE_SLUGS.includes(item.action as WorkflowFeature)
     ? (item.action as WorkflowFeature)
     : null
@@ -115,7 +119,7 @@ function buildItemReadinessRequest(item: ImageActionMenuItem) {
     outputResolution: outputResolution.value,
   }
   if (item.action === IMAGE_NODE_ACTION.imageInpaint) {
-    return buildPartialEditReadinessRequest()
+    return buildInpaintReadinessRequest()
   }
   if (item.action === IMAGE_NODE_ACTION.outpaint || isImageTaskAction(item.action)) {
     return buildImageActionReadinessRequest(item.action, options)
@@ -125,7 +129,7 @@ function buildItemReadinessRequest(item: ImageActionMenuItem) {
 
 function refreshBillingQuotes() {
   if (!billingStore) return
-  for (const item of IMAGE_ACTION_MENU_ITEMS) {
+  for (const item of actionMenuItems.value) {
     const feature = resolveItemBillingFeature(item)
     const request = buildItemReadinessRequest(item)
     if (feature && request) {
@@ -153,7 +157,7 @@ function getItemTooltip(item: ImageActionMenuItem) {
 }
 
 function formatQuote(totalCredits: number) {
-  return totalCredits === 0 ? '免费' : formatIdeaAmount(totalCredits)
+  return totalCredits === 0 ? t('canvas.controls.free') : formatIdeaAmount(totalCredits)
 }
 
 function getItemTouchPrice(item: ImageActionMenuItem) {

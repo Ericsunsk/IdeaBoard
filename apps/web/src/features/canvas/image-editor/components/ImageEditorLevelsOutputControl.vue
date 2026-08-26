@@ -1,11 +1,11 @@
 <template>
-  <div class="image-editor-levels-output" aria-label="输出色阶">
+  <div class="image-editor-levels-output" :aria-label="t('canvas.imageEditor.outputLevelsLabel')">
     <div class="editing-controls-label image-editor-levels-output__header">
-      <span>输出色阶</span>
+      <span>{{ t("canvas.imageEditor.outputLevelsLabel") }}</span>
     </div>
     <EditingTwoHandleSlider
       class="image-editor-levels-output__slider"
-      aria-label="输出色阶范围"
+      :aria-label="t('canvas.imageEditor.outputLevelsRangeAria')"
       :min="IMAGE_EDITOR_CHANNEL_MIN"
       :max="IMAGE_EDITOR_CHANNEL_MAX"
       :step="1"
@@ -25,7 +25,7 @@
           :max="constraints.outputBlack.max"
           step="1"
           inputmode="numeric"
-          aria-label="输出黑场"
+          :aria-label="t('canvas.imageEditor.params.outputBlack')"
           :aria-valuemin="constraints.outputBlack.min"
           :aria-valuemax="constraints.outputBlack.max"
           :value="params.outputBlack"
@@ -43,7 +43,7 @@
           :max="constraints.outputWhite.max"
           step="1"
           inputmode="numeric"
-          aria-label="输出白场"
+          :aria-label="t('canvas.imageEditor.params.outputWhite')"
           :aria-valuemin="constraints.outputWhite.min"
           :aria-valuemax="constraints.outputWhite.max"
           :value="params.outputWhite"
@@ -55,6 +55,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'
 import EditingTwoHandleSlider from '../../components/EditingTwoHandleSlider.vue'
 import type { ImageEditorLevelsParams } from '../types'
@@ -78,20 +79,22 @@ const emit = defineEmits<{
   (e: 'update:params', value: ImageEditorLevelsParams): void
 }>()
 
+const { t } = useI18n()
+
 const outputSliderHandles = computed(() => [
   {
     id: 'outputBlack',
     value: props.params.outputBlack,
     min: props.constraints.outputBlack.min,
     max: props.constraints.outputBlack.max,
-    ariaLabel: '输出黑场',
+    ariaLabel: t('canvas.imageEditor.params.outputBlack'),
   },
   {
     id: 'outputWhite',
     value: props.params.outputWhite,
     min: props.constraints.outputWhite.min,
     max: props.constraints.outputWhite.max,
-    ariaLabel: '输出白场',
+    ariaLabel: t('canvas.imageEditor.params.outputWhite'),
   },
 ])
 

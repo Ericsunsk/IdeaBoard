@@ -92,11 +92,11 @@ describe('HomeCanvasImageActionMenu', () => {
   it('keeps inactive strength ranges outside keyboard navigation', () => {
     renderImageActionMenu()
 
-    const styleVariationRange = screen.getByLabelText('风格延展强度')
-    const hdRange = screen.getByLabelText('HD强度')
+    const variationsRange = screen.getByLabelText('Variations strength')
+    const hdRange = screen.getByLabelText('Upscale strength')
 
-    expect(styleVariationRange).toHaveAttribute('tabindex', '-1')
-    expect(styleVariationRange).toHaveAttribute('aria-hidden', 'true')
+    expect(variationsRange).toHaveAttribute('tabindex', '-1')
+    expect(variationsRange).toHaveAttribute('aria-hidden', 'true')
     expect(hdRange).toHaveAttribute('tabindex', '-1')
     expect(hdRange).toHaveAttribute('aria-hidden', 'true')
   })
@@ -106,7 +106,7 @@ describe('HomeCanvasImageActionMenu', () => {
 
     await waitFor(() => {
       expect(props.strengthControl.setTriggerRef).toHaveBeenCalledWith(
-        IMAGE_NODE_ACTION.styleVariation,
+        IMAGE_NODE_ACTION.variations,
         expect.anything(),
       )
       expect(props.strengthControl.setTriggerRef).toHaveBeenCalledWith(
@@ -117,25 +117,25 @@ describe('HomeCanvasImageActionMenu', () => {
   })
 
   it('shows the active strength range for style variation and HD actions', () => {
-    const styleRender = renderImageActionMenu({
+    const variationsRender = renderImageActionMenu({
       showStrengthControl: true,
-      activeStrengthAction: IMAGE_NODE_ACTION.styleVariation,
+      activeStrengthAction: IMAGE_NODE_ACTION.variations,
     })
-    const activeStyleRange = styleRender.getByRole('slider', { name: '风格延展强度' })
-    const hiddenHdRange = styleRender.getByLabelText('HD强度')
+    const activeStyleRange = variationsRender.getByRole('slider', { name: 'Variations strength' })
+    const hiddenHdRange = variationsRender.getByLabelText('Upscale strength')
 
     expect(activeStyleRange).not.toHaveAttribute('aria-hidden')
     expect(findActionControl(activeStyleRange)).toHaveClass('is-strength-active')
     expect(hiddenHdRange).toHaveAttribute('aria-hidden', 'true')
     expect(findActionControl(hiddenHdRange)).toHaveClass('is-strength-hidden')
 
-    styleRender.unmount()
+    variationsRender.unmount()
 
     const hdRender = renderImageActionMenu({
       showStrengthControl: true,
       activeStrengthAction: IMAGE_NODE_ACTION.hdUpscale,
     })
-    const activeHdRange = hdRender.getByRole('slider', { name: 'HD强度' })
+    const activeHdRange = hdRender.getByRole('slider', { name: 'Upscale strength' })
 
     expect(activeHdRange).not.toHaveAttribute('aria-hidden')
     expect(activeHdRange).toHaveAttribute('min', '1')
@@ -149,18 +149,18 @@ describe('HomeCanvasImageActionMenu', () => {
       ensureFeature: vi.fn(async () => undefined),
       applyReadiness: vi.fn(),
       getFeatureState: (feature) =>
-        feature === IMAGE_NODE_ACTION.removeBg
+        feature === IMAGE_NODE_ACTION.cutout
           ? { feature, status: 'blocked', reason: '价格未配置' }
           : { feature, status: 'ready', unitCredits: 3, totalCredits: 7, availableCredits: 20 },
     }
 
     renderImageActionMenu({ billingStore, outputCount: 4 })
 
-    expect(screen.getByRole('button', { name: '抠图' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: '风格延展 · 7 Ideas' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Cutout' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Variations · 7 Ideas' })).toBeEnabled()
     expect(screen.getAllByText('7 Ideas')[0]).toHaveAttribute('data-touch-quote')
-    expect(screen.getByRole('button', { name: '图像编辑' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: '局部重绘 · 7 Ideas' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Retouch' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Inpaint · 7 Ideas' })).toBeEnabled()
   })
 
   it('presents explicit zero pricing as free in tooltip and touch quote', () => {
@@ -178,8 +178,8 @@ describe('HomeCanvasImageActionMenu', () => {
 
     renderImageActionMenu({ billingStore })
 
-    expect(screen.getByRole('button', { name: '抠图 · 免费' })).toBeEnabled()
-    expect(screen.getAllByText('免费')[0]).toHaveAttribute('data-touch-quote')
+    expect(screen.getByRole('button', { name: 'Cutout · Free' })).toBeEnabled()
+    expect(screen.getAllByText('Free')[0]).toHaveAttribute('data-touch-quote')
   })
 
   it('requests and displays the 4K quote when resolution changes during a 2K request', async () => {
@@ -187,7 +187,7 @@ describe('HomeCanvasImageActionMenu', () => {
     const fetchReadiness = vi.fn(
       async (feature: WorkflowFeature, request?: { params?: unknown }) => {
         const params = request?.params as { output_resolution?: OutputResolution } | undefined
-        if (feature === IMAGE_NODE_ACTION.styleVariation && params?.output_resolution === '2k') {
+        if (feature === IMAGE_NODE_ACTION.variations && params?.output_resolution === '2k') {
           return pending2K.promise
         }
         return makeReadiness(
@@ -202,7 +202,7 @@ describe('HomeCanvasImageActionMenu', () => {
 
     await waitFor(() => {
       expect(fetchReadiness).toHaveBeenCalledWith(
-        IMAGE_NODE_ACTION.styleVariation,
+        IMAGE_NODE_ACTION.variations,
         expect.objectContaining({ params: expect.objectContaining({ output_resolution: '2k' }) }),
       )
     })
@@ -211,24 +211,24 @@ describe('HomeCanvasImageActionMenu', () => {
 
     await waitFor(() => {
       expect(fetchReadiness).toHaveBeenCalledWith(
-        IMAGE_NODE_ACTION.styleVariation,
+        IMAGE_NODE_ACTION.variations,
         expect.objectContaining({ params: expect.objectContaining({ output_resolution: '4k' }) }),
       )
-      expect(screen.getByRole('button', { name: '风格延展 · 12 Ideas' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Variations · 12 Ideas' })).toBeEnabled()
     })
 
-    pending2K.resolve(makeReadiness(IMAGE_NODE_ACTION.styleVariation, '2k', 8))
+    pending2K.resolve(makeReadiness(IMAGE_NODE_ACTION.variations, '2k', 8))
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '风格延展 · 12 Ideas' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Variations · 12 Ideas' })).toBeEnabled()
     })
   })
 
   it('submits a strength action once when the committed value changes', () => {
     const view = renderImageActionMenu({
       showStrengthControl: true,
-      activeStrengthAction: IMAGE_NODE_ACTION.styleVariation,
+      activeStrengthAction: IMAGE_NODE_ACTION.variations,
     })
-    const range = screen.getByRole('slider', { name: '风格延展强度' })
+    const range = screen.getByRole('slider', { name: 'Variations strength' })
 
     Object.defineProperty(range, 'value', { configurable: true, value: '72' })
     range.dispatchEvent(new Event('input', { bubbles: true }))
@@ -239,6 +239,6 @@ describe('HomeCanvasImageActionMenu', () => {
     expect(view.props.strengthControl.onInput).toHaveBeenCalledOnce()
     expect(view.props.strengthControl.onPointerUp).toHaveBeenCalledOnce()
     expect(view.props.strengthControl.onChange).toHaveBeenCalledOnce()
-    expect(view.emitted('action')).toEqual([[IMAGE_NODE_ACTION.styleVariation, 72]])
+    expect(view.emitted('action')).toEqual([[IMAGE_NODE_ACTION.variations, 72]])
   })
 })

@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { i18n } from '../../shared/i18n'
 import { useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/vue-query'
 import { userBillingRecordsQueryKeys } from './userBillingRecordsResource'
 import {
@@ -22,7 +23,7 @@ export function createUserRewardRedemptionWorkflow(dependencies: UserRewardRedem
   const pending = ref(false)
 
   async function redeem(code: string): Promise<UserRewardRedeemResult> {
-    if (pending.value) throw new Error('兑换请求正在处理中')
+    if (pending.value) throw new Error(i18n.global.t('account.errors.redeemInProgress'))
     pending.value = true
     try {
       const result = await dependencies.redeem(code.trim())

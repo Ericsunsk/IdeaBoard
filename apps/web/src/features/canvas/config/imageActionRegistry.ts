@@ -1,5 +1,6 @@
 import { IMAGE_NODE_ACTION as WORKFLOW_IMAGE_NODE_ACTION } from '../../../shared/domain/imageActions'
-import { getWorkflowFeatureImageActionText } from '../../../shared/domain/workflowFeatureRegistry'
+import { workflowFeatureLabelKey } from '../../../shared/domain/workflowFeatureRegistry'
+import { i18n } from '../../../shared/i18n'
 import type { WorkflowFeature } from '../../../shared/domain/workflowFeatures'
 import { IMAGE_EXECUTION_MODE, isImageStrengthAction, type ImageStrengthAction } from '../execution'
 
@@ -15,86 +16,86 @@ export const IMAGE_ACTION_MODE = {
   directTask: IMAGE_EXECUTION_MODE.directTask,
   hdUpscaleTask: IMAGE_EXECUTION_MODE.hdUpscaleTask,
   canvasExtend: IMAGE_EXECUTION_MODE.canvasExtend,
-  partialEdit: 'partial-edit',
+  inpaint: 'inpaint',
   localImageEditor: 'local-image-editor',
 } as const
 
 export type ImageActionMode = (typeof IMAGE_ACTION_MODE)[keyof typeof IMAGE_ACTION_MODE]
 
 export type ImageActionMenuIcon =
-  | 'remove-bg'
-  | 'style-variation'
-  | 'sketch-to-image'
+  | 'cutout'
+  | 'variations'
+  | 'render'
   | 'hd'
   | 'outpaint'
   | 'image-inpaint'
-  | 'adobe-photoshop'
+  | 'retouch'
 
 type WorkflowImageNodeAction = Extract<ImageNodeAction, WorkflowFeature>
 
+/**
+ * Registry facts only: mode + icon + label key. Copy resolves read-time so it
+ * never freezes at module import.
+ */
 export type ImageActionRegistryItem = {
   action: ImageNodeAction
   mode: ImageActionMode
-  label: string
-  title: string
+  labelKey: string
   icon: ImageActionMenuIcon
 }
 
-function createWorkflowImageAction<
-  TAction extends WorkflowImageNodeAction,
-  TConfig extends Omit<ImageActionRegistryItem, 'action' | 'label' | 'title'>,
->(action: TAction, config: TConfig): { action: TAction; label: string; title: string } & TConfig {
-  const text = getWorkflowFeatureImageActionText(action)
+function workflowImageAction(
+  action: WorkflowImageNodeAction,
+  config: { mode: ImageActionMode; icon: ImageActionMenuIcon },
+): ImageActionRegistryItem {
   return {
     action,
-    label: text.label,
-    title: text.title,
     ...config,
+    // The shared registry derives the locale key from the slug.
+    labelKey: workflowFeatureLabelKey(action),
   }
 }
 
-export const IMAGE_ACTION_REGISTRY_LIST = [
-  createWorkflowImageAction(IMAGE_NODE_ACTION.removeBg, {
+function localImageAction(
+  action: typeof IMAGE_NODE_ACTION.imageInpaint | typeof IMAGE_NODE_ACTION.localImageEditor,
+  labelKey: string,
+  config: { mode: ImageActionMode; icon: ImageActionMenuIcon },
+): ImageActionRegistryItem {
+  return { action, ...config, labelKey }
+}
+
+export const IMAGE_ACTION_REGISTRY_LIST: readonly ImageActionRegistryItem[] = [
+  workflowImageAction(IMAGE_NODE_ACTION.cutout, {
     mode: IMAGE_ACTION_MODE.directTask,
-    icon: 'remove-bg',
+    icon: 'cutout',
   }),
-  createWorkflowImageAction(IMAGE_NODE_ACTION.styleVariation, {
+  workflowImageAction(IMAGE_NODE_ACTION.variations, {
     mode: IMAGE_ACTION_MODE.directTask,
-    icon: 'style-variation',
+    icon: 'variations',
   }),
-  createWorkflowImageAction(IMAGE_NODE_ACTION.sketchToImage, {
+  workflowImageAction(IMAGE_NODE_ACTION.render, {
     mode: IMAGE_ACTION_MODE.directTask,
-    icon: 'sketch-to-image',
+    icon: 'render',
   }),
-  createWorkflowImageAction(IMAGE_NODE_ACTION.hdUpscale, {
+  workflowImageAction(IMAGE_NODE_ACTION.hdUpscale, {
     mode: IMAGE_ACTION_MODE.hdUpscaleTask,
     icon: 'hd',
   }),
-  createWorkflowImageAction(IMAGE_NODE_ACTION.outpaint, {
+  workflowImageAction(IMAGE_NODE_ACTION.outpaint, {
     mode: IMAGE_ACTION_MODE.canvasExtend,
     icon: 'outpaint',
   }),
-  {
-    action: IMAGE_NODE_ACTION.imageInpaint,
-    mode: IMAGE_ACTION_MODE.partialEdit,
-    label: '局部重绘',
-    title: '局部重绘',
+  localImageAction(IMAGE_NODE_ACTION.imageInpaint, 'canvas.imageAction.inpaint', {
+    mode: IMAGE_ACTION_MODE.inpaint,
     icon: 'image-inpaint',
-  },
-  {
-    action: IMAGE_NODE_ACTION.localImageEditor,
+  }),
+  localImageAction(IMAGE_NODE_ACTION.localImageEditor, 'canvas.imageAction.editImage', {
     mode: IMAGE_ACTION_MODE.localImageEditor,
-    label: '图像编辑',
-    title: '图像编辑',
-    icon: 'adobe-photoshop',
-  },
-] as const satisfies readonly ImageActionRegistryItem[]
+    icon: 'retouch',
+  }),
+]
 
-type ImageActionRegistryListItem = (typeof IMAGE_ACTION_REGISTRY_LIST)[number]
-
-export type ImageActionRegistry = {
-  readonly [TAction in ImageNodeAction]: Extract<ImageActionRegistryListItem, { action: TAction }>
-}
+export type ImageActionRegistry = Readonly<Record<ImageNodeAction, ImageActionRegistryItem>>
 
 export const IMAGE_ACTION_REGISTRY = Object.fromEntries(
   IMAGE_ACTION_REGISTRY_LIST.map((item) => [item.action, item]),
@@ -108,10 +109,16 @@ export type ImageActionMenuItem = {
   strengthAction?: ImageStrengthAction
 }
 
-export const IMAGE_ACTION_MENU_ITEMS = IMAGE_ACTION_REGISTRY_LIST.map((item) => ({
-  action: item.action,
-  label: item.label,
-  title: item.title,
-  icon: item.icon,
-  ...(isImageStrengthAction(item.action) ? { strengthAction: item.action } : {}),
-})) as readonly ImageActionMenuItem[]
+/** Menu copy resolved at call time; callers invoke inside render/computed. */
+export function getImageActionMenuItems(): readonly ImageActionMenuItem[] {
+  return IMAGE_ACTION_REGISTRY_LIST.map((item) => {
+    const label = i18n.global.t(item.labelKey)
+    return {
+      action: item.action,
+      label,
+      title: label,
+      icon: item.icon,
+      ...(isImageStrengthAction(item.action) ? { strengthAction: item.action } : {}),
+    }
+  })
+}

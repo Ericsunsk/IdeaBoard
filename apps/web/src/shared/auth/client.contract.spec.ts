@@ -9,30 +9,22 @@ vi.mock('better-auth/client/plugins', () => ({
   emailOTPClient: () => ({}),
 }))
 
-import { extractBetterAuthErrorMessage } from './client'
+import { resolveBetterAuthErrorMessage } from './client'
 
-describe('extractBetterAuthErrorMessage', () => {
-  it('extracts Better Auth messages in priority order', () => {
-    expect(extractBetterAuthErrorMessage({ message: ' root message ' }, '默认错误')).toBe(
-      'root message',
+describe('resolveBetterAuthErrorMessage', () => {
+  it('resolves Better Auth stable error codes to User copy', () => {
+    expect(resolveBetterAuthErrorMessage({ code: 'INVALID_EMAIL_OR_PASSWORD' }, 'Fallback')).toBe(
+      'The email or password is incorrect.',
     )
-    expect(extractBetterAuthErrorMessage({ statusText: ' status text ' }, '默认错误')).toBe(
-      'status text',
-    )
-    expect(
-      extractBetterAuthErrorMessage({ error: { message: ' nested message ' } }, '默认错误'),
-    ).toBe('nested message')
-    expect(extractBetterAuthErrorMessage({ data: { message: ' data message ' } }, '默认错误')).toBe(
-      'data message',
-    )
-    expect(extractBetterAuthErrorMessage({ data: { msg: ' data msg ' } }, '默认错误')).toBe(
-      'data msg',
+    expect(resolveBetterAuthErrorMessage({ data: { code: 'TOO_MANY_REQUESTS' } }, 'Fallback')).toBe(
+      'Too many attempts. Please wait and try again.',
     )
   })
 
-  it('falls back for empty or unsupported payloads', () => {
-    expect(extractBetterAuthErrorMessage(null, '默认错误')).toBe('默认错误')
-    expect(extractBetterAuthErrorMessage({ message: '   ' }, '默认错误')).toBe('默认错误')
-    expect(extractBetterAuthErrorMessage({ data: { msg: 403 } }, '默认错误')).toBe('默认错误')
+  it('never exposes raw Better Auth prose', () => {
+    expect(resolveBetterAuthErrorMessage({ message: 'provider detail' }, 'Fallback')).toBe(
+      'Fallback',
+    )
+    expect(resolveBetterAuthErrorMessage(null, 'Fallback')).toBe('Fallback')
   })
 })

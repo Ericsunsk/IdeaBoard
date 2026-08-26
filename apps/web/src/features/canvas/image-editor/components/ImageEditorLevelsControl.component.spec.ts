@@ -42,8 +42,8 @@ function renderLevelsControl(
   })
 
   const result = renderWithUser(Harness)
-  const plot = screen.getByRole('group', { name: '色阶直方图' })
-  const outputSlider = screen.getByRole('group', { name: '输出色阶范围' })
+  const plot = screen.getByRole('group', { name: 'Levels histogram' })
+  const outputSlider = screen.getByRole('group', { name: 'Output levels range' })
 
   stubPointerTarget(plot, { right: 100, bottom: 100, width: 100, height: 100 })
   stubPointerTarget(outputSlider, { right: 255, bottom: 22, width: 255, height: 22 })
@@ -117,14 +117,14 @@ describe('ImageEditorLevelsControl', () => {
     expect(markers[0]?.style.left).toBe(`${(64 / 255) * 100}%`)
     expect(markers[1]?.style.left).toBe(`${(128 / 255) * 100}%`)
     expect(markers[2]?.style.left).toBe(`${(191 / 255) * 100}%`)
-    expect(markers[0]).toHaveAttribute('aria-label', '黑场 64')
+    expect(markers[0]).toHaveAttribute('aria-label', 'Blacks 64')
     expect(markers[0]).toHaveAttribute('aria-valuemin', '0')
     expect(markers[0]).toHaveAttribute('aria-valuemax', '190')
     expect(markers[0]).toHaveAttribute('aria-valuenow', '64')
     expect(markers[1]).toHaveClass('is-midtones')
     expect(markers[1]).toHaveAttribute('aria-valuemin', '65')
     expect(markers[1]).toHaveAttribute('aria-valuemax', '190')
-    expect(markers[2]).toHaveAttribute('aria-label', '白场 191')
+    expect(markers[2]).toHaveAttribute('aria-label', 'Whites 191')
     expect(markers[2]).toHaveAttribute('aria-valuemin', '65')
     expect(markers[2]).toHaveAttribute('aria-valuemax', '255')
     expect(guideLines[0]?.getAttribute('x1')).toBe(`${(64 / 255) * 100}`)
@@ -144,7 +144,7 @@ describe('ImageEditorLevelsControl', () => {
       outputWhite: 255,
     })
 
-    dispatchPointerEvent(screen.getByRole('slider', { name: '黑场 10' }), 'pointerdown', {
+    dispatchPointerEvent(screen.getByRole('slider', { name: 'Blacks 10' }), 'pointerdown', {
       clientX: 90,
     })
     expect(events.updateParams).toHaveBeenCalledWith({
@@ -156,7 +156,7 @@ describe('ImageEditorLevelsControl', () => {
     })
 
     await nextTick()
-    dispatchPointerEvent(screen.getByRole('slider', { name: '中点 152' }), 'pointerdown', {
+    dispatchPointerEvent(screen.getByRole('slider', { name: 'Midtones 152' }), 'pointerdown', {
       clientX: 30,
     })
     expect(events.updateParams).toHaveBeenCalledWith({
@@ -177,7 +177,7 @@ describe('ImageEditorLevelsControl', () => {
       outputWhite: 255,
     })
 
-    updateInputValue(screen.getByLabelText('白场'), '30')
+    updateInputValue(screen.getByLabelText('Whites'), '30')
 
     expect(events.updateParams).toHaveBeenCalledWith({
       shadows: 10,
@@ -188,7 +188,7 @@ describe('ImageEditorLevelsControl', () => {
     })
 
     await nextTick()
-    updateInputValue(screen.getByLabelText('中点'), '0')
+    updateInputValue(screen.getByLabelText('Midtones'), '0')
 
     expect(events.updateParams).toHaveBeenCalledWith({
       shadows: 10,
@@ -209,8 +209,8 @@ describe('ImageEditorLevelsControl', () => {
     })
     const outputHandles = within(outputSlider).getAllByRole('slider')
     const outputNumbers = [
-      screen.getByRole('spinbutton', { name: '输出黑场' }) as HTMLInputElement,
-      screen.getByRole('spinbutton', { name: '输出白场' }) as HTMLInputElement,
+      screen.getByRole('spinbutton', { name: 'Output Blacks' }) as HTMLInputElement,
+      screen.getByRole('spinbutton', { name: 'Output Whites' }) as HTMLInputElement,
     ]
 
     expect(outputHandles).toHaveLength(2)
@@ -223,8 +223,8 @@ describe('ImageEditorLevelsControl', () => {
     expect(outputNumbers[0]?.value).toBe('20')
     expect(outputNumbers[1]?.value).toBe('220')
     expect(outputHandles.map((handle) => handle.getAttribute('aria-label'))).toEqual([
-      '输出黑场',
-      '输出白场',
+      'Output Blacks',
+      'Output Whites',
     ])
     expect(outputNumbers.map((input) => [input.min, input.max])).toEqual([
       ['0', '219'],

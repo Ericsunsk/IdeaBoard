@@ -9,7 +9,7 @@ import type { OutpaintParams } from './outpaintParams'
 import type { OutputResolution } from './outputResolution'
 import type { RequestedOutputCount } from './requestedOutputCount'
 import type { StyleFusionParams } from './styleFusionParams'
-import type { StyleVariationParams } from './styleVariationParams'
+import type { VariationsParams } from './variationsParams'
 
 export interface SubmitTaskRequestParams {
   original_image_url?: string
@@ -29,7 +29,7 @@ export interface SubmitTaskRequestParams {
   output_count?: RequestedOutputCount
   output_resolution?: OutputResolution
   prompt_upsampling?: boolean
-  variation?: StyleVariationParams
+  variation?: VariationsParams
   extend?: OutpaintParams
   hd?: HDUpscaleParams
   fusion?: StyleFusionParams

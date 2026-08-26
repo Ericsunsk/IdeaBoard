@@ -12,7 +12,7 @@ func TestFeaturePromptSaveUpdatesSingleCurrentRow(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)
 	repository := NewFeaturePromptRepository(db)
-	slug := workflow.FeatureSlugStyleVariation
+	slug := workflow.FeatureSlugVariations
 
 	if _, err := repository.SaveConfig(ctx, slug, "first", nil); err != nil {
 		t.Fatalf("SaveConfig first: %v", err)
@@ -52,7 +52,7 @@ func TestFeaturePromptListIncludesUnconfiguredFeatures(t *testing.T) {
 	}
 	want := make(map[string]bool, len(workflow.SupportedFeatureSlugs())-1)
 	for _, slug := range workflow.SupportedFeatureSlugs() {
-		if slug != workflow.FeatureSlugRemoveBg {
+		if slug != workflow.FeatureSlugCutout {
 			want[slug] = false
 		}
 	}

@@ -16,17 +16,18 @@ import {
 import { assertTaskSubmitReady } from './taskReadiness'
 import { notifyUserCreditsInvalidation } from '../../../../shared/query/userCreditsInvalidation'
 import { mapCanvasBillingRequestError } from './canvasBillingPreflight'
+import { i18n } from '../../../../shared/i18n'
 
 export async function assertTaskRequestReady(
   request: SubmitTaskReadinessRequestData,
-  fallbackMessage = '提交任务失败',
+  fallbackMessage: string = i18n.global.t('common.errors.taskSubmitFailed'),
 ): Promise<void> {
   await assertTaskSubmitReady(request, fallbackMessage)
 }
 
 export async function submitTaskRequest(
   request: SubmitTaskData,
-  fallbackMessage = '提交任务失败',
+  fallbackMessage: string = i18n.global.t('common.errors.taskSubmitFailed'),
 ): Promise<{ taskId: string }> {
   let submission: Awaited<ReturnType<typeof taskApi.submit>>
   try {
@@ -61,7 +62,7 @@ export async function waitExistingOrLiveTaskImageResults(
     notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'completed' })
     const results = extractImageResultsFromTaskPayload(task)
     if (results.length > 0) return results
-    throw new Error('任务完成但未返回图片')
+    throw new Error(i18n.global.t('canvas.execution.taskCompletedNoImage'))
   }
   if (task?.status === 'failed') {
     notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'failed' })

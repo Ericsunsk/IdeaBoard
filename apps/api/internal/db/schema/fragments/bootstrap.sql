@@ -11,7 +11,7 @@ ON CONFLICT (config_key) DO NOTHING;
 INSERT INTO feature_prompts (feature_slug, prompt, updated_by)
 VALUES
   (
-    'partial-edit',
+    'inpaint',
     'Edit only the masked region according to the requested edit. Preserve all unmasked content. When removing an object, reconstruct the occluded background from surrounding visual evidence. Blend only a narrow boundary for seamless color and texture continuity. Maintain composition, perspective, lighting, identity, text, logos, and product structure wherever they are not masked.',
     NULL
   ),

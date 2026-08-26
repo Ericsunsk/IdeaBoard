@@ -43,10 +43,10 @@ describe('imageOutputPolicy', () => {
 
     expect(
       createImageProcessingOutputFileName({
-        title: 'remove bg.png',
+        title: 'cutout source.png',
         mimeType: 'image/png',
       }),
-    ).toBe('remove-bg-adjusted.png')
+    ).toBe('cutout-source-adjusted.png')
   })
 
   it('preserves CJK filename parts and maps jpeg output to jpg', () => {

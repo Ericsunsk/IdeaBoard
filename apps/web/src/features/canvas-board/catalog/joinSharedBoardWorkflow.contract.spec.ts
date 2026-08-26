@@ -31,7 +31,7 @@ describe('joinSharedCanvasBoardByToken', () => {
   })
 
   it('rejects an empty token before calling the API', async () => {
-    await expect(joinSharedCanvasBoardByToken('  ')).rejects.toThrow('缺少分享令牌')
+    await expect(joinSharedCanvasBoardByToken('  ')).rejects.toThrow('Share token is missing')
 
     expect(mocks.request).not.toHaveBeenCalled()
     expect(mocks.hydrateCanvasBoardsFromServer).not.toHaveBeenCalled()
@@ -60,7 +60,7 @@ describe('joinSharedCanvasBoardByToken', () => {
     })
 
     await expect(joinSharedCanvasBoardByToken('share-token')).rejects.toThrow(
-      '服务端未返回可用画布 ID',
+      'The server did not return a valid canvas ID',
     )
 
     expect(mocks.hydrateCanvasBoardsFromServer).not.toHaveBeenCalled()
@@ -74,7 +74,7 @@ describe('joinSharedCanvasBoardByToken', () => {
     })
 
     await expect(joinSharedCanvasBoardByToken('share-token')).rejects.toThrow(
-      '画布同步失败，请稍后重试',
+      'Canvas sync failed. Please try again later.',
     )
 
     expect(expectJoinRequestBody()).toEqual({ token: 'share-token' })
@@ -84,7 +84,9 @@ describe('joinSharedCanvasBoardByToken', () => {
   it('replaces unsafe API errors with the workflow fallback', async () => {
     mocks.request.mockRejectedValueOnce(new Error('token=exposed'))
 
-    await expect(joinSharedCanvasBoardByToken('share-token')).rejects.toThrow('加入共享画布失败')
+    await expect(joinSharedCanvasBoardByToken('share-token')).rejects.toThrow(
+      'Could not join the shared canvas',
+    )
 
     expect(mocks.hydrateCanvasBoardsFromServer).not.toHaveBeenCalled()
   })

@@ -21,11 +21,11 @@ func ApplyFeatureSystemPrompt(basePrompt, userPrompt, featureSlug string, params
 	})
 }
 
-func TestApplyFeatureSystemPromptStyleVariationUsesConfiguredPromptOnly(t *testing.T) {
+func TestApplyFeatureSystemPromptVariationsUsesConfiguredPromptOnly(t *testing.T) {
 	got := ApplyFeatureSystemPrompt(
-		"[style-variation] 延展强度：40%，前端默认文案",
-		"[style-variation] 延展强度：40%，前端默认文案",
-		"style-variation",
+		"[variations] 延展强度：40%，前端默认文案",
+		"[variations] 延展强度：40%，前端默认文案",
+		"variations",
 		map[string]interface{}{
 			"variation": map[string]interface{}{
 				"strength": 40,
@@ -41,7 +41,7 @@ func TestApplyFeatureSystemPromptStyleVariationUsesConfiguredPromptOnly(t *testi
 	}
 }
 
-func TestApplyFeatureSystemPromptNonStyleVariationStillAppendsBasePrompt(t *testing.T) {
+func TestApplyFeatureSystemPromptNonVariationsStillAppendsBasePrompt(t *testing.T) {
 	got := ApplyFeatureSystemPrompt(
 		"user prompt",
 		"user prompt",
@@ -78,10 +78,10 @@ func TestApplyFeatureSystemPromptDoesNotAppendHiddenConstraints(t *testing.T) {
 
 func TestApplyFeatureSystemPromptImageNodeFeaturesRequireExplicitUserPromptPlaceholder(t *testing.T) {
 	features := []string{
-		workflow.FeatureSlugPartialEdit,
-		workflow.FeatureSlugSketchToImage,
-		workflow.FeatureSlugStyleVariation,
-		workflow.FeatureSlugRemoveBg,
+		workflow.FeatureSlugInpaint,
+		workflow.FeatureSlugRender,
+		workflow.FeatureSlugVariations,
+		workflow.FeatureSlugCutout,
 		workflow.FeatureSlugOutpaint,
 	}
 
@@ -203,7 +203,7 @@ func TestApplyFeatureSystemPromptDoesNotReplacePlaceholdersInsideUserPrompt(t *t
 	got := ApplyFeatureSystemPrompt(
 		"",
 		"literal {{variation_strength}}",
-		"style-variation",
+		"variations",
 		map[string]interface{}{
 			"variation": map[string]interface{}{
 				"strength": 40,

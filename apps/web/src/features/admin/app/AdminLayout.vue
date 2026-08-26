@@ -268,6 +268,7 @@ import Drawer from 'primevue/drawer'
 import Popover from 'primevue/popover'
 import Tag from 'primevue/tag'
 import Tooltip from 'primevue/tooltip'
+import { usePrimeVue } from 'primevue/config'
 import {
   Bell as BellIcon,
   LogOut,
@@ -295,6 +296,8 @@ import { useAdminBrandLogoOverrides } from '../shared/logos/useAdminBrandLogoOve
 import type { AdminAnomalyItem } from '../shared/lib/adminAnomalyRules'
 import { createAdminPopoverPt } from '../shared/lib/adminOverlayPt'
 import { adminAnomalyPopoverClass } from '../shared/lib/adminUiClasses'
+import { ideaBoardUserPrimeLocale } from '../../../app/primeLocale'
+import { ideaBoardAdminPrimeLocale } from './adminPrimeLocale'
 
 const vTooltip = Tooltip
 const toast = useAdminToast()
@@ -309,6 +312,7 @@ type PrimePopupPanel = PrimePopupMenu & {
 
 const router = useRouter()
 const route = useRoute()
+const primeVue = usePrimeVue()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 
@@ -327,6 +331,9 @@ const { fallbackText, logoURL, projectName } = useSiteBranding({
 })
 const adminBrandLogoOverridesQuery = useAdminBrandLogoOverrides(isAdminShellRoute)
 const brandAriaLabel = computed(() => `${projectName.value} Admin`)
+
+// PrimeVue has one app-level locale. Admin deliberately retains its established Chinese date UI.
+primeVue.config.locale = ideaBoardAdminPrimeLocale
 
 const layoutShellClass =
   'grid min-h-screen grid-cols-[133px_minmax(0,1fr)] bg-ib-surface text-ib-text max-[1080px]:grid-cols-1'
@@ -465,5 +472,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   setAdminRouteClass(false)
+  primeVue.config.locale = ideaBoardUserPrimeLocale
 })
 </script>

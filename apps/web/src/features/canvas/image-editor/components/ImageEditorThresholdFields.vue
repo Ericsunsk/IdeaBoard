@@ -1,7 +1,7 @@
 <template>
   <div class="editing-controls-fields image-editor-threshold-fields">
     <label class="editing-controls-field">
-      <span class="editing-controls-label">阈值</span>
+      <span class="editing-controls-label">{{ t("canvas.imageEditor.params.threshold") }}</span>
       <input
         name="image-editor-threshold"
         class="editing-controls-control editing-controls-number-input"
@@ -18,16 +18,17 @@
       class="editing-controls-toggle-button node-tool-tooltip-trigger"
       type="button"
       :aria-pressed="invert ? 'true' : 'false'"
-      aria-label="反转阈值输出"
+      :aria-label="t('canvas.imageEditor.invertThresholdOutput')"
       @click="emit('update:invert', !invert)"
     >
       <FlipReverse aria-hidden="true" />
-      <span class="node-tool-tooltip" aria-hidden="true">反转</span>
+      <span class="node-tool-tooltip" aria-hidden="true">{{ t("canvas.imageEditor.invertTooltip") }}</span>
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { FlipReverse } from '@iconoir/vue'
 import { clampThresholdValue } from '../utils/imageEditorThreshold'
 import { readFiniteNumberInputValue } from '../utils/readFiniteNumberInputValue'
@@ -41,6 +42,8 @@ const emit = defineEmits<{
   (e: 'update:threshold', value: number): void
   (e: 'update:invert', value: boolean): void
 }>()
+
+const { t } = useI18n()
 
 function onThresholdInput(event: Event) {
   const value = readFiniteNumberInputValue(event)

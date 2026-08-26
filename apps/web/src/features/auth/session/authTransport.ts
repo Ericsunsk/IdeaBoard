@@ -1,12 +1,13 @@
 import {
   authClient,
-  extractBetterAuthErrorMessage,
+  resolveBetterAuthErrorMessage,
   normalizeCanonicalEmail,
 } from '../../../shared/auth/client'
 import { resolveAuthUrl } from '../../../shared/config/runtimeUrls'
 import { USER_AUTH_CALLBACK_PATH } from '../../../shared/constants/routePaths'
 import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
 import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../shared/auth/oauthProviders'
+import { i18n } from '../../../shared/i18n'
 
 async function requestAuthEndpoint(
   path: string,
@@ -16,7 +17,7 @@ async function requestAuthEndpoint(
   const response = await fetch(resolveAuthUrl(path), init)
   const payload: unknown = await response.json().catch(() => null)
   if (!response.ok) {
-    throw new Error(extractBetterAuthErrorMessage(payload, fallback))
+    throw new Error(resolveBetterAuthErrorMessage(payload, fallback))
   }
   return payload
 }
@@ -28,7 +29,9 @@ export const authTransport = {
       password,
     })
     if (result?.error) {
-      throw new Error(extractBetterAuthErrorMessage(result.error, '登录失败'))
+      throw new Error(
+        resolveBetterAuthErrorMessage(result.error, i18n.global.t('auth.errors.signInFailed')),
+      )
     }
   },
 
@@ -41,10 +44,12 @@ export const authTransport = {
       password,
     })
     if (result?.error) {
-      throw new Error(extractBetterAuthErrorMessage(result.error, '注册失败'))
+      throw new Error(
+        resolveBetterAuthErrorMessage(result.error, i18n.global.t('auth.errors.signUpFailed')),
+      )
     }
     if (!result?.data?.user) {
-      throw new Error('注册成功，但服务端未返回用户身份')
+      throw new Error(i18n.global.t('auth.errors.signUpIdentityMissing'))
     }
   },
 
@@ -62,7 +67,12 @@ export const authTransport = {
     })
     if (result?.error) {
       throw new Error(
-        extractBetterAuthErrorMessage(result.error, `${getOAuthProviderLabel(provider)} 登录失败`),
+        resolveBetterAuthErrorMessage(
+          result.error,
+          i18n.global.t('auth.errors.oauthSignInFailed', {
+            provider: getOAuthProviderLabel(provider),
+          }),
+        ),
       )
     }
   },
@@ -86,11 +96,20 @@ export const authTransport = {
       const social = payload?.data?.social
       return {
         social: Object.fromEntries(
-          Object.entries(social ?? {}).map(([provider, available]) => [provider, available === true]),
+          Object.entries(social ?? {}).map(([provider, available]) => [
+            provider,
+            available === true,
+          ]),
         ),
         providers: payload?.data?.providers?.flatMap((provider) =>
           typeof provider.provider === 'string' && typeof provider.label === 'string'
-            ? [{ provider: provider.provider, label: provider.label, available: provider.available === true }]
+            ? [
+                {
+                  provider: provider.provider,
+                  label: provider.label,
+                  available: provider.available === true,
+                },
+              ]
             : [],
         ),
       }
@@ -108,7 +127,7 @@ export const authTransport = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: normalizeCanonicalEmail(email), otp: otp.trim() }),
       },
-      '验证码无效或已过期',
+      i18n.global.t('auth.errors.otpInvalidOrExpired'),
     )
   },
 
@@ -120,7 +139,7 @@ export const authTransport = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: normalizeCanonicalEmail(email) }),
       },
-      '无法发送验证码，请稍后重试',
+      i18n.global.t('auth.errors.otpSendFailed'),
     )
   },
 
@@ -136,7 +155,7 @@ export const authTransport = {
           password,
         }),
       },
-      '验证码无效或密码更新失败',
+      i18n.global.t('auth.errors.passwordResetFailed'),
     )
   },
 
@@ -149,7 +168,7 @@ export const authTransport = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
       },
-      '当前密码错误',
+      i18n.global.t('auth.errors.currentPasswordIncorrect'),
     )
   },
 
@@ -162,7 +181,7 @@ export const authTransport = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newEmail: normalizeCanonicalEmail(newEmail) }),
       },
-      '无法发送 Email 验证码',
+      i18n.global.t('auth.errors.emailCodeSendFailed'),
     )
   },
 
@@ -175,7 +194,7 @@ export const authTransport = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newEmail: normalizeCanonicalEmail(newEmail), otp: otp.trim() }),
       },
-      'Email 验证码无效或已过期',
+      i18n.global.t('auth.errors.otpInvalidOrExpired'),
     )
     await requestAuthEndpoint(
       '/api/auth/revoke-other-sessions',
@@ -185,7 +204,7 @@ export const authTransport = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       },
-      '其他 Session 撤销失败',
+      i18n.global.t('auth.errors.otherSessionsRevokeFailed'),
     )
   },
 
@@ -195,7 +214,7 @@ export const authTransport = {
       if (result?.error) {
         console.warn(
           '[auth] signOut failed',
-          extractBetterAuthErrorMessage(result.error, '退出登录失败，请稍后重试'),
+          resolveBetterAuthErrorMessage(result.error, i18n.global.t('auth.errors.signOutFailed')),
         )
         return false
       }
@@ -228,7 +247,7 @@ export const authTransport = {
           revokeOtherSessions: true,
         }),
       },
-      '密码更新失败',
+      i18n.global.t('auth.errors.passwordUpdateFailed'),
     )
   },
 
@@ -239,7 +258,9 @@ export const authTransport = {
   async stopImpersonating(): Promise<void> {
     const { error } = await authClient.admin.stopImpersonating()
     if (error) {
-      throw new Error(extractBetterAuthErrorMessage(error, '退出伪装失败'))
+      throw new Error(
+        resolveBetterAuthErrorMessage(error, i18n.global.t('auth.errors.stopImpersonatingFailed')),
+      )
     }
   },
 }

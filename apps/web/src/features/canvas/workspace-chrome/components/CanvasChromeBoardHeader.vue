@@ -4,7 +4,7 @@
       <button
         type="button"
         class="canvas-chrome-board-icon-button"
-        aria-label="返回画布列表"
+:aria-label="t('canvas.chrome.backToBoards')"
         @click.stop="emit('navigate-back')"
       >
         <ArrowLeft class="size-4" />
@@ -18,11 +18,11 @@
           :contenteditable="board.isRenaming && !board.isRenamePending ? 'plaintext-only' : 'false'"
           role="textbox"
           tabindex="0"
-          aria-label="画布名称"
+:aria-label="t('canvas.chrome.boardName')"
           :aria-readonly="!board.isRenaming || board.isRenamePending"
           :aria-busy="board.isRenamePending"
           spellcheck="false"
-          title="点击重命名画布"
+:title="t('canvas.chrome.clickToRenameBoard')"
           @click.stop="emit('start-board-rename')"
           @mousedown.stop
           @input="emit('update:board-name-draft', ($event.target as HTMLElement).textContent ?? '')"
@@ -38,7 +38,7 @@
         <button
           type="button"
           class="canvas-chrome-board-icon-button"
-          aria-label="选择画布"
+:aria-label="t('canvas.chrome.selectBoard')"
           @click.stop="emit('toggle-board-menu')"
         >
           <SquareCursor class="size-4" />
@@ -69,7 +69,7 @@
       </div>
     </div>
     <div v-if="board.isRenamePending" class="canvas-chrome-catalog-recovery" aria-live="polite">
-      <span class="canvas-chrome-catalog-recovery-label">名称同步中</span>
+      <span class="canvas-chrome-catalog-recovery-label">{{ t('canvas.chrome.syncingName') }}</span>
     </div>
     <div
       v-if="board.catalogRecovery.status !== 'idle'"
@@ -79,24 +79,25 @@
       <span class="canvas-chrome-catalog-recovery-label">
         {{
           board.catalogRecovery.status === 'reloading'
-            ? '正在重新加载画布列表'
-            : '画布列表需要重新加载'
+            ? t('canvas.chrome.reloadingCatalog')
+            : t('canvas.chrome.catalogReloadRequired')
         }}
       </span>
       <button
         type="button"
         class="canvas-chrome-catalog-recovery-action"
-        aria-label="重新加载画布列表"
+:aria-label="t('canvas.chrome.reloadCatalog')"
         :disabled="board.catalogRecovery.status === 'reloading'"
         @click="emit('reload-board-catalog')"
       >
-        重新加载
+        {{ t('canvas.chrome.reload') }}
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { ComponentPublicInstance } from 'vue'
 import { ArrowLeft, SquareCursor } from '@iconoir/vue'
 import { createPopoverMotionTransition } from '../../../../shared/motion/popoverMotion'
@@ -116,6 +117,8 @@ const emit = defineEmits<{
   'select-board': [boardId: string]
   'navigate-back': []
 }>()
+
+const { t } = useI18n()
 
 const boardMenuMotion = createPopoverMotionTransition()
 

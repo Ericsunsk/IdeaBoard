@@ -240,7 +240,7 @@ func TestReadGoogleProviderParamsDerivesModelRefsAndImagenControls(t *testing.T)
 	geminiReq := newProviderRequest("prompt", 0, 0, map[string]interface{}{
 		"image_urls":           []interface{}{"https://img.example/source.png"},
 		"reference_image_urls": []interface{}{"https://img.example/ref.png"},
-	}, "models/gemini-2.5-flash-image", resolvedProviderRequestFacts{outputCount: 1}, workflow.RuntimeOperationSketchToImage, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsNone)
+	}, "models/gemini-2.5-flash-image", resolvedProviderRequestFacts{outputCount: 1}, workflow.RuntimeOperationRender, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsNone)
 	geminiParams := readGoogleProviderParams(geminiReq)
 	if geminiParams.Model != "gemini-2.5-flash-image" {
 		t.Fatalf("gemini model = %q", geminiParams.Model)

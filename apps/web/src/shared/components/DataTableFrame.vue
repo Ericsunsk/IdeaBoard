@@ -21,7 +21,7 @@
             class="flex min-h-40 flex-col items-center justify-center px-6 py-10 text-center"
             role="status"
           >
-            <span class="font-semibold">{{ emptyTitle }}</span>
+            <span class="font-semibold">{{ emptyTitle || t('common.states.empty') }}</span>
             <span v-if="emptyDescription" class="mt-1 text-sm">
               {{ emptyDescription }}
             </span>
@@ -40,6 +40,7 @@
 
 <script setup lang="ts" generic="TRow extends object">
 import { computed, useSlots, type TableHTMLAttributes } from 'vue'
+import { useI18n } from 'vue-i18n'
 import DataTable, { type DataTablePassThroughOptions } from 'primevue/datatable'
 
 const props = withDefaults(
@@ -66,12 +67,14 @@ const props = withDefaults(
     tableAriaLabel: '',
     frameClass: '',
     scrollAriaLabel: '',
-    emptyTitle: '暂无数据',
+    emptyTitle: '',
     emptyDescription: '',
   },
 )
 
 defineOptions({ inheritAttrs: false })
+
+const { t } = useI18n()
 
 const slots = useSlots()
 const forwardedSlotNames = computed(() =>

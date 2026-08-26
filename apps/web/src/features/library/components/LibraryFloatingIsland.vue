@@ -481,6 +481,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
@@ -516,6 +517,7 @@ import {
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import UserConfirmDialog from '../../../shared/components/UserConfirmDialog.vue'
 import { useUserConfirmDialog } from '../../../shared/composables/useUserConfirmDialog'
+import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { deleteFolderConfirmation, removeAssetConfirmation } from '../libraryConfirmations'
 
 const props = defineProps<{
@@ -532,6 +534,7 @@ const emit = defineEmits<{
   'focus-scope-change': [focused: boolean]
 }>()
 const isExpanded = defineModel<boolean>('expanded', { default: false })
+const { t } = useI18n()
 
 const isCanvasPresentation = computed(() => props.presentation === 'canvas')
 const searchIslandClass = computed(() =>
@@ -651,7 +654,7 @@ async function submitRenameFolder() {
     await workspace.renameFolder(renameFolderKey.value, name)
     renameDialogVisible.value = false
   } catch (error) {
-    renameError.value = error instanceof Error ? error.message : '重命名收藏夹失败'
+    renameError.value = userFacingErrorCopy(error, t('library.errors.renameFolderFailed'))
   } finally {
     renameSaving.value = false
   }
@@ -780,7 +783,7 @@ async function saveReferenceToFolder(
     })
     workspace.selectFolder(folderKey)
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : '保存素材失败')
+    toast.error(userFacingErrorCopy(error, t('library.errors.saveAssetFailed')))
   }
 }
 
@@ -794,7 +797,7 @@ async function submitFolder() {
     folderDialogVisible.value = false
     folderDraft.value = ''
   } catch (error) {
-    folderError.value = error instanceof Error ? error.message : '创建收藏夹失败'
+    folderError.value = userFacingErrorCopy(error, t('library.errors.createFolderFailed'))
   } finally {
     folderSaving.value = false
   }

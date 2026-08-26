@@ -27,8 +27,8 @@ describe('PromptComposerControls billing contract', () => {
       priceVersionId: 1,
     })
 
-    expect(screen.getByRole('button', { name: '发送' })).toHaveAttribute('title', '发送 · 4 Ideas')
-    expect(screen.getByRole('button', { name: '发送' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Send' })).toHaveAttribute('title', 'Send · 4 Ideas')
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
   })
 
   it('shows the total quote for every requested output and preserves explicit free pricing', async () => {
@@ -50,7 +50,7 @@ describe('PromptComposerControls billing contract', () => {
       },
     })
 
-    expect(screen.getByRole('button', { name: '发送' })).toHaveAttribute('title', '发送 · 12 Ideas')
+    expect(screen.getByRole('button', { name: 'Send' })).toHaveAttribute('title', 'Send · 12 Ideas')
     expect(screen.getByText('12 Ideas')).toHaveAttribute('data-touch-quote')
 
     await paid.rerender({
@@ -69,8 +69,8 @@ describe('PromptComposerControls billing contract', () => {
       },
     })
 
-    expect(screen.getByRole('button', { name: '发送' })).toHaveAttribute('title', '发送 · 免费')
-    expect(screen.getByText('免费')).toHaveAttribute('data-touch-quote')
+    expect(screen.getByRole('button', { name: 'Send' })).toHaveAttribute('title', 'Send · Free')
+    expect(screen.getByText('Free')).toHaveAttribute('data-touch-quote')
   })
 
   it('keeps submit actionable when a cached quote reports insufficient Idea余额', () => {
@@ -83,14 +83,14 @@ describe('PromptComposerControls billing contract', () => {
       reason: 'Idea不足（需要 8 Ideas，当前 3 Ideas）',
     })
 
-    expect(screen.getByRole('button', { name: '发送' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
   })
 
   it('keeps local composers price-free when no billing state is provided', () => {
     renderControls(null)
 
     expect(screen.queryByText(/Idea/)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '发送' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
   })
 
   it('can hide the independent submit control without affecting the draft input', async () => {
@@ -107,7 +107,7 @@ describe('PromptComposerControls billing contract', () => {
     })
 
     const textarea = screen.getByRole('textbox')
-    expect(screen.queryByRole('button', { name: '发送' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument()
 
     await user.click(textarea)
     await user.keyboard('{Enter}第二行')
@@ -128,8 +128,8 @@ describe('PromptComposerControls billing contract', () => {
       },
     })
 
-    expect(screen.queryByRole('button', { name: '输出清晰度' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '发送' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Output resolution' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
   })
 
   it('keeps Enter as a newline and submits only from the send button', async () => {
@@ -153,7 +153,7 @@ describe('PromptComposerControls billing contract', () => {
     expect(onSubmit).not.toHaveBeenCalled()
     expect(textarea).toHaveValue('第一行\n第二行')
 
-    await user.click(screen.getByRole('button', { name: '发送' }))
+    await user.click(screen.getByRole('button', { name: 'Send' }))
     expect(onSubmit).toHaveBeenCalledOnce()
   })
 })

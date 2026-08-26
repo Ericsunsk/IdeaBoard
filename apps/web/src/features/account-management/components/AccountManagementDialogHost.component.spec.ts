@@ -82,7 +82,7 @@ async function renderHost(
             <section
               v-if="visible"
               role="dialog"
-              aria-label="账户管理"
+              aria-label="Account"
               :data-initial-tab="initialTab"
               :data-payment-token="paymentReturn?.publicToken"
               :data-payment-source="paymentReturn?.source"
@@ -111,14 +111,14 @@ describe('AccountManagementDialogHost', () => {
     const { overlay } = await renderHost()
     overlay.commands.open()
 
-    expect(await screen.findByRole('dialog', { name: '账户管理' })).toBeVisible()
+    expect(await screen.findByRole('dialog', { name: 'Account' })).toBeVisible()
   })
 
   it('forwards the controller initial tab to the global dialog', async () => {
     const { overlay } = await renderHost()
     overlay.commands.open('billing')
 
-    expect(await screen.findByRole('dialog', { name: '账户管理' })).toHaveAttribute(
+    expect(await screen.findByRole('dialog', { name: 'Account' })).toHaveAttribute(
       'data-initial-tab',
       'billing',
     )
@@ -130,7 +130,7 @@ describe('AccountManagementDialogHost', () => {
       `/user/boards?boardId=board-8&account=recharge&payment_return=${token}&checkout_return=success`,
     )
 
-    const dialog = await screen.findByRole('dialog', { name: '账户管理' })
+    const dialog = await screen.findByRole('dialog', { name: 'Account' })
     expect(dialog).toHaveAttribute('data-initial-tab', 'recharge')
     expect(dialog).toHaveAttribute('data-payment-token', token)
     expect(dialog).toHaveAttribute('data-payment-source', 'success')
@@ -147,10 +147,10 @@ describe('AccountManagementDialogHost', () => {
       false,
     )
 
-    expect(screen.queryByRole('dialog', { name: '账户管理' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Account' })).not.toBeInTheDocument()
     store.setAuth(makeUser())
 
-    const dialog = await screen.findByRole('dialog', { name: '账户管理' })
+    const dialog = await screen.findByRole('dialog', { name: 'Account' })
     expect(dialog).toHaveAttribute('data-payment-token', token)
     await waitFor(() => expect(router.currentRoute.value.query).toEqual({}))
   })
@@ -158,7 +158,7 @@ describe('AccountManagementDialogHost', () => {
   it('ignores malformed Checkout return parameters', async () => {
     await renderHost('/user/boards?account=recharge&payment_return=short&checkout_return=success')
 
-    expect(screen.queryByRole('dialog', { name: '账户管理' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Account' })).not.toBeInTheDocument()
   })
 
   it('closes instead of consuming an unrelated navigation while Checkout query cleanup is pending', async () => {
@@ -178,7 +178,7 @@ describe('AccountManagementDialogHost', () => {
     await waitFor(() =>
       expect(router.currentRoute.value.fullPath).toBe('/user/canvas?source=payment-cleanup'),
     )
-    expect(screen.queryByRole('dialog', { name: '账户管理' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Account' })).not.toBeInTheDocument()
   })
 
   it.each([['/admin/users'], ['/user/login'], ['/user/register']])(
@@ -187,7 +187,7 @@ describe('AccountManagementDialogHost', () => {
       const { overlay } = await renderHost(path)
       overlay.commands.open()
 
-      expect(screen.queryByRole('dialog', { name: '账户管理' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: 'Account' })).not.toBeInTheDocument()
     },
   )
 
@@ -197,31 +197,31 @@ describe('AccountManagementDialogHost', () => {
     overlay.commands.open()
 
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: '账户管理' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: 'Account' })).not.toBeInTheDocument()
     })
   })
 
   it('closes the dialog on route changes', async () => {
     const { overlay, router } = await renderHost()
     overlay.commands.open()
-    expect(await screen.findByRole('dialog', { name: '账户管理' })).toBeVisible()
+    expect(await screen.findByRole('dialog', { name: 'Account' })).toBeVisible()
 
     await router.push('/user/canvas?boardId=demo')
 
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: '账户管理' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: 'Account' })).not.toBeInTheDocument()
     })
   })
 
   it('closes the dialog when the current user becomes unavailable', async () => {
     const { overlay, store } = await renderHost()
     overlay.commands.open()
-    expect(await screen.findByRole('dialog', { name: '账户管理' })).toBeVisible()
+    expect(await screen.findByRole('dialog', { name: 'Account' })).toBeVisible()
 
     store.clearAuth()
 
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: '账户管理' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: 'Account' })).not.toBeInTheDocument()
     })
   })
 })

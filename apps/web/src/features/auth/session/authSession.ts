@@ -1,5 +1,6 @@
 import { ref, computed, reactive } from 'vue'
 import type { User } from '../../../shared/api/userSession'
+import { i18n } from '../../../shared/i18n'
 import { authTransport } from './authTransport'
 import { readStoredSessionUser } from './authSessionPersistence'
 import { createBrowserSessionTransition } from './browserSessionTransition'
@@ -77,7 +78,7 @@ function createUserSessionStore(): UserSessionStore {
 
     await transition.fetchUserInfo(true, { failClosedOnError: true })
     if (!user.value) {
-      throw new Error('登录状态恢复失败')
+      throw new Error(i18n.global.t('auth.errors.sessionRestoreFailed'))
     }
     return true
   }
@@ -90,7 +91,7 @@ function createUserSessionStore(): UserSessionStore {
   async function verifyRegistrationOTP(email: string, otp: string) {
     await authTransport.verifyRegistrationOTP(email, otp)
     await transition.fetchUserInfo(true, { failClosedOnError: true })
-    if (!user.value) throw new Error('验证成功，但登录状态恢复失败')
+    if (!user.value) throw new Error(i18n.global.t('auth.errors.sessionRestoreAfterVerifyFailed'))
     return true
   }
 

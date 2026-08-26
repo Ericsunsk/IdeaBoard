@@ -1,6 +1,7 @@
 import { ofetch, type FetchError, type FetchOptions } from 'ofetch'
 import { handleAuthFailure } from '../utils/auth'
 import { API_BASE_URL, normalizeRuntimeMediaRefs } from '../config/runtimeUrls'
+import { i18n } from '../i18n'
 
 export type ApiClientError = Error & {
   code?: number | string
@@ -28,7 +29,7 @@ function getPayloadMessage(payload: unknown, data: Record<string, unknown> | nul
 export function createApiError(payload?: unknown, status?: number): ApiClientError {
   const data = toObject(payload)
   const safeMessage = getPayloadMessage(payload, data)
-  const message = safeMessage || '请求失败'
+  const message = safeMessage || i18n.global.t('common.errors.requestIncomplete')
   const error = new Error(message) as ApiClientError
   error.code =
     (typeof data?.code === 'number' || typeof data?.code === 'string' ? data.code : undefined) ??

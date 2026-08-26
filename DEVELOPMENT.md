@@ -261,10 +261,10 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 
 | Feature | 语义 |
 | ------- | ---- |
-| `sketch-to-image` | 草图成图 |
-| `style-variation` | 风格延展 |
-| `partial-edit` | 局部重绘 |
-| `remove-bg` | 抠图 |
+| `render` | 草图成图 |
+| `variations` | 风格延展 |
+| `inpaint` | 局部重绘 |
+| `cutout` | 抠图 |
 | `style-fusion` | 多图融合 |
 | `pattern-gen` | 图案生成 |
 | `hd-upscale` | HD |
@@ -276,7 +276,7 @@ Rules:
 - `image_urls` 是顶层媒体字段。
 - `params` 只承载 feature-specific structured parameters。
 - 工作流参数只接受 canonical key；前端 execution contract、OpenAPI 与 Go validation 必须保持同名同层级。
-- `use_mask`、`mask_image_url`、`mask_image_urls` 是 `partial-edit` 运行时边界参数，不是 prompt 模板变量。
+- `use_mask`、`mask_image_url`、`mask_image_urls` 是 `inpaint` 运行时边界参数，不是 prompt 模板变量。
 - 新增或修改 feature 时同步前端 contract、后端 workflow helper、Admin prompt config 和 runbook。
 
 ## Generated Code

@@ -274,7 +274,7 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 }
 
 func requiresImageFillSystemPrompt(featureSlug string) bool {
-	return featureSlug == workflow.FeatureSlugPartialEdit || featureSlug == workflow.FeatureSlugOutpaint
+	return featureSlug == workflow.FeatureSlugInpaint || featureSlug == workflow.FeatureSlugOutpaint
 }
 
 func (i *taskIntake) requireSystemPrompt(ctx context.Context, featureSlug string) error {

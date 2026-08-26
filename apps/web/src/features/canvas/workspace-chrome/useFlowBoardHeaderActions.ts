@@ -6,6 +6,7 @@ import {
   type CanvasBoardCatalog,
 } from '../../canvas-board/catalog/canvasBoardCatalog'
 import { USER_CANVAS_PATH } from '../../../shared/constants/routePaths'
+import { i18n } from '../../../shared/i18n'
 
 type UseFlowBoardHeaderActionsOptions = {
   currentBoardId: Ref<string | null | undefined>
@@ -24,6 +25,7 @@ export type CanvasBoardCatalogRecoveryState =
   { status: 'idle' } | { status: 'reload-required' | 'reloading'; boardId: string }
 
 export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOptions) {
+  const { t } = i18n.global
   const boardCatalog = options.catalog ?? useCanvasBoardCatalog()
   const isBoardMenuOpen = ref(false)
   const isRenamingBoard = ref(false)
@@ -52,7 +54,7 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
 
   function startBoardRename() {
     if (isRenamePending.value) {
-      options.message.warning('画布名称正在同步，请稍后再改名')
+      options.message.warning(t('canvas.chrome.renamePendingWarning'))
       return
     }
     if (!options.currentBoardId.value) return
@@ -92,7 +94,7 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
     isRenamingBoard.value = false
     boardNameDraft.value = ''
     if (!normalized) {
-      options.message.warning('请输入画布名称')
+      options.message.warning(t('canvas.chrome.emptyNameWarning'))
       return
     }
     if (normalized === currentName) return
@@ -104,15 +106,15 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
         isRenamePending.value = false
       })
     if (result.ok) {
-      options.message.success('已重命名画布')
+      options.message.success(t('canvas.chrome.renameSuccess'))
       return
     }
     if (result.reason === 'local-name-conflict') {
-      options.message.warning('名称已存在')
+      options.message.warning(t('canvas.chrome.duplicateNameWarning'))
       return
     }
     if (result.reason === 'invalid-name') {
-      options.message.warning('重命名失败')
+      options.message.warning(t('canvas.chrome.renameFailedWarning'))
       return
     }
     if (result.reason === 'scope-changed') return
@@ -121,18 +123,18 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
     const rollbackSucceeded = result.rollback.ok
     if (result.reason === 'remote-name-conflict' && hydrateSucceeded) {
       catalogRecovery.value = { status: 'idle' }
-      options.message.error?.('名称冲突，已重新加载画布列表')
+      options.message.error?.(t('canvas.chrome.conflictReloadedError'))
     } else if (rollbackSucceeded && result.reason === 'sync-failed') {
       catalogRecovery.value = { status: 'idle' }
-      options.message.error?.('重命名同步失败，已恢复原名称')
+      options.message.error?.(t('canvas.chrome.syncFailedRestoredError'))
     } else {
       catalogRecovery.value = { status: 'reload-required', boardId }
       options.message.error?.(
         result.reason === 'remote-name-conflict' && rollbackSucceeded
-          ? '名称冲突，已恢复原名称，但远端列表刷新失败，请重新加载'
+          ? t('canvas.chrome.conflictRestoredRefreshFailedError')
           : result.reason === 'remote-name-conflict'
-            ? '名称冲突且恢复失败，请重新加载画布列表'
-            : '重命名同步失败，无法恢复原名称，请重新加载画布列表',
+            ? t('canvas.chrome.conflictRestoreFailedError')
+            : t('canvas.chrome.syncFailedRestoreFailedError'),
       )
     }
     console.warn('[canvas] failed to sync renamed board', result.error)
@@ -148,11 +150,11 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
     })
     if (result.ok) {
       catalogRecovery.value = { status: 'idle' }
-      options.message.success('画布列表已重新加载')
+      options.message.success(t('canvas.chrome.catalogReloadedSuccess'))
       return
     }
     catalogRecovery.value = { status: 'reload-required', boardId: recovery.boardId }
-    options.message.error?.('画布列表重新加载失败，请稍后重试')
+    options.message.error?.(t('canvas.chrome.catalogReloadFailedError'))
   }
 
   function onSelectBoard(boardId: string) {

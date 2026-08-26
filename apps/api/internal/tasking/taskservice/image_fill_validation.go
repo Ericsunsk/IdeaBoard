@@ -16,7 +16,7 @@ const (
 )
 
 func validateImageFillDimensions(featureSlug string, params *tasks.WorkflowTaskParams) error {
-	if featureSlug != workflow.FeatureSlugOutpaint && featureSlug != workflow.FeatureSlugPartialEdit {
+	if featureSlug != workflow.FeatureSlugOutpaint && featureSlug != workflow.FeatureSlugInpaint {
 		return nil
 	}
 	if params == nil || params.Controls == nil {
@@ -57,7 +57,7 @@ func validateImageFillDimensions(featureSlug string, params *tasks.WorkflowTaskP
 		if targetWidth == originalWidth && targetHeight == originalHeight {
 			return validation.New("扩图目标尺寸必须至少扩展一个方向")
 		}
-	case workflow.FeatureSlugPartialEdit:
+	case workflow.FeatureSlugInpaint:
 		targetWidth, targetHeight, err := validateImageFillSize(
 			"目标图片",
 			params.Controls.CustomWidth,

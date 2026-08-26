@@ -9,13 +9,13 @@
             v-if="loading"
             class="h-8 w-8"
             stroke-width="4"
-            aria-label="正在加入共享画布"
+            :aria-label="t('account.shareJoin.spinnerAria')"
           />
           <h1 class="m-0 text-[22px] font-bold text-ib-text">{{ titleText }}</h1>
           <p class="m-0 text-[15px] leading-7 text-ib-text-muted">{{ statusText }}</p>
           <Button
             v-if="failed"
-            label="返回画布列表"
+            :label="t('account.shareJoin.backToBoards')"
             severity="secondary"
             outlined
             class="!rounded-[var(--radius-ib-control)] !border-ib-border !bg-ib-surface !text-ib-text-muted !shadow-none hover:!border-ib-border-hover hover:!bg-ib-surface-hover hover:!text-ib-text focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]"
@@ -29,6 +29,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
@@ -36,6 +37,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import { USER_BOARDS_PATH, USER_CANVAS_PATH } from '../../../shared/constants/routePaths'
 import { joinSharedCanvasBoardByToken } from '../../canvas-board/catalog/joinSharedBoardWorkflow'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
@@ -44,15 +46,15 @@ const failed = ref(false)
 const errorMessage = ref('')
 
 const titleText = computed(() => {
-  if (loading.value) return '正在加入共享画布'
-  if (failed.value) return '加入共享画布失败'
-  return '加入共享画布成功'
+  if (loading.value) return t('account.shareJoin.loadingTitle')
+  if (failed.value) return t('account.shareJoin.failedTitle')
+  return t('account.shareJoin.successTitle')
 })
 
 const statusText = computed(() => {
-  if (loading.value) return '请稍候，系统正在校验分享令牌并同步画布...'
-  if (failed.value) return errorMessage.value || '加入画布失败，请检查分享链接是否有效。'
-  return '加入成功，正在跳转...'
+  if (loading.value) return t('account.shareJoin.loadingStatus')
+  if (failed.value) return errorMessage.value || t('account.shareJoin.failedStatus')
+  return t('account.shareJoin.successStatus')
 })
 
 function getTokenFromQuery(): string {
@@ -80,7 +82,6 @@ onMounted(async () => {
     await joinSharedBoard()
   } catch (_error: unknown) {
     failed.value = true
-    errorMessage.value = '加入共享画布失败，请确认链接是否有效'
   } finally {
     loading.value = false
   }

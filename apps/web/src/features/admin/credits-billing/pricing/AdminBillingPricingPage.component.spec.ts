@@ -1,7 +1,7 @@
 import PrimeVue from 'primevue/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
-import { primeVueTestOptions } from '../../../../test/primeVue'
+import { adminPrimeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import AdminBillingPricingPage from './AdminBillingPricingPage.vue'
 
@@ -66,7 +66,7 @@ describe('AdminBillingPricingPage', () => {
     const items = [
       ...makeCatalogItems(),
       {
-        sku: 'ai-image:style-variation',
+        sku: 'ai-image:variations',
         namespace: 'ai-image',
         product_kind: 'workflow-feature',
         display_name: '风格延展',
@@ -135,7 +135,7 @@ describe('AdminBillingPricingPage', () => {
       ),
       http.post('/api/admin/billing/catalog/:sku/prices', async ({ request, params }) => {
         publishRequests += 1
-        expect(params.sku).toBe('ai-image:partial-edit')
+        expect(params.sku).toBe('ai-image:inpaint')
         await expect(request.json()).resolves.toEqual({ prices: { default: 0 } })
         return HttpResponse.json({
           code: 0,
@@ -176,7 +176,7 @@ describe('AdminBillingPricingPage', () => {
         HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
       ),
       http.put('/api/admin/billing/catalog/:sku/availability', async ({ request, params }) => {
-        expect(params.sku).toBe('ai-image:remove-bg')
+        expect(params.sku).toBe('ai-image:cutout')
         const body = (await request.json()) as { enabled: boolean }
         requests.push(body.enabled)
         return HttpResponse.json({
@@ -341,7 +341,7 @@ describe('AdminBillingPricingPage', () => {
 function renderPricingPage() {
   return renderWithUser(AdminBillingPricingPage, {
     global: {
-      plugins: [[PrimeVue, primeVueTestOptions]],
+      plugins: [[PrimeVue, adminPrimeVueTestOptions]],
       stubs: { Refresh: true },
     },
   })
@@ -368,7 +368,7 @@ function makeCatalogItems() {
   const legacyPrice = { ...price, output_resolution: '1k' as const }
   return [
     {
-      sku: 'ai-image:partial-edit',
+      sku: 'ai-image:inpaint',
       namespace: 'ai-image',
       product_kind: 'workflow-feature',
       display_name: '局部重绘',
@@ -377,7 +377,7 @@ function makeCatalogItems() {
       pricing_variants: ['default'],
     },
     {
-      sku: 'ai-image:remove-bg',
+      sku: 'ai-image:cutout',
       namespace: 'ai-image',
       product_kind: 'workflow-feature',
       display_name: '抠图',

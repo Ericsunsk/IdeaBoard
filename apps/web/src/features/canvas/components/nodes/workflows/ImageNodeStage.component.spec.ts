@@ -54,8 +54,8 @@ describe('ImageNodeStage disabled state', () => {
       },
     })
 
-    expect(view.getByLabelText('图片正在生成，暂时无法上传')).toBeTruthy()
-    expect(view.getByLabelText('图片正在生成，暂时无法上传').tagName).not.toBe('BUTTON')
+    expect(view.getByLabelText('Image is being generated; upload unavailable')).toBeTruthy()
+    expect(view.getByLabelText('Image is being generated; upload unavailable').tagName).not.toBe('BUTTON')
   })
 })
 
@@ -74,7 +74,7 @@ describe('ImageNodeStage Library import recovery', () => {
       global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
     })
 
-    expect(view.getByRole('button', { name: /图片节点预览/ })).toHaveAttribute(
+    expect(view.getByRole('button', { name: /Image node preview/ })).toHaveAttribute(
       'src',
       'https://provider.example/preview.png',
     )
@@ -98,7 +98,7 @@ describe('ImageNodeStage Library import recovery', () => {
       global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
     })
 
-    await fireEvent.click(view.getByLabelText('重试导入图片'))
+    await fireEvent.click(view.getByLabelText('Retry image import'))
     expect(view.emitted('retry-image-import')).toEqual([[]])
   })
 
@@ -116,11 +116,11 @@ describe('ImageNodeStage Library import recovery', () => {
       global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
     })
 
-    expect(view.getByRole('button', { name: /图片节点预览/ })).toHaveAttribute(
+    expect(view.getByRole('button', { name: /Image node preview/ })).toHaveAttribute(
       'src',
       'blob:local-image',
     )
-    await fireEvent.click(view.getByLabelText('重试导入图片'))
+    await fireEvent.click(view.getByLabelText('Retry image import'))
     expect(view.emitted('retry-image-import')).toEqual([[]])
   })
 })

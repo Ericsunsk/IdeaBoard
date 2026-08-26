@@ -9,11 +9,7 @@ import {
   type AccountManagementOverlay,
 } from '../account-management/accountManagementOverlay'
 import type { UserCreditWalletSummaryState } from '../account-management/useUserCreditWalletSummary'
-import {
-  createAuthOverlay,
-  provideAuthOverlay,
-  type AuthOverlay,
-} from '../auth/authOverlay'
+import { createAuthOverlay, provideAuthOverlay, type AuthOverlay } from '../auth/authOverlay'
 import { useUserAccountControls } from './useUserAccountControls'
 
 const currentUser = ref<User | null>(null)
@@ -104,7 +100,7 @@ describe('useUserAccountControls', () => {
     expect(controls.viewModel.balance.value).toMatchObject({
       availableIdeas: 1280,
       displayValue: '1,280',
-      ariaLabel: 'Idea余额 1,280 Ideas',
+      ariaLabel: 'Ideas balance: 1,280 Ideas',
       status: 'ready',
     })
     expect(controls.viewModel.menuItems.value.map((item) => item.key)).toEqual([
@@ -123,7 +119,7 @@ describe('useUserAccountControls', () => {
     expect(controls.viewModel.balance.value).toEqual({
       status: 'anonymous',
       displayValue: '',
-      ariaLabel: 'Idea 标识',
+      ariaLabel: 'Ideas',
     })
     expect(controls.viewModel.menuItems.value.map((item) => item.key)).toEqual([
       'login',
@@ -154,8 +150,8 @@ describe('useUserAccountControls', () => {
 
     expect(controls.viewModel.balance.value).toMatchObject({
       status: 'loading',
-      displayValue: '加载中',
-      ariaLabel: 'Idea余额 加载中',
+      displayValue: 'Loading…',
+      ariaLabel: 'Ideas balance is loading',
     })
 
     controls.viewModel.balance.value.command?.()
@@ -172,8 +168,8 @@ describe('useUserAccountControls', () => {
     expect(controls.viewModel.balance.value).toMatchObject({
       status: 'error',
       displayValue: '--',
-      ariaLabel: 'Idea余额加载失败，点击查看账户',
-      errorMessage: 'wallet unavailable',
+      ariaLabel: 'Could not load your Ideas balance. Open your account.',
+      errorMessage: 'Billing information is unavailable right now.',
     })
 
     controls.viewModel.balance.value.command?.()

@@ -32,7 +32,7 @@ func (c *ProviderExecutor) callFluxFill(ctx context.Context, account *accounts.A
 	}
 	var route string
 	switch operation {
-	case workflow.RuntimeOperationPartialEdit:
+	case workflow.RuntimeOperationInpaint:
 		if len(request.MaskRefs) != 1 {
 			return providerCallResult{}, fmt.Errorf("图像填充局部重绘缺少蒙版")
 		}

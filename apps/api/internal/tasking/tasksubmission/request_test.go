@@ -33,7 +33,7 @@ func canonicalExecutionPlanFixture(feature string, count int) (workflow.FeatureE
 			RequestedOutputCount: &count,
 			OutputResolution:     &resolution,
 			ImageInputCount:      imageInputCount,
-			HasMaskInput:         feature == workflow.FeatureSlugPartialEdit,
+			HasMaskInput:         feature == workflow.FeatureSlugInpaint,
 		},
 	})
 	if err != nil {
@@ -57,7 +57,7 @@ func canonicalExecutionPlanFixture(feature string, count int) (workflow.FeatureE
 func TestNewCanonicalRequestRejectsMismatchedBillingProduct(t *testing.T) {
 	_, err := NewCanonicalRequest(CanonicalRequestInput{
 		UserID:         42,
-		Feature:        "style-variation",
+		Feature:        "variations",
 		ClientActionID: "action-1",
 		BillingRequest: &taskbilling.Request{
 			Feature:          "prompt-generation",
@@ -73,7 +73,7 @@ func TestNewCanonicalRequestRejectsMismatchedBillingProduct(t *testing.T) {
 func TestNewCanonicalRequestRejectsInvalidPriority(t *testing.T) {
 	_, err := NewCanonicalRequest(CanonicalRequestInput{
 		UserID:   42,
-		Feature:  "style-variation",
+		Feature:  "variations",
 		Priority: tasks.TaskPriorityLowest + 1,
 	})
 	if err == nil {
@@ -85,7 +85,7 @@ func TestNewCanonicalRequestRejectsInvalidUserID(t *testing.T) {
 	for _, userID := range []int64{0, -1} {
 		_, err := NewCanonicalRequest(CanonicalRequestInput{
 			UserID:  userID,
-			Feature: "style-variation",
+			Feature: "variations",
 		})
 		if err == nil {
 			t.Fatalf("expected userID %d to be rejected", userID)
@@ -96,7 +96,7 @@ func TestNewCanonicalRequestRejectsInvalidUserID(t *testing.T) {
 func TestNewCanonicalRequestRejectsMissingBillingForBillableWorkflow(t *testing.T) {
 	_, err := NewCanonicalRequest(CanonicalRequestInput{
 		UserID:  42,
-		Feature: "style-variation",
+		Feature: "variations",
 	})
 	if err == nil {
 		t.Fatal("expected billable workflow without Billing request to be rejected")
@@ -118,7 +118,7 @@ func TestNewCanonicalRequestRejectsMissingExecutionPlanForAIImageWorkflow(t *tes
 
 func TestNewCanonicalRequestRejectsPersistedExecutionPlanMismatch(t *testing.T) {
 	plan, _ := canonicalExecutionPlanForTest(t, workflow.FeatureSlugPromptGeneration, 1)
-	_, styleParams := canonicalExecutionPlanForTest(t, workflow.FeatureSlugStyleVariation, 1)
+	_, styleParams := canonicalExecutionPlanForTest(t, workflow.FeatureSlugVariations, 1)
 	_, err := NewCanonicalRequest(CanonicalRequestInput{
 		UserID: 42, Feature: workflow.FeatureSlugPromptGeneration, Params: styleParams,
 		ClientActionID: "mismatched-plan", ExecutionPlan: &plan,
@@ -132,7 +132,7 @@ func TestNewCanonicalRequestRejectsPersistedExecutionPlanMismatch(t *testing.T) 
 }
 
 func TestCanonicalRequestOwnsBillingFacts(t *testing.T) {
-	inputBilling := &taskbilling.Request{Feature: "style-variation", OutputResolution: "1k", Quantity: 1}
+	inputBilling := &taskbilling.Request{Feature: "variations", OutputResolution: "1k", Quantity: 1}
 	plan, params := canonicalExecutionPlanForTest(t, inputBilling.Feature, 1)
 	request, err := NewCanonicalRequest(CanonicalRequestInput{
 		UserID:         42,
@@ -149,19 +149,19 @@ func TestCanonicalRequestOwnsBillingFacts(t *testing.T) {
 	inputBilling.Feature = "prompt-generation"
 	inputBilling.Quantity = 9
 	billingRequest := request.BillingRequest()
-	if billingRequest == nil || billingRequest.Feature != "style-variation" || billingRequest.Quantity != 1 {
-		t.Fatalf("Billing request=%+v, want immutable style-variation quantity 1", billingRequest)
+	if billingRequest == nil || billingRequest.Feature != "variations" || billingRequest.Quantity != 1 {
+		t.Fatalf("Billing request=%+v, want immutable variations quantity 1", billingRequest)
 	}
 }
 
 func TestCanonicalRequestRejectsPreparedMediaThatDivergesFromExecutionPlan(t *testing.T) {
-	plan, params := canonicalExecutionPlanForTest(t, workflow.FeatureSlugStyleVariation, 1)
+	plan, params := canonicalExecutionPlanForTest(t, workflow.FeatureSlugVariations, 1)
 	request, err := NewCanonicalRequest(CanonicalRequestInput{
-		UserID: 42, Feature: workflow.FeatureSlugStyleVariation, Params: params,
+		UserID: 42, Feature: workflow.FeatureSlugVariations, Params: params,
 		ClientActionID: "prepare-media-contract", ExecutionPlan: &plan,
-		BillingRequest: &taskbilling.Request{Feature: workflow.FeatureSlugStyleVariation, OutputResolution: "1k", Quantity: 1},
+		BillingRequest: &taskbilling.Request{Feature: workflow.FeatureSlugVariations, OutputResolution: "1k", Quantity: 1},
 		Generation: &tasks.GenerationRequestSnapshot{
-			Feature: workflow.FeatureSlugStyleVariation, Primitive: string(workflow.GenerationPrimitiveImageToImage),
+			Feature: workflow.FeatureSlugVariations, Primitive: string(workflow.GenerationPrimitiveImageToImage),
 			TemplateFingerprint: "fp", RequestedOutputCount: 1,
 			Media: []tasks.GenerationMediaIntent{{InputIndex: 0, Role: "input", Source: "source"}},
 		},
@@ -206,12 +206,12 @@ func TestValidatePreparedGenerationMediaRequiresAssetIDs(t *testing.T) {
 
 func TestNewCanonicalRequestRejectsBillingQuantityMismatchedWithGeneration(t *testing.T) {
 	count := 2
-	plan, params := canonicalExecutionPlanForTest(t, workflow.FeatureSlugStyleVariation, count)
+	plan, params := canonicalExecutionPlanForTest(t, workflow.FeatureSlugVariations, count)
 	_, err := NewCanonicalRequest(CanonicalRequestInput{
-		UserID: 42, Feature: "style-variation", Params: params, ClientActionID: "action-1", ExecutionPlan: &plan,
-		BillingRequest: &taskbilling.Request{Feature: "style-variation", OutputResolution: "1k", Quantity: 1},
+		UserID: 42, Feature: "variations", Params: params, ClientActionID: "action-1", ExecutionPlan: &plan,
+		BillingRequest: &taskbilling.Request{Feature: "variations", OutputResolution: "1k", Quantity: 1},
 		Generation: &tasks.GenerationRequestSnapshot{
-			Feature: "style-variation", Primitive: "image-to-image", TemplateFingerprint: "fp", RequestedOutputCount: count,
+			Feature: "variations", Primitive: "image-to-image", TemplateFingerprint: "fp", RequestedOutputCount: count,
 		},
 	})
 	if err == nil {

@@ -20,7 +20,7 @@ describe('UserAccountMenu', () => {
     const { user } = renderWithUser(UserAccountMenu, { props: { items, balance } })
 
     const credits = screen.getByRole('button', { name: 'Idea余额 1,280 Ideas' })
-    const accountMenu = screen.getByRole('button', { name: '账户菜单' })
+    const accountMenu = screen.getByRole('button', { name: 'Account menu' })
 
     expect(credits).toBeVisible()
     expect(credits).toHaveTextContent('1,280')
@@ -64,7 +64,7 @@ describe('UserAccountMenu', () => {
 
     expect(loginBtn).toBeVisible()
     expect(registerBtn).toBeVisible()
-    expect(screen.queryByRole('button', { name: '账户菜单' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Account menu' })).toBeNull()
 
     await user.click(loginBtn)
     expect(openLogin).toHaveBeenCalledOnce()
@@ -116,7 +116,7 @@ describe('UserAccountMenu', () => {
     ]
     const { user } = renderWithUser(UserAccountMenu, { props: { items } })
 
-    await user.click(screen.getByRole('button', { name: '账户菜单' }))
+    await user.click(screen.getByRole('button', { name: 'Account menu' }))
     await screen.findByRole('menuitem', { name: '退出登录' })
     const logoutItem = screen.getByText('退出登录').closest('a')
 
@@ -129,7 +129,7 @@ describe('UserAccountMenu', () => {
   it('restores focus and clears open state after Escape before reopening', async () => {
     const items: UserAccountMenuItem[] = [{ key: 'profile', label: '账户管理', command: vi.fn() }]
     const { user } = renderWithUser(UserAccountMenu, { props: { items } })
-    const trigger = screen.getByRole('button', { name: '账户菜单' })
+    const trigger = screen.getByRole('button', { name: 'Account menu' })
 
     await user.click(trigger)
     expect(await screen.findByRole('menuitem', { name: '账户管理' })).toBeVisible()
@@ -149,7 +149,7 @@ describe('UserAccountMenu', () => {
     const { user } = renderWithUser(UserAccountMenu, {
       props: { items },
     })
-    const trigger = screen.getByRole('button', { name: '账户菜单' })
+    const trigger = screen.getByRole('button', { name: 'Account menu' })
 
     await user.click(trigger)
     expect(await screen.findByRole('menuitem', { name: '账户管理' })).toBeVisible()
@@ -177,7 +177,7 @@ describe('UserAccountMenu', () => {
 
     const customAction = screen.getByRole('button', { name: 'custom-action' })
     const credits = screen.getByRole('button', { name: 'Idea余额 100 Ideas' })
-    const accountMenu = screen.getByRole('button', { name: '账户菜单' })
+    const accountMenu = screen.getByRole('button', { name: 'Account menu' })
 
     expect(customAction).toBeVisible()
     expect(credits.nextElementSibling).toBe(customAction)

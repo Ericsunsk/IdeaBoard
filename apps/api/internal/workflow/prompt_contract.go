@@ -14,7 +14,7 @@ const (
 	ParamKeyFusion    = paramkeys.Fusion
 )
 
-type StyleVariationPromptContract struct {
+type VariationsPromptContract struct {
 	Strength float64
 }
 
@@ -27,19 +27,19 @@ type OutpaintContract struct {
 
 type HDUpscaleContract struct{ Scale float64 }
 
-func ReadStyleVariationPromptContract(params map[string]interface{}) (StyleVariationPromptContract, bool) {
+func ReadVariationsPromptContract(params map[string]interface{}) (VariationsPromptContract, bool) {
 	obj, ok := readWorkflowObjectParam(params, ParamKeyVariation)
 	if !ok {
-		return StyleVariationPromptContract{}, false
+		return VariationsPromptContract{}, false
 	}
 	strength, ok := readNumberField(obj, paramkeys.Strength)
 	if !ok {
-		return StyleVariationPromptContract{}, false
+		return VariationsPromptContract{}, false
 	}
-	return StyleVariationPromptContract{Strength: strength}, true
+	return VariationsPromptContract{Strength: strength}, true
 }
 
-func (c StyleVariationPromptContract) PromptVariables() map[string]interface{} {
+func (c VariationsPromptContract) PromptVariables() map[string]interface{} {
 	return map[string]interface{}{
 		paramkeys.PromptPlaceholderVariationStrength: formatPercentControl(c.Strength),
 	}
@@ -118,8 +118,8 @@ func NormalizeStructuredPromptContractParams(params map[string]interface{}, feat
 		return nil
 	}
 	switch featureSlug {
-	case FeatureSlugStyleVariation:
-		return normalizeStyleVariationContract(params)
+	case FeatureSlugVariations:
+		return normalizeVariationsContract(params)
 	case FeatureSlugOutpaint:
 		return normalizeOutpaintContract(params)
 	case FeatureSlugHDUpscale:
@@ -143,7 +143,7 @@ func buildProviderPromptParams(params map[string]interface{}) map[string]interfa
 	for key, value := range params {
 		out[key] = value
 	}
-	if contract, ok := ReadStyleVariationPromptContract(params); ok {
+	if contract, ok := ReadVariationsPromptContract(params); ok {
 		out[paramkeys.VariationStrength] = contract.Strength
 	}
 	if contract, ok := ReadStyleFusionPromptContract(params); ok {
@@ -152,7 +152,7 @@ func buildProviderPromptParams(params map[string]interface{}) map[string]interfa
 	return out
 }
 
-func normalizeStyleVariationContract(params map[string]interface{}) error {
+func normalizeVariationsContract(params map[string]interface{}) error {
 	obj, err := requiredWorkflowObjectParam(params, ParamKeyVariation)
 	if err != nil {
 		return err

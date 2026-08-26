@@ -298,10 +298,5 @@ export function isBoardNotFoundError(error: unknown): boolean {
   const status = 'status' in error ? (error as { status?: unknown }).status : undefined
   if (status === 404) return true
   const code = 'code' in error ? (error as { code?: unknown }).code : undefined
-  if (code === 404) return true
-  const msg = 'msg' in error ? (error as { msg?: unknown }).msg : undefined
-  return (
-    typeof msg === 'string' &&
-    (msg.includes('画布不存在') || msg.toLowerCase().includes('not found'))
-  )
+  return code === 404
 }

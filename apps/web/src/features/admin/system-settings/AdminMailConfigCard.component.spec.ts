@@ -1,7 +1,7 @@
 import PrimeVue from 'primevue/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor } from '../../../test/render'
-import { primeVueTestOptions } from '../../../test/primeVue'
+import { adminPrimeVueTestOptions } from '../../../test/primeVue'
 import AdminMailConfigCard from './AdminMailConfigCard.vue'
 import type { AdminMailConfigResource } from './mailConfigResource'
 import type { MailConfigSummary } from './mailConfigTypes'
@@ -36,7 +36,7 @@ const resource: AdminMailConfigResource = {
 function renderCard() {
   return renderWithUser(AdminMailConfigCard, {
     props: { resource },
-    global: { plugins: [[PrimeVue, primeVueTestOptions]], stubs: { transition: false } },
+    global: { plugins: [[PrimeVue, adminPrimeVueTestOptions]], stubs: { transition: false } },
   })
 }
 

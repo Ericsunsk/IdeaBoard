@@ -5,9 +5,25 @@ type ApiResponseWithData<T> = ApiResponseBase & {
   data?: T | null
 }
 
+function responseError(response: ApiResponseWithData<unknown>, fallback: string): Error {
+  const data =
+    response.data && typeof response.data === 'object'
+      ? (response.data as Record<string, unknown>)
+      : null
+  const error = new Error(response.message_safe ? response.msg : fallback) as Error & {
+    code?: unknown
+    data?: unknown
+    msg?: string
+  }
+  error.code = data?.error_code ?? data?.code ?? response.code
+  error.data = response.data
+  error.msg = response.message_safe ? response.msg : fallback
+  return error
+}
+
 export function requireApiData<T>(response: ApiResponseWithData<T>, fallback: string): T {
   if (response.code !== 0) {
-    throw new Error(response.message_safe ? response.msg : fallback)
+    throw responseError(response, fallback)
   }
   if (response.data == null) throw new Error(fallback)
   return response.data
@@ -19,7 +35,7 @@ export function createApiDataSelector<T>(fallback: string) {
 
 export function assertApiOk(response: ApiResponseBase, fallback: string): void {
   if (response.code !== 0) {
-    throw new Error(response.message_safe ? response.msg : fallback)
+    throw responseError(response, fallback)
   }
 }
 

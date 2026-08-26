@@ -23,8 +23,8 @@
       </div>
       <NodeToolIconButton
         class="image-editor-layer-actions__cancel"
-        aria-label="取消应用"
-        tooltip="取消应用"
+        :aria-label="t('canvas.imageEditor.cancelApply')"
+        :tooltip="t('canvas.imageEditor.cancelApply')"
         @click="emit('cancel-apply')"
       >
         <Xmark />
@@ -33,8 +33,8 @@
     <div class="image-editor-layer-actions__buttons">
       <NodeToolIconButton
         class="image-editor-layer-actions__button"
-        aria-label="添加图层"
-        tooltip="添加图层"
+        :aria-label="t('canvas.imageEditor.addLayer')"
+        :tooltip="t('canvas.imageEditor.addLayer')"
         @click="emit('add-layer')"
       >
         <EmptyPage />
@@ -42,8 +42,8 @@
       <NodeToolIconButton
         class="image-editor-layer-actions__button"
         :disabled="!canCopyLayer"
-        aria-label="复制图层"
-        tooltip="复制图层"
+        :aria-label="t('canvas.imageEditor.duplicateLayer')"
+        :tooltip="t('canvas.imageEditor.duplicateLayer')"
         @click="emit('copy-layer')"
       >
         <Copy />
@@ -51,8 +51,8 @@
       <NodeToolIconButton
         class="image-editor-layer-actions__button"
         :disabled="!canMergeLayer"
-        aria-label="合并图层"
-        tooltip="合并图层"
+        :aria-label="t('canvas.imageEditor.mergeLayers')"
+        :tooltip="t('canvas.imageEditor.mergeLayers')"
         @click="emit('merge-layer')"
       >
         <VerticalMerge />
@@ -60,8 +60,8 @@
       <NodeToolIconButton
         class="image-editor-layer-actions__button"
         :disabled="!canRemoveLayer"
-        aria-label="删除图层"
-        tooltip="删除图层"
+        :aria-label="t('canvas.imageEditor.deleteLayer')"
+        :tooltip="t('canvas.imageEditor.deleteLayer')"
         @click="emit('remove-layer')"
       >
         <Trash />
@@ -70,8 +70,8 @@
         class="image-editor-layer-actions__button image-editor-layer-actions__button--apply"
         primary
         :disabled="applyDisabled"
-        :aria-label="applying ? '应用中' : '应用为新节点'"
-        :tooltip="applying ? '应用中' : '应用为新节点'"
+        :aria-label="applying ? t('canvas.imageEditor.applying') : t('canvas.imageEditor.applyAsNewNode')"
+        :tooltip="applying ? t('canvas.imageEditor.applying') : t('canvas.imageEditor.applyAsNewNode')"
         @click="emit('apply-adjustments')"
       >
         <SendDiagonalSolid />
@@ -81,6 +81,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Copy, EmptyPage, SendDiagonalSolid, Trash, VerticalMerge, Xmark } from '@iconoir/vue'
 import { NodeToolIconButton } from '../../components/nodes/primitives'
@@ -104,15 +105,19 @@ const emit = defineEmits<{
   (e: 'cancel-apply'): void
 }>()
 
+const { t } = useI18n()
+
 const APPLY_PROGRESS_DISCLOSURE_DELAY_MS = 200
 
-const progressPhaseLabels: Record<ImageAdjustmentFinalApplyProgress['phase'], string> = {
-  queued: '准备应用',
-  decode: '读取图像',
-  render: '渲染调整',
-  encode: '生成文件',
-  complete: '收尾',
-}
+const progressPhaseLabels = computed<Record<ImageAdjustmentFinalApplyProgress['phase'], string>>(
+  () => ({
+    queued: t('canvas.imageEditor.progressQueued'),
+    decode: t('canvas.imageEditor.progressDecode'),
+    render: t('canvas.imageEditor.progressRender'),
+    encode: t('canvas.imageEditor.progressEncode'),
+    complete: t('canvas.imageEditor.progressComplete'),
+  }),
+)
 
 const progressPercent = computed(() => {
   const progress = props.applyProgress
@@ -121,9 +126,13 @@ const progressPercent = computed(() => {
   }
   return Math.min(100, Math.max(0, Math.round((progress.loaded / progress.total) * 100)))
 })
-const progressLabel = computed(() => progressPhaseLabels[props.applyProgress?.phase ?? 'queued'])
+const progressLabel = computed(
+  () => progressPhaseLabels.value[props.applyProgress?.phase ?? 'queued'],
+)
 const progressValueLabel = computed(() =>
-  progressPercent.value == null ? '处理中' : `${progressPercent.value}%`,
+  progressPercent.value == null
+    ? t('canvas.imageEditor.progressPending')
+    : `${progressPercent.value}%`,
 )
 const progressBarStyle = computed(() =>
   progressPercent.value == null ? {} : { width: `${progressPercent.value}%` },

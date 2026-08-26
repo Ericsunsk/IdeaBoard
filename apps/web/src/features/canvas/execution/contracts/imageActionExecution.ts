@@ -13,9 +13,9 @@ export type ImageExecutionMode = (typeof IMAGE_EXECUTION_MODE)[keyof typeof IMAG
 export const DEFAULT_IMAGE_ACTION_STRENGTH = 50
 
 export const IMAGE_DIRECT_TASK_ACTIONS = [
-  IMAGE_NODE_ACTION.removeBg,
-  IMAGE_NODE_ACTION.styleVariation,
-  IMAGE_NODE_ACTION.sketchToImage,
+  IMAGE_NODE_ACTION.cutout,
+  IMAGE_NODE_ACTION.variations,
+  IMAGE_NODE_ACTION.render,
 ] as const
 
 export type ImageDirectTaskAction = (typeof IMAGE_DIRECT_TASK_ACTIONS)[number]
@@ -38,10 +38,10 @@ export type ImageActionStrengthConfig = {
 }
 
 export type ImageStrengthAction =
-  typeof IMAGE_NODE_ACTION.styleVariation | typeof IMAGE_HD_UPSCALE_ACTION
+  typeof IMAGE_NODE_ACTION.variations | typeof IMAGE_HD_UPSCALE_ACTION
 
 export const IMAGE_STRENGTH_ACTIONS = [
-  IMAGE_NODE_ACTION.styleVariation,
+  IMAGE_NODE_ACTION.variations,
   IMAGE_HD_UPSCALE_ACTION,
 ] as const satisfies readonly ImageStrengthAction[]
 
@@ -75,10 +75,10 @@ function createWorkflowExecutionConfig<TAction extends WorkflowImageExecutionAct
 }
 
 export const IMAGE_ACTION_EXECUTION_REGISTRY_LIST = [
-  createWorkflowExecutionConfig(IMAGE_NODE_ACTION.removeBg, {
+  createWorkflowExecutionConfig(IMAGE_NODE_ACTION.cutout, {
     mode: IMAGE_EXECUTION_MODE.directTask,
   }),
-  createWorkflowExecutionConfig(IMAGE_NODE_ACTION.styleVariation, {
+  createWorkflowExecutionConfig(IMAGE_NODE_ACTION.variations, {
     mode: IMAGE_EXECUTION_MODE.directTask,
     strength: {
       defaultValue: DEFAULT_IMAGE_ACTION_STRENGTH,
@@ -88,7 +88,7 @@ export const IMAGE_ACTION_EXECUTION_REGISTRY_LIST = [
       paramPath: 'variation.strength',
     },
   }),
-  createWorkflowExecutionConfig(IMAGE_NODE_ACTION.sketchToImage, {
+  createWorkflowExecutionConfig(IMAGE_NODE_ACTION.render, {
     mode: IMAGE_EXECUTION_MODE.directTask,
   }),
   createWorkflowExecutionConfig(IMAGE_NODE_ACTION.hdUpscale, {
@@ -118,7 +118,7 @@ export const IMAGE_ACTION_EXECUTION_REGISTRY = Object.fromEntries(
 ) as ImageActionExecutionRegistry
 
 export const DEFAULT_IMAGE_ACTION_STRENGTHS = {
-  [IMAGE_NODE_ACTION.styleVariation]: DEFAULT_IMAGE_ACTION_STRENGTH,
+  [IMAGE_NODE_ACTION.variations]: DEFAULT_IMAGE_ACTION_STRENGTH,
   [IMAGE_HD_UPSCALE_ACTION]: 2,
 } as const satisfies Record<ImageStrengthAction, number>
 

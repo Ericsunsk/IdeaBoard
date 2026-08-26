@@ -58,6 +58,6 @@ describe('userBillingRecordsResource', () => {
       msg: 'credential=exposed',
     })
 
-    await expect(fetchUserBillingRecords({ limit: 20 })).rejects.toThrow('加载账单记录失败')
+    await expect(fetchUserBillingRecords({ limit: 20 })).rejects.toThrow('Could not load billing records.')
   })
 })

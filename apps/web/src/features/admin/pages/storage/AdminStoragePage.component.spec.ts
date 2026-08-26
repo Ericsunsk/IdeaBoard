@@ -3,7 +3,7 @@ import PrimeVue from 'primevue/config'
 import ConfirmationService from 'primevue/confirmationservice'
 import ToastService from 'primevue/toastservice'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { primeVueTestOptions } from '../../../../test/primeVue'
+import { adminPrimeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen } from '../../../../test/render'
 import AdminStoragePage from './AdminStoragePage.vue'
 
@@ -80,7 +80,7 @@ describe('AdminStoragePage', () => {
     renderWithUser(Harness, {
       global: {
         plugins: [
-          [PrimeVue, primeVueTestOptions],
+          [PrimeVue, adminPrimeVueTestOptions],
           ConfirmationService,
           ToastService,
         ],
@@ -97,7 +97,7 @@ describe('AdminStoragePage', () => {
     const { user } = renderWithUser(Harness, {
       global: {
         plugins: [
-          [PrimeVue, primeVueTestOptions],
+          [PrimeVue, adminPrimeVueTestOptions],
           ConfirmationService,
           ToastService,
         ],

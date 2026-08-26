@@ -1,7 +1,7 @@
 import PrimeVue from 'primevue/config'
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { primeVueTestOptions } from '../../../test/primeVue'
+import { userPrimeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen, within } from '../../../test/render'
 import type { UserBillingRecord } from '../userBillingRecordsResource'
 import UserBillingRecordsPane from './UserBillingRecordsPane.vue'
@@ -41,7 +41,7 @@ function makeBillingState(overrides: Record<string, unknown> = {}) {
 function renderPane() {
   return renderWithUser(UserBillingRecordsPane, {
     props: { active: true },
-    global: { plugins: [[PrimeVue, primeVueTestOptions]] },
+    global: { plugins: [[PrimeVue, userPrimeVueTestOptions]] },
   })
 }
 
@@ -73,15 +73,15 @@ describe('UserBillingRecordsPane', () => {
 
     renderPane()
 
-    expect(screen.getByRole('heading', { name: '账单记录' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Transactions' })).toBeVisible()
     expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
-      '交易时间',
-      '记录内容',
-      'Idea 变动',
-      '可用余额',
+      'Time',
+      'Description',
+      'Ideas change',
+      'Balance after',
     ])
     expect(screen.getAllByRole('columnheader')[0]).toHaveClass('p-datatable-header-cell')
-    expect(screen.getByRole('region', { name: '账单记录表格' })).toHaveClass(
+    expect(screen.getByRole('region', { name: 'Transactions table' })).toHaveClass(
       'p-datatable-table-container',
       'app-scrollbar',
     )
@@ -90,7 +90,6 @@ describe('UserBillingRecordsPane', () => {
     expect(screen.getByText('+50')).toHaveClass('text-ib-success')
     expect(screen.getByText('-5')).toHaveClass('text-ib-danger')
     expect(screen.getByText('1,030')).toBeVisible()
-    expect(screen.queryByText(/Ideas/)).not.toBeInTheDocument()
   })
 
   it('keeps the table headers and stable rows visible during the first request', () => {
@@ -98,9 +97,9 @@ describe('UserBillingRecordsPane', () => {
 
     renderPane()
 
-    expect(screen.getByRole('table', { name: '账单记录表格' })).toBeVisible()
+    expect(screen.getByRole('table', { name: 'Transactions table' })).toBeVisible()
     expect(screen.getAllByRole('columnheader')).toHaveLength(4)
-    expect(screen.getByRole('status', { name: '正在加载账单记录' })).toBeInTheDocument()
+    expect(screen.getByRole('status', { name: 'Loading billing records…' })).toBeInTheDocument()
     const skeletonRows = screen.getAllByTestId('billing-skeleton-row')
     expect(skeletonRows).toHaveLength(5)
     expect(skeletonRows[0]).toHaveClass('p-skeleton')
@@ -111,8 +110,30 @@ describe('UserBillingRecordsPane', () => {
 
     renderPane()
 
-    expect(screen.getByText('暂无账单记录')).toBeVisible()
-    expect(screen.getByText('Idea 收支记录会显示在这里')).toBeVisible()
+    expect(screen.getByText('No billing records yet')).toBeVisible()
+    expect(screen.getByText('Your Ideas activity will appear here.')).toBeVisible()
+  })
+
+  it('maps ledger kinds to English descriptions and keeps ai_usage pricing display names', () => {
+    useUserBillingRecordsMock.mockReturnValue(
+      makeBillingState({
+        records: ref([
+          makeRecord({ record_id: 'record-1', kind: 'usage', title: 'Idea 消费' }),
+          makeRecord({ record_id: 'record-2', kind: 'top_up', title: 'Idea 充值' }),
+          makeRecord({ record_id: 'record-3', kind: 'system_grant', title: '系统赠送' }),
+          makeRecord({ record_id: 'record-4', kind: 'ai_usage', title: 'Inpaint' }),
+        ]),
+      }),
+    )
+
+    renderPane()
+
+    expect(screen.getByText('Usage')).toBeVisible()
+    expect(screen.getByText('Top up')).toBeVisible()
+    expect(screen.getByText('Ideas grant')).toBeVisible()
+    expect(screen.getByText('Inpaint')).toBeVisible()
+    expect(screen.queryByText('Idea 消费')).not.toBeInTheDocument()
+    expect(screen.queryByText('Idea 充值')).not.toBeInTheDocument()
   })
 
   it('recovers from an initial failure without removing the table header', async () => {
@@ -123,11 +144,11 @@ describe('UserBillingRecordsPane', () => {
 
     const { user } = renderPane()
 
-    expect(screen.getByRole('table', { name: '账单记录表格' })).toBeVisible()
+    expect(screen.getByRole('table', { name: 'Transactions table' })).toBeVisible()
     const alert = screen.getByRole('alert')
-    expect(alert).toHaveTextContent('账单加载失败')
-    expect(alert).toHaveTextContent('账单服务暂不可用')
-    await user.click(within(alert).getByRole('button', { name: '重新加载' }))
+    expect(alert).toHaveTextContent('Could not load billing records.')
+    expect(alert).toHaveTextContent('Network error. Please try again.')
+    await user.click(within(alert).getByRole('button', { name: 'Reload' }))
     expect(retryInitial).toHaveBeenCalledOnce()
   })
 
@@ -146,8 +167,8 @@ describe('UserBillingRecordsPane', () => {
 
     expect(screen.getByText('局部重绘')).toBeVisible()
     const alert = screen.getByRole('alert')
-    expect(alert).toHaveTextContent('网络错误')
-    await user.click(within(alert).getByRole('button', { name: '重试加载' }))
+    expect(alert).toHaveTextContent('Network error. Please try again.')
+    await user.click(within(alert).getByRole('button', { name: 'Retry load' }))
     expect(loadMore).toHaveBeenCalledOnce()
   })
 
@@ -158,7 +179,7 @@ describe('UserBillingRecordsPane', () => {
     )
 
     const { user } = renderPane()
-    const loadMoreButton = screen.getByRole('button', { name: '加载更多' })
+    const loadMoreButton = screen.getByRole('button', { name: 'Load more' })
     expect(loadMoreButton).toHaveClass('p-button-outlined')
     await user.click(loadMoreButton)
 

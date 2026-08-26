@@ -37,10 +37,10 @@ describe('ImageEditorSharpenControl', () => {
   it('keeps radius and threshold tracks visibly styled', () => {
     renderSharpenControl({ amount: 0, radius: 1, threshold: 4, protectColor: true })
 
-    expect(screen.getByLabelText('半径滑块')).toHaveClass(
+    expect(screen.getByLabelText('Radius slider')).toHaveClass(
       'editing-controls-slider-row__range--tonal',
     )
-    expect(screen.getByLabelText('阈值滑块')).toHaveClass(
+    expect(screen.getByLabelText('Threshold slider')).toHaveClass(
       'editing-controls-slider-row__range--tonal',
     )
   })
@@ -53,7 +53,7 @@ describe('ImageEditorSharpenControl', () => {
       protectColor: true,
     })
 
-    updateInputValue(screen.getByLabelText('数量滑块'), '120')
+    updateInputValue(screen.getByLabelText('Amount slider'), '120')
 
     expect(events.updateParams).toHaveBeenCalledWith({
       amount: 120,
@@ -62,8 +62,8 @@ describe('ImageEditorSharpenControl', () => {
       protectColor: true,
     })
 
-    await waitFor(() => expect(screen.getByLabelText('数量数值')).toHaveValue(120))
-    updateInputValue(screen.getByLabelText('半径数值'), '1.7')
+    await waitFor(() => expect(screen.getByLabelText('Amount value')).toHaveValue(120))
+    updateInputValue(screen.getByLabelText('Radius value'), '1.7')
 
     expect(events.updateParams).toHaveBeenCalledWith({
       amount: 120,
@@ -72,8 +72,8 @@ describe('ImageEditorSharpenControl', () => {
       protectColor: true,
     })
 
-    await waitFor(() => expect(screen.getByLabelText('半径数值')).toHaveValue(1.7))
-    updateInputValue(screen.getByLabelText('阈值数值'), '60')
+    await waitFor(() => expect(screen.getByLabelText('Radius value')).toHaveValue(1.7))
+    updateInputValue(screen.getByLabelText('Threshold value'), '60')
 
     expect(events.updateParams).toHaveBeenCalledWith({
       amount: 120,
@@ -82,8 +82,8 @@ describe('ImageEditorSharpenControl', () => {
       protectColor: true,
     })
 
-    await waitFor(() => expect(screen.getByLabelText('阈值数值')).toHaveValue(50))
-    const protectColorButton = screen.getByRole('button', { name: '保护锐化颜色' })
+    await waitFor(() => expect(screen.getByLabelText('Threshold value')).toHaveValue(50))
+    const protectColorButton = screen.getByRole('button', { name: 'Protect sharpen colors' })
 
     expect(protectColorButton).toHaveAttribute('aria-pressed', 'true')
     await user.click(protectColorButton)

@@ -177,14 +177,19 @@ describe('useCanvasLibraryImportRuntime', () => {
 
     first.resolve({ mediaAssetId: 42, url: 'https://app.example/old', width: 100, height: 100 })
     await flushPromises()
-    expect(((harness.nodes.value[0]!.data as FlowNodeData).snapshotNode as ImageNodeItem).libraryImport).toEqual({
+    expect(
+      ((harness.nodes.value[0]!.data as FlowNodeData).snapshotNode as ImageNodeItem).libraryImport,
+    ).toEqual({
       state: 'pending',
       libraryAssetId: 7,
     })
 
     second.resolve({ mediaAssetId: 43, url: 'https://app.example/new', width: 100, height: 100 })
     await flushPromises()
-    expect(((harness.nodes.value[0]!.data as FlowNodeData).snapshotNode as ImageNodeItem).sourceMediaAssetId).toBe(43)
+    expect(
+      ((harness.nodes.value[0]!.data as FlowNodeData).snapshotNode as ImageNodeItem)
+        .sourceMediaAssetId,
+    ).toBe(43)
   })
 
   it('leaves a failed fact inert until an explicit retry', async () => {
@@ -198,7 +203,7 @@ describe('useCanvasLibraryImportRuntime', () => {
     expect(failed).toEqual({
       state: 'failed',
       libraryAssetId: 7,
-      failureMessage: '源图不可访问',
+      failureMessage: 'Library import failed. Please try again later.',
     })
     expect(harness.imports.resumePending()).toBe(0)
     expect(harness.materialize).toHaveBeenCalledTimes(1)
@@ -213,7 +218,9 @@ describe('useCanvasLibraryImportRuntime', () => {
     await flushPromises()
     expect(harness.materialize).toHaveBeenCalledTimes(2)
     expect(harness.materialize).toHaveBeenNthCalledWith(2, 7)
-    expect(((harness.nodes.value[0]!.data as FlowNodeData).snapshotNode as ImageNodeItem).libraryImport).toBeUndefined()
+    expect(
+      ((harness.nodes.value[0]!.data as FlowNodeData).snapshotNode as ImageNodeItem).libraryImport,
+    ).toBeUndefined()
   })
 
   it('does not apply a late completion after the node is deleted', async () => {
@@ -222,7 +229,12 @@ describe('useCanvasLibraryImportRuntime', () => {
     harness.materialize.mockReturnValue(request.promise)
     harness.imports.resumePending()
     harness.nodes.value = []
-    request.resolve({ mediaAssetId: 42, url: 'https://app.example/media/42', width: 200, height: 100 })
+    request.resolve({
+      mediaAssetId: 42,
+      url: 'https://app.example/media/42',
+      width: 200,
+      height: 100,
+    })
 
     await flushPromises()
     expect(harness.nodes.value).toEqual([])
@@ -242,7 +254,12 @@ describe('useCanvasLibraryImportRuntime', () => {
 
     expect(harness.imports.retry('image-1')).toBe(true)
     harness.nodes.value = []
-    request.resolve({ mediaAssetId: 42, url: 'https://app.example/media/42', width: 200, height: 100 })
+    request.resolve({
+      mediaAssetId: 42,
+      url: 'https://app.example/media/42',
+      width: 200,
+      height: 100,
+    })
 
     await flushPromises()
     expect(harness.materialize).toHaveBeenCalledWith(7)

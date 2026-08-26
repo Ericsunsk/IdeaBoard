@@ -1,6 +1,8 @@
 import type { Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import { resolveImageNodeFrameSize, type ImageNodeItem } from '../../canvas-board/domain'
+import { i18n } from '../../../shared/i18n'
+import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import type { CanvasBoardAttachment } from '../board-attachment'
 import {
   createPendingLibraryImportFact,
@@ -55,9 +57,7 @@ function resolveRatio(candidate: CanvasLibraryImportDescriptor): number {
 }
 
 function resolveErrorMessage(error: unknown): string {
-  return error instanceof Error && error.message.trim()
-    ? error.message.trim()
-    : '素材导入失败，请稍后重试'
+  return userFacingErrorCopy(error, i18n.global.t('canvas.session.libraryImportFailed'))
 }
 
 function readLibraryImportNode(nodes: Node[], nodeId: string): LibraryImportNode | null {
@@ -74,7 +74,9 @@ function isValidMaterialization(value: {
   width: number
   height: number
 }): boolean {
-  return Number.isInteger(value.mediaAssetId) && value.mediaAssetId > 0 && value.url.trim().length > 0
+  return (
+    Number.isInteger(value.mediaAssetId) && value.mediaAssetId > 0 && value.url.trim().length > 0
+  )
 }
 
 /**
@@ -128,9 +130,15 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
     fallbackRatio: number,
   ) {
     if (!isCurrentAttachment(attachment)) return
-    if (!hasPendingLibraryImport(readLibraryImportNode(options.nodes.value, nodeId)?.snapshot, libraryAssetId)) return
+    if (
+      !hasPendingLibraryImport(
+        readLibraryImportNode(options.nodes.value, nodeId)?.snapshot,
+        libraryAssetId,
+      )
+    )
+      return
     if (!isValidMaterialization(materialized)) {
-      throw new Error('素材导入失败：服务未返回有效媒体资产')
+      throw new Error(i18n.global.t('canvas.session.libraryImportInvalidAsset'))
     }
 
     options.updateImageSnapshot(nodeId, (current) => {
@@ -154,10 +162,17 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
     notify: boolean,
   ) {
     if (!isCurrentAttachment(attachment)) return
-    if (!hasPendingLibraryImport(readLibraryImportNode(options.nodes.value, nodeId)?.snapshot, libraryAssetId)) return
+    if (
+      !hasPendingLibraryImport(
+        readLibraryImportNode(options.nodes.value, nodeId)?.snapshot,
+        libraryAssetId,
+      )
+    )
+      return
     const message = resolveErrorMessage(error)
-    options.updateImageSnapshot(nodeId, (current) =>
-      failLibraryImport(current, libraryAssetId, message) ?? current,
+    options.updateImageSnapshot(
+      nodeId,
+      (current) => failLibraryImport(current, libraryAssetId, message) ?? current,
     )
     options.refreshNodeInternals([nodeId])
     if (notify) options.onWarning(message)
@@ -172,7 +187,13 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
   ): boolean {
     const activeNodeIds = activeNodeIdsByAttachment.get(attachment) ?? new Set<string>()
     if (activeNodeIds.has(nodeId)) return false
-    if (!hasPendingLibraryImport(readLibraryImportNode(options.nodes.value, nodeId)?.snapshot, libraryAssetId)) return false
+    if (
+      !hasPendingLibraryImport(
+        readLibraryImportNode(options.nodes.value, nodeId)?.snapshot,
+        libraryAssetId,
+      )
+    )
+      return false
     activeNodeIds.add(nodeId)
     activeNodeIdsByAttachment.set(attachment, activeNodeIds)
 
@@ -228,7 +249,15 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
       if (!current) return
       const fact = current.snapshot.libraryImport
       if (fact?.state !== 'pending') return
-      if (materializePending(node.id, fact.libraryAssetId, current.snapshot.sourceImageRatio, attachment, false)) {
+      if (
+        materializePending(
+          node.id,
+          fact.libraryAssetId,
+          current.snapshot.sourceImageRatio,
+          attachment,
+          false,
+        )
+      ) {
         resumed += 1
       }
     })

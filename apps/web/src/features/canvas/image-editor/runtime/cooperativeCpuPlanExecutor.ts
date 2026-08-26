@@ -1,4 +1,5 @@
 import { cloneImageData } from '../utils/imageDataUtils'
+import { isProcessingCancelled, processingCancelledError } from './processingCancelled'
 import {
   createImageAdjustmentPlanStepExecutionState,
   estimateImageAdjustmentPlanStepRangeWorkUnits,
@@ -60,12 +61,12 @@ export function createPlanWorkUnits(imageData: ImageData, plan: ImageAdjustmentP
 
 export function throwIfAborted(signal: AbortSignal) {
   if (!signal.aborted) return
-  throw new Error('图像处理已取消')
+  throw processingCancelledError()
 }
 
 export function isAbortSignalError(signal: AbortSignal, error: unknown) {
   if (signal.aborted) return true
-  return error instanceof Error && error.message.includes('已取消')
+  return isProcessingCancelled(error)
 }
 
 export function normalizePixelChunkBytes(value: number | undefined, fallback: number) {

@@ -2,7 +2,7 @@ import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import PrimeVue from 'primevue/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
-import { primeVueTestOptions } from '../../../test/primeVue'
+import { adminPrimeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen } from '../../../test/render'
 import {
   ADMIN_CREDIT_PRICING_PATH,
@@ -49,7 +49,7 @@ describe('AdminCreditsBillingLayout', () => {
     renderWithUser(AdminCreditsBillingLayout, {
       global: {
         plugins: [
-          [PrimeVue, primeVueTestOptions],
+          [PrimeVue, adminPrimeVueTestOptions],
           [VueQueryPlugin, { queryClient }],
         ],
         stubs: { RouterView: true },
@@ -78,7 +78,7 @@ describe('AdminCreditsBillingLayout', () => {
     const { user } = renderWithUser(AdminCreditsBillingLayout, {
       global: {
         plugins: [
-          [PrimeVue, primeVueTestOptions],
+          [PrimeVue, adminPrimeVueTestOptions],
           [VueQueryPlugin, { queryClient }],
         ],
         stubs: { RouterView: true },
@@ -111,7 +111,7 @@ describe('AdminCreditsBillingLayout', () => {
     const { user } = renderWithUser(AdminCreditsBillingLayout, {
       global: {
         plugins: [
-          [PrimeVue, primeVueTestOptions],
+          [PrimeVue, adminPrimeVueTestOptions],
           [VueQueryPlugin, { queryClient }],
         ],
         stubs: { RouterView: true },
@@ -157,7 +157,7 @@ describe('AdminCreditsBillingLayout', () => {
     const { user } = renderWithUser(AdminCreditsBillingLayout, {
       global: {
         plugins: [
-          [PrimeVue, primeVueTestOptions],
+          [PrimeVue, adminPrimeVueTestOptions],
           [VueQueryPlugin, { queryClient }],
         ],
         stubs: { RouterView: true, transition: false },

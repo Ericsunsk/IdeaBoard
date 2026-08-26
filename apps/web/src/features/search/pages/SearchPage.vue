@@ -97,7 +97,7 @@
                     ? 'Add keywords or prompt (optional)...'
                     : 'Search inspiration...'
                 "
-                aria-label="搜索灵感"
+                :aria-label="t('search.inputLabel')"
                 @input="queryError = ''"
               />
 
@@ -232,7 +232,7 @@
         v-else-if="results.length === 0"
         class="mt-6 grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-board-card-border bg-board-loading-bg/80 backdrop-blur-sm"
       >
-        <p class="m-0 text-sm text-board-page-text-muted">没有找到匹配的灵感</p>
+        <p class="m-0 text-sm text-board-page-text-muted">{{ t('search.noResults') }}</p>
       </section>
 
       <!-- Virtualized responsive Masonry result viewport -->
@@ -261,7 +261,7 @@
             <button
               type="button"
               class="block w-full cursor-zoom-in text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-board-primary"
-              :aria-label="`查看 ${result.title || '灵感图片'}`"
+              :aria-label="t('search.viewResult', { title: result.title || t('search.fallbackTitle') })"
               @click="openLightbox(result)"
             >
               <div
@@ -273,7 +273,7 @@
                   :src="result.preview_url || result.thumbnail_url"
                   :srcset="`${result.thumbnail_url} 400w, ${result.preview_url} 1200w`"
                   sizes="(min-width: 1280px) 20vw, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 100vw"
-                  :alt="result.title || '灵感图片'"
+                  :alt="result.title || t('search.fallbackTitle')"
                   :loading="index < 4 ? 'eager' : 'lazy'"
                   :fetchpriority="index < 2 ? 'high' : 'auto'"
                   class="block h-full w-full object-cover select-none pointer-events-none"
@@ -376,9 +376,9 @@
               v-if="failedImages.has(result.id)"
               class="grid place-items-center gap-2 bg-board-loading-bg px-4 py-5 text-center"
             >
-              <span class="text-xs font-semibold text-board-page-text-muted">图片暂时无法加载</span>
+              <span class="text-xs font-semibold text-board-page-text-muted">{{ t('common.errors.imageLoadFailed') }}</span>
               <Button
-                label="重试"
+                :label="t('common.actions.retry')"
                 size="small"
                 severity="secondary"
                 outlined
@@ -394,14 +394,14 @@
         <ProgressSpinner
           class="!h-7 !w-7 text-board-primary"
           stroke-width="4"
-          aria-label="加载更多灵感"
+          :aria-label="t('search.loadingMore')"
         />
       </div>
       <p
         v-else-if="results.length > 0 && !hasMore"
         class="py-4 text-center text-xs text-board-page-text-muted"
       >
-        已加载全部可用灵感
+        {{ t('search.allLoaded') }}
       </p>
     </main>
 
@@ -485,7 +485,7 @@
           >
             <img
               :src="activeResult.original_url || activeResult.preview_url"
-              :alt="activeResult.title || '灵感图片'"
+              :alt="activeResult.title || t('search.fallbackTitle')"
               class="max-h-[82vh] max-w-full object-contain rounded-2xl shadow-2xl border-0 ring-0 outline-none select-none"
             />
           </div>
@@ -507,6 +507,7 @@
 import '../search.css'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -529,6 +530,7 @@ import {
 } from '../useSearchScreenRuntime'
 
 const router = useRouter()
+const { t } = useI18n()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const accountControls = useUserAccountControls({

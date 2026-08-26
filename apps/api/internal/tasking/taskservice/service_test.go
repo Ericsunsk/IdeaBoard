@@ -251,7 +251,7 @@ func TestLoadAdminBillingSnapshotsResolvesFeatureExistenceFromCurrentRegistry(t 
 	service := NewService(ServiceDeps{
 		AdminBillingHistory: adminBillingHistoryStub{snapshots: map[string]tasks.AdminBillingSnapshot{
 			"task-existing": {
-				SKU: "ai-image:partial-edit", DisplayName: "局部重绘", PriceVersionID: 10,
+				SKU: "ai-image:inpaint", DisplayName: "局部重绘", PriceVersionID: 10,
 				PriceVersion: 2, UnitCredits: 4, Quantity: 1, TotalCredits: 4, QuotedAt: quotedAt,
 			},
 			"task-deleted": {
@@ -259,7 +259,7 @@ func TestLoadAdminBillingSnapshotsResolvesFeatureExistenceFromCurrentRegistry(t 
 				PriceVersion: 1, UnitCredits: 2, Quantity: 2, TotalCredits: 4, QuotedAt: quotedAt,
 			},
 		}},
-		BillableItems: billableItemLookupStub{"ai-image:partial-edit": true},
+		BillableItems: billableItemLookupStub{"ai-image:inpaint": true},
 	}, ServiceOptions{})
 	snapshots, err := service.loadAdminBillingSnapshots(t.Context(), []string{"task-existing", "task-deleted"})
 	if err != nil {
@@ -369,13 +369,13 @@ func TestOutpaintEmptyUserPromptCanStillBuildConfiguredPrompt(t *testing.T) {
 	}
 }
 
-func TestRemoveBgWithoutConfiguredSystemPromptAllowsEmptyPrompt(t *testing.T) {
+func TestCutoutWithoutConfiguredSystemPromptAllowsEmptyPrompt(t *testing.T) {
 	fullPrompt := applyTaskSystemPrompt(
 		"",
 		"",
-		workflow.FeatureSlugRemoveBg,
+		workflow.FeatureSlugCutout,
 		map[string]interface{}{
-			"feature": workflow.FeatureSlugRemoveBg,
+			"feature": workflow.FeatureSlugCutout,
 		},
 		func(string) (string, error) {
 			return "", nil
@@ -391,8 +391,8 @@ func TestResolveTaskBillingRequestUsesAIWorkflowRegistry(t *testing.T) {
 	for _, feature := range workflow.AIImageFeatureSlugs() {
 		t.Run(feature, func(t *testing.T) {
 			resolution := "1k"
-			if feature == workflow.FeatureSlugPartialEdit ||
-				feature == workflow.FeatureSlugRemoveBg ||
+			if feature == workflow.FeatureSlugInpaint ||
+				feature == workflow.FeatureSlugCutout ||
 				feature == workflow.FeatureSlugHDUpscale ||
 				feature == workflow.FeatureSlugOutpaint {
 				resolution = "default"
@@ -409,7 +409,7 @@ func TestResolveTaskBillingRequestUsesAIWorkflowRegistry(t *testing.T) {
 				Params: workflow.FeatureExecutionParams{
 					OutputResolution: &resolution,
 					ImageInputCount:  imageInputCount,
-					HasMaskInput:     feature == workflow.FeatureSlugPartialEdit,
+					HasMaskInput:     feature == workflow.FeatureSlugInpaint,
 				},
 			})
 			if err != nil {
@@ -815,7 +815,7 @@ func TestSubmitTaskCanvasUploadRefsRequireBoardAccess(t *testing.T) {
 	})
 	prepare := func(userID int64, ref string) error {
 		_, err := intake.Compile(ctx, userID, &tasks.SubmitTaskRequest{
-			Prompt: "image", Feature: workflow.FeatureSlugSketchToImage,
+			Prompt: "image", Feature: workflow.FeatureSlugRender,
 			ImageURLs: []string{ref}, ClientActionID: "media-access",
 		})
 		return err
@@ -852,7 +852,7 @@ func TestSubmitTaskMediaRefValidationFailsClosedWithoutServiceValidator(t *testi
 
 	intake := NewTaskIntake(TaskIntakeDeps{})
 	_, err := intake.Compile(ctx, 42, &tasks.SubmitTaskRequest{
-		Prompt: "image", Feature: workflow.FeatureSlugSketchToImage,
+		Prompt: "image", Feature: workflow.FeatureSlugRender,
 		ImageURLs: []string{allowedByFormat}, ClientActionID: "missing-media-validator",
 	})
 	if err == nil {
@@ -874,7 +874,7 @@ func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 	svc := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo:     accountRepo,
 		SubmissionStore: submissionStore,
-		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugSketchToImage, "gpt-image-1"),
+		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugRender, "gpt-image-1"),
 		MediaValidator:  testSubmitMediaValidator{},
 	}, ServiceOptions{
 		TaskEvents: taskEvents,
@@ -882,7 +882,7 @@ func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 
 	taskID, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
 		Prompt:         "draw a chair",
-		Feature:        workflow.FeatureSlugSketchToImage,
+		Feature:        workflow.FeatureSlugRender,
 		ImageURLs:      []string{"https://example.com/sketch.png"},
 		ClientActionID: " canvas-action-1 ",
 		Params:         map[string]interface{}{"size": "1024x1024"},
@@ -1022,7 +1022,7 @@ func TestReadinessDoesNotPrepareMediaButSubmitDoes(t *testing.T) {
 		TaskBilling:     newHandlerTaskBillingService(),
 	}, ServiceOptions{})
 	req := &tasks.SubmitTaskRequest{
-		Prompt: "draw from reference", Feature: workflow.FeatureSlugSketchToImage,
+		Prompt: "draw from reference", Feature: workflow.FeatureSlugRender,
 		ImageURLs: []string{"https://example.com/reference.png"}, ClientActionID: "media-boundary",
 	}
 	if _, err := svc.CheckSubmitTaskReadiness(context.Background(), 42, req); err != nil {
@@ -1084,13 +1084,13 @@ func TestSubmitTaskUsesInteractivePriority(t *testing.T) {
 	svc := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo:     accountRepo,
 		SubmissionStore: submissionStore,
-		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugSketchToImage, "gpt-image-1"),
+		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugRender, "gpt-image-1"),
 		MediaValidator:  testSubmitMediaValidator{},
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
 		Prompt:         "draw a chair",
-		Feature:        workflow.FeatureSlugSketchToImage,
+		Feature:        workflow.FeatureSlugRender,
 		ImageURLs:      []string{"https://example.com/sketch.png"},
 		ClientActionID: "interactive-priority",
 		Priority:       tasks.TaskPriorityInteractive,
@@ -1134,7 +1134,7 @@ func TestSubmitTaskReturnsExistingTaskWithoutPublishingWhenClientActionRepeats(t
 	svc := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo:     accountRepo,
 		SubmissionStore: submissionStore,
-		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugSketchToImage, "gpt-image-1"),
+		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugRender, "gpt-image-1"),
 		MediaValidator:  testSubmitMediaValidator{},
 	}, ServiceOptions{
 		TaskEvents: taskEvents,
@@ -1142,7 +1142,7 @@ func TestSubmitTaskReturnsExistingTaskWithoutPublishingWhenClientActionRepeats(t
 
 	taskID, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
 		Prompt:         "draw a chair",
-		Feature:        workflow.FeatureSlugSketchToImage,
+		Feature:        workflow.FeatureSlugRender,
 		ImageURLs:      []string{"https://example.com/sketch.png"},
 		ClientActionID: "canvas-action-repeat",
 		Params:         map[string]interface{}{"size": "1024x1024"},
@@ -1422,8 +1422,8 @@ func newGoogleNativeSubmitTestService(submissionStore *recordingSubmissionStore)
 		TaskBilling:     newHandlerTaskBillingService(),
 		MediaValidator:  testSubmitMediaValidator{},
 		PromptStore: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
-			workflow.FeatureSlugSketchToImage: {
-				Prompt: "{{user_prompt}}", UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(workflow.FeatureSlugSketchToImage),
+			workflow.FeatureSlugRender: {
+				Prompt: "{{user_prompt}}", UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(workflow.FeatureSlugRender),
 			},
 		}},
 	}, ServiceOptions{})
@@ -1440,7 +1440,7 @@ func featurePromptStoreForTest(slug, _ string) fakeFeaturePromptStore {
 
 func newGoogleNativeSubmitRequest() *tasks.SubmitTaskRequest {
 	return &tasks.SubmitTaskRequest{
-		Prompt: "draw a product mockup", Feature: workflow.FeatureSlugSketchToImage,
+		Prompt: "draw a product mockup", Feature: workflow.FeatureSlugRender,
 		ImageURLs:      []string{"https://example.com/sketch.png"},
 		ClientActionID: "google-native-test",
 	}

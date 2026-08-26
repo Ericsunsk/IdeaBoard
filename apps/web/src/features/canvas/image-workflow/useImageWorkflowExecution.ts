@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@vue-flow/core'
 import { onScopeDispose, ref, type Ref } from 'vue'
+import { i18n } from '../../../shared/i18n'
 import {
   createImageExecutionPlanner,
   createImageWorkflowCommands,
@@ -33,24 +34,21 @@ export type ImageWorkflowExecution = ImageWorkflowCommands & {
   hydratePendingImageLeases: () => number
 }
 
-const DEFAULT_GENERATION_UNAVAILABLE_MESSAGE = '生成服务暂不可用，请稍后重试'
+function defaultGenerationUnavailableMessage(): string {
+  return i18n.global.t('canvas.execution.generationUnavailable')
+}
 const GENERATION_UNAVAILABLE_RETRY_MS = 15_000
 
 function isProviderUnavailableMessage(message: string): boolean {
-  const normalized = message.trim().toLowerCase()
-  if (!normalized) return false
-  return (
-    /provider.*unavailable/.test(normalized) ||
-    /no available/.test(normalized) ||
-    /暂无可用|没有可用|无可用|服务暂不可用|服务暂时不可用/.test(message)
-  )
+  // Degradation warnings originate only from our own single-source copy; no prose matching.
+  return message.trim() === i18n.global.t('canvas.execution.generationUnavailable')
 }
 
 export function useImageWorkflowExecution(
   options: UseImageWorkflowExecutionOptions,
 ): ImageWorkflowExecution {
   const generationUnavailableUntilMs = ref(0)
-  const generationUnavailableMessage = ref(DEFAULT_GENERATION_UNAVAILABLE_MESSAGE)
+  const generationUnavailableMessage = ref(defaultGenerationUnavailableMessage())
   let generationAvailabilityTimer: ReturnType<typeof setTimeout> | null = null
 
   function isGenerationAvailable(): boolean {
@@ -73,7 +71,7 @@ export function useImageWorkflowExecution(
           return
         }
         generationUnavailableUntilMs.value = 0
-        generationUnavailableMessage.value = DEFAULT_GENERATION_UNAVAILABLE_MESSAGE
+        generationUnavailableMessage.value = defaultGenerationUnavailableMessage()
       },
       Math.max(0, delayMs),
     )
@@ -82,7 +80,8 @@ export function useImageWorkflowExecution(
   function handleWorkflowWarning(message: string) {
     if (isProviderUnavailableMessage(message) && isGenerationAvailable()) {
       generationUnavailableUntilMs.value = Date.now() + GENERATION_UNAVAILABLE_RETRY_MS
-      generationUnavailableMessage.value = message.trim() || DEFAULT_GENERATION_UNAVAILABLE_MESSAGE
+      generationUnavailableMessage.value =
+        message.trim() || defaultGenerationUnavailableMessage()
       refreshGenerationAvailabilityAfter(GENERATION_UNAVAILABLE_RETRY_MS)
     }
     options.feedback.warning(message)

@@ -8,6 +8,7 @@ import {
 } from '../api/generated-query/settings/settings'
 import type { ApiResponseBrandingSetting, BrandingSetting } from '../api/generated-query/model'
 import { createApiDataSelector, resolveApiData } from '../api/apiResponse'
+import { i18n } from '../i18n'
 import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../config/runtimeUrls'
 
 export const SITE_BRANDING_QUERY_KEY = getGetSiteBrandingSettingQueryKey()
@@ -20,11 +21,13 @@ export const DEFAULT_SITE_BRANDING_SETTING: BrandingSetting = {
 export const SITE_BRANDING_PROJECT_NAME_MAX_CHARS = 40
 export const SITE_BRANDING_LOGO_URL_MAX_LENGTH = 2048
 export const SITE_BRANDING_UPLOAD_LOGO_PATH_PREFIX = '/uploads/site/assets/'
-const selectSiteBranding = createApiDataSelector<BrandingSetting>('读取站点设置失败')
+const selectSiteBranding = createApiDataSelector<BrandingSetting>(
+  i18n.global.t('account.branding.loadFailed'),
+)
 
 export async function fetchSiteBranding(): Promise<BrandingSetting> {
   return normalizeSiteBrandingSetting(
-    await resolveApiData(getSiteBrandingSetting(), '读取站点设置失败'),
+    await resolveApiData(getSiteBrandingSetting(), i18n.global.t('account.branding.loadFailed')),
   )
 }
 

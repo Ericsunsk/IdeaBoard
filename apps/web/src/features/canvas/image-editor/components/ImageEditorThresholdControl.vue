@@ -1,7 +1,7 @@
 <template>
   <div class="editing-controls-stack image-editor-threshold-control">
     <ImageEditorHistogramPlot
-      aria-label="阈值直方图"
+      :aria-label="t('canvas.imageEditor.thresholdHistogramAria')"
       :histogram-path="histogramPath"
       marker-mode="range"
       :markers="plotMarkers"
@@ -17,6 +17,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'
 import type { ImageEditorThresholdParams } from '../types'
 import { createImageEditorHistogram, sampleHistogramPath } from '../utils/imageEditorHistogram'
@@ -41,6 +42,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:params', value: ImageEditorThresholdParams): void
 }>()
+
+const { t } = useI18n()
 
 const normalizedParams = computed(() => normalizeThresholdAdjustment(props.params))
 const histogramPath = computed(() =>

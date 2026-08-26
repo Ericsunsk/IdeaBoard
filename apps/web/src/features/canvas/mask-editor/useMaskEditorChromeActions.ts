@@ -1,3 +1,4 @@
+import { i18n } from '../../../shared/i18n'
 import type { ImageMaskEditorCommittedData } from './types'
 
 type ValueRef<T> = {
@@ -31,7 +32,7 @@ export function useMaskEditorChromeActions(options: UseMaskEditorChromeActionsOp
     const didCommitMask = options.commitMaskEditorMode()
     const committed = options.getCommittedMaskData(nodeId)
     if (!didCommitMask || !committed?.executionMaskDataUrl) {
-      options.onWarning('请先标记局部重绘区域')
+      options.onWarning(i18n.global.t('canvas.execution.markInpaintAreaFirst'))
       return
     }
     options.clearActiveNodePanel()

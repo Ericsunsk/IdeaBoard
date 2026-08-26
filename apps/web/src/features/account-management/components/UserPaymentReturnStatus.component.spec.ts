@@ -20,13 +20,13 @@ describe('UserPaymentReturnStatus', () => {
       },
     })
 
-    expect(screen.getByText('正在确认支付结果')).toBeVisible()
-    expect(screen.queryByText('到账处理中')).not.toBeInTheDocument()
+    expect(screen.getByText('Confirming your payment result')).toBeVisible()
+    expect(screen.queryByText('Processing Ideas')).not.toBeInTheDocument()
 
     await vi.advanceTimersByTimeAsync(60_000)
 
-    expect(screen.getByText('到账处理中')).toBeVisible()
-    expect(screen.getByText(/无需重复支付/)).toBeVisible()
+    expect(screen.getByText('Processing Ideas')).toBeVisible()
+    expect(screen.getByText(/No need to pay again/)).toBeVisible()
   })
 
   it('treats a cancelled Checkout return as navigation context until backend credit is confirmed', async () => {
@@ -43,8 +43,8 @@ describe('UserPaymentReturnStatus', () => {
       },
     })
 
-    expect(screen.getByText('已返回 IdeaBoard')).toBeVisible()
-    expect(screen.getByText(/订单未到账/)).toBeVisible()
+    expect(screen.getByText('Back on IdeaBoard')).toBeVisible()
+    expect(screen.getByText(/has not been completed/)).toBeVisible()
 
     await view.rerender({
       pending: false,
@@ -57,6 +57,6 @@ describe('UserPaymentReturnStatus', () => {
       },
     })
 
-    expect(screen.getByText('1,000 Ideas 已到账')).toBeVisible()
+    expect(screen.getByText('1,000 Ideas added')).toBeVisible()
   })
 })

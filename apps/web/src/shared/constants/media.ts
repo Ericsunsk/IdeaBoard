@@ -27,7 +27,7 @@ export const IMAGE_UPLOAD_ACCEPT = [
 export const IMAGE_UPLOAD_FORMAT_LABEL = 'JPG / PNG / GIF / BMP / WEBP'
 
 export const DEFAULT_IMAGE_DOWNLOAD_NAME = 'image.png'
-export const UPLOAD_SUCCESS_MESSAGE = '上传成功'
-export const UPLOAD_FAILED_MESSAGE = '上传失败'
-export const IMAGE_GENERATION_SUCCESS_MESSAGE = '图片已生成'
-export const IMAGE_GENERATION_FAILURE_MESSAGE = '图片生成失败'
+export const UPLOAD_SUCCESS_MESSAGE = 'Upload succeeded'
+export const UPLOAD_FAILED_MESSAGE = 'Upload failed'
+export const IMAGE_GENERATION_SUCCESS_MESSAGE = 'Image generated'
+export const IMAGE_GENERATION_FAILURE_MESSAGE = 'Image generation failed'

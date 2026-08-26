@@ -11,7 +11,7 @@ describe('usePasswordChangeWorkflow', () => {
     const workflow = usePasswordChangeWorkflow(createDeps())
 
     expect(workflow.validateField('oldPassword')).toBe(false)
-    expect(workflow.errors.value.oldPassword).toBe(markRequiredError('请输入当前原密码'))
+    expect(workflow.errors.value.oldPassword).toBe(markRequiredError('Enter your current password'))
 
     workflow.form.value.newPassword = '123456789'
     expect(workflow.validateField('newPassword')).toBe(false)
@@ -24,7 +24,7 @@ describe('usePasswordChangeWorkflow', () => {
     workflow.form.value.newPassword = '1234567890'
     workflow.form.value.confirmPassword = 'abcdef'
     expect(workflow.validateField('confirmPassword')).toBe(false)
-    expect(workflow.errors.value.confirmPassword).toBe('两次输入密码不一致')
+    expect(workflow.errors.value.confirmPassword).toBe('Passwords do not match')
   })
 
   it('clears new password error and revalidates confirm password when needed', () => {
@@ -33,7 +33,7 @@ describe('usePasswordChangeWorkflow', () => {
     workflow.form.value.newPassword = '1234567890'
     workflow.form.value.confirmPassword = 'abcdefghij'
     workflow.errors.value.newPassword = 'Password must be 10-128 characters'
-    workflow.errors.value.confirmPassword = '两次输入密码不一致'
+    workflow.errors.value.confirmPassword = 'Passwords do not match'
 
     workflow.form.value.newPassword = 'abcdefghij'
     workflow.handleNewPasswordInput()
@@ -106,7 +106,9 @@ describe('usePasswordChangeWorkflow', () => {
 
     await workflow.submit()
 
-    expect(capturedErrors).toEqual(['密码已更新，但退出登录失败，请手动退出后重新登录'])
+    expect(capturedErrors).toEqual([
+      'Your password was updated, but sign-out failed. Sign out manually and sign in again.',
+    ])
     expect(deps.router.replace).not.toHaveBeenCalled()
   })
 

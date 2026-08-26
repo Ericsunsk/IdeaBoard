@@ -1,6 +1,8 @@
 import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import { watch } from 'vue'
+import { i18n } from '../../../shared/i18n'
+import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import type {
   CanvasNodeItem,
   FusionNodeItem,
@@ -8,9 +10,7 @@ import type {
   PromptNodeItem,
 } from '../../canvas-board/domain'
 import { getCanvasNodeImageInputLimit } from '../../canvas-board/domain'
-import {
-  type ImageNodeDisplayPayload,
-} from '../utils/flowImageNodeSelectors'
+import { type ImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
 import type { CanvasVueFlowGraphAdapter } from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions } from '../vue-flow-adapter/flowGraphAdapterCommandSideEffects'
 import {
@@ -147,7 +147,8 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
       return `${node.id}:${JSON.stringify(domain)}`
     })
     const edgeParts = options.edges.value.map(
-      (edge) => `${edge.id}:${edge.source}:${edge.sourceHandle ?? ''}:${edge.target}:${edge.targetHandle ?? ''}`,
+      (edge) =>
+        `${edge.id}:${edge.source}:${edge.sourceHandle ?? ''}:${edge.target}:${edge.targetHandle ?? ''}`,
     )
     return [...nodeParts, ...edgeParts].sort().join('|')
   }
@@ -160,11 +161,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
       if (!isMediaInputSnapshotNode(record.snapshot)) return
       const linkedImages = resolveLinkedImagesForTarget(nodeId)
       const current = record.snapshot.inputImages
-      const nextImages = createSyncedMediaInputImages(
-        current,
-        linkedImages,
-        record.snapshot.type,
-      )
+      const nextImages = createSyncedMediaInputImages(current, linkedImages, record.snapshot.type)
       if (areMediaInputImagesEqual(current, nextImages)) return
 
       options.updateSnapshotNodeBase(
@@ -183,13 +180,14 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
   }
 
   function resolveLinkedImagesForTarget(targetNodeId: string): LinkedNodePreviewImage[] {
-    const imageInputEdgesByTargetId = createImageInputEdgesByTargetId(options.readCanvasGraphStore())
+    const imageInputEdgesByTargetId = createImageInputEdgesByTargetId(
+      options.readCanvasGraphStore(),
+    )
     return (imageInputEdgesByTargetId.get(targetNodeId) ?? [])
-      .map(
-        (edge) =>
-          resolveNodePreviewImageById(
-            `${edge.connection.fromNodeType}-${edge.connection.fromNodeId}`,
-          ),
+      .map((edge) =>
+        resolveNodePreviewImageById(
+          `${edge.connection.fromNodeType}-${edge.connection.fromNodeId}`,
+        ),
       )
       .filter((item): item is LinkedNodePreviewImage => !!item && !!item.url)
   }
@@ -237,7 +235,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
   }
 
   function resolveMediaInputNodeLabel(kind: MediaInputNodeKind | null) {
-    return kind === 'prompt' ? 'Prompt' : '节点'
+    return kind === 'prompt' ? 'Prompt' : i18n.global.t('canvas.session.mediaInputNodeLabel')
   }
 
   async function addMediaInputImageFile(nodeId: string, file: File) {
@@ -247,7 +245,9 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
     const currentInputCount = getMediaInputImages(nodeId).length
     const label = resolveMediaInputNodeLabel(kind)
     if (currentInputCount >= inputLimit) {
-      options.onWarning(`${label} 最多接入 ${inputLimit} 张图片`)
+      options.onWarning(
+        i18n.global.t('canvas.session.inputLimitExceeded', { label, count: inputLimit }),
+      )
       return
     }
     try {
@@ -271,7 +271,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
       })
       options.markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
     } catch (error) {
-      const msg = error instanceof Error ? error.message : '上传失败'
+      const msg = userFacingErrorCopy(error, i18n.global.t('canvas.session.uploadFailed'))
       options.onWarning(msg)
     }
   }
@@ -288,7 +288,9 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
     const currentInputCount = getMediaInputImages(nodeId).length
     const label = resolveMediaInputNodeLabel(kind)
     if (currentInputCount >= inputLimit) {
-      options.onWarning(`${label} 最多接入 ${inputLimit} 张图片`)
+      options.onWarning(
+        i18n.global.t('canvas.session.inputLimitExceeded', { label, count: inputLimit }),
+      )
       return
     }
     const file = await options.browser.pickImageFile()
@@ -325,7 +327,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
     } catch (error) {
       transaction.cancel()
       console.error('[Canvas] Failed to remove media input', error)
-      options.onWarning('移除输入图片失败，请刷新画布后重试')
+      options.onWarning(i18n.global.t('canvas.session.removeInputImageFailed'))
       return
     }
     const projection = canvasBoardSnapshotToFlow(writeGraphStore().exportSnapshot())
@@ -380,7 +382,9 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
     const ordered = getMediaInputImages(promptNodeId)
       .filter((item) => item.sourceType === 'node')
       .map((item) => item.sourceId)
-    const imageInputEdgesByTargetId = createImageInputEdgesByTargetId(options.readCanvasGraphStore())
+    const imageInputEdgesByTargetId = createImageInputEdgesByTargetId(
+      options.readCanvasGraphStore(),
+    )
     const linked = new Set(
       (imageInputEdgesByTargetId.get(promptNodeId) ?? []).map(
         (edge) => `${edge.connection.fromNodeType}-${edge.connection.fromNodeId}`,

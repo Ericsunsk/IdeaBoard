@@ -5,9 +5,9 @@
       class="grid gap-4"
       role="status"
       aria-live="polite"
-      aria-label="正在加载充值选项"
+      :aria-label="t('account.topUp.optionsLoading')"
     >
-      <span class="sr-only">正在加载充值选项</span>
+      <span class="sr-only">{{ t('account.topUp.optionsLoading') }}</span>
       <Skeleton height="4.5rem" />
       <Skeleton height="2.75rem" />
       <Skeleton height="2.75rem" />
@@ -18,11 +18,11 @@
       class="flex min-h-40 flex-col items-center justify-center text-center"
     >
       <p id="recharge-purchase-heading" class="m-0 font-semibold text-ib-danger">
-        充值选项加载失败
+        {{ t('account.errors.optionsLoadFailed') }}
       </p>
       <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(error) }}</p>
       <Button
-        label="重新加载"
+        :label="t('account.reload')"
         severity="secondary"
         size="small"
         text
@@ -36,7 +36,7 @@
       class="flex min-h-36 flex-col items-center justify-center text-center"
       role="status"
     >
-      <p id="recharge-purchase-heading" class="m-0 font-semibold text-ib-text">暂时无法充值</p>
+      <p id="recharge-purchase-heading" class="m-0 font-semibold text-ib-text">{{ t('account.topUp.unavailableTitle') }}</p>
       <p class="mt-1 mb-0 text-sm text-ib-text-muted">
         {{ unavailableMessage(options.unavailable_reason) }}
       </p>
@@ -46,13 +46,13 @@
       <div>
         <div class="flex items-end justify-between gap-4">
           <h3 id="recharge-purchase-heading" class="m-0 text-base font-bold text-ib-text">
-            选择充值数量
+            {{ t('account.topUp.chooseQuantity') }}
           </h3>
           <span class="text-[12px] font-semibold text-ib-text-subtle">$1.00 USD = 100 Ideas</span>
         </div>
         <div
           class="mt-3 grid grid-cols-5 gap-2.5 max-[900px]:grid-cols-3 max-[640px]:grid-cols-2"
-          aria-label="快捷充值套餐"
+          :aria-label="t('account.topUp.packagesAria')"
         >
           <button
             v-for="quantity in options.quick_idea_quantities"
@@ -77,7 +77,7 @@
 
       <IbFormField
         v-slot="{ fieldId }"
-        label="自定义数量"
+        :label="t('account.topUp.customQuantity')"
         field-id="account-recharge-custom"
         field-class="grid gap-2"
         label-class="text-[13px] font-semibold text-ib-text-muted"
@@ -107,28 +107,27 @@
         <Button
           unstyled
           type="submit"
-          label="立即支付"
+          :label="t('account.topUp.payNow')"
           :disabled="!canCheckout"
           :loading="checkoutPending"
           :class="accountPrimaryActionButtonClass"
           :pt="accountButtonPt"
         />
         <p class="mt-2 mb-0 text-center text-[12px] leading-5 text-ib-text-subtle">
-          点击“立即支付”即表示你同意
+          {{ t('account.topUp.termsPrefix') }}
           <a
             :href="options.terms.url"
             target="_blank"
             rel="noopener noreferrer"
             class="rounded-[var(--radius-ib-control)] font-semibold text-ib-creative-accent-pressed focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"
-            >服务条款</a
-          >
-          和
+            >{{ t('account.topUp.termsLink') }}</a
+          >{{ t('account.topUp.termsAnd') }}
           <a
             :href="options.refund_policy.url"
             target="_blank"
             rel="noopener noreferrer"
             class="rounded-[var(--radius-ib-control)] font-semibold text-ib-creative-accent-pressed focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"
-            >退款政策</a
+            >{{ t('account.topUp.refundLink') }}</a
           >
         </p>
         <p
@@ -145,9 +144,11 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
 import IbFormField from '../../../shared/components/IbFormField.vue'
+import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
 import { ibFormInputClass } from '../../../shared/theme/formControls'
 import { formatUsdForIdeas, MIN_IDEA_QUANTITY, normalizeIdeaQuantity } from '../paymentMoney'
@@ -169,7 +170,7 @@ const emit = defineEmits<{
   retry: []
   checkout: [ideaQuantity: number]
 }>()
-
+const { t } = useI18n()
 const selectionMode = ref<'package' | 'custom'>('package')
 const selectedQuantity = ref(1000)
 const customQuantity = ref('')
@@ -224,17 +225,17 @@ function submitCheckout() {
 function unavailableMessage(reason?: UserPaymentPurchaseOptions['unavailable_reason']): string {
   switch (reason) {
     case 'purchases_disabled':
-      return '充值功能暂未开放'
+      return t('account.topUp.reasonDisabled')
     case 'wallet_restricted':
       return props.options?.restriction_type === 'payment_dispute'
-        ? '银行卡 Dispute 处理中，当前账户暂时无法充值或使用 Idea'
-        : '当前账户暂时无法充值'
+        ? t('account.topUp.reasonDispute')
+        : t('account.topUp.reasonRestricted')
     default:
-      return '充值服务尚未准备好，请稍后再试'
+      return t('account.topUp.reasonDefault')
   }
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : '网络错误，请重试'
+  return userFacingErrorCopy(error, t('account.errors.networkRetry'))
 }
 </script>

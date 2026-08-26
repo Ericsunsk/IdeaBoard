@@ -48,12 +48,12 @@ describe('ImageEditorCurvesControl', () => {
 
     const bubbledKeydown = vi.fn()
     container.addEventListener('keydown', bubbledKeydown)
-    const midtonePoint = screen.getByRole('button', { name: '曲线点 输入 50 输出 55' })
+    const midtonePoint = screen.getByRole('button', { name: 'Curve point In 50 Out 55' })
 
     midtonePoint.focus()
     dispatchDelete(midtonePoint)
 
-    const highlightPoint = screen.getByRole('button', { name: '曲线点 输入 75 输出 82' })
+    const highlightPoint = screen.getByRole('button', { name: 'Curve point In 75 Out 82' })
 
     await waitFor(() => expect(highlightPoint).toHaveFocus())
     expect(params.value.channels.rgb?.map((point) => point.id)).toEqual(['shadow', 'highlight'])
@@ -73,10 +73,10 @@ describe('ImageEditorCurvesControl', () => {
       },
     })
 
-    await user.click(screen.getByRole('button', { name: '曲线点 输入 50 输出 55' }))
+    await user.click(screen.getByRole('button', { name: 'Curve point In 50 Out 55' }))
 
-    const inputField = screen.getByLabelText('输入')
-    const outputField = screen.getByLabelText('输出')
+    const inputField = screen.getByLabelText('Input')
+    const outputField = screen.getByLabelText('Output')
 
     await user.clear(inputField)
     await user.clear(outputField)

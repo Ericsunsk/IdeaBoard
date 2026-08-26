@@ -5,6 +5,7 @@ import {
 } from '../../../shared/api/generated-query/boards/boards'
 import type { BoardStateEnvelope, UserBoardItem } from '../../../shared/api/generated-query/model'
 import { resolveApiData, resolveApiOk } from '../../../shared/api/apiResponse'
+import { i18n } from '../../../shared/i18n'
 import {
   getAuthStorageUserScope,
   subscribeAuthStorageScopeChange,
@@ -201,7 +202,7 @@ function resolveHydrateOptions(
 }
 
 async function listRemoteBoards(): Promise<UserBoardItem[]> {
-  const data = await resolveApiData(listUserBoards(), '同步画布列表失败')
+  const data = await resolveApiData(listUserBoards(), i18n.global.t('workspace.sync.listFailed'))
   return Array.isArray(data.list) ? data.list : []
 }
 
@@ -254,7 +255,7 @@ export async function syncCanvasBoardToServer(
         created_at: board.createdAt,
         updated_at: Math.max(board.updatedAt, state?.updatedAt ?? 0),
       }),
-      '保存画布失败',
+      i18n.global.t('workspace.sync.saveFailed'),
     )
     if (syncScope && getAuthStorageUserScope() === syncScope) {
       pendingRollbackBoardIds.delete(boardId.trim())
@@ -274,7 +275,7 @@ export function clearPendingBoardSyncRollback(boardId: string) {
 }
 
 export async function syncDeleteCanvasBoardToServer(boardId: string) {
-  await resolveApiOk(deleteUserBoard(boardId), '删除画布失败')
+  await resolveApiOk(deleteUserBoard(boardId), i18n.global.t('workspace.sync.deleteFailed'))
 }
 
 export function isBoardNameConflictError(error: unknown): boolean {
@@ -282,12 +283,5 @@ export function isBoardNameConflictError(error: unknown): boolean {
   const status = 'status' in error ? (error as { status?: unknown }).status : undefined
   if (status === 409) return true
   const code = 'code' in error ? (error as { code?: unknown }).code : undefined
-  if (code === 409) return true
-  const msg =
-    error instanceof Error
-      ? error.message
-      : 'msg' in error
-        ? (error as { msg?: unknown }).msg
-        : undefined
-  return typeof msg === 'string' && msg.includes('画布名称已存在')
+  return code === 409
 }

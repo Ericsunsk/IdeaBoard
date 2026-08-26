@@ -30,12 +30,12 @@ describe('paymentMoney', () => {
   })
 
   it.each([
-    ['', '请输入充值数量'],
-    ['499', '最少充值 500 Ideas'],
-    ['500001', '最多充值 500,000 Ideas'],
-    ['500.5', '请输入 500–500,000 之间的整数'],
-    ['5e2', '请输入 500–500,000 之间的整数'],
-    ['1,000', '请输入 500–500,000 之间的整数'],
+    ['', 'Enter an amount to top up.'],
+    ['499', 'Minimum top-up is 500 Ideas.'],
+    ['500001', 'Maximum top-up is 500,000 Ideas.'],
+    ['500.5', 'Enter a whole number between 500 and 500,000.'],
+    ['5e2', 'Enter a whole number between 500 and 500,000.'],
+    ['1,000', 'Enter a whole number between 500 and 500,000.'],
   ])('rejects invalid quantity %s', (value, error) => {
     expect(parseIdeaQuantity(value)).toEqual({ ok: false, error })
   })

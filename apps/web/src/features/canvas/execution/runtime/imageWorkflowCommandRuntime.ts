@@ -8,6 +8,7 @@ import {
 } from '../planning/ImageExecutionPlan'
 import type { CanvasExtendRect } from '../../utils/canvasExtendGeometry'
 import { createCanvasActivationId } from '../task-runner/taskClientActionIds'
+import { i18n } from '../../../../shared/i18n'
 
 export type RunImageDirectActionOptions = {
   prompt?: string
@@ -102,7 +103,7 @@ export function createImageWorkflowCommands(options: {
   }
 
   function warnGenerationUnavailable() {
-    options.onWarning(options.generationUnavailableMessage?.() ?? '生成服务暂不可用，请稍后重试')
+    options.onWarning(options.generationUnavailableMessage?.() ?? i18n.global.t('canvas.execution.generationUnavailable'))
   }
 
   async function executePlannedAction(planAction: () => ImageExecutionPlan) {

@@ -43,7 +43,7 @@ describe('flowImageDirectActionExecutor', () => {
 
   it('classifies only the Task Submit machine code as user wallet insufficiency', async () => {
     mocks.submit.mockRejectedValueOnce(
-      Object.assign(new Error('Idea不足'), {
+      Object.assign(new Error('You need more Ideas to run this action.'), {
         status: 402,
         code: 'insufficient_credits',
       }),
@@ -51,7 +51,7 @@ describe('flowImageDirectActionExecutor', () => {
 
     await expect(submitTaskRequest({ prompt: 'generate' })).rejects.toMatchObject({
       kind: 'insufficient-credits',
-      message: 'Idea不足',
+      message: 'You need more Ideas to run this action.',
     })
 
     mocks.submit.mockRejectedValueOnce(
@@ -68,7 +68,7 @@ describe('flowImageDirectActionExecutor', () => {
 
     await expect(submitTaskRequest({ prompt: 'generate' })).rejects.toMatchObject({
       kind: 'network',
-      message: '网络错误，请重试',
+      message: 'The request could not be completed.',
     })
   })
 
@@ -82,7 +82,7 @@ describe('flowImageDirectActionExecutor', () => {
 
     await expect(submitTaskRequest({ prompt: 'generate' })).rejects.toMatchObject({
       kind: 'pricing-unavailable',
-      message: '暂时无法获取报价，请重试',
+      message: 'Pricing is temporarily unavailable. Please try again shortly.',
     })
   })
 

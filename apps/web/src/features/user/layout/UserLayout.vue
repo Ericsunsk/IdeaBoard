@@ -10,7 +10,7 @@
         >
           <Shield class="size-3.5" />
         </span>
-        <span class="whitespace-nowrap text-xs font-semibold">伪装预览中</span>
+        <span class="whitespace-nowrap text-xs font-semibold">{{ t('common.impersonation.activeBanner') }}</span>
       </div>
       <Button
         type="button"
@@ -18,7 +18,7 @@
         text
         severity="secondary"
         class="!size-[26px] !min-w-[26px] !shrink-0 !border !border-ib-creative-accent/35 !bg-ib-surface !p-0 !text-ib-creative-accent-pressed !shadow-none hover:!border-ib-creative-accent/50 hover:!bg-ib-creative-accent-soft active:!border-ib-creative-accent-pressed/55 active:!bg-ib-creative-accent/15 focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)] disabled:!cursor-wait disabled:!opacity-70 max-[720px]:!size-6 max-[720px]:!min-w-6"
-        aria-label="退出伪装身份"
+        :aria-label="t('common.impersonation.exit')"
         :aria-busy="stopImpersonatingLoading"
         :disabled="stopImpersonatingLoading"
         :loading="stopImpersonatingLoading"
@@ -46,6 +46,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { Shield, Xmark } from '@iconoir/vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -71,6 +72,7 @@ import {
   provideAccountManagementOverlay,
 } from '../../account-management/accountManagementOverlay'
 
+const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const authFeedback = useAuthFeedback()

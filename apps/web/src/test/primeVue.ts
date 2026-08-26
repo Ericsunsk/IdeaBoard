@@ -1,10 +1,10 @@
 import type { PrimeVueConfiguration } from 'primevue/config'
 import { ideaBoardPrimePt } from '../app/primePassThrough'
-import { ideaBoardPrimeLocale } from '../app/primeLocale'
+import { ideaBoardUserPrimeLocale } from '../app/primeLocale'
+import { ideaBoardAdminPrimeLocale } from '../features/admin/app/adminPrimeLocale'
 import { ideaBoardPrimePreset } from '../app/primeTheme'
 
-export const primeVueTestOptions = {
-  locale: ideaBoardPrimeLocale,
+const sharedPrimeVueTestOptions = {
   pt: ideaBoardPrimePt,
   ptOptions: {
     mergeSections: true,
@@ -18,4 +18,14 @@ export const primeVueTestOptions = {
       cssLayer: false,
     },
   },
+} satisfies Omit<PrimeVueConfiguration, 'locale'>
+
+export const userPrimeVueTestOptions = {
+  ...sharedPrimeVueTestOptions,
+  locale: ideaBoardUserPrimeLocale,
+} satisfies PrimeVueConfiguration
+
+export const adminPrimeVueTestOptions = {
+  ...sharedPrimeVueTestOptions,
+  locale: ideaBoardAdminPrimeLocale,
 } satisfies PrimeVueConfiguration

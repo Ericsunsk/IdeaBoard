@@ -1,6 +1,7 @@
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { fetchUserCreditWallet, userCreditsQueryKeys } from './userCreditsResource'
+import { i18n } from '../../shared/i18n'
 import { useUserCreditsInvalidationBridge } from './useUserCreditsInvalidationBridge'
 
 export type UserCreditWalletSummaryState =
@@ -20,7 +21,7 @@ export function useUserCreditWalletSummary(enabled: MaybeRefOrGetter<boolean> = 
     if (query.isError.value) {
       return {
         status: 'error',
-        error: query.error.value ?? new Error('Idea余额加载失败'),
+        error: query.error.value ?? new Error(i18n.global.t('account.errors.walletLoadFailed')),
       }
     }
     const availableCredits = query.data.value?.available_credits

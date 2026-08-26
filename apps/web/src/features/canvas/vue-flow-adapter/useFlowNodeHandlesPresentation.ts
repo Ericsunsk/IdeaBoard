@@ -1,5 +1,6 @@
 import { computed, type CSSProperties } from 'vue'
 import { Position } from '@vue-flow/core'
+import { i18n } from '../../../shared/i18n'
 import {
   getCanvasNodeVisibleInputPorts,
   getCanvasNodeVisibleOutputPorts,
@@ -52,8 +53,7 @@ type HandleDirectionPolicy = {
   getAggregateId: (ids: string[]) => string | null
   getAnchorIds: (ids: string[]) => string[]
   portPrefix: 'in' | 'out'
-  ariaDirectionLabel: string
-  title: string
+  directionKey: 'input' | 'output'
 }
 
 const HANDLE_DIRECTION_POLICIES: Record<FlowNodeHandleDirection, HandleDirectionPolicy> = {
@@ -69,8 +69,7 @@ const HANDLE_DIRECTION_POLICIES: Record<FlowNodeHandleDirection, HandleDirection
     handleType: 'target',
     position: Position.Left,
     portPrefix: 'in',
-    ariaDirectionLabel: '输入',
-    title: '拖拽创建输入连接',
+    directionKey: 'input',
   },
   output: {
     centeredStyle: {
@@ -84,8 +83,7 @@ const HANDLE_DIRECTION_POLICIES: Record<FlowNodeHandleDirection, HandleDirection
     handleType: 'source',
     position: Position.Right,
     portPrefix: 'out',
-    ariaDirectionLabel: '输出',
-    title: '拖拽创建输出连接',
+    directionKey: 'output',
   },
 }
 
@@ -106,12 +104,14 @@ function createFollowStyle(
 }
 
 function getNodeKindLabel(kind: CanvasConnectionNodeType) {
-  const labels: Partial<Record<CanvasConnectionNodeType, string>> = {
-    prompt: '提示词节点',
-    image: '图片节点',
-    fusion: '融合节点',
+  const { t } = i18n.global
+  const labelKeys: Partial<Record<CanvasConnectionNodeType, string>> = {
+    prompt: 'canvas.handles.promptNodeLabel',
+    image: 'canvas.handles.imageNodeLabel',
+    fusion: 'canvas.handles.fusionNodeLabel',
   }
-  return labels[kind] ?? '节点'
+  const labelKey = labelKeys[kind]
+  return labelKey ? t(labelKey) : t('canvas.handles.fallbackNodeLabel')
 }
 
 function useHandleDirectionPresentation(
@@ -156,8 +156,11 @@ function useHandleDirectionPresentation(
       style: proximity.isActive.value
         ? createFollowStyle(policy.centeredStyle, proximity.point.value, localScale())
         : policy.centeredStyle,
-      ariaLabel: `${nodeKindLabel()}${policy.ariaDirectionLabel}连接点，拖拽创建连接`,
-      title: policy.title,
+      ariaLabel: i18n.global.t('canvas.handles.connectHandleAria', {
+        kind: nodeKindLabel(),
+        direction: i18n.global.t(`canvas.handles.${policy.directionKey}DirectionLabel`),
+      }),
+      title: i18n.global.t(`canvas.handles.${policy.directionKey}Title`),
     }
   })
 

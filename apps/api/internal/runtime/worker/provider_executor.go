@@ -571,8 +571,8 @@ func providerRuntimeAdapterFor(apiType string, protocol string, operation workfl
 	case providerendpoints.ProtocolModelAPI:
 		switch operation {
 		case workflow.RuntimeOperationPromptGeneration,
-			workflow.RuntimeOperationSketchToImage,
-			workflow.RuntimeOperationStyleVariation,
+			workflow.RuntimeOperationRender,
+			workflow.RuntimeOperationVariations,
 			workflow.RuntimeOperationStyleFusion:
 			return providerRuntimeAdapterModelImage, nil
 		}
@@ -591,7 +591,7 @@ func providerRuntimeAdapterFor(apiType string, protocol string, operation workfl
 			return 0, fmt.Errorf("endpoint protocol %q does not support API type %q", protocol, apiType)
 		}
 		switch operation {
-		case workflow.RuntimeOperationPartialEdit, workflow.RuntimeOperationOutpaint:
+		case workflow.RuntimeOperationInpaint, workflow.RuntimeOperationOutpaint:
 			return providerRuntimeAdapterFluxFill, nil
 		}
 	}

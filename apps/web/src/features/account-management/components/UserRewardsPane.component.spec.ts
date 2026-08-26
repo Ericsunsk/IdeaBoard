@@ -1,6 +1,6 @@
 import PrimeVue from 'primevue/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { primeVueTestOptions } from '../../../test/primeVue'
+import { userPrimeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen } from '../../../test/render'
 import UserRewardsPane from './UserRewardsPane.vue'
 
@@ -53,7 +53,7 @@ vi.mock('../useUserRewardRedemptions', async () => {
 function renderRewardsPane() {
   return renderWithUser(UserRewardsPane, {
     global: {
-      plugins: [[PrimeVue, primeVueTestOptions]],
+      plugins: [[PrimeVue, userPrimeVueTestOptions]],
       stubs: {
         Gift: true,
       },
@@ -76,20 +76,20 @@ describe('UserRewardsPane', () => {
   it('renders the redeem form and empty history state', () => {
     renderRewardsPane()
 
-    expect(screen.getByRole('heading', { name: '奖励中心' })).toBeVisible()
-    expect(screen.getByRole('textbox', { name: '输入兑换码' })).toHaveAttribute(
+    expect(screen.getByRole('heading', { name: 'Redeem code' })).toBeVisible()
+    expect(screen.getByRole('textbox', { name: 'Enter redemption code' })).toHaveAttribute(
       'placeholder',
-      '请输入兑换码',
+      'Enter redemption code',
     )
-    expect(screen.getByRole('button', { name: '兑换' })).toBeDisabled()
-    expect(screen.getByRole('heading', { name: '兑换记录' })).toBeVisible()
-    expect(screen.getByText('暂无兑换记录')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Redeem' })).toBeDisabled()
+    expect(screen.getByRole('heading', { name: 'Redemption history' })).toBeVisible()
+    expect(screen.getByText('No redemptions yet')).toBeVisible()
   })
 
   it('keeps the user-shell primary action visual contract', () => {
     renderRewardsPane()
 
-    const redeemButton = screen.getByRole('button', { name: '兑换' })
+    const redeemButton = screen.getByRole('button', { name: 'Redeem' })
     expect(redeemButton).not.toHaveClass('p-button')
     expect(redeemButton).toHaveClass('bg-ib-creative-accent-hover', 'text-ib-text-inverse')
   })
@@ -99,12 +99,12 @@ describe('UserRewardsPane', () => {
     rewardRedemptionSucceededMock.mockReset()
     const { user } = renderRewardsPane()
 
-    await user.type(screen.getByRole('textbox', { name: '输入兑换码' }), '  IDEA-2026  ')
-    await user.click(screen.getByRole('button', { name: '兑换' }))
+    await user.type(screen.getByRole('textbox', { name: 'Enter redemption code' }), '  IDEA-2026  ')
+    await user.click(screen.getByRole('button', { name: 'Redeem' }))
 
     expect(redeemMock).toHaveBeenCalledWith('IDEA-2026')
     expect(rewardRedemptionSucceededMock).toHaveBeenCalledWith(80, false)
-    expect(screen.getByRole('textbox', { name: '输入兑换码' })).toHaveValue('')
+    expect(screen.getByRole('textbox', { name: 'Enter redemption code' })).toHaveValue('')
   })
 
   it('retains the code when redemption fails', async () => {
@@ -113,11 +113,11 @@ describe('UserRewardsPane', () => {
     rewardRedemptionFailedMock.mockReset()
     const { user } = renderRewardsPane()
 
-    await user.type(screen.getByRole('textbox', { name: '输入兑换码' }), 'IDEA2026')
-    await user.click(screen.getByRole('button', { name: '兑换' }))
+    await user.type(screen.getByRole('textbox', { name: 'Enter redemption code' }), 'IDEA2026')
+    await user.click(screen.getByRole('button', { name: 'Redeem' }))
 
     expect(rewardRedemptionFailedMock).toHaveBeenCalledWith(error)
-    expect(screen.getByRole('textbox', { name: '输入兑换码' })).toHaveValue('IDEA2026')
+    expect(screen.getByRole('textbox', { name: 'Enter redemption code' })).toHaveValue('IDEA2026')
   })
 
   it('shows paginated redemption details with masked codes and Shanghai time', () => {
@@ -140,7 +140,7 @@ describe('UserRewardsPane', () => {
     historyMock.hasNextPage = true
     renderRewardsPane()
 
-    expect(screen.getByRole('table', { name: '兑换记录表格' })).toBeVisible()
+    expect(screen.getByRole('table', { name: 'Redemption history table' })).toBeVisible()
     expect(screen.getByText('夏日灵感奖励')).toBeVisible()
     expect(screen.getByText('+80 Ideas')).toBeVisible()
     expect(screen.getByText('+1 Idea')).toBeVisible()
@@ -148,15 +148,15 @@ describe('UserRewardsPane', () => {
     expect(screen.queryByText('IDEA-2026')).not.toBeInTheDocument()
     expect(screen.getByText('2026-07-15 18:00:00')).toBeVisible()
     expect(screen.getByText('2026-07-15 00:05:06')).toBeVisible()
-    expect(screen.getByRole('button', { name: '加载更多' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Load more' })).toBeVisible()
   })
 
   it('provides recovery actions for initial and load-more errors', async () => {
     historyMock.initialError = new Error('奖励服务暂不可用')
     const { unmount, user } = renderRewardsPane()
 
-    expect(screen.getByRole('alert')).toHaveTextContent('奖励服务暂不可用')
-    await user.click(screen.getByRole('button', { name: '重新加载' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Network error. Please try again.')
+    await user.click(screen.getByRole('button', { name: 'Reload' }))
     expect(retryInitialMock).toHaveBeenCalledOnce()
 
     unmount()
@@ -173,8 +173,8 @@ describe('UserRewardsPane', () => {
     historyMock.loadMoreError = new Error('下一页加载失败')
     const next = renderRewardsPane()
 
-    expect(screen.getByRole('alert')).toHaveTextContent('下一页加载失败')
-    await next.user.click(screen.getByRole('button', { name: '重试加载' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Network error. Please try again.')
+    await next.user.click(screen.getByRole('button', { name: 'Retry load' }))
     expect(loadMoreMock).toHaveBeenCalledOnce()
   })
 
@@ -182,7 +182,7 @@ describe('UserRewardsPane', () => {
     historyMock.isInitialPending = true
     renderRewardsPane()
 
-    expect(screen.getByRole('status', { name: '正在加载兑换记录' })).toBeInTheDocument()
-    expect(screen.queryByText('暂无兑换记录')).not.toBeInTheDocument()
+    expect(screen.getByRole('status', { name: 'Loading redemption history…' })).toBeInTheDocument()
+    expect(screen.queryByText('No redemptions yet')).not.toBeInTheDocument()
   })
 })

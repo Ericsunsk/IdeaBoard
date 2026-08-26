@@ -75,6 +75,6 @@ describe('flowImageDirectActionTaskResult', () => {
         1,
         vi.fn(async () => ({ width: 100, height: 100 })),
       ),
-    ).rejects.toThrow('任务完成但未返回对应图片')
+    ).rejects.toThrow('Task completed but did not return this image.')
   })
 })

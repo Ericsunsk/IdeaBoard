@@ -1114,7 +1114,7 @@ describe('useFlowCanvasRuntime', () => {
       targetHandle: 'in:image',
     })
 
-    expect(harness.onWarning).toHaveBeenCalledWith('连线未能写入画布，请刷新后重试')
+    expect(harness.onWarning).toHaveBeenCalledWith('Failed to write the connection to the canvas. Refresh and try again.')
     expect(readEdgeProjection(harness.fullEdges.value)).toEqual(projectionBefore)
     expect(exportCurrentBoardSnapshot(harness)).toEqual(snapshotBefore)
     expect(harness.graphActions.addEdges).not.toHaveBeenCalled()
@@ -1164,7 +1164,7 @@ describe('useFlowCanvasRuntime', () => {
     harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, ['image-1', 'prompt-1'])
     expect(harness.runtime.graphEditing.grouping.view.selectionGroupAction.value).toEqual({
       kind: 'group',
-      label: '组合',
+      label: 'Group',
       nodeIds: ['image-1', 'prompt-1'],
     })
 
@@ -1198,7 +1198,7 @@ describe('useFlowCanvasRuntime', () => {
     ])
     expect(harness.runtime.graphEditing.grouping.view.selectionGroupAction.value).toEqual({
       kind: 'ungroup',
-      label: '解组',
+      label: 'Ungroup',
       groupId: 'group-1',
       nodeIds: ['image-1', 'prompt-1'],
     })
@@ -1224,7 +1224,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.runtime.graphEditing.grouping.internal.selectedGroupId.value).toBe('group-1')
     expect(harness.runtime.graphEditing.grouping.view.selectionGroupAction.value).toEqual({
       kind: 'ungroup',
-      label: '解组',
+      label: 'Ungroup',
       groupId: 'group-1',
       nodeIds: ['image-1', 'prompt-1'],
     })
@@ -1354,7 +1354,7 @@ describe('useFlowCanvasRuntime', () => {
     ).toBe(true)
     expect(harness.runtime.graphEditing.grouping.view.selectionGroupAction.value).toEqual({
       kind: 'ungroup',
-      label: '解组',
+      label: 'Ungroup',
       groupId: 'group-1',
       nodeIds,
     })
@@ -1386,7 +1386,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.runtime.graphEditing.grouping.internal.selectedGroupId.value).toBe('group-1')
     expect(harness.runtime.graphEditing.grouping.view.selectionGroupAction.value).toEqual({
       kind: 'ungroup',
-      label: '解组',
+      label: 'Ungroup',
       groupId: 'group-1',
       nodeIds: ['image-1', 'prompt-1'],
     })
@@ -2683,7 +2683,7 @@ describe('useFlowCanvasRuntime', () => {
 
     graphRuntime.onFlowDeleteNode('node-image-1')
 
-    expect(harness.onWarning).toHaveBeenCalledWith('删除操作未能写入画布，请刷新后重试')
+    expect(harness.onWarning).toHaveBeenCalledWith('Failed to write the deletion to the canvas. Refresh and try again.')
     expect(exportCurrentBoardSnapshot(harness)).toEqual(graphBefore)
     expect(harness.isDirty.value).toBe(false)
   })
@@ -2883,7 +2883,7 @@ describe('useFlowCanvasRuntime', () => {
       },
     ])
 
-    expect(harness.onWarning).not.toHaveBeenCalledWith('删除操作未能应用，请刷新画布后重试')
+    expect(harness.onWarning).not.toHaveBeenCalledWith('Failed to apply the deletion. Refresh the canvas and try again.')
     expect(harness.fullEdges.value).toHaveLength(0)
   })
 
@@ -2916,7 +2916,7 @@ describe('useFlowCanvasRuntime', () => {
       },
     ])
 
-    expect(harness.onWarning).toHaveBeenCalledWith('删除操作未能应用，请刷新画布后重试')
+    expect(harness.onWarning).toHaveBeenCalledWith('Failed to apply the deletion. Refresh the canvas and try again.')
     expect(readEdgeProjection(harness.fullEdges.value)).toEqual(edgeProjectionBefore)
     expect(harness.graphActions.applyEdgeChanges).not.toHaveBeenCalled()
     expect(harness.isDirty.value).toBe(false)
@@ -2951,7 +2951,7 @@ describe('useFlowCanvasRuntime', () => {
     ])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.onWarning).not.toHaveBeenCalledWith('删除操作未能应用，请刷新画布后重试')
+    expect(harness.onWarning).not.toHaveBeenCalledWith('Failed to apply the deletion. Refresh the canvas and try again.')
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toHaveLength(0)
   })
@@ -2983,7 +2983,7 @@ describe('useFlowCanvasRuntime', () => {
     harness.runtime.flowPane.onNodesChange([{ id: 'image-1', type: 'remove' }])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.onWarning).not.toHaveBeenCalledWith('删除操作未能应用，请刷新画布后重试')
+    expect(harness.onWarning).not.toHaveBeenCalledWith('Failed to apply the deletion. Refresh the canvas and try again.')
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toHaveLength(0)
   })
@@ -3016,7 +3016,7 @@ describe('useFlowCanvasRuntime', () => {
     harness.runtime.flowPane.onNodesChange([{ id: driftedImageNode.id, type: 'remove' }])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.onWarning).not.toHaveBeenCalledWith('删除操作未能应用，请刷新画布后重试')
+    expect(harness.onWarning).not.toHaveBeenCalledWith('Failed to apply the deletion. Refresh the canvas and try again.')
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toHaveLength(0)
   })

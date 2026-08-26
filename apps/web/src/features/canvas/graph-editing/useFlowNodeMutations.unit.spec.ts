@@ -403,7 +403,7 @@ describe('useFlowNodeMutations', () => {
     expect(edges.value).toHaveLength(4)
     expect(graphActions.addEdges).not.toHaveBeenCalled()
     expect(graphActions.setEdges).not.toHaveBeenCalled()
-    expect(onWarning).toHaveBeenCalledWith('Fusion 最多接入 4 张图片')
+    expect(onWarning).toHaveBeenCalledWith('Fusion accepts up to 4 images.')
   })
 
   it('rejects invalid connections before graph adapter edge commands run', () => {
@@ -425,6 +425,6 @@ describe('useFlowNodeMutations', () => {
     expect(edges.value).toHaveLength(0)
     expect(graphActions.addEdges).not.toHaveBeenCalled()
     expect(graphActions.setEdges).not.toHaveBeenCalled()
-    expect(onWarning).toHaveBeenCalledWith('该连线不符合当前连接语义')
+    expect(onWarning).toHaveBeenCalledWith('This connection does not match the current connection rules.')
   })
 })

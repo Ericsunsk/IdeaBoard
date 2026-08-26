@@ -311,7 +311,7 @@ type compiledProviderControls struct {
 func compileProviderControls(params map[string]interface{}, operation workflow.RuntimeOperation, invocation workflow.RuntimeInvocation, controlContract workflow.RuntimeControlContract) compiledProviderControls {
 	controls := compiledProviderControls{Google: googleProviderControls{AspectRatio: parseGoogleAspectRatioValue(params)}}
 	controls.OpenAI.UseEditEndpoint = invocation == workflow.RuntimeInvocationEdit
-	controls.OpenAI.DropOriginalImageRef = operation == workflow.RuntimeOperationStyleVariation
+	controls.OpenAI.DropOriginalImageRef = operation == workflow.RuntimeOperationVariations
 	if params == nil {
 		return controls
 	}

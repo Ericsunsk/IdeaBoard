@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PrimeVue from 'primevue/config'
 import { fireEvent } from '@testing-library/vue'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
-import { primeVueTestOptions } from '../../../../test/primeVue'
+import { adminPrimeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import AdminRewardCodesPage from './AdminRewardCodesPage.vue'
 
@@ -422,7 +422,7 @@ describe('AdminRewardCodesPage', () => {
 
 function renderPage() {
   return renderWithUser(AdminRewardCodesPage, {
-    global: { plugins: [[PrimeVue, primeVueTestOptions]] },
+    global: { plugins: [[PrimeVue, adminPrimeVueTestOptions]] },
   })
 }
 

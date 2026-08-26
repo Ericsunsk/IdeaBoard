@@ -273,6 +273,6 @@ function createWorkerImageProcessingRequestId() {
 function createCancelledError() {
   return new WorkerImageProcessingError({
     code: 'cancelled',
-    message: '图像处理已取消',
+    message: 'Image processing cancelled',
   })
 }

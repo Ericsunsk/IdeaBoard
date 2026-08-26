@@ -1,3 +1,4 @@
+import { i18n } from '../../../../shared/i18n'
 import type { ImageEditorThresholdParams } from '../types'
 import {
   clampImageEditorChannel,
@@ -42,7 +43,7 @@ export function createThresholdMarker(
     id: IMAGE_EDITOR_THRESHOLD_MARKER_ID,
     position: imageEditorChannelToPlotPercent(value),
     value,
-    ariaLabel: `阈值 ${value}`,
+    ariaLabel: i18n.global.t('canvas.imageEditor.thresholdMarkerAria', { value }),
   }
 }
 

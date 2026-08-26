@@ -64,10 +64,10 @@ Canvas 术语以 [apps/web/src/features/canvas/CONTEXT.md](./apps/web/src/featur
 
 | Feature | 语义 |
 | ------- | ---- |
-| `sketch-to-image` | 草图成图 |
-| `style-variation` | 风格延展 |
-| `partial-edit` | 局部重绘 |
-| `remove-bg` | 抠图 |
+| `render` | 草图成图 |
+| `variations` | 风格延展 |
+| `inpaint` | 局部重绘 |
+| `cutout` | 抠图 |
 | `style-fusion` | 多图融合 |
 | `pattern-gen` | 图案生成 |
 | `hd-upscale` | HD |
@@ -78,7 +78,7 @@ Contract rules:
 - `feature` 是顶层任务字段，由后端统一校验。
 - `image_urls` 是顶层媒体输入字段。
 - `params` 只承载 feature-specific structured parameters。
-- `use_mask`、`mask_image_url`、`mask_image_urls` 属于 `partial-edit` 的运行时边界参数，不是 prompt 模板变量。
+- `use_mask`、`mask_image_url`、`mask_image_urls` 属于 `inpaint` 的运行时边界参数，不是 prompt 模板变量。
 - 产品文案、模板变量和展示分组只能描述当前可执行能力。
 
 实现入口：

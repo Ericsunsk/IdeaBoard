@@ -37,7 +37,7 @@ func TestTaskLeaseTokenBindsToRiverJobID(t *testing.T) {
 
 func TestTaskExecutionPlanProvidesRoutingRequirement(t *testing.T) {
 	tests := map[string]workflow.RoutingCapability{
-		workflow.FeatureSlugRemoveBg:    workflow.RoutingCapabilityBackgroundRemoval,
+		workflow.FeatureSlugCutout:      workflow.RoutingCapabilityBackgroundRemoval,
 		workflow.FeatureSlugHDUpscale:   workflow.RoutingCapabilityImageUpscale,
 		workflow.FeatureSlugStyleFusion: workflow.RoutingCapabilityImageGeneration,
 	}
@@ -179,7 +179,7 @@ func TestPostgresTaskAssignerRoutesModelessTaskFromExecutionPlan(t *testing.T) {
 	setAssignerEndpointCapabilities(t, db, backgroundAccount, string(workflow.RoutingCapabilityBackgroundRemoval))
 	setAssignerModelEnabled(t, db, backgroundAccount, "gpt-image-1", false)
 	createAssignerTaskWithOptions(t, db, "pending-background-modeless", 0, tasks.StatusPending, "", "", assignerTaskOptions{
-		ParamsJSON: assignerExecutionParams(t, workflow.FeatureSlugRemoveBg, workflow.OutputResolutionDefault),
+		ParamsJSON: assignerExecutionParams(t, workflow.FeatureSlugCutout, workflow.OutputResolutionDefault),
 	})
 
 	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
@@ -223,7 +223,7 @@ func TestPostgresTaskAssignerRoutesModelessImageFillTasks(t *testing.T) {
 		name    string
 		feature string
 	}{
-		{name: "partial edit", feature: workflow.FeatureSlugPartialEdit},
+		{name: "partial edit", feature: workflow.FeatureSlugInpaint},
 		{name: "outpaint", feature: workflow.FeatureSlugOutpaint},
 	}
 
@@ -1171,10 +1171,10 @@ func assignerExecutionParams(t *testing.T, feature string, resolution string) st
 	case workflow.FeatureSlugPromptGeneration:
 	case workflow.FeatureSlugStyleFusion:
 		imageInputCount = 2
-	case workflow.FeatureSlugPartialEdit:
+	case workflow.FeatureSlugInpaint:
 		imageInputCount = 1
 		hasMaskInput = true
-	case workflow.FeatureSlugRemoveBg, workflow.FeatureSlugHDUpscale:
+	case workflow.FeatureSlugCutout, workflow.FeatureSlugHDUpscale:
 		imageInputCount = 1
 		resolution = workflow.OutputResolutionDefault
 	default:

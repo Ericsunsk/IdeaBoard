@@ -13,7 +13,8 @@
     "bundle:size:check": "tsx scripts/check-bundle-size.ts",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "lint": "eslint . && npm run test:guardrails && npm run lint:style-governance && npm run lint:import-boundaries && npm run lint:knip",
+    "lint": "eslint . && npm run test:guardrails && npm run lint:user-copy && npm run lint:style-governance && npm run lint:import-boundaries && npm run lint:knip",
+    "lint:user-copy": "tsx scripts/check-user-copy-locale.ts",
     "lint:import-boundaries": "tsx scripts/check-eslint-import-boundaries.ts",
     "lint:style-governance": "tsx scripts/check-style-governance.ts",
     "lint:style": "stylelint \"src/**/*.{css,vue}\" --allow-empty-input",
@@ -44,6 +45,7 @@
     "valibot": "^1.4.2",
     "vue": "^3.5.41",
     "vue-advanced-cropper": "^2.8.9",
+    "vue-i18n": "^11.4.10",
     "vue-router": "^5.1.0",
     "vue-sonner": "^2.0.9"
   },

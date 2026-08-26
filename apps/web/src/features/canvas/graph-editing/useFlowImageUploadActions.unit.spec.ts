@@ -276,10 +276,7 @@ describe('useFlowImageUploadActions', () => {
       sourceMediaAssetId: 61,
       sourceImageRatio: 1,
     })
-    expect(runtimeStates).toEqual([
-      { previewUrl: 'blob:local-image' },
-      null,
-    ])
+    expect(runtimeStates).toEqual([{ previewUrl: 'blob:local-image' }, null])
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:local-image')
   })
 
@@ -317,12 +314,12 @@ describe('useFlowImageUploadActions', () => {
       setLocalUploadState: (_nodeId, state) => runtimeStates.push(state),
     })
 
-    await expect(actions.createImageNodeFromFile({ x: 10, y: 20 }, makeFile('retry.png'))).resolves.toBe(
-      'image-1',
-    )
+    await expect(
+      actions.createImageNodeFromFile({ x: 10, y: 20 }, makeFile('retry.png')),
+    ).resolves.toBe('image-1')
     expect(runtimeStates).toEqual([
       { previewUrl: 'blob:retry-image' },
-      { previewUrl: 'blob:retry-image', failureMessage: 'network unavailable' },
+      { previewUrl: 'blob:retry-image', failureMessage: 'Upload failed.' },
     ])
     expect(revokeObjectUrl).not.toHaveBeenCalled()
 
@@ -330,7 +327,7 @@ describe('useFlowImageUploadActions', () => {
     expect(snapshots.get('image-1')?.sourceImageUrl).toBe('/uploads/retried.png')
     expect(runtimeStates).toEqual([
       { previewUrl: 'blob:retry-image' },
-      { previewUrl: 'blob:retry-image', failureMessage: 'network unavailable' },
+      { previewUrl: 'blob:retry-image', failureMessage: 'Upload failed.' },
       { previewUrl: 'blob:retry-image' },
       null,
     ])
@@ -381,7 +378,10 @@ describe('useFlowImageUploadActions', () => {
 
   it('does not create a node after its scope is disposed during image inspection', async () => {
     const bitmap = createDeferred<ImageBitmap>()
-    vi.stubGlobal('createImageBitmap', vi.fn(() => bitmap.promise))
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(() => bitmap.promise),
+    )
     const createNodeAtPosition = vi.fn()
     const createObjectUrl = vi.fn(() => 'blob:stale-image')
     const actions = useFlowImageUploadActions({
@@ -429,6 +429,6 @@ describe('useFlowImageUploadActions', () => {
     currentBoardId.value = 'board-b'
     upload.resolve({ url: '/uploads/a.png', width: 100, height: 100, media_asset_id: 51 })
 
-    await expect(task).rejects.toThrow('上传结果已过期')
+    await expect(task).rejects.toThrow('Upload result expired. Please pick the image again.')
   })
 })

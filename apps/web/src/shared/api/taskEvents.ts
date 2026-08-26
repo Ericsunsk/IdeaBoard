@@ -15,7 +15,6 @@ const SSE_TIMEOUT_MS = 6 * 60 * 1000
 const POLL_INITIAL_DELAY_MS = 1200
 const POLL_MAX_DELAY_MS = 8000
 const POLL_BACKOFF_FACTOR = 1.6
-const RESULT_FINALIZATION_PENDING_MESSAGE = IMAGE_GENERATION_FAILURE_MESSAGE
 
 type WaitTaskResultOptions = {
   timeoutMs?: number
@@ -23,15 +22,23 @@ type WaitTaskResultOptions = {
   pollMaxDelayMs?: number
 }
 
+export type TaskWaitFailureKind = 'pending' | 'timeout'
+
+/** Transport-level facts only: the feedback boundary translates `kind` to copy. */
 export class TaskResultPendingError extends Error {
-  constructor(message = '任务仍在处理中，请稍后查看结果') {
+  readonly kind: TaskWaitFailureKind
+
+  constructor(kind: TaskWaitFailureKind = 'pending', message = '') {
     super(message)
     this.name = 'TaskResultPendingError'
+    this.kind = kind
   }
 }
 
 export class TaskCancelledError extends Error {
-  constructor(message = '任务已取消') {
+  readonly kind = 'cancelled' as const
+
+  constructor(message = '') {
     super(message)
     this.name = 'TaskCancelledError'
   }
@@ -58,8 +65,7 @@ function isResultFinalizationFailure(task: TaskFailurePayload): boolean {
     return true
   }
 
-  const message = normalizeTaskFailureValue(task.error_msg)
-  return message.includes('图片结果保存失败') || message.includes('任务结果保存失败')
+  return false
 }
 
 export function createTaskResultFailureError(
@@ -67,7 +73,7 @@ export function createTaskResultFailureError(
   fallbackMessage = IMAGE_GENERATION_FAILURE_MESSAGE,
 ): Error {
   if (isResultFinalizationFailure(task)) {
-    return new TaskResultPendingError(RESULT_FINALIZATION_PENDING_MESSAGE)
+    return new TaskResultPendingError('pending')
   }
   const msg = task.error_msg?.trim() || fallbackMessage
   return new Error(sanitizeApiErrorMessage(msg, fallbackMessage))
@@ -128,14 +134,14 @@ function waitWithEventSource(
 
     timeout = window.setTimeout(
       () => {
-        settleReject(new TaskResultPendingError('任务进度推送超时，请稍后查看结果'))
+        settleReject(new TaskResultPendingError('timeout'))
       },
       Math.max(0, deadlineAt - Date.now()),
     )
 
     const handleTaskEvent = (task: TaskEventPayload) => {
       if (!task || typeof task !== 'object' || typeof task.status !== 'string') {
-        settleReject(new Error('任务进度数据异常，请稍后重试'))
+        settleReject(new Error('Malformed task event payload'))
         return
       }
 
@@ -175,7 +181,7 @@ function waitWithEventSource(
           const payload = JSON.parse(event.data) as { task_id?: unknown }
           if (payload.task_id === taskId) void refreshTask()
         } catch {
-          settleReject(new Error('任务进度数据异常，请稍后重试'))
+          settleReject(new Error('Malformed task event payload'))
         }
       },
       fallbackToPolling,
@@ -225,9 +231,9 @@ async function waitWithPolling(
   }
 
   if (lastError) {
-    throw new TaskResultPendingError('任务状态查询超时，请稍后查看结果')
+    throw new TaskResultPendingError('timeout')
   }
-  throw new TaskResultPendingError('任务进度推送超时，请稍后查看结果')
+  throw new TaskResultPendingError('timeout')
 }
 
 function sleep(ms: number): Promise<void> {
@@ -247,8 +253,9 @@ function isTaskNotFoundError(error: unknown): boolean {
 export function createTaskCancelledError(
   task?: Pick<Task, 'error_msg' | 'cancel_reason'>,
 ): TaskCancelledError {
-  const msg = task?.cancel_reason?.trim() || task?.error_msg?.trim() || '任务已取消'
-  return new TaskCancelledError(sanitizeApiErrorMessage(msg, '任务已取消'))
+  const detail = task?.cancel_reason?.trim() || task?.error_msg?.trim() || ''
+  // Backend reason text stays as debug detail; the feedback boundary shows copy for kind='cancelled'.
+  return new TaskCancelledError(sanitizeApiErrorMessage(detail, ''))
 }
 
 function extractImageResultsFromTaskEvent(task: TaskEventPayload): TaskImageResult[] {

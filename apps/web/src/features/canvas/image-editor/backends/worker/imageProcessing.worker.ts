@@ -4,6 +4,7 @@ import {
   estimateImageAdjustmentPlanWorkUnits,
   executeImageAdjustmentPlanStepRange,
 } from '../../utils/imageAdjustmentEngine'
+import { i18n } from '../../../../../shared/i18n'
 import type {
   WorkerImageProcessingErrorPayload,
   WorkerImageProcessingExecuteRequest,
@@ -52,7 +53,7 @@ async function executeRequest(
       requestId: request.requestId,
       error: {
         code: 'cancelled',
-        message: '图像处理已取消',
+        message: 'Image processing cancelled',
       },
     })
     return
@@ -79,7 +80,7 @@ async function executeRequest(
         requestId: request.requestId,
         error: {
           code: 'cancelled',
-          message: '图像处理已取消',
+          message: 'Image processing cancelled',
         },
       })
       return
@@ -169,7 +170,7 @@ class WorkerImageProcessingCancelledError extends Error {
   readonly code = 'cancelled'
 
   constructor() {
-    super('图像处理已取消')
+    super('Image processing cancelled')
     this.name = 'WorkerImageProcessingCancelledError'
   }
 }
@@ -204,7 +205,7 @@ function toWorkerImageProcessingError(error: unknown): WorkerImageProcessingErro
 
   return {
     code: 'execution-failed',
-    message: 'Worker 图像处理失败',
+    message: i18n.global.t('canvas.imageEditor.errors.processingFailed'),
   }
 }
 

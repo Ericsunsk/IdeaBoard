@@ -3,12 +3,13 @@ import type { Edge, Node } from '@vue-flow/core'
 import type { CanvasGraphStore } from '../../graph-runtime'
 import type { CanvasRendererMetricsPort } from '../../vue-flow-adapter'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
+import { i18n } from '../../../../shared/i18n'
 import {
   buildImageActionReadinessRequest,
   buildImageExecutionTaskRequest,
   buildPreparedImageInpaintTaskRequest,
 } from '../commands/flowImageTaskRequests'
-import { prepareFlowPartialEditMask } from '../media/flowPartialEditMask'
+import { prepareFlowInpaintMask } from '../media/flowInpaintMask'
 import { loadImageSizeFromUrl } from '../media/imageSize'
 import {
   prepareFusionExecutionPlan,
@@ -70,7 +71,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       await options.flushAutosave?.({ silent: true })
     } catch (error) {
       console.warn('[canvas] flush pending task snapshot failed', error)
-      options.onWarning('画布保存失败，刷新页面后任务进度可能丢失')
+      options.onWarning(i18n.global.t('canvas.execution.canvasSaveFailedProgressLost'))
     }
   }
 
@@ -167,7 +168,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     const attachment = requireCurrentAttachment()
     const boardId = attachment.boardId
     const [maskImageUrl, imageSize] = await Promise.all([
-      prepareFlowPartialEditMask(plan.rawMaskDataUrl, boardId),
+      prepareFlowInpaintMask(plan.rawMaskDataUrl, boardId),
       loadImageSizeFromUrl(plan.source.url),
     ])
     const taskRequest = buildPreparedImageInpaintTaskRequest({ plan, maskImageUrl, imageSize })

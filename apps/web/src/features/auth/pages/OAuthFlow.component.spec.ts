@@ -238,7 +238,7 @@ describe('UserAuthCallbackPage', () => {
 
     renderCallbackPage()
 
-    expect(await screen.findByText('OAuth 登录失败，请重新尝试。')).toBeVisible()
+    expect(await screen.findByText('Sign in failed. Please try again.')).toBeVisible()
     expect(mocks.completeOAuthCallback).toHaveBeenCalledWith({
       providerError: 'access_denied:provider-raw-detail',
       redirectPath: '/user/boards',
@@ -252,7 +252,7 @@ describe('UserAuthCallbackPage', () => {
     mocks.completeOAuthCallback.mockResolvedValue(false)
 
     const view = renderCallbackPage()
-    await view.user.click(await screen.findByRole('button', { name: '返回登录' }))
+    await view.user.click(await screen.findByRole('button', { name: 'Back to sign in' }))
 
     expect(mocks.routerReplace).toHaveBeenCalledWith({
       path: '/user/login',

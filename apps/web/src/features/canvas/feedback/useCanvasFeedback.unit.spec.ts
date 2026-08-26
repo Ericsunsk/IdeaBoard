@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createCanvasFeedback } from './useCanvasFeedback'
 
 describe('createCanvasFeedback', () => {
-  it('deduplicates Idea不足 for six seconds and opens recharge without retrying', () => {
+  it('deduplicates insufficient-credits toasts for six seconds and opens recharge without retrying', () => {
     const appToast = {
       success: vi.fn(),
       warning: vi.fn().mockReturnValue('canvas-insufficient-credits'),
@@ -18,11 +18,11 @@ describe('createCanvasFeedback', () => {
 
     expect(appToast.warning).toHaveBeenCalledTimes(2)
     expect(appToast.warning).toHaveBeenLastCalledWith(
-      'Idea不足',
+      'You need more Ideas to run this action.',
       expect.objectContaining({
         id: 'canvas-insufficient-credits',
         duration: 6000,
-        action: expect.objectContaining({ label: '立即充值' }),
+        action: expect.objectContaining({ label: 'Top up now' }),
       }),
     )
 

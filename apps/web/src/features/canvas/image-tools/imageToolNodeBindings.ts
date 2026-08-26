@@ -4,6 +4,7 @@ import type {
   ImageToolStageBinding,
 } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
+import { i18n } from '../../../shared/i18n'
 
 function areBindingObjectsEqual<T extends object>(
   left: T,
@@ -86,7 +87,9 @@ export function createImageToolNodeBindings(
     const nextBinding: ImageActionBinding = {
       actionMenuVisible,
       promptComposerVisible: ui.isImagePromptComposerVisible(nodeId),
-      promptPlaceholder: hasCommittedMask ? '描述如何重绘选区' : '输入辅助要求（可选）',
+      promptPlaceholder: hasCommittedMask
+        ? i18n.global.t('canvas.tools.maskPromptPlaceholder')
+        : i18n.global.t('canvas.tools.optionalPromptPlaceholder'),
       directGenerating,
       strengthControl: {
         visible: !!activeStrengthAction && actionMenuVisible,

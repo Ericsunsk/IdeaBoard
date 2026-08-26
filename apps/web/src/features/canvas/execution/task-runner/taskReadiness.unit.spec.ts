@@ -46,7 +46,7 @@ describe('task readiness billing updates', () => {
         client_action_id: 'canvas:action-1',
         params: { output_count: 4 },
       }),
-    ).rejects.toThrow('Idea不足')
+    ).rejects.toThrow('You need more Ideas to run this action.')
 
     expect(listener).toHaveBeenCalledWith(readiness)
     unsubscribe()
@@ -90,10 +90,10 @@ describe('task readiness billing updates', () => {
         feature: 'prompt-generation',
         params: { output_count: 1 },
       }),
-    ).rejects.toMatchObject({ kind: 'network', message: '网络错误，请重试' })
+    ).rejects.toMatchObject({ kind: 'network', message: 'The request could not be completed.' })
 
     mocks.checkSubmitReadiness.mockRejectedValueOnce(
-      Object.assign(new Error('暂时无法获取报价，请重试'), {
+      Object.assign(new Error('pricing unavailable'), {
         status: 503,
         code: 'pricing_unavailable',
       }),
@@ -107,7 +107,7 @@ describe('task readiness billing updates', () => {
       }),
     ).rejects.toMatchObject({
       kind: 'pricing-unavailable',
-      message: '暂时无法获取报价，请重试',
+      message: 'Pricing is temporarily unavailable. Please try again shortly.',
     })
   })
 })

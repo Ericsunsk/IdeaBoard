@@ -48,7 +48,7 @@ const AccountManagementDialogContentStub = defineComponent({
   emits: ['close', 'update:busy'],
   template: `
     <div data-testid="account-management-dialog-content" :data-initial-tab="initialTab">
-      Account management content
+      Settings content
       <button type="button" @click="$emit('update:busy', true)">开始异步操作</button>
       <button type="button" aria-label="关闭账户管理" @click="$emit('close')">
         关闭
@@ -129,11 +129,11 @@ describe('AccountManagementDialog', () => {
     )
     renderAccountManagementDialog(true)
 
-    expect(screen.getByRole('dialog', { name: '账户管理' })).toHaveAttribute(
+    expect(screen.getByRole('dialog', { name: 'Account' })).toHaveAttribute(
       'data-transition-name',
       'ib-dialog-motion',
     )
-    expect(screen.getByRole('dialog', { name: '账户管理' })).toHaveAttribute(
+    expect(screen.getByRole('dialog', { name: 'Account' })).toHaveAttribute(
       'data-transition-css',
       'true',
     )
@@ -147,7 +147,7 @@ describe('AccountManagementDialog', () => {
     renderAccountManagementDialog(true)
 
     expect(screen.getByTestId('account-management-dialog-content')).toBeVisible()
-    expect(screen.getByRole('dialog', { name: '账户管理' })).toHaveAttribute(
+    expect(screen.getByRole('dialog', { name: 'Account' })).toHaveAttribute(
       'data-transition-css',
       'false',
     )
@@ -156,8 +156,8 @@ describe('AccountManagementDialog', () => {
   it('renders dialog-ready account management content when visible', () => {
     renderAccountManagementDialog(true)
 
-    expect(screen.getByRole('dialog', { name: '账户管理' })).toBeVisible()
-    expect(screen.getByRole('dialog', { name: '账户管理' })).toHaveAttribute(
+    expect(screen.getByRole('dialog', { name: 'Account' })).toBeVisible()
+    expect(screen.getByRole('dialog', { name: 'Account' })).toHaveAttribute(
       'data-show-header',
       'false',
     )
@@ -189,7 +189,7 @@ describe('AccountManagementDialog', () => {
 
   it('closes from Escape and the close button, but not from the mask', async () => {
     const { user, onVisibleUpdate } = renderAccountManagementDialog(true)
-    const dialog = screen.getByRole('dialog', { name: '账户管理' })
+    const dialog = screen.getByRole('dialog', { name: 'Account' })
 
     expect(screen.getByTestId('account-management-dialog-mask')).toHaveAttribute(
       'data-dismissable-mask',
@@ -207,7 +207,7 @@ describe('AccountManagementDialog', () => {
 
   it('lets canonical pending state lock Escape and the content close control', async () => {
     const { user, onVisibleUpdate } = renderAccountManagementDialog(true)
-    const dialog = screen.getByRole('dialog', { name: '账户管理' })
+    const dialog = screen.getByRole('dialog', { name: 'Account' })
 
     await user.click(screen.getByRole('button', { name: '开始异步操作' }))
     expect(dialog).toHaveAttribute('aria-busy', 'true')

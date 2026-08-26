@@ -16,7 +16,7 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 		ok   bool
 	}{
 		{name: "canonical slug is valid", raw: "style-fusion", want: "style-fusion", ok: true},
-		{name: "remove-bg slug is valid", raw: "remove-bg", want: "remove-bg", ok: true},
+		{name: "cutout slug is valid", raw: "cutout", want: "cutout", ok: true},
 		{name: "underscore slug is invalid", raw: "style_fusion", want: "", ok: false},
 		{name: "unsupported slug is invalid", raw: "unknown-workflow", want: "", ok: false},
 		{name: "invalid chars are rejected", raw: "style fusion", want: "", ok: false},

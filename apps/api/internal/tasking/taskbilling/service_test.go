@@ -12,7 +12,7 @@ import (
 
 func TestAIImageWorkflowBillingConsumesCompiledPlan(t *testing.T) {
 	plan, err := workflow.CompileFeatureExecutionPlan(workflow.CompileFeatureExecutionInput{
-		Feature: workflow.FeatureSlugRemoveBg,
+		Feature: workflow.FeatureSlugCutout,
 		Params:  workflow.FeatureExecutionParams{ImageInputCount: 1},
 	})
 	if err != nil {
@@ -30,30 +30,30 @@ func TestAIImageWorkflowBillingConsumesCompiledPlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(sku) != "ai-image:remove-bg" || !RequiresBilling(plan.Feature()) {
+	if string(sku) != "ai-image:cutout" || !RequiresBilling(plan.Feature()) {
 		t.Fatalf("compiled plan billing identity: sku=%q request=%+v", sku, request)
 	}
 }
 
 func TestAIImageRequestConsumesExplicitCompiledResolution(t *testing.T) {
-	request, err := AIImageRequest(workflow.FeatureSlugRemoveBg, "default", 5)
+	request, err := AIImageRequest(workflow.FeatureSlugCutout, "default", 5)
 	if err != nil || request.OutputResolution != billing.OutputResolutionDefault {
 		t.Fatalf("default resolution request=%+v err=%v", request, err)
 	}
 	if request.Quantity != 5 {
 		t.Fatalf("billing quantity=%d, want explicit quantity 5", request.Quantity)
 	}
-	if _, err := AIImageRequest(workflow.FeatureSlugRemoveBg, "", 1); !errors.Is(err, billing.ErrInvalidOutputResolution) {
+	if _, err := AIImageRequest(workflow.FeatureSlugCutout, "", 1); !errors.Is(err, billing.ErrInvalidOutputResolution) {
 		t.Fatalf("empty resolution error=%v", err)
 	}
 }
 
 func TestAIImagePricingIdentityAndFingerprintAreFeatureScoped(t *testing.T) {
-	first, err := AIImageRequest(workflow.FeatureSlugPartialEdit, "default", 1)
+	first, err := AIImageRequest(workflow.FeatureSlugInpaint, "default", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := AIImageRequest(workflow.FeatureSlugPartialEdit, "default", 1)
+	second, err := AIImageRequest(workflow.FeatureSlugInpaint, "default", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestTaskBillingRequestValidationFailsClosed(t *testing.T) {
 		request Request
 		wantErr error
 	}{
-		{name: "zero quantity", request: Request{Feature: workflow.FeatureSlugPartialEdit}, wantErr: billing.ErrInvalidQuantity},
+		{name: "zero quantity", request: Request{Feature: workflow.FeatureSlugInpaint}, wantErr: billing.ErrInvalidQuantity},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			if _, err := validateRequest(testCase.request); !errors.Is(err, testCase.wantErr) {

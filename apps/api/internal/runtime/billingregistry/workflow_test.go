@@ -28,10 +28,10 @@ func TestWorkflowRegistryUsesFeatureLevelBillingIdentities(t *testing.T) {
 	}
 	want := []string{
 		"ai-image:prompt-generation",
-		"ai-image:partial-edit",
-		"ai-image:sketch-to-image",
-		"ai-image:style-variation",
-		"ai-image:remove-bg",
+		"ai-image:inpaint",
+		"ai-image:render",
+		"ai-image:variations",
+		"ai-image:cutout",
 		"ai-image:style-fusion",
 		"ai-image:hd-upscale",
 		"ai-image:outpaint",
@@ -49,7 +49,7 @@ func TestWorkflowRegistryUsesFeatureLevelBillingIdentities(t *testing.T) {
 		if !slices.Equal(item.PricingVariants, want) {
 			t.Fatalf("pricing variants for %s=%v, want %v", item.SKU, item.PricingVariants, want)
 		}
-		if (slug == workflow.FeatureSlugPartialEdit || slug == workflow.FeatureSlugOutpaint) &&
+		if (slug == workflow.FeatureSlugInpaint || slug == workflow.FeatureSlugOutpaint) &&
 			!slices.Equal(item.PricingVariants, []billing.OutputResolution{billing.OutputResolutionDefault}) {
 			t.Fatalf("fixed-price variants for %s=%v", item.SKU, item.PricingVariants)
 		}

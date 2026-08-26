@@ -6,7 +6,7 @@
     :class="textareaClass"
     :rows="rows"
     :placeholder="placeholder"
-    :aria-label="placeholder || 'Prompt 提示词'"
+    :aria-label="placeholder || t('canvas.controls.prompt')"
     :disabled="disabled"
     @focus="emit('focus')"
   />
@@ -26,8 +26,8 @@
       :options="IMAGE_OUTPUT_COUNT_PRESET_OPTIONS"
       :visible="outputCountPickerVisible"
       :disabled="disabled"
-      tooltip="选择张数"
-      label="输出张数"
+      :tooltip="t('canvas.controls.selectImageCountTooltip')"
+      :label="t('canvas.controls.imageCountLabel')"
       @toggle="toggleOutputCountPicker"
       @select="selectOutputCount"
     />
@@ -40,8 +40,8 @@
       :disabled="disabled"
       :format="formatOutputResolution"
       option-role="menuitemradio"
-      tooltip="选择清晰度"
-      label="输出清晰度"
+      :tooltip="t('canvas.controls.selectResolutionTooltip')"
+      :label="t('canvas.controls.resolutionLabel')"
       @toggle="toggleOutputResolutionPicker"
       @select="selectOutputResolution"
     />
@@ -50,7 +50,7 @@
         :class="sendButtonClass"
         type="button"
         :disabled="!canSubmit"
-        aria-label="发送"
+        :aria-label="t('canvas.controls.send')"
         :title="billingTooltip"
         @click="submit"
       >
@@ -70,6 +70,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { SendDiagonalSolid } from '@iconoir/vue'
 import {
   IMAGE_OUTPUT_COUNT_PRESET_OPTIONS,
@@ -135,16 +136,20 @@ const emit = defineEmits<{
   (e: 'submit', prompt: string, outputCount: number, aspectRatio: PromptAspectRatio): void
 }>()
 
+const { t } = useI18n()
+
 const quoteLabel = computed(() => {
   const state = props.billingState
   if (!state || state.status !== 'ready') return ''
   const unitTotal = state.unitCredits ?? 0
-  if (unitTotal === 0) return '免费'
+  if (unitTotal === 0) return t('canvas.controls.free')
   const total = unitTotal * outputCountValue.value
   if (!Number.isSafeInteger(total)) return ''
   return formatIdeaAmount(total)
 })
-const billingTooltip = computed(() => (quoteLabel.value ? `发送 · ${quoteLabel.value}` : '发送'))
+const billingTooltip = computed(() =>
+  quoteLabel.value ? `${t('canvas.controls.send')} · ${quoteLabel.value}` : t('canvas.controls.send'),
+)
 const touchQuoteLabel = computed(() => quoteLabel.value)
 const formatOutputResolution = (value: OutputResolution) => value.toUpperCase()
 

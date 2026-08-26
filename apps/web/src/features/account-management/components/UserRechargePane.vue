@@ -1,5 +1,5 @@
 <template>
-  <AccountManagementPane title="充值积分">
+  <AccountManagementPane :title="t('account.tabs.topUp')">
     <UserPaymentReturnStatus
       v-if="paymentReturn"
       :pending="returnPending"
@@ -42,6 +42,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { toRef } from 'vue'
 import type { PaymentReturnContext } from '../paymentReturnRoute'
 import { useUserRecharge } from '../useUserRecharge'
@@ -52,6 +53,7 @@ import UserRechargePendingOrders from './UserRechargePendingOrders.vue'
 import UserRechargePurchaseCard from './UserRechargePurchaseCard.vue'
 
 const props = defineProps<{ active: boolean; paymentReturn: PaymentReturnContext | null }>()
+const { t } = useI18n()
 const {
   purchaseOptions,
   optionsPending,

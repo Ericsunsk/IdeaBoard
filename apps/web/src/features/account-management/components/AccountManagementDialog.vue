@@ -10,7 +10,7 @@
     :style="accountManagementDialogStyle"
     :pt="accountManagementDialogPt"
     :aria-busy="ariaBusy"
-    aria-label="账户管理"
+    :aria-label="t('account.dialog.title')"
     @update:visible="handleVisibilityChange"
     @hide="disableVendorFocusRestore"
     @after-hide="completeClose"
@@ -27,6 +27,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Dialog from 'primevue/dialog'
 import { usePrimeDialogOverlayLifecycle } from '../../../shared/composables/usePrimeDialogOverlayLifecycle'
 import { defaultAccountManagementTab, type AccountManagementTab } from '../accountTabRegistry'
@@ -49,6 +50,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   'update:visible': [visible: boolean]
 }>()
+const { t } = useI18n()
 const busy = ref(false)
 const {
   ariaBusy,

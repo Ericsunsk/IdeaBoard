@@ -16,8 +16,8 @@
       v-if="removable"
       class="node-input-thumbnail-remove"
       type="button"
-      :title="removeTitle"
-      :aria-label="removeAriaLabel"
+      :title="resolvedRemoveTitle"
+      :aria-label="resolvedRemoveAriaLabel"
       @mousedown.stop
       @pointerdown.stop
       @click.stop="emit('remove')"
@@ -28,7 +28,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useElementVisibility } from '@vueuse/core'
 import { Xmark } from '@iconoir/vue'
 import { useDisplayImagePreview } from '../../../vue-flow-adapter/useDisplayImagePreview'
@@ -50,8 +51,8 @@ const props = withDefaults(
     draggable: false,
     removable: false,
     previewMaxSide: 128,
-    removeTitle: '移除图片输入',
-    removeAriaLabel: '移除图片输入',
+    removeTitle: undefined,
+    removeAriaLabel: undefined,
   },
 )
 
@@ -59,6 +60,12 @@ const emit = defineEmits<{
   (e: 'remove'): void
 }>()
 
+const { t } = useI18n()
+
+const resolvedRemoveTitle = computed(() => props.removeTitle ?? t('canvas.controls.removeImageInput'))
+const resolvedRemoveAriaLabel = computed(
+  () => props.removeAriaLabel ?? t('canvas.controls.removeImageInput'),
+)
 const thumbnailRef = ref<HTMLElement | null>(null)
 const isThumbnailVisible = useElementVisibility(thumbnailRef)
 

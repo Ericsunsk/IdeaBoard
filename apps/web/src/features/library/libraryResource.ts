@@ -17,6 +17,7 @@ import type {
   ListLibraryAssetsParams,
 } from '../../shared/api/generated-query/model'
 import { resolveApiData, resolveApiOk } from '../../shared/api/apiResponse'
+import { i18n } from '../../shared/i18n'
 
 export type LibraryFolderView = LibraryFolder
 export type LibraryAssetView = LibraryAsset
@@ -59,7 +60,7 @@ export function toLibraryAssetInput(reference: LibrarySearchReference): LibraryA
 }
 
 export function getLibraryFolders(): Promise<LibraryFolder[]> {
-  return resolveApiData(listLibraryFolders(), '加载收藏夹失败').then((data) => data.folders)
+  return resolveApiData(listLibraryFolders(), i18n.global.t('library.errors.loadFoldersFailed')).then((data) => data.folders)
 }
 
 export function getLibraryAssets(params: ListLibraryAssetsParams): Promise<{
@@ -67,7 +68,7 @@ export function getLibraryAssets(params: ListLibraryAssetsParams): Promise<{
   nextCursor: string
   hasMore: boolean
 }> {
-  return resolveApiData(listLibraryAssets(params), '加载素材失败').then((data) => ({
+  return resolveApiData(listLibraryAssets(params), i18n.global.t('library.errors.loadAssetsFailed')).then((data) => ({
     items: data.items,
     nextCursor: data.next_cursor ?? '',
     hasMore: data.has_more,
@@ -75,17 +76,17 @@ export function getLibraryAssets(params: ListLibraryAssetsParams): Promise<{
 }
 
 export function createFolder(name: string): Promise<LibraryFolder> {
-  return resolveApiData(createLibraryFolder({ name }), '创建收藏夹失败').then((data) => data)
+  return resolveApiData(createLibraryFolder({ name }), i18n.global.t('library.errors.createFolderFailed')).then((data) => data)
 }
 
 export function renameFolder(folderId: number, name: string): Promise<LibraryFolder> {
-  return resolveApiData(renameLibraryFolder(folderId, { name }), '重命名收藏夹失败')
+  return resolveApiData(renameLibraryFolder(folderId, { name }), i18n.global.t('library.errors.renameFolderFailed'))
 }
 
 export function saveAsset(asset: LibraryAssetInput, folderId?: number, newFolderName?: string) {
   return resolveApiData(
     saveLibraryAsset({ asset, folder_id: folderId, new_folder_name: newFolderName }),
-    '保存素材失败',
+    i18n.global.t('library.errors.saveAssetFailed'),
   )
 }
 
@@ -98,20 +99,20 @@ export function saveSearchReference(
 }
 
 export function moveAsset(assetId: number, folderId: number): Promise<LibraryAsset> {
-  return resolveApiData(moveLibraryAsset(assetId, { folder_id: folderId }), '移动素材失败')
+  return resolveApiData(moveLibraryAsset(assetId, { folder_id: folderId }), i18n.global.t('library.errors.moveAssetFailed'))
 }
 
 export function removeAsset(assetId: number): Promise<void> {
-  return resolveApiOk(deleteLibraryAsset(assetId), '移除素材失败')
+  return resolveApiOk(deleteLibraryAsset(assetId), i18n.global.t('library.errors.removeAssetFailed'))
 }
 
 export function removeFolder(folderId: number): Promise<void> {
-  return resolveApiOk(deleteLibraryFolder(folderId), '删除收藏夹失败')
+  return resolveApiOk(deleteLibraryFolder(folderId), i18n.global.t('library.errors.deleteFolderFailed'))
 }
 
 /** Turns an owned URL-backed Library asset into a managed Media asset for Canvas. */
 export function materializeLibraryAssetForCanvas(assetId: number): Promise<LibraryMaterializedMedia> {
-  return resolveApiData(materializeLibraryAsset(assetId), '导入素材失败').then((data) => ({
+  return resolveApiData(materializeLibraryAsset(assetId), i18n.global.t('library.errors.importAssetFailed')).then((data) => ({
     mediaAssetId: data.media_asset_id,
     url: data.url,
     width: data.width,
@@ -132,7 +133,7 @@ export async function removeSearchReference(
 export async function lookupSavedAssets(
   keys: Array<{ provider: 'unsplash' | 'pexels'; source_id: string }>,
 ): Promise<LibraryAsset[]> {
-  return resolveApiData(lookupLibraryAssets({ keys }), '查询收藏状态失败').then((data) => data.items)
+  return resolveApiData(lookupLibraryAssets({ keys }), i18n.global.t('library.errors.lookupStatusFailed')).then((data) => data.items)
 }
 
 export async function lookupSavedAssetKeys(

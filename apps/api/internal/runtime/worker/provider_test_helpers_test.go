@@ -192,17 +192,17 @@ func providerRequestFactsForTest(params map[string]interface{}, operation workfl
 func providerRuntimeIntentForTest(params map[string]interface{}) (workflow.RuntimeOperation, workflow.RuntimeInvocation, workflow.RuntimeControlContract) {
 	feature, _ := workflow.ResolveWorkflowFeatureSlug(params)
 	switch feature {
-	case workflow.FeatureSlugPartialEdit:
-		return workflow.RuntimeOperationPartialEdit, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsNone
-	case workflow.FeatureSlugSketchToImage:
-		return workflow.RuntimeOperationSketchToImage, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsNone
-	case workflow.FeatureSlugStyleVariation:
-		return workflow.RuntimeOperationStyleVariation, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsVariation
+	case workflow.FeatureSlugInpaint:
+		return workflow.RuntimeOperationInpaint, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsNone
+	case workflow.FeatureSlugRender:
+		return workflow.RuntimeOperationRender, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsNone
+	case workflow.FeatureSlugVariations:
+		return workflow.RuntimeOperationVariations, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsVariation
 	case workflow.FeatureSlugStyleFusion:
 		return workflow.RuntimeOperationStyleFusion, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsFusion
 	case workflow.FeatureSlugOutpaint:
 		return workflow.RuntimeOperationOutpaint, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsExtend
-	case workflow.FeatureSlugRemoveBg:
+	case workflow.FeatureSlugCutout:
 		return workflow.RuntimeOperationBackgroundRemoval, workflow.RuntimeInvocationTransform, workflow.RuntimeControlsNone
 	case workflow.FeatureSlugHDUpscale:
 		return workflow.RuntimeOperationImageUpscale, workflow.RuntimeInvocationTransform, workflow.RuntimeControlsUpscale

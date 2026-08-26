@@ -2,6 +2,8 @@ import { computed, ref, watch, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { USER_SEARCH_PATH } from '../../shared/constants/routePaths'
 import { useAppToast } from '../../shared/composables/useAppToast'
+import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
+import { i18n } from '../../shared/i18n'
 import { libraryAssetKey, type LibrarySearchReference } from '../library/libraryResource'
 import { getLibraryIslandState, setLibraryIslandState } from './libraryIslandPersistence'
 import {
@@ -146,7 +148,7 @@ export function useSearchSession(options: {
       toast.success(`Saved "${reference.title || 'Image'}" to Quick Saves!`)
       return true
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '保存素材失败')
+      toast.error(userFacingErrorCopy(error, i18n.global.t('library.errors.saveAssetFailed')))
       return false
     }
   }
@@ -205,7 +207,7 @@ export function useSearchSession(options: {
   async function submitQuery(): Promise<void> {
     const query = normalizeSearchQuery(draftQuery.value)
     if (!isSearchQueryWithinLimit(query)) {
-      queryError.value = '搜索关键词不能超过 200 个字符'
+      queryError.value = i18n.global.t('search.queryTooLong')
       return
     }
     queryError.value = ''

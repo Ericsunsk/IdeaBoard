@@ -50,7 +50,7 @@ func TestResolveProviderExecutionRejectsIncompleteSnapshotBeforeMediaIO(t *testi
 	useMask := true
 	task := &tasks.TaskPayload{TaskID: "incomplete-snapshot", Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       workflow.FeatureSlugPartialEdit,
+		Feature:       workflow.FeatureSlugInpaint,
 		Media: &tasks.MediaInputs{
 			Original: &tasks.MediaRef{AssetID: 1, Role: "original"},
 			Mask:     &tasks.MediaRef{AssetID: 2, Role: "mask"},
@@ -87,8 +87,8 @@ func TestResolveProviderExecutionEnforcesSnapshotModelPolicy(t *testing.T) {
 	})
 
 	t.Run("modelless transform", func(t *testing.T) {
-		assignment := resolvedExecutionAssignment("http://127.0.0.1:18080/remove-bg", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolImageURLJSONImage, "")
-		exec, err := executor.resolveProviderExecution(context.Background(), account, resolvedExecutionTask(t, workflow.FeatureSlugRemoveBg), assignment)
+		assignment := resolvedExecutionAssignment("http://127.0.0.1:18080/cutout", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolImageURLJSONImage, "")
+		exec, err := executor.resolveProviderExecution(context.Background(), account, resolvedExecutionTask(t, workflow.FeatureSlugCutout), assignment)
 		if err != nil {
 			t.Fatalf("resolve modelless execution: %v", err)
 		}
@@ -97,7 +97,7 @@ func TestResolveProviderExecutionEnforcesSnapshotModelPolicy(t *testing.T) {
 		}
 
 		assignment.ResolvedModel = "unexpected-model"
-		if _, err := executor.resolveProviderExecution(context.Background(), account, resolvedExecutionTask(t, workflow.FeatureSlugRemoveBg), assignment); err == nil || !strings.Contains(err.Error(), "modelless") {
+		if _, err := executor.resolveProviderExecution(context.Background(), account, resolvedExecutionTask(t, workflow.FeatureSlugCutout), assignment); err == nil || !strings.Contains(err.Error(), "modelless") {
 			t.Fatalf("error = %v, want modelless model rejection", err)
 		}
 	})
@@ -174,7 +174,7 @@ func resolvedExecutionTask(t *testing.T, feature string) *tasks.TaskPayload {
 	t.Helper()
 	params := &tasks.WorkflowTaskParams{SchemaVersion: tasks.CurrentParamsSchemaVersion, Feature: feature}
 	switch feature {
-	case workflow.FeatureSlugRemoveBg, workflow.FeatureSlugHDUpscale:
+	case workflow.FeatureSlugCutout, workflow.FeatureSlugHDUpscale:
 		params.Media = &tasks.MediaInputs{Inputs: []tasks.MediaRef{{AssetID: 1, Role: "input"}}}
 	}
 	return &tasks.TaskPayload{

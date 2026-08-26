@@ -5,7 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface StyleVariationParams {
+export interface VariationsParams {
   /**
    * @minimum 0
    * @maximum 100

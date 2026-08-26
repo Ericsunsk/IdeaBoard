@@ -7,6 +7,8 @@ import {
   type PromptNodeInputImage,
 } from '../../canvas-board/domain'
 import type { CanvasBoardSession } from './useCanvasBoardSession'
+import { i18n } from '../../../shared/i18n'
+import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { measureCanvasPerf, measureCanvasPerfAsync } from '../utils/canvasPerfProbe'
 
 export type SaveStatus = 'idle' | 'saved' | 'pending' | 'retry' | 'conflict' | 'recover'
@@ -113,11 +115,17 @@ function rebaseStabilizedMedia(
   stabilized: CanvasBoardSnapshot,
 ): CanvasBoardSnapshot {
   const capturedImageNodes = new Map(captured.imageNodes.map((node) => [node.id, node] as const))
-  const stabilizedImageNodes = new Map(stabilized.imageNodes.map((node) => [node.id, node] as const))
+  const stabilizedImageNodes = new Map(
+    stabilized.imageNodes.map((node) => [node.id, node] as const),
+  )
   const capturedPromptNodes = new Map(captured.promptNodes.map((node) => [node.id, node] as const))
-  const stabilizedPromptNodes = new Map(stabilized.promptNodes.map((node) => [node.id, node] as const))
+  const stabilizedPromptNodes = new Map(
+    stabilized.promptNodes.map((node) => [node.id, node] as const),
+  )
   const capturedFusionNodes = new Map(captured.fusionNodes.map((node) => [node.id, node] as const))
-  const stabilizedFusionNodes = new Map(stabilized.fusionNodes.map((node) => [node.id, node] as const))
+  const stabilizedFusionNodes = new Map(
+    stabilized.fusionNodes.map((node) => [node.id, node] as const),
+  )
   const rebased: CanvasBoardSnapshot = {
     ...current,
     imageNodes: current.imageNodes.map((node) => {
@@ -133,14 +141,25 @@ function rebaseStabilizedMedia(
         ...node,
         sourceImageUrl: source.url,
         sourceMediaAssetId: source.mediaAssetId,
-        outputImages: rebaseIndexedMediaAssets(node.outputImages, capturedNode.outputImages, stabilizedNode.outputImages),
+        outputImages: rebaseIndexedMediaAssets(
+          node.outputImages,
+          capturedNode.outputImages,
+          stabilizedNode.outputImages,
+        ),
       }
     }),
     promptNodes: current.promptNodes.map((node) => {
       const capturedNode = capturedPromptNodes.get(node.id)
       const stabilizedNode = stabilizedPromptNodes.get(node.id)
       return capturedNode && stabilizedNode
-        ? { ...node, inputImages: rebaseInputMediaAssets(node.inputImages, capturedNode.inputImages, stabilizedNode.inputImages) }
+        ? {
+            ...node,
+            inputImages: rebaseInputMediaAssets(
+              node.inputImages,
+              capturedNode.inputImages,
+              stabilizedNode.inputImages,
+            ),
+          }
         : node
     }),
     fusionNodes: current.fusionNodes.map((node) => {
@@ -149,8 +168,16 @@ function rebaseStabilizedMedia(
       return capturedNode && stabilizedNode
         ? {
             ...node,
-            inputImages: rebaseInputMediaAssets(node.inputImages, capturedNode.inputImages, stabilizedNode.inputImages),
-            outputImages: rebaseIndexedMediaAssets(node.outputImages, capturedNode.outputImages, stabilizedNode.outputImages),
+            inputImages: rebaseInputMediaAssets(
+              node.inputImages,
+              capturedNode.inputImages,
+              stabilizedNode.inputImages,
+            ),
+            outputImages: rebaseIndexedMediaAssets(
+              node.outputImages,
+              capturedNode.outputImages,
+              stabilizedNode.outputImages,
+            ),
           }
         : node
     }),
@@ -175,9 +202,10 @@ export function createBoardSyncCoordinator(
 ): BoardSyncCoordinator {
   let saveSequence = 0
   let loadSequence = 0
-  let deferredMediaStabilization:
-    | { captured: CanvasBoardSnapshot; stabilized: CanvasBoardSnapshot }
-    | null = null
+  let deferredMediaStabilization: {
+    captured: CanvasBoardSnapshot
+    stabilized: CanvasBoardSnapshot
+  } | null = null
   let lastNotifiedSaveFailure: { boardId: string; kind: SaveFailureKind } | null = null
 
   function shouldNotifySaveFailure(
@@ -222,10 +250,10 @@ export function createBoardSyncCoordinator(
 
   function notifyLoadFailure(error: unknown) {
     if (error instanceof InvalidBoardStateError) {
-      options.onError('画布数据校验失败，已保留当前画布，请稍后重试')
+      options.onError(i18n.global.t('canvas.session.boardDataInvalid'))
       return
     }
-    options.onError('导入画布快照失败，请稍后重试')
+    options.onError(i18n.global.t('canvas.session.importSnapshotFailed'))
   }
 
   async function importBoardSnapshot(): Promise<CanvasBoardLoadResult> {
@@ -292,10 +320,10 @@ export function createBoardSyncCoordinator(
 
   function notifyRemoteSyncFailure(reason: 'sync-failed' | 'conflict') {
     if (reason === 'conflict') {
-      options.onError('已保存到本地，但画布名称已存在，请更换后再试')
+      options.onError(i18n.global.t('canvas.session.nameConflictSavedLocally'))
       return
     }
-    options.onWarning('已保存到本地，远端同步失败，将在网络恢复后重试')
+    options.onWarning(i18n.global.t('canvas.session.savedLocallySyncFailed'))
   }
 
   async function saveCurrentBoardSnapshot(
@@ -303,7 +331,7 @@ export function createBoardSyncCoordinator(
   ): Promise<CanvasBoardSaveResult> {
     const boardId = options.boardSession.currentBoardId.value
     if (!boardId) {
-      options.onWarning('缺少 boardId，无法保存')
+      options.onWarning(i18n.global.t('canvas.session.missingBoardIdSave'))
       return { saved: false }
     }
     const saveToken = ++saveSequence
@@ -362,7 +390,7 @@ export function createBoardSyncCoordinator(
           options.isDirty.value = hasUnreconciledDraft
           options.saveStatus.value = hasUnreconciledDraft ? 'pending' : 'saved'
           if (!saveOptions.silent && !hasUnreconciledDraft) {
-            options.onSuccess('已保存')
+            options.onSuccess(i18n.global.t('canvas.session.saved'))
           }
         } else {
           options.isDirty.value = true
@@ -391,7 +419,7 @@ export function createBoardSyncCoordinator(
         isSaveStillCurrent() &&
         shouldNotifySaveFailure(saveOptions.silent, boardId, 'save-failed')
       ) {
-        options.onError(error instanceof Error ? error.message : '保存失败，请稍后重试')
+        options.onError(userFacingErrorCopy(error, i18n.global.t('canvas.session.saveFailed')))
       }
       return { saved: false }
     } finally {

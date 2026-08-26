@@ -242,9 +242,9 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 
 	// Feature-specific nested contracts
 	switch featureSlug {
-	case workflow.FeatureSlugStyleVariation:
-		if c, ok := workflow.ReadStyleVariationPromptContract(params); ok {
-			p.Variation = &tasks.StyleVariationParams{Strength: c.Strength}
+	case workflow.FeatureSlugVariations:
+		if c, ok := workflow.ReadVariationsPromptContract(params); ok {
+			p.Variation = &tasks.VariationsParams{Strength: c.Strength}
 		}
 	case workflow.FeatureSlugOutpaint:
 		if c, ok := workflow.ReadOutpaintContract(params); ok {

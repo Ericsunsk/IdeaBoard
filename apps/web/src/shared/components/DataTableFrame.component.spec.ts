@@ -2,7 +2,7 @@ import PrimeVue from 'primevue/config'
 import Column from 'primevue/column'
 import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { primeVueTestOptions } from '../../test/primeVue'
+import { userPrimeVueTestOptions } from '../../test/primeVue'
 import { renderWithUser, screen } from '../../test/render'
 import DataTableFrame from './DataTableFrame.vue'
 
@@ -29,7 +29,7 @@ describe('DataTableFrame', () => {
     renderWithUser(DataTableFrame, {
       props: { value: rows },
       slots: { default: () => h(Column, { field: 'name', header: '名称' }) },
-      global: { plugins: [[PrimeVue, primeVueTestOptions]] },
+      global: { plugins: [[PrimeVue, userPrimeVueTestOptions]] },
     })
 
     const tableContainer = screen.getByRole('table').parentElement
@@ -85,7 +85,7 @@ describe('DataTableFrame', () => {
       `,
     })
     const { user } = renderWithUser(SelectionHarness, {
-      global: { plugins: [[PrimeVue, primeVueTestOptions]] },
+      global: { plugins: [[PrimeVue, userPrimeVueTestOptions]] },
     })
 
     const [headerCheckbox, rowCheckbox] = screen.getAllByRole('checkbox')
@@ -127,6 +127,6 @@ function renderTable(
       after: () => h('div', '表格后置内容'),
     },
     attrs: { onRowClick },
-    global: { plugins: [[PrimeVue, primeVueTestOptions]] },
+    global: { plugins: [[PrimeVue, userPrimeVueTestOptions]] },
   })
 }

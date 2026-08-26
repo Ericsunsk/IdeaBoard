@@ -242,12 +242,12 @@ func TestGoogleGeminiReadsRelativeCanvasUploadFromStorage(t *testing.T) {
 
 	rawParams := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       "style-variation",
+		Feature:       "variations",
 		Media: &tasks.MediaInputs{
 			Inputs:   []tasks.MediaRef{{AssetID: 1, Role: "input"}},
 			Original: &tasks.MediaRef{AssetID: 2, Role: "original"},
 		},
-		Variation: &tasks.StyleVariationParams{Strength: 40},
+		Variation: &tasks.VariationsParams{Strength: 40},
 	})
 	task := &tasks.TaskPayload{TaskID: "task-google-storage-input", Prompt: "prompt", Params: rawParams}
 	parsedParams, parseErr := executor.parseAndNormalizeTaskParams(context.Background(), task)

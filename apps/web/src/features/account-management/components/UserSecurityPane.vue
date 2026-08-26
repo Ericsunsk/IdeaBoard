@@ -1,5 +1,5 @@
 <template>
-  <AccountManagementPane title="账号安全">
+  <AccountManagementPane :title="t('account.tabs.security')">
     <form class="grid gap-5" novalidate @submit.prevent="handleUpdatePassword">
       <IbFormField
         v-slot="{
@@ -11,7 +11,7 @@
           invalid,
           required,
         }"
-        label="当前原密码"
+        :label="t('account.security.currentPassword')"
         :error="pwdErrors.oldPassword"
         field-id="profile-old-password"
         required
@@ -35,7 +35,7 @@
           }"
           :invalid="invalid"
           :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
-          :placeholder="inlineError ? inlineErrorText : '请输入当前使用的密码'"
+          :placeholder="inlineError ? inlineErrorText : t('account.security.currentPasswordPlaceholder')"
           toggle-mask
           @blur="validatePasswordField('oldPassword')"
           @update:model-value="clearPasswordFieldError('oldPassword')"
@@ -53,7 +53,7 @@
             invalid,
             required,
           }"
-          label="设置新密码"
+          :label="t('account.security.newPassword')"
           :error="pwdErrors.newPassword"
           field-id="profile-new-password"
           required
@@ -77,7 +77,7 @@
             }"
             :invalid="invalid"
             :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
-            :placeholder="inlineError ? inlineErrorText : '不少于6位字符'"
+            :placeholder="inlineError ? inlineErrorText : t('account.security.newPasswordPlaceholder')"
             toggle-mask
             @blur="validatePasswordField('newPassword')"
             @update:model-value="handleNewPasswordInput"
@@ -94,7 +94,7 @@
             invalid,
             required,
           }"
-          label="重复新密码"
+          :label="t('account.security.confirmPassword')"
           :error="pwdErrors.confirmPassword"
           field-id="profile-confirm-password"
           required
@@ -118,7 +118,7 @@
             }"
             :invalid="invalid"
             :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
-            :placeholder="inlineError ? inlineErrorText : '请再次输入新密码'"
+            :placeholder="inlineError ? inlineErrorText : t('account.security.confirmPasswordPlaceholder')"
             toggle-mask
             @blur="validatePasswordField('confirmPassword')"
             @update:model-value="clearPasswordFieldError('confirmPassword')"
@@ -129,7 +129,7 @@
       <Button
         unstyled
         type="submit"
-        :label="pwdLoading ? '更新中...' : '确认更新密码'"
+        :label="pwdLoading ? t('account.security.updating') : t('account.security.updatePassword')"
         :loading="pwdLoading"
         :disabled="pwdLoading"
         :class="accountPrimaryActionButtonClass"
@@ -142,7 +142,7 @@
     <form v-if="!emailOtpSent" class="grid gap-5" novalidate @submit.prevent="handleRequestEmailChange">
       <IbFormField
         v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
-        label="当前密码（重新验证）"
+        :label="t('account.security.reauthCurrentPassword')"
         :error="emailErrors.currentPassword"
         field-id="email-current-password"
         required
@@ -160,13 +160,13 @@
           :input-props="{ id: fieldId, autocomplete: 'current-password', required, 'aria-invalid': ariaInvalid, 'aria-describedby': describedbyId }"
           :invalid="invalid"
           :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
-          :placeholder="inlineError ? inlineErrorText : '请输入当前密码'"
+          :placeholder="inlineError ? inlineErrorText : t('account.security.currentPasswordPlaceholder')"
           toggle-mask
         />
       </IbFormField>
       <IbFormField
         v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
-        label="新 Email"
+        :label="t('account.security.newEmail')"
         :error="emailErrors.newEmail"
         field-id="new-email"
         required
@@ -183,7 +183,7 @@
           :required="required"
           :class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
           :invalid="invalid"
-          :placeholder="inlineError ? inlineErrorText : '请输入新的 Email'"
+          :placeholder="inlineError ? inlineErrorText : t('account.security.newEmailPlaceholder')"
           :aria-invalid="ariaInvalid"
           :aria-describedby="describedbyId"
         />
@@ -191,7 +191,7 @@
       <Button
         unstyled
         type="submit"
-        :label="emailLoading ? '发送中...' : '发送 Email 验证码'"
+        :label="emailLoading ? t('account.security.sending') : t('account.security.sendCode')"
         :loading="emailLoading"
         :disabled="emailLoading"
         :class="accountPrimaryActionButtonClass"
@@ -200,10 +200,10 @@
     </form>
 
     <form v-else class="grid gap-5" novalidate @submit.prevent="handleConfirmEmailChange">
-      <p class="text-sm text-ib-text-subtle">验证码已发送到 {{ emailForm.newEmail }}。</p>
+      <p class="text-sm text-ib-text-subtle">{{ t('account.security.otpSentTo', { email: emailForm.newEmail }) }}</p>
       <IbFormField
         v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
-        label="Email 验证码"
+        :label="t('account.security.emailOtp')"
         :error="emailErrors.otp"
         field-id="email-otp"
         required
@@ -221,7 +221,7 @@
           :required="required"
           :class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
           :invalid="invalid"
-          :placeholder="inlineError ? inlineErrorText : '输入 6 位验证码'"
+          :placeholder="inlineError ? inlineErrorText : t('account.security.otpPlaceholder')"
           :aria-invalid="ariaInvalid"
           :aria-describedby="describedbyId"
         />
@@ -229,7 +229,7 @@
       <Button
         unstyled
         type="submit"
-        :label="emailLoading ? '更新中...' : '确认换绑 Email'"
+        :label="emailLoading ? t('account.security.updating') : t('account.security.confirmEmailChange')"
         :loading="emailLoading"
         :disabled="emailLoading"
         :class="accountPrimaryActionButtonClass"
@@ -241,6 +241,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
@@ -255,10 +256,12 @@ import IbFormField from '../../../shared/components/IbFormField.vue'
 import { useUserStore } from '../../auth/session/authSession'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useAppToast } from '../../../shared/composables/useAppToast'
+import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { usePasswordChangeWorkflow } from '../usePasswordChangeWorkflow'
 import AccountManagementPane from './AccountManagementPane.vue'
 import { accountButtonPt, accountPrimaryActionButtonClass } from './accountManagementUi'
 
+const { t } = useI18n()
 const {
   form: pwdForm,
   errors: pwdErrors,
@@ -283,10 +286,10 @@ const emailErrors = ref({ currentPassword: '', newEmail: '', otp: '' })
 async function handleRequestEmailChange() {
   emailErrors.value.currentPassword = emailForm.value.currentPassword
     ? ''
-    : '请输入当前密码'
+    : t('account.security.errors.enterCurrentPassword')
   emailErrors.value.newEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailForm.value.newEmail.trim())
     ? ''
-    : '请输入有效的 Email'
+    : t('account.security.errors.invalidEmail')
   if (emailErrors.value.currentPassword || emailErrors.value.newEmail) return
   const sent = await runAsyncAction(
     async () => {
@@ -297,8 +300,11 @@ async function handleRequestEmailChange() {
     {
       loading: emailLoading,
       feedback: {
-        success: () => appToast.success('验证码已发送'),
-        error: (error) => appToast.error(error instanceof Error ? error.message : '发送失败'),
+        success: () => appToast.success(t('account.security.toast.verificationCodeSent')),
+        error: (error) =>
+          appToast.error(
+            userFacingErrorCopy(error, t('account.security.toast.sendCodeFailed')),
+          ),
       },
     },
   )
@@ -308,15 +314,18 @@ async function handleRequestEmailChange() {
 async function handleConfirmEmailChange() {
   emailErrors.value.otp = /^\d{6}$/.test(emailForm.value.otp.trim())
     ? ''
-    : '请输入 6 位验证码'
+    : t('account.security.errors.sixDigitCode')
   if (emailErrors.value.otp) return
   const changed = await runAsyncAction(
     () => userStore.changeEmailWithOTP(emailForm.value.newEmail, emailForm.value.otp),
     {
       loading: emailLoading,
       feedback: {
-        success: () => appToast.success('Email 已更新，其他会话已退出'),
-        error: (error) => appToast.error(error instanceof Error ? error.message : 'Email 更新失败'),
+        success: () => appToast.success(t('account.security.toast.emailUpdated')),
+        error: (error) =>
+          appToast.error(
+            userFacingErrorCopy(error, t('account.security.toast.emailUpdateFailed')),
+          ),
       },
     },
   )

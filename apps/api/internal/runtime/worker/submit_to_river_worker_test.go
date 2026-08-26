@@ -41,7 +41,7 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
-	billingRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugSketchToImage, "1k", 1)
+	billingRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugRender, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -437,10 +437,10 @@ func newSubmitToRiverWorkerTask(t *testing.T, taskID string) *tasks.Task {
 		UserPrompt: "draw a River convergence proof",
 		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Feature:       workflow.FeatureSlugSketchToImage,
+			Feature:       workflow.FeatureSlugRender,
 			Media:         &tasks.MediaInputs{Inputs: []tasks.MediaRef{{AssetID: 1, Role: "input"}}},
 		}),
-		FeatureSlug: workflow.FeatureSlugSketchToImage,
+		FeatureSlug: workflow.FeatureSlugRender,
 		APIType:     "openai-compatible",
 		Status:      tasks.StatusPending,
 	}

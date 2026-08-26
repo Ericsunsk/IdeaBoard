@@ -184,7 +184,7 @@ describe('useCanvasBoardSession', () => {
     if (!result.remoteSync.ok) {
       expect(result.remoteSync.reason).toBe('sync-failed')
       expect(result.remoteSync.error).toBeInstanceOf(Error)
-      expect((result.remoteSync.error as Error).message).toContain('缺少用户信息')
+      expect((result.remoteSync.error as Error).message).toContain('user session is missing')
     }
     expect(createUploadLifecycle).not.toHaveBeenCalled()
     expect(repository.saveLocal).toHaveBeenCalledWith('board-a', snapshot)

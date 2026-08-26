@@ -10,6 +10,7 @@ import {
 } from '../../../canvas-board/domain'
 import { parseRequestedOutputCount } from '../../../../shared/domain/generationContract'
 import { normalizeOutputResolution, type OutputResolution } from '../../../../shared/domain/generationContract'
+import { i18n } from '../../../../shared/i18n'
 import { EXECUTION_FUSION_META } from '../contracts/executionContract'
 import type { ImageTaskAction } from '../contracts/imageActionExecution'
 import {
@@ -149,7 +150,7 @@ function resolveNodeOutputResolution(
 
 function requireRequestedOutputCount(value: unknown): number {
   const outputCount = parseRequestedOutputCount(value)
-  if (outputCount === null) failPlanning('生成数量无效')
+  if (outputCount === null) failPlanning(i18n.global.t('canvas.execution.invalidOutputCount'))
   return outputCount
 }
 
@@ -228,16 +229,16 @@ function requireImageExecutionImage(
 ): ResolvedImageExecutionImage {
   const node = graph.nodes.find((item) => item.id === nodeId)
   if (!node || node.data?.kind !== 'image') {
-    failPlanning('图片节点不存在或缺少 URL')
+    failPlanning(i18n.global.t('canvas.execution.imageNodeMissingUrl'))
   }
   const snapshot = node.data.snapshotNode
   if (!snapshot || typeof snapshot !== 'object') {
-    failPlanning('图片节点不存在或缺少 URL')
+    failPlanning(i18n.global.t('canvas.execution.imageNodeMissingUrl'))
   }
   const source = resolveImageExecutionImage(node, snapshot as ImageNodeItem, {
     requireUrl: true,
   })
-  if (!source?.input.url) failPlanning('图片节点不存在或缺少 URL')
+  if (!source?.input.url) failPlanning(i18n.global.t('canvas.execution.imageNodeMissingUrl'))
   return source
 }
 
@@ -337,7 +338,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     const graph = readGraph()
     const source = requireImageExecutionImage(graph, nodeId)
     const resolvedIntent = resolveCanvasExtendIntent(intent.frameRect, intent.originalImageRect)
-    if (!resolvedIntent.hasExtension) failPlanning('请先拖动扩图框')
+    if (!resolvedIntent.hasExtension) failPlanning(i18n.global.t('canvas.execution.dragOutpaintFrameFirst'))
     const { targetRatio } = resolvedIntent
     const targetWidth = resolveCanvasExtendResultWidth(
       source.resultAnchor.width,
@@ -371,11 +372,11 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     },
   ): ImageInpaintExecutionPlan {
     const prompt = `${inpaint.prompt ?? ''}`.trim()
-    if (!prompt) failPlanning('请输入 Prompt')
+    if (!prompt) failPlanning(i18n.global.t('canvas.execution.enterPromptFirst'))
     const graph = readGraph()
     const source = requireImageExecutionImage(graph, nodeId)
     const rawMaskDataUrl = `${inpaint.maskDataUrl ?? ''}`.trim()
-    if (!rawMaskDataUrl) failPlanning('请先标记局部重绘区域')
+    if (!rawMaskDataUrl) failPlanning(i18n.global.t('canvas.execution.markInpaintAreaFirst'))
     return {
       kind: 'image-inpaint',
       sourceNodeId: nodeId,
@@ -397,12 +398,12 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     aspectRatio: PromptAspectRatio,
   ): PromptGenerationExecutionPlan {
     const normalizedPrompt = `${prompt ?? ''}`.trim()
-    if (referenceImages.length > 4) failPlanning('Prompt 节点最多支持 4 张参考图')
+    if (referenceImages.length > 4) failPlanning(i18n.global.t('canvas.execution.tooManyReferenceImages'))
     const normalizedReferences = referenceImages.map((image) => ({
       url: `${image.url ?? ''}`.trim(),
       ratio: normalizeExecutionRatio(image.ratio),
     }))
-    if (normalizedReferences.some((image) => !image.url)) failPlanning('参考图缺少 URL')
+    if (normalizedReferences.some((image) => !image.url)) failPlanning(i18n.global.t('canvas.execution.referenceImageMissingUrl'))
     const graph = readGraph()
     const promptNode = graph.nodes.find((node) => node.id === anchorNodeId)
     const outputResolution =
@@ -439,7 +440,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       !fusionNode.data.snapshotNode ||
       typeof fusionNode.data.snapshotNode !== 'object'
     ) {
-      failPlanning('Fusion 节点不存在')
+      failPlanning(i18n.global.t('canvas.execution.fusionNodeMissing'))
     }
     const snapshot = fusionNode.data.snapshotNode as FusionNodeItem
     const fusionInputLimit = getCanvasNodeImageInputLimit('fusion')
@@ -449,13 +450,13 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       snapshot.inputImages,
       fusionInputLimit,
     )
-    if (inputImages.length < 2) failPlanning('Fusion 节点至少需要 2 张图片')
+    if (inputImages.length < 2) failPlanning(i18n.global.t('canvas.execution.fusionNeedsTwoImages'))
     const fusionInputs = inputImages
       .map((item) => ({ ...item, url: item.url.trim() }))
       .filter((item) => item.url)
       .slice(0, fusionInputLimit)
     const imageUrls = fusionInputs.map((item) => item.url)
-    if (imageUrls.length < 2) failPlanning('Fusion 输入图片无效')
+    if (imageUrls.length < 2) failPlanning(i18n.global.t('canvas.execution.fusionInputsInvalid'))
 
     const normalizedPrompt = `${prompt ?? ''}`.trim()
     const normalizedAspectRatio = normalizePromptAspectRatio(aspectRatio)

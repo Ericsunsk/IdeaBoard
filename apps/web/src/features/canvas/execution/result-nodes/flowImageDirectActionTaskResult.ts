@@ -3,6 +3,7 @@ import {
   normalizeTaskImageResults,
   type TaskImageResult,
 } from '../../../../shared/query/taskResult'
+import { i18n } from '../../../../shared/i18n'
 import type { ResolvedTaskImageResult } from './resolvedTaskImageResult'
 
 export type ImageSize = {
@@ -34,15 +35,19 @@ export function pickFirstValidImageResult(results: TaskImageResult[]): TaskImage
   return normalizeTaskImageResults(results)[0] ?? null
 }
 
+function noImageMessage(): string {
+  return i18n.global.t('canvas.execution.taskCompletedNoImage')
+}
+
 export async function resolveFirstTaskImageResultDisplay(
   results: TaskImageResult[],
   fallbackRatio: number,
   loadImageSize: ImageSizeLoader,
 ): Promise<ResolvedTaskImageResult> {
   const result = pickFirstValidImageResult(results)
-  if (!result) throw new Error('任务完成但未返回图片')
+  if (!result) throw new Error(noImageMessage())
   const resolved = await resolveTaskImageResultDisplay(result, fallbackRatio, loadImageSize)
-  if (!resolved) throw new Error('任务完成但未返回图片')
+  if (!resolved) throw new Error(noImageMessage())
   return resolved
 }
 
@@ -54,9 +59,9 @@ export async function resolveTaskImageResultAtIndexDisplay(
 ): Promise<ResolvedTaskImageResult> {
   const normalized = normalizeTaskImageResults(results)
   const result = normalized.find((candidate) => candidate.resultIndex === resultIndex)
-  if (!result) throw new Error('任务完成但未返回对应图片')
+  if (!result) throw new Error(i18n.global.t('canvas.execution.taskCompletedNoImageAtIndex'))
   const resolved = await resolveTaskImageResultDisplay(result, fallbackRatio, loadImageSize)
-  if (!resolved) throw new Error('任务完成但未返回对应图片')
+  if (!resolved) throw new Error(i18n.global.t('canvas.execution.taskCompletedNoImageAtIndex'))
   return { ...resolved, resultIndex }
 }
 

@@ -1,48 +1,5 @@
+import { i18n } from '../i18n'
 import { WORKFLOW_FEATURE, type WorkflowFeature } from './workflowFeatures'
-
-export const WORKFLOW_FEATURE_GROUP = {
-  image: 'image',
-  prompt: 'prompt',
-  fusion: 'fusion',
-} as const
-
-export type WorkflowFeatureGroupKey =
-  (typeof WORKFLOW_FEATURE_GROUP)[keyof typeof WORKFLOW_FEATURE_GROUP]
-
-export interface WorkflowFeatureGroupMeta {
-  key: WorkflowFeatureGroupKey
-  title: string
-  order: number
-}
-
-export const WORKFLOW_FEATURE_GROUP_LIST: readonly WorkflowFeatureGroupMeta[] = [
-  {
-    key: WORKFLOW_FEATURE_GROUP.image,
-    title: 'Image',
-    order: 10,
-  },
-  {
-    key: WORKFLOW_FEATURE_GROUP.prompt,
-    title: 'Prompt',
-    order: 20,
-  },
-  {
-    key: WORKFLOW_FEATURE_GROUP.fusion,
-    title: 'Fusion',
-    order: 30,
-  },
-] as const
-
-export interface WorkflowFeatureRegistryItem {
-  slug: WorkflowFeature
-  label: string
-  title: string
-  adminTitle: string
-  groupKey: WorkflowFeatureGroupKey
-  imageActionLabel?: string
-  imageActionTitle?: string
-  promptVariables: readonly WorkflowFeaturePromptVariable[]
-}
 
 export type WorkflowFeaturePromptVariableTone = 'prompt' | 'control' | 'context'
 
@@ -51,17 +8,29 @@ export interface WorkflowFeaturePromptVariable {
   tone: WorkflowFeaturePromptVariableTone
 }
 
-export interface WorkflowFeatureConfigItem {
-  slug: WorkflowFeature
-  title: string
-  label: string
+const WORKFLOW_FEATURE_PROMPT_VARIABLES: Readonly<
+  Record<WorkflowFeature, readonly WorkflowFeaturePromptVariable[]>
+> = {
+  [WORKFLOW_FEATURE.render]: [{ key: '{{user_prompt}}', tone: 'prompt' }],
+  [WORKFLOW_FEATURE.inpaint]: [],
+  [WORKFLOW_FEATURE.variations]: [
+    { key: '{{user_prompt}}', tone: 'prompt' },
+    { key: '{{variation_strength}}', tone: 'control' },
+  ],
+  [WORKFLOW_FEATURE.styleFusion]: [
+    { key: '{{user_prompt}}', tone: 'prompt' },
+    { key: '{{fusion_input_weights}}', tone: 'control' },
+  ],
+  [WORKFLOW_FEATURE.cutout]: [],
+  [WORKFLOW_FEATURE.promptGeneration]: [{ key: '{{user_prompt}}', tone: 'prompt' }],
+  [WORKFLOW_FEATURE.hdUpscale]: [],
+  [WORKFLOW_FEATURE.outpaint]: [],
 }
 
-export interface WorkflowFeatureConfigGroup {
-  key: string
-  title: string
-  order: number
-  items: readonly WorkflowFeatureConfigItem[]
+export function getWorkflowFeaturePromptVariables(
+  slug: WorkflowFeature,
+): readonly WorkflowFeaturePromptVariable[] {
+  return WORKFLOW_FEATURE_PROMPT_VARIABLES[slug]
 }
 
 export interface WorkflowFeatureImageActionText {
@@ -69,189 +38,16 @@ export interface WorkflowFeatureImageActionText {
   title: string
 }
 
-type WorkflowFeatureRegistryBaseItem = Omit<
-  WorkflowFeatureRegistryItem,
-  'title' | 'adminTitle' | 'promptVariables'
-> & {
-  promptVariables?: readonly WorkflowFeaturePromptVariable[]
+/** Locale keys mirror slugs (`hd-upscale` -> `canvas.features.hdUpscale`). */
+export function workflowFeatureLabelKey(slug: WorkflowFeature): string {
+  const camel = slug.replace(/-([a-z])/g, (_, character: string) => character.toUpperCase())
+  return `canvas.features.${camel}`
 }
-
-const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[] = [
-  {
-    slug: WORKFLOW_FEATURE.sketchToImage,
-    label: '草图成图',
-    groupKey: WORKFLOW_FEATURE_GROUP.image,
-    imageActionLabel: '草图成图',
-    imageActionTitle: '草图成图',
-    promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
-  },
-  {
-    slug: WORKFLOW_FEATURE.partialEdit,
-    label: '局部重绘',
-    groupKey: WORKFLOW_FEATURE_GROUP.image,
-    imageActionLabel: '局部重绘',
-    imageActionTitle: '局部重绘',
-    promptVariables: [],
-  },
-  {
-    slug: WORKFLOW_FEATURE.styleVariation,
-    label: '风格延展',
-    groupKey: WORKFLOW_FEATURE_GROUP.image,
-    imageActionLabel: '风格延展',
-    imageActionTitle: '风格延展',
-    promptVariables: [
-      { key: '{{user_prompt}}', tone: 'prompt' },
-      { key: '{{variation_strength}}', tone: 'control' },
-    ],
-  },
-  {
-    slug: WORKFLOW_FEATURE.styleFusion,
-    label: '多图融合',
-    groupKey: WORKFLOW_FEATURE_GROUP.fusion,
-    promptVariables: [
-      { key: '{{user_prompt}}', tone: 'prompt' },
-      { key: '{{fusion_input_weights}}', tone: 'control' },
-    ],
-  },
-  {
-    slug: WORKFLOW_FEATURE.removeBg,
-    label: '抠图',
-    groupKey: WORKFLOW_FEATURE_GROUP.image,
-    imageActionLabel: '抠图',
-    imageActionTitle: '抠图',
-    promptVariables: [],
-  },
-  {
-    slug: WORKFLOW_FEATURE.promptGeneration,
-    label: 'Prompt 生图',
-    groupKey: WORKFLOW_FEATURE_GROUP.prompt,
-    promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
-  },
-  {
-    slug: WORKFLOW_FEATURE.hdUpscale,
-    label: 'HD',
-    groupKey: WORKFLOW_FEATURE_GROUP.image,
-    imageActionLabel: 'HD',
-    imageActionTitle: 'HD',
-    promptVariables: [],
-  },
-  {
-    slug: WORKFLOW_FEATURE.outpaint,
-    label: '扩图',
-    groupKey: WORKFLOW_FEATURE_GROUP.image,
-    imageActionLabel: '扩图',
-    imageActionTitle: '扩图',
-    promptVariables: [],
-  },
-] as const
-
-function getWorkflowFeatureGroupTitle(groupKey: WorkflowFeatureGroupKey): string {
-  return WORKFLOW_FEATURE_GROUP_LIST.find((group) => group.key === groupKey)?.title || groupKey
-}
-
-function getWorkflowFeatureTitle(item: WorkflowFeatureRegistryBaseItem): string {
-  return `${getWorkflowFeatureGroupTitle(item.groupKey)} · ${item.label}`
-}
-
-export const WORKFLOW_FEATURE_REGISTRY: readonly WorkflowFeatureRegistryItem[] =
-  WORKFLOW_FEATURE_REGISTRY_BASE.map((item) => {
-    const title = getWorkflowFeatureTitle(item)
-    return {
-      ...item,
-      title,
-      adminTitle: title,
-      promptVariables: item.promptVariables ?? [],
-    }
-  })
-
-export const WORKFLOW_FEATURE_REGISTRY_MAP = Object.fromEntries(
-  WORKFLOW_FEATURE_REGISTRY.map((item) => [item.slug, item]),
-) as Record<WorkflowFeature, WorkflowFeatureRegistryItem>
-
-export function getWorkflowFeatureRegistryItem(slug: string): WorkflowFeatureRegistryItem | null {
-  return WORKFLOW_FEATURE_REGISTRY.find((item) => item.slug === slug) ?? null
-}
-
-const WORKFLOW_FEATURE_CONFIG_GROUP_DEFS = [
-  {
-    key: 'image',
-    title: 'Image',
-    order: 10,
-    slugs: [
-      WORKFLOW_FEATURE.sketchToImage,
-      WORKFLOW_FEATURE.styleVariation,
-      WORKFLOW_FEATURE.partialEdit,
-      WORKFLOW_FEATURE.outpaint,
-    ],
-  },
-  {
-    key: 'prompt',
-    title: 'Prompt',
-    order: 20,
-    slugs: [WORKFLOW_FEATURE.promptGeneration],
-  },
-  {
-    key: 'fusion',
-    title: 'Fusion',
-    order: 30,
-    slugs: [WORKFLOW_FEATURE.styleFusion],
-  },
-] as const satisfies readonly {
-  key: string
-  title: string
-  order: number
-  slugs: readonly WorkflowFeature[]
-}[]
-
-function toWorkflowFeatureConfigItem(
-  slug: WorkflowFeature,
-  groupTitle: string,
-): WorkflowFeatureConfigItem {
-  const feature = WORKFLOW_FEATURE_REGISTRY_MAP[slug]
-  return {
-    slug,
-    title: `${groupTitle} · ${feature.label}`,
-    label: feature.label,
-  }
-}
-
-export const WORKFLOW_FEATURE_CONFIG_ITEMS = WORKFLOW_FEATURE_CONFIG_GROUP_DEFS.flatMap((group) =>
-  group.slugs.map((slug) => toWorkflowFeatureConfigItem(slug, group.title)),
-)
-
-export const WORKFLOW_FEATURE_CONFIG_ITEM_MAP = Object.fromEntries(
-  WORKFLOW_FEATURE_CONFIG_ITEMS.map((item) => [item.slug, item]),
-) as Record<WorkflowFeature, WorkflowFeatureConfigItem>
-
-export const WORKFLOW_FEATURE_CONFIG_GROUPS = WORKFLOW_FEATURE_CONFIG_GROUP_DEFS.filter(
-  (group) => group.slugs.length > 0,
-)
-  .sort((a, b) => a.order - b.order)
-  .map((group) => ({
-    key: group.key,
-    title: group.title,
-    order: group.order,
-    items: group.slugs.map((slug) => WORKFLOW_FEATURE_CONFIG_ITEM_MAP[slug]),
-  })) satisfies readonly WorkflowFeatureConfigGroup[]
-
-export const WORKFLOW_FEATURE_IMAGE_ACTION_TEXT_MAP = Object.fromEntries(
-  WORKFLOW_FEATURE_REGISTRY.map((item) => [
-    item.slug,
-    {
-      label: item.imageActionLabel ?? item.adminTitle,
-      title: item.imageActionTitle ?? item.imageActionLabel ?? item.adminTitle,
-    },
-  ]),
-) as Record<WorkflowFeature, WorkflowFeatureImageActionText>
 
 export function getWorkflowFeatureImageActionText(
   slug: WorkflowFeature,
 ): WorkflowFeatureImageActionText {
-  return WORKFLOW_FEATURE_IMAGE_ACTION_TEXT_MAP[slug]
-}
-
-export function getWorkflowFeaturePromptVariables(
-  slug: WorkflowFeature,
-): readonly WorkflowFeaturePromptVariable[] {
-  return WORKFLOW_FEATURE_REGISTRY_MAP[slug].promptVariables
+  // Resolve at read time so a future locale switch does not freeze this copy at module import.
+  const label = i18n.global.t(workflowFeatureLabelKey(slug))
+  return { label, title: label }
 }

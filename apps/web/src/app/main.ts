@@ -3,8 +3,9 @@ import { VueQueryPlugin } from '@tanstack/vue-query'
 import PrimeVue from 'primevue/config'
 import ConfirmationService from 'primevue/confirmationservice'
 import { queryClient } from '../shared/query/queryClient'
+import { i18n } from '../shared/i18n'
 import { ideaBoardPrimePt } from './primePassThrough'
-import { ideaBoardPrimeLocale } from './primeLocale'
+import { ideaBoardUserPrimeLocale } from './primeLocale'
 import { ideaBoardPrimePreset } from './primeTheme'
 import router from './router'
 import App from './App.vue'
@@ -14,9 +15,10 @@ import 'vue-sonner/style.css'
 
 const app = createApp(App)
 app.use(router)
+app.use(i18n)
 app.use(VueQueryPlugin, { queryClient })
 app.use(PrimeVue, {
-  locale: ideaBoardPrimeLocale,
+  locale: ideaBoardUserPrimeLocale,
   pt: ideaBoardPrimePt,
   ptOptions: {
     mergeSections: true,

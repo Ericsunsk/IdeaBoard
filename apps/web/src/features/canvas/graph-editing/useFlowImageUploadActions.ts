@@ -9,6 +9,8 @@ import {
 } from '../../../shared/utils/imageUploadSupport'
 import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
 import { canonicalizeRuntimeUploadRef } from '../../../shared/config/runtimeUrls'
+import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
+import { i18n } from '../../../shared/i18n'
 import { resolveImageNodeFrameSize } from '../../canvas-board/domain'
 import { readCurrentBoardIdRef } from '../utils/currentBoardId'
 import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
@@ -149,7 +151,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
       throw new Error(unsupportedUploadImageMessage())
     }
     if (!boardId) {
-      throw new Error('缺少 boardId，无法上传图片')
+      throw new Error(i18n.global.t('canvas.session.missingBoardIdUpload'))
     }
     const cacheKey = buildInFlightUploadKey(boardId, file)
     const cached = inFlightUploads.get(cacheKey)
@@ -161,7 +163,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
         const uploaded = await options.uploadApi.upload(prepared.uploadFile, boardId)
         const mediaAssetId = Number(uploaded.media_asset_id)
         if (!Number.isInteger(mediaAssetId) || mediaAssetId <= 0) {
-          throw new Error('上传图片失败：缺少媒体资产标识')
+          throw new Error(i18n.global.t('canvas.session.uploadMissingMediaAsset'))
         }
         const width = Number(uploaded.width)
         const height = Number(uploaded.height)
@@ -189,7 +191,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
     const boardId = readCurrentBoardIdRef(options.currentBoardId)
     const uploaded = await uploadImageToBoardForBoard(file, boardId)
     if (!isBoardStillCurrent(boardId)) {
-      throw new Error('上传结果已过期，请重新选择图片')
+      throw new Error(i18n.global.t('canvas.session.uploadStale'))
     }
     return uploaded
   }
@@ -197,7 +199,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
   async function applyImageFileToImageNode(nodeId: string, file: File): Promise<boolean> {
     const snapshotNode = options.getImageNodeSnapshot(nodeId)
     if (!snapshotNode) {
-      options.onWarning('Image 节点不存在')
+      options.onWarning(i18n.global.t('canvas.session.imageNodeMissing'))
       return false
     }
     const boardId = readCurrentBoardIdRef(options.currentBoardId)
@@ -225,10 +227,10 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
         }
       })
       options.onNodeMutated?.(nodeId)
-      options.onSuccess('Image 节点输入已更新')
+      options.onSuccess(i18n.global.t('canvas.session.imageNodeInputUpdated'))
       return true
     } catch (error) {
-      const msg = error instanceof Error ? error.message : '上传失败'
+      const msg = userFacingErrorCopy(error, i18n.global.t('canvas.session.uploadFailed'))
       options.onWarning(msg)
       return false
     } finally {
@@ -296,11 +298,11 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
       })
       options.onNodeMutated?.(nodeId)
       releaseLocalUpload(nodeId)
-      options.onSuccess('Image 节点已添加')
+      options.onSuccess(i18n.global.t('canvas.session.imageNodeAdded'))
       return true
     } catch (error) {
       if (!isNodeUploadRequestCurrent(nodeId, requestId)) return false
-      const message = error instanceof Error ? error.message : '上传失败'
+      const message = userFacingErrorCopy(error, i18n.global.t('canvas.session.uploadFailed'))
       retainFailedLocalUpload(nodeId, message)
       options.onWarning(message)
       return false

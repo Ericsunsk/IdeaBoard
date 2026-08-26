@@ -40,9 +40,9 @@ describe('CanvasChrome', () => {
     expect(screen.queryByText('保存冲突')).toBeNull()
     expect(screen.queryByText('未保存')).toBeNull()
     expect(screen.queryByRole('button', { name: '重试画布自动保存' })).toBeNull()
-    expect(screen.getByRole('button', { name: '缩小' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Zoom Out' })).toBeVisible()
     expect(screen.getByText('100%')).toBeVisible()
-    expect(screen.getByRole('button', { name: '放大' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Zoom In' })).toBeVisible()
   })
 
   it('places the credits balance immediately before the share control', () => {
@@ -76,11 +76,11 @@ describe('CanvasChrome', () => {
     })
 
     const credits = screen.getByRole('button', { name: 'Idea余额 100 Ideas' })
-    const share = screen.getByRole('button', { name: '分享功能稍后接入' })
+    const share = screen.getByRole('button', { name: 'Share coming soon' })
 
     expect(share.previousElementSibling).toBe(credits)
     expect(share).toBeDisabled()
-    expect(share).toHaveAttribute('title', '分享功能稍后接入')
+    expect(share).toHaveAttribute('title', 'Share coming soon')
     expect(screen.getAllByRole('button', { name: 'Idea余额 100 Ideas' })).toHaveLength(1)
     expect(credits).toHaveTextContent('100')
     expect(credits).not.toHaveTextContent('Ideas')
@@ -116,7 +116,7 @@ describe('CanvasChrome', () => {
       },
     })
 
-    screen.getByRole('button', { name: '重新加载画布列表' }).click()
+    screen.getByRole('button', { name: 'Reload canvas list' }).click()
 
     expect(emitted()['reload-board-catalog']).toHaveLength(1)
   })
@@ -151,7 +151,7 @@ describe('CanvasChrome', () => {
       },
     })
 
-    const name = screen.getByRole('textbox', { name: '画布名称' })
+    const name = screen.getByRole('textbox', { name: 'Canvas name' })
     name.focus()
     await user.keyboard('{Enter}')
 
@@ -190,7 +190,7 @@ describe('CanvasChrome', () => {
       },
     })
 
-    const name = screen.getByRole('textbox', { name: '画布名称' })
+    const name = screen.getByRole('textbox', { name: 'Canvas name' })
     expect(setNameInputRef).toHaveBeenLastCalledWith(name)
     expect(name).toHaveAttribute('contenteditable', 'plaintext-only')
     expect(name).toHaveAttribute('aria-readonly', 'false')
@@ -219,7 +219,7 @@ describe('CanvasChrome', () => {
     expect(name).toHaveAttribute('contenteditable', 'false')
     expect(name).toHaveAttribute('aria-readonly', 'true')
     expect(name).toHaveAttribute('aria-busy', 'true')
-    expect(screen.getByText('名称同步中')).toBeVisible()
+    expect(screen.getByText('Syncing name')).toBeVisible()
 
     await user.keyboard('{Escape}')
     expect(emitted()['cancel-board-rename']).toHaveLength(1)
@@ -261,7 +261,7 @@ describe('CanvasChrome', () => {
     const secondBoard = screen.getByRole('button', { name: 'Second Board' })
     secondBoard.focus()
     await user.keyboard('{Enter}')
-    await user.click(screen.getByRole('button', { name: '重新加载画布列表' }))
+    await user.click(screen.getByRole('button', { name: 'Reload canvas list' }))
 
     expect(emitted()['select-board']).toEqual([['board-b']])
     expect(emitted()['reload-board-catalog']).toHaveLength(1)
@@ -298,7 +298,7 @@ describe('CanvasChrome', () => {
     })
 
     const library = screen.getByRole('button', { name: 'Library' })
-    const minimap = screen.getByRole('button', { name: '小地图' })
+    const minimap = screen.getByRole('button', { name: 'MiniMap' })
 
     expect(library.nextElementSibling).toBe(minimap)
     expect(library).toHaveAttribute('aria-pressed', 'true')

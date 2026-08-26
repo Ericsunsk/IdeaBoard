@@ -36,10 +36,10 @@ type WorkflowTaskParams struct {
 
 	// Feature-specific canonical prompt contracts. Keep these in sync with
 	// workflow/prompt_contract.go and SYSTEM_PROMPT.md.
-	Variation *StyleVariationParams `json:"variation,omitempty"`
-	Extend    *OutpaintParams       `json:"extend,omitempty"`
-	HD        *HDUpscaleParams      `json:"hd,omitempty"`
-	Fusion    *StyleFusionParams    `json:"fusion,omitempty"`
+	Variation *VariationsParams  `json:"variation,omitempty"`
+	Extend    *OutpaintParams    `json:"extend,omitempty"`
+	HD        *HDUpscaleParams   `json:"hd,omitempty"`
+	Fusion    *StyleFusionParams `json:"fusion,omitempty"`
 
 	// Provider hints (passthrough, not validated).
 	// Extra carries provider-specific parameters that don't have a
@@ -204,7 +204,7 @@ type GenerationControls struct {
 	PromptUpsampling *bool   `json:"prompt_upsampling,omitempty"`
 }
 
-type StyleVariationParams struct {
+type VariationsParams struct {
 	Strength float64 `json:"strength"`
 }
 

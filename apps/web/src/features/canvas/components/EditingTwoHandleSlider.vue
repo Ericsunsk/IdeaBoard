@@ -3,7 +3,7 @@
     ref="sliderRef"
     class="editing-two-handle-slider"
     role="group"
-    :aria-label="ariaLabel"
+    :aria-label="resolvedAriaLabel"
     @pointerdown="onTrackPointerDown"
   >
     <div class="editing-two-handle-slider__track" aria-hidden="true" />
@@ -32,6 +32,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { usePointerDragSession } from '../utils/interaction/usePointerDragSession'
 
 type TwoHandleSliderHandle = {
@@ -57,13 +58,17 @@ const props = withDefaults(
   {
     step: 1,
     shiftStep: 10,
-    ariaLabel: '范围控制',
+    ariaLabel: undefined,
   },
 )
 
 const emit = defineEmits<{
   (e: 'update:handle', handleId: string, value: number): void
 }>()
+
+const { t } = useI18n()
+
+const resolvedAriaLabel = computed(() => props.ariaLabel ?? t('canvas.controls.rangeControl'))
 
 const sliderRef = ref<HTMLElement | null>(null)
 const activeHandleId = ref<string | null>(null)

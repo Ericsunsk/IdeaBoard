@@ -3,7 +3,7 @@
     ref="plotRef"
     class="image-editor-histogram-plot"
     role="group"
-    :aria-label="ariaLabel"
+    :aria-label="ariaLabel || t('canvas.imageEditor.histogramControlsAria')"
     @pointerdown="onPlotPointerDown"
   >
     <div class="image-editor-histogram-plot__canvas" aria-hidden="true">
@@ -84,9 +84,29 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import './styles/image-editor-histogram-plot.css'
 import { computed, nextTick, ref } from 'vue'
 import { usePointerDragSession } from '../../utils/interaction/usePointerDragSession'
+
+const props = withDefaults(
+  defineProps<{
+    histogramPath: string
+    markers: readonly ImageEditorHistogramPlotMarker[]
+    markerMode?: MarkerMode
+    ariaLabel?: string
+  }>(),
+  {
+    markerMode: 'button',
+    ariaLabel: '',
+  },
+)
+
+const emit = defineEmits<{
+  (e: 'update-marker', markerId: string, position: number): void
+}>()
+
+const { t } = useI18n()
 
 export type ImageEditorHistogramPlotMarker = {
   id: string
@@ -105,23 +125,6 @@ export type ImageEditorHistogramPlotMarker = {
 
 type MarkerMode = 'button' | 'range'
 type PointerPosition = Pick<PointerEvent, 'clientX'>
-
-const props = withDefaults(
-  defineProps<{
-    histogramPath: string
-    markers: readonly ImageEditorHistogramPlotMarker[]
-    markerMode?: MarkerMode
-    ariaLabel?: string
-  }>(),
-  {
-    ariaLabel: '直方图控制',
-    markerMode: 'button',
-  },
-)
-
-const emit = defineEmits<{
-  (e: 'update-marker', markerId: string, position: number): void
-}>()
 
 const plotRef = ref<HTMLElement | null>(null)
 const activeMarkerId = ref<string | null>(null)

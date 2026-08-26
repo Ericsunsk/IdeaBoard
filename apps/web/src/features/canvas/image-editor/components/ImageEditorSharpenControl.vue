@@ -26,22 +26,23 @@
       @update:value="updateNumberParam('threshold', $event)"
     />
     <div class="editing-controls-toggle-row">
-      <span>保护颜色</span>
+      <span>{{ t("canvas.imageEditor.protectColors") }}</span>
       <button
         class="editing-controls-toggle-button node-tool-tooltip-trigger"
         type="button"
         :aria-pressed="normalizedParams.protectColor ? 'true' : 'false'"
-        aria-label="保护锐化颜色"
+        :aria-label="t('canvas.imageEditor.protectSharpenColorsAria')"
         @click="updateProtectColor(!normalizedParams.protectColor)"
       >
         <ColorFilter aria-hidden="true" />
-        <span class="node-tool-tooltip" aria-hidden="true">保护颜色</span>
+        <span class="node-tool-tooltip" aria-hidden="true">{{ t("canvas.imageEditor.protectColors") }}</span>
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'
 import { ColorFilter } from '@iconoir/vue'
 import type { ImageEditorSharpenParams } from '../types'
@@ -55,6 +56,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:params', value: ImageEditorSharpenParams): void
 }>()
+
+const { t } = useI18n()
 
 const ranges = IMAGE_ADJUSTMENT_DEFINITIONS.sharpen.ranges
 const normalizedParams = computed(() =>

@@ -93,7 +93,7 @@ describe('useFlowNodeUiState', () => {
       Record<string, boolean | undefined> | undefined
 
     expect(pendingInputs?.image).toBe(false)
-    expect(fusionState.primaryAction).toEqual({ label: '融合', disabled: false })
+    expect(fusionState.primaryAction).toEqual({ label: 'Generate', disabled: false })
   })
 
   it('marks a multi-image input as pending when any connected image is still running', () => {
@@ -145,7 +145,7 @@ describe('useFlowNodeUiState', () => {
       Record<string, boolean | undefined> | undefined
 
     expect(pendingInputs?.image).toBe(true)
-    expect(fusionState.primaryAction).toEqual({ label: '等待 Image', disabled: true })
+    expect(fusionState.primaryAction).toEqual({ label: 'Waiting for Image', disabled: true })
   })
 
   it('preserves ui state identity across position-only node replacements', () => {
@@ -226,7 +226,7 @@ describe('useFlowNodeUiState', () => {
     expect(connectedFusionState).not.toBe(disconnectedFusionState)
     expect(connectedInputs?.image).toBe(true)
     expect(pendingInputs?.image).toBe(true)
-    expect(connectedFusionState.primaryAction).toEqual({ label: '等待 Image', disabled: true })
+    expect(connectedFusionState.primaryAction).toEqual({ label: 'Waiting for Image', disabled: true })
   })
 
   it('refreshes connection state when edges update with the same array identity', () => {

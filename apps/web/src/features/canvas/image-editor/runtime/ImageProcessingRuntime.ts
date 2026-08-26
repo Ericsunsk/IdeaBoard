@@ -14,6 +14,7 @@ import type {
   RenderPreviewInput,
   RenderPreviewResult,
 } from './types'
+import { i18n } from '../../../../shared/i18n'
 
 export type CreateImageProcessingRuntimeOptions = {
   backend: ImageProcessingBackend
@@ -150,13 +151,13 @@ function toImageProcessingError(error: unknown): ImageProcessingError {
   if (error instanceof Error) {
     return {
       code: 'backend-failed',
-      message: error.message || '图像处理失败',
+      message: error.message || i18n.global.t('canvas.imageEditor.errors.processingFailed'),
       cause: error,
     }
   }
   return {
     code: 'unknown',
-    message: '图像处理失败',
+    message: i18n.global.t('canvas.imageEditor.errors.processingFailed'),
     cause: error,
   }
 }

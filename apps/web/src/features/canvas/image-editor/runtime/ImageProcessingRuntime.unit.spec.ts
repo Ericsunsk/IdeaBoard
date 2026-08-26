@@ -196,7 +196,7 @@ describe('ImageProcessingRuntime', () => {
       status: 'failed',
       error: {
         code: 'unknown',
-        message: '图像处理失败',
+        message: 'Image processing failed.',
       },
     })
   })

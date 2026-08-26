@@ -1,0 +1,46 @@
+/** Workspace (board catalog) and shared board sync copy. */
+export default {
+  catalog: {
+    reloadRequired: 'The canvas list needs to be reloaded',
+    reloading: 'Reloading…',
+    reload: 'Reload',
+  },
+  deleteDialog: {
+    title: 'Delete canvas',
+    description: 'Delete "{name}"? This action cannot be undone.',
+    deleting: 'Deleting…',
+  },
+  feedback: {
+    createNameConflict: 'A canvas with this name already exists. Please try again.',
+    createSyncFailed: 'Could not create the canvas. Please try again later.',
+    nameAlreadyExists: 'Name already exists',
+    nameEmpty: 'Canvas name cannot be empty',
+    renameConflictReloaded: 'Name conflict. The canvas list has been reloaded.',
+    renameSyncFailedRolledBack: 'Rename sync failed. The original name has been restored.',
+    renameConflictRecoveryIncomplete:
+      'Name conflict and recovery incomplete. Please reload the canvas list.',
+    renameSyncFailedNoRollback:
+      'Rename sync failed and could not be rolled back. Please reload the canvas list.',
+    renamed: 'Canvas renamed',
+    copyFailed: 'Copy failed',
+    duplicateNameConflict: 'A canvas with the copied name already exists. Please try again.',
+    duplicateSyncFailed: 'Copy sync failed. Please try again later.',
+    duplicated: 'Canvas copied',
+    deleteSyncFailed: 'Delete failed. Please try again later.',
+    deleteFailed: 'Delete failed',
+    deleted: 'Canvas deleted',
+    syncFailedRetry: 'Canvas sync failed. Please try again later.',
+    reloaded: 'Canvas list reloaded',
+  },
+  joinSharedBoard: {
+    missingToken: 'Share token is missing',
+    joinFailed: 'Could not join the shared canvas',
+    missingBoardId: 'The server did not return a valid canvas ID',
+    hydrateFailed: 'Canvas sync failed. Please try again later.',
+  },
+  sync: {
+    listFailed: 'Could not sync the canvas list',
+    saveFailed: 'Could not save the canvas',
+    deleteFailed: 'Could not delete the canvas',
+  },
+} as const

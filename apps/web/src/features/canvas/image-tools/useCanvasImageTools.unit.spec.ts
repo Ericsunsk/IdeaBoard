@@ -370,7 +370,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(false)
       expect(harness.runtime.viewModel.adjustment.finalApplyProgress.value).toBeNull()
       expect(harness.feedback.warning).not.toHaveBeenCalled()
-      expect(harness.feedback.succeeded).toHaveBeenCalledWith('图片已生成')
+      expect(harness.feedback.succeeded).toHaveBeenCalledWith('Image generated')
       expect(harness.connectionAdapter.connectIntent).toHaveBeenCalledWith({
         sourceNodeId: 'image-1',
         sourcePort: 'image',
@@ -395,7 +395,9 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(renderLayerStackFileMock).not.toHaveBeenCalled()
       expect(harness.createImageNodeFromFile).not.toHaveBeenCalled()
       expect(harness.connectionAdapter.connectIntent).not.toHaveBeenCalled()
-      expect(harness.feedback.warning).toHaveBeenCalledWith('图片节点未能写入画布')
+      expect(harness.feedback.warning).toHaveBeenCalledWith(
+        'Failed to write the image node to the canvas.',
+      )
       expect(harness.feedback.succeeded).not.toHaveBeenCalled()
     } finally {
       harness.unmount()
@@ -417,7 +419,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(harness.createImageNodeFromFile).toHaveBeenCalledTimes(1)
       expect(harness.connectionAdapter.connectIntent).toHaveBeenCalledTimes(1)
       expect(harness.feedback.warning).toHaveBeenCalledWith(
-        '图片已创建，但自动连线失败，请手动连接',
+        'Image created, but automatic connection failed. Please connect it manually.',
       )
       expect(harness.feedback.succeeded).not.toHaveBeenCalled()
       expect(harness.runtime.viewModel.active.nodeId.value).toBe('image-1')
@@ -512,7 +514,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
         height: '240px',
       })
       expect(actionBinding.actionMenuVisible).toBe(true)
-      expect(actionBinding.promptPlaceholder).toBe('输入辅助要求（可选）')
+      expect(actionBinding.promptPlaceholder).toBe('Optional instructions')
     } finally {
       harness.unmount()
     }
@@ -630,10 +632,10 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       harness.runtime.commands.chrome.submitMaskPrompt('重绘 image-2')
 
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-2').promptPlaceholder).toBe(
-        '描述如何重绘选区',
+        'Describe how to repaint the selection',
       )
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').promptPlaceholder).toBe(
-        '输入辅助要求（可选）',
+        'Optional instructions',
       )
     } finally {
       harness.unmount()

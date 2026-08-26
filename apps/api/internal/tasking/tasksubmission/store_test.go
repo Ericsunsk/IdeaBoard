@@ -75,7 +75,7 @@ func TestStoreRejectsMissingBillingWithoutPartialFacts(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	canonical, constructErr := NewCanonicalRequest(CanonicalRequestInput{
 		UserID:         42,
-		Feature:        "style-variation",
+		Feature:        "variations",
 		ClientActionID: "missing-billing",
 	})
 	if constructErr == nil {

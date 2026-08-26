@@ -15,9 +15,9 @@ describe('generated API response boundary', () => {
   })
 
   it('rejects failed or incomplete data responses with safe caller-facing messages', () => {
-		expect(() => requireApiData({ code: 503, msg: '服务暂不可用', message_safe: true }, '加载失败')).toThrow(
-      '服务暂不可用',
-    )
+    expect(() =>
+      requireApiData({ code: 503, msg: '服务暂不可用', message_safe: true }, '加载失败'),
+    ).toThrow('服务暂不可用')
     expect(() => requireApiData({ code: 0, msg: 'success', data: undefined }, '加载失败')).toThrow(
       '加载失败',
     )
@@ -34,7 +34,29 @@ describe('generated API response boundary', () => {
 
   it('accepts successful responses without data and rejects failed responses', () => {
     expect(() => assertApiOk({ code: 0, msg: 'success' }, '保存失败')).not.toThrow()
-		expect(() => assertApiOk({ code: 409, msg: '名称已存在', message_safe: true }, '保存失败')).toThrow('名称已存在')
+    expect(() =>
+      assertApiOk({ code: 409, msg: '名称已存在', message_safe: true }, '保存失败'),
+    ).toThrow('名称已存在')
+  })
+
+  it('preserves a stable business error code from response data', () => {
+    expect.assertions(1)
+    try {
+      requireApiData(
+        {
+          code: 422,
+          msg: '视觉搜索失败',
+          message_safe: true,
+          data: { error_code: 'vision_search_timeout' },
+        },
+        'Visual Search failed',
+      )
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: 'vision_search_timeout',
+        data: { error_code: 'vision_search_timeout' },
+      })
+    }
   })
 
   it('creates a query selector that exposes domain data and rejects business failures', () => {

@@ -1,4 +1,5 @@
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
+import { i18n } from '../../../shared/i18n'
 import {
   commitCanvasGraphDeleteIntent,
   isCanvasGraphNodeId,
@@ -129,12 +130,12 @@ export function createCanvasDeleteCommandLifecycle(
 
   function deleteNode(nodeId: string): boolean {
     if (!isCanvasGraphNodeId(nodeId)) {
-      options.onWarning('删除操作未能写入画布，请刷新后重试')
+      options.onWarning(i18n.global.t('canvas.edges.deleteWriteFailedWarning'))
       return false
     }
     const store = options.readGraphStore()
     if (!store.getNode(nodeId)) {
-      options.onWarning('删除操作未能写入画布，请刷新后重试')
+      options.onWarning(i18n.global.t('canvas.edges.deleteWriteFailedWarning'))
       return false
     }
     try {
@@ -145,7 +146,7 @@ export function createCanvasDeleteCommandLifecycle(
       })
     } catch (error) {
       console.error('[Canvas] Failed to commit node delete transaction', error)
-      options.onWarning('删除操作未能写入画布，请刷新后重试')
+      options.onWarning(i18n.global.t('canvas.edges.deleteWriteFailedWarning'))
       return false
     }
   }
@@ -197,7 +198,7 @@ export function createCanvasDeleteCommandLifecycle(
     } catch (error) {
       console.error('[Canvas] Failed to commit native delete transaction', error)
     }
-    options.onWarning('删除操作未能应用，请刷新画布后重试')
+    options.onWarning(i18n.global.t('canvas.edges.deleteApplyFailedWarning'))
   }
 
   function scheduleCommit() {

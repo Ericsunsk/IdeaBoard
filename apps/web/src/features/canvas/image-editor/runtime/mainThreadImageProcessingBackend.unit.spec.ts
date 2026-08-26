@@ -140,7 +140,7 @@ describe('createMainThreadImageProcessingBackend', () => {
           outputPolicy: createImageProcessingOutputPolicy(),
         }),
       }),
-    ).rejects.toThrow('图像处理已取消')
+    ).rejects.toThrow('Image processing cancelled')
 
     expect(source.context.putImageData).not.toHaveBeenCalled()
     expect(source.canvas.toBlob).not.toHaveBeenCalled()

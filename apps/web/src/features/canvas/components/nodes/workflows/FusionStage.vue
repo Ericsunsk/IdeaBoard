@@ -50,14 +50,18 @@
         </template>
       </TransitionGroup>
     </div>
-    <div v-if="showBlendPad" class="fusion-blend-layer" aria-label="融合权重控制">
+    <div
+      v-if="showBlendPad"
+      class="fusion-blend-layer"
+      :aria-label="t('canvas.controls.blendControl')"
+    >
       <Transition name="fusion-blend-handle" appear>
         <button
           class="fusion-blend-handle"
           :class="{ 'is-hover': blendHandleHover, 'is-dragging': blendDragging }"
           type="button"
           :style="blendHandleStyle"
-          aria-label="拖动调整融合权重，双击重置"
+          :aria-label="t('canvas.controls.blendHandleHint')"
           @pointerdown.stop.prevent="onBlendHandlePointerDown"
           @pointerenter="onBlendHandlePointerEnter"
           @pointerleave="onBlendHandlePointerLeave"
@@ -87,6 +91,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watchPostEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { FusionNodeItem } from '../../../../canvas-board/domain'
 import {
   FUSION_SLOT_LAYOUT,
@@ -118,6 +123,8 @@ const emit = defineEmits<{
   (e: 'input-image-remove', value: FusionNodeItem['inputImages'][number]): void
   (e: 'contextmenu', event: MouseEvent): void
 }>()
+
+const { t } = useI18n()
 
 const thumbsRef = ref<HTMLElement | null>(null)
 type NodeStageFrameExpose = { stageElement: HTMLElement | null }

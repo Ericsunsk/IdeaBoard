@@ -4,7 +4,7 @@ import { IconoirProvider } from '@iconoir/vue'
 import PrimeVue from 'primevue/config'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { primeVueTestOptions } from '../../../test/primeVue'
+import { userPrimeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen, waitFor } from '../../../test/render'
 import { createDeferred } from '../../../test/deferred'
 import { useUserStore } from '../../auth/session/authSession'
@@ -118,8 +118,20 @@ const TestProviders = defineComponent({
     '<IconoirProvider><AccountManagementDialogContent :initial-tab="initialTab" /></IconoirProvider>',
 })
 
+// Resolve expected visible labels through the same locale the component uses.
+const enAccountMessages = (
+  (await import('../../../shared/i18n/locales/en/account')) as {
+    default: { tabs: Record<string, string> }
+  }
+).default
+
 const accountTabCases: Array<{ key: AccountManagementTab; label: string }> =
-  accountTabRegistry.flatMap(({ tabs }) => tabs.map(({ key, label }) => ({ key, label })))
+  accountTabRegistry.flatMap(({ tabs }) =>
+    tabs.map(({ key, labelKey }) => ({
+      key,
+      label: enAccountMessages.tabs[labelKey.replace('account.tabs.', '')],
+    })),
+  )
 
 function makeUser(): User {
   return {
@@ -145,7 +157,7 @@ function renderAccountManagementDialogContent(initialTab?: AccountManagementTab)
   return renderWithUser(TestProviders, {
     props: initialTab === undefined ? {} : { initialTab },
     global: {
-      plugins: [[PrimeVue, primeVueTestOptions], router],
+      plugins: [[PrimeVue, userPrimeVueTestOptions], router],
       stubs: {
         Avatar: AvatarStub,
         Button: ButtonStub,
@@ -155,19 +167,19 @@ function renderAccountManagementDialogContent(initialTab?: AccountManagementTab)
         transition: TransitionStub,
         UserBillingRecordsPane: {
           props: ['active'],
-          template: '<section aria-label="账单记录">最终收支记录</section>',
+          template: '<section aria-label="Transactions">最终收支记录</section>',
         },
         UserRechargePane: {
           props: ['active', 'paymentReturn'],
           template:
-            '<section aria-label="充值积分">选择充值数量<span v-if="paymentReturn">{{ paymentReturn.publicToken }}</span></section>',
+            '<section aria-label="Top up">选择充值数量<span v-if="paymentReturn">{{ paymentReturn.publicToken }}</span></section>',
         },
         UserUsagePane: {
           props: ['active'],
-          template: '<section aria-label="用量统计">Lifetime 数据</section>',
+          template: '<section aria-label="Usage">Lifetime 数据</section>',
         },
         UserRewardsPane: {
-          template: '<section aria-label="奖励中心">输入兑换码</section>',
+          template: '<section aria-label="Redeem code">输入兑换码</section>',
         },
       },
     },
@@ -208,8 +220,8 @@ describe('AccountManagementDialogContent', () => {
       'true',
     )
 
-    await user.click(screen.getByRole('button', { name: '账号安全' }))
-    expect(screen.getByRole('heading', { name: '账号安全' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Security' }))
+    expect(screen.getByRole('heading', { name: 'Security' })).toBeVisible()
   })
 
   it('switches panes immediately under reduced motion', async () => {
@@ -224,28 +236,27 @@ describe('AccountManagementDialogContent', () => {
       'false',
     )
 
-    await user.click(screen.getByRole('button', { name: '账号安全' }))
-    expect(screen.getByRole('heading', { name: '账号安全' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Security' }))
+    expect(screen.getByRole('heading', { name: 'Security' })).toBeVisible()
   })
 
   it('renders a left navigation rail with profile content in the right pane', () => {
     renderAccountManagementDialogContent()
 
-    expect(screen.getByRole('navigation', { name: '账户管理导航' })).toBeVisible()
-    expect(screen.getByRole('region', { name: '账户设置' })).toBeVisible()
-    expect(screen.getByRole('region', { name: '订阅与套餐' })).toBeVisible()
-    expect(screen.getByRole('region', { name: '权益和账单' })).toBeVisible()
-    expect(screen.getByRole('button', { name: '个人资料' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('button', { name: '充值积分' })).toBeVisible()
-    expect(screen.getByRole('button', { name: '订阅套餐' })).toBeVisible()
-    expect(screen.getByRole('button', { name: '奖励中心' })).toBeVisible()
-    expect(screen.getByRole('button', { name: '账单记录' })).toBeVisible()
-    expect(screen.getByRole('button', { name: '用量统计' })).toBeVisible()
+    expect(screen.getByRole('navigation', { name: 'Account navigation' })).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Account' })).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Billing' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Profile' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Top up' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Plans' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Redeem code' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Transactions' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Usage' })).toBeVisible()
     expect(screen.getByText('IdeaBoard')).toBeVisible()
-    expect(screen.getByRole('button', { name: '退出登录' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeVisible()
     expect(screen.getAllByText('mock-user')[0]).toBeVisible()
     expect(screen.getAllByText('USM001')[0]).toBeVisible()
-    expect(screen.getByRole('region', { name: '账户资料概览' })).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Account profile overview' })).toBeVisible()
     expect(screen.queryByText('00000000-0000-0000-0000-000000000001')).not.toBeInTheDocument()
     expect(screen.queryByText('正常使用中')).not.toBeInTheDocument()
   })
@@ -253,10 +264,10 @@ describe('AccountManagementDialogContent', () => {
   it('switches the right pane from profile to account security', async () => {
     const { user } = renderAccountManagementDialogContent()
 
-    await user.click(screen.getByRole('button', { name: '账号安全' }))
+    await user.click(screen.getByRole('button', { name: 'Security' }))
 
-    expect(screen.getByRole('button', { name: '账号安全' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('heading', { name: '账号安全' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Security' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('heading', { name: 'Security' })).toBeVisible()
     expect(screen.queryByText('00000000-0000-0000-0000-000000000001')).not.toBeInTheDocument()
   })
 
@@ -264,29 +275,29 @@ describe('AccountManagementDialogContent', () => {
     const { user } = renderAccountManagementDialogContent()
 
     expect(useAvatarUploadWorkflowMock).toHaveBeenCalledOnce()
-    await user.click(screen.getByRole('button', { name: '账号安全' }))
-    expect(screen.getByRole('heading', { name: '账号安全' })).toBeVisible()
-    await user.click(screen.getByRole('button', { name: '个人资料' }))
+    await user.click(screen.getByRole('button', { name: 'Security' }))
+    expect(screen.getByRole('heading', { name: 'Security' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Profile' }))
 
-    expect(screen.getByRole('heading', { name: '个人资料' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Profile' })).toBeVisible()
     expect(useAvatarUploadWorkflowMock).toHaveBeenCalledOnce()
   })
 
   it('opens billing records inside account management', async () => {
     const { user } = renderAccountManagementDialogContent()
 
-    await user.click(screen.getByRole('button', { name: '账单记录' }))
+    await user.click(screen.getByRole('button', { name: 'Transactions' }))
 
-    expect(screen.getByRole('button', { name: '账单记录' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('region', { name: '账单记录' })).toHaveTextContent('最终收支记录')
+    expect(screen.getByRole('button', { name: 'Transactions' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('region', { name: 'Transactions' })).toHaveTextContent('最终收支记录')
   })
 
   it('opens directly on the requested initial tab', () => {
     renderAccountManagementDialogContent('billing')
 
-    expect(screen.getByRole('button', { name: '账单记录' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('region', { name: '账单记录' })).toBeVisible()
-    expect(screen.queryByRole('region', { name: '账户资料概览' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Transactions' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('region', { name: 'Transactions' })).toBeVisible()
+    expect(screen.queryByRole('region', { name: 'Account profile overview' })).not.toBeInTheDocument()
   })
 
   it.each(accountTabCases)(
@@ -304,21 +315,21 @@ describe('AccountManagementDialogContent', () => {
     const { rerender } = renderAccountManagementDialogContent()
 
     await rerender({ initialTab: 'usage' })
-    expect(screen.getByRole('button', { name: '用量统计' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Usage' })).toHaveAttribute('aria-current', 'page')
 
     await rerender({ initialTab: 'unknown-tab' as AccountManagementTab })
-    expect(screen.getByRole('button', { name: '个人资料' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Profile' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('opens the recharge workflow', async () => {
     const { user } = renderAccountManagementDialogContent()
 
-    await user.click(screen.getByRole('button', { name: '充值积分' }))
+    await user.click(screen.getByRole('button', { name: 'Top up' }))
 
-    expect(screen.getByRole('region', { name: '充值积分' })).toHaveTextContent('选择充值数量')
+    expect(screen.getByRole('region', { name: 'Top up' })).toHaveTextContent('选择充值数量')
   })
 
-  it.each([['订阅套餐', '订阅套餐即将上线']])(
+  it.each([['Plans', 'Plans is coming soon']])(
     'opens the %s roadmap page',
     async (label, regionName) => {
       const { user } = renderAccountManagementDialogContent()
@@ -333,19 +344,19 @@ describe('AccountManagementDialogContent', () => {
   it('opens the rewards redemption pane', async () => {
     const { user } = renderAccountManagementDialogContent()
 
-    await user.click(screen.getByRole('button', { name: '奖励中心' }))
+    await user.click(screen.getByRole('button', { name: 'Redeem code' }))
 
-    expect(screen.getByRole('button', { name: '奖励中心' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('region', { name: '奖励中心' })).toHaveTextContent('输入兑换码')
+    expect(screen.getByRole('button', { name: 'Redeem code' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('region', { name: 'Redeem code' })).toHaveTextContent('输入兑换码')
   })
 
   it('opens lifetime usage inside account management', async () => {
     const { user } = renderAccountManagementDialogContent()
 
-    await user.click(screen.getByRole('button', { name: '用量统计' }))
+    await user.click(screen.getByRole('button', { name: 'Usage' }))
 
-    expect(screen.getByRole('button', { name: '用量统计' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('region', { name: '用量统计' })).toHaveTextContent('Lifetime 数据')
+    expect(screen.getByRole('button', { name: 'Usage' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('region', { name: 'Usage' })).toHaveTextContent('Lifetime 数据')
   })
 
   it('logs out directly from the left rail without extra confirmation', async () => {
@@ -353,7 +364,7 @@ describe('AccountManagementDialogContent', () => {
 
     expect(screen.queryByRole('group', { name: '退出登录确认' })).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: '退出登录' }))
+    await user.click(screen.getByRole('button', { name: 'Sign out' }))
 
     await vi.waitFor(() => {
       expect(logoutAndRedirectMock).toHaveBeenCalledWith(HOME_PATH)
@@ -365,30 +376,30 @@ describe('AccountManagementDialogContent', () => {
     const logoutRequest = createDeferred<boolean>()
     logoutAndRedirectMock.mockReturnValueOnce(logoutRequest.promise)
     const { user } = renderAccountManagementDialogContent()
-    const logoutButton = screen.getByRole('button', { name: '退出登录' })
+    const logoutButton = screen.getByRole('button', { name: 'Sign out' })
 
     await user.click(logoutButton)
 
     expect(logoutButton).toBeDisabled()
-    expect(logoutButton).toHaveAccessibleName('正在退出登录')
+    expect(logoutButton).toHaveAccessibleName('Signing out…')
     await user.click(logoutButton)
     expect(logoutAndRedirectMock).toHaveBeenCalledOnce()
 
     logoutRequest.resolve(false)
 
     await waitFor(() => expect(logoutButton).toBeEnabled())
-    expect(logoutButton).toHaveAccessibleName('退出登录')
-    expect(toastErrorMock).toHaveBeenCalledWith('退出登录失败，请稍后重试')
+    expect(logoutButton).toHaveAccessibleName('Sign out')
+    expect(toastErrorMock).toHaveBeenCalledWith('Sign-out failed. Please try again later.')
   })
 
   it('restores logout controls and shows safe feedback after a rejected request', async () => {
     logoutAndRedirectMock.mockRejectedValueOnce(new Error('sensitive provider failure'))
     const { user } = renderAccountManagementDialogContent()
-    const logoutButton = screen.getByRole('button', { name: '退出登录' })
+    const logoutButton = screen.getByRole('button', { name: 'Sign out' })
 
     await user.click(logoutButton)
 
     await waitFor(() => expect(logoutButton).toBeEnabled())
-    expect(toastErrorMock).toHaveBeenCalledWith('退出登录失败，请稍后重试')
+    expect(toastErrorMock).toHaveBeenCalledWith('Sign-out failed. Please try again later.')
   })
 })

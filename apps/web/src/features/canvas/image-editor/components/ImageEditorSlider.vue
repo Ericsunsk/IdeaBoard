@@ -10,7 +10,7 @@
         :max="max"
         :step="normalizedStep"
         :inputmode="inputMode"
-        :aria-label="`${label}数值`"
+        :aria-label="t('canvas.imageEditor.sliderValueAria', { label })"
         :value="value"
         @input="onInput"
       />
@@ -24,17 +24,16 @@
       :max="max"
       :step="normalizedStep"
       :value="value"
-      :aria-label="`${label}滑块`"
+      :aria-label="t('canvas.imageEditor.sliderAria', { label })"
       @input="onInput"
     />
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'
 import { readFiniteNumberInputValue } from '../utils/readFiniteNumberInputValue'
-
-type ImageEditorSliderTrackVariant = 'hue' | 'tonal' | 'tonal-reverse'
 
 const props = defineProps<{
   label: string
@@ -48,6 +47,10 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:value', value: number): void
 }>()
+
+const { t } = useI18n()
+
+type ImageEditorSliderTrackVariant = 'hue' | 'tonal' | 'tonal-reverse'
 
 const rangeClass = computed(() => ({
   'editing-controls-slider-row__range--hue': props.trackVariant === 'hue',
