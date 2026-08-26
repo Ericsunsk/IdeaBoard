@@ -1,8 +1,8 @@
 /*
  * Canvas node CSS contract.
  * Public classes: workflow-node-header, node-header-title, node-execution-body,
- * node-primary-action-slot, node-mode-card, node-control-*, node-option-row,
- * and node-inline-range. These are shared by Canvas node components only.
+ * node-primary-action-slot, node-mode-card, node-control-*, and node-option-row.
+ * These are shared by Canvas node components only.
  * Component-private classes stay in their owning .vue file.
  */
 
@@ -145,79 +145,4 @@
 .canvas-node-screen-ui {
   transform: scale(var(--canvas-node-ui-scale, 1));
   transform-origin: top center;
-}
-
-.node-inline-range {
-  margin: 0;
-  height: var(--canvas-range-input-height);
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  cursor: pointer;
-  /* accent-color provides cross-browser slider fill without moz-range-progress */
-  accent-color: var(--canvas-accent);
-}
-
-.node-inline-range::-webkit-slider-runnable-track {
-  height: var(--canvas-range-track-height);
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    var(--canvas-accent) 0%,
-    var(--canvas-accent) var(--slider-pct),
-    var(--canvas-track-bg) var(--slider-pct),
-    var(--canvas-track-bg) 100%
-  );
-}
-
-.node-inline-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: var(--canvas-range-thumb-size);
-  height: var(--canvas-range-thumb-size);
-  margin-top: var(--canvas-range-thumb-offset);
-  border: 0;
-  border-radius: 999px;
-  background: var(--canvas-accent);
-  box-shadow: none;
-}
-
-.node-inline-range::-moz-range-track {
-  height: var(--canvas-range-track-height);
-  border: 0;
-  border-radius: 999px;
-  background: var(--canvas-track-bg);
-}
-
-.node-inline-range::-moz-range-thumb {
-  width: var(--canvas-range-thumb-size);
-  height: var(--canvas-range-thumb-size);
-  border: 0;
-  border-radius: 999px;
-  background: var(--canvas-accent);
-  box-shadow: none;
-}
-
-/* suppress default focus ring; show accessible ring only for keyboard nav */
-.node-inline-range:focus {
-  outline: none;
-}
-
-.node-inline-range:focus-visible {
-  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
-  outline-offset: var(--ib-focus-outline-offset);
-  border-radius: 3px;
-}
-
-.node-inline-range:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.node-inline-range:active,
-.node-inline-range::-webkit-slider-runnable-track:active,
-.node-inline-range::-moz-range-track:active,
-.node-inline-range::-moz-range-thumb:active {
-  opacity: 1;
-  filter: none;
 }

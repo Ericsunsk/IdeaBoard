@@ -38,7 +38,7 @@
           />
           <button
             v-if="canAcceptMoreImages"
-            class="prompt-node-thumb-add node-input-thumbnail-add node-tool-output-count node-tool-button node-tool-tooltip-trigger"
+            class="prompt-node-thumb-add node-input-thumbnail-add node-tool-output-count node-tool-button canvas-tool-tooltip-trigger"
             :class="{
               'is-drag-over': addSlotDragOver,
             }"
@@ -53,7 +53,7 @@
             @drop.stop.prevent="onAddSlotDrop"
           >
             <Plus class="size-4" />
-            <span class="node-tool-tooltip" aria-hidden="true">{{ t('canvas.controls.addImageInput') }}</span>
+            <span class="canvas-tool-tooltip" aria-hidden="true">{{ t('canvas.controls.addImageInput') }}</span>
           </button>
         </div>
         <PromptTextComposer

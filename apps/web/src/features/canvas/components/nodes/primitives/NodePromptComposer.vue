@@ -24,7 +24,7 @@
       :billing-state="billingState"
       :textarea-class="promptInputClass"
       :actions-class="promptActionsClass"
-      send-button-class="image-node-prompt-send node-tool-send node-tool-button node-tool-tooltip-trigger"
+      send-button-class="image-node-prompt-send node-tool-send node-tool-button canvas-tool-tooltip-trigger"
       @update:model-value="emit('update:modelValue', $event)"
       @update:output-count="emit('update:output-count', $event)"
       @update:output-resolution="emit('update:output-resolution', $event)"

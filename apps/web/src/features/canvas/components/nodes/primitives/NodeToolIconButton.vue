@@ -5,7 +5,7 @@
     class="ib-control-state node-tool-icon-button inline-grid cursor-pointer place-items-center p-0 shadow-none"
     :class="{
       primary,
-      'node-tool-tooltip-trigger': !!resolvedTooltip,
+      'canvas-tool-tooltip-trigger': !!resolvedTooltip,
     }"
     :style="buttonStyle"
     :aria-label="resolvedAriaLabel"
@@ -14,7 +14,7 @@
     <span class="node-tool-icon-button__icon inline-grid place-items-center">
       <slot />
     </span>
-    <span v-if="resolvedTooltip" class="node-tool-tooltip" aria-hidden="true">
+    <span v-if="resolvedTooltip" class="canvas-tool-tooltip" aria-hidden="true">
       {{ resolvedTooltip }}
     </span>
   </button>

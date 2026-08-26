@@ -14,7 +14,7 @@
         @click.stop="emit('activate')"
       >
         <component :is="actionIcon" class="canvas-selection-group-action-icon" aria-hidden="true" />
-        <span class="node-tool-tooltip" aria-hidden="true">{{ action.label }}</span>
+        <span class="canvas-tool-tooltip" aria-hidden="true">{{ action.label }}</span>
       </button>
     </Transition>
   </div>
@@ -37,9 +37,8 @@ const emit = defineEmits<{
 }>()
 
 const actionButtonClass = createPageChromeRoundControlClass(
-  'canvas-chrome-icon-button',
   'canvas-selection-group-action-button',
-  'node-tool-tooltip-trigger',
+  'canvas-tool-tooltip-trigger',
 )
 const groupActionMotion = createPopoverMotionTransition()
 

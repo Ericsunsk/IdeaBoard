@@ -55,7 +55,7 @@
         @click="submit"
       >
         <SendDiagonalSolid class="size-4 translate-x-[0.5px]" />
-        <span class="node-tool-tooltip" aria-hidden="true">{{ billingTooltip }}</span>
+        <span class="canvas-tool-tooltip" aria-hidden="true">{{ billingTooltip }}</span>
       </button>
       <span
         v-if="touchQuoteLabel"

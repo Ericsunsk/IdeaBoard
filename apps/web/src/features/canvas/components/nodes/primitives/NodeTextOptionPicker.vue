@@ -2,14 +2,14 @@
   <div class="image-node-output-count-wrap node-tool-output-count-wrap">
     <button
       class="image-node-output-count node-tool-output-count node-tool-button"
-      :class="{ active: visible, 'node-tool-tooltip-trigger': !!tooltip }"
+      :class="{ active: visible, 'canvas-tool-tooltip-trigger': !!tooltip }"
       type="button"
       :disabled="disabled"
       :aria-label="label"
       @click.stop="emit('toggle')"
     >
       {{ format(modelValue) }}
-      <span v-if="tooltip" class="node-tool-tooltip" aria-hidden="true">
+      <span v-if="tooltip" class="canvas-tool-tooltip" aria-hidden="true">
         {{ tooltip }}
       </span>
     </button>

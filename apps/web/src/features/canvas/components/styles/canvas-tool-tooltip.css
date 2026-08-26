@@ -1,0 +1,33 @@
+/* Canvas feature-local tooltip contract for workspace tools, nodes, and editors. */
+.canvas-tool-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translate(-50%, 2px);
+  white-space: nowrap;
+  background: var(--canvas-tooltip-bg);
+  color: var(--canvas-tooltip-text);
+  border: var(--canvas-control-border-width) solid var(--canvas-accent-tooltip-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-feedback-duration) var(--motion-feedback-easing),
+    transform var(--motion-feedback-duration) var(--motion-feedback-easing);
+}
+
+.canvas-tool-tooltip-trigger {
+  --canvas-tool-tooltip-delay: 200ms;
+  position: relative;
+}
+
+.canvas-tool-tooltip-trigger:not(:disabled):hover .canvas-tool-tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  /* Dwell prevents accidental activation while crossing compact controls. */
+  transition-delay: var(--canvas-tool-tooltip-delay);
+}

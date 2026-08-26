@@ -165,8 +165,6 @@
 }
 
 .editing-controls-toggle-button {
-  /* Tooltip dwell prevents accidental activation while crossing editor controls. */
-  --node-tool-tooltip-delay: 200ms;
   width: 24px;
   height: var(--editing-controls-compact-control-height);
   display: inline-flex;

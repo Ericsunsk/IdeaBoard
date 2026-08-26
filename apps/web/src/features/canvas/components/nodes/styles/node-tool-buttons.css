@@ -3,7 +3,7 @@
  * Public classes: node-tool-surface, node-tool-button, node-tool-output-count,
  * node-tool-output-count-wrap, node-tool-output-count-option,
  * node-tool-output-count-popover, node-tool-popover-{grid,row},
- * node-tool-tooltip, node-tool-tooltip-trigger, and node-tool-send.
+ * node-tool-send. Canvas-wide tooltip presentation lives in canvas-tool-tooltip.css.
  * Consumers may set --node-tool-* variables on node-tool-surface; they should
  * not style component-private descendants owned by a specific .vue file.
  */
@@ -15,8 +15,6 @@
   --node-tool-button-gap: var(--canvas-tool-button-gap);
   --node-tool-icon-size: 21px;
   --node-tool-popover-option-height: 33px;
-  /* Tooltip dwell prevents accidental activation while crossing node tools. */
-  --node-tool-tooltip-delay: 200ms;
   --node-tool-button-border: var(--canvas-accent-border);
   --node-tool-button-accent: var(--canvas-accent);
   --node-tool-button-brand: var(--canvas-accent-hover);
@@ -93,37 +91,6 @@
 .node-tool-output-count-option:focus-visible {
   outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
   outline-offset: var(--ib-focus-outline-offset);
-}
-
-.node-tool-tooltip {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  transform: translate(-50%, 2px);
-  white-space: nowrap;
-  background: var(--canvas-tooltip-bg);
-  color: var(--canvas-tooltip-text);
-  border: var(--node-tool-border-width) solid var(--canvas-accent-tooltip-border);
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 11px;
-  line-height: 1.2;
-  letter-spacing: 0.01em;
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity var(--motion-feedback-duration) var(--motion-feedback-easing),
-    transform var(--motion-feedback-duration) var(--motion-feedback-easing);
-}
-
-.node-tool-tooltip-trigger {
-  position: relative;
-}
-
-.node-tool-tooltip-trigger:not(:disabled):hover .node-tool-tooltip {
-  opacity: 1;
-  transform: translate(-50%, 0);
-  transition-delay: var(--node-tool-tooltip-delay);
 }
 
 .node-tool-send {

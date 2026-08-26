@@ -24,14 +24,14 @@
       />
       <button
         v-if="canAddImageInput"
-        class="prompt-text-composer-image-add node-input-thumbnail-add node-tool-output-count node-tool-button node-tool-tooltip-trigger"
+        class="prompt-text-composer-image-add node-input-thumbnail-add node-tool-output-count node-tool-button canvas-tool-tooltip-trigger"
         type="button"
         :disabled="disabled"
         :aria-label="t('canvas.controls.addImageInput')"
         @click="emit('image-input-open')"
       >
         <Plus class="prompt-text-composer-image-add-icon size-4" />
-        <span class="node-tool-tooltip" aria-hidden="true">{{ t('canvas.controls.addImageInput') }}</span>
+        <span class="canvas-tool-tooltip" aria-hidden="true">{{ t('canvas.controls.addImageInput') }}</span>
       </button>
     </div>
     <PromptComposerControls
@@ -50,7 +50,7 @@
       :billing-state="billingState"
       :textarea-class="promptTextInputClass"
       actions-class="prompt-text-composer-actions flex self-end gap-[var(--node-tool-button-gap)]"
-      send-button-class="prompt-text-composer-send node-tool-send node-tool-button node-tool-tooltip-trigger"
+      send-button-class="prompt-text-composer-send node-tool-send node-tool-button canvas-tool-tooltip-trigger"
       @update:model-value="emit('update:modelValue', $event)"
       @update:output-count="emit('update:output-count', $event)"
       @update:output-resolution="emit('update:output-resolution', $event)"

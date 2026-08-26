@@ -15,14 +15,14 @@
       />
     </label>
     <button
-      class="editing-controls-toggle-button node-tool-tooltip-trigger"
+      class="editing-controls-toggle-button canvas-tool-tooltip-trigger"
       type="button"
       :aria-pressed="invert ? 'true' : 'false'"
       :aria-label="t('canvas.imageEditor.invertThresholdOutput')"
       @click="emit('update:invert', !invert)"
     >
       <FlipReverse aria-hidden="true" />
-      <span class="node-tool-tooltip" aria-hidden="true">{{ t("canvas.imageEditor.invertTooltip") }}</span>
+      <span class="canvas-tool-tooltip" aria-hidden="true">{{ t("canvas.imageEditor.invertTooltip") }}</span>
     </button>
   </div>
 </template>

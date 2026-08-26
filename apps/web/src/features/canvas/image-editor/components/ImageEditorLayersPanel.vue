@@ -23,13 +23,13 @@
         <button
           v-else
           type="button"
-          class="image-editor-layer-row__visibility node-tool-tooltip-trigger"
+          class="image-editor-layer-row__visibility canvas-tool-tooltip-trigger"
           :aria-label="layer.visible ? t('canvas.imageEditor.hideLayer') : t('canvas.imageEditor.showLayer')"
           @click.stop="onToggleVisibility(layer)"
         >
           <Eye v-if="layer.visible" class="image-editor-layer-row__icon" />
           <EyeClosed v-else class="image-editor-layer-row__icon" />
-          <span class="node-tool-tooltip" aria-hidden="true">
+          <span class="canvas-tool-tooltip" aria-hidden="true">
             {{ layer.visible ? t('canvas.imageEditor.hideLayer') : t('canvas.imageEditor.showLayer') }}
           </span>
         </button>
@@ -173,7 +173,7 @@ function assertNever(value: never): never {
   outline-offset: var(--ib-focus-outline-offset);
 }
 
-.image-editor-layer-row__visibility .node-tool-tooltip {
+.image-editor-layer-row__visibility .canvas-tool-tooltip {
   top: 50%;
   bottom: auto;
   right: calc(100% + 6px);
@@ -181,7 +181,7 @@ function assertNever(value: never): never {
   transform: translate(-2px, -50%);
 }
 
-.image-editor-layer-row__visibility.node-tool-tooltip-trigger:hover .node-tool-tooltip {
+.image-editor-layer-row__visibility.canvas-tool-tooltip-trigger:hover .canvas-tool-tooltip {
   transform: translate(0, -50%);
 }
 

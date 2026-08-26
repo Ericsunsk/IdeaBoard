@@ -11,6 +11,8 @@ const canvasScreen = readSource('workspace-ui/CanvasScreen.vue')
 const surfaceSkin = readSource('components/styles/canvas-surface-skin.css')
 const appStyle = readSource('../../app/style.css')
 const chromeSkin = readSource('components/styles/canvas-chrome.css')
+const styleContracts = readSource('components/styles/canvas-style-contracts.css')
+const toolTooltipSkin = readSource('components/styles/canvas-tool-tooltip.css')
 const nodeSkin = readSource('components/nodes/styles/node-shared.css')
 const nodeToolSkin = readSource('components/nodes/styles/node-tool-buttons.css')
 const nodeStageFrame = readSource('components/nodes/primitives/NodeStageFrame.vue')
@@ -98,6 +100,16 @@ describe('Canvas surface skin contract', () => {
     expect(nodeStageFrame).toContain('--node-stage-frame-emphasis-shadow-primary')
     expect(imageEditorLayerActions).toContain('@media (prefers-reduced-motion: reduce)')
     expect(maskEditorChrome).toContain(':disabled="directGenerating"')
+  })
+
+  it('owns tooltips at the Canvas feature boundary without legacy node-only contracts', () => {
+    expect(styleContracts).toContain("@import './canvas-tool-tooltip.css'")
+    expect(toolTooltipSkin).toContain('.canvas-tool-tooltip')
+    expect(toolTooltipSkin).toContain('.canvas-tool-tooltip-trigger')
+    expect(toolTooltipSkin).toContain('--canvas-tool-tooltip-delay: 200ms')
+    expect(toolTooltipSkin).toContain('transition-delay: var(--canvas-tool-tooltip-delay)')
+    expect(nodeToolSkin).not.toContain('node-tool-tooltip')
+    expect(nodeSkin).not.toContain('node-inline-range')
   })
 
   it('contains rendered adjustment previews within the existing image stage geometry', () => {

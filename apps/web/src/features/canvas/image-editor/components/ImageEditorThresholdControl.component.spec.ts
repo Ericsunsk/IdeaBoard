@@ -132,7 +132,7 @@ describe('ImageEditorThresholdControl', () => {
 
     expect(invertButton).toHaveAttribute('aria-pressed', 'false')
     expect(invertButton).toHaveClass('editing-controls-toggle-button')
-    expect(invertButton.querySelector('.node-tool-tooltip')?.textContent?.trim()).toBe('Invert')
+    expect(invertButton.querySelector('.canvas-tool-tooltip')?.textContent?.trim()).toBe('Invert')
 
     await user.click(invertButton)
 

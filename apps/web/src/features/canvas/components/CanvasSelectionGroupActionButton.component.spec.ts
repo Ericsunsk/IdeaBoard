@@ -28,10 +28,11 @@ describe('CanvasSelectionGroupActionButton', () => {
     expect(button?.getAttribute('aria-label')).toBe('Group')
     expect(button?.getAttribute('title')).toBe('Group')
     expect(button?.getAttribute('class')).toContain('ib-round-control')
-    expect(button?.getAttribute('class')).toContain('canvas-chrome-icon-button')
+    expect(button?.getAttribute('class')).not.toContain('canvas-chrome-icon-button')
+    expect(button?.getAttribute('class')).toContain('canvas-tool-tooltip-trigger')
     expect(button?.style.left).toBe('420px')
     expect(button?.style.top).toBe('88px')
-    expect(container.querySelector('.node-tool-tooltip')?.textContent).toBe('Group')
+    expect(container.querySelector('.canvas-tool-tooltip')?.textContent).toBe('Group')
     expect(container.querySelector('[data-testid="group-action-transition"]')).toHaveAttribute(
       'data-transition-name',
       'ib-popover-motion',
@@ -55,7 +56,7 @@ describe('CanvasSelectionGroupActionButton', () => {
     })
 
     expect(visible.container.querySelector('button')?.getAttribute('aria-label')).toBe('Ungroup')
-    expect(visible.container.querySelector('.node-tool-tooltip')?.textContent).toBe('Ungroup')
+    expect(visible.container.querySelector('.canvas-tool-tooltip')?.textContent).toBe('Ungroup')
     expect(visible.container.querySelector('button')?.style.left).toBe('270px')
     expect(visible.container.querySelector('button')?.style.top).toBe('88px')
 

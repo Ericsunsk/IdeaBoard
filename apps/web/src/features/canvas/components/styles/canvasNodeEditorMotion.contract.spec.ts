@@ -21,6 +21,7 @@ const nodeMotionSources = [
   'components/nodes/styles/node-input-thumbnails.css',
   'components/nodes/styles/node-shared.css',
   'components/nodes/styles/node-tool-buttons.css',
+  'components/styles/canvas-tool-tooltip.css',
 ].map(readSource)
 
 const editorMotionSources = [

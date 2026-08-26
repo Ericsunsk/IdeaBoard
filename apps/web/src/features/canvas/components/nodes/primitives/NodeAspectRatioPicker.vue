@@ -3,7 +3,7 @@
     class="node-aspect-ratio-wrap relative h-[var(--node-tool-button-size)] w-[var(--node-tool-button-size)]"
   >
     <button
-      class="node-aspect-ratio-trigger node-tool-tooltip-trigger inline-flex h-[var(--node-tool-button-size)] w-[var(--node-tool-button-size)] flex-[0_0_var(--node-tool-button-size)] cursor-pointer items-center justify-center rounded-[var(--node-tool-button-radius)] border-[length:var(--node-tool-border-width)] border-solid border-[color:var(--node-tool-button-border)] bg-[var(--canvas-glass-bg)] p-0 text-xs leading-none font-bold text-[var(--canvas-text-control)] outline-none backdrop-blur-[var(--canvas-glass-blur)] disabled:cursor-wait disabled:opacity-[0.55]"
+      class="node-aspect-ratio-trigger canvas-tool-tooltip-trigger inline-flex h-[var(--node-tool-button-size)] w-[var(--node-tool-button-size)] flex-[0_0_var(--node-tool-button-size)] cursor-pointer items-center justify-center rounded-[var(--node-tool-button-radius)] border-[length:var(--node-tool-border-width)] border-solid border-[color:var(--node-tool-button-border)] bg-[var(--canvas-glass-bg)] p-0 text-xs leading-none font-bold text-[var(--canvas-text-control)] outline-none backdrop-blur-[var(--canvas-glass-blur)] disabled:cursor-wait disabled:opacity-[0.55]"
       type="button"
       :class="{ active: visible }"
       :disabled="disabled"
@@ -19,14 +19,14 @@
           aria-hidden="true"
         ></span>
       </span>
-      <span class="node-tool-tooltip" aria-hidden="true">{{ resolvedTooltip }}</span>
+      <span class="canvas-tool-tooltip" aria-hidden="true">{{ resolvedTooltip }}</span>
     </button>
     <NodeToolPopover :visible="visible" layout="row" class="node-aspect-ratio-popover">
       <button
         v-for="option in PROMPT_ASPECT_RATIO_OPTIONS"
         :key="option"
         type="button"
-        class="node-aspect-ratio-option node-tool-tooltip-trigger relative h-[var(--node-tool-popover-option-height)] w-[var(--node-tool-button-size)] cursor-pointer rounded-none border-0 bg-transparent p-0 text-[var(--canvas-text-option)]"
+        class="node-aspect-ratio-option canvas-tool-tooltip-trigger relative h-[var(--node-tool-popover-option-height)] w-[var(--node-tool-button-size)] cursor-pointer rounded-none border-0 bg-transparent p-0 text-[var(--canvas-text-option)]"
         :class="{ active: option === ratio }"
         :disabled="disabled"
         :aria-label="option"
@@ -41,7 +41,7 @@
             aria-hidden="true"
           ></span>
         </span>
-        <span class="node-tool-tooltip" aria-hidden="true">{{ option }}</span>
+        <span class="canvas-tool-tooltip" aria-hidden="true">{{ option }}</span>
       </button>
     </NodeToolPopover>
   </div>

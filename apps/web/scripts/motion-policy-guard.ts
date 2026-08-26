@@ -16,17 +16,9 @@ const localMotionAllowances: Record<string, LocalMotionAllowance> = {
     reason:
       'Canvas execution edges use a continuous activity cycle; finite Motion Policy intents do not describe cycle speed.',
   },
-  'src/features/canvas/components/nodes/styles/node-tool-buttons.css': {
-    properties: ['--node-tool-tooltip-delay'],
-    reason: 'Node tooltips need a dwell delay, which is not a transition duration.',
-  },
-  'src/features/canvas/components/styles/editing-controls.css': {
-    properties: ['--node-tool-tooltip-delay'],
-    reason: 'Image-editor tooltips need a dwell delay, which is not a transition duration.',
-  },
-  'src/features/canvas/components/nodes/primitives/NodeActionButton.vue': {
-    properties: ['--node-tool-tooltip-delay'],
-    reason: 'The compact node action tooltip needs a dwell delay, not a motion duration.',
+  'src/features/canvas/components/styles/canvas-tool-tooltip.css': {
+    properties: ['--canvas-tool-tooltip-delay'],
+    reason: 'Canvas tooltips need a dwell delay, which is not a transition duration.',
   },
   'src/features/canvas/components/nodes/styles/node-shared.css': {
     properties: ['--node-running-border-cycle'],

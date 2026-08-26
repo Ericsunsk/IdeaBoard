@@ -8,7 +8,7 @@
         active,
         'w-full': full,
         'ml-auto': pushRight,
-        'node-tool-tooltip-trigger': !!resolvedTooltip,
+        'canvas-tool-tooltip-trigger': !!resolvedTooltip,
       },
     ]"
     :disabled="disabled"
@@ -16,7 +16,7 @@
     @click="emit('click', $event)"
   >
     <slot />
-    <span v-if="resolvedTooltip" class="node-tool-tooltip" aria-hidden="true">
+    <span v-if="resolvedTooltip" class="canvas-tool-tooltip" aria-hidden="true">
       {{ resolvedTooltip }}
     </span>
   </button>
@@ -67,8 +67,6 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
 <style scoped>
 .node-action-btn {
   --node-tool-border-width: var(--canvas-control-border-width);
-  /* Tooltip dwell prevents accidental activation while crossing compact controls. */
-  --node-tool-tooltip-delay: 200ms;
   --node-tool-button-accent: var(--canvas-accent);
   --node-tool-button-brand: var(--canvas-accent-hover);
 }
