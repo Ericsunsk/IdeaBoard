@@ -1,7 +1,10 @@
 import type { PrimeVueLocaleOptions } from 'primevue/config'
+import type { SupportedLocale } from '../shared/i18n'
 
-export const ideaBoardUserPrimeLocale = {
-  fileSizeTypes: ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'],
+const FILE_SIZE_TYPES = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
+
+export const userPrimeLocaleEn: PrimeVueLocaleOptions = {
+  fileSizeTypes: FILE_SIZE_TYPES,
   dayNames: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
   dayNamesShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
   dayNamesMin: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
@@ -59,4 +62,201 @@ export const ideaBoardUserPrimeLocale = {
     previous: 'Previous',
     next: 'Next',
   },
-} satisfies PrimeVueLocaleOptions
+}
+
+export const userPrimeLocaleZhCN: PrimeVueLocaleOptions = {
+  fileSizeTypes: FILE_SIZE_TYPES,
+  dayNames: ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'],
+  dayNamesShort: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
+  dayNamesMin: ['日', '一', '二', '三', '四', '五', '六'],
+  monthNames: [
+    '一月',
+    '二月',
+    '三月',
+    '四月',
+    '五月',
+    '六月',
+    '七月',
+    '八月',
+    '九月',
+    '十月',
+    '十一月',
+    '十二月',
+  ],
+  monthNamesShort: [
+    '1月',
+    '2月',
+    '3月',
+    '4月',
+    '5月',
+    '6月',
+    '7月',
+    '8月',
+    '9月',
+    '10月',
+    '11月',
+    '12月',
+  ],
+  firstDayOfWeek: 1,
+  showMonthAfterYear: true,
+  dateFormat: 'yy-mm-dd',
+  chooseDate: '选择日期和时间',
+  chooseMonth: '选择月份',
+  chooseYear: '选择年份',
+  prevDecade: '上一个十年',
+  nextDecade: '下一个十年',
+  prevYear: '上一年',
+  nextYear: '下一年',
+  prevMonth: '上个月',
+  nextMonth: '下个月',
+  prevHour: '上一小时',
+  nextHour: '下一小时',
+  prevMinute: '上一分钟',
+  nextMinute: '下一分钟',
+  prevSecond: '上一秒',
+  nextSecond: '下一秒',
+  today: '今天',
+  clear: '清除',
+  weekHeader: '周',
+  aria: {
+    close: '关闭',
+    previous: '上一个',
+    next: '下一个',
+  },
+}
+
+export const userPrimeLocaleEs: PrimeVueLocaleOptions = {
+  fileSizeTypes: FILE_SIZE_TYPES,
+  dayNames: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+  dayNamesShort: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
+  dayNamesMin: ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'],
+  monthNames: [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
+  ],
+  monthNamesShort: [
+    'Ene',
+    'Feb',
+    'Mar',
+    'Abr',
+    'May',
+    'Jun',
+    'Jul',
+    'Ago',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dic',
+  ],
+  firstDayOfWeek: 1,
+  showMonthAfterYear: false,
+  dateFormat: 'dd/mm/yy',
+  chooseDate: 'Elegir fecha y hora',
+  chooseMonth: 'Elegir mes',
+  chooseYear: 'Elegir año',
+  prevDecade: 'Década anterior',
+  nextDecade: 'Década siguiente',
+  prevYear: 'Año anterior',
+  nextYear: 'Año siguiente',
+  prevMonth: 'Mes anterior',
+  nextMonth: 'Mes siguiente',
+  prevHour: 'Hora anterior',
+  nextHour: 'Hora siguiente',
+  prevMinute: 'Minuto anterior',
+  nextMinute: 'Minuto siguiente',
+  prevSecond: 'Segundo anterior',
+  nextSecond: 'Segundo siguiente',
+  today: 'Hoy',
+  clear: 'Limpiar',
+  weekHeader: 'Sm',
+  aria: {
+    close: 'Cerrar',
+    previous: 'Anterior',
+    next: 'Siguiente',
+  },
+}
+
+export const userPrimeLocaleKo: PrimeVueLocaleOptions = {
+  fileSizeTypes: FILE_SIZE_TYPES,
+  dayNames: ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'],
+  dayNamesShort: ['일', '월', '화', '수', '목', '금', '토'],
+  dayNamesMin: ['일', '월', '화', '수', '목', '금', '토'],
+  monthNames: [
+    '1월',
+    '2월',
+    '3월',
+    '4월',
+    '5월',
+    '6월',
+    '7월',
+    '8월',
+    '9월',
+    '10월',
+    '11월',
+    '12월',
+  ],
+  monthNamesShort: [
+    '1월',
+    '2월',
+    '3월',
+    '4월',
+    '5월',
+    '6월',
+    '7월',
+    '8월',
+    '9월',
+    '10월',
+    '11월',
+    '12월',
+  ],
+  firstDayOfWeek: 0,
+  showMonthAfterYear: true,
+  dateFormat: 'yy-mm-dd',
+  chooseDate: '날짜 및 시간 선택',
+  chooseMonth: '월 선택',
+  chooseYear: '연도 선택',
+  prevDecade: '이전 10년',
+  nextDecade: '다음 10년',
+  prevYear: '이전 연도',
+  nextYear: '다음 연도',
+  prevMonth: '이전 달',
+  nextMonth: '다음 달',
+  prevHour: '이전 시간',
+  nextHour: '다음 시간',
+  prevMinute: '이전 분',
+  nextMinute: '다음 분',
+  prevSecond: '이전 초',
+  nextSecond: '다음 초',
+  today: '오늘',
+  clear: '지우기',
+  weekHeader: '주',
+  aria: {
+    close: '닫기',
+    previous: '이전',
+    next: '다음',
+  },
+}
+
+export function getUserPrimeLocale(locale: SupportedLocale): PrimeVueLocaleOptions {
+  switch (locale) {
+    case 'zh-CN':
+      return userPrimeLocaleZhCN
+    case 'es':
+      return userPrimeLocaleEs
+    case 'ko':
+      return userPrimeLocaleKo
+    case 'en':
+    default:
+      return userPrimeLocaleEn
+  }
+}

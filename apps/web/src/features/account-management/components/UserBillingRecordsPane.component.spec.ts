@@ -85,7 +85,7 @@ describe('UserBillingRecordsPane', () => {
       'p-datatable-table-container',
       'app-scrollbar',
     )
-    expect(screen.getAllByText('2026-07-14 09:08:07')).toHaveLength(3)
+    expect(screen.getAllByText('07/14/2026, 09:08:07')).toHaveLength(3)
     expect(screen.getByText('-20')).toHaveClass('text-ib-text')
     expect(screen.getByText('+50')).toHaveClass('text-ib-success')
     expect(screen.getByText('-5')).toHaveClass('text-ib-danger')

@@ -1,0 +1,61 @@
+/** Workspace (board catalog) y sincronización de tablero compartido. */
+export default {
+  catalog: {
+    reloadRequired: 'La lista de lienzos necesita recargarse',
+    reloading: 'Recargando…',
+    reload: 'Recargar',
+  },
+  deleteDialog: {
+    title: 'Eliminar lienzo',
+    description: '¿Eliminar "{name}"? Esta acción no se puede deshacer.',
+    deleting: 'Eliminando…',
+  },
+  feedback: {
+    createNameConflict: 'Ya existe un lienzo con este nombre. Inténtelo de nuevo.',
+    createSyncFailed: 'No se pudo crear el lienzo. Inténtelo de nuevo más tarde.',
+    nameAlreadyExists: 'El nombre ya existe',
+    nameEmpty: 'El nombre del lienzo no puede estar vacío',
+    renameConflictReloaded: 'Conflicto de nombre. Se ha recargado la lista de lienzos.',
+    renameSyncFailedRolledBack: 'Error al sincronizar el cambio de nombre. Se restauró el nombre original.',
+    renameConflictRecoveryIncomplete:
+      'Conflicto de nombre y recuperación incompleta. Recargue la lista de lienzos.',
+    renameSyncFailedNoRollback:
+      'Error al sincronizar el cambio de nombre y no se pudo restaurar. Recargue la lista de lienzos.',
+    renamed: 'Lienzo renombrado',
+    copyFailed: 'Error al copiar',
+    duplicateNameConflict: 'Ya existe un lienzo con el nombre copiado. Inténtelo de nuevo.',
+    duplicateSyncFailed: 'Error al sincronizar la copia. Inténtelo de nuevo más tarde.',
+    duplicated: 'Lienzo copiado',
+    deleteSyncFailed: 'Error al eliminar. Inténtelo de nuevo más tarde.',
+    deleteFailed: 'Error al eliminar',
+    deleted: 'Lienzo eliminado',
+    syncFailedRetry: 'Error al sincronizar el lienzo. Inténtelo de nuevo más tarde.',
+    reloaded: 'Lista de lienzos recargada',
+  },
+  joinSharedBoard: {
+    missingToken: 'Falta el token de recurso compartido',
+    joinFailed: 'No se pudo unir al lienzo compartido',
+    missingBoardId: 'El servidor no devolvió un ID de lienzo válido',
+    hydrateFailed: 'Error al sincronizar el lienzo. Inténtelo de nuevo más tarde.',
+  },
+  sync: {
+    listFailed: 'No se pudo sincronizar la lista de lienzos',
+    saveFailed: 'No se pudo guardar el lienzo',
+    deleteFailed: 'No se pudo eliminar el lienzo',
+  },
+  boards: {
+    subtitle: 'Explora, amplía y perfecciona tus ideas',
+    newCanvas: 'Nuevo lienzo',
+    searchPlaceholder: 'Buscar lienzos...',
+    sortLabel: 'Ordenar lienzos',
+    sortRecent: 'Reciente',
+    sortName: 'Nombre',
+    createNewCanvas: 'Crear nuevo lienzo',
+    startFromEmpty: 'Empieza desde un lienzo vacío',
+    noMatchingCanvas: 'No hay lienzos coincidentes',
+    untitledCanvas: 'Lienzo sin título',
+    moreActions: 'Más acciones',
+    duplicate: 'Duplicar',
+    edited: 'Editado {date}',
+  },
+} as const

@@ -19,8 +19,21 @@ export default {
     generate: 'Generate',
   },
   node: {
+    image: 'Image',
+    prompt: 'Prompt',
+    fusion: 'Fusion',
+    unsupported: 'Unsupported node',
     preview: 'Preview',
     processing: 'Processing…',
+  },
+  states: {
+    failed: 'Failed',
+  },
+  homeHero: {
+    tagline: 'AI CANVAS FOR VISUAL DESIGNERS',
+    getStarted: 'Get started',
+    note: '{projectName} is an AI Canvas for Visual Designers to explore, compare, and refine image directions in one connected workspace.',
+    legalNavAria: 'Legal links',
   },
   task: {
     stillProcessing: 'Still processing — check back in a moment.',
@@ -34,6 +47,7 @@ export default {
   },
   controls: {
     prompt: 'Prompt',
+    promptPlaceholder: 'type your idea...',
     send: 'Send',
     free: 'Free',
     selectImageCountTooltip: 'Select image count',
@@ -57,6 +71,7 @@ export default {
     uploadOrDropImage: 'Upload or drag an image as input',
     generatingUploadBlocked: 'Image is being generated; upload unavailable',
     waitingToUpload: 'Waiting for generation to finish before uploading',
+    waiting: 'Waiting...',
     uploadImageInput: 'Upload image as input',
     fusionPlaceholder: 'Enter fusion prompt',
     blendControl: 'Fusion weight control',
@@ -82,6 +97,7 @@ export default {
     boardName: 'Canvas name',
     clickToRenameBoard: 'Click to rename canvas',
     selectBoard: 'Select canvas',
+    noCanvas: 'No canvas',
     syncingName: 'Syncing name',
     reloadingCatalog: 'Reloading canvas list',
     catalogReloadRequired: 'Canvas list needs reloading',

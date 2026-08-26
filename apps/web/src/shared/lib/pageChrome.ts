@@ -18,6 +18,6 @@ export function createPageChromeRoundControlClass(...extraClasses: string[]) {
   return joinClassNames(pageChromeClasses.roundControl, ...extraClasses)
 }
 
-export function createPageChromeAccountAvatarButtonClass(...extraClasses: string[]) {
+export function createPageChromeAccountRoundControlClass(...extraClasses: string[]) {
   return joinClassNames(pageChromeAccountMenuClasses.avatarButton, ...extraClasses)
 }

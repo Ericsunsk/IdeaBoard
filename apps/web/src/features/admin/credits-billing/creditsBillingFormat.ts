@@ -2,7 +2,7 @@ import type {
   CreditLedgerTransaction,
   CreditReconciliationRun,
 } from '../../../shared/api/generated-query/model'
-import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
+import { formatIdeaAmount } from '../shared/lib/adminIdeaCurrency'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 
 const dateTimeFormat = new Intl.DateTimeFormat('zh-CN', {

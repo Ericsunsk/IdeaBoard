@@ -115,7 +115,7 @@
       </div>
     </template>
     <template v-else>
-      <div class="flow-canvas-node__unsupported">Unsupported node</div>
+      <div class="flow-canvas-node__unsupported">{{ t('canvas.node.unsupported') }}</div>
     </template>
     <FlowCanvasNodeHandleRail
       v-if="hasRenderedNode"
@@ -130,6 +130,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { CanvasExtendDragAnchor } from '../image-workflow/useImageCanvasExtendOverlay'
@@ -186,6 +187,8 @@ const emit = defineEmits<{
   (e: 'node-intent', intent: CanvasNodePresentationIntent): void
   (e: 'node-mousedown', nodeId: string, event: MouseEvent): void
 }>()
+
+const { t } = useI18n()
 
 const showDefaultDragZone = false
 const flowCanvasNodeRef = ref<HTMLElement | null>(null)

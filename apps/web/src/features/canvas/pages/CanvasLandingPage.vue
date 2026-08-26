@@ -85,7 +85,7 @@
       </div>
 
       <nav
-        aria-label="Legal links"
+        :aria-label="t('canvas.homeHero.legalNavAria')"
         class="absolute right-6 bottom-5 z-20 flex max-w-[calc(100%-3rem)] flex-wrap justify-end gap-x-5 gap-y-1 text-[13px] font-medium text-[#5f6368] max-[640px]:right-4 max-[640px]:bottom-4 max-[640px]:gap-x-3 max-[640px]:text-[12px]"
       >
         <RouterLink
@@ -103,6 +103,7 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import bootsAsset from '../assets/home/boots.svg'
 import portraitAsset from '../assets/home/portrait.svg'
 import socksAsset from '../assets/home/socks.svg'
@@ -113,6 +114,7 @@ import { USER_SEARCH_PATH } from '../../../shared/constants/routePaths'
 import { PUBLIC_LEGAL_LINKS } from '../../../shared/constants/legalLinks'
 
 const router = useRouter()
+const { t } = useI18n()
 const { projectName } = useSiteBranding()
 
 const homeHeroAssets = {

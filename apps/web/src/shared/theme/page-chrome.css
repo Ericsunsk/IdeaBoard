@@ -1,6 +1,13 @@
 @layer components {
   .ib-page-chrome-account {
     --ib-page-chrome-control-size: 40px;
+    --ib-page-chrome-account-border: var(--color-board-card-border);
+    --ib-page-chrome-account-border-hover: var(--color-board-card-border-hover);
+    --ib-page-chrome-account-bg: var(--color-board-control-bg);
+    --ib-page-chrome-account-bg-hover: var(--color-ib-surface-hover);
+    --ib-page-chrome-account-color: var(--color-board-card-action);
+    --ib-page-chrome-account-color-hover: var(--color-board-card-action-hover);
+    --ib-page-chrome-account-focus-ring: var(--color-board-focus-ring);
     display: inline-flex;
     min-width: var(--ib-page-chrome-control-size);
     height: var(--ib-page-chrome-control-size);
@@ -11,5 +18,18 @@
 
   .ib-page-chrome-account > .ib-page-chrome-control {
     flex: none;
+  }
+
+  .ib-page-chrome-account > .ib-round-control.ib-page-chrome-control {
+    --ib-round-control-border-width: 1px;
+    --ib-round-control-border: var(--ib-page-chrome-account-border);
+    --ib-round-control-border-hover: var(--ib-page-chrome-account-border-hover);
+    --ib-round-control-bg: var(--ib-page-chrome-account-bg);
+    --ib-round-control-bg-hover: var(--ib-page-chrome-account-bg-hover);
+    --ib-round-control-bg-disabled: var(--ib-page-chrome-account-bg);
+    --ib-round-control-color: var(--ib-page-chrome-account-color);
+    --ib-round-control-color-hover: var(--ib-page-chrome-account-color-hover);
+    --ib-round-control-color-disabled: var(--color-board-card-text);
+    --ib-round-control-focus-ring: var(--ib-page-chrome-account-focus-ring);
   }
 }

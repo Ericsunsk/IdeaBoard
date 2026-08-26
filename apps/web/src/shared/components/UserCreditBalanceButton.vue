@@ -49,9 +49,12 @@ defineProps<{
   padding: 0 13px 0 11px;
   flex: none;
   overflow: hidden;
-  border: 1px solid var(--user-credit-pill-border, var(--color-board-card-border));
+  border: 1px solid var(--ib-page-chrome-account-border, var(--color-board-card-border));
   border-radius: 9999px;
-  background: var(--user-credit-pill-bg, var(--color-board-control-bg, rgba(255, 255, 255, 0.8)));
+  background: var(
+    --ib-page-chrome-account-bg,
+    var(--color-board-control-bg, rgba(255, 255, 255, 0.8))
+  );
   color: var(--color-ib-text);
   box-shadow: var(--shadow-ib-control);
   backdrop-filter: blur(var(--ib-glass-blur));
@@ -70,12 +73,12 @@ defineProps<{
 }
 
 .user-credit-pill:hover {
-  border-color: var(--user-credit-pill-border-hover, var(--color-ib-border-hover));
-  background: var(--color-ib-surface-hover);
+  border-color: var(--ib-page-chrome-account-border-hover, var(--color-ib-border-hover));
+  background: var(--ib-page-chrome-account-bg-hover, var(--color-ib-surface-hover));
 }
 
 .user-credit-pill:active {
-  border-color: var(--user-credit-pill-border-active, var(--color-ib-border-pressed));
+  border-color: var(--ib-page-chrome-account-border-hover, var(--color-ib-border-pressed));
   background: var(--color-ib-surface-pressed);
 }
 

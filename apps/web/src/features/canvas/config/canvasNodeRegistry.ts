@@ -12,22 +12,22 @@ type ExecutionActionLabelKeys = { readyKey: string; runningKey: string }
 
 type CanvasNodeUiRegistryItem = {
   kind: CanvasConnectionNodeType
-  defaultTitle: string
+  defaultTitleKey: string
   primaryAction?: ExecutionActionLabelKeys
 }
 
 const CANVAS_NODE_UI_REGISTRY = {
   image: {
     kind: 'image',
-    defaultTitle: 'Image',
+    defaultTitleKey: 'canvas.node.image',
   },
   prompt: {
     kind: 'prompt',
-    defaultTitle: 'Prompt',
+    defaultTitleKey: 'canvas.node.prompt',
   },
   fusion: {
     kind: 'fusion',
-    defaultTitle: 'Fusion',
+    defaultTitleKey: 'canvas.node.fusion',
     primaryAction: {
       readyKey: 'canvas.workflow.generate',
       runningKey: 'canvas.node.processing',
@@ -42,7 +42,7 @@ function getCanvasNodeUiRegistryItem(nodeType: CanvasConnectionNodeType): Canvas
 }
 
 export function getDefaultCanvasNodeTitle(nodeType: CanvasConnectionNodeType): string {
-  return getCanvasNodeUiRegistryItem(nodeType).defaultTitle
+  return i18n.global.t(getCanvasNodeUiRegistryItem(nodeType).defaultTitleKey)
 }
 
 export function getCanvasNodeExecutionActionLabels(
@@ -55,8 +55,8 @@ export function getCanvasNodeExecutionActionLabels(
 }
 
 export function formatCanvasNodePortLabel(port: CanvasConnectionPort): string {
-  if (port === 'image') return 'Image'
-  if (port === 'prompt') return 'Prompt'
+  if (port === 'image') return i18n.global.t('canvas.node.image')
+  if (port === 'prompt') return i18n.global.t('canvas.node.prompt')
   return port
 }
 
@@ -64,6 +64,6 @@ export function formatCanvasNodePortLabel(port: CanvasConnectionPort): string {
 export function getCanvasNodeKindMenuItems(): readonly { key: CanvasCreatableNodeKind; label: string }[] {
   return CANVAS_NODE_UI_REGISTRY_LIST.map((item) => ({
     key: item.kind as CanvasCreatableNodeKind,
-    label: item.defaultTitle,
+    label: i18n.global.t(item.defaultTitleKey),
   }))
 }

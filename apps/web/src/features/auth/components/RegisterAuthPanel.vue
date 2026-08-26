@@ -5,8 +5,8 @@
       <AuthModalCloseButton :disabled="loading" @click="emit('close')" />
 
       <div :class="authModalHeaderClass">
-        <p :class="authModalKickerClass">START MAKING</p>
-        <h2 :class="authModalTitleClass">Create account</h2>
+        <p :class="authModalKickerClass">{{ t('auth.kickerStartMaking') }}</p>
+        <h2 :class="authModalTitleClass">{{ t('auth.createAccount') }}</h2>
       </div>
 
       <form
@@ -25,7 +25,7 @@
             invalid,
             required,
           }"
-          label="Username"
+          :label="t('auth.fields.username')"
           :error="errors.displayName"
           field-id="register-display-name"
           required
@@ -46,7 +46,7 @@
               :required="required"
               :class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
               :invalid="invalid"
-              :placeholder="inlineError ? inlineErrorText : 'e.g. alex'"
+              :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.username')"
               :aria-invalid="ariaInvalid"
               :aria-describedby="describedbyId"
               @blur="handleFieldBlur('displayName')"
@@ -65,7 +65,7 @@
             invalid,
             required,
           }"
-          label="Email"
+          :label="t('auth.fields.email')"
           :error="errors.email"
           field-id="register-email"
           required
@@ -84,7 +84,7 @@
               :required="required"
               :class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
               :invalid="invalid"
-              :placeholder="inlineError ? inlineErrorText : 'you@example.com'"
+              :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.email')"
               :aria-invalid="ariaInvalid"
               :aria-describedby="describedbyId"
               @blur="handleFieldBlur('email')"
@@ -103,7 +103,7 @@
             invalid,
             required,
           }"
-          label="Password"
+          :label="t('auth.fields.password')"
           :error="errors.password"
           field-id="register-password"
           required
@@ -132,7 +132,7 @@
               }"
               :invalid="invalid"
               :input-class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
-              :placeholder="inlineError ? inlineErrorText : '••••••••'"
+              :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.password')"
               toggle-mask
               @blur="handleFieldBlur('password')"
               @update:model-value="handlePasswordInput"
@@ -150,7 +150,7 @@
             invalid,
             required,
           }"
-          label="Confirm Password"
+          :label="t('auth.fields.confirmPassword')"
           :error="errors.confirmPassword"
           field-id="register-confirm-password"
           required
@@ -179,7 +179,7 @@
               }"
               :invalid="invalid"
               :input-class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
-              :placeholder="inlineError ? inlineErrorText : '••••••••'"
+              :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.password')"
               toggle-mask
               @blur="handleFieldBlur('confirmPassword')"
               @update:model-value="clearFieldError('confirmPassword')"
@@ -192,14 +192,14 @@
           :class="authPrimaryButtonClass"
           :pt="authButtonPt"
           type="submit"
-          :label="loading ? 'Creating...' : 'Create account'"
+          :label="loading ? t('auth.buttons.creating') : t('auth.buttons.createAccount')"
           :loading="loading"
           v-bind="submitControlState"
           fluid
         />
 
         <p class="m-0 text-center text-[11px] leading-4 text-[var(--color-ib-auth-subtle)]">
-          By signing up, you agree to our
+          {{ t('auth.legal.agreePrefix') }}
           <RouterLink
             :to="TERMS_PATH"
             target="_blank"
@@ -226,7 +226,7 @@
         @submit.prevent="handleVerifyOTP"
       >
         <p class="text-xs text-slate-600">
-          A verification code was sent to {{ formValue.email }}. Enter it below to complete registration.
+          {{ t('auth.otpSentTo', { email: formValue.email }) }}
         </p>
         <IbFormField
           v-slot="{
@@ -238,7 +238,7 @@
             invalid,
             required,
           }"
-          label="Verification Code"
+          :label="t('auth.fields.otp')"
           :error="otpError"
           field-id="register-otp"
           required
@@ -255,7 +255,7 @@
             :required="required"
             :class="[authInputClass, inlineError ? authInputErrorClass : '']"
             :invalid="invalid"
-            :placeholder="inlineError ? inlineErrorText : 'Enter 6-digit code'"
+            :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.otp')"
             :aria-invalid="ariaInvalid"
             :aria-describedby="describedbyId"
             @update:model-value="otpError = ''"
@@ -266,7 +266,7 @@
           :class="authPrimaryButtonClass"
           :pt="authButtonPt"
           type="submit"
-          :label="loading ? 'Verifying...' : 'Verify & Sign in'"
+          :label="loading ? t('auth.buttons.verifying') : t('auth.buttons.verifyAndSignIn')"
           :loading="loading"
           v-bind="submitControlState"
           fluid
@@ -274,14 +274,14 @@
       </form>
 
       <div :class="['mt-5', authFooterClass]">
-        <span>Already have an account?</span>
+        <span>{{ t('auth.footer.alreadyHaveAccount') }}</span>
         <button
           type="button"
           :class="authSwitchButtonClass"
           v-bind="secondaryControlState"
           @click="emit('to-login')"
         >
-          Sign in
+          {{ t('auth.footer.signIn') }}
         </button>
       </div>
     </div>
@@ -290,6 +290,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
@@ -332,6 +333,7 @@ const emit = defineEmits<{
   'update:busy': [busy: boolean]
 }>()
 
+const { t } = useI18n()
 const userStore = useUserStore()
 const authFeedback = useAuthFeedback()
 const { isPending: loading, runAsyncAction } = useAsyncAction()
@@ -374,12 +376,12 @@ function handleFieldBlur(field: RegisterField) {
   if (field === 'displayName') {
     const displayName = formValue.value.displayName.trim()
     if (displayName) {
-      errors.value.displayName = getLengthError(displayName, AUTH_DISPLAY_NAME_LIMIT, 'Username')
+      errors.value.displayName = getLengthError(displayName, AUTH_DISPLAY_NAME_LIMIT, t('auth.fields.username'))
     }
   } else if (field === 'email') {
     const email = formValue.value.email.trim()
     if (email && (!email.includes('@') || email.endsWith('@'))) {
-      errors.value.email = 'Please enter a valid email address'
+      errors.value.email = t('auth.errors.invalidEmail')
     }
   } else if (field === 'password') {
     const password = formValue.value.password
@@ -389,7 +391,7 @@ function handleFieldBlur(field: RegisterField) {
   } else if (field === 'confirmPassword') {
     const confirmPassword = formValue.value.confirmPassword
     if (confirmPassword && confirmPassword !== formValue.value.password) {
-      errors.value.confirmPassword = 'Passwords do not match'
+      errors.value.confirmPassword = t('auth.errors.passwordMismatch')
     }
   }
 }
@@ -398,32 +400,32 @@ function validateField(field: RegisterField) {
   if (field === 'displayName') {
     const displayName = formValue.value.displayName.trim()
     errors.value.displayName =
-      getRequiredError(displayName, 'Username') ||
-      getLengthError(displayName, AUTH_DISPLAY_NAME_LIMIT, 'Username')
+      getRequiredError(displayName, t('auth.fields.username')) ||
+      getLengthError(displayName, AUTH_DISPLAY_NAME_LIMIT, t('auth.fields.username'))
     return !errors.value.displayName
   }
 
   if (field === 'password') {
     const password = formValue.value.password
-    errors.value.password = getRequiredError(password, 'Password') || getPasswordLengthError(password)
+    errors.value.password = getRequiredError(password, t('auth.fields.password')) || getPasswordLengthError(password)
     return !errors.value.password
   }
 
   if (field === 'email') {
     const email = formValue.value.email.trim()
-    errors.value.email = getRequiredError(email, 'Email')
+    errors.value.email = getRequiredError(email, t('auth.fields.email'))
     if (!errors.value.email && (!email.includes('@') || email.endsWith('@'))) {
-      errors.value.email = 'Please enter a valid email address'
+      errors.value.email = t('auth.errors.invalidEmail')
     }
     return !errors.value.email
   }
 
   const confirmPassword = formValue.value.confirmPassword
   errors.value.confirmPassword =
-    getRequiredError(confirmPassword, 'Confirm Password') || getPasswordLengthError(confirmPassword)
+    getRequiredError(confirmPassword, t('auth.fields.confirmPassword')) || getPasswordLengthError(confirmPassword)
 
   if (!errors.value.confirmPassword && confirmPassword !== formValue.value.password) {
-    errors.value.confirmPassword = 'Passwords do not match'
+    errors.value.confirmPassword = t('auth.errors.passwordMismatch')
   }
   return !errors.value.confirmPassword
 }
@@ -474,7 +476,7 @@ async function handleRegister() {
 async function handleVerifyOTP() {
   const code = otp.value.trim()
   if (!/^\d{6}$/.test(code)) {
-    otpError.value = 'Please enter a 6-digit code'
+    otpError.value = t('auth.errors.sixDigitCode')
     return
   }
   const verified = await runAsyncAction(

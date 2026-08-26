@@ -67,7 +67,7 @@
             "
             @click="selectPackage(quantity)"
           >
-            <span class="text-sm font-bold">{{ ideaFormatter.format(quantity) }} Ideas</span>
+            <span class="text-sm font-bold">{{ formatLocaleNumber(quantity) }} Ideas</span>
             <span class="mt-1 font-mono text-[12px] text-ib-text-muted">{{
               formatUsdForIdeas(quantity)
             }}</span>
@@ -151,6 +151,7 @@ import IbFormField from '../../../shared/components/IbFormField.vue'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
 import { ibFormInputClass } from '../../../shared/theme/formControls'
+import { formatLocaleNumber } from '../../../shared/i18n/formatters'
 import { formatUsdForIdeas, MIN_IDEA_QUANTITY, normalizeIdeaQuantity } from '../paymentMoney'
 import type { UserPaymentPurchaseOptions } from '../userPaymentsResource'
 import {
@@ -174,7 +175,6 @@ const { t } = useI18n()
 const selectionMode = ref<'package' | 'custom'>('package')
 const selectedQuantity = ref(1000)
 const customQuantity = ref('')
-const ideaFormatter = new Intl.NumberFormat('en-US')
 
 watch(
   () => props.options,

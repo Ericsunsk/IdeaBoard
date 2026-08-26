@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { i18n } from '../../shared/i18n'
 import {
   formatCurrencyMinor,
   formatUsdForIdeas,
@@ -7,6 +8,14 @@ import {
 } from './paymentMoney'
 
 describe('paymentMoney', () => {
+  beforeEach(() => {
+    i18n.global.locale.value = 'en'
+  })
+
+  afterEach(() => {
+    i18n.global.locale.value = 'en'
+  })
+
   it('derives the exact two-decimal USD price from integer Ideas', () => {
     expect(formatUsdForIdeas(500)).toBe('$5.00 USD')
     expect(formatUsdForIdeas(501)).toBe('$5.01 USD')
@@ -18,6 +27,21 @@ describe('paymentMoney', () => {
     expect(formatCurrencyMinor(500, 'cny')).toBe('CN¥5.00 CNY')
     expect(formatCurrencyMinor(500, 'hkd')).toBe('HK$5.00 HKD')
     expect(formatCurrencyMinor(500, 'jpy')).toBe('¥500 JPY')
+  })
+
+  it.each([
+    ['en', '$123.45 USD'],
+    ['zh-CN', 'US$123.45 USD'],
+    ['es', '123,45\u00a0US$ USD'],
+    ['ko', 'US$123.45 USD'],
+  ] as const)('uses the %s currency pattern while keeping the ISO code visible', (locale, expected) => {
+    ;(i18n.global.locale as { value: string }).value = locale
+
+    expect(formatCurrencyMinor(12_345, 'USD')).toBe(expected)
+  })
+
+  it('formats the largest safe minor amount without converting it through a floating point major amount', () => {
+    expect(formatCurrencyMinor(Number.MAX_SAFE_INTEGER, 'USD')).toBe('$90,071,992,547,409.91 USD')
   })
 
   it.each([

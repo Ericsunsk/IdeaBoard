@@ -36,7 +36,7 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
 
   const currentBoardName = computed(() => {
     const boardId = `${options.currentBoardId.value ?? ''}`.trim()
-    if (!boardId) return 'Untitled Canvas'
+    if (!boardId) return t('canvas.chrome.noCanvas')
     return boardCatalog.viewModel.byId.value.get(boardId)?.name ?? boardId
   })
 

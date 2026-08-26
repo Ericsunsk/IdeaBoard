@@ -163,6 +163,12 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the single PrimeVue table-container scroll surface and its mechanical accessibility class.',
     },
   ],
+  'src/shared/components/UserLocaleSelect.component.spec.ts': [
+    {
+      reason:
+        'Verifies the locale selector preserves the 40px chrome control dimensions and circular trigger contract across open/close/disabled states.',
+    },
+  ],
 }
 
 const contractGeneratedQueryMockExceptions: ExceptionMap<GeneratedQueryMockException> = {

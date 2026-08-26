@@ -13,7 +13,7 @@ import {
   type WorkflowFeature,
 } from '../../../../shared/domain/workflowFeatures'
 import type { SubmitTaskReadinessData } from '../../../../shared/api/task'
-import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
+import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { i18n } from '../../../../shared/i18n'
 import { readinessErrorCopy } from '../../../../shared/errors/errorCatalog'
 import { fetchCanvasBillingReadiness } from './canvasBillingReadinessResource'

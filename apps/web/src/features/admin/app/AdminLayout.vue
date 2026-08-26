@@ -296,7 +296,7 @@ import { useAdminBrandLogoOverrides } from '../shared/logos/useAdminBrandLogoOve
 import type { AdminAnomalyItem } from '../shared/lib/adminAnomalyRules'
 import { createAdminPopoverPt } from '../shared/lib/adminOverlayPt'
 import { adminAnomalyPopoverClass } from '../shared/lib/adminUiClasses'
-import { ideaBoardUserPrimeLocale } from '../../../app/primeLocale'
+import { getActiveUserPrimeLocale } from '../../../shared/i18n'
 import { ideaBoardAdminPrimeLocale } from './adminPrimeLocale'
 
 const vTooltip = Tooltip
@@ -472,6 +472,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   setAdminRouteClass(false)
-  primeVue.config.locale = ideaBoardUserPrimeLocale
+  primeVue.config.locale = getActiveUserPrimeLocale()
 })
 </script>

@@ -253,10 +253,6 @@
 
 .canvas-chrome-action-group {
   pointer-events: auto;
-  --user-credit-pill-border: var(--canvas-control-border-color);
-  --user-credit-pill-border-hover: var(--canvas-control-border-color);
-  --user-credit-pill-border-active: var(--canvas-control-border-color);
-  --user-credit-pill-bg: var(--canvas-glass-bg);
 }
 
 .canvas-chrome-icon-button,

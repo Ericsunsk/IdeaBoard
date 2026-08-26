@@ -24,6 +24,9 @@
       :items="account.menuItems"
       :avatar-button-class="canvasChromeAvatarButtonClass"
     >
+      <template #before-balance>
+        <UserLocaleSelect />
+      </template>
       <template #actions>
         <button
           type="button"
@@ -76,9 +79,9 @@
     <button
       type="button"
       :class="[canvasChromeRoundControlClass, { 'is-active': tools.libraryOpen }]"
-      aria-label="Library"
+      :aria-label="t('common.navigation.library')"
       :aria-pressed="tools.libraryOpen"
-      title="Library"
+      :title="t('common.navigation.library')"
       @click="emit('toggle-library')"
     >
       <BookmarkSolid v-if="tools.libraryOpen" class="canvas-chrome-icon" />
@@ -154,8 +157,9 @@ import {
 } from '@iconoir/vue'
 import CanvasChromeBoardHeader from './CanvasChromeBoardHeader.vue'
 import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
+import UserLocaleSelect from '../../../../shared/components/UserLocaleSelect.vue'
 import {
-  createPageChromeAccountAvatarButtonClass,
+  createPageChromeAccountRoundControlClass,
   createPageChromeRoundControlClass,
 } from '../../../../shared/lib/pageChrome'
 import type {
@@ -201,7 +205,7 @@ const canvasChromeActionControlClass = createPageChromeRoundControlClass(
 const canvasChromeExportControlClass = createPageChromeRoundControlClass(
   'canvas-chrome-icon-button canvas-chrome-bordered-control canvas-chrome-export-button',
 )
-const canvasChromeAvatarButtonClass = createPageChromeAccountAvatarButtonClass(
+const canvasChromeAvatarButtonClass = createPageChromeAccountRoundControlClass(
   'canvas-user-avatar-button',
 )
 

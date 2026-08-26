@@ -6,24 +6,25 @@
     @mousedown.stop
     @click.stop
   >
+    <slot name="before-balance" />
     <template v-if="isGuest">
       <Button
         unstyled
         type="button"
         class="ib-control-state [--ib-control-active-transform:scale(0.97)] inline-flex h-9 items-center justify-center rounded-full border border-board-card-border bg-board-control-bg/80 px-4 text-xs font-semibold text-ib-text backdrop-blur-md transition-[border-color,background-color,transform,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-ib-border-hover hover:bg-ib-surface-hover active:scale-[0.97]"
-        aria-label="Log in"
+        :aria-label="t('auth.signIn')"
         @click="loginItem?.command?.()"
       >
-        Log in
+        {{ t('auth.signIn') }}
       </Button>
       <Button
         unstyled
         type="button"
         class="ib-control-state [--ib-control-hover-transform:scale(1.02)] [--ib-control-active-transform:scale(0.97)] inline-flex h-9 items-center justify-center rounded-full border-0 bg-gradient-to-r from-[var(--color-ib-auth-primary-from)] to-[var(--color-ib-auth-primary-to)] px-4.5 text-xs font-semibold text-[var(--color-ib-auth-primary-text)] shadow-[var(--shadow-ib-auth-primary)] transition-[box-shadow,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-[var(--shadow-ib-auth-primary-hover)] active:scale-[0.97]"
-        aria-label="Get started for free"
+        :aria-label="t('auth.signUpFree')"
         @click="registerItem?.command?.()"
       >
-        Get started for free
+        {{ t('auth.signUpFree') }}
       </Button>
     </template>
     <template v-else>

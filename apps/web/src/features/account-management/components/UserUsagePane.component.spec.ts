@@ -1,7 +1,8 @@
 import { cleanup } from '@testing-library/vue'
-import { defineComponent, type Ref } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { defineComponent, nextTick, type Ref } from 'vue'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, within } from '../../../test/render'
+import { setUserLocale } from '../../../shared/i18n'
 import UserUsagePane from './UserUsagePane.vue'
 
 const usageState = vi.hoisted(() => ({
@@ -59,6 +60,10 @@ function renderUsagePane() {
 }
 
 describe('UserUsagePane', () => {
+  afterEach(async () => {
+    await setUserLocale('en')
+  })
+
   it('renders lifetime values in one consolidated summary panel', () => {
     usageState.usage.value = {
       timezone: 'Asia/Shanghai',
@@ -83,6 +88,32 @@ describe('UserUsagePane', () => {
     expect(screen.getByRole('region', { name: 'Usage summary' })).not.toHaveTextContent('Ideas')
     expect(screen.getByText('Tasks run')).toBeVisible()
     expect(screen.getByText('Active days')).toBeVisible()
+  })
+
+  it('updates range and summary labels after the locale changes', async () => {
+    usageState.usage.value = {
+      timezone: 'Asia/Shanghai',
+      lifetime: {
+        total_credits: 1234,
+        peak_daily_credits: 500,
+        average_daily_credits: 12.5,
+        task_count: 9,
+        active_days: 4,
+      },
+      trend: buildZeroTrend(),
+    }
+    usageState.isInitialPending.value = false
+    usageState.error.value = null
+
+    renderUsagePane()
+    expect(screen.getByRole('button', { name: 'Week' })).toBeVisible()
+    expect(screen.getByText('Total used')).toBeVisible()
+
+    await setUserLocale('es')
+    await nextTick()
+
+    expect(screen.getByRole('button', { name: 'Semana' })).toBeVisible()
+    expect(screen.getByText('Total usado')).toBeVisible()
   })
 
   it('keeps the responsive 2x2 plus spanning-row contract without viewport font sizing', () => {

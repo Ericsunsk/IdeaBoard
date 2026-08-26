@@ -11,17 +11,21 @@
         :avatar-url="accountControls.viewModel.avatarUrl.value"
         :balance="accountControls.viewModel.balance.value"
         :items="accountControls.viewModel.menuItems.value"
-      />
+      >
+        <template #before-balance>
+          <UserLocaleSelect />
+        </template>
+      </UserAccountMenu>
     </header>
 
     <main :class="boardCatalogClasses.main">
-      <h1 :class="boardCatalogClasses.pageTitle">Welcome to {{ projectName }}!</h1>
-      <p :class="boardCatalogClasses.pageSubtitle">Explore, expand, and refine your ideas</p>
+      <h1 :class="boardCatalogClasses.pageTitle">Welcome to IdeaBoard!</h1>
+      <p :class="boardCatalogClasses.pageSubtitle">{{ t('workspace.boards.subtitle') }}</p>
 
       <section :class="boardCatalogClasses.toolbar">
         <Button
           type="button"
-          label="New Canvas"
+          :label="t('workspace.boards.newCanvas')"
           :class="boardCatalogClasses.createButton"
           @click="createAndOpenBoard"
         />
@@ -31,7 +35,7 @@
             :model-value="searchKeyword"
             unstyled
             type="text"
-            placeholder="Search canvases..."
+            :placeholder="t('workspace.boards.searchPlaceholder')"
             :class="boardCatalogClasses.searchInput"
             @update:model-value="onSearchInput"
           />
@@ -43,7 +47,7 @@
           option-value="value"
           :class="boardCatalogClasses.sortSelect"
           :pt="boardCatalogSortSelectPt"
-          aria-label="Sort canvases"
+          :aria-label="t('workspace.boards.sortLabel')"
           @update:model-value="setSortMode"
         />
       </section>
@@ -75,8 +79,8 @@
             <div :class="boardCatalogClasses.createPreviewIcon" aria-hidden="true"></div>
           </div>
           <div :class="boardCatalogClasses.createMeta">
-            <div :class="boardCatalogClasses.createTitle">Create New Canvas</div>
-            <div :class="boardCatalogClasses.createDate">Start from an empty board</div>
+            <div :class="boardCatalogClasses.createTitle">{{ t('workspace.boards.createNewCanvas') }}</div>
+            <div :class="boardCatalogClasses.createDate">{{ t('workspace.boards.startFromEmpty') }}</div>
           </div>
         </Button>
 
@@ -107,7 +111,7 @@
         v-if="!isBoardsLoading && visibleBoards.length === 0 && searchKeyword"
         :class="boardCatalogClasses.emptyTip"
       >
-        No matching canvas
+        {{ t('workspace.boards.noMatchingCanvas') }}
       </p>
     </main>
 
@@ -135,7 +139,7 @@
         <p :class="boardCatalogClasses.deleteDialogDescription">
           {{
             t('workspace.deleteDialog.description', {
-              name: pendingDeleteBoard?.name || 'Untitled',
+              name: pendingDeleteBoard?.name || t('workspace.boards.untitledCanvas'),
             })
           }}
         </p>
@@ -164,7 +168,7 @@
 </template>
 
 <script setup lang="ts">
-import '../styles/board-surface-skin.css'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import BoardCard from '../components/BoardCard.vue'
@@ -176,10 +180,10 @@ import {
 } from '../lib/boardCatalogSkin'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { usePrimeDialogOverlayLifecycle } from '../../../shared/composables/usePrimeDialogOverlayLifecycle'
-import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { HOME_PATH, USER_CANVAS_PATH } from '../../../shared/constants/routePaths'
 import { useUserStore } from '../../auth/session/authSession'
 import UserAccountMenu from '../../../shared/components/UserAccountMenu.vue'
+import UserLocaleSelect from '../../../shared/components/UserLocaleSelect.vue'
 import StudioName from '../../../shared/components/StudioName.vue'
 import UserWorkspaceNavigation from '../../user-shell/components/UserWorkspaceNavigation.vue'
 import { Search } from '@iconoir/vue'
@@ -195,7 +199,6 @@ const router = useRouter()
 const { t } = useI18n()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
-const { projectName } = useSiteBranding()
 const boardCatalogController = useBoardsCatalog({
   navigation: {
     openBoard(boardId) {
@@ -262,10 +265,10 @@ function handleDeleteDialogAfterHide() {
   handleDeleteDialogHidden()
 }
 
-const sortOptions = [
-  { label: 'Recent', value: 'recent' },
-  { label: 'Name', value: 'name' },
-]
+const sortOptions = computed(() => [
+  { label: t('workspace.boards.sortRecent'), value: 'recent' },
+  { label: t('workspace.boards.sortName'), value: 'name' },
+])
 
 const accountControls = useUserAccountControls({
   navigation: {

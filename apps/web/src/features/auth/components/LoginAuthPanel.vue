@@ -5,8 +5,8 @@
       <AuthModalCloseButton :disabled="loading" @click="emit('close')" />
 
       <div :class="authModalHeaderClass">
-        <p :class="authModalKickerClass">WELCOME BACK</p>
-        <h2 :class="authModalTitleClass">Sign in</h2>
+        <p :class="authModalKickerClass">{{ t('auth.kickerWelcomeBack') }}</p>
+        <h2 :class="authModalTitleClass">{{ t('auth.signIn') }}</h2>
       </div>
 
       <form
@@ -29,8 +29,8 @@
             type="button"
             :class="authSocialIconButtonClass"
             :disabled="loading"
-            :aria-label="`Sign in with ${getOAuthProviderLabel(provider)}`"
-            :title="`Sign in with ${getOAuthProviderLabel(provider)}`"
+            :aria-label="t('auth.socialSignInAria', { provider: getOAuthProviderLabel(provider) })"
+            :title="t('auth.socialSignInAria', { provider: getOAuthProviderLabel(provider) })"
             @click="handleSocialLogin(provider)"
           >
             <img
@@ -54,7 +54,7 @@
             invalid,
             required,
           }"
-          label="Email"
+          :label="t('auth.fields.email')"
           :error="errors.identifier"
           field-id="login-identifier"
           required
@@ -75,7 +75,7 @@
               :required="required"
               :class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
               :invalid="invalid"
-              :placeholder="inlineError ? inlineErrorText : 'you@example.com'"
+              :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.email')"
               :aria-invalid="ariaInvalid"
               :aria-describedby="describedbyId"
               @blur="handleFieldBlur('identifier')"
@@ -85,7 +85,7 @@
         </IbFormField>
 
         <IbFormField
-          label="Password"
+          :label="t('auth.fields.password')"
           :error="errors.password"
           field-id="login-password"
           required
@@ -100,7 +100,7 @@
               :disabled="loading"
               @click="resetMode = true"
             >
-              Forgot?
+              {{ t('auth.forgotPassword') }}
             </button>
           </template>
           <template
@@ -135,7 +135,7 @@
                 }"
                 :invalid="invalid"
                 :input-class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
-                :placeholder="inlineError ? inlineErrorText : '••••••••'"
+                :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.password')"
                 toggle-mask
                 @blur="handleFieldBlur('password')"
                 @update:model-value="clearFieldError('password')"
@@ -149,7 +149,7 @@
           :class="authPrimaryButtonClass"
           :pt="authButtonPt"
           type="submit"
-          :label="loading ? 'Signing in...' : 'Sign in'"
+          :label="loading ? t('auth.buttons.signingIn') : t('auth.buttons.signIn')"
           :loading="loading"
           v-bind="submitControlState"
           fluid
@@ -157,10 +157,10 @@
       </form>
 
       <form v-else class="relative z-[1] flex flex-col gap-3.5" novalidate @submit.prevent="handleResetPassword">
-        <p class="text-xs text-ib-text-subtle">Enter your email to receive a verification code.</p>
+        <p class="text-xs text-ib-text-subtle">{{ t('auth.resetPasswordInstructions') }}</p>
         <IbFormField
           v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
-          label="Email"
+          :label="t('auth.fields.email')"
           :error="resetErrors.email"
           field-id="reset-email"
           required
@@ -176,7 +176,7 @@
             :required="required"
             :class="[authInputClass, inlineError ? authInputErrorClass : '']"
             :invalid="invalid"
-            :placeholder="inlineError ? inlineErrorText : 'you@example.com'"
+            :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.email')"
             :aria-invalid="ariaInvalid"
             :aria-describedby="describedbyId"
           />
@@ -186,7 +186,7 @@
           :class="authPrimaryButtonClass"
           :pt="authButtonPt"
           type="submit"
-          :label="loading ? 'Sending...' : 'Send Code'"
+          :label="loading ? t('auth.buttons.sending') : t('auth.buttons.sendCode')"
           :loading="loading"
           v-bind="submitControlState"
           fluid
@@ -197,14 +197,14 @@
           :disabled="loading"
           @click="resetMode = false"
         >
-          Back to sign in
+          {{ t('auth.backToSignIn') }}
         </button>
       </form>
 
       <form v-if="resetMode && resetOtpSent" class="relative z-[1] mt-3 flex flex-col gap-3.5" novalidate @submit.prevent="handleResetPasswordConfirm">
         <IbFormField
           v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
-          label="Verification Code"
+          :label="t('auth.fields.otp')"
           :error="resetErrors.otp"
           field-id="reset-otp"
           required
@@ -222,14 +222,14 @@
             :required="required"
             :class="[authInputClass, inlineError ? authInputErrorClass : '']"
             :invalid="invalid"
-            :placeholder="inlineError ? inlineErrorText : 'Enter 6-digit code'"
+            :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.otp')"
             :aria-invalid="ariaInvalid"
             :aria-describedby="describedbyId"
           />
         </IbFormField>
         <IbFormField
           v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
-          label="New Password"
+          :label="t('auth.fields.newPassword')"
           :error="resetErrors.password"
           field-id="reset-password"
           required
@@ -246,7 +246,7 @@
             :input-props="{ id: fieldId, autocomplete: 'new-password', required, 'aria-invalid': ariaInvalid, 'aria-describedby': describedbyId }"
             :invalid="invalid"
             :input-class="[authInputClass, inlineError ? authInputErrorClass : '']"
-            :placeholder="inlineError ? inlineErrorText : 'At least 10 characters'"
+            :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.newPassword')"
             toggle-mask
           />
         </IbFormField>
@@ -255,7 +255,7 @@
           :class="authPrimaryButtonClass"
           :pt="authButtonPt"
           type="submit"
-          :label="loading ? 'Resetting...' : 'Reset Password'"
+          :label="loading ? t('auth.buttons.resetting') : t('auth.buttons.resetPassword')"
           :loading="loading"
           v-bind="submitControlState"
           fluid
@@ -263,7 +263,7 @@
       </form>
 
       <div :class="['mt-5', authFooterClass]">
-        <span>Don't have an account?</span>
+        <span>{{ t('auth.footer.dontHaveAccount') }}</span>
         <button
           type="button"
           :class="authSwitchButtonClass"
@@ -279,6 +279,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
@@ -328,6 +329,7 @@ const emit = defineEmits<{
   'update:busy': [busy: boolean]
 }>()
 
+const { t } = useI18n()
 const userStore = useUserStore()
 const authFeedback = useAuthFeedback()
 const { isPending: loading, runAsyncAction } = useAsyncAction()
@@ -340,10 +342,10 @@ const secondaryControlState = computed(() =>
 
 type LoginField = 'identifier' | 'password'
 
-const loginFieldLabels: Record<LoginField, string> = {
-  identifier: 'Email',
-  password: 'Password',
-}
+const loginFieldLabels = computed<Record<LoginField, string>>(() => ({
+  identifier: t('auth.fields.email'),
+  password: t('auth.fields.password'),
+}))
 const formValue = ref({
   identifier: '',
   password: '',
@@ -383,13 +385,13 @@ function handleFieldBlur(field: LoginField) {
   const value = formValue.value[field].trim()
   if (!value) return
   if (field === 'identifier' && (!value.includes('@') || value.endsWith('@'))) {
-    errors.value.identifier = 'Please enter a valid email address'
+    errors.value.identifier = t('auth.errors.invalidEmail')
   }
 }
 
 function validateField(field: LoginField) {
   const value = formValue.value[field].trim()
-  errors.value[field] = getRequiredError(value, loginFieldLabels[field])
+  errors.value[field] = getRequiredError(value, loginFieldLabels.value[field])
   return !errors.value[field]
 }
 
@@ -434,7 +436,7 @@ async function handleSocialLogin(provider: OAuthProviderCode) {
 
 async function handleResetPassword() {
   const email = resetForm.value.email.trim()
-  resetErrors.value.email = !email || !email.includes('@') ? 'Please enter a valid email address' : ''
+  resetErrors.value.email = !email || !email.includes('@') ? t('auth.errors.invalidEmail') : ''
   if (resetErrors.value.email) return
 
   const sent = await runAsyncAction(
@@ -445,7 +447,7 @@ async function handleResetPassword() {
 }
 
 async function handleResetPasswordConfirm() {
-  resetErrors.value.otp = /^\d{6}$/.test(resetForm.value.otp.trim()) ? '' : 'Please enter a 6-digit code'
+  resetErrors.value.otp = /^\d{6}$/.test(resetForm.value.otp.trim()) ? '' : t('auth.errors.sixDigitCode')
   resetErrors.value.password = getPasswordLengthError(resetForm.value.password)
   if (resetErrors.value.otp || resetErrors.value.password) return
 

@@ -1,0 +1,29 @@
+/**
+ * 백엔드 안정적인 오류 코드에 대한 한국어 문구.
+ */
+export default {
+  submission_invalid: '요청 내용을 확인한 뒤 다시 시도해 주세요.',
+  submission_failed: '요청을 제출할 수 없습니다. 다시 시도해 주세요.',
+  insufficient_credits: '이 작업을 실행하려면 더 많은 Ideas가 필요합니다.',
+  pricing_unavailable: '가격 정보를 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+  provider_unavailable: '현재 서비스를 사용할 수 없습니다. 나중에 다시 시도해 주세요.',
+  prompt_unavailable: '현재 프롬프트를 사용할 수 없습니다. 나중에 다시 시도해 주세요.',
+  wallet_restricted: '이 계정에서는 Ideas를 일시적으로 사용할 수 없습니다.',
+  vision_search_not_configured: '비전 검색을 현재 사용할 수 없습니다.',
+  vision_search_unavailable: '비전 검색을 현재 사용할 수 없습니다. 나중에 다시 시도해 주세요.',
+  vision_search_input_invalid: '검색어를 확인한 뒤 다시 시도해 주세요.',
+  vision_search_image_invalid: '이 이미지는 비전 검색에 사용할 수 없습니다.',
+  vision_search_image_unavailable: '이미지를 사용할 수 없습니다. 다른 이미지를 시도해 주세요.',
+  vision_search_timeout: '비전 검색 시간이 초과되었습니다. 다시 시도해 주세요.',
+  vision_search_credentials: '비전 검색을 현재 사용할 수 없습니다.',
+  vision_search_quota: '비전 검색을 일시적으로 사용할 수 없습니다. 나중에 다시 시도해 주세요.',
+  vision_search_network: '비전 검색에 연결할 수 없습니다. 다시 시도해 주세요.',
+  vision_search_provider_error: '비전 검색에 실패했습니다. 다시 시도해 주세요.',
+  vision_search_schema_error: '비전 검색 결과가 올바르지 않습니다. 다시 시도해 주세요.',
+  vision_search_idempotency_key_required: '비전 검색을 시작할 수 없습니다. 다시 시도해 주세요.',
+  vision_search_idempotency_conflict: '이미 진행 중인 비전 검색입니다.',
+  vision_search_pricing_unavailable: '비전 검색 가격 정보를 일시적으로 사용할 수 없습니다.',
+  checkout_request_rejected: '결제를 시작할 수 없습니다. 다시 시도해 주세요.',
+  checkout_session_expired: '결제 세션이 만료되었습니다. 새 결제를 시작해 주세요.',
+  payment_already_completed: '이미 완료된 결제입니다.',
+} as const

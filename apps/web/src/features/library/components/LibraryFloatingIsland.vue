@@ -5,7 +5,7 @@
       v-show="open"
       class="z-40 flex flex-col overflow-hidden rounded-[28px] border border-board-card-border bg-board-control-bg/80 p-5 text-board-page-text backdrop-blur-md shadow-[0_16px_48px_rgba(45,64,89,0.08),0_2px_8px_rgba(0,0,0,0.02)] will-change-[width,transform] transition-[width,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] max-w-[calc(100vw-32px)]"
       :class="isCanvasPresentation ? 'relative h-full w-full' : searchIslandClass"
-      aria-label="Personal Library"
+      :aria-label="t('library.title')"
       @click="closeFolderMenu"
       @dragover.prevent="handleIslandDragOver"
       @drop.prevent="handleIslandDrop"
@@ -15,12 +15,12 @@
         <!-- 顶栏：标题 + 折叠微按钮 + 展开/收缩按钮 + 微圆关闭按钮 -->
         <div class="flex items-center justify-between pb-2 shrink-0">
           <div class="flex items-center gap-1.5">
-            <h2 class="m-0 text-base font-semibold tracking-tight">My Library</h2>
+            <h2 class="m-0 text-base font-semibold tracking-tight">{{ t('library.title') }}</h2>
             <button
               type="button"
               class="grid size-6 shrink-0 place-items-center rounded-full bg-black/[0.04] text-board-page-text-muted transition-colors hover:bg-black/[0.08] hover:text-board-page-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] cursor-pointer"
-              :aria-label="isHeaderCollapsed ? 'Show folders' : 'Hide folders'"
-              :title="isHeaderCollapsed ? 'Show folders' : 'Hide folders'"
+              :aria-label="isHeaderCollapsed ? t('library.actions.showFolders') : t('library.actions.hideFolders')"
+              :title="isHeaderCollapsed ? t('library.actions.showFolders') : t('library.actions.hideFolders')"
               @click="isHeaderCollapsed = !isHeaderCollapsed"
             >
               <NavArrowDown v-if="isHeaderCollapsed" class="size-3.5" aria-hidden="true" />
@@ -32,8 +32,8 @@
               v-if="!isCanvasPresentation"
               type="button"
               class="grid size-8 shrink-0 place-items-center rounded-full bg-black/[0.04] text-board-page-text-muted transition-colors hover:bg-black/[0.08] hover:text-board-page-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] cursor-pointer"
-              :aria-label="isExpanded ? 'Collapse library' : 'Expand library'"
-              :title="isExpanded ? 'Collapse library' : 'Expand library'"
+              :aria-label="isExpanded ? t('library.actions.collapse') : t('library.actions.expand')"
+              :title="isExpanded ? t('library.actions.collapse') : t('library.actions.expand')"
               @click="isExpanded = !isExpanded"
             >
               <NavArrowLeft v-if="isExpanded" class="size-4" aria-hidden="true" />
@@ -42,8 +42,8 @@
             <button
               type="button"
               class="grid size-8 shrink-0 place-items-center rounded-full bg-black/[0.04] text-board-page-text-muted transition-colors hover:bg-black/[0.08] hover:text-board-page-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] cursor-pointer"
-              aria-label="Close Library"
-              title="Close Library"
+              :aria-label="t('library.actions.close')"
+              :title="t('library.actions.close')"
               @click="emit('close')"
             >
               <Xmark class="size-4" aria-hidden="true" />
@@ -63,7 +63,7 @@
             <div
               class="flex flex-wrap items-center gap-1.5"
               role="tablist"
-              aria-label="Library folders"
+              :aria-label="t('library.folders.libraryFoldersAria')"
             >
               <div
                 v-for="folder in workspace.folderTabs.value"
@@ -112,7 +112,7 @@
                 @click="folderDialogVisible = true"
               >
                 <Plus class="size-3" aria-hidden="true" />
-                <span>New</span>
+                <span>{{ t('library.actions.new') }}</span>
               </button>
             </div>
           </div>
@@ -131,7 +131,7 @@
           class="shrink-0 rounded-full bg-board-primary px-3 py-1.5 font-semibold text-ib-text-inverse focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
           @click="workspace.retry"
         >
-          Retry
+          {{ t('common.actions.retry') }}
         </button>
       </div>
 
@@ -162,9 +162,9 @@
           class="grid h-full min-h-40 place-items-center rounded-[18px] border border-dashed border-board-card-border px-5 text-center"
         >
           <div>
-            <p class="m-0 text-sm font-semibold">No saved references</p>
+            <p class="m-0 text-sm font-semibold">{{ t('library.empty.noSavedReferences') }}</p>
             <p class="mt-1 mb-0 text-xs text-board-page-text-muted">
-              Drag or save images from Search to build your library.
+              {{ t('library.empty.dragOrSaveHint') }}
             </p>
           </div>
         </div>
@@ -189,7 +189,7 @@
                 <button
                   type="button"
                   class="block w-full cursor-zoom-in text-left focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
-                  :aria-label="`View ${asset.title || 'saved reference'}`"
+                  :aria-label="t('library.actions.viewSavedReference', { title: asset.title || t('library.states.savedReference') })"
                   @click="openAsset(asset)"
                 >
                   <div
@@ -200,12 +200,12 @@
                       v-if="failedImages.has(asset.id)"
                       class="grid min-h-24 place-items-center px-2 text-center text-xs text-board-page-text-muted"
                     >
-                      Image unavailable
+                      {{ t('library.states.imageUnavailable') }}
                     </div>
                     <img
                       v-else
                       :src="asset.preview_url"
-                      :alt="asset.title || 'Saved reference'"
+                      :alt="asset.title || t('library.states.savedReference')"
                       loading="lazy"
                       class="h-full w-full object-cover"
                       @error="markImageError(asset.id)"
@@ -221,8 +221,8 @@
                     <button
                       type="button"
                       class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-board-danger transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
-                      aria-label="Remove saved reference"
-                      title="Remove saved reference"
+                      :aria-label="t('library.actions.removeSavedReference')"
+                      :title="t('library.actions.removeSavedReference')"
                       @click="requestRemove(asset)"
                     >
                       <Xmark class="size-3" aria-hidden="true" />
@@ -231,8 +231,8 @@
                       v-if="isCanvasPresentation"
                       type="button"
                       class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-board-primary transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
-                      aria-label="Add to Canvas"
-                      title="Add to Canvas"
+                      :aria-label="t('library.actions.addToCanvas')"
+                      :title="t('library.actions.addToCanvas')"
                       @click.stop="emit('add-to-canvas', toCanvasLibraryImportDescriptor(asset))"
                     >
                       <Plus class="size-3" aria-hidden="true" />
@@ -241,8 +241,8 @@
                       v-else
                       type="button"
                       class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-board-primary transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
-                      aria-label="Use as search reference"
-                      title="Use as search reference"
+                      :aria-label="t('library.actions.useAsSearchReference')"
+                      :title="t('library.actions.useAsSearchReference')"
                       @click.stop="selectReference(asset)"
                     >
                       <Check
@@ -259,7 +259,7 @@
                   </div>
                   <div class="min-w-0 pointer-events-auto">
                     <p class="m-0 truncate text-[11px] font-medium text-white leading-tight">
-                      {{ asset.title || 'Untitled reference' }}
+                      {{ asset.title || t('library.states.untitledReference') }}
                     </p>
                     <p class="mt-0.5 mb-0 truncate text-[10px] text-white/70">
                       {{ asset.author || asset.provider }}
@@ -277,7 +277,7 @@
             :disabled="workspace.loading.value"
             @click="workspace.loadAssets(false)"
           >
-            Load more
+            {{ t('library.actions.loadMore') }}
           </button>
         </div>
       </div>
@@ -299,7 +299,7 @@
       role="menuitem"
       @click="openRenameFolder(contextMenu.folder)"
     >
-      <span>Rename</span>
+      <span>{{ t('library.actions.rename') }}</span>
     </button>
     <button
       type="button"
@@ -307,7 +307,7 @@
       role="menuitem"
       @click="deleteFolder(contextMenu.folder)"
     >
-      <span>Delete</span>
+      <span>{{ t('library.actions.delete') }}</span>
     </button>
   </div>
 
@@ -322,8 +322,8 @@
     @focusout="emit('focus-scope-change', false)"
   >
     <form class="p-6" @submit.prevent="submitFolder">
-      <h3 class="m-0 text-lg font-semibold">New folder</h3>
-      <label class="mt-5 block text-sm font-semibold" for="island-folder-name">Folder name</label>
+      <h3 class="m-0 text-lg font-semibold">{{ t('library.dialogs.newFolderTitle') }}</h3>
+      <label class="mt-5 block text-sm font-semibold" for="island-folder-name">{{ t('library.dialogs.folderNameLabel') }}</label>
       <InputText
         id="island-folder-name"
         v-model="folderDraft"
@@ -331,21 +331,21 @@
         class="mt-2 w-full rounded-xl border border-board-card-border bg-board-control-bg px-3 py-2.5 text-sm outline-none focus:border-board-primary"
         maxlength="100"
         autofocus
-        placeholder="e.g. Minimalist Spatial"
+        :placeholder="t('library.dialogs.folderNamePlaceholder')"
       />
       <p v-if="folderError" class="mt-2 mb-0 text-sm text-board-danger">{{ folderError }}</p>
       <div class="mt-6 flex justify-end gap-2">
         <Button
           unstyled
           type="button"
-          label="Cancel"
+          :label="t('library.dialogs.cancel')"
           class="rounded-full px-4 py-2 text-sm font-semibold text-board-page-text-muted hover:bg-ib-surface-hover"
           @click="folderDialogVisible = false"
         />
         <Button
           unstyled
           type="submit"
-          label="Create"
+          :label="t('library.dialogs.create')"
           :disabled="folderSaving || !folderDraft.trim()"
           class="rounded-full bg-board-primary px-4 py-2 text-sm font-semibold text-ib-text-inverse disabled:opacity-50"
         />
@@ -364,9 +364,9 @@
     @focusout="emit('focus-scope-change', false)"
   >
     <form class="p-6" @submit.prevent="submitRenameFolder">
-      <h3 class="m-0 text-lg font-semibold">Rename folder</h3>
+      <h3 class="m-0 text-lg font-semibold">{{ t('library.dialogs.renameFolderTitle') }}</h3>
       <label class="mt-5 block text-sm font-semibold" for="island-rename-folder-name"
-        >Folder name</label
+        >{{ t('library.dialogs.folderNameLabel') }}</label
       >
       <InputText
         id="island-rename-folder-name"
@@ -375,20 +375,21 @@
         class="mt-2 w-full rounded-xl border border-board-card-border bg-board-control-bg px-3 py-2.5 text-sm outline-none focus:border-board-primary"
         maxlength="100"
         autofocus
+        :placeholder="t('library.dialogs.folderNamePlaceholder')"
       />
       <p v-if="renameError" class="mt-2 mb-0 text-sm text-board-danger">{{ renameError }}</p>
       <div class="mt-6 flex justify-end gap-2">
         <Button
           unstyled
           type="button"
-          label="Cancel"
+          :label="t('library.dialogs.cancel')"
           class="rounded-full px-4 py-2 text-sm font-semibold text-board-page-text-muted hover:bg-ib-surface-hover"
           @click="renameDialogVisible = false"
         />
         <Button
           unstyled
           type="submit"
-          label="Save"
+          :label="t('library.dialogs.save')"
           :disabled="renameSaving || !renameDraft.trim()"
           class="rounded-full bg-board-primary px-4 py-2 text-sm font-semibold text-ib-text-inverse disabled:opacity-50"
         />
@@ -419,7 +420,7 @@
             <h3
               class="m-0 text-white text-base sm:text-lg font-semibold tracking-tight drop-shadow-md truncate max-w-[240px] sm:max-w-md"
             >
-              {{ workspace.activeAsset.value.title || 'Saved reference' }}
+              {{ workspace.activeAsset.value.title || t('library.states.savedReference') }}
             </h3>
             <p class="mt-1 mb-0 text-white/70 text-xs drop-shadow-md">
               {{ workspace.activeAsset.value.author }} · {{ workspace.activeAsset.value.provider }}
@@ -435,14 +436,14 @@
               rel="noreferrer"
               class="h-7 px-3 rounded-full bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-board-primary hover:text-white hover:border-transparent flex items-center justify-center text-xs font-medium no-underline cursor-pointer"
             >
-              <span>View Source</span>
+              <span>{{ t('library.actions.viewSource') }}</span>
             </a>
 
             <button
               type="button"
               class="grid size-7 place-items-center rounded-full bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-board-primary hover:text-white hover:border-transparent focus-visible:outline-none cursor-pointer"
-              aria-label="Close preview"
-              title="Close (Esc)"
+              :aria-label="t('library.actions.closePreview')"
+              :title="t('library.actions.closePreviewEsc')"
               @click="workspace.setActiveAsset(null)"
             >
               <Xmark class="size-3.5" aria-hidden="true" />
@@ -459,7 +460,7 @@
             :src="
               workspace.activeAsset.value.original_url || workspace.activeAsset.value.preview_url
             "
-            :alt="workspace.activeAsset.value.title || 'Saved reference'"
+            :alt="workspace.activeAsset.value.title || t('library.states.savedReference')"
             class="max-h-[82vh] max-w-full object-contain rounded-2xl shadow-2xl border-0 ring-0 outline-none select-none"
           />
         </div>

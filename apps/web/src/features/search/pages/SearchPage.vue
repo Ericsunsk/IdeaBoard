@@ -12,7 +12,11 @@
         :avatar-url="accountControls.viewModel.avatarUrl.value"
         :balance="accountControls.viewModel.balance.value"
         :items="accountControls.viewModel.menuItems.value"
-      />
+      >
+        <template #before-balance>
+          <UserLocaleSelect />
+        </template>
+      </UserAccountMenu>
     </header>
 
     <!-- 🌟 主视窗容器：当左侧素材库浮岛展开时，右侧紧贴浮岛右侧保留标准 24px 呼吸间距；全屏展开时 1:1 物理被顶出右侧屏幕 -->
@@ -49,14 +53,14 @@
                     type="button"
                     class="grid size-8 overflow-hidden rounded-full bg-board-card-bg cursor-pointer transition-[transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-board-primary"
                     :class="isReferencePending(reference.key) ? 'opacity-60' : ''"
-                    :title="`Remove reference (${referenceSlotCount}/4)`"
-                    :aria-label="`Remove reference ${reference.key}`"
+                    :title="t('search.tooltips.removeReferenceWithCount', { count: referenceSlotCount })"
+                    :aria-label="t('search.tooltips.removeReference')"
                     :aria-busy="isReferencePending(reference.key)"
                     @click="removeReference(reference.key)"
                   >
                     <img
                       :src="reference.previewUrl"
-                      alt="Search reference"
+                      :alt="t('search.reference.imageAlt')"
                       class="size-full object-cover select-none pointer-events-none"
                     />
                   </button>
@@ -69,7 +73,7 @@
                     >
                       <img
                         :src="reference.previewUrl"
-                        alt="Reference preview"
+                        :alt="t('search.reference.previewAlt')"
                         class="size-full block object-cover select-none pointer-events-none"
                       />
                     </div>
@@ -80,8 +84,8 @@
                   v-if="canAddReference"
                   type="button"
                   class="search-reference-control"
-                  :title="`Add more references (${referenceSlotCount}/4)`"
-                  :aria-label="`Add more references (${referenceSlotCount}/4)`"
+                  :title="t('search.tooltips.addReferencesWithCount', { count: referenceSlotCount })"
+                  :aria-label="t('search.tooltips.addReferencesWithCount', { count: referenceSlotCount })"
                   @click="openFilePicker"
                 >
                   <Plus class="size-3.5" aria-hidden="true" />
@@ -94,8 +98,8 @@
                 class="min-w-0 flex-1 bg-transparent px-1 text-[13.5px] text-board-control-input-text outline-none"
                 :placeholder="
                   references.length > 0
-                    ? 'Add keywords or prompt (optional)...'
-                    : 'Search inspiration...'
+                    ? t('search.placeholders.queryWithReferences')
+                    : t('search.placeholders.queryDefault')
                 "
                 :aria-label="t('search.inputLabel')"
                 @input="queryError = ''"
@@ -106,8 +110,8 @@
                   v-if="references.length > 0 || draftQuery"
                   type="button"
                   class="search-reference-control"
-                  title="Clear search"
-                  aria-label="Clear search"
+                  :title="t('search.tooltips.clearSearch')"
+                  :aria-label="t('search.tooltips.clearSearch')"
                   @click="handleClearSearch"
                 >
                   <Xmark class="size-3.5" aria-hidden="true" />
@@ -116,17 +120,17 @@
                   v-if="references.length === 0"
                   type="button"
                   class="h-8 px-3 rounded-full border border-board-card-border text-board-page-text-muted hover:text-board-page-text hover:border-board-primary hover:bg-board-primary/10 flex items-center gap-1.5 text-xs font-medium transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label="Add search reference image"
-                  title="Add search reference image"
+                  :aria-label="t('search.tooltips.addReferences')"
+                  :title="t('search.tooltips.addReferences')"
                   :disabled="!canAddReference"
                   @click="openFilePicker"
                 >
                   <Camera class="size-3.5 text-board-primary" aria-hidden="true" />
-                  <span class="hidden sm:inline">Image</span>
+                  <span class="hidden sm:inline">{{ t('search.fallbackImageTitle') }}</span>
                 </button>
                 <Button
                   type="submit"
-                  label="Search"
+                  :label="t('search.actions.search')"
                   :loading="visionState === 'extracting'"
                   :disabled="hasPendingReferences || visionState === 'extracting'"
                   :title="searchButtonTitle"
@@ -140,8 +144,8 @@
             type="button"
             class="group grid size-11 shrink-0 place-items-center rounded-full border border-board-card-border bg-board-control-bg/80 backdrop-blur-md transition-[transform,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 hover:border-board-card-border-hover focus-visible:outline-none cursor-pointer"
             :class="[isTriggerHoveredDuringDrag ? '!scale-110 !border-board-primary' : '']"
-            aria-label="Toggle My Library"
-            title="My Library / Drop here to Quick Save"
+            :aria-label="t('search.tooltips.toggleLibrary')"
+            :title="t('search.tooltips.toggleLibrary')"
             :aria-expanded="libraryIslandOpen"
             @pointerenter="preloadLibraryIsland"
             @focus="preloadLibraryIsland"
@@ -169,7 +173,7 @@
           accept="image/*"
           multiple
           class="hidden"
-          aria-label="Upload reference images"
+          :aria-label="t('search.tooltips.addReferences')"
           @change="handleFileInput"
         />
 
@@ -190,9 +194,9 @@
             v-if="hasError && results.length > 0"
             class="mt-1 flex items-center gap-2 text-sm text-board-danger"
           >
-            <span>Unable to load results</span>
+            <span>{{ t('search.errors.unableToLoadResults') }}</span>
             <button type="button" class="font-semibold text-board-primary" @click="reload">
-              Retry
+              {{ t('search.actions.retry') }}
             </button>
           </div>
         </div>
@@ -220,9 +224,9 @@
         class="mt-6 grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-board-card-border bg-board-loading-bg/80 backdrop-blur-sm text-center"
       >
         <div>
-          <p class="m-0 font-semibold">Unable to load inspiration</p>
+          <p class="m-0 font-semibold">{{ t('search.errors.unableToLoadInspiration') }}</p>
           <Button
-            label="Retry"
+            :label="t('search.actions.retry')"
             class="!mt-4 !rounded-full !border-0 !bg-board-primary !text-ib-text-inverse"
             @click="reload"
           />
@@ -298,8 +302,8 @@
                       ? '!bg-board-primary text-ib-text-inverse shadow-xs'
                       : 'bg-[var(--search-overlay-btn-bg)] text-white/80 hover:bg-[var(--search-overlay-btn-bg-hover)] hover:text-white backdrop-blur-[var(--search-glass-blur)]'
                   "
-                  :title="isResultSelected(result) ? 'Deselect image' : 'Select image'"
-                  :aria-label="isResultSelected(result) ? 'Deselect image' : 'Select image'"
+                  :title="isResultSelected(result) ? t('search.tooltips.deselectImage') : t('search.tooltips.selectImage')"
+                  :aria-label="isResultSelected(result) ? t('search.tooltips.deselectImage') : t('search.tooltips.selectImage')"
                   @click.stop="toggleBatchSelect(result)"
                 >
                   <Check class="size-3.5 stroke-[2.5]" aria-hidden="true" />
@@ -315,8 +319,8 @@
                         (ref) => ref.key === searchReferenceKey(result.provider, result.id),
                       ) || isReferencePending(searchReferenceKey(result.provider, result.id)),
                   }"
-                  title="Use as search reference"
-                  aria-label="Use as search reference"
+                  :title="t('search.tooltips.useAsReference')"
+                  :aria-label="t('search.tooltips.useAsReference')"
                   :aria-busy="isReferencePending(searchReferenceKey(result.provider, result.id))"
                   @click.stop="handleSearchResultReference(result)"
                 >
@@ -336,10 +340,10 @@
               <div class="pointer-events-auto flex items-end justify-between gap-3">
                 <div class="min-w-0 flex-1">
                   <p class="m-0 truncate text-xs font-medium text-white leading-tight">
-                    {{ result.title || 'Untitled reference' }}
+                    {{ result.title || t('search.lightbox.untitledReference') }}
                   </p>
                   <p class="mt-1 mb-0 truncate text-[11px] text-white/70 leading-tight">
-                    by {{ result.author }} · {{ result.provider }}
+                    {{ t('search.attribution.byAuthorProvider', { author: result.author, provider: result.provider }) }}
                   </p>
                 </div>
 
@@ -353,13 +357,13 @@
                   "
                   :aria-label="
                     savedKeys.has(libraryAssetKey(result.provider, result.id))
-                      ? 'Remove from Library'
-                      : 'Save to Library'
+                      ? t('search.tooltips.removeFromLibrary')
+                      : t('search.tooltips.saveToLibrary')
                   "
                   :title="
                     savedKeys.has(libraryAssetKey(result.provider, result.id))
-                      ? 'Remove from Library'
-                      : 'Save to Library Folder'
+                      ? t('search.tooltips.removeFromLibrary')
+                      : t('search.tooltips.saveToLibrary')
                   "
                   @click.stop="toggleSavePopover($event, result)"
                 >
@@ -447,7 +451,7 @@
               <h3
                 class="m-0 text-white text-base sm:text-lg font-semibold tracking-tight drop-shadow-md truncate max-w-[240px] sm:max-w-md"
               >
-                {{ activeResult.title || 'Inspiration' }}
+                {{ activeResult.title || t('search.lightbox.inspiration') }}
               </h3>
               <p class="mt-1 mb-0 text-white/70 text-xs drop-shadow-md">
                 {{ activeResult.author }} · {{ activeResult.provider }}
@@ -463,14 +467,14 @@
                 rel="noreferrer"
                 class="h-7 px-3 rounded-full bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-board-primary hover:text-white hover:border-transparent flex items-center justify-center text-xs font-medium no-underline cursor-pointer"
               >
-                <span>View Source</span>
+                <span>{{ t('search.lightbox.viewSource') }}</span>
               </a>
 
               <button
                 type="button"
                 class="grid size-7 place-items-center rounded-full bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-board-primary hover:text-white hover:border-transparent focus-visible:outline-none cursor-pointer"
-                aria-label="Close preview"
-                title="Close (Esc)"
+                :aria-label="t('search.lightbox.close')"
+                :title="t('search.lightbox.close')"
                 @click="closeLightbox"
               >
                 <Xmark class="size-3.5" aria-hidden="true" />
@@ -514,6 +518,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import { Bookmark, BookmarkSolid, Camera, Check, Plus, Search, Xmark } from '@iconoir/vue'
 import StudioName from '../../../shared/components/StudioName.vue'
 import UserAccountMenu from '../../../shared/components/UserAccountMenu.vue'
+import UserLocaleSelect from '../../../shared/components/UserLocaleSelect.vue'
 import { HOME_PATH } from '../../../shared/constants/routePaths'
 import { useUserStore } from '../../auth/session/authSession'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'

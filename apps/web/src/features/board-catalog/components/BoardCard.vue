@@ -44,15 +44,15 @@
       <div v-else class="truncate text-sm font-[650] text-board-card-title">
         {{ board.name }}
       </div>
-      <div class="mt-[3px] text-xs text-board-card-text">Edited {{ displayDate }}</div>
+      <div class="mt-[3px] text-xs text-board-card-text">{{ t('workspace.boards.edited', { date: displayDate }) }}</div>
     </div>
 
     <div class="absolute right-3 bottom-3 z-[3]" @click.stop @pointerdown.stop>
       <Button
         unstyled
         type="button"
-        title="More actions"
-        aria-label="More actions"
+        :title="t('workspace.boards.moreActions')"
+        :aria-label="t('workspace.boards.moreActions')"
         aria-haspopup="menu"
         :aria-expanded="isMenuOpen"
         class="inline-flex size-[34px] cursor-pointer items-center justify-center border-0 bg-transparent text-board-card-action hover:text-board-card-action-hover"
@@ -92,6 +92,7 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
+import { useI18n } from 'vue-i18n'
 import { usePrimePopupMenuOverlayLifecycle } from '../../../shared/composables/usePrimePopupMenuOverlayLifecycle'
 import {
   appOverlayMenuDangerItemClass,
@@ -125,6 +126,7 @@ const emit = defineEmits<{
 }>()
 
 const renameInputEl = ref<RenameInputRef>(null)
+const { t } = useI18n()
 const {
   popupRef: menuRef,
   isOpen: isMenuOverlayOpen,
@@ -143,17 +145,17 @@ const menuPt = boardMenuPt
 const menuItems = computed<MenuItem[]>(() => [
   {
     key: 'rename',
-    label: 'Rename',
+    label: t('common.actions.rename'),
     command: () => selectMenuItem(() => emit('rename-action')),
   },
   {
     key: 'duplicate',
-    label: 'Duplicate',
+    label: t('workspace.boards.duplicate'),
     command: () => selectMenuItem(() => emit('duplicate-action')),
   },
   {
     key: 'delete',
-    label: 'Delete',
+    label: t('common.actions.delete'),
     command: () => selectMenuItem(() => emit('delete-action')),
   },
 ])

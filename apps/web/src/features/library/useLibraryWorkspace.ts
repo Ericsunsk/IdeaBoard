@@ -85,19 +85,32 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
     normalizeFolderQuery(syncRoute ? route.query.folder : options.initialFolder),
   )
   const folderTabs = computed(() => {
-    const tabs = folders.value.map((folder) => ({
-      queryKey: folder.query_key,
-      name: folder.name,
-      assetCount: folder.asset_count,
-      isMutable: !folder.is_system && !folder.is_virtual,
-    }))
+    const tabs = folders.value.map((folder) => {
+      const name =
+        folder.query_key === 'all'
+          ? i18n.global.t('library.folders.allAssets')
+          : folder.query_key === 'quick-saves'
+            ? i18n.global.t('library.folders.quickSaves')
+            : folder.name
+      return {
+        queryKey: folder.query_key,
+        name,
+        assetCount: folder.asset_count,
+        isMutable: !folder.is_system && !folder.is_virtual,
+      }
+    })
     if (!tabs.some((tab) => tab.queryKey === 'all')) {
-      tabs.unshift({ queryKey: 'all', name: 'All Assets', assetCount: 0, isMutable: false })
+      tabs.unshift({
+        queryKey: 'all',
+        name: i18n.global.t('library.folders.allAssets'),
+        assetCount: 0,
+        isMutable: false,
+      })
     }
     if (!tabs.some((tab) => tab.queryKey === 'quick-saves')) {
       tabs.splice(1, 0, {
         queryKey: 'quick-saves',
-        name: 'Quick Saves',
+        name: i18n.global.t('library.folders.quickSaves'),
         assetCount: 0,
         isMutable: false,
       })
@@ -170,7 +183,7 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
       galleryEffect: 'selection-will-reload',
     })
     selectFolder(folder.query_key)
-    toast.success('Folder created')
+    toast.success(i18n.global.t('library.toasts.folderCreated'))
   }
 
   async function renameFolderByKey(key: string, name: string) {
@@ -182,7 +195,7 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
       affectedFolderKeys: [updated.query_key],
       galleryEffect: 'none',
     })
-    toast.success('Folder renamed')
+    toast.success(i18n.global.t('library.toasts.folderRenamed'))
   }
 
   async function deleteFolder(key: string): Promise<boolean> {
@@ -197,7 +210,7 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
         galleryEffect: selectedFolderWasDeleted ? 'selection-will-reload' : 'none',
       })
       if (selectedFolder.value === key) selectFolder('quick-saves')
-      toast.success('Folder deleted')
+      toast.success(i18n.global.t('library.toasts.folderDeleted'))
       return true
     } catch (error) {
       toast.error(userFacingErrorCopy(error, i18n.global.t('library.errors.deleteFolderFailed')))
@@ -222,7 +235,7 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
         affectedFolderKeys: ['all', String(asset.folder_id), folderKey],
         galleryEffect: 'none',
       })
-      toast.success('Asset moved')
+      toast.success(i18n.global.t('library.toasts.assetMoved'))
       return true
     } catch (error) {
       toast.error(userFacingErrorCopy(error, i18n.global.t('library.errors.moveAssetFailed')))
@@ -242,7 +255,7 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
         affectedFolderKeys: ['all', String(asset.folder_id)],
         galleryEffect: 'none',
       })
-      toast.success('Removed from Library')
+      toast.success(i18n.global.t('library.toasts.removedFromLibrary'))
     } catch (error) {
       toast.error(userFacingErrorCopy(error, i18n.global.t('library.errors.removeAssetFailed')))
     }

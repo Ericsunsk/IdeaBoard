@@ -3,7 +3,7 @@
     kind="image"
     :node-id="node.id"
     :width="node.width"
-    :title="node.title || 'Image'"
+    :title="node.title || t('canvas.node.image')"
     :active="active"
     :dragging="dragging"
     :copy-mode="copyMode"
@@ -87,6 +87,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watchPostEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { MediaImage } from '@iconoir/vue'
 import {
   requireImageNodeOutputCount,
@@ -155,6 +156,8 @@ const emit = defineEmits<{
   (e: 'expand-handle-pointerup', event: PointerEvent): void
   (e: 'expand-frame-pointerdown', event: PointerEvent): void
 }>()
+
+const { t } = useI18n()
 
 const emptyIconVariant = computed(() => props.emptyIconVariant ?? 'image')
 const isImageEditorActive = computed(() => props.imageToolStageBinding?.mode != null)

@@ -92,13 +92,13 @@
       role="status"
       :title="imageImportFailureMessage"
     >
-      <span>Failed</span>
+      <span>{{ t('canvas.states.failed') }}</span>
       <NodeActionButton
         variant="stage-ghost"
         :aria-label="t('canvas.controls.retryImageImport')"
         @click.stop="emit('retry-image-import')"
       >
-        Retry
+        {{ t('common.actions.retry') }}
       </NodeActionButton>
     </div>
     <div
@@ -219,7 +219,7 @@ const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl,
 })
 const { t } = useI18n()
 const emptyStateLabel = computed(() =>
-  props.inputLocked ? 'Waiting...' : t('canvas.controls.uploadOrDropImage'),
+  props.inputLocked ? t('canvas.controls.waiting') : t('canvas.controls.uploadOrDropImage'),
 )
 const emptyStateDisabled = computed(() => !!props.inputLocked || !!props.directGenerating)
 const emptyStageAriaLabel = computed(() => {

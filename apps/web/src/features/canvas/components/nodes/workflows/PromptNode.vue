@@ -3,7 +3,7 @@
     kind="prompt"
     :node-id="node.id"
     :width="node.width"
-    :title="node.title || 'Prompt'"
+    :title="node.title || t('canvas.node.prompt')"
     :active="active"
     :dragging="dragging"
     :copy-mode="copyMode"

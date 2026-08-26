@@ -3,15 +3,46 @@
  * Keys are stable identifiers; never use sentences as keys.
  */
 export default {
+  brand: {
+    studioName: 'Eric Studio',
+    currency: 'Ideas',
+  },
+  navigation: {
+    search: 'Search',
+    workspace: 'Workspace',
+    library: 'Library',
+    account: 'Account',
+    workspaceNavigation: 'Workspace navigation',
+  },
   actions: {
     cancel: 'Cancel',
     delete: 'Delete',
     retry: 'Retry',
     loading: 'Loading…',
+    confirm: 'Confirm',
+    save: 'Save',
+    create: 'Create',
+    remove: 'Remove',
+    rename: 'Rename',
+    close: 'Close',
+    back: 'Back',
+    loadMore: 'Load more',
+    select: 'Select',
+    deselect: 'Deselect',
+    copy: 'Copy',
+    copied: 'Copied',
+    open: 'Open',
+    search: 'Search',
   },
   states: {
     noData: 'No data',
     empty: 'Nothing here yet',
+    loading: 'Loading…',
+    saving: 'Saving…',
+    processing: 'Processing…',
+    ready: 'Ready',
+    failed: 'Failed',
+    unavailable: 'Unavailable',
   },
   errors: {
     imageLoadFailed: 'The image could not be loaded. Try again.',
@@ -32,11 +63,18 @@ export default {
     parseImageFailed: 'The image content could not be parsed.',
     compressInvalidOutput: 'Compression produced invalid output.',
   },
+  dialogs: {
+    unsavedChangesTitle: 'Unsaved changes',
+    unsavedChangesMessage: 'You have unsaved changes. Are you sure you want to leave?',
+  },
   a11y: {
     chartTimeRange: 'Chart time range',
   },
   impersonation: {
     activeBanner: 'Impersonation preview active',
     exit: 'Exit impersonation',
+  },
+  locale: {
+    selectLanguage: 'Select language',
   },
 } as const

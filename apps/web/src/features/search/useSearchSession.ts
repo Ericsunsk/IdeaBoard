@@ -72,8 +72,10 @@ export function useSearchSession(options: {
   const libraryIslandExpanded = ref(isAuthenticated() && islandState.expanded)
   const selectedBatchResults = ref<SearchResult[]>([])
   const heading = computed(() => {
-    if (vision.references.value.length > 0) return 'Results for “Visual Concepts”'
-    return submittedQuery.value ? `Results for “${submittedQuery.value}”` : 'Inspiration'
+    if (vision.references.value.length > 0) return i18n.global.t('search.headings.visualConcepts')
+    return submittedQuery.value
+      ? i18n.global.t('search.headings.resultsForQuery', { query: submittedQuery.value })
+      : i18n.global.t('search.headings.inspiration')
   })
 
   function queryValue(): string {
@@ -122,7 +124,7 @@ export function useSearchSession(options: {
       return
     }
     if (selectedBatchResults.value.length >= 8) {
-      toast.warning('Maximum 8 images for batch selection!')
+      toast.warning(i18n.global.t('search.toasts.maxBatchSelected'))
       return
     }
     selectedBatchResults.value.push(result)
@@ -136,7 +138,7 @@ export function useSearchSession(options: {
     const toAdd = selectedBatchResults.value.slice(0, 4)
     await vision.addSearchResults(toAdd)
     if (selectedBatchResults.value.length > 4) {
-      toast.info('Added top 4 selected images as vision search references')
+      toast.info(i18n.global.t('search.toasts.batchVisionReferencesAdded'))
     }
     clearSelection()
   }
@@ -145,7 +147,11 @@ export function useSearchSession(options: {
     try {
       await libraryCoordinator.saveReference(reference)
       feed.markSavedKey(libraryAssetKey(reference.provider, reference.id))
-      toast.success(`Saved "${reference.title || 'Image'}" to Quick Saves!`)
+      toast.success(
+        i18n.global.t('search.toasts.savedToQuickSaves', {
+          title: reference.title || i18n.global.t('search.fallbackImageTitle'),
+        }),
+      )
       return true
     } catch (error) {
       toast.error(userFacingErrorCopy(error, i18n.global.t('library.errors.saveAssetFailed')))
@@ -174,11 +180,13 @@ export function useSearchSession(options: {
     }
     const failureCount = outcomes.length - successCount
     if (failureCount === 0) {
-      toast.success(`Saved ${successCount} assets to Library!`)
+      toast.success(i18n.global.t('search.toasts.savedBatchSuccess', { count: successCount }))
     } else if (successCount === 0) {
-      toast.error('Failed to save selected assets')
+      toast.error(i18n.global.t('search.toasts.savedBatchFailed'))
     } else {
-      toast.warning(`Saved ${successCount} assets; ${failureCount} failed`)
+      toast.warning(
+        i18n.global.t('search.toasts.savedBatchPartial', { successCount, failureCount }),
+      )
     }
     clearSelection()
   }

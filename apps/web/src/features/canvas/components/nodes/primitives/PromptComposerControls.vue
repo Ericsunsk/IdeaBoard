@@ -80,7 +80,7 @@ import {
   OUTPUT_RESOLUTION_OPTIONS,
   type OutputResolution,
 } from '../../../../../shared/domain/generationContract'
-import { formatIdeaAmount } from '../../../../../shared/utils/ideaCurrency'
+import { formatIdeaAmount } from '../../../../../shared/i18n/userIdeaCurrency'
 import type { CanvasBillingQuoteState } from '../../../execution'
 import NodeAspectRatioPicker from './NodeAspectRatioPicker.vue'
 import NodeTextOptionPicker from './NodeTextOptionPicker.vue'

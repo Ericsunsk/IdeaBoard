@@ -146,8 +146,8 @@ describe('UserRewardsPane', () => {
     expect(screen.getByText('+1 Idea')).toBeVisible()
     expect(screen.getByText('•••• 2026')).toBeVisible()
     expect(screen.queryByText('IDEA-2026')).not.toBeInTheDocument()
-    expect(screen.getByText('2026-07-15 18:00:00')).toBeVisible()
-    expect(screen.getByText('2026-07-15 00:05:06')).toBeVisible()
+    expect(screen.getByText('07/15/2026, 18:00:00')).toBeVisible()
+    expect(screen.getByText('07/15/2026, 00:05:06')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Load more' })).toBeVisible()
   })
 

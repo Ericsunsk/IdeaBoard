@@ -55,7 +55,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
-import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
+import { formatIdeaAmount } from '../../../shared/i18n/userIdeaCurrency'
 import type { PaymentReturnSource } from '../paymentReturnRoute'
 import type { UserPaymentOrderReturnStatus } from '../userPaymentsResource'
 

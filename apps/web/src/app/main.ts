@@ -3,9 +3,13 @@ import { VueQueryPlugin } from '@tanstack/vue-query'
 import PrimeVue from 'primevue/config'
 import ConfirmationService from 'primevue/confirmationservice'
 import { queryClient } from '../shared/query/queryClient'
-import { i18n } from '../shared/i18n'
+import {
+  getActiveUserPrimeLocale,
+  i18n,
+  initUserLocale,
+  registerPrimeVueConfig,
+} from '../shared/i18n'
 import { ideaBoardPrimePt } from './primePassThrough'
-import { ideaBoardUserPrimeLocale } from './primeLocale'
 import { ideaBoardPrimePreset } from './primeTheme'
 import router from './router'
 import App from './App.vue'
@@ -13,12 +17,14 @@ import { useUserStore } from '../features/auth/session/authSession'
 import './style.css'
 import 'vue-sonner/style.css'
 
+await initUserLocale()
+
 const app = createApp(App)
 app.use(router)
 app.use(i18n)
 app.use(VueQueryPlugin, { queryClient })
 app.use(PrimeVue, {
-  locale: ideaBoardUserPrimeLocale,
+  locale: getActiveUserPrimeLocale(),
   pt: ideaBoardPrimePt,
   ptOptions: {
     mergeSections: true,
@@ -33,6 +39,7 @@ app.use(PrimeVue, {
     },
   },
 })
+registerPrimeVueConfig(app.config.globalProperties.$primevue.config)
 app.use(ConfirmationService)
 
 const userStore = useUserStore()

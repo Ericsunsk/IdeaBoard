@@ -3,7 +3,7 @@
     kind="fusion"
     :node-id="node.id"
     :width="node.width"
-    :title="node.title || 'Fusion'"
+    :title="node.title || t('canvas.node.fusion')"
     :active="active"
     :dragging="dragging"
     :copy-mode="copyMode"

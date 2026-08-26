@@ -116,7 +116,9 @@ import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Skeleton from 'primevue/skeleton'
 import DataTableFrame from '../../../shared/components/DataTableFrame.vue'
+import { formatLocaleNumber } from '../../../shared/i18n/formatters'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
+import { formatAccountLocalDateTime } from '../accountDateTimeFormatters'
 import type { UserBillingRecord } from '../userBillingRecordsResource'
 import { useUserBillingRecords } from '../useUserBillingRecords'
 import AccountManagementPane from './AccountManagementPane.vue'
@@ -140,8 +142,6 @@ const {
   retryInitial,
   loadMore,
 } = useUserBillingRecords(() => props.active)
-
-const numberFormatter = new Intl.NumberFormat('en-US')
 const skeletonRows: BillingSkeletonRow[] = Array.from({ length: 5 }, (_, index) => ({
   record_id: `billing-skeleton-${index}`,
   isSkeleton: true,
@@ -154,7 +154,7 @@ function isSkeletonRow(row: BillingTableRow): row is BillingSkeletonRow {
 }
 
 function formatAmount(value: number): string {
-  return numberFormatter.format(value)
+  return formatLocaleNumber(value)
 }
 
 function formatSignedAmount(value: number): string {
@@ -189,15 +189,7 @@ function recordDescription(record: UserBillingRecord): string {
 function formatLocalDateTime(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return t('account.billingRecords.unknownTime')
-
-  return [
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
-    `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`,
-  ].join(' ')
-}
-
-function pad(value: number): string {
-  return String(value).padStart(2, '0')
+  return formatAccountLocalDateTime(date)
 }
 
 function errorMessage(error: unknown): string {

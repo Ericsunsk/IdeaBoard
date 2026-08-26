@@ -138,7 +138,8 @@ import { computed, markRaw, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import RangedLineChartCard from '../../../shared/components/RangedLineChartCard.vue'
-import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
+import { formatIdeaAmount } from '../../../shared/i18n/userIdeaCurrency'
+import { formatLocaleNumber } from '../../../shared/i18n/formatters'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { useUserUsage } from '../useUserUsage'
 import { DEFAULT_USER_USAGE_RANGE, type UserUsageRange } from '../userUsageResource'
@@ -150,14 +151,12 @@ import {
 import AccountManagementPane from './AccountManagementPane.vue'
 
 const props = defineProps<{ active: boolean }>()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const selectedRange = ref<UserUsageRange>(DEFAULT_USER_USAGE_RANGE)
 const { usage, displayRange, isInitialPending, isSwitching, error, retry } = useUserUsage(
   selectedRange,
   () => props.active,
 )
-
-const numberFormatter = new Intl.NumberFormat('en-US')
 const summaryPanelClass =
   'overflow-hidden rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-control)]'
 const summaryGridClass = 'grid grid-cols-5 max-[640px]:grid-cols-2'
@@ -166,36 +165,44 @@ const trendChartTheme = resolveUserUsageChartTheme()
 const trendChartPlugins = markRaw(createUserUsageChartPlugins(trendChartTheme))
 const trendDetailsCaptionId = useId()
 
-const rangeOptions = [
-  { key: '7d', label: t('account.usage.rangeWeek'), days: 7 },
-  { key: '30d', label: t('account.usage.rangeMonth'), days: 30 },
-  { key: '1y', label: t('account.usage.rangeYear'), days: 365 },
-] satisfies Array<{ key: UserUsageRange; label: string; days: number }>
+const rangeOptions = computed(
+  () =>
+    [
+      { key: '7d', label: t('account.usage.rangeWeek'), days: 7 },
+      { key: '30d', label: t('account.usage.rangeMonth'), days: 30 },
+      { key: '1y', label: t('account.usage.rangeYear'), days: 365 },
+    ] satisfies Array<{ key: UserUsageRange; label: string; days: number }>,
+)
 
-const summaryCellDefinitions = [
-  {
-    label: t('account.usage.metricTotalUsed'),
-    cellClass: 'border-r border-ib-border-soft max-[640px]:border-b',
-  },
-  {
-    label: t('account.usage.metricPeakDaily'),
-    cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r-0',
-  },
-  {
-    label: t('account.usage.metricAvgDaily'),
-    cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r',
-  },
-  {
-    label: t('account.usage.metricTasks'),
-    cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r-0',
-  },
-  {
-    label: t('account.usage.metricActiveDays'),
-    cellClass: 'max-[640px]:col-span-2',
-  },
-] as const
+const summaryCellDefinitions = computed(
+  () =>
+    [
+      {
+        label: t('account.usage.metricTotalUsed'),
+        cellClass: 'border-r border-ib-border-soft max-[640px]:border-b',
+      },
+      {
+        label: t('account.usage.metricPeakDaily'),
+        cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r-0',
+      },
+      {
+        label: t('account.usage.metricAvgDaily'),
+        cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r',
+      },
+      {
+        label: t('account.usage.metricTasks'),
+        cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r-0',
+      },
+      {
+        label: t('account.usage.metricActiveDays'),
+        cellClass: 'max-[640px]:col-span-2',
+      },
+    ] as const,
+)
 
 const metrics = computed(() => {
+  // Track locale for reactivity
+  void locale.value
   const lifetime = usage.value?.lifetime
   const values = [
     formatNumber(lifetime?.total_credits ?? 0),
@@ -204,7 +211,7 @@ const metrics = computed(() => {
     formatNumber(lifetime?.task_count ?? 0),
     formatNumber(lifetime?.active_days ?? 0),
   ]
-  return summaryCellDefinitions.map((metric, index) => ({ ...metric, value: values[index] }))
+  return summaryCellDefinitions.value.map((metric, index) => ({ ...metric, value: values[index] }))
 })
 
 const trendRows = computed(() => usage.value?.trend || [])
@@ -225,11 +232,11 @@ function rangeText(value: UserUsageRange) {
 }
 
 function rangeDays(value: UserUsageRange) {
-  return rangeOptions.find((candidate) => candidate.key === value)?.days ?? 30
+  return rangeOptions.value.find((candidate) => candidate.key === value)?.days ?? 30
 }
 
 function formatNumber(value: number) {
-  return numberFormatter.format(value)
+  return formatLocaleNumber(value)
 }
 
 function errorMessage(value: unknown) {

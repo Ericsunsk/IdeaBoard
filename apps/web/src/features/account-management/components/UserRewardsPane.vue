@@ -159,8 +159,9 @@ import Skeleton from 'primevue/skeleton'
 import DataTableFrame from '../../../shared/components/DataTableFrame.vue'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { ibFormInputClass } from '../../../shared/theme/formControls'
-import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
+import { formatIdeaAmount } from '../../../shared/i18n/userIdeaCurrency'
 import { useProfileFeedback } from '../useProfileFeedback'
+import { formatAccountShanghaiDateTime } from '../accountDateTimeFormatters'
 import { useUserRewardRedemption } from '../useUserRewardRedemption'
 import { useUserRewardRedemptions } from '../useUserRewardRedemptions'
 import type { UserRewardRedemption } from '../userRewardsResource'
@@ -195,16 +196,6 @@ type RewardSkeletonRow = {
 }
 type RewardTableRow = UserRewardRedemption | RewardSkeletonRow
 
-const shanghaiDateTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
-  timeZone: 'Asia/Shanghai',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-  hourCycle: 'h23',
-})
 const skeletonRows: RewardSkeletonRow[] = Array.from({ length: 4 }, (_, index) => ({
   id: `reward-skeleton-${index}`,
   isSkeleton: true,
@@ -225,13 +216,7 @@ function formatShanghaiDateTime(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return t('account.rewards.unknownTime')
 
-  const parts = Object.fromEntries(
-    shanghaiDateTimeFormatter
-      .formatToParts(date)
-      .filter((part) => part.type !== 'literal')
-      .map((part) => [part.type, part.value]),
-  )
-  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`
+  return formatAccountShanghaiDateTime(date)
 }
 
 function errorMessage(error: unknown): string {

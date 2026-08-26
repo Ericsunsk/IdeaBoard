@@ -12,8 +12,8 @@
           ref="searchInputRef"
           v-model="searchQuery"
           type="text"
-          placeholder="Save to folder or create..."
-          aria-label="Save to folder or create"
+          :placeholder="t('search.savePopover.searchPlaceholder')"
+          :aria-label="t('search.savePopover.searchAria')"
           class="w-full bg-transparent text-xs font-normal text-board-page-text placeholder:text-board-page-text-muted outline-none"
           @keydown.enter.prevent="handleEnterCreate"
         />
@@ -26,7 +26,7 @@
           :disabled="saving || !folderFactsReady"
           @click="handleEnterCreate"
         >
-          <span class="truncate">+ Create "{{ searchQuery.trim() }}"</span>
+          <span class="truncate">{{ t('search.savePopover.createNamedFolder', { name: searchQuery.trim() }) }}</span>
           <span class="font-mono text-[10px] text-board-primary">↵</span>
         </button>
       </div>
@@ -36,7 +36,7 @@
           v-if="folderFactsReady && !showQuickSaves && filteredFolders.length === 0 && !canCreateFromQuery"
           class="py-2.5 text-center text-xs text-board-page-text-muted"
         >
-          No matching folders
+          {{ t('search.savePopover.noMatchingFolders') }}
         </div>
 
         <button
@@ -48,7 +48,7 @@
         >
           <div class="flex min-w-0 items-center gap-2">
             <Bookmark class="size-3.5 shrink-0 text-board-primary" aria-hidden="true" />
-            <span class="truncate font-medium">Quick Saves</span>
+            <span class="truncate font-medium">{{ t('search.savePopover.quickSaves') }}</span>
           </div>
           <span class="shrink-0 font-sans text-[11px] text-board-page-text-muted">{{
             quickSavesCount
@@ -177,7 +177,7 @@ async function loadFolders(): Promise<boolean> {
     return true
   }
   folderFactsReady.value = false
-  if (snapshot.status === 'error') toast.error('Unable to load Library folders. Please try again.')
+  if (snapshot.status === 'error') toast.error(t('search.savePopover.loadFoldersFailed'))
   return false
 }
 
@@ -214,7 +214,7 @@ async function handleUnsave(request: SearchSavePopoverRequest) {
   saving.value = true
   try {
     await library.removeReference(request.result.provider, request.result.id)
-    toast.success('Removed from your Library')
+    toast.success(t('search.savePopover.removedToast'))
   } catch (error) {
     toast.error(userFacingErrorCopy(error, t('library.errors.removeAssetFailed')))
   } finally {
@@ -281,8 +281,8 @@ async function persist(folderId?: number, newFolderName?: string) {
     await library.saveReference(request.result, folderId, newFolderName)
     popover.value?.hide()
     const targetName =
-      newFolderName || folders.value.find((folder) => folder.id === folderId)?.name || 'Quick Saves'
-    toast.success(`Saved to "${targetName}" in your Personal Library!`)
+      newFolderName || folders.value.find((folder) => folder.id === folderId)?.name || t('search.savePopover.quickSaves')
+    toast.success(t('search.savePopover.savedToast', { name: targetName }))
   } catch (error) {
     toast.error(userFacingErrorCopy(error, t('library.errors.saveAssetFailed')))
   } finally {

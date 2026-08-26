@@ -164,7 +164,7 @@ import type { DataTableRowCollapseEvent, DataTableRowExpandEvent } from 'primevu
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
-import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
+import { formatIdeaAmount } from '../../shared/lib/adminIdeaCurrency'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'

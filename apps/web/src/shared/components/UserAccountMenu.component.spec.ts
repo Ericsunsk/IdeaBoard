@@ -59,8 +59,8 @@ describe('UserAccountMenu', () => {
     ]
     const { user } = renderWithUser(UserAccountMenu, { props: { items } })
 
-    const loginBtn = screen.getByRole('button', { name: 'Log in' })
-    const registerBtn = screen.getByRole('button', { name: 'Get started for free' })
+    const loginBtn = screen.getByRole('button', { name: 'Sign in' })
+    const registerBtn = screen.getByRole('button', { name: 'Sign up for free' })
 
     expect(loginBtn).toBeVisible()
     expect(registerBtn).toBeVisible()
@@ -182,5 +182,54 @@ describe('UserAccountMenu', () => {
     expect(customAction).toBeVisible()
     expect(credits.nextElementSibling).toBe(customAction)
     expect(customAction.nextElementSibling).toBe(accountMenu)
+  })
+
+  it('renders before-balance slot leading element before credit balance in authenticated state', () => {
+    const items: UserAccountMenuItem[] = [{ key: 'profile', label: '账户管理', command: vi.fn() }]
+    const balance: UserIdeaBalanceControl = {
+      status: 'ready',
+      availableIdeas: 100,
+      displayValue: '100',
+      ariaLabel: 'Idea余额 100 Ideas',
+      command: vi.fn(),
+    }
+    render(UserAccountMenu, {
+      props: { items, balance },
+      slots: {
+        'before-balance': '<button type="button" aria-label="locale-trigger">Translate</button>',
+        actions: '<button type="button" aria-label="custom-action">Custom Action</button>',
+      },
+    })
+
+    const localeTrigger = screen.getByRole('button', { name: 'locale-trigger' })
+    const credits = screen.getByRole('button', { name: 'Idea余额 100 Ideas' })
+    const customAction = screen.getByRole('button', { name: 'custom-action' })
+    const accountMenu = screen.getByRole('button', { name: 'Account menu' })
+
+    expect(localeTrigger).toBeVisible()
+    expect(localeTrigger.nextElementSibling).toBe(credits)
+    expect(credits.nextElementSibling).toBe(customAction)
+    expect(customAction.nextElementSibling).toBe(accountMenu)
+  })
+
+  it('renders before-balance slot leading element before guest login and register buttons in guest state', () => {
+    const items: UserAccountMenuItem[] = [
+      { key: 'login', label: '登录', command: vi.fn() },
+      { key: 'register', label: '免费注册', command: vi.fn() },
+    ]
+    render(UserAccountMenu, {
+      props: { items },
+      slots: {
+        'before-balance': '<button type="button" aria-label="locale-trigger">Translate</button>',
+      },
+    })
+
+    const localeTrigger = screen.getByRole('button', { name: 'locale-trigger' })
+    const loginBtn = screen.getByRole('button', { name: 'Sign in' })
+    const registerBtn = screen.getByRole('button', { name: 'Sign up for free' })
+
+    expect(localeTrigger).toBeVisible()
+    expect(localeTrigger.nextElementSibling).toBe(loginBtn)
+    expect(loginBtn.nextElementSibling).toBe(registerBtn)
   })
 })

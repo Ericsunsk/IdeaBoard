@@ -74,7 +74,7 @@ describe('UserWorkspaceNavigation', () => {
     session.ensureSession.mockResolvedValue(null)
     const { overlay, router, view } = await renderNavigation()
 
-    await view.user.click(view.getByRole('button', { name: 'Workspace' }))
+    await view.user.click(view.getByRole('link', { name: 'Workspace' }))
 
     await waitFor(() => expect(overlay.viewModel.mode.value).toBe('login'))
     expect(session.ensureSession).toHaveBeenCalledWith({ fresh: true })
@@ -87,7 +87,7 @@ describe('UserWorkspaceNavigation', () => {
     session.ensureSession.mockRejectedValue(new Error('session unavailable'))
     const { overlay, router, view } = await renderNavigation()
 
-    await view.user.click(view.getByRole('button', { name: 'Workspace' }))
+    await view.user.click(view.getByRole('link', { name: 'Workspace' }))
 
     await waitFor(() => expect(overlay.viewModel.mode.value).toBe('login'))
     expect(router.currentRoute.value.fullPath).toBe(USER_SEARCH_PATH)
@@ -100,7 +100,7 @@ describe('UserWorkspaceNavigation', () => {
     session.ensureSession.mockResolvedValue(user)
     const { overlay, router, view } = await renderNavigation()
 
-    await view.user.click(view.getByRole('button', { name: 'Workspace' }))
+    await view.user.click(view.getByRole('link', { name: 'Workspace' }))
 
     await waitFor(() => expect(router.currentRoute.value.fullPath).toBe(USER_BOARDS_PATH))
     expect(session.ensureSession).toHaveBeenCalledWith({ fresh: true })
@@ -111,7 +111,7 @@ describe('UserWorkspaceNavigation', () => {
     session.ensureSession.mockResolvedValue(null)
     const { overlay, router, view } = await renderNavigation(USER_BOARDS_PATH)
 
-    await view.user.click(view.getByRole('button', { name: 'Workspace' }))
+    await view.user.click(view.getByRole('link', { name: 'Workspace' }))
 
     await waitFor(() => expect(overlay.viewModel.mode.value).toBe('login'))
     expect(router.currentRoute.value.fullPath).toBe(USER_BOARDS_PATH)

@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
 import { getCanvasNodeKindMenuItems } from '../config/canvasNodeRegistry'
 
@@ -19,7 +19,7 @@ export function useCanvasNodeContextMenu() {
     flowY: 0,
   })
 
-  const canvasNodeMenuItems = getCanvasNodeKindMenuItems()
+  const canvasNodeMenuItems = computed(() => getCanvasNodeKindMenuItems())
 
   function close() {
     nodeContextMenu.value.visible = false

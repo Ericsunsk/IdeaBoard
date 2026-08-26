@@ -1,7 +1,7 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import { useRouter, type Router } from 'vue-router'
 import { USER_SEARCH_PATH } from '../../shared/constants/routePaths'
-import { formatIdeaAmount } from '../../shared/utils/ideaCurrency'
+import { formatIdeaAmount } from '../../shared/i18n/userIdeaCurrency'
 import { useAppToast } from '../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
 import { i18n } from '../../shared/i18n'
@@ -65,10 +65,12 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
   const referenceSlotCount = collection.slotCount
   const canAddReference = collection.canAdd
   const buttonTitle = computed(() => {
-    if (hasPendingReferences.value) return 'Preparing references'
-    if (state.value === 'extracting') return 'Searching'
-    if (references.value.length === 0 || price.value === null) return 'Search'
-    return `Search · ${price.value === 0 ? i18n.global.t('search.priceFree') : formatIdeaAmount(price.value)}`
+    if (hasPendingReferences.value) return i18n.global.t('search.buttons.preparingReferences')
+    if (state.value === 'extracting') return i18n.global.t('search.buttons.searching')
+    if (references.value.length === 0 || price.value === null) return i18n.global.t('search.buttons.search')
+    return i18n.global.t('search.buttons.searchWithPrice', {
+      price: price.value === 0 ? i18n.global.t('search.priceFree') : formatIdeaAmount(price.value),
+    })
   })
   let extractionController: AbortController | null = null
   let priceController: AbortController | null = null
@@ -203,18 +205,18 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
     if (files.length === 0) return
     const room = MAX_REFERENCE_COUNT - referenceSlotCount.value
     if (files.length > room) {
-      toast.warning('You can add up to 4 reference images')
+      toast.warning(i18n.global.t('search.errors.maxReferenceImages'))
       return
     }
     let totalBytes = collection.currentBytes()
     for (const file of files) {
       if (!file.type.startsWith('image/')) {
-        toast.warning('Only image files are supported')
+        toast.warning(i18n.global.t('search.errors.onlyImageFilesSupported'))
         return
       }
       totalBytes += file.size
       if (totalBytes > MAX_REFERENCE_BYTES) {
-        toast.warning('Total reference images size cannot exceed 10MB')
+        toast.warning(i18n.global.t('search.errors.maxReferenceSizeExceeded'))
         return
       }
     }
@@ -237,7 +239,7 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
     const key = searchReferenceKey(asset.provider, asset.source_id)
     if (collection.has(key) || collection.isPending(key)) return
     if (!canAddReference.value) {
-      toast.warning('You can add up to 4 reference images')
+      toast.warning(i18n.global.t('search.errors.maxReferenceImages'))
       return
     }
     collection.add(toVisionReference(asset))
@@ -249,7 +251,7 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
     const key = searchReferenceKey(result.provider, result.id)
     if (collection.has(key) || collection.isPending(key)) return
     if (!canAddReference.value) {
-      toast.warning('You can add up to 4 reference images')
+      toast.warning(i18n.global.t('search.errors.maxReferenceImages'))
       return
     }
     if (!collection.begin(key)) return

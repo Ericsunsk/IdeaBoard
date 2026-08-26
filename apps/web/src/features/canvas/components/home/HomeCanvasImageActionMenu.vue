@@ -64,7 +64,7 @@ import {
   WORKFLOW_FEATURE,
   type WorkflowFeature,
 } from '../../../../shared/domain/workflowFeatures'
-import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
+import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import {
   getImageActionMenuItems,
   IMAGE_NODE_ACTION,

@@ -7,8 +7,9 @@ import type {
 } from '../../shared/components/userAccountMenu.types'
 import { ADMIN_ROOT_PATH, HOME_PATH } from '../../shared/constants/routePaths'
 import { i18n } from '../../shared/i18n'
+import { formatLocaleNumber } from '../../shared/i18n/formatters'
 import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
-import { formatIdeaAmount } from '../../shared/utils/ideaCurrency'
+import { formatIdeaAmount } from '../../shared/i18n/userIdeaCurrency'
 import {
   defaultAccountManagementTab,
   type AccountManagementTab,
@@ -28,7 +29,7 @@ type UseUserAccountControlsOptions = {
 }
 
 function formatIdeaValue(value: number): string {
-  return new Intl.NumberFormat('en-US').format(value)
+  return formatLocaleNumber(value)
 }
 
 export function useUserAccountControls(options: UseUserAccountControlsOptions) {
@@ -63,6 +64,8 @@ export function useUserAccountControls(options: UseUserAccountControlsOptions) {
   }
 
   const balance = computed<UserIdeaBalanceControl>(() => {
+    // Track locale for reactivity of number formatting
+    void i18n.global.locale.value
     if (!userStore.user) {
       return {
         status: 'anonymous',

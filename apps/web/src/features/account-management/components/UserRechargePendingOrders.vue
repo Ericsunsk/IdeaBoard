@@ -108,7 +108,8 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
-import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
+import { formatIdeaAmount } from '../../../shared/i18n/userIdeaCurrency'
+import { formatLocaleDate } from '../../../shared/i18n/formatters'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { accountButtonPt, accountPrimaryActionButtonClass } from './accountManagementUi'
 import type { UserPendingPaymentOrder } from '../userPaymentsResource'
@@ -195,11 +196,11 @@ function isCreditProcessingDelayed(updatedAt: string) {
 function expiryText(item: UserPendingPaymentOrder) {
   const date = new Date(item.expires_at)
   if (Number.isNaN(date.getTime())) return t('account.topUp.expiryUnknown')
-  const formatted = new Intl.DateTimeFormat('en-US', {
+  const formatted = formatLocaleDate(date, {
     dateStyle: 'medium',
     timeStyle: 'short',
     hour12: false,
-  }).format(date)
+  })
   return item.status === 'expired'
     ? t('account.topUp.expiredAt', { time: formatted })
     : t('account.topUp.expiresAt', { time: formatted })

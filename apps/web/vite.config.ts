@@ -11,6 +11,7 @@ export default defineConfig({
     setupFiles: ['src/test/setup.ts'],
   },
   build: {
+    manifest: true,
     chunkSizeWarningLimit: 700,
     rollupOptions: {
       onwarn(warning, warn) {

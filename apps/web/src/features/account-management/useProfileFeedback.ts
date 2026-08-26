@@ -1,7 +1,7 @@
 import type { AsyncActionFeedback } from '../../shared/composables/useAsyncAction'
 import { useAppToast } from '../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
-import { formatIdeaAmount } from '../../shared/utils/ideaCurrency'
+import { formatIdeaAmount } from '../../shared/i18n/userIdeaCurrency'
 import { i18n } from '../../shared/i18n'
 
 type ProfileToast = Pick<ReturnType<typeof useAppToast>, 'success' | 'info' | 'warning' | 'error'>

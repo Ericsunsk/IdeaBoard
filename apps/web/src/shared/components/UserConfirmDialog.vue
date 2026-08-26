@@ -14,7 +14,7 @@
         <Button
           unstyled
           type="button"
-          label="Cancel"
+          :label="t('common.actions.cancel')"
           class="rounded-full px-4 py-2 text-sm font-semibold text-board-page-text-muted hover:bg-ib-surface-hover"
           :disabled="loading"
           @click="emit('update:visible', false)"
@@ -22,7 +22,7 @@
         <Button
           unstyled
           type="button"
-          :label="confirmLabel"
+          :label="confirmLabel || t('common.actions.confirm')"
           :disabled="loading"
           :class="[
             'rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-50',
@@ -40,6 +40,7 @@
 <script setup lang="ts">
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
+import { useI18n } from 'vue-i18n'
 
 withDefaults(
   defineProps<{
@@ -51,7 +52,7 @@ withDefaults(
     loading?: boolean
   }>(),
   {
-    confirmLabel: 'Confirm',
+    confirmLabel: '',
     intent: 'primary',
     loading: false,
   },
@@ -61,6 +62,8 @@ const emit = defineEmits<{
   'update:visible': [visible: boolean]
   confirm: []
 }>()
+
+const { t } = useI18n()
 
 const dialogPt = {
   root: { class: '!rounded-2xl !border-board-card-border' },

@@ -1,11 +1,13 @@
 import { i18n } from '../../shared/i18n'
+import { formatLocaleNumber, getLocaleNumberFormatter } from '../../shared/i18n/formatters'
+import { getActiveUserLocale } from '../../shared/i18n/userLocale'
 
 const MIN_IDEA_QUANTITY = 500
 const MAX_IDEA_QUANTITY = 500_000
 const integerPattern = /^\d+$/
 
 function integerQuantityLabel(value: number): string {
-  return value.toLocaleString('en-US')
+  return formatLocaleNumber(value)
 }
 
 function integerRangeError(): string {
@@ -70,32 +72,41 @@ export function formatCurrencyMinor(amountMinor: number, currency: string): stri
   const minorAmount = BigInt(amountMinor)
   const major = minorAmount / minorUnitsPerMajor
   const minor = minorAmount % minorUnitsPerMajor
-  const majorDisplay = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(major)
-  const symbol = currencySymbol(normalizedCurrency)
-  const decimal = fractionDigits > 0 ? `.${minor.toString().padStart(fractionDigits, '0')}` : ''
-  return `${symbol}${majorDisplay}${decimal} ${normalizedCurrency}`
+  const activeLocale = getActiveUserLocale()
+  const wholeNumber = getLocaleNumberFormatter(activeLocale, {
+    maximumFractionDigits: 0,
+    useGrouping: true,
+  }).format(major)
+  const minorDisplay = minor.toString().padStart(fractionDigits, '0')
+  const currencyFormatter = getLocaleNumberFormatter(activeLocale, {
+    style: 'currency',
+    currency: normalizedCurrency,
+    currencyDisplay: 'symbol',
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  })
+
+  // Build the localized currency pattern from Intl while keeping minor-unit math exact.
+  const localizedAmount = currencyFormatter
+    .formatToParts(0)
+    .map((part) => {
+      if (part.type === 'integer') return wholeNumber
+      if (part.type === 'fraction') return minorDisplay
+      return part.value
+    })
+    .join('')
+
+  // Payment history keeps the ISO code visible even where the locale symbol is ambiguous.
+  return `${localizedAmount} ${normalizedCurrency}`
 }
 
 function currencyFractionDigits(currency: string): number {
   return (
-    new Intl.NumberFormat('en-US', {
+    getLocaleNumberFormatter('en', {
       style: 'currency',
       currency,
     }).resolvedOptions().maximumFractionDigits ?? 2
   )
-}
-
-function currencySymbol(currency: string): string {
-  const symbol = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    currencyDisplay: 'symbol',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  })
-    .formatToParts(0)
-    .find((part) => part.type === 'currency')?.value
-  return symbol === currency ? '' : (symbol ?? '')
 }
 
 export { MAX_IDEA_QUANTITY, MIN_IDEA_QUANTITY }

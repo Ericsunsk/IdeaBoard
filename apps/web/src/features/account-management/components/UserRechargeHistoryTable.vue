@@ -24,7 +24,7 @@
           ><Skeleton v-if="isSkeleton(data)" width="4rem" /><span
             v-else
             class="font-mono font-bold text-ib-text"
-            >{{ ideaFormatter.format(data.idea_quantity) }}</span
+            >{{ formatLocaleNumber(data.idea_quantity) }}</span
           ></template
         >
       </Column>
@@ -128,6 +128,8 @@ import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Skeleton from 'primevue/skeleton'
 import DataTableFrame from '../../../shared/components/DataTableFrame.vue'
+import { formatLocaleNumber } from '../../../shared/i18n/formatters'
+import { formatAccountRechargeDateTime } from '../accountDateTimeFormatters'
 import { formatCurrencyMinor } from '../paymentMoney'
 import type { UserRechargeHistoryItem } from '../userPaymentsResource'
 
@@ -144,7 +146,6 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ retry: []; 'load-more': [] }>()
 const { t } = useI18n()
-const ideaFormatter = new Intl.NumberFormat('en-US')
 const skeletonRows: SkeletonRow[] = Array.from({ length: 4 }, (_, index) => ({
   occurred_at: `recharge-skeleton-${index}`,
   skeleton: true,
@@ -166,7 +167,6 @@ function rechargeStatusLabel(item: UserRechargeHistoryItem): string {
 function formatDateTime(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return t('account.topUp.unknownTime')
-  const pad = (part: number) => String(part).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return formatAccountRechargeDateTime(date)
 }
 </script>

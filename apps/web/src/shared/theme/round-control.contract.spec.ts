@@ -8,7 +8,7 @@ const sourceRoot = resolve(process.cwd(), 'src')
 const readSource = (relativePath: string) => readFileSync(resolve(sourceRoot, relativePath), 'utf8')
 
 const roundControl = readSource('shared/theme/round-control.css')
-const boardSurfaceSkin = readSource('features/board-catalog/styles/board-surface-skin.css')
+const pageChrome = readSource('shared/theme/page-chrome.css')
 const canvasChromeSkin = readSource('features/canvas/components/styles/canvas-chrome.css')
 
 describe('Round Control surface ownership contract', () => {
@@ -21,7 +21,7 @@ describe('Round Control surface ownership contract', () => {
     expect(roundControl).not.toContain('--ib-control-')
   })
 
-  it('lets Boards and Canvas provide complete surface state skins', () => {
+  it('lets Account chrome and Canvas tools provide complete surface state skins', () => {
     ;[
       '--ib-round-control-border:',
       '--ib-round-control-border-hover:',
@@ -33,10 +33,12 @@ describe('Round Control surface ownership contract', () => {
       '--ib-round-control-color-disabled:',
       '--ib-round-control-focus-ring:',
     ].forEach((token) => {
-      expect(boardSurfaceSkin).toContain(token)
+      expect(pageChrome).toContain(token)
       expect(canvasChromeSkin).toContain(token)
     })
-    expect(boardSurfaceSkin).toContain('.board-surface-skin .ib-round-control')
+    expect(pageChrome).toContain(
+      '.ib-page-chrome-account > .ib-round-control.ib-page-chrome-control',
+    )
     expect(canvasChromeSkin).toMatch(
       /\.canvas-chrome-icon-button\s*,\s*\.canvas-user-avatar-button/,
     )

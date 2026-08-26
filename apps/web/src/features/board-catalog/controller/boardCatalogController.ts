@@ -1,4 +1,5 @@
 import { computed, readonly, ref, watch } from 'vue'
+import { formatLocaleDate } from '../../../shared/i18n/formatters'
 import type { CanvasBoardCatalog } from '../../canvas-board/catalog/canvasBoardCatalog'
 import type { BoardPreviewRefreshQueue } from '../../canvas-board/preview'
 import type {
@@ -331,9 +332,9 @@ export function createBoardCatalogController(
 
 export function formatBoardCatalogDate(timestamp: number): string {
   if (!Number.isFinite(timestamp)) return '-'
-  const date = new Date(timestamp)
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, '0')
-  const day = `${date.getDate()}`.padStart(2, '0')
-  return `${year}.${month}.${day}`
+  return formatLocaleDate(timestamp, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
 }

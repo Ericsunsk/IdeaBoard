@@ -16,6 +16,7 @@ const ALLOWLIST_PATH = join(import.meta.dirname, 'user-copy-locale-allowlist.jso
 const EXCLUDED_DIR_PARTS = [
   ['features', 'admin'],
   ['shared', 'api', 'generated-query'],
+  ['shared', 'i18n', 'locales'],
 ]
 const CJK_PATTERN = /[\u4e00-\u9fff\u3400-\u4dbf]/
 
