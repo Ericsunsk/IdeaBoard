@@ -1,5 +1,6 @@
 import { blankBoardPreviewSurfaceClass } from '../../canvas-board/preview'
 import { ibDialogMaskPt } from '../../../shared/theme/dialogMask'
+import { createAppOverlayMenuPt } from '../../../shared/theme/appOverlayMenu'
 
 export { blankBoardPreviewSurfaceClass }
 
@@ -22,13 +23,12 @@ export const boardCatalogClasses = {
     'inline-flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-board-primary px-3 text-xs font-bold text-ib-text-inverse hover:bg-board-primary-hover disabled:cursor-wait disabled:opacity-60',
   createButton:
     '!h-[42px] !rounded-full !border-0 !bg-board-primary !px-5 !text-sm !font-bold !tracking-normal !text-ib-text-inverse !shadow-none hover:!bg-board-primary-hover focus-visible:!shadow-[var(--shadow-board-focus-strong)] max-[860px]:!w-full',
-  searchWrap:
-    'flex h-[42px] min-w-0 items-center gap-2 rounded-full border border-board-card-border bg-board-control-bg px-3',
+  searchWrap: 'ib-page-chrome-surface flex h-[42px] min-w-0 items-center gap-2 rounded-full px-3',
   searchIcon: 'size-3.5 shrink-0 text-board-control-icon',
   searchInput:
     'min-w-0 flex-1 bg-transparent text-[13px] text-board-control-input-text outline-none',
-  sortSelect:
-    '!inline-flex !h-[42px] !w-[108px] !min-w-[108px] !items-center !justify-center !gap-2 !rounded-full !border-board-card-border !bg-board-control-bg !text-[13px] !font-semibold !text-board-control-text !shadow-none max-[860px]:!w-full',
+  sortMenuTrigger:
+    'ib-page-chrome-surface inline-flex h-[42px] w-[108px] min-w-[108px] cursor-pointer items-center justify-center gap-2 rounded-full px-3 text-[13px] font-semibold text-board-control-text transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-[var(--color-ib-page-chrome-border-hover)] hover:bg-[var(--color-ib-page-chrome-bg-hover)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ib-page-chrome-focus-ring)] max-[860px]:w-full',
   loadingState:
     'flex min-h-[244px] items-center justify-center rounded-xl border border-dashed border-board-card-border bg-board-loading-bg',
   loadingSpinner: '!h-9 !w-9 text-board-primary',
@@ -53,22 +53,15 @@ export const boardCatalogClasses = {
     'inline-flex h-9 min-w-[72px] cursor-pointer items-center justify-center rounded-full border-0 bg-board-danger px-3.5 text-sm font-bold text-ib-text-inverse transition-colors hover:bg-board-danger-hover disabled:cursor-not-allowed disabled:opacity-70',
 } as const
 
-export const boardCatalogSortSelectPt = {
-  label: { class: '!w-auto !flex-none !py-0 !pr-0 !pl-0 !leading-[40px]' },
-  dropdown: { class: '!w-auto !flex-none' },
-  overlay: {
-    class:
-      '!rounded-xl !border !border-board-menu-border !bg-board-surface-strong !shadow-[var(--shadow-ib-overlay)]',
-  },
-  list: { class: '!p-1.5' },
-  option: { class: '!rounded-lg !px-3 !py-2 !text-[13px] !font-semibold' },
-} as const
+export const boardCatalogSortMenuPt = createAppOverlayMenuPt(
+  '!z-40 !w-[108px] !min-w-[108px] !max-w-[108px] !p-0',
+)
 
 export const boardCatalogDeleteDialogPt = {
   ...ibDialogMaskPt,
   root: {
     class:
-      '!overflow-hidden !rounded-[var(--radius-board-dialog)] !border !border-board-menu-border !bg-board-surface-strong !shadow-[var(--shadow-board-dialog)]',
+      '!overflow-hidden !rounded-[var(--radius-board-dialog)] !border !border-board-card-border !bg-board-surface-strong !shadow-[var(--shadow-board-dialog)]',
   },
   content: { class: '!bg-transparent !p-0' },
 } as const

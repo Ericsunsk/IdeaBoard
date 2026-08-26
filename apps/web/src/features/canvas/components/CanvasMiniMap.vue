@@ -1,7 +1,7 @@
 <template>
   <div class="canvas-minimap-shell" :style="minimapShellStyle">
     <MiniMap
-      class="canvas-minimap"
+      class="ib-page-chrome-surface canvas-minimap"
       position="bottom-left"
       :width="CANVAS_MINIMAP_WIDTH"
       :height="CANVAS_MINIMAP_HEIGHT"

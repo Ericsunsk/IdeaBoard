@@ -133,6 +133,18 @@
   --color-ib-page-chrome-color-hover: var(--color-board-card-action-hover);
   --color-ib-page-chrome-color-disabled: var(--color-board-card-text);
   --color-ib-page-chrome-focus-ring: var(--color-board-focus-ring);
+  --shadow-ib-page-chrome: none;
+  --color-ib-overlay-bg: rgba(255, 255, 255, 0.98);
+  --color-ib-overlay-border: #d8ddea;
+  --color-ib-overlay-item: #4b5565;
+  --color-ib-overlay-item-hover-bg: var(--color-ib-creative-accent-ring);
+  --color-ib-overlay-danger: var(--color-ib-danger);
+  --color-ib-overlay-danger-hover-bg: color-mix(
+    in srgb,
+    var(--color-ib-overlay-danger) 10%,
+    transparent
+  );
+  --shadow-ib-overlay-menu: none;
   --spacing-ib-page-dot: 12px;
   --spacing-ib-page-chrome-inset: 16px;
 
@@ -152,7 +164,6 @@
   --color-board-surface: rgba(255, 255, 255, 0.9);
   --color-board-surface-soft: rgba(255, 255, 255, 0.6);
   --color-board-surface-strong: var(--color-ib-surface);
-  --color-board-overlay-bg: rgba(255, 255, 255, 0.98);
   --color-board-control-bg: rgba(255, 255, 255, 0.85);
   --color-board-control-text: #3e4457;
   --color-board-control-input-text: #2f3446;
@@ -174,15 +185,6 @@
   --color-board-create-icon: #cfd7ea;
   --color-board-create-title: #394054;
   --color-board-loading-bg: rgba(220, 227, 238, 0.45);
-  --color-board-menu-border: #d8ddea;
-  --color-board-menu-item: #4b5565;
-  --color-board-menu-item-hover-bg: var(--color-ib-creative-accent-ring);
-  --color-board-menu-danger: var(--color-ib-danger);
-  --color-board-menu-danger-hover-bg: color-mix(
-    in srgb,
-    var(--color-board-menu-danger) 10%,
-    transparent
-  );
   --color-board-danger: var(--color-ib-danger);
   --color-board-danger-hover: var(--color-ib-danger-pressed);
   --color-board-dialog-title: var(--color-board-control-input-text);
@@ -235,15 +237,6 @@
   --color-ib-danger-pressed: var(--color-admin-danger-pressed);
   --color-ib-info: var(--color-admin-info);
   --color-ib-dialog-mask: color-mix(in srgb, var(--color-ib-text) 38%, transparent);
-  --color-ib-board-border: var(--color-board-card-border);
-  --color-ib-board-border-hover: var(--color-board-card-border-hover);
-  --color-ib-account-menu-bg: var(--color-board-overlay-bg);
-  --color-ib-account-menu-border: var(--color-board-menu-border);
-  --color-ib-account-menu-item: var(--color-board-menu-item);
-  --color-ib-account-menu-item-hover-bg: var(--color-board-menu-item-hover-bg);
-  --color-ib-account-menu-danger: var(--color-board-menu-danger);
-  --color-ib-account-menu-danger-hover-bg: var(--color-board-menu-danger-hover-bg);
-
   /*
    * Auth modal aliases.
    * These preserve the creative glass treatment while sourcing neutral values

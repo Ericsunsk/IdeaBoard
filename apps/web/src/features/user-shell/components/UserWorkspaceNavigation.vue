@@ -1,6 +1,6 @@
 <template>
   <nav
-    class="absolute top-0 left-1/2 flex h-[var(--ib-page-chrome-control-size,40px)] w-max -translate-x-1/2 items-center rounded-full border border-board-card-border bg-board-control-bg p-1 backdrop-blur-md shadow-[var(--shadow-ib-control)] max-[860px]:static max-[860px]:order-3 max-[860px]:mt-4 max-[860px]:w-full max-[860px]:translate-x-0"
+    class="ib-page-chrome-surface absolute top-0 left-1/2 flex h-[var(--ib-page-chrome-control-size,40px)] w-max -translate-x-1/2 items-center rounded-full p-1 max-[860px]:static max-[860px]:order-3 max-[860px]:mt-4 max-[860px]:w-full max-[860px]:translate-x-0"
     :aria-label="t('common.navigation.workspaceNavigation')"
   >
     <RouterLink
@@ -15,8 +15,8 @@
         :class="[
           navigationItemClass,
           isActive
-            ? 'bg-ib-surface-hover text-board-page-text'
-            : 'text-board-page-text-muted hover:text-board-page-text',
+            ? 'bg-[var(--color-ib-page-chrome-bg-hover)] text-[var(--color-ib-page-chrome-color-hover)]'
+            : 'text-[var(--color-ib-page-chrome-color)] hover:text-[var(--color-ib-page-chrome-color-hover)]',
           item.path === USER_BOARDS_PATH && isWorkspaceNavigationPending
             ? 'cursor-wait'
             : 'cursor-pointer',
@@ -55,12 +55,15 @@ const authOverlay = useAuthOverlay()
 const isWorkspaceNavigationPending = ref(false)
 const isWorkspaceActive = computed(() => route.path === USER_BOARDS_PATH)
 const navigationItemClass =
-  'flex h-full flex-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-transparent px-3 text-[13px] leading-none font-medium no-underline transition-[background-color,color] duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] max-[860px]:flex-1'
+  'flex h-full flex-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-transparent px-3 text-[13px] leading-none font-medium no-underline transition-[background-color,color] duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ib-page-chrome-focus-ring)] max-[860px]:flex-1'
 
-const navigationItems = computed(() => [
-  { path: USER_SEARCH_PATH, label: t('common.navigation.search'), icon: Compass },
-  { path: USER_BOARDS_PATH, label: t('common.navigation.workspace'), icon: ViewGrid },
-] as const)
+const navigationItems = computed(
+  () =>
+    [
+      { path: USER_SEARCH_PATH, label: t('common.navigation.search'), icon: Compass },
+      { path: USER_BOARDS_PATH, label: t('common.navigation.workspace'), icon: ViewGrid },
+    ] as const,
+)
 
 function handleNavClick(path: string) {
   if (route.path === path && typeof window !== 'undefined') {

@@ -13,7 +13,10 @@ import { useAppToast } from '../../shared/composables/useAppToast'
 import { useAuthOverlay } from '../auth/authOverlay'
 import { useRoute, useRouter } from 'vue-router'
 import { libraryAssetKey } from '../library/libraryResource'
-import { readSearchReferenceTransfer, writeSearchReferenceTransfer } from '../library/libraryTransfer'
+import {
+  readSearchReferenceTransfer,
+  writeSearchReferenceTransfer,
+} from '../library/libraryTransfer'
 import {
   peekPendingSearchAuthAction,
   setPendingSearchAuthAction,
@@ -327,7 +330,7 @@ export function useSearchScreenRuntime(options: SearchScreenRuntimeOptions) {
         writeSearchReferenceTransfer(dataTransfer, session().toLibraryReference(result))
         const ghost = document.createElement('div')
         ghost.style.cssText =
-          'position:fixed;top:-9999px;left:-9999px;width:58px;height:44px;border-radius:8px;overflow:hidden;box-shadow:var(--search-dock-shadow);transform:rotate(-3deg);z-index:9999'
+          'position:fixed;top:-9999px;left:-9999px;width:58px;height:44px;border-radius:8px;overflow:hidden;box-shadow:var(--shadow-ib-overlay);transform:rotate(-3deg);z-index:9999'
         const image = document.createElement('img')
         image.src = result.thumbnail_url || result.preview_url
         image.style.cssText = 'width:100%;height:100%;object-fit:cover'
@@ -372,9 +375,13 @@ export function useSearchScreenRuntime(options: SearchScreenRuntimeOptions) {
   watch(view.library.open, (open) => {
     if (open) libraryIslandMounted.value = true
   })
-  watch(scopeKey, (nextScope, previousScope) => {
-    if (nextScope !== previousScope) replaceScopedSession(nextScope, previousScope)
-  }, { flush: 'sync' })
+  watch(
+    scopeKey,
+    (nextScope, previousScope) => {
+      if (nextScope !== previousScope) replaceScopedSession(nextScope, previousScope)
+    },
+    { flush: 'sync' },
+  )
 
   onMounted(() => {
     mounted.value = true

@@ -11,7 +11,7 @@
       <Button
         unstyled
         type="button"
-        class="ib-control-state [--ib-control-active-transform:scale(0.97)] inline-flex h-9 items-center justify-center rounded-full border border-board-card-border bg-board-control-bg/80 px-4 text-xs font-semibold text-ib-text backdrop-blur-md transition-[border-color,background-color,transform,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-ib-border-hover hover:bg-ib-surface-hover active:scale-[0.97]"
+        class="ib-page-chrome-surface ib-control-state [--ib-control-active-transform:scale(0.97)] inline-flex h-9 items-center justify-center rounded-full px-4 text-xs font-semibold text-ib-text transition-[border-color,background-color,transform,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-[var(--color-ib-page-chrome-border-hover)] hover:bg-[var(--color-ib-page-chrome-bg-hover)] active:scale-[0.97]"
         :aria-label="t('auth.signIn')"
         @click="loginItem?.command?.()"
       >
@@ -41,7 +41,12 @@
         :class="avatarButtonClass"
         @click="toggleMenu"
       >
-        <img v-if="avatarUrl" :src="avatarUrl" :class="avatarImageClass" :alt="t('auth.menu.avatarAlt')" />
+        <img
+          v-if="avatarUrl"
+          :src="avatarUrl"
+          :class="avatarImageClass"
+          :alt="t('auth.menu.avatarAlt')"
+        />
         <div v-else :class="[avatarPlaceholderClass, 'bg-transparent']">
           <User :class="avatarIconClass" />
         </div>
@@ -81,9 +86,12 @@ import Menu from 'primevue/menu'
 import type { MenuPassThroughOptions } from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import { usePrimePopupMenuOverlayLifecycle } from '../composables/usePrimePopupMenuOverlayLifecycle'
-import { appOverlayMenuDangerItemClass, appOverlayMenuItemClass } from '../theme/appOverlayMenu'
+import {
+  appOverlayMenuDangerItemClass,
+  appOverlayMenuItemClass,
+  userAccountMenuPt,
+} from '../theme/appOverlayMenu'
 import { pageChromeAccountMenuClasses } from '../lib/pageChrome'
-import { userAccountMenuPt } from '../theme/userAccountMenuSkin'
 import UserCreditBalanceButton from './UserCreditBalanceButton.vue'
 import type { UserAccountMenuItem, UserIdeaBalanceControl } from './userAccountMenu.types'
 

@@ -116,7 +116,7 @@
     :inert="inert"
     @wheel.prevent.stop
   >
-    <div class="canvas-chrome-status-control">
+    <div class="ib-page-chrome-surface canvas-chrome-status-control">
       <button
         type="button"
         class="canvas-chrome-status-button"

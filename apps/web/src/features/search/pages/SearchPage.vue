@@ -33,7 +33,7 @@
       <div class="sticky top-16 z-30 flex flex-col items-center mb-6 pointer-events-none">
         <div class="flex w-full max-w-[720px] items-center gap-2 pointer-events-auto">
           <form
-            class="min-w-0 flex-1 rounded-full border border-board-card-border bg-board-control-bg/80 p-1.5 backdrop-blur-md"
+            class="ib-page-chrome-surface min-w-0 flex-1 rounded-full p-1.5"
             @submit.prevent="submitQuery"
           >
             <div class="flex items-center gap-2">
@@ -53,7 +53,9 @@
                     type="button"
                     class="grid size-8 overflow-hidden rounded-full bg-board-card-bg cursor-pointer transition-[transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-board-primary"
                     :class="isReferencePending(reference.key) ? 'opacity-60' : ''"
-                    :title="t('search.tooltips.removeReferenceWithCount', { count: referenceSlotCount })"
+                    :title="
+                      t('search.tooltips.removeReferenceWithCount', { count: referenceSlotCount })
+                    "
                     :aria-label="t('search.tooltips.removeReference')"
                     :aria-busy="isReferencePending(reference.key)"
                     @click="removeReference(reference.key)"
@@ -84,8 +86,12 @@
                   v-if="canAddReference"
                   type="button"
                   class="search-reference-control"
-                  :title="t('search.tooltips.addReferencesWithCount', { count: referenceSlotCount })"
-                  :aria-label="t('search.tooltips.addReferencesWithCount', { count: referenceSlotCount })"
+                  :title="
+                    t('search.tooltips.addReferencesWithCount', { count: referenceSlotCount })
+                  "
+                  :aria-label="
+                    t('search.tooltips.addReferencesWithCount', { count: referenceSlotCount })
+                  "
                   @click="openFilePicker"
                 >
                   <Plus class="size-3.5" aria-hidden="true" />
@@ -119,7 +125,7 @@
                 <button
                   v-if="references.length === 0"
                   type="button"
-                  class="h-8 px-3 rounded-full border border-board-card-border text-board-page-text-muted hover:text-board-page-text hover:border-board-primary hover:bg-board-primary/10 flex items-center gap-1.5 text-xs font-medium transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  class="h-8 px-3 rounded-full border border-[var(--color-ib-page-chrome-border)] text-[var(--color-ib-page-chrome-color)] hover:text-[var(--color-ib-page-chrome-color-hover)] hover:border-[var(--color-ib-page-chrome-border-hover)] hover:bg-[var(--color-ib-page-chrome-bg-hover)] flex items-center gap-1.5 text-xs font-medium transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                   :aria-label="t('search.tooltips.addReferences')"
                   :title="t('search.tooltips.addReferences')"
                   :disabled="!canAddReference"
@@ -142,7 +148,7 @@
 
           <button
             type="button"
-            class="group grid size-11 shrink-0 place-items-center rounded-full border border-board-card-border bg-board-control-bg/80 backdrop-blur-md transition-[transform,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 hover:border-board-card-border-hover focus-visible:outline-none cursor-pointer"
+            class="ib-page-chrome-surface group grid size-11 shrink-0 place-items-center rounded-full transition-[transform,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 hover:border-[var(--color-ib-page-chrome-border-hover)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ib-page-chrome-focus-ring)] cursor-pointer"
             :class="[isTriggerHoveredDuringDrag ? '!scale-110 !border-board-primary' : '']"
             :aria-label="t('search.tooltips.toggleLibrary')"
             :title="t('search.tooltips.toggleLibrary')"
@@ -161,7 +167,7 @@
             />
             <Bookmark
               v-else
-              class="size-4 text-board-page-text-muted transition-[transform,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] group-hover:text-board-page-text group-hover:rotate-6 group-hover:scale-105"
+              class="size-4 text-[var(--color-ib-page-chrome-color)] transition-[transform,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] group-hover:text-[var(--color-ib-page-chrome-color-hover)] group-hover:rotate-6 group-hover:scale-105"
               aria-hidden="true"
             />
           </button>
@@ -265,7 +271,9 @@
             <button
               type="button"
               class="block w-full cursor-zoom-in text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-board-primary"
-              :aria-label="t('search.viewResult', { title: result.title || t('search.fallbackTitle') })"
+              :aria-label="
+                t('search.viewResult', { title: result.title || t('search.fallbackTitle') })
+              "
               @click="openLightbox(result)"
             >
               <div
@@ -300,10 +308,18 @@
                   :class="
                     isResultSelected(result)
                       ? '!bg-board-primary text-ib-text-inverse shadow-xs'
-                      : 'bg-[var(--search-overlay-btn-bg)] text-white/80 hover:bg-[var(--search-overlay-btn-bg-hover)] hover:text-white backdrop-blur-[var(--search-glass-blur)]'
+                      : 'bg-[var(--search-overlay-btn-bg)] text-white/80 hover:bg-[var(--search-overlay-btn-bg-hover)] hover:text-white backdrop-blur-[var(--ib-glass-blur)]'
                   "
-                  :title="isResultSelected(result) ? t('search.tooltips.deselectImage') : t('search.tooltips.selectImage')"
-                  :aria-label="isResultSelected(result) ? t('search.tooltips.deselectImage') : t('search.tooltips.selectImage')"
+                  :title="
+                    isResultSelected(result)
+                      ? t('search.tooltips.deselectImage')
+                      : t('search.tooltips.selectImage')
+                  "
+                  :aria-label="
+                    isResultSelected(result)
+                      ? t('search.tooltips.deselectImage')
+                      : t('search.tooltips.selectImage')
+                  "
                   @click.stop="toggleBatchSelect(result)"
                 >
                   <Check class="size-3.5 stroke-[2.5]" aria-hidden="true" />
@@ -312,7 +328,7 @@
                 <!-- 右上角以图搜图参考圆纽 (强制 28x28 正圆) -->
                 <button
                   type="button"
-                  class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full bg-[var(--search-overlay-btn-bg)] text-white backdrop-blur-[var(--search-glass-blur)] transition-colors hover:bg-board-primary focus-visible:outline-none cursor-pointer"
+                  class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full bg-[var(--search-overlay-btn-bg)] text-white backdrop-blur-[var(--ib-glass-blur)] transition-colors hover:bg-board-primary focus-visible:outline-none cursor-pointer"
                   :class="{
                     '!bg-board-primary shadow-xs':
                       references.some(
@@ -343,7 +359,12 @@
                     {{ result.title || t('search.lightbox.untitledReference') }}
                   </p>
                   <p class="mt-1 mb-0 truncate text-[11px] text-white/70 leading-tight">
-                    {{ t('search.attribution.byAuthorProvider', { author: result.author, provider: result.provider }) }}
+                    {{
+                      t('search.attribution.byAuthorProvider', {
+                        author: result.author,
+                        provider: result.provider,
+                      })
+                    }}
                   </p>
                 </div>
 
@@ -380,7 +401,9 @@
               v-if="failedImages.has(result.id)"
               class="grid place-items-center gap-2 bg-board-loading-bg px-4 py-5 text-center"
             >
-              <span class="text-xs font-semibold text-board-page-text-muted">{{ t('common.errors.imageLoadFailed') }}</span>
+              <span class="text-xs font-semibold text-board-page-text-muted">{{
+                t('common.errors.imageLoadFailed')
+              }}</span>
               <Button
                 :label="t('common.actions.retry')"
                 size="small"

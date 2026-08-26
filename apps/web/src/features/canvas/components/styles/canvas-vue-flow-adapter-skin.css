@@ -148,10 +148,7 @@
   margin: 0;
   padding: 4px;
   overflow: hidden;
-  border: 1px solid var(--canvas-control-border-color);
   border-radius: 6px;
-  background: color-mix(in srgb, var(--canvas-surface-bg) 72%, transparent);
-  box-shadow: none;
 }
 
 .vue-flow__minimap.canvas-minimap svg {

@@ -3,7 +3,7 @@
     <aside
       v-if="presentation === 'canvas' || open"
       v-show="open"
-      class="z-40 flex flex-col overflow-hidden rounded-[28px] border border-board-card-border bg-board-control-bg/80 p-5 text-board-page-text backdrop-blur-md shadow-[0_16px_48px_rgba(45,64,89,0.08),0_2px_8px_rgba(0,0,0,0.02)] will-change-[width,transform] transition-[width,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] max-w-[calc(100vw-32px)]"
+      class="ib-page-chrome-surface z-40 flex flex-col overflow-hidden rounded-[28px] p-5 text-board-page-text will-change-[width,transform] transition-[width,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] max-w-[calc(100vw-32px)]"
       :class="isCanvasPresentation ? 'relative h-full w-full' : searchIslandClass"
       :aria-label="t('library.title')"
       @click="closeFolderMenu"
@@ -19,8 +19,16 @@
             <button
               type="button"
               class="grid size-6 shrink-0 place-items-center rounded-full bg-black/[0.04] text-board-page-text-muted transition-colors hover:bg-black/[0.08] hover:text-board-page-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] cursor-pointer"
-              :aria-label="isHeaderCollapsed ? t('library.actions.showFolders') : t('library.actions.hideFolders')"
-              :title="isHeaderCollapsed ? t('library.actions.showFolders') : t('library.actions.hideFolders')"
+              :aria-label="
+                isHeaderCollapsed
+                  ? t('library.actions.showFolders')
+                  : t('library.actions.hideFolders')
+              "
+              :title="
+                isHeaderCollapsed
+                  ? t('library.actions.showFolders')
+                  : t('library.actions.hideFolders')
+              "
               @click="isHeaderCollapsed = !isHeaderCollapsed"
             >
               <NavArrowDown v-if="isHeaderCollapsed" class="size-3.5" aria-hidden="true" />
@@ -169,10 +177,7 @@
           </div>
         </div>
         <div v-else class="pb-2">
-          <div
-            class="flex items-start"
-            :class="isExpanded ? 'gap-3' : 'gap-2'"
-          >
+          <div class="flex items-start" :class="isExpanded ? 'gap-3' : 'gap-2'">
             <div
               v-for="(column, colIndex) in columnBuckets"
               :key="colIndex"
@@ -189,7 +194,11 @@
                 <button
                   type="button"
                   class="block w-full cursor-zoom-in text-left focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
-                  :aria-label="t('library.actions.viewSavedReference', { title: asset.title || t('library.states.savedReference') })"
+                  :aria-label="
+                    t('library.actions.viewSavedReference', {
+                      title: asset.title || t('library.states.savedReference'),
+                    })
+                  "
                   @click="openAsset(asset)"
                 >
                   <div
@@ -288,14 +297,17 @@
   <div
     v-if="contextMenu"
     ref="folderMenuRef"
-    class="fixed z-[80] min-w-40 rounded-xl border border-board-card-border bg-board-surface-strong/80 p-1.5 text-board-page-text shadow-[0_12px_32px_rgba(45,64,89,0.16)] backdrop-blur-md"
+    :class="[
+      appOverlayMenuSurfaceClass,
+      'fixed z-[80] min-w-40 rounded-xl p-1.5 shadow-[var(--shadow-ib-overlay-menu)] backdrop-blur-md',
+    ]"
     :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
     role="menu"
     @click.stop
   >
     <button
       type="button"
-      class="flex h-8 w-full items-center rounded-lg px-2.5 text-left text-xs font-semibold text-board-page-text transition-colors hover:bg-ib-surface-hover cursor-pointer"
+      :class="[appOverlayMenuItemClass, '!h-8 !py-0 !text-xs cursor-pointer']"
       role="menuitem"
       @click="openRenameFolder(contextMenu.folder)"
     >
@@ -303,7 +315,11 @@
     </button>
     <button
       type="button"
-      class="flex h-8 w-full items-center rounded-lg px-2.5 text-left text-xs font-semibold text-board-danger transition-colors hover:bg-board-danger/10 cursor-pointer"
+      :class="[
+        appOverlayMenuItemClass,
+        appOverlayMenuDangerItemClass,
+        '!h-8 !py-0 !text-xs cursor-pointer',
+      ]"
       role="menuitem"
       @click="deleteFolder(contextMenu.folder)"
     >
@@ -323,7 +339,9 @@
   >
     <form class="p-6" @submit.prevent="submitFolder">
       <h3 class="m-0 text-lg font-semibold">{{ t('library.dialogs.newFolderTitle') }}</h3>
-      <label class="mt-5 block text-sm font-semibold" for="island-folder-name">{{ t('library.dialogs.folderNameLabel') }}</label>
+      <label class="mt-5 block text-sm font-semibold" for="island-folder-name">{{
+        t('library.dialogs.folderNameLabel')
+      }}</label>
       <InputText
         id="island-folder-name"
         v-model="folderDraft"
@@ -365,9 +383,9 @@
   >
     <form class="p-6" @submit.prevent="submitRenameFolder">
       <h3 class="m-0 text-lg font-semibold">{{ t('library.dialogs.renameFolderTitle') }}</h3>
-      <label class="mt-5 block text-sm font-semibold" for="island-rename-folder-name"
-        >{{ t('library.dialogs.folderNameLabel') }}</label
-      >
+      <label class="mt-5 block text-sm font-semibold" for="island-rename-folder-name">{{
+        t('library.dialogs.folderNameLabel')
+      }}</label>
       <InputText
         id="island-rename-folder-name"
         v-model="renameDraft"
@@ -501,11 +519,7 @@ import {
 } from '@iconoir/vue'
 import { useLibraryWorkspace, type LibraryFolderTab } from '../useLibraryWorkspace'
 import type { LibraryFolderFacts, LibraryMutationPublisher } from '../libraryFolderFacts'
-import {
-  libraryAssetKey,
-  saveSearchReference,
-  type LibraryAssetView,
-} from '../libraryResource'
+import { libraryAssetKey, saveSearchReference, type LibraryAssetView } from '../libraryResource'
 import {
   toCanvasLibraryImportDescriptor,
   getLibraryDropEffect,
@@ -519,6 +533,11 @@ import { useAppToast } from '../../../shared/composables/useAppToast'
 import UserConfirmDialog from '../../../shared/components/UserConfirmDialog.vue'
 import { useUserConfirmDialog } from '../../../shared/composables/useUserConfirmDialog'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
+import {
+  appOverlayMenuDangerItemClass,
+  appOverlayMenuItemClass,
+  appOverlayMenuSurfaceClass,
+} from '../../../shared/theme/appOverlayMenu'
 import { deleteFolderConfirmation, removeAssetConfirmation } from '../libraryConfirmations'
 
 const props = defineProps<{

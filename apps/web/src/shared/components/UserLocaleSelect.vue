@@ -57,14 +57,9 @@ import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import { Translate } from '@iconoir/vue'
 import { createPageChromeAccountRoundControlClass } from '../lib/pageChrome'
-import { appOverlayMenuItemClass } from '../theme/appOverlayMenu'
-import { userAccountMenuPt } from '../theme/userAccountMenuSkin'
+import { appOverlayMenuItemClass, userAccountMenuPt } from '../theme/appOverlayMenu'
 import { usePrimePopupMenuOverlayLifecycle } from '../composables/usePrimePopupMenuOverlayLifecycle'
-import {
-  getActiveUserLocale,
-  setUserLocale,
-  type SupportedLocale,
-} from '../i18n/userLocale'
+import { getActiveUserLocale, setUserLocale, type SupportedLocale } from '../i18n/userLocale'
 import { LOCALE_MANIFEST } from '../i18n/localeManifest'
 
 interface UserLocaleSelectProps {

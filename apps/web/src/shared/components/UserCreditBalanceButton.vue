@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="balance.status === 'anonymous'"
-    class="inline-flex size-[var(--ib-page-chrome-control-size,40px)] items-center justify-center rounded-full border border-[var(--color-ib-page-chrome-border)] bg-[var(--color-ib-page-chrome-bg)] backdrop-blur-md select-none shrink-0"
+    class="ib-page-chrome-surface inline-flex size-[var(--ib-page-chrome-control-size,40px)] shrink-0 items-center justify-center rounded-full select-none"
     :title="balance.ariaLabel"
     :aria-label="balance.ariaLabel"
   >
@@ -11,7 +11,7 @@
     v-else
     unstyled
     type="button"
-    class="user-credit-pill"
+    class="ib-page-chrome-surface user-credit-pill"
     :class="`is-${balance.status}`"
     :data-balance-status="balance.status"
     :title="balance.ariaLabel"
@@ -49,13 +49,8 @@ defineProps<{
   padding: 0 13px 0 11px;
   flex: none;
   overflow: hidden;
-  border: 1px solid var(--color-ib-page-chrome-border);
   border-radius: 9999px;
-  background: var(--color-ib-page-chrome-bg);
   color: var(--color-ib-text);
-  box-shadow: var(--shadow-ib-control);
-  backdrop-filter: blur(var(--ib-glass-blur));
-  -webkit-backdrop-filter: blur(var(--ib-glass-blur));
   cursor: pointer;
   appearance: none;
   transition:

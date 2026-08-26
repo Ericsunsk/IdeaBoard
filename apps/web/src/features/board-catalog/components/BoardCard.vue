@@ -44,7 +44,9 @@
       <div v-else class="truncate text-sm font-[650] text-board-card-title">
         {{ board.name }}
       </div>
-      <div class="mt-[3px] text-xs text-board-card-text">{{ t('workspace.boards.edited', { date: displayDate }) }}</div>
+      <div class="mt-[3px] text-xs text-board-card-text">
+        {{ t('workspace.boards.edited', { date: displayDate }) }}
+      </div>
     </div>
 
     <div class="absolute right-3 bottom-3 z-[3]" @click.stop @pointerdown.stop>
@@ -95,12 +97,12 @@ import type { MenuItem } from 'primevue/menuitem'
 import { useI18n } from 'vue-i18n'
 import { usePrimePopupMenuOverlayLifecycle } from '../../../shared/composables/usePrimePopupMenuOverlayLifecycle'
 import {
+  createAppOverlayMenuPt,
   appOverlayMenuDangerItemClass,
   appOverlayMenuItemClass,
 } from '../../../shared/theme/appOverlayMenu'
 import type { BoardCatalogEntry } from '../boardCatalogContract'
 import { blankBoardPreviewSurfaceClass } from '../lib/boardCatalogSkin'
-import { boardMenuPt } from '../lib/menuStyles'
 
 type RenameInputRef = HTMLInputElement | { $el?: HTMLInputElement } | null
 
@@ -140,7 +142,7 @@ const {
     if (!visible) emit('menu-hidden')
   },
 })
-const menuPt = boardMenuPt
+const menuPt = createAppOverlayMenuPt('!z-40 !w-32 !min-w-[8rem] !max-w-[8rem] !p-0')
 
 const menuItems = computed<MenuItem[]>(() => [
   {

@@ -3,7 +3,7 @@
     <Transition name="search-batch-action-dock">
       <div
         v-if="selectedCount > 0"
-        class="search-batch-action-dock fixed inset-x-0 bottom-7 z-40 mx-auto h-[var(--search-dock-height)] w-fit gap-2 p-1.5"
+        class="ib-page-chrome-surface search-batch-action-dock fixed inset-x-0 bottom-7 z-40 mx-auto h-[var(--search-dock-height)] w-fit gap-2 p-1.5"
         role="toolbar"
         :aria-label="t('search.batch.toolbarAria')"
       >

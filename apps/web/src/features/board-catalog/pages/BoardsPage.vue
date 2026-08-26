@@ -40,24 +40,61 @@
             @update:model-value="onSearchInput"
           />
         </label>
-        <Select
-          :model-value="sortMode"
-          :options="sortOptions"
-          option-label="label"
-          option-value="value"
-          :class="boardCatalogClasses.sortSelect"
-          :pt="boardCatalogSortSelectPt"
+        <Button
+          ref="sortMenuTriggerRef"
+          unstyled
+          type="button"
+          :class="boardCatalogClasses.sortMenuTrigger"
           :aria-label="t('workspace.boards.sortLabel')"
-          @update:model-value="setSortMode"
-        />
+          aria-haspopup="menu"
+          :aria-expanded="isSortMenuOpen"
+          @click="toggleSortMenu"
+        >
+          <span class="truncate">{{ activeSortLabel }}</span>
+          <NavArrowDown
+            class="size-3.5 shrink-0 transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
+            :class="isSortMenuOpen ? 'rotate-180' : ''"
+            aria-hidden="true"
+          />
+        </Button>
+        <Menu
+          ref="sortMenuRef"
+          :model="sortMenuItems"
+          popup
+          append-to="body"
+          :pt="boardCatalogSortMenuPt"
+          @show="handleSortMenuShow"
+          @hide="handleSortMenuHide"
+        >
+          <template #item="{ item, props: itemProps }">
+            <a
+              v-bind="itemProps.action"
+              :class="[
+                appOverlayMenuItemClass,
+                item.value === sortMode
+                  ? 'bg-[var(--app-overlay-menu-item-hover-bg)] text-[var(--app-overlay-menu-item-hover-color)]'
+                  : '',
+              ]"
+              :aria-current="item.value === sortMode ? 'true' : undefined"
+            >
+              {{ item.label }}
+            </a>
+          </template>
+        </Menu>
       </section>
 
       <div v-if="catalogRecoveryBoardId" :class="boardCatalogClasses.recoveryState" role="alert">
-        <span :class="boardCatalogClasses.recoveryText">{{ t('workspace.catalog.reloadRequired') }}</span>
+        <span :class="boardCatalogClasses.recoveryText">{{
+          t('workspace.catalog.reloadRequired')
+        }}</span>
         <Button
           unstyled
           type="button"
-          :label="isCatalogReloadPending ? t('workspace.catalog.reloading') : t('workspace.catalog.reload')"
+          :label="
+            isCatalogReloadPending
+              ? t('workspace.catalog.reloading')
+              : t('workspace.catalog.reload')
+          "
           :disabled="isCatalogReloadPending"
           :class="boardCatalogClasses.recoveryButton"
           @click="reloadCatalog"
@@ -79,8 +116,12 @@
             <div :class="boardCatalogClasses.createPreviewIcon" aria-hidden="true"></div>
           </div>
           <div :class="boardCatalogClasses.createMeta">
-            <div :class="boardCatalogClasses.createTitle">{{ t('workspace.boards.createNewCanvas') }}</div>
-            <div :class="boardCatalogClasses.createDate">{{ t('workspace.boards.startFromEmpty') }}</div>
+            <div :class="boardCatalogClasses.createTitle">
+              {{ t('workspace.boards.createNewCanvas') }}
+            </div>
+            <div :class="boardCatalogClasses.createDate">
+              {{ t('workspace.boards.startFromEmpty') }}
+            </div>
           </div>
         </Button>
 
@@ -156,7 +197,9 @@
           <Button
             unstyled
             type="button"
-            :label="isDeletePending ? t('workspace.deleteDialog.deleting') : t('common.actions.delete')"
+            :label="
+              isDeletePending ? t('workspace.deleteDialog.deleting') : t('common.actions.delete')
+            "
             :disabled="isDeletePending"
             :class="boardCatalogClasses.deleteConfirmButton"
             @click="confirmDelete"
@@ -168,7 +211,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import BoardCard from '../components/BoardCard.vue'
@@ -176,24 +219,31 @@ import {
   boardCatalogClasses,
   boardCatalogDeleteDialogPt,
   boardCatalogDeleteDialogStyle,
-  boardCatalogSortSelectPt,
+  boardCatalogSortMenuPt,
 } from '../lib/boardCatalogSkin'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { usePrimeDialogOverlayLifecycle } from '../../../shared/composables/usePrimeDialogOverlayLifecycle'
+import { usePrimePopupMenuOverlayLifecycle } from '../../../shared/composables/usePrimePopupMenuOverlayLifecycle'
 import { HOME_PATH, USER_CANVAS_PATH } from '../../../shared/constants/routePaths'
+import { appOverlayMenuItemClass } from '../../../shared/theme/appOverlayMenu'
 import { useUserStore } from '../../auth/session/authSession'
 import UserAccountMenu from '../../../shared/components/UserAccountMenu.vue'
 import UserLocaleSelect from '../../../shared/components/UserLocaleSelect.vue'
 import StudioName from '../../../shared/components/StudioName.vue'
 import UserWorkspaceNavigation from '../../user-shell/components/UserWorkspaceNavigation.vue'
-import { Search } from '@iconoir/vue'
+import { NavArrowDown, Search } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import Menu from 'primevue/menu'
+import type { MenuItem } from 'primevue/menuitem'
 import ProgressSpinner from 'primevue/progressspinner'
-import Select from 'primevue/select'
 import { useUserAccountControls } from '../../user-shell/useUserAccountControls'
-import { formatBoardCatalogDate, useBoardsCatalog } from '../boardsCatalog'
+import {
+  formatBoardCatalogDate,
+  useBoardsCatalog,
+  type BoardCatalogSortMode,
+} from '../boardsCatalog'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -265,10 +315,34 @@ function handleDeleteDialogAfterHide() {
   handleDeleteDialogHidden()
 }
 
-const sortOptions = computed(() => [
+const sortOptions = computed<Array<{ label: string; value: BoardCatalogSortMode }>>(() => [
   { label: t('workspace.boards.sortRecent'), value: 'recent' },
   { label: t('workspace.boards.sortName'), value: 'name' },
 ])
+const activeSortLabel = computed(
+  () => sortOptions.value.find((option) => option.value === sortMode.value)?.label ?? '',
+)
+const sortMenuTriggerRef = ref<HTMLElement | { $el?: HTMLElement } | null>(null)
+const {
+  popupRef: sortMenuRef,
+  isOpen: isSortMenuOpen,
+  toggle: toggleSortMenuOverlay,
+  handleShow: handleSortMenuShow,
+  handleHide: handleSortMenuHide,
+  select: selectSortMenuItem,
+} = usePrimePopupMenuOverlayLifecycle({})
+const sortMenuItems = computed<MenuItem[]>(() =>
+  sortOptions.value.map((option) => ({
+    ...option,
+    command: () => selectSortMenuItem(() => setSortMode(option.value)),
+  })),
+)
+
+function toggleSortMenu(event: Event) {
+  const trigger = sortMenuTriggerRef.value
+  const target = trigger instanceof HTMLElement ? trigger : trigger?.$el
+  toggleSortMenuOverlay(event, target)
+}
 
 const accountControls = useUserAccountControls({
   navigation: {

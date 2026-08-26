@@ -26,14 +26,21 @@
           :disabled="saving || !folderFactsReady"
           @click="handleEnterCreate"
         >
-          <span class="truncate">{{ t('search.savePopover.createNamedFolder', { name: searchQuery.trim() }) }}</span>
+          <span class="truncate">{{
+            t('search.savePopover.createNamedFolder', { name: searchQuery.trim() })
+          }}</span>
           <span class="font-mono text-[10px] text-board-primary">↵</span>
         </button>
       </div>
 
       <div class="app-scrollbar max-h-48 space-y-0.5 overflow-y-auto pt-1">
         <div
-          v-if="folderFactsReady && !showQuickSaves && filteredFolders.length === 0 && !canCreateFromQuery"
+          v-if="
+            folderFactsReady &&
+            !showQuickSaves &&
+            filteredFolders.length === 0 &&
+            !canCreateFromQuery
+          "
           class="py-2.5 text-center text-xs text-board-page-text-muted"
         >
           {{ t('search.savePopover.noMatchingFolders') }}
@@ -88,6 +95,7 @@ import type { SearchResult } from '../searchResource'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { createPopoverMotionPt } from '../../../shared/motion/popoverMotion'
+import { appOverlaySurfaceClass } from '../../../shared/theme/appOverlayMenu'
 import type { PopoverPassThroughOptions } from 'primevue/popover'
 import { useSearchLibraryCoordinator } from '../searchLibraryCoordinator'
 
@@ -131,8 +139,7 @@ let pendingOpen: OpenRequest | null = null
 const searchSavePopoverPt = {
   ...createPopoverMotionPt(),
   root: {
-    class:
-      '!rounded-[var(--radius-ib-control)] !border !border-board-card-border/70 !bg-[var(--search-glass-bg)] !p-1.5 !shadow-[var(--search-dock-shadow)] backdrop-blur-[var(--search-glass-blur)]',
+    class: `${appOverlaySurfaceClass} !rounded-[var(--radius-ib-control)] !p-1.5 !shadow-[var(--shadow-ib-overlay-menu)] !backdrop-blur-[var(--ib-glass-blur)]`,
   },
   content: { class: '!p-0' },
 } satisfies PopoverPassThroughOptions
@@ -281,7 +288,9 @@ async function persist(folderId?: number, newFolderName?: string) {
     await library.saveReference(request.result, folderId, newFolderName)
     popover.value?.hide()
     const targetName =
-      newFolderName || folders.value.find((folder) => folder.id === folderId)?.name || t('search.savePopover.quickSaves')
+      newFolderName ||
+      folders.value.find((folder) => folder.id === folderId)?.name ||
+      t('search.savePopover.quickSaves')
     toast.success(t('search.savePopover.savedToast', { name: targetName }))
   } catch (error) {
     toast.error(userFacingErrorCopy(error, t('library.errors.saveAssetFailed')))
