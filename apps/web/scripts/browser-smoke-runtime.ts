@@ -142,6 +142,7 @@ export function createBrowserSmokeRuntime(options: BrowserSmokeRuntimeOptions) {
     } catch (error) {
       throw new Error(
         `Invalid browser assertion: ${error instanceof Error ? error.message : String(error)}\n${source}`,
+        { cause: error },
       )
     }
     await assertion(requirePage())
