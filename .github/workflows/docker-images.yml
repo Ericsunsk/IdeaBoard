@@ -128,7 +128,7 @@ jobs:
           context: ${{ matrix.image.context }}
           file: ${{ matrix.image.file }}
           target: ${{ matrix.image.target }}
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64
           push: true
           tags: ${{ steps.image.outputs.immutable_tag }}
           cache-from: type=gha,scope=${{ matrix.image.cache_scope }}
@@ -138,18 +138,6 @@ jobs:
 
       - name: Prepare release asset directory
         run: mkdir -p release-assets
-
-      - name: Generate linux/amd64 SBOM
-        timeout-minutes: 10
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
-        env:
-          SYFT_PLATFORM: linux/amd64
-        with:
-          image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
-          format: cyclonedx-json
-          output-file: release-assets/${{ matrix.image.name }}-linux-amd64.sbom.cyclonedx.json
-          upload-artifact: false
-          upload-release-assets: false
 
       - name: Generate linux/arm64 SBOM
         timeout-minutes: 10
@@ -186,15 +174,6 @@ jobs:
           GRYPE_DB_CACHE_DIR: ${{ runner.temp }}/grype-db
         run: grype db update
 
-      - name: Scan linux/amd64 image
-        timeout-minutes: 10
-        env:
-          GRYPE_CHECK_FOR_APP_UPDATE: 'false'
-          GRYPE_DB_AUTO_UPDATE: 'false'
-          GRYPE_DB_CACHE_DIR: ${{ runner.temp }}/grype-db
-          IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
-        run: grype "registry:${IMAGE}" --platform linux/amd64 --config .grype.yaml --fail-on high --output table
-
       - name: Scan linux/arm64 image
         timeout-minutes: 10
         env:
@@ -220,14 +199,12 @@ jobs:
           IMAGE_NAME: ${{ steps.image.outputs.name }}
           IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
           IMAGE_KEY: ${{ matrix.image.name }}
-          SBOM_AMD64_FILE: ${{ matrix.image.name }}-linux-amd64.sbom.cyclonedx.json
           SBOM_ARM64_FILE: ${{ matrix.image.name }}-linux-arm64.sbom.cyclonedx.json
         run: |
           jq -n \
             --arg name "${IMAGE_KEY}" \
             --arg image "${IMAGE_NAME}" \
             --arg digest "${IMAGE_DIGEST}" \
-            --arg sbom_amd64_file "${SBOM_AMD64_FILE}" \
             --arg sbom_arm64_file "${SBOM_ARM64_FILE}" \
             '{
               name: $name,
@@ -235,7 +212,6 @@ jobs:
               digest: $digest,
               ref: ($image + "@" + $digest),
               sbom_files: {
-                "linux/amd64": $sbom_amd64_file,
                 "linux/arm64": $sbom_arm64_file
               }
             }' > "release-assets/${IMAGE_KEY}.json"
