@@ -94,7 +94,7 @@ if [[ -n "$(git -C "${STACK_DIR}" status --porcelain --untracked-files=no)" ]]; 
   die 'Production checkout has tracked modifications'
 fi
 
-git -C "${STACK_DIR}" fetch --no-tags origin "refs/tags/${tag}:refs/tags/${tag}" \
+git -C "${STACK_DIR}" fetch --no-tags origin "+refs/tags/${tag}:refs/tags/${tag}" \
   >/dev/null 2>&1 || die 'release tag fetch failed'
 resolved_commit="$(git -C "${STACK_DIR}" rev-parse --verify "refs/tags/${tag}^{commit}" 2>/dev/null)" || \
   die 'release tag could not be resolved'
