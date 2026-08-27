@@ -25,11 +25,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y ca-certificates
     chmod 0555 /out/atlas && \
     rm -rf /var/lib/apt/lists/*
 
-FROM debian:bookworm-slim AS runtime
-
-RUN apt-get update && apt-get install --no-install-recommends -y ca-certificates libvips-tools && \
-    useradd --system --uid 65532 --no-create-home ideaboard && \
-    rm -rf /var/lib/apt/lists/*
+FROM cgr.dev/chainguard/static:latest AS runtime
 
 WORKDIR /app
 
@@ -41,8 +37,6 @@ ENV APP_ENV=production \
     APP_HOST=0.0.0.0 \
     APP_PORT=6000 \
     METRICS_ADDR=127.0.0.1:9091
-
-ENV IDEABOARD_VIPS_BINARY=/usr/bin/vips
 
 EXPOSE 6000 9091
 
