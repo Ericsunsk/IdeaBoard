@@ -34,11 +34,37 @@ require_non_negative_integer() {
   [[ "${value}" =~ ^[0-9]+$ ]] || fail "${name} must be a non-negative integer"
 }
 
+record_api_test_timing() {
+  local mode="$1"
+  local shard="$2"
+  local shard_count="$3"
+  local elapsed_seconds="$4"
+  local status="$5"
+
+  printf 'ci-parity: api-test %s mode=%s shard=%s shard_count=%s elapsed=%ss\n' \
+    "${status}" "${mode}" "${shard}" "${shard_count}" "${elapsed_seconds}"
+
+  [[ -n "${GITHUB_STEP_SUMMARY:-}" ]] || return 0
+
+  if ! {
+    printf '### API test\n\n'
+    printf -- "- Status: \`%s\`\n" "${status}"
+    printf -- "- Mode: \`%s\`\n" "${mode}"
+    printf -- "- Shard: \`%s/%s\`\n" "${shard}" "${shard_count}"
+    printf -- "- Elapsed: \`%ss\`\n" "${elapsed_seconds}"
+  } >>"${GITHUB_STEP_SUMMARY}"; then
+    printf 'ci-parity: unable to append API timing to GITHUB_STEP_SUMMARY\n' >&2
+  fi
+}
+
 run_api_tests() {
   local mode="${TEST_MODE:-standard}"
   local shard="${TEST_SHARD:-0}"
   local shard_count="${TEST_SHARD_COUNT:-1}"
   local package
+  local started_at
+  local elapsed_seconds
+  local test_exit_code=0
   local -a packages=()
 
   [[ -n "${API_TEST_DATABASE_DSN:-}" ]] || \
@@ -50,6 +76,7 @@ run_api_tests() {
   (( shard_count > 0 )) || fail 'TEST_SHARD_COUNT must be greater than zero'
   (( shard < shard_count )) || fail 'TEST_SHARD must be less than TEST_SHARD_COUNT'
   require_command go
+  started_at="${SECONDS}"
 
   while IFS= read -r package; do
     [[ -n "${package}" ]] && packages+=("${package}")
@@ -62,15 +89,35 @@ run_api_tests() {
   )
 
   ((${#packages[@]} > 0)) || fail "API shard ${shard}/${shard_count} selected no packages"
-  printf 'Running %s API tests for shard %s/%s:\n' "${mode}" "${shard}" "${shard_count}"
-  printf '  %s\n' "${packages[@]}"
+  # Snapshot-backed fixtures initialize quickly enough to exhaust PostgreSQL's
+  # lock table when Go starts every package at once. Keep package concurrency
+  # bounded at the test-runner boundary; each CI shard still runs independently.
+  printf 'ci-parity: running API tests mode=%s shard=%s/%s packages=%s package_parallelism=4\n' \
+    "${mode}" "${shard}" "${shard_count}" "${#packages[@]}"
 
   export API_TEST_DATABASE_REQUIRED=1
   if [[ "${mode}" == "race" ]]; then
-    (cd "${repo_root}/apps/api" && go test -race -count=1 "${packages[@]}")
+    if (cd "${repo_root}/apps/api" && go test -race -p=4 -count=1 "${packages[@]}"); then
+      :
+    else
+      test_exit_code=$?
+    fi
   else
-    (cd "${repo_root}/apps/api" && go test -count=1 "${packages[@]}")
+    if (cd "${repo_root}/apps/api" && go test -p=4 -count=1 "${packages[@]}"); then
+      :
+    else
+      test_exit_code=$?
+    fi
   fi
+
+  elapsed_seconds="$((SECONDS - started_at))"
+  if (( test_exit_code == 0 )); then
+    record_api_test_timing "${mode}" "${shard}" "${shard_count}" "${elapsed_seconds}" passed
+  else
+    record_api_test_timing "${mode}" "${shard}" "${shard_count}" "${elapsed_seconds}" failed
+  fi
+
+  return "${test_exit_code}"
 }
 
 run_web_smoke_on_host() {

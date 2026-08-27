@@ -20,6 +20,9 @@ printf '\n' >>"${CI_PARITY_TEST_LOG}"
 if [[ "${1:-}" == "list" ]]; then
   printf '%s\n' example.test/pkg0 example.test/pkg1 example.test/pkg2 example.test/pkg3
 fi
+if [[ "${1:-}" == "test" && -n "${CI_PARITY_TEST_GO_EXIT:-}" ]]; then
+  exit "${CI_PARITY_TEST_GO_EXIT}"
+fi
 EOF
 
 cat >"${bin_dir}/npm" <<'EOF'
@@ -45,9 +48,15 @@ run_parity() {
 
 assert_contains() {
   local expected="$1"
-  if ! grep -Fq -- "${expected}" "${log_file}"; then
-    printf 'Expected command log to contain: %s\n' "${expected}" >&2
-    cat "${log_file}" >&2
+  assert_file_contains "${log_file}" "${expected}"
+}
+
+assert_file_contains() {
+  local file="$1"
+  local expected="$2"
+  if ! grep -Fq -- "${expected}" "${file}"; then
+    printf 'Expected %s to contain: %s\n' "${file}" "${expected}" >&2
+    cat "${file}" >&2
     exit 1
   fi
 }
@@ -64,18 +73,41 @@ fi
 : >"${log_file}"
 API_TEST_DATABASE_DSN='postgres://test.invalid/ideaboard' \
   TEST_MODE=standard TEST_SHARD=1 TEST_SHARD_COUNT=2 \
-  run_parity api-test
+  run_parity api-test >"${fixture_dir}/standard.out"
 assert_contains 'go list ./...'
-assert_contains 'go test -count=1 example.test/pkg1 example.test/pkg3'
+assert_contains 'go test -p=4 -count=1 example.test/pkg1 example.test/pkg3'
+assert_file_contains "${fixture_dir}/standard.out" 'ci-parity: api-test passed mode=standard shard=1 shard_count=2 elapsed='
 
 : >"${log_file}"
 API_TEST_DATABASE_DSN='postgres://test.invalid/ideaboard' \
   TEST_MODE=race TEST_SHARD=0 TEST_SHARD_COUNT=1 \
   run_parity api-test
-assert_contains 'go test -race -count=1 example.test/pkg0 example.test/pkg1 example.test/pkg2 example.test/pkg3'
+assert_contains 'go test -race -p=4 -count=1 example.test/pkg0 example.test/pkg1 example.test/pkg2 example.test/pkg3'
 
 : >"${log_file}"
 run_parity web-smoke
 assert_contains 'npm run smoke:user'
+
+: >"${log_file}"
+if API_TEST_DATABASE_DSN='postgres://test.invalid/ideaboard' \
+  TEST_MODE=standard TEST_SHARD=0 TEST_SHARD_COUNT=1 \
+  CI_PARITY_TEST_GO_EXIT=23 \
+  run_parity api-test >"${fixture_dir}/failed-api.out" 2>&1; then
+  echo 'api-test unexpectedly hid the go test failure' >&2
+  exit 1
+fi
+assert_file_contains "${fixture_dir}/failed-api.out" 'ci-parity: api-test failed mode=standard shard=0 shard_count=1 elapsed='
+
+summary_file="${fixture_dir}/github-step-summary.md"
+: >"${summary_file}"
+API_TEST_DATABASE_DSN='postgres://test.invalid/ideaboard' \
+  TEST_MODE=race TEST_SHARD=0 TEST_SHARD_COUNT=1 \
+  GITHUB_STEP_SUMMARY="${summary_file}" \
+  run_parity api-test >"${fixture_dir}/summary.out"
+assert_file_contains "${summary_file}" '### API test'
+assert_file_contains "${summary_file}" "- Status: \`passed\`"
+assert_file_contains "${summary_file}" "- Mode: \`race\`"
+assert_file_contains "${summary_file}" "- Shard: \`0/1\`"
+assert_file_contains "${summary_file}" '- Elapsed: `'
 
 echo 'ci-parity contract tests passed'
