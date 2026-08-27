@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"ideaboard/api/internal/media/ingestion"
 )
@@ -62,15 +63,27 @@ type StoredUploadLocator interface {
 type StorageService struct {
 	profileRepo         *StorageProfileRepository
 	assetLocator        StoredUploadLocator
+	publicAPIOrigin     string
 	s3CompatibleService *S3CompatibleService
 	adapterRegistry     *storageAdapterRegistry
 	providerMeta        map[StorageProvider]StorageProviderMeta
 }
 
 func NewStorageService(profileRepo *StorageProfileRepository, assetLocator StoredUploadLocator) *StorageService {
+	return newStorageService(profileRepo, assetLocator, "")
+}
+
+// NewStorageServiceWithPublicAPI binds local upload URLs to the API origin so
+// browsers on a separate web origin do not resolve /uploads against the web host.
+func NewStorageServiceWithPublicAPI(profileRepo *StorageProfileRepository, assetLocator StoredUploadLocator, publicAPIOrigin string) *StorageService {
+	return newStorageService(profileRepo, assetLocator, publicAPIOrigin)
+}
+
+func newStorageService(profileRepo *StorageProfileRepository, assetLocator StoredUploadLocator, publicAPIOrigin string) *StorageService {
 	service := &StorageService{
 		profileRepo:         profileRepo,
 		assetLocator:        assetLocator,
+		publicAPIOrigin:     strings.TrimRight(strings.TrimSpace(publicAPIOrigin), "/"),
 		s3CompatibleService: NewS3CompatibleService(),
 		providerMeta:        make(map[StorageProvider]StorageProviderMeta),
 	}

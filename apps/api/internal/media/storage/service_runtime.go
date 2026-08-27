@@ -112,7 +112,7 @@ func (s *StorageService) PrepareUploadRef(ctx context.Context, filename string, 
 	}
 	publicURL, urlErr := adapter.ProviderURL(profile, key)
 	if urlErr != nil && profile.Provider == StorageProviderLocal {
-		publicURL = publicUploadURL(key)
+		publicURL = s.publicUploadURL(ctx, key)
 		urlErr = nil
 	}
 	if urlErr != nil {
@@ -797,6 +797,9 @@ func copyExactWithStorageBuffer(dst io.Writer, src io.Reader, size int64) error 
 func (s *StorageService) publicUploadURL(ctx context.Context, objectKey string) string {
 	if s == nil {
 		return ""
+	}
+	if s.publicAPIOrigin != "" {
+		return s.publicAPIOrigin + publicUploadURL(objectKey)
 	}
 	return publicUploadURL(objectKey)
 }

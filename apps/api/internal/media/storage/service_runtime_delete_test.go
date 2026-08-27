@@ -98,6 +98,34 @@ func TestStoreRemoteRefLocalSavesImageAndCleansTempFile(t *testing.T) {
 	assertDirEmpty(t, tmpDir)
 }
 
+func TestLocalStoredUploadURLUsesConfiguredAPIOrigin(t *testing.T) {
+	withTempWorkingDir(t)
+
+	service := NewStorageServiceWithPublicAPI(nil, nil, "https://api.example.com")
+	profile := benchmarkLocalProfile()
+	adapter, err := service.adapterRegistry.get(StorageProviderLocal)
+	if err != nil {
+		t.Fatalf("local storage adapter missing: %v", err)
+	}
+	imageBytes := tinyPNGBytes(t)
+	stored, err := adapter.StoreBytesRef(context.Background(), &profile, "logo.png", imageBytes, StorageStoreOptions{
+		ObjectKey: "uploads/site/assets/logo.png",
+	})
+	if err != nil {
+		t.Fatalf("StoreBytesRef returned error: %v", err)
+	}
+	if stored.URL != "https://api.example.com/uploads/site/assets/logo.png" {
+		t.Fatalf("stored URL = %q, want API-origin URL", stored.URL)
+	}
+	storedBytes, err := os.ReadFile(filepath.FromSlash("uploads/site/assets/logo.png"))
+	if err != nil {
+		t.Fatalf("read stored logo failed: %v", err)
+	}
+	if !bytes.Equal(storedBytes, imageBytes) {
+		t.Fatal("stored logo bytes differ from uploaded bytes")
+	}
+}
+
 func TestDownloadRemoteFileInfersExtensionFromContentType(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("TMPDIR", tmpDir)
