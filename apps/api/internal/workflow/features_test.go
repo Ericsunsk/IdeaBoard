@@ -121,12 +121,6 @@ func TestSupportedFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T
 	assertSameFeatureSlugs(t, "OpenAPI", backendSlugs, extractOpenAPIWorkflowFeatureSlugs(t, string(openAPIRaw)))
 	assertSameFeatureSlugs(
 		t,
-		"frontend canonical contract",
-		CanonicalFeatureSlugs(),
-		extractFrontendCanonicalWorkflowFeatureSlugs(t, string(raw)),
-	)
-	assertSameFeatureSlugs(
-		t,
 		"OpenAPI canonical contract",
 		CanonicalFeatureSlugs(),
 		extractOpenAPIStringEnum(t, string(openAPIRaw), "CanonicalWorkflowFeatureSlug"),
@@ -135,7 +129,7 @@ func TestSupportedFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T
 	featureKeys := extractFrontendWorkflowFeatureKeys(t, string(raw))
 	for label, relativePath := range map[string]string{
 		"frontend execution": "apps/web/src/features/canvas/execution/contracts/executionContract.ts",
-		"Admin registry":     "apps/web/src/shared/domain/workflowFeatureRegistry.ts",
+		"Admin registry":     "apps/web/src/features/admin/shared/lib/workflowFeatureAdminMeta.ts",
 	} {
 		contractRaw, err := os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(relativePath)))
 		if err != nil {
@@ -143,29 +137,6 @@ func TestSupportedFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T
 		}
 		assertSameFeatureSlugs(t, label, backendSlugs, extractWorkflowFeatureReferences(t, label, string(contractRaw), featureKeys))
 	}
-}
-
-func extractFrontendCanonicalWorkflowFeatureSlugs(t *testing.T, source string) []string {
-	t.Helper()
-	if !regexp.MustCompile(`export\s+const\s+CANONICAL_WORKFLOW_FEATURE_SLUGS\s*=\s*Object\.values\(`).MatchString(source) {
-		t.Fatal("CANONICAL_WORKFLOW_FEATURE_SLUGS must be derived from Object.values(CANONICAL_WORKFLOW_FEATURE)")
-	}
-	objectRe := regexp.MustCompile(`(?s)export\s+const\s+CANONICAL_WORKFLOW_FEATURE\s*=\s*\{(?P<body>.*?)\}\s+as\s+const`)
-	match := objectRe.FindStringSubmatch(source)
-	if match == nil {
-		t.Fatal("CANONICAL_WORKFLOW_FEATURE object not found")
-	}
-	body := match[objectRe.SubexpIndex("body")]
-	entryRe := regexp.MustCompile(`(?m)[A-Za-z_][A-Za-z0-9_]*\s*:\s*'([^']+)'\s*,?`)
-	entries := entryRe.FindAllStringSubmatch(body, -1)
-	if len(entries) == 0 {
-		t.Fatal("CANONICAL_WORKFLOW_FEATURE has no string literal values")
-	}
-	slugs := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		slugs = append(slugs, entry[1])
-	}
-	return slugs
 }
 
 func assertSameFeatureSlugs(t *testing.T, label string, want, got []string) {
@@ -320,7 +291,7 @@ func extractWorkflowFeatureReferences(t *testing.T, label, source string, featur
 	case "frontend execution":
 		blockPattern = `(?s)export\s+const\s+EXECUTION_FEATURE\s*=\s*\{(.*?)\}\s+as\s+const`
 	case "Admin registry":
-		blockPattern = `(?s)const\s+WORKFLOW_FEATURE_REGISTRY_BASE.*?=\s*\[(.*?)\]\s+as\s+const`
+		blockPattern = `(?s)const\s+ADMIN_WORKFLOW_FEATURE_META.*?=\s*\{(.*?)\}\n\nexport\s+function`
 	default:
 		t.Fatalf("unsupported feature contract label %q", label)
 	}

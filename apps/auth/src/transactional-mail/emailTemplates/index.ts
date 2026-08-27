@@ -111,7 +111,7 @@ export function verificationOtp(
   const appName = variables.appName?.trim() || APP_NAME;
   const brandLogoUrl = variables.brandLogoUrl?.trim() || BRAND_LOGO_URL;
   return {
-    subject: `你的 ${appName} Email 验证码`,
+    subject: `Your ${appName} verification code`,
     html: renderHTML(
       "verification-otp.html",
       {
@@ -120,7 +120,7 @@ export function verificationOtp(
       },
       { appName, brandLogoUrl },
     ),
-    text: `${otp} 是你的 ${appName} Email 验证码，${expiresInMinutes} 分钟内有效。如非本人操作，请忽略此邮件。`,
+    text: `${otp} is your ${appName} verification code. It expires in ${expiresInMinutes} minutes. If you did not request it, you can safely ignore this email.`,
   };
 }
 
@@ -132,7 +132,7 @@ export function passwordResetOtp(
   const appName = variables.appName?.trim() || APP_NAME;
   const brandLogoUrl = variables.brandLogoUrl?.trim() || BRAND_LOGO_URL;
   return {
-    subject: `重置你的 ${appName} Password`,
+    subject: `Reset your ${appName} password`,
     html: renderHTML(
       "password-reset-otp.html",
       {
@@ -141,7 +141,7 @@ export function passwordResetOtp(
       },
       { appName, brandLogoUrl },
     ),
-    text: `${otp} 是你的 ${appName} Password 重置验证码，${expiresInMinutes} 分钟内有效。如非本人操作，请忽略此邮件。`,
+    text: `${otp} is your ${appName} password reset code. It expires in ${expiresInMinutes} minutes. If you did not request it, you can safely ignore this email.`,
   };
 }
 
@@ -153,7 +153,7 @@ export function welcomeOnboarding(
   const appName = variables.appName?.trim() || APP_NAME;
   const brandLogoUrl = variables.brandLogoUrl?.trim() || BRAND_LOGO_URL;
   return {
-    subject: `欢迎加入 ${appName}`,
+    subject: `Welcome to ${appName}`,
     html: renderHTML(
       "welcome-onboarding.html",
       {
@@ -162,7 +162,7 @@ export function welcomeOnboarding(
       },
       { appName, brandLogoUrl },
     ),
-    text: `Hi ${userName}，欢迎加入 ${appName}！打开你的画布：${canvasUrl}`,
+    text: `Hi ${userName}, welcome to ${appName}. Open your canvas: ${canvasUrl}`,
   };
 }
 
@@ -183,7 +183,7 @@ export function paymentReceipt(
   const appName = variables.appName?.trim() || APP_NAME;
   const brandLogoUrl = variables.brandLogoUrl?.trim() || BRAND_LOGO_URL;
   return {
-    subject: `${appName} 付款收据 ${orderId}`,
+    subject: `${appName} receipt · ${orderId}`,
     html: renderHTML(
       "payment-receipt.html",
       {
@@ -199,14 +199,14 @@ export function paymentReceipt(
       { appName, brandLogoUrl },
     ),
     text: [
-      `${appName} 付款成功`,
-      `金额：¥${amount}`,
-      `订单号：${orderId}`,
-      `套餐：${planName}（${credits} Ideas）`,
-      `支付时间：${paymentTime}`,
-      `支付渠道：${paymentMethod}`,
-      `当前可用 Ideas：${totalCredits}`,
-      `账单管理：${accountBillingUrl}`,
+      `Payment received by ${appName}`,
+      `Amount: ¥${amount}`,
+      `Order: ${orderId}`,
+      `Plan: ${planName} (${credits} Ideas)`,
+      `Paid: ${paymentTime}`,
+      `Method: ${paymentMethod}`,
+      `Available Ideas: ${totalCredits}`,
+      `Manage billing: ${accountBillingUrl}`,
     ].join("\n"),
   };
 }
@@ -222,7 +222,7 @@ export function teamInvite(variables: TeamInviteVariables): RenderedEmail {
   const appName = variables.appName?.trim() || APP_NAME;
   const brandLogoUrl = variables.brandLogoUrl?.trim() || BRAND_LOGO_URL;
   return {
-    subject: `${inviterName} 邀请你加入 ${appName} 画板`,
+    subject: `${inviterName} invited you to ${appName}`,
     html: renderHTML(
       "team-invite.html",
       {
@@ -233,7 +233,7 @@ export function teamInvite(variables: TeamInviteVariables): RenderedEmail {
       },
       { appName, brandLogoUrl },
     ),
-    text: `${inviterName} 邀请你以“${roleName}”身份加入画板“${boardTitle}”。接受邀请：${acceptInviteUrl}`,
+    text: `${inviterName} invited you to join the “${boardTitle}” board as ${roleName}. Accept the invitation: ${acceptInviteUrl}`,
   };
 }
 
@@ -251,7 +251,7 @@ export function securityAlertLogin(
   const appName = variables.appName?.trim() || APP_NAME;
   const brandLogoUrl = variables.brandLogoUrl?.trim() || BRAND_LOGO_URL;
   return {
-    subject: `${appName} 新设备登录安全提醒`,
+    subject: `New sign-in to your ${appName} account`,
     html: renderHTML(
       "login-security-alert.html",
       {
@@ -264,11 +264,11 @@ export function securityAlertLogin(
       { appName, brandLogoUrl },
     ),
     text: [
-      `Hi ${userName}，你的 ${appName} 账号刚才在一台新设备上完成了登录。`,
-      `登录时间：${loginTime}`,
-      `设备与浏览器：${deviceInfo}`,
-      `IP 地址 / 位置：${ipLocation}`,
-      `如果这不是你本人操作，请立即保护账号：${secureAccountUrl}`,
+      `Hi ${userName}, a new device just signed in to your ${appName} account.`,
+      `Time: ${loginTime}`,
+      `Device and browser: ${deviceInfo}`,
+      `IP address and location: ${ipLocation}`,
+      `If this was not you, secure your account now: ${secureAccountUrl}`,
     ].join("\n"),
   };
 }
@@ -279,9 +279,9 @@ export function mailConfigurationTest(
   const appName = variables?.appName?.trim() || APP_NAME;
   const brandLogoUrl = variables?.brandLogoUrl?.trim() || BRAND_LOGO_URL;
   return {
-    subject: `${appName} 邮件服务测试`,
+    subject: `${appName} email service test`,
     html: renderHTML("mail-configuration-test.html", {}, { appName, brandLogoUrl }),
-    text: `${appName} 邮件服务配置测试成功。`,
+    text: `${appName} email service configuration test succeeded.`,
   };
 }
 

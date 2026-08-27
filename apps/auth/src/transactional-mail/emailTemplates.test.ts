@@ -16,6 +16,10 @@ function assertRenderedEmail(email: RenderedEmail): void {
   assert.match(email.html, /<!DOCTYPE html>/i);
   assert.ok(email.text.trim());
   assert.doesNotMatch(email.html, /\{\{[A-Z0-9_]+\}\}/);
+  assert.doesNotMatch(
+    `${email.subject}\n${email.html}\n${email.text}`,
+    /\p{Script=Han}/u,
+  );
 }
 
 describe("emailTemplates", () => {
@@ -32,11 +36,12 @@ describe("emailTemplates", () => {
     assertRenderedEmail(verification);
     assertRenderedEmail(passwordReset);
     assert.match(verification.html, /849201/);
-    assert.match(verification.html, /10 分钟/);
+    assert.match(verification.html, /10 minutes/);
     assert.match(verification.text, /849201/);
+    assert.match(verification.text, /expires in 10 minutes/);
     assert.match(passwordReset.html, /192048/);
-    assert.match(passwordReset.text, /10 分钟/);
-    assert.doesNotMatch(passwordReset.html, /RESET_URL|重置链接/);
+    assert.match(passwordReset.text, /expires in 10 minutes/);
+    assert.doesNotMatch(passwordReset.html, /RESET_URL/);
   });
 
   it("renders custom appName and brandLogoUrl when provided", () => {

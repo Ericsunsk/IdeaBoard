@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="zh-CN" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
   <meta name="supported-color-schemes" content="light dark">
-  <title>IdeaBoard 支付凭证与收据</title>
+  <title>IdeaBoard Payment Receipt</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -55,7 +55,7 @@
 
   <!-- Preheader Text -->
   <div style="display: none; font-size: 1px; color: #ffffff; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
-    💳 支付凭证确认：你已成功支付 ¥{{AMOUNT}}，购买 {{PLAN_NAME}}。积分已自动注入账户。&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
+    💳 Your payment of ¥{{AMOUNT}} for {{PLAN_NAME}} was successful. Your Ideas have been added to your account.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
   </div>
 
   <table role="presentation" width="100%" height="100%" cellspacing="0" cellpadding="0" style="background: transparent; padding: 48px 16px;">
@@ -96,7 +96,7 @@
           <!-- Amount Display with Emoji -->
           <tr>
             <td align="left" style="padding-bottom: 24px; border-bottom: 1px solid #e8ecf4;" class="email-footer">
-              <p class="email-desc" style="margin: 0 0 4px 0; font-size: 12px; color: #98a2b3;">付款金额 💰</p>
+              <p class="email-desc" style="margin: 0 0 4px 0; font-size: 12px; color: #98a2b3;">Amount paid 💰</p>
               <h1 class="email-title" style="margin: 0; font-size: 32px; font-weight: 800; color: #1d2939; letter-spacing: -0.02em;">¥{{AMOUNT}}</h1>
             </td>
           </tr>
@@ -106,19 +106,19 @@
             <td style="padding-top: 20px; padding-bottom: 24px;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size: 13px;">
                 <tr>
-                  <td class="email-desc" style="padding: 6px 0; color: #475467;">🏷️ 订单号：</td>
+                  <td class="email-desc" style="padding: 6px 0; color: #475467;">🏷️ Order ID:</td>
                   <td align="right" class="email-title" style="padding: 6px 0; color: #1d2939; font-family: ui-monospace, SFMono-Regular, monospace; font-weight: 600;">{{ORDER_ID}}</td>
                 </tr>
                 <tr>
-                  <td class="email-desc" style="padding: 6px 0; color: #475467;">📦 购买套餐：</td>
-                  <td align="right" class="email-title" style="padding: 6px 0; color: #1d2939; font-weight: 600;">{{PLAN_NAME}} ({{CREDITS}} 积分 ⚡)</td>
+                  <td class="email-desc" style="padding: 6px 0; color: #475467;">📦 Plan:</td>
+                  <td align="right" class="email-title" style="padding: 6px 0; color: #1d2939; font-weight: 600;">{{PLAN_NAME}} ({{CREDITS}} Ideas ⚡)</td>
                 </tr>
                 <tr>
-                  <td class="email-desc" style="padding: 6px 0; color: #475467;">📅 支付时间：</td>
+                  <td class="email-desc" style="padding: 6px 0; color: #475467;">📅 Payment time:</td>
                   <td align="right" class="email-title" style="padding: 6px 0; color: #1d2939;">{{PAYMENT_TIME}}</td>
                 </tr>
                 <tr>
-                  <td class="email-desc" style="padding: 6px 0; color: #475467;">💳 支付渠道：</td>
+                  <td class="email-desc" style="padding: 6px 0; color: #475467;">💳 Payment method:</td>
                   <td align="right" class="email-title" style="padding: 6px 0; color: #1d2939;">{{PAYMENT_METHOD}}</td>
                 </tr>
               </table>
@@ -130,7 +130,7 @@
             <td style="padding-bottom: 28px;">
               <div class="credit-box" style="background-color: #f5f2ff; border: 1px solid rgba(122, 107, 213, 0.28); border-radius: 8px; padding: 14px 16px; text-align: center;">
                 <p style="margin: 0; font-size: 13px; color: #9278e6; font-weight: 600;">
-                  🎉 积分已自动充值！当前账户可用总积分：<strong>{{TOTAL_CREDITS}}</strong> 积分 ⚡
+                  🎉 Your Ideas have been added. Your current balance is <strong>{{TOTAL_CREDITS}}</strong> Ideas ⚡
                 </p>
               </div>
             </td>
@@ -142,7 +142,7 @@
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
                   <td class="email-desc" style="font-size: 12px; color: #98a2b3; line-height: 1.5;">
-                    🧾 开具发票明细请前往 <a href="{{ACCOUNT_BILLING_URL}}" style="color: #9278e6; text-decoration: none; font-weight: 600;">账单管理</a>
+                    🧾 View your invoice details in <a href="{{ACCOUNT_BILLING_URL}}" style="color: #9278e6; text-decoration: none; font-weight: 600;">Billing</a>
                   </td>
                   <td align="right" class="email-desc" style="font-size: 12px; color: #98a2b3;">
                     <a href="https://ideaboard.art" style="color: #9278e6; text-decoration: none; font-weight: 600;">🌐 ideaboard.art</a>
