@@ -7,7 +7,12 @@ mark_all_contexts() { web=true; api=true; auth=true; schema=true; migration_inte
 while IFS= read -r changed_path; do
   [[ -n "${changed_path}" ]] || continue
   case "${changed_path}" in
-    .github/workflows/* | .github/actions/* | .node-version | scripts/ci-change-classifier* | scripts/ci-gate*) mark_all_contexts; has_non_docs_change=true ;;
+    .github/workflows/ci.yml | .github/workflows/ops.yml | .github/actions/* | .node-version | scripts/ci-change-classifier* | scripts/ci-gate*) mark_all_contexts; has_non_docs_change=true ;;
+    .github/workflows/web.yml) web=true; ops=true; has_non_docs_change=true ;;
+    .github/workflows/api.yml) api=true; docker=true; ops=true; has_non_docs_change=true ;;
+    .github/workflows/auth.yml) auth=true; docker=true; ops=true; has_non_docs_change=true ;;
+    .github/workflows/migration-integration.yml) migration_integration=true; ops=true; has_non_docs_change=true ;;
+    .github/workflows/docker-images.yml | .github/workflows/deploy-production.yml) ops=true; has_non_docs_change=true ;;
     scripts/ci-migration-integration* | scripts/atlas-migration-check*) api=true; auth=true; migration_integration=true; ops=true; has_non_docs_change=true ;;
     apps/api/openapi.yaml) web=true; api=true; has_non_docs_change=true ;;
     apps/api/internal/db/migrations/* | apps/api/internal/db/schema/*) api=true; schema=true; migration_integration=true; has_non_docs_change=true ;;

@@ -15,6 +15,9 @@ on:
 permissions:
   contents: read
 
+env:
+  DOCKER_BUILD_RECORD_UPLOAD: 'false'
+
 jobs:
   quality:
     name: Auth Quality

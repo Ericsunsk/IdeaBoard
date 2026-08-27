@@ -62,6 +62,57 @@ assert_output_line "${ci_output}" 'schema=true'
 assert_output_line "${ci_output}" 'migration_integration=true'
 assert_output_line "${ci_output}" 'docs_only=false'
 
+docker_workflow_output="$(printf '%s\n' .github/workflows/docker-images.yml | "${classifier}")"
+
+assert_output_line "${docker_workflow_output}" 'web=false'
+assert_output_line "${docker_workflow_output}" 'api=false'
+assert_output_line "${docker_workflow_output}" 'auth=false'
+assert_output_line "${docker_workflow_output}" 'docker=false'
+assert_output_line "${docker_workflow_output}" 'ops=true'
+assert_output_line "${docker_workflow_output}" 'docs_only=false'
+
+deploy_workflow_output="$(printf '%s\n' .github/workflows/deploy-production.yml | "${classifier}")"
+
+assert_output_line "${deploy_workflow_output}" 'web=false'
+assert_output_line "${deploy_workflow_output}" 'api=false'
+assert_output_line "${deploy_workflow_output}" 'auth=false'
+assert_output_line "${deploy_workflow_output}" 'docker=false'
+assert_output_line "${deploy_workflow_output}" 'ops=true'
+assert_output_line "${deploy_workflow_output}" 'docs_only=false'
+
+api_workflow_output="$(printf '%s\n' .github/workflows/api.yml | "${classifier}")"
+
+assert_output_line "${api_workflow_output}" 'web=false'
+assert_output_line "${api_workflow_output}" 'api=true'
+assert_output_line "${api_workflow_output}" 'auth=false'
+assert_output_line "${api_workflow_output}" 'docker=true'
+assert_output_line "${api_workflow_output}" 'ops=true'
+
+web_workflow_output="$(printf '%s\n' .github/workflows/web.yml | "${classifier}")"
+
+assert_output_line "${web_workflow_output}" 'web=true'
+assert_output_line "${web_workflow_output}" 'api=false'
+assert_output_line "${web_workflow_output}" 'auth=false'
+assert_output_line "${web_workflow_output}" 'docker=false'
+assert_output_line "${web_workflow_output}" 'ops=true'
+
+auth_workflow_output="$(printf '%s\n' .github/workflows/auth.yml | "${classifier}")"
+
+assert_output_line "${auth_workflow_output}" 'web=false'
+assert_output_line "${auth_workflow_output}" 'api=false'
+assert_output_line "${auth_workflow_output}" 'auth=true'
+assert_output_line "${auth_workflow_output}" 'docker=true'
+assert_output_line "${auth_workflow_output}" 'ops=true'
+
+migration_workflow_output="$(printf '%s\n' .github/workflows/migration-integration.yml | "${classifier}")"
+
+assert_output_line "${migration_workflow_output}" 'web=false'
+assert_output_line "${migration_workflow_output}" 'api=false'
+assert_output_line "${migration_workflow_output}" 'auth=false'
+assert_output_line "${migration_workflow_output}" 'docker=false'
+assert_output_line "${migration_workflow_output}" 'migration_integration=true'
+assert_output_line "${migration_workflow_output}" 'ops=true'
+
 openapi_output="$(printf '%s\n' apps/api/openapi.yaml | "${classifier}")"
 
 assert_output_line "${openapi_output}" 'web=true'

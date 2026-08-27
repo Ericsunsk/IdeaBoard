@@ -104,8 +104,12 @@ func checkReusableWorkflows(root string) {
 	}
 
 	api := loadWorkflow(root, "api.yml")
+	requireEqual(object(api, "env")["DOCKER_BUILD_RECORD_UPLOAD"], "false", "API workflow must not upload Docker build records")
 	apiTestStep := requireStep(object(object(api, "jobs"), "tests"), "Test race shard")
 	requireEqual(object(apiTestStep, "env")["TEST_MODE"], "race", "API tests must run in race mode")
+
+	auth := loadWorkflow(root, "auth.yml")
+	requireEqual(object(auth, "env")["DOCKER_BUILD_RECORD_UPLOAD"], "false", "Auth workflow must not upload Docker build records")
 
 	web := loadWorkflow(root, "web.yml")
 	webAudit := requireStep(object(object(web, "jobs"), "quality"), "Production dependency audit")
@@ -136,6 +140,7 @@ func checkReusableWorkflows(root string) {
 }
 
 func checkRelease(root string, release workflow) {
+	requireEqual(object(release, "env")["DOCKER_BUILD_RECORD_UPLOAD"], "false", "Release workflow must not upload Docker build records")
 	jobs := object(release, "jobs")
 	preflight := object(jobs, "preflight")
 	requireEqual(object(preflight, "permissions")["checks"], "read", "Release preflight must read CI checks")

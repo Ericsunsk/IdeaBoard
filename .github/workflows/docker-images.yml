@@ -16,6 +16,7 @@ permissions:
 
 env:
   GRYPE_LOG_QUIET: 'true'
+  DOCKER_BUILD_RECORD_UPLOAD: 'false'
 
 concurrency:
   group: docker-images-${{ github.ref_name }}
@@ -212,7 +213,7 @@ jobs:
           name: ideaboard-${{ matrix.image.name }}-release-metadata
           path: release-assets
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 3
 
   aggregate-release-manifest:
     name: Build Release Manifest
@@ -303,7 +304,7 @@ jobs:
           name: release-manifest
           path: release-assets/release-manifest.json
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 3
 
   deploy-production:
     name: Deploy Production
