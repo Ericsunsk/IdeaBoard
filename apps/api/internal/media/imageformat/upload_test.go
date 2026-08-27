@@ -2,6 +2,7 @@ package imageformat
 
 import (
 	"bytes"
+	"encoding/base64"
 	"strings"
 	"testing"
 )
@@ -72,4 +73,35 @@ func TestNormalizeImageExtensionRejectsSVG(t *testing.T) {
 	if _, ok := NormalizeImageExtension(".svg"); ok {
 		t.Fatal("expected svg to be rejected")
 	}
+}
+
+func TestAVIFIsAllowedAndDetectedFromBytes(t *testing.T) {
+	data := decodeTestAVIF(t)
+
+	if ext, ok := NormalizeImageExtension("avif"); !ok || ext != ".avif" {
+		t.Fatalf("expected avif extension to normalize, got %q, %v", ext, ok)
+	}
+	if mimeType, ok := NormalizeImageMIME("image/avif"); !ok || mimeType != "image/avif" {
+		t.Fatalf("expected avif mime to normalize, got %q, %v", mimeType, ok)
+	}
+	if !UploadAllowedImageExtensions()[".avif"] {
+		t.Fatal("expected avif uploads to be allowed")
+	}
+	if err := ValidateImageBytes(data, ".avif"); err != nil {
+		t.Fatalf("expected valid avif bytes, got %v", err)
+	}
+	if ext := DetectImageExtensionFromBytes(data); ext != ".avif" {
+		t.Fatalf("expected avif detection, got %q", ext)
+	}
+}
+
+const testAVIFBase64 = "AAAAHGZ0eXBhdmlmAAAAAG1pZjFhdmlmbWlhZgAAAOBtZXRhAAAAAAAAACFoZGxyAAAAAAAAAABwaWN0AAAAAAAAAAAAAAAAAAAAAA5waXRtAAAAAAABAAAAImlsb2MAAAAAREAAAQABAAAAAAEEAAEAAAAAAAAAoQAAACNpaW5mAAAAAAABAAAAFWluZmUCAAAAAAEAAGF2MDEAAAAAYGlwcnAAAABBaXBjbwAAAAxhdjFDgURsAAAAABRpc3BlAAAAAAAAAoAAAAHgAAAAEHBpeGkAAAAAAwwMDAAAAAlpcm90AwAAABdpcG1hAAAAAAAAAAEAAQSBAgOEAAAAqW1kYXQSAAoKWSYn/vsaAhoNwjKQAUSAAOOOOEC1G3sKlYvaVm9zmuFenT+Jbbn7wihWiZQajoFIfo9fh4ogJHXITkDBR1Dq0X1/+mpbBz3ACJDYZ/cdkT+Tog4zAuH5JO6h8O5xxC/1ohrvPJmFOvChzKzeihbRYfk7eGF78rRrgaBFwNV/2xfMnjYEDVp+M3L2T+hJEoZnwaHPrB4G8pfTHWmAUA=="
+
+func decodeTestAVIF(t *testing.T) []byte {
+	t.Helper()
+	data, err := base64.StdEncoding.DecodeString(testAVIFBase64)
+	if err != nil {
+		t.Fatalf("decode avif fixture: %v", err)
+	}
+	return data
 }

@@ -55,6 +55,15 @@ var imageFormatSpecs = []imageFormatSpec{
 		},
 		UploadAllowed: true,
 	},
+	{
+		Ext:  ".avif",
+		MIME: "image/avif",
+		Magic: []imageSignature{
+			{offset: 4, bytes: []byte{0x66, 0x74, 0x79, 0x70}},
+			{offset: 8, bytes: []byte{0x61, 0x76, 0x69, 0x66}},
+		},
+		UploadAllowed: true,
+	},
 }
 
 var (
@@ -143,6 +152,11 @@ func ImageMIMEFromExtension(ext string) string {
 }
 
 func DetectImageExtensionFromBytes(data []byte) string {
+	for _, spec := range imageFormatSpecs {
+		if validateImageMagic(data, spec.Ext) == nil {
+			return spec.Ext
+		}
+	}
 	mimeType := strings.ToLower(strings.TrimSpace(http.DetectContentType(data)))
 	if ext := ImageExtensionFromMIME(mimeType); ext != "" {
 		return ext

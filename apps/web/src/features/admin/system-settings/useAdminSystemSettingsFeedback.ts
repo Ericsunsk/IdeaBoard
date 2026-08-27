@@ -91,7 +91,12 @@ export function useAdminOutboundPolicyFeedback() {
 
 export function useAdminUnsupportedLogoFileFeedback() {
   const toast = useAdminToast()
-  return () => toast.error(unsupportedUploadImageMessage())
+  return (error?: unknown) =>
+    toast.error(
+      error
+        ? formatAdminDisplayError(error, unsupportedUploadImageMessage())
+        : unsupportedUploadImageMessage(),
+    )
 }
 
 function createAdminSettingFeedback(

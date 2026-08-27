@@ -9,11 +9,8 @@ import {
 } from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type { BrandingSetting } from '../../../shared/api/generated-query/model'
 import { createApiDataSelector, resolveApiData } from '../../../shared/api/apiResponse'
+import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
 import type { AdminBrandingSettingsFeedback } from './useAdminSystemSettingsFeedback'
-import {
-  isSupportedUploadImageFile,
-  unsupportedUploadImageMessage,
-} from '../../../shared/utils/imageUploadSupport'
 import {
   DEFAULT_SITE_BRANDING_SETTING,
   SITE_BRANDING_QUERY_KEY,
@@ -109,11 +106,11 @@ function isSameBrandingSetting(current: BrandingSetting, synced: BrandingSetting
 }
 
 async function uploadBrandingLogoFile(file: File): Promise<string> {
-  if (!isSupportedUploadImageFile(file)) {
-    throw new Error(unsupportedUploadImageMessage())
-  }
-
-  const data = await resolveApiData(uploadAdminAsset({ file }), '上传 Logo 失败')
+  const prepared = await prepareImageAssetForUpload(file, { compressionPolicy: 'none' })
+  const data = await resolveApiData(
+    uploadAdminAsset({ file: prepared.uploadFile }),
+    '上传 Logo 失败',
+  )
   if (!data.url) throw new Error('上传 Logo 失败')
   return data.url
 }

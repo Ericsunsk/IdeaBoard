@@ -61,6 +61,7 @@ export default {
     readImageSizeFailed: '无法读取图片尺寸。',
     parseImageFailed: '图片内容解析失败。',
     compressInvalidOutput: '图片压缩产生无效输出。',
+    heicConversionFailed: 'HEIC/HEIF 图片转换失败，请换一张图片。',
   },
   dialogs: {
     unsavedChangesTitle: '未保存的更改',

@@ -19,9 +19,12 @@ type AssetSummary = {
   largest: { file: string; bytes: number } | null
 }
 
-// Lazy route and locale chunks should not consume the initial-load budget.
+// Lazy route, locale, and optional converter chunks should not consume the initial-load budget.
 const INITIAL_JS_BUDGET_BYTES = 900_000
 const LARGEST_JS_CHUNK_BUDGET_BYTES = 650_000
+const OPTIONAL_LAZY_JS_CHUNK_BUDGETS = new Map([
+  ['node_modules/heic2any/dist/heic2any.js', 1_400_000],
+])
 const LOCALE_CHUNK_BUDGET_BYTES = 64_000
 const CSS_BUDGET = { totalBytes: 350_000, largestBytes: 180_000 }
 
@@ -127,6 +130,38 @@ async function findOversizedLocaleChunks(manifest: ViteManifest): Promise<string
   return failures
 }
 
+async function findOversizedJSChunks(
+  files: string[],
+  manifest: ViteManifest,
+  initialChunks: ManifestChunk[],
+): Promise<string[]> {
+  const failures: string[] = []
+  const manifestSourceByFile = new Map(
+    Object.entries(manifest).map(([source, chunk]) => [chunk.file, source]),
+  )
+  const initialFiles = new Set(initialChunks.map((chunk) => chunk.file))
+
+  for (const file of files.filter((candidate) => candidate.endsWith('.js'))) {
+    const relativeFile = path.relative(distDirectory, file)
+    const source = manifestSourceByFile.get(relativeFile)
+    const optionalLazyBudget = source ? OPTIONAL_LAZY_JS_CHUNK_BUDGETS.get(source) : undefined
+    if (optionalLazyBudget !== undefined && initialFiles.has(relativeFile)) {
+      failures.push(`Optional converter must remain lazy-loaded (${relativeFile})`)
+      continue
+    }
+
+    const budget = optionalLazyBudget ?? LARGEST_JS_CHUNK_BUDGET_BYTES
+    const bytes = (await stat(file)).size
+    if (bytes > budget) {
+      failures.push(
+        `JS chunk ${formatBytes(bytes)} exceeds ${formatBytes(budget)} (${path.relative(assetsDirectory, file)})`,
+      )
+    }
+  }
+
+  return failures
+}
+
 async function main() {
   const [files, manifest] = await Promise.all([listAssetFiles(assetsDirectory), readManifest()])
 
@@ -135,7 +170,8 @@ async function main() {
   const cssSummary = summaries.find((summary) => summary.kind === 'css')
   if (!jsSummary || !cssSummary) throw new Error('Unable to summarize build assets.')
 
-  const initialJsBytes = await sumChunkBytes(collectInitialChunks(manifest))
+  const initialChunks = collectInitialChunks(manifest)
+  const initialJsBytes = await sumChunkBytes(initialChunks)
   const failures: string[] = []
 
   for (const summary of summaries) {
@@ -151,11 +187,7 @@ async function main() {
       `Initial JS ${formatBytes(initialJsBytes)} exceeds ${formatBytes(INITIAL_JS_BUDGET_BYTES)}`,
     )
   }
-  if (jsSummary.largest && jsSummary.largest.bytes > LARGEST_JS_CHUNK_BUDGET_BYTES) {
-    failures.push(
-      `JS largest ${formatBytes(jsSummary.largest.bytes)} exceeds ${formatBytes(LARGEST_JS_CHUNK_BUDGET_BYTES)} (${path.relative(assetsDirectory, jsSummary.largest.file)})`,
-    )
-  }
+  failures.push(...(await findOversizedJSChunks(files, manifest, initialChunks)))
   if (cssSummary.bytes > CSS_BUDGET.totalBytes) {
     failures.push(
       `CSS total ${formatBytes(cssSummary.bytes)} exceeds ${formatBytes(CSS_BUDGET.totalBytes)}`,

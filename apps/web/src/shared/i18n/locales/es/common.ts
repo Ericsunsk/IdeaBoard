@@ -61,6 +61,7 @@ export default {
     readImageSizeFailed: 'No se pudo leer el tamaño de la imagen.',
     parseImageFailed: 'No se pudo analizar el contenido de la imagen.',
     compressInvalidOutput: 'La compresión produjo un resultado no válido.',
+    heicConversionFailed: 'No se pudo convertir la imagen HEIC/HEIF. Pruebe con otra imagen.',
   },
   dialogs: {
     unsavedChangesTitle: 'Cambios sin guardar',

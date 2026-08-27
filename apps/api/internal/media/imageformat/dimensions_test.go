@@ -29,6 +29,16 @@ func TestInspectBytesAcceptsSmallPNG(t *testing.T) {
 	}
 }
 
+func TestInspectBytesAcceptsAVIF(t *testing.T) {
+	facts, err := InspectBytes(decodeTestAVIF(t), ".avif")
+	if err != nil {
+		t.Fatalf("expected avif to pass, got %v", err)
+	}
+	if facts.Width != 640 || facts.Height != 480 || facts.Extension != ".avif" || facts.MIMEType != "image/avif" || facts.Animated {
+		t.Fatalf("unexpected facts: %+v", facts)
+	}
+}
+
 func TestInspectBytesRejectsHugePNGHeaderBeforeFullDecode(t *testing.T) {
 	data := buildPNGConfigOnly(20000, 20000)
 

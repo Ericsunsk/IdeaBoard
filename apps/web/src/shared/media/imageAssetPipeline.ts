@@ -43,6 +43,9 @@ const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
   '.png': 'image/png',
   '.webp': 'image/webp',
   '.bmp': 'image/bmp',
+  '.avif': 'image/avif',
+  '.heic': 'image/heic',
+  '.heif': 'image/heif',
 }
 
 const IMAGE_EXTENSION_BY_MIME: Record<string, string> = {
@@ -51,6 +54,130 @@ const IMAGE_EXTENSION_BY_MIME: Record<string, string> = {
   'image/webp': '.webp',
   'image/bmp': '.bmp',
   'image/x-ms-bmp': '.bmp',
+}
+
+type DetectedImageFormat = {
+  mime: string
+  extension: string
+  compatibleExtensions: readonly string[]
+  requiresJPEGConversion?: boolean
+}
+
+const HEIC_UPLOAD_MIME_TYPES = new Set(['image/heic', 'image/heif'])
+const HEIC_UPLOAD_EXTENSIONS = new Set(['.heic', '.heif'])
+
+function hasBytes(data: Uint8Array, offset: number, expected: readonly number[]): boolean {
+  if (data.length < offset + expected.length) return false
+  return expected.every((value, index) => data[offset + index] === value)
+}
+
+function detectImageFormat(data: Uint8Array): DetectedImageFormat | null {
+  if (hasBytes(data, 0, [0xff, 0xd8, 0xff])) {
+    return { mime: 'image/jpeg', extension: '.jpg', compatibleExtensions: ['.jpg', '.jpeg'] }
+  }
+  if (hasBytes(data, 0, [0x89, 0x50, 0x4e, 0x47])) {
+    return { mime: 'image/png', extension: '.png', compatibleExtensions: ['.png'] }
+  }
+  if (hasBytes(data, 0, [0x47, 0x49, 0x46])) {
+    return { mime: 'image/gif', extension: '.gif', compatibleExtensions: ['.gif'] }
+  }
+  if (hasBytes(data, 0, [0x42, 0x4d])) {
+    return { mime: 'image/bmp', extension: '.bmp', compatibleExtensions: ['.bmp'] }
+  }
+  if (hasBytes(data, 0, [0x52, 0x49, 0x46, 0x46]) && hasBytes(data, 8, [0x57, 0x45, 0x42, 0x50])) {
+    return { mime: 'image/webp', extension: '.webp', compatibleExtensions: ['.webp'] }
+  }
+  if (hasBytes(data, 4, [0x66, 0x74, 0x79, 0x70])) {
+    const brand = String.fromCharCode(...data.slice(8, 12))
+    if (brand === 'avif') {
+      return { mime: 'image/avif', extension: '.avif', compatibleExtensions: ['.avif'] }
+    }
+    if (['heic', 'heix', 'hevc', 'hevx'].includes(brand)) {
+      return {
+        mime: 'image/heic',
+        extension: '.heic',
+        compatibleExtensions: ['.heic'],
+        requiresJPEGConversion: true,
+      }
+    }
+    if (['mif1', 'msf1'].includes(brand)) {
+      return {
+        mime: 'image/heif',
+        extension: '.heif',
+        compatibleExtensions: ['.heif'],
+        requiresJPEGConversion: true,
+      }
+    }
+  }
+  return null
+}
+
+function replaceFileExtension(fileName: string, extension: string): string {
+  const trimmed = fileName.trim() || `image-${Date.now()}`
+  return /\.[^.]+$/.test(trimmed)
+    ? trimmed.replace(/\.[^.]+$/, extension)
+    : `${trimmed}${extension}`
+}
+
+async function normalizeImageUploadFile(file: File): Promise<File> {
+  // Dragged and fetched Blobs can carry stale name/type metadata, while the API
+  // intentionally validates the filename extension against the actual magic bytes.
+  let format: DetectedImageFormat | null
+  try {
+    const header = new Uint8Array(await file.slice(0, 12).arrayBuffer())
+    format = detectImageFormat(header)
+  } catch {
+    return file
+  }
+  if (format?.requiresJPEGConversion || (!format && isHEICUpload(file))) {
+    return convertHEICUploadToJPEG(file)
+  }
+  if (!format) return file
+
+  const currentExtension = getFileExtension(file.name)
+  const normalizedName = format.compatibleExtensions.includes(currentExtension)
+    ? file.name
+    : replaceFileExtension(file.name, format.extension)
+  if (normalizedName === file.name && normalizeMime(file.type) === format.mime) return file
+
+  return new File([file], normalizedName, {
+    type: format.mime,
+    lastModified: file.lastModified,
+  })
+}
+
+function isHEICUpload(file: File): boolean {
+  return (
+    HEIC_UPLOAD_MIME_TYPES.has(normalizeMime(file.type)) ||
+    HEIC_UPLOAD_EXTENSIONS.has(getFileExtension(file.name))
+  )
+}
+
+async function convertHEICUploadToJPEG(file: File): Promise<File> {
+  try {
+    const { default: heic2any } = await import('heic2any')
+    const converted = await heic2any({
+      blob: file,
+      toType: 'image/jpeg',
+      quality: 0.9,
+    })
+    const jpegBlob = Array.isArray(converted) ? converted[0] : converted
+    if (!(jpegBlob instanceof Blob)) {
+      throw new Error(i18n.global.t('common.errors.heicConversionFailed'))
+    }
+    return new File([jpegBlob], replaceFileExtension(file.name, '.jpg'), {
+      type: 'image/jpeg',
+      lastModified: file.lastModified,
+    })
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === i18n.global.t('common.errors.heicConversionFailed')
+    ) {
+      throw error
+    }
+    throw new Error(i18n.global.t('common.errors.heicConversionFailed'), { cause: error })
+  }
 }
 
 function normalizeMime(mime: string): string {
@@ -141,14 +268,15 @@ function shouldCompress(file: File, width: number, height: number): boolean {
 }
 
 function buildUncompressedAsset(
-  file: File,
+  originalFile: File,
+  uploadFile: File,
   warnings: string[],
   dimensions?: { width: number; height: number },
 ): PreparedImageAsset {
   const ratio = dimensions ? dimensions.height / dimensions.width : 1
   return {
-    originalFile: file,
-    uploadFile: file,
+    originalFile,
+    uploadFile,
     width: dimensions?.width ?? 0,
     height: dimensions?.height ?? 0,
     ratio: ratio > 0 ? ratio : 1,
@@ -162,33 +290,37 @@ export async function prepareImageAssetForUpload(
   file: File,
   options: PrepareImageAssetOptions = {},
 ): Promise<PreparedImageAsset> {
-  if (!isSupportedUploadImageFile(file)) {
+  const uploadSourceFile = await normalizeImageUploadFile(file)
+  if (!isSupportedUploadImageFile(uploadSourceFile)) {
     throw new Error(i18n.global.t('common.errors.unsupportedImageFormat'))
   }
   const warnings: string[] = []
   let dimensions: { width: number; height: number } | undefined
   try {
-    dimensions = await readImageDimensions(file)
+    dimensions = await readImageDimensions(uploadSourceFile)
   } catch (error) {
     const reason = userFacingErrorCopy(error, i18n.global.t('canvas.session.unknownError'))
     warnings.push(`${i18n.global.t('canvas.session.readImageSizeSkipCompression')}: ${reason}`)
-    return buildUncompressedAsset(file, warnings)
+    return buildUncompressedAsset(file, uploadSourceFile, warnings)
   }
   const compressionPolicy = options.compressionPolicy ?? 'default'
 
-  if (compressionPolicy === 'none' || !shouldCompress(file, dimensions.width, dimensions.height)) {
-    return buildUncompressedAsset(file, warnings, dimensions)
+  if (
+    compressionPolicy === 'none' ||
+    !shouldCompress(uploadSourceFile, dimensions.width, dimensions.height)
+  ) {
+    return buildUncompressedAsset(file, uploadSourceFile, warnings, dimensions)
   }
 
   try {
-    const compressedFile = await compressImageFile(file)
+    const compressedFile = await compressImageFile(uploadSourceFile)
     const compressedDimensions = await readImageDimensions(compressedFile).catch(() => dimensions)
     const ratio = compressedDimensions.height / compressedDimensions.width
     const reducedDimensions =
       Math.max(compressedDimensions.width, compressedDimensions.height) <
       Math.max(dimensions.width, dimensions.height)
-    if (compressedFile.size >= file.size && !reducedDimensions) {
-      return buildUncompressedAsset(file, warnings, dimensions)
+    if (compressedFile.size >= uploadSourceFile.size && !reducedDimensions) {
+      return buildUncompressedAsset(file, uploadSourceFile, warnings, dimensions)
     }
     return {
       originalFile: file,
@@ -203,7 +335,7 @@ export async function prepareImageAssetForUpload(
   } catch (error) {
     const reason = userFacingErrorCopy(error, i18n.global.t('canvas.session.unknownError'))
     warnings.push(`${i18n.global.t('canvas.session.compressFallbackOriginal')}: ${reason}`)
-    return buildUncompressedAsset(file, warnings, dimensions)
+    return buildUncompressedAsset(file, uploadSourceFile, warnings, dimensions)
   }
 }
 

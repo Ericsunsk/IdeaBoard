@@ -225,6 +225,7 @@ import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../../shared/constants/media'
+import { prepareImageAssetForUpload } from '../../../../shared/media/imageAssetPipeline'
 import { isSupportedUploadImageFile } from '../../../../shared/utils/imageUploadSupport'
 import AdminOutboundPolicyCard from '../../system-settings/AdminOutboundPolicyCard.vue'
 import AdminMailConfigCard from '../../system-settings/AdminMailConfigCard.vue'
@@ -309,8 +310,13 @@ async function handleLogoInputChange(event: Event) {
     unsupportedLogoFileFeedback()
     return
   }
-  pendingLogoFile.value = file
-  logoCropDialogVisible.value = true
+  try {
+    const prepared = await prepareImageAssetForUpload(file, { compressionPolicy: 'none' })
+    pendingLogoFile.value = prepared.uploadFile
+    logoCropDialogVisible.value = true
+  } catch (error) {
+    unsupportedLogoFileFeedback(error)
+  }
 }
 
 async function handleLogoCropConfirm(file: File) {
