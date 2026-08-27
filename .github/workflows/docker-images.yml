@@ -139,18 +139,6 @@ jobs:
       - name: Prepare release asset directory
         run: mkdir -p release-assets
 
-      - name: Generate linux/arm64 SBOM
-        timeout-minutes: 10
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
-        env:
-          SYFT_PLATFORM: linux/arm64
-        with:
-          image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
-          format: cyclonedx-json
-          output-file: release-assets/${{ matrix.image.name }}-linux-arm64.sbom.cyclonedx.json
-          upload-artifact: false
-          upload-release-assets: false
-
       - name: Set up Grype
         timeout-minutes: 5
         uses: ./.github/actions/setup-grype
@@ -199,21 +187,16 @@ jobs:
           IMAGE_NAME: ${{ steps.image.outputs.name }}
           IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
           IMAGE_KEY: ${{ matrix.image.name }}
-          SBOM_ARM64_FILE: ${{ matrix.image.name }}-linux-arm64.sbom.cyclonedx.json
         run: |
           jq -n \
             --arg name "${IMAGE_KEY}" \
             --arg image "${IMAGE_NAME}" \
             --arg digest "${IMAGE_DIGEST}" \
-            --arg sbom_arm64_file "${SBOM_ARM64_FILE}" \
             '{
               name: $name,
               image: $image,
               digest: $digest,
-              ref: ($image + "@" + $digest),
-              sbom_files: {
-                "linux/arm64": $sbom_arm64_file
-              }
+              ref: ($image + "@" + $digest)
             }' > "release-assets/${IMAGE_KEY}.json"
 
           {
@@ -289,12 +272,6 @@ jobs:
                 auth: $auth[0].ref,
                 "auth-migrate": $auth_migrate[0].ref
               },
-              sbom_files: {
-                api: $api[0].sbom_files,
-                "api-migrate": $api_migrate[0].sbom_files,
-                auth: $auth[0].sbom_files,
-                "auth-migrate": $auth_migrate[0].sbom_files
-              },
               cosign: {
                 certificate_identity: $cosign_identity,
                 certificate_oidc_issuer: $cosign_issuer
@@ -324,9 +301,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: release-manifest
-          path: |
-            release-assets/release-manifest.json
-            release-assets/*.sbom.cyclonedx.json
+          path: release-assets/release-manifest.json
           if-no-files-found: error
           retention-days: 90
 
@@ -563,7 +538,5 @@ jobs:
       - name: Upload image metadata to GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
-          files: |
-            release-assets/release-manifest.json
-            release-assets/*.sbom.cyclonedx.json
+          files: release-assets/release-manifest.json
           fail_on_unmatched_files: true

@@ -1,8 +1,10 @@
 package bootstrap
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -33,10 +35,11 @@ func Migrate(ctx context.Context, cfg *config.Config, atlasBinary, migrationsDir
 		return fmt.Errorf("clean break reconciliation failed: %w", err)
 	}
 	cmd := exec.CommandContext(ctx, atlasBinary, "migrate", "apply", "--dir", migrationsDirectory, "--url", database.PostgresDSN(migrationConfig))
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	var output bytes.Buffer
+	cmd.Stdout = io.MultiWriter(os.Stdout, &output)
+	cmd.Stderr = io.MultiWriter(os.Stderr, &output)
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("atlas schema migration failed: %w", err)
+		return fmt.Errorf("atlas schema migration failed: %w (output: %s)", err, strings.TrimSpace(output.String()))
 	}
 	if err := finalizeAppDatabases(ctx, cfg); err != nil {
 		return fmt.Errorf("runtime migration finalization failed: %w", err)
@@ -54,17 +57,20 @@ func reconcileCleanBreakDatabase(ctx context.Context, migrationConfig config.Dat
 	var revisionsTableExists bool
 	err = db.QueryRowContext(ctx, `
 		SELECT EXISTS (
-			SELECT 1 FROM information_schema.tables 
-			WHERE table_schema = 'public' AND table_name = 'atlas_schema_revisions'
+			SELECT 1 FROM pg_tables 
+			WHERE schemaname = 'public' AND tablename = 'atlas_schema_revisions'
 		)
 	`).Scan(&revisionsTableExists)
-	if err != nil || !revisionsTableExists {
-		return err
+	if err != nil {
+		return fmt.Errorf("check revisions table: %w", err)
+	}
+	if !revisionsTableExists {
+		return nil
 	}
 
 	rows, err := db.QueryContext(ctx, `SELECT version FROM atlas_schema_revisions ORDER BY version ASC`)
 	if err != nil {
-		return nil
+		return fmt.Errorf("query atlas schema revisions: %w", err)
 	}
 	defer rows.Close()
 
@@ -82,7 +88,7 @@ func reconcileCleanBreakDatabase(ctx context.Context, migrationConfig config.Dat
 	dirPath := strings.TrimPrefix(migrationsDirectory, "file://")
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
-		return nil
+		return fmt.Errorf("read migrations directory %s: %w", dirPath, err)
 	}
 
 	availableVersions := make(map[string]bool)

@@ -27,6 +27,9 @@ cleanup() {
   if [[ -n "${DEPLOY_RESULT_FILE}" ]]; then
     rm -f -- "${DEPLOY_RESULT_FILE}"
   fi
+  if [[ -n "${DEPLOY_LOG_FILE:-}" ]]; then
+    rm -f -- "${DEPLOY_LOG_FILE}"
+  fi
 }
 trap cleanup EXIT
 
@@ -110,7 +113,8 @@ deploy_command="${STACK_DIR}/scripts/deploy-stack.sh"
 
 ENTRYPOINT_STAGE="deployment"
 DEPLOY_RESULT_FILE="$(mktemp "${TMP_DIR%/}/ideaboard-production-deploy-result.XXXXXX")"
-chmod 600 "${DEPLOY_RESULT_FILE}"
+DEPLOY_LOG_FILE="$(mktemp "${TMP_DIR%/}/ideaboard-production-deploy-log.XXXXXX")"
+chmod 600 "${DEPLOY_RESULT_FILE}" "${DEPLOY_LOG_FILE}"
 
 deploy_status=0
 IDEABOARD_STACK_DIR="${STACK_DIR}" \
@@ -118,7 +122,11 @@ IDEABOARD_STACK_DIR="${STACK_DIR}" \
   COMPOSE_PROJECT_NAME=ideaboard \
   IDEABOARD_DEPLOY_RESULT_FILE="${DEPLOY_RESULT_FILE}" \
   "${deploy_command}" update --manifest "${MANIFEST_FILE}" \
-  > /dev/null 2>&1 || deploy_status=$?
+  > "${DEPLOY_LOG_FILE}" 2>&1 || deploy_status=$?
+
+if (( deploy_status != 0 )); then
+  tail -n 60 "${DEPLOY_LOG_FILE}" >&2 || true
+fi
 
 if jq -e -s --argjson deploy_status "${deploy_status}" '
   length == 1
