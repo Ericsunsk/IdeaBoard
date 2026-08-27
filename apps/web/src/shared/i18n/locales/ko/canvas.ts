@@ -29,6 +29,10 @@ export default {
   states: {
     failed: '실패',
   },
+  feedback: {
+    imageGenerated: '이미지가 생성되었습니다',
+    imageGenerationFailed: '이미지 생성에 실패했습니다',
+  },
   homeHero: {
     tagline: 'AI CANVAS FOR VISUAL DESIGNERS',
     getStarted: '시작하기',
@@ -292,9 +296,10 @@ export default {
     addImageFailed: '이미지를 추가하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
     duplicateImagesFailed: '이미지를 복제하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
     noExportableImages: '선택한 노드에 내보낼 이미지가 없습니다.',
+    exportingImages: '이미지 {count}개를 내보내는 중...',
+    exportQueued: '내보내기 대기열에 추가됨: {count}개',
+    exportPartiallyQueued: '대기열 추가 {completed}/{total}, 실패 {failed}개',
     imageNodeMissing: '이미지 노드를 찾을 수 없습니다.',
-    imageNodeInputUpdated: '이미지 노드 입력이 업데이트되었습니다.',
-    imageNodeAdded: '이미지 노드가 추가되었습니다.',
     uploadStale: '업로드 결과가 만료되었습니다. 이미지를 다시 선택해 주세요.',
     missingBoardIdUpload: '보드 ID가 없습니다. 이미지를 업로드할 수 없습니다.',
     missingBoardIdSave: '보드 ID가 없습니다. 저장할 수 없습니다.',

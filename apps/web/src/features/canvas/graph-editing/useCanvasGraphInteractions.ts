@@ -225,9 +225,10 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
       return
     }
     exportLoading?.destroy()
-    const loading = options.feedback.operationLoading(`Exporting ${entries.length} images...`, {
-      duration: 1500,
-    })
+    const loading = options.feedback.operationLoading(
+      i18n.global.t('canvas.session.exportingImages', { count: entries.length }),
+      { duration: 1500 },
+    )
     exportLoading = loading
     const counts = new Map<string, number>()
     let failed = 0
@@ -249,11 +250,15 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
     }
     if (failed === 0) {
       options.feedback.operationSucceeded(
-        `Export queued: ${entries.length} image${entries.length > 1 ? 's' : ''}`,
+        i18n.global.t('canvas.session.exportQueued', { count: entries.length }),
       )
     } else {
       options.feedback.operationWarning(
-        `Export queued ${entries.length - failed}/${entries.length}, failed ${failed}`,
+        i18n.global.t('canvas.session.exportPartiallyQueued', {
+          completed: entries.length - failed,
+          total: entries.length,
+          failed,
+        }),
       )
     }
   }

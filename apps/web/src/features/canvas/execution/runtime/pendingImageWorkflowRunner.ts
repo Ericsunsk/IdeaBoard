@@ -4,10 +4,6 @@ import {
   TaskResultPendingError,
 } from '../../../../shared/api/taskEvents'
 import { i18n } from '../../../../shared/i18n'
-import {
-  IMAGE_GENERATION_FAILURE_MESSAGE,
-  IMAGE_GENERATION_SUCCESS_MESSAGE,
-} from '../../../../shared/constants/media'
 import type { SubmitTaskData } from '../../../../shared/api/task'
 import type {
   ImageExecutionInput,
@@ -72,13 +68,21 @@ export type PendingImageWorkflowRunnerOptions = {
   onError?: (error: unknown) => boolean
 }
 
+function imageGenerationSuccessMessage(): string {
+  return i18n.global.t('canvas.feedback.imageGenerated')
+}
+
+function imageGenerationFailureMessage(): string {
+  return i18n.global.t('canvas.feedback.imageGenerationFailed')
+}
+
 /** Presentation boundary: transport errors carry a kind; copy is resolved here. */
 export function taskExecutionWarning(error: unknown): string {
   if (error instanceof TaskResultPendingError) {
     return i18n.global.t(error.kind === 'timeout' ? 'canvas.task.progressTimeout' : 'canvas.task.stillProcessing')
   }
   if (error instanceof TaskCancelledError) return i18n.global.t('canvas.task.cancelled')
-  return IMAGE_GENERATION_FAILURE_MESSAGE
+  return imageGenerationFailureMessage()
 }
 
 function releasedResultNodeIds(
@@ -106,7 +110,7 @@ export function createPendingImageWorkflowRunner(
         const submission = await options.taskTransport.submit(
           intent.taskRequest,
           actionId,
-          IMAGE_GENERATION_FAILURE_MESSAGE,
+          imageGenerationFailureMessage(),
         )
         const applied = leases.filter(
           (lease) =>
@@ -144,7 +148,7 @@ export function createPendingImageWorkflowRunner(
     try {
       await options.taskTransport.assertReady(
         intent.readinessRequest ?? intent.taskRequest,
-        IMAGE_GENERATION_FAILURE_MESSAGE,
+        imageGenerationFailureMessage(),
       )
       if (!options.executionCore.isAttachmentCurrent(intent.attachment)) return
 
@@ -200,18 +204,20 @@ export function createPendingImageWorkflowRunner(
       const materialized =
         resolved.length > 0 ? options.executionCore.materializeBatch(resolved) : null
       const successCount = materialized?.changedNodeIds.length ?? 0
-      if (successCount > 0) {
-        options.onSuccess(IMAGE_GENERATION_SUCCESS_MESSAGE)
-      }
-      if (pending.length > 0) {
-        options.onWarning(i18n.global.t('canvas.execution.tasksInProgress'))
-      }
       const firstFailure = failures.find(
         (attempt): attempt is PromiseRejectedResult => attempt.status === 'rejected',
       )
       if (firstFailure) {
         const handled = options.onError?.(firstFailure.reason)
         if (!handled) options.onWarning(taskExecutionWarning(firstFailure.reason))
+        return
+      }
+      if (pending.length > 0) {
+        options.onWarning(i18n.global.t('canvas.execution.tasksInProgress'))
+        return
+      }
+      if (successCount > 0) {
+        options.onSuccess(imageGenerationSuccessMessage())
       }
     } catch (error) {
       const release =

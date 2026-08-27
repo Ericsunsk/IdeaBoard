@@ -7,9 +7,9 @@ import {
   readCanvasLibraryImportTransfer,
   type CanvasLibraryImportDescriptor,
 } from '../../library/libraryTransfer'
-import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
+import type { CanvasImageNodeCreationResult } from './useFlowImageUploadActions'
 
 type UseFlowCanvasDropOptions = {
   browser: {
@@ -22,7 +22,7 @@ type UseFlowCanvasDropOptions = {
   createImageNodeFromFile: (
     point: { x: number; y: number },
     file: File,
-  ) => Promise<CanvasGraphNodeIdForKind<'image'> | null>
+  ) => Promise<CanvasImageNodeCreationResult | null>
   addLibraryAsset: (
     asset: CanvasLibraryImportDescriptor,
     point: { x: number; y: number },
@@ -51,7 +51,8 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
       return
     }
     try {
-      await options.createImageNodeFromFile(point, file)
+      const result = await options.createImageNodeFromFile(point, file)
+      if (result && result.kind !== 'ready') options.onWarning(result.failureMessage)
     } catch (error) {
       options.onWarning(userFacingErrorCopy(error, i18n.global.t('canvas.session.uploadFailed')))
     }

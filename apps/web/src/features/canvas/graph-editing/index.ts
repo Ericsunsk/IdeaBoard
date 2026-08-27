@@ -8,6 +8,7 @@ export {
 } from './interactionBrowserAdapter'
 export { useCanvasGraphEditing } from './useCanvasGraphEditing'
 export { useCanvasGraphInteractions } from './useCanvasGraphInteractions'
+export type { CanvasImageNodeCreationResult } from './useFlowImageUploadActions'
 export type {
   CanvasGraphEditingNodeInteractions,
   CanvasGraphEditingNodeInteractionsOptions,

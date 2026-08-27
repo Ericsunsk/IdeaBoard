@@ -119,7 +119,6 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     getImageNodeSnapshot,
     uploadApi: options.upload,
     onWarning: options.feedback.operationWarning,
-    onSuccess: options.feedback.operationSucceeded,
     onNodeMutated: (nodeId) => nodeMutations.markFlowExecutionNodeDirty(nodeId),
     setLocalUploadState,
   })

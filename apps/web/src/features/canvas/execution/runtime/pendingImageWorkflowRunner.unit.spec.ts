@@ -1,5 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TaskCancelledError, TaskResultPendingError } from '../../../../shared/api/taskEvents'
+import { i18n } from '../../../../shared/i18n'
+import { loadLocaleMessages } from '../../../../shared/i18n/userLocale'
 import { createEmptyCanvasBoardSnapshot, type ImageNodeItem } from '../../../canvas-board/domain'
 import { CanvasGraphSession } from '../../graph-runtime'
 import { CanvasBoardGraphSession, createPendingImageExecutionCore } from '../pending-execution'
@@ -49,13 +51,15 @@ function createHarness(taskIds: readonly string[] = ['task-1']) {
   )
   const transport = { assertReady, submit, resolve }
   const cancelTasks = vi.fn()
+  const onSuccess = vi.fn()
+  const onWarning = vi.fn()
   const runner = createPendingImageWorkflowRunner({
     executionCore: core,
     pendingResults,
     taskTransport: transport,
     cancelTasks,
-    onSuccess: vi.fn(),
-    onWarning: vi.fn(),
+    onSuccess,
+    onWarning,
     createClientActionId: () => 'action-1',
   })
   const intent = {
@@ -67,8 +71,23 @@ function createHarness(taskIds: readonly string[] = ['task-1']) {
     readinessRequest: {} as never,
     fallbackRatio: 1,
   }
-  return { attachment, cancelTasks, core, intent, pendingResults, runner, store, transport }
+  return {
+    attachment,
+    cancelTasks,
+    core,
+    intent,
+    onSuccess,
+    onWarning,
+    pendingResults,
+    runner,
+    store,
+    transport,
+  }
 }
+
+afterEach(() => {
+  i18n.global.locale.value = 'en'
+})
 
 describe('pendingImageWorkflowRunner', () => {
   it('executes one shared prepared intent through stable transport adapters', async () => {
@@ -90,6 +109,64 @@ describe('pendingImageWorkflowRunner', () => {
     expect(harness.core.snapshot().executions.every((fact) => fact.status === 'succeeded')).toBe(
       true,
     )
+    expect(harness.onSuccess).toHaveBeenCalledOnce()
+    expect(harness.onSuccess).toHaveBeenCalledWith('Image generated')
+    expect(harness.onWarning).not.toHaveBeenCalled()
+  })
+
+  it('uses the active locale for the terminal success message', async () => {
+    await loadLocaleMessages('zh-CN')
+    ;(i18n.global.locale as { value: string }).value = 'zh-CN'
+    const harness = createHarness()
+
+    await harness.runner.execute(harness.intent)
+
+    expect(harness.onSuccess).toHaveBeenCalledWith('图片已生成')
+  })
+
+  it('reports one warning and no success when some results are still pending', async () => {
+    const harness = createHarness(['task-1', 'task-1'])
+    harness.transport.resolve.mockImplementation(async (_taskId, resultIndex) => {
+      if (resultIndex === 1) throw new TaskResultPendingError()
+      return { url: 'https://example.com/0.png', ratio: 1 }
+    })
+
+    await harness.runner.execute(harness.intent)
+
+    expect(harness.onSuccess).not.toHaveBeenCalled()
+    expect(harness.onWarning).toHaveBeenCalledOnce()
+    expect(harness.onWarning).toHaveBeenCalledWith(
+      'Tasks are still running. Results will appear on the canvas shortly.',
+    )
+  })
+
+  it('reports one failure and no success when only some results resolve', async () => {
+    const harness = createHarness(['task-1', 'task-1'])
+    harness.transport.resolve.mockImplementation(async (_taskId, resultIndex) => {
+      if (resultIndex === 1) throw new Error('provider failure')
+      return { url: 'https://example.com/0.png', ratio: 1 }
+    })
+
+    await harness.runner.execute(harness.intent)
+
+    expect(harness.onSuccess).not.toHaveBeenCalled()
+    expect(harness.onWarning).toHaveBeenCalledOnce()
+    expect(harness.onWarning).toHaveBeenCalledWith('Image generation failed')
+  })
+
+  it('prioritizes one hard failure when other results are still pending', async () => {
+    const harness = createHarness(['task-1', 'task-1', 'task-1'])
+    harness.transport.resolve.mockImplementation(async (_taskId, resultIndex) => {
+      if (resultIndex === 1) throw new TaskResultPendingError()
+      if (resultIndex === 2) throw new Error('provider failure')
+      return { url: 'https://example.com/0.png', ratio: 1 }
+    })
+
+    await harness.runner.execute(harness.intent)
+
+    expect(harness.onSuccess).not.toHaveBeenCalled()
+    expect(harness.onWarning).toHaveBeenCalledOnce()
+    expect(harness.onWarning).toHaveBeenCalledWith('Image generation failed')
   })
 
   it('does not reserve when the injected readiness transport rejects', async () => {

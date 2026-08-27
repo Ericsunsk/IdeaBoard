@@ -5,14 +5,16 @@ import {
 import { useMaskEditorChromeActions } from '../mask-editor/useMaskEditorChromeActions'
 import { isProcessingCancelled } from '../image-editor/runtime/processingCancelled'
 import { isCanvasGraphNodeId } from '../graph-runtime'
-import { IMAGE_GENERATION_SUCCESS_MESSAGE } from '../../../shared/constants/media'
-import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
 import type { ImageToolChromeCommands } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
 
 export function createImageToolCommands(session: ImageToolSession) {
   const { board, execution, ui, feedback } = session.capabilities
+
+  const reportGenerationFailure = () => {
+    feedback.warning(i18n.global.t('canvas.feedback.imageGenerationFailed'))
+  }
 
   async function applyAdjustments() {
     if (session.isApplyingImageEditorAdjustments.value) return
@@ -61,18 +63,33 @@ export function createImageToolCommands(session: ImageToolSession) {
       if (board.currentBoardId.value !== boardId || session.imageEditorNodeId.value !== nodeId) {
         return
       }
-      const newNodeId = await board.createImageNodeFromFile(
+      const creation = await board.createImageNodeFromFile(
         {
           x: Number(sourceNode.x ?? 0) + Math.max(240, Number(sourceNode.width ?? 300) + 64),
           y: Number(sourceNode.y ?? 0) + 18,
         },
         renderedFile,
       )
-      if (!newNodeId) return
+      if (!creation || creation.kind === 'rejected') {
+        if (board.currentBoardId.value === boardId && session.imageEditorNodeId.value === nodeId) {
+          reportGenerationFailure()
+        }
+        return
+      }
+      if (creation.kind === 'awaiting-retry') {
+        board.connectIntent({
+          sourceNodeId: nodeId,
+          sourcePort: 'image',
+          targetNodeId: creation.nodeId,
+          targetPort: 'image',
+        })
+        reportGenerationFailure()
+        return
+      }
       const didConnect = board.connectIntent({
         sourceNodeId: nodeId,
         sourcePort: 'image',
-        targetNodeId: newNodeId,
+        targetNodeId: creation.nodeId,
         targetPort: 'image',
       })
       if (!didConnect) {
@@ -81,7 +98,7 @@ export function createImageToolCommands(session: ImageToolSession) {
       }
       session.exitImageEditorMode({ runBeforeExit: false })
       session.imageEditorSession.resetImageEditorSession()
-      feedback.succeeded(IMAGE_GENERATION_SUCCESS_MESSAGE)
+      feedback.succeeded(i18n.global.t('canvas.feedback.imageGenerated'))
     } catch (error) {
       if (
         isImageAdjustmentFinalApplyCancelled(error) ||
@@ -91,7 +108,7 @@ export function createImageToolCommands(session: ImageToolSession) {
       ) {
         return
       }
-      feedback.warning(userFacingErrorCopy(error, i18n.global.t('canvas.tools.applyEditFailed')))
+      reportGenerationFailure()
     } finally {
       if (session.activeImageAdjustmentFinalScopeId.value === scopeId) {
         session.activeImageAdjustmentFinalScopeId.value = null

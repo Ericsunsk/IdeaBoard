@@ -4,7 +4,7 @@ import type { Ref } from 'vue'
 import type { ImageNodeItem } from '../../canvas-board/domain'
 import type { CanvasInteractionKey } from '../workspace-ui/useFlowCanvasInteractionState'
 import type { CanvasVueFlowConnectionAdapter } from '../vue-flow-adapter'
-import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
+import type { CanvasImageNodeCreationResult } from '../graph-editing'
 import { useImageEditorMode } from '../image-editor/useImageEditorMode'
 import { useImageEditorSession } from '../image-editor/useImageEditorSession'
 import { useImageEditorCoordinateAdapter } from '../image-editor'
@@ -49,7 +49,7 @@ export type UseCanvasImageToolsOptions = {
   createImageNodeFromFile: (
     point: { x: number; y: number },
     file: File,
-  ) => Promise<CanvasGraphNodeIdForKind<'image'> | null>
+  ) => Promise<CanvasImageNodeCreationResult | null>
   connectionAdapter: Pick<CanvasVueFlowConnectionAdapter, 'connectIntent'>
   uploadImageToBoard: (file: File) => Promise<{ url: string; ratio: number }>
   openImageUrlPreview: (url: string, ratio: number) => void | Promise<void>

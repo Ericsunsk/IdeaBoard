@@ -1,11 +1,13 @@
 import type { Edge, Elements, Node } from '@vue-flow/core'
 import { shallowRef } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createEmptyCanvasBoardSnapshot,
   type CanvasBoardSnapshot,
   type ImageNodeItem,
 } from '../../canvas-board/domain'
+import { i18n } from '../../../shared/i18n'
+import { loadLocaleMessages } from '../../../shared/i18n/userLocale'
 import { CanvasGraphSession } from '../graph-runtime'
 import { useCanvasVueFlowGraphAdapter } from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
@@ -90,6 +92,10 @@ function createHarness() {
 }
 
 describe('useCanvasGraphInteractions', () => {
+  afterEach(() => {
+    ;(i18n.global.locale as { value: string }).value = 'en'
+  })
+
   it('enables image export when selection changes after the Graph Session attaches', () => {
     const harness = createHarness()
     const selectedImage = harness.nodes.value[0]
@@ -115,7 +121,20 @@ describe('useCanvasGraphInteractions', () => {
       fileName: 'Domain image.png',
     })
     expect(harness.loading.destroy).toHaveBeenCalledOnce()
-    expect(harness.feedback.operationSucceeded).toHaveBeenCalledWith('Export queued: 1 image')
+    expect(harness.feedback.operationSucceeded).toHaveBeenCalledWith('Images queued: 1')
+  })
+
+  it('uses the active locale for image export feedback', async () => {
+    await loadLocaleMessages('zh-CN')
+    ;(i18n.global.locale as { value: string }).value = 'zh-CN'
+    const harness = createHarness()
+
+    await harness.interactions.commands.exportSelectedImages()
+
+    expect(harness.feedback.operationLoading).toHaveBeenCalledWith('正在导出 1 张图片…', {
+      duration: 1500,
+    })
+    expect(harness.feedback.operationSucceeded).toHaveBeenCalledWith('已加入导出队列：1 张')
   })
 
   it('previews and appends images using Graph facts instead of stale Flow data', () => {

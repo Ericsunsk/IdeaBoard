@@ -29,6 +29,10 @@ export default {
   states: {
     failed: 'Failed',
   },
+  feedback: {
+    imageGenerated: 'Image generated',
+    imageGenerationFailed: 'Image generation failed',
+  },
   homeHero: {
     tagline: 'AI CANVAS FOR VISUAL DESIGNERS',
     getStarted: 'Get started',
@@ -292,9 +296,10 @@ export default {
     addImageFailed: 'Failed to add the image. Refresh the canvas and try again.',
     duplicateImagesFailed: 'Failed to duplicate images. Refresh the canvas and try again.',
     noExportableImages: 'The selected nodes have no images to export.',
+    exportingImages: 'Exporting images: {count}...',
+    exportQueued: 'Images queued: {count}',
+    exportPartiallyQueued: 'Queued {completed}/{total}; failed {failed}',
     imageNodeMissing: 'Image node not found.',
-    imageNodeInputUpdated: 'Image node input updated.',
-    imageNodeAdded: 'Image node added.',
     uploadStale: 'Upload result expired. Please pick the image again.',
     missingBoardIdUpload: 'Missing board ID. Unable to upload the image.',
     missingBoardIdSave: 'Missing board ID. Unable to save.',

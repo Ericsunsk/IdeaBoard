@@ -28,6 +28,10 @@ export default {
   states: {
     failed: 'Error',
   },
+  feedback: {
+    imageGenerated: 'Imagen generada',
+    imageGenerationFailed: 'Error al generar la imagen',
+  },
   homeHero: {
     tagline: 'LIENZO DE IA PARA DISEÑADORES VISUALES',
     getStarted: 'Empezar',
@@ -291,9 +295,10 @@ export default {
     addImageFailed: 'Error al añadir la imagen. Actualice el lienzo e inténtelo de nuevo.',
     duplicateImagesFailed: 'Error al duplicar imágenes. Actualice el lienzo e inténtelo de nuevo.',
     noExportableImages: 'Los nodos seleccionados no tienen imágenes para exportar.',
+    exportingImages: 'Exportando imágenes: {count}...',
+    exportQueued: 'Imágenes en cola: {count}',
+    exportPartiallyQueued: 'En cola: {completed}/{total}; errores: {failed}',
     imageNodeMissing: 'Nodo de imagen no encontrado.',
-    imageNodeInputUpdated: 'Entrada del nodo de imagen actualizada.',
-    imageNodeAdded: 'Nodo de imagen añadido.',
     uploadStale: 'El resultado de la subida ha caducado. Vuelva a seleccionar la imagen.',
     missingBoardIdUpload: 'Falta el ID del lienzo. No se puede subir la imagen.',
     missingBoardIdSave: 'Falta el ID del lienzo. No se puede guardar.',

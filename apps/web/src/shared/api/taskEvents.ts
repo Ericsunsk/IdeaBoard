@@ -3,7 +3,7 @@ import { sanitizeApiErrorMessage } from '../utils/errorMessages'
 import { taskApi } from './task'
 import type { Task } from './task'
 import { notifyUserCreditsInvalidation } from '../query/userCreditsInvalidation'
-import { IMAGE_GENERATION_FAILURE_MESSAGE } from '../constants/media'
+import { i18n } from '../i18n'
 import { subscribeUserEvent } from './userEventStream'
 
 type TaskEventPayload = Pick<
@@ -70,7 +70,7 @@ function isResultFinalizationFailure(task: TaskFailurePayload): boolean {
 
 export function createTaskResultFailureError(
   task: TaskFailurePayload,
-  fallbackMessage = IMAGE_GENERATION_FAILURE_MESSAGE,
+  fallbackMessage = i18n.global.t('canvas.feedback.imageGenerationFailed'),
 ): Error {
   if (isResultFinalizationFailure(task)) {
     return new TaskResultPendingError('pending')

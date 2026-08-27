@@ -18,6 +18,20 @@ import type { FlowLocalUploadState } from '../types/flowTypes'
 
 type FlowImageUploadResult = { url: string; ratio: number; mediaAssetId: number }
 
+export type CanvasImageNodeCreationResult =
+  | Readonly<{ kind: 'ready'; nodeId: CanvasGraphNodeIdForKind<'image'> }>
+  | Readonly<{
+      kind: 'awaiting-retry'
+      nodeId: CanvasGraphNodeIdForKind<'image'>
+      failureMessage: string
+    }>
+  | Readonly<{ kind: 'rejected'; failureMessage: string }>
+
+type LocalUploadMaterializationResult =
+  | Readonly<{ kind: 'ready' }>
+  | Readonly<{ kind: 'failed'; message: string }>
+  | Readonly<{ kind: 'stale' }>
+
 type UploadedImageData = {
   url: string
   media_asset_id?: number
@@ -41,7 +55,6 @@ type UseFlowImageUploadActionsOptions = {
     upload: (file: File, boardId: string) => Promise<UploadedImageData>
   }
   onWarning: (msg: string) => void
-  onSuccess: (msg: string) => void
   onNodeMutated?: (nodeId: string) => void
   setLocalUploadState: (nodeId: string, state: FlowLocalUploadState | null) => void
   createObjectUrl?: (file: File) => string
@@ -227,7 +240,6 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
         }
       })
       options.onNodeMutated?.(nodeId)
-      options.onSuccess(i18n.global.t('canvas.session.imageNodeInputUpdated'))
       return true
     } catch (error) {
       const msg = userFacingErrorCopy(error, i18n.global.t('canvas.session.uploadFailed'))
@@ -243,10 +255,9 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
   async function createImageNodeFromFile(
     point: { x: number; y: number },
     file: File,
-  ): Promise<CanvasGraphNodeIdForKind<'image'> | null> {
+  ): Promise<CanvasImageNodeCreationResult | null> {
     if (!isSupportedUploadImageFile(file)) {
-      options.onWarning(unsupportedUploadImageMessage())
-      return null
+      return { kind: 'rejected', failureMessage: unsupportedUploadImageMessage() }
     }
     const boardId = readCurrentBoardIdRef(options.currentBoardId)
     const previewRatio = await resolveLocalPreviewRatio(file)
@@ -262,17 +273,27 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
     })
     if (!nodeId) {
       revokeObjectUrl(previewUrl)
-      return null
+      return {
+        kind: 'rejected',
+        failureMessage: i18n.global.t('canvas.session.uploadFailed'),
+      }
     }
 
     const requestId = beginLocalUpload(nodeId, { boardId, file, previewUrl })
-    const completed = await materializeLocalUpload(nodeId, requestId)
-    return completed || localUploads.has(nodeId) ? nodeId : null
+    const result = await materializeLocalUpload(nodeId, requestId)
+    if (result.kind === 'ready') return { kind: 'ready', nodeId }
+    if (result.kind === 'failed') {
+      return { kind: 'awaiting-retry', nodeId, failureMessage: result.message }
+    }
+    return null
   }
 
-  async function materializeLocalUpload(nodeId: string, requestId: number): Promise<boolean> {
+  async function materializeLocalUpload(
+    nodeId: string,
+    requestId: number,
+  ): Promise<LocalUploadMaterializationResult> {
     const localUpload = localUploads.get(nodeId)
-    if (!localUpload) return false
+    if (!localUpload) return { kind: 'stale' }
     try {
       const uploaded = await uploadImageToBoardForBoard(localUpload.file, localUpload.boardId)
       if (
@@ -281,7 +302,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
         !options.getImageNodeSnapshot(nodeId)
       ) {
         releaseLocalUpload(nodeId)
-        return false
+        return { kind: 'stale' }
       }
       options.updateSnapshotNode(nodeId, (prev) => {
         if (prev.type !== 'image-node') return prev
@@ -298,14 +319,12 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
       })
       options.onNodeMutated?.(nodeId)
       releaseLocalUpload(nodeId)
-      options.onSuccess(i18n.global.t('canvas.session.imageNodeAdded'))
-      return true
+      return { kind: 'ready' }
     } catch (error) {
-      if (!isNodeUploadRequestCurrent(nodeId, requestId)) return false
+      if (!isNodeUploadRequestCurrent(nodeId, requestId)) return { kind: 'stale' }
       const message = userFacingErrorCopy(error, i18n.global.t('canvas.session.uploadFailed'))
       retainFailedLocalUpload(nodeId, message)
-      options.onWarning(message)
-      return false
+      return { kind: 'failed', message }
     } finally {
       if (isNodeUploadRequestCurrent(nodeId, requestId)) {
         nodeUploadRequests.delete(nodeId)
@@ -321,7 +340,9 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
     }
     const requestId = startNodeUploadRequest(nodeId)
     updateLocalUploadState(nodeId, { previewUrl: localUpload.previewUrl })
-    return materializeLocalUpload(nodeId, requestId)
+    const result = await materializeLocalUpload(nodeId, requestId)
+    if (result.kind === 'failed') options.onWarning(result.message)
+    return result.kind === 'ready'
   }
 
   function releaseDetachedLocalUploads(

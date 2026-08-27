@@ -5,6 +5,7 @@ import {
   type CanvasLibraryImportDescriptor,
 } from '../../library/libraryTransfer'
 import { useFlowCanvasDrop } from './useFlowCanvasDrop'
+import type { CanvasImageNodeCreationResult } from './useFlowImageUploadActions'
 
 function transfer(): DataTransfer {
   const values = new Map<string, string>()
@@ -34,8 +35,14 @@ const asset: CanvasLibraryImportDescriptor = {
 function createDropHarness() {
   const markDropAsCopy = vi.fn()
   const readDroppedFile = vi.fn(() => new File(['file'], 'upload.png', { type: 'image/png' }))
-  const createImageNodeFromFile = vi.fn(async () => 'image-1' as `image-${number}`)
+  const createImageNodeFromFile = vi.fn(
+    async (): Promise<CanvasImageNodeCreationResult | null> => ({
+      kind: 'ready',
+      nodeId: 'image-1',
+    }),
+  )
   const addLibraryAsset = vi.fn()
+  const onWarning = vi.fn()
   const screenToFlowCoordinate = vi.fn(({ x, y }: { x: number; y: number }) => ({
     x: x + 12,
     y: y + 18,
@@ -47,11 +54,19 @@ function createDropHarness() {
       readDropScreenPoint: (event) => ({ x: event.clientX, y: event.clientY }),
     },
     screenToFlowCoordinate,
-    onWarning: vi.fn(),
+    onWarning,
     createImageNodeFromFile,
     addLibraryAsset,
   })
-  return { drop, markDropAsCopy, readDroppedFile, createImageNodeFromFile, addLibraryAsset, screenToFlowCoordinate }
+  return {
+    addLibraryAsset,
+    createImageNodeFromFile,
+    drop,
+    markDropAsCopy,
+    onWarning,
+    readDroppedFile,
+    screenToFlowCoordinate,
+  }
 }
 
 describe('useFlowCanvasDrop', () => {
@@ -87,5 +102,23 @@ describe('useFlowCanvasDrop', () => {
     const harness = createDropHarness()
     harness.drop.onCanvasDragOver({ dataTransfer: transfer() } as unknown as DragEvent)
     expect(harness.markDropAsCopy).toHaveBeenCalled()
+  })
+
+  it('reports one upload warning when a dropped image is retained for retry', async () => {
+    const harness = createDropHarness()
+    harness.createImageNodeFromFile.mockResolvedValueOnce({
+      kind: 'awaiting-retry',
+      nodeId: 'image-1',
+      failureMessage: 'Upload failed.',
+    })
+
+    await harness.drop.onCanvasDrop({
+      clientX: 80,
+      clientY: 90,
+      dataTransfer: transfer(),
+    } as unknown as DragEvent)
+
+    expect(harness.onWarning).toHaveBeenCalledOnce()
+    expect(harness.onWarning).toHaveBeenCalledWith('Upload failed.')
   })
 })

@@ -102,7 +102,6 @@ describe('useFlowImageUploadActions', () => {
       getImageNodeSnapshot: (nodeId) => snapshots.get(nodeId) ?? null,
       uploadApi,
       onWarning: (msg) => warnings.push(msg),
-      onSuccess: vi.fn(),
       setLocalUploadState: vi.fn(),
     })
 
@@ -138,7 +137,6 @@ describe('useFlowImageUploadActions', () => {
       getImageNodeSnapshot: (nodeId) => snapshots.get(nodeId) ?? null,
       uploadApi: { upload: vi.fn().mockReturnValue(upload.promise) },
       onWarning: vi.fn(),
-      onSuccess: vi.fn(),
       setLocalUploadState: vi.fn(),
     })
 
@@ -167,7 +165,6 @@ describe('useFlowImageUploadActions', () => {
       getImageNodeSnapshot: vi.fn(),
       uploadApi: { upload: vi.fn().mockReturnValue(upload.promise) },
       onWarning: vi.fn(),
-      onSuccess: vi.fn(),
       setLocalUploadState: vi.fn(),
     })
 
@@ -215,13 +212,18 @@ describe('useFlowImageUploadActions', () => {
       getImageNodeSnapshot: (nodeId) => snapshots.get(nodeId) ?? null,
       uploadApi,
       onWarning: vi.fn(),
-      onSuccess: vi.fn(),
       setLocalUploadState: vi.fn(),
     })
     const file = makeFile('same.png')
 
-    await expect(actions.createImageNodeFromFile({ x: 10, y: 20 }, file)).resolves.toBe('image-1')
-    await expect(actions.createImageNodeFromFile({ x: 30, y: 40 }, file)).resolves.toBe('image-2')
+    await expect(actions.createImageNodeFromFile({ x: 10, y: 20 }, file)).resolves.toEqual({
+      kind: 'ready',
+      nodeId: 'image-1',
+    })
+    await expect(actions.createImageNodeFromFile({ x: 30, y: 40 }, file)).resolves.toEqual({
+      kind: 'ready',
+      nodeId: 'image-2',
+    })
 
     expect(uploadApi.upload).toHaveBeenCalledTimes(2)
     expect(createdUrls).toEqual(['', ''])
@@ -251,7 +253,6 @@ describe('useFlowImageUploadActions', () => {
       getImageNodeSnapshot: (nodeId) => snapshots.get(nodeId) ?? null,
       uploadApi: { upload: vi.fn().mockReturnValue(upload.promise) },
       onWarning: vi.fn(),
-      onSuccess: vi.fn(),
       createObjectUrl: vi.fn(() => 'blob:local-image'),
       revokeObjectUrl,
       setLocalUploadState: (_nodeId, state) => runtimeStates.push(state),
@@ -270,7 +271,7 @@ describe('useFlowImageUploadActions', () => {
       media_asset_id: 61,
     })
 
-    await expect(task).resolves.toBe('image-1')
+    await expect(task).resolves.toEqual({ kind: 'ready', nodeId: 'image-1' })
     expect(snapshots.get('image-1')).toMatchObject({
       sourceImageUrl: '/uploads/local.png',
       sourceMediaAssetId: 61,
@@ -285,6 +286,7 @@ describe('useFlowImageUploadActions', () => {
     const snapshots = new Map<string, ImageNodeItem>()
     const runtimeStates: Array<{ previewUrl: string; failureMessage?: string } | null> = []
     const revokeObjectUrl = vi.fn()
+    const onWarning = vi.fn()
     const actions = useFlowImageUploadActions({
       currentBoardId,
       createNodeAtPosition: vi.fn((_kind, _x, _y, patch) => {
@@ -307,8 +309,7 @@ describe('useFlowImageUploadActions', () => {
             media_asset_id: 62,
           }),
       },
-      onWarning: vi.fn(),
-      onSuccess: vi.fn(),
+      onWarning,
       createObjectUrl: vi.fn(() => 'blob:retry-image'),
       revokeObjectUrl,
       setLocalUploadState: (_nodeId, state) => runtimeStates.push(state),
@@ -316,11 +317,16 @@ describe('useFlowImageUploadActions', () => {
 
     await expect(
       actions.createImageNodeFromFile({ x: 10, y: 20 }, makeFile('retry.png')),
-    ).resolves.toBe('image-1')
+    ).resolves.toEqual({
+      kind: 'awaiting-retry',
+      nodeId: 'image-1',
+      failureMessage: 'Upload failed.',
+    })
     expect(runtimeStates).toEqual([
       { previewUrl: 'blob:retry-image' },
       { previewUrl: 'blob:retry-image', failureMessage: 'Upload failed.' },
     ])
+    expect(onWarning).not.toHaveBeenCalled()
     expect(revokeObjectUrl).not.toHaveBeenCalled()
 
     await expect(actions.retryLocalUpload('image-1')).resolves.toBe(true)
@@ -355,7 +361,6 @@ describe('useFlowImageUploadActions', () => {
       getImageNodeSnapshot: (nodeId) => snapshots.get(nodeId) ?? null,
       uploadApi: { upload: vi.fn().mockReturnValue(upload.promise) },
       onWarning: vi.fn(),
-      onSuccess: vi.fn(),
       createObjectUrl: vi.fn(() => 'blob:detached-image'),
       revokeObjectUrl,
       setLocalUploadState: vi.fn(),
@@ -391,7 +396,6 @@ describe('useFlowImageUploadActions', () => {
       getImageNodeSnapshot: vi.fn(),
       uploadApi: { upload: vi.fn() },
       onWarning: vi.fn(),
-      onSuccess: vi.fn(),
       setLocalUploadState: vi.fn(),
       createObjectUrl,
     })
@@ -420,7 +424,6 @@ describe('useFlowImageUploadActions', () => {
       getImageNodeSnapshot: vi.fn(),
       uploadApi: { upload: vi.fn().mockReturnValue(upload.promise) },
       onWarning: vi.fn(),
-      onSuccess: vi.fn(),
       setLocalUploadState: vi.fn(),
     })
 

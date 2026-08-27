@@ -28,6 +28,10 @@ export default {
   states: {
     failed: '失败',
   },
+  feedback: {
+    imageGenerated: '图片已生成',
+    imageGenerationFailed: '图片生成失败',
+  },
   homeHero: {
     tagline: 'AI CANVAS FOR VISUAL DESIGNERS',
     getStarted: '开始体验',
@@ -291,9 +295,10 @@ export default {
     addImageFailed: '添加图片失败，请刷新画布后重试。',
     duplicateImagesFailed: '复制图片失败，请刷新画布后重试。',
     noExportableImages: '所选节点中没有可导出的图片。',
+    exportingImages: '正在导出 {count} 张图片…',
+    exportQueued: '已加入导出队列：{count} 张',
+    exportPartiallyQueued: '已加入队列 {completed}/{total}，失败 {failed} 张',
     imageNodeMissing: '未找到图像节点。',
-    imageNodeInputUpdated: '图像节点输入已更新。',
-    imageNodeAdded: '已添加图像节点。',
     uploadStale: '上传结果已过期，请重新选择图片。',
     missingBoardIdUpload: '缺少画布 ID，无法上传图片。',
     missingBoardIdSave: '缺少画布 ID，无法保存。',

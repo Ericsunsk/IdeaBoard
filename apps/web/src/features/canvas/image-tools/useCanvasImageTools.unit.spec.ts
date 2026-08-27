@@ -14,6 +14,8 @@ import {
 import { IMAGE_STRENGTH_ACTIONS, type ImageStrengthAction } from '../execution'
 import type { UseCanvasImageToolsOptions } from './imageToolSession'
 import { useCanvasImageTools, type CanvasImageTools } from '.'
+import { i18n } from '../../../shared/i18n'
+import { loadLocaleMessages } from '../../../shared/i18n/userLocale'
 
 vi.mock('../image-editor/services/imageAdjustmentRenderer', async (importOriginal) => {
   const actual =
@@ -144,7 +146,7 @@ function mountCanvasImageTools() {
   )
   const connectionAdapter = { connectIntent: vi.fn(() => true) }
   const createImageNodeFromFile = vi.fn<UseCanvasImageToolsOptions['createImageNodeFromFile']>(
-    async () => 'image-3',
+    async () => ({ kind: 'ready', nodeId: 'image-3' }),
   )
   const setViewport = vi.fn()
   const setCenter = vi.fn()
@@ -256,6 +258,7 @@ async function flushPromises() {
 }
 
 afterEach(() => {
+  i18n.global.locale.value = 'en'
   vi.restoreAllMocks()
   cancelFinalRenderMock.mockReset()
   renderLayerStackFileMock.mockReset()
@@ -371,12 +374,80 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(harness.runtime.viewModel.adjustment.finalApplyProgress.value).toBeNull()
       expect(harness.feedback.warning).not.toHaveBeenCalled()
       expect(harness.feedback.succeeded).toHaveBeenCalledWith('Image generated')
+      expect(harness.feedback.succeeded).toHaveBeenCalledTimes(1)
       expect(harness.connectionAdapter.connectIntent).toHaveBeenCalledWith({
         sourceNodeId: 'image-1',
         sourcePort: 'image',
         targetNodeId: 'image-3',
         targetPort: 'image',
       })
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('reports one generation failure when the rendered image cannot be materialized', async () => {
+    renderLayerStackFileMock.mockResolvedValue(
+      new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
+    )
+    const harness = mountCanvasImageTools()
+    harness.createImageNodeFromFile.mockResolvedValueOnce({
+      kind: 'awaiting-retry',
+      nodeId: 'image-3',
+      failureMessage: 'Upload failed',
+    })
+
+    try {
+      prepareRenderableAdjustmentSession(harness.runtime)
+
+      await harness.runtime.commands.editor.apply()
+
+      expect(harness.feedback.warning).toHaveBeenCalledWith('Image generation failed')
+      expect(harness.feedback.warning).toHaveBeenCalledTimes(1)
+      expect(harness.feedback.succeeded).not.toHaveBeenCalled()
+      expect(harness.connectionAdapter.connectIntent).toHaveBeenCalledWith({
+        sourceNodeId: 'image-1',
+        sourcePort: 'image',
+        targetNodeId: 'image-3',
+        targetPort: 'image',
+      })
+      expect(harness.runtime.viewModel.active.mode.value).toBe('adjust')
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('reports one generation failure when rendering adjustments fails', async () => {
+    renderLayerStackFileMock.mockRejectedValueOnce(new Error('render failed'))
+    const harness = mountCanvasImageTools()
+
+    try {
+      prepareRenderableAdjustmentSession(harness.runtime)
+
+      await harness.runtime.commands.editor.apply()
+
+      expect(harness.feedback.warning).toHaveBeenCalledWith('Image generation failed')
+      expect(harness.feedback.warning).toHaveBeenCalledTimes(1)
+      expect(harness.feedback.succeeded).not.toHaveBeenCalled()
+      expect(harness.createImageNodeFromFile).not.toHaveBeenCalled()
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('uses the active locale for image adjustment terminal feedback', async () => {
+    await loadLocaleMessages('zh-CN')
+    ;(i18n.global.locale as { value: string }).value = 'zh-CN'
+    renderLayerStackFileMock.mockRejectedValueOnce(new Error('render failed'))
+    const harness = mountCanvasImageTools()
+
+    try {
+      prepareRenderableAdjustmentSession(harness.runtime)
+
+      await harness.runtime.commands.editor.apply()
+
+      expect(harness.feedback.warning).toHaveBeenCalledOnce()
+      expect(harness.feedback.warning).toHaveBeenCalledWith('图片生成失败')
     } finally {
       harness.unmount()
     }

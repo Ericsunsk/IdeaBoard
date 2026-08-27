@@ -1,10 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiResponseTaskData, Task } from './generated-query/model'
 import {
+  createTaskResultFailureError,
   TaskCancelledError,
   waitTaskImageResultsWithSse,
 } from './taskEvents'
 import { subscribeUserCreditsInvalidation } from '../query/userCreditsInvalidation'
+import { i18n } from '../i18n'
+import { loadLocaleMessages } from '../i18n/userLocale'
 
 const mocks = vi.hoisted(() => ({
   getTask: vi.fn(),
@@ -124,6 +127,22 @@ describe('waitTaskImageResultsWithSse', () => {
     vi.unstubAllGlobals()
     vi.clearAllMocks()
     MockEventSource.instances = []
+  })
+
+  afterEach(() => {
+    ;(i18n.global.locale as { value: string }).value = 'en'
+  })
+
+  it('uses the active locale for an empty task failure message', async () => {
+    await loadLocaleMessages('zh-CN')
+    ;(i18n.global.locale as { value: string }).value = 'zh-CN'
+
+    const error = createTaskResultFailureError({
+      error_msg: '',
+      execution_metrics: undefined,
+    })
+
+    expect(error.message).toBe('图片生成失败')
   })
 
   it('falls back to task polling when EventSource is unavailable', async () => {
