@@ -322,7 +322,6 @@ export default {
     networkError: 'network error',
     readImageSizeSkipCompression: 'Could not read the image size; skipped pre-upload compression',
     compressFallbackOriginal: 'Image compression failed; uploading the original image',
-    uploadUnstableUrl: 'Upload failed: the returned link is not a board canvas uploads URL of the current board.',
     unstableImageLink: 'Save failed: {path} uses an unstable image link. {reason}',
   },
 } as const

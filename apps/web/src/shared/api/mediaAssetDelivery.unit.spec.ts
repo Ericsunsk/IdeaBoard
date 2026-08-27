@@ -42,6 +42,11 @@ describe('useMediaAssetDelivery', () => {
     mocks.subscribe.mockReturnValue(vi.fn())
   })
 
+  it('resolves a stable API content URL for an asset', async () => {
+    const { resolveMediaAssetOriginalURL } = await import('./mediaAssetDelivery')
+    expect(resolveMediaAssetOriginalURL(42)).toBe('/api/user/media-assets/42/original/content')
+  })
+
   it('loads the selected tier and refreshes it from a media derivative event', async () => {
     mocks.request
       .mockResolvedValueOnce(metadata('pending'))

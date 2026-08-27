@@ -2,33 +2,64 @@ package imageformat
 
 import (
 	"fmt"
+	"image"
 	"io"
 	"mime/multipart"
 )
 
-// ValidateImageContent reads the first bytes of an uploaded file and verifies
-// the magic number matches the claimed extension. This prevents uploading
-// disguised files (e.g. an HTML file renamed to .png).
-func ValidateImageContent(fh *multipart.FileHeader, ext string) error {
-	normalizedExt, ok := NormalizeImageExtension(ext)
-	if !ok {
-		return fmt.Errorf("不支持的图片格式: %s", ext)
+// InspectFileHeader determines the image format from the uploaded bytes and
+// validates its dimensions. The filename extension is deliberately ignored:
+// multipart metadata is user-controlled and may be stale after content
+// negotiation or a client-side rename.
+func InspectFileHeader(fh *multipart.FileHeader) (Facts, error) {
+	if fh == nil {
+		return Facts{}, fmt.Errorf("文件内容不合法")
 	}
-
 	f, err := fh.Open()
 	if err != nil {
-		return fmt.Errorf("读取文件失败")
+		return Facts{}, fmt.Errorf("读取文件失败: %w", err)
 	}
 	defer f.Close()
-
-	signatures := imageSignaturesByExtension(normalizedExt)
-	buf := make([]byte, requiredImageHeaderLength(signatures))
-	n, err := f.Read(buf)
-	if err != nil || n < len(buf) {
-		return fmt.Errorf("文件内容不合法")
+	facts, err := InspectDetected(f)
+	if err != nil {
+		return Facts{}, err
 	}
+	// Go does not currently ship an AVIF pixel decoder in this service. Its
+	// container and dimension validation remains authoritative until a native
+	// decoder is introduced; all other accepted upload formats are fully decoded.
+	if facts.Extension != ".avif" {
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return Facts{}, fmt.Errorf("读取图片失败: %w", err)
+		}
+		if _, _, err := image.Decode(f); err != nil {
+			return Facts{}, fmt.Errorf("图片内容无法完整解码: %w", err)
+		}
+	}
+	return facts, nil
+}
 
-	return validateImageMagic(buf, normalizedExt)
+// InspectDetected detects the canonical format from the source bytes before
+// running the normal signature and image-config validation.
+func InspectDetected(source io.ReadSeeker) (Facts, error) {
+	if source == nil {
+		return Facts{}, fmt.Errorf("文件内容不合法")
+	}
+	if _, err := source.Seek(0, io.SeekStart); err != nil {
+		return Facts{}, fmt.Errorf("读取图片失败: %w", err)
+	}
+	header := make([]byte, 64*1024)
+	n, readErr := io.ReadFull(source, header)
+	if readErr != nil && readErr != io.EOF && readErr != io.ErrUnexpectedEOF {
+		return Facts{}, fmt.Errorf("读取图片失败: %w", readErr)
+	}
+	ext := DetectImageExtensionFromBytes(header[:n])
+	if ext == "" {
+		return Facts{}, fmt.Errorf("文件内容不合法")
+	}
+	if _, err := source.Seek(0, io.SeekStart); err != nil {
+		return Facts{}, fmt.Errorf("读取图片失败: %w", err)
+	}
+	return Inspect(source, ext)
 }
 
 // ValidateImageBytes verifies in-memory bytes match the allowed image extension.

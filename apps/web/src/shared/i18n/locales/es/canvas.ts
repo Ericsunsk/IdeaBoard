@@ -321,7 +321,6 @@ export default {
     networkError: 'error de red',
     readImageSizeSkipCompression: 'No se pudo leer el tamaño de la imagen; se omitió la compresión previa a la subida',
     compressFallbackOriginal: 'Falló la compresión de la imagen; subiendo la imagen original',
-    uploadUnstableUrl: 'Error al subir: el enlace devuelto no es una URL de subida válida del lienzo actual.',
     unstableImageLink: 'Error al guardar: {path} utiliza un enlace de imagen inestable. {reason}',
   },
 } as const

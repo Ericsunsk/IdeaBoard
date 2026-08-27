@@ -7,7 +7,7 @@ import {
   watch,
   type MaybeRefOrGetter,
 } from 'vue'
-import { resolveAssetUrl } from '../config/runtimeUrls'
+import { resolveApiUrl, resolveAssetUrl } from '../config/runtimeUrls'
 import { requireApiData } from './apiResponse'
 import { api } from './client'
 import { subscribeUserEvent } from './userEventStream'
@@ -172,7 +172,7 @@ export async function getMediaAssetMetadata(
 }
 
 export function resolveMediaAssetOriginalURL(assetId: number): string {
-	return getGetUserMediaAssetOriginalContentUrl(String(assetId))
+	return resolveApiUrl(getGetUserMediaAssetOriginalContentUrl(String(assetId)))
 }
 
 function normalizeTier(value: unknown): MediaAssetDeliveryTier {

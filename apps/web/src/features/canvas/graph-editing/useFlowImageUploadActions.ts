@@ -8,7 +8,7 @@ import {
   unsupportedUploadImageMessage,
 } from '../../../shared/utils/imageUploadSupport'
 import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
-import { canonicalizeRuntimeUploadRef } from '../../../shared/config/runtimeUrls'
+import { resolveMediaAssetOriginalURL } from '../../../shared/api/mediaAssetDelivery'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
 import { resolveImageNodeFrameSize } from '../../canvas-board/domain'
@@ -188,7 +188,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
         const resolvedRatio =
           preparedRatio ?? (serverRatio && serverRatio > 0 ? serverRatio : null) ?? 1
         return {
-          url: canonicalizeRuntimeUploadRef(uploaded.url),
+          url: resolveMediaAssetOriginalURL(mediaAssetId),
           ratio: resolvedRatio,
           mediaAssetId,
         }

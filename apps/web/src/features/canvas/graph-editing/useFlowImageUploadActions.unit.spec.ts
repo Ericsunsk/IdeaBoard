@@ -114,9 +114,11 @@ describe('useFlowImageUploadActions', () => {
     uploadA.resolve({ url: '/uploads/a.png', width: 100, height: 100, media_asset_id: 11 })
     await expect(firstUpload).resolves.toBe(false)
 
-    expect(snapshots.get('node-1')?.sourceImageUrl).toBe('/uploads/b.png')
+    expect(snapshots.get('node-1')?.sourceImageUrl).toBe(
+      '/api/user/media-assets/22/original/content',
+    )
     expect(snapshots.get('node-1')?.sourceMediaAssetId).toBe(22)
-    expect(updates).toEqual(['/uploads/b.png'])
+    expect(updates).toEqual(['/api/user/media-assets/22/original/content'])
     expect(warnings).toEqual([])
   })
 
@@ -273,7 +275,7 @@ describe('useFlowImageUploadActions', () => {
 
     await expect(task).resolves.toEqual({ kind: 'ready', nodeId: 'image-1' })
     expect(snapshots.get('image-1')).toMatchObject({
-      sourceImageUrl: '/uploads/local.png',
+      sourceImageUrl: '/api/user/media-assets/61/original/content',
       sourceMediaAssetId: 61,
       sourceImageRatio: 1,
     })
@@ -330,7 +332,9 @@ describe('useFlowImageUploadActions', () => {
     expect(revokeObjectUrl).not.toHaveBeenCalled()
 
     await expect(actions.retryLocalUpload('image-1')).resolves.toBe(true)
-    expect(snapshots.get('image-1')?.sourceImageUrl).toBe('/uploads/retried.png')
+    expect(snapshots.get('image-1')?.sourceImageUrl).toBe(
+      '/api/user/media-assets/62/original/content',
+    )
     expect(runtimeStates).toEqual([
       { previewUrl: 'blob:retry-image' },
       { previewUrl: 'blob:retry-image', failureMessage: 'Upload failed.' },

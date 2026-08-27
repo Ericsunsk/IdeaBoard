@@ -7,11 +7,13 @@ import {
 } from '../../canvas-board/domain'
 import { filenameFromImageUrl, isDataUrl, resolveFetchUrl } from '../services/flowMediaIO'
 import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
+import { resolveMediaAssetOriginalURL } from '../../../shared/api/mediaAssetDelivery'
 import { measureCanvasPerfAsync } from '../utils/canvasPerfProbe'
 
 interface StableRef {
   path: string
   get: () => string
+  getMediaAssetId?: () => number | undefined
   set: (url: string) => void
   setMediaAssetId?: (mediaAssetId: number) => void
 }
@@ -79,6 +81,7 @@ function appendImageItemRefs(
       refs.push({
         path: `${prefix}[${nodeIndex}].${collection}[${itemIndex}].url`,
         get: () => item.url,
+        getMediaAssetId: () => item.mediaAssetId,
         set: (url) => {
           item.url = url
         },
@@ -96,6 +99,7 @@ function collectStableRefs(snapshot: CanvasBoardSnapshot): StableRef[] {
     refs.push({
       path: `imageNodes[${index}].sourceImageUrl`,
       get: () => node.sourceImageUrl,
+      getMediaAssetId: () => node.sourceMediaAssetId,
       set: (url) => {
         node.sourceImageUrl = url
       },
@@ -135,15 +139,11 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
     const prepared = await prepareImageAssetForUpload(file)
     prepared.warnings.forEach((message) => warning(message))
     const uploaded = await uploadApi.upload(prepared.uploadFile, normalizedBoardId)
-    const stableUrl = uploaded.url.trim()
     const mediaAssetId = Number(uploaded.media_asset_id)
-    if (!stableUrl || !isStableCanvasUrl(stableUrl)) {
-      throw new Error(t('canvas.session.uploadUnstableUrl'))
-    }
     if (!Number.isInteger(mediaAssetId) || mediaAssetId <= 0) {
       throw new Error(t('canvas.session.uploadMissingMediaAsset'))
     }
-    return { url: stableUrl, mediaAssetId }
+    return { url: resolveMediaAssetOriginalURL(mediaAssetId), mediaAssetId }
   }
 
   async function fetchImageBlob(raw: string): Promise<Blob> {
@@ -204,6 +204,12 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
           const normalized = current.trim()
           if (!normalized) continue
           if (normalized !== current) ref.set(normalized)
+          const mediaAssetId = Number(ref.getMediaAssetId?.())
+          if (Number.isInteger(mediaAssetId) && mediaAssetId > 0) {
+            const stableUrl = resolveMediaAssetOriginalURL(mediaAssetId)
+            if (normalized !== stableUrl) ref.set(stableUrl)
+            continue
+          }
           if (isStableCanvasUrl(normalized)) continue
           unstableRefCount += 1
           const taskKey = `default::${normalized}`

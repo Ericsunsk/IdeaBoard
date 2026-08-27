@@ -19,7 +19,7 @@ describe('taskResult image result helpers', () => {
       }),
     ).toEqual([
       {
-        url: 'https://cdn.example.com/output.png',
+        url: '/api/user/media-assets/42/original/content',
         width: 1024,
         height: 768,
         mimeType: 'image/png',

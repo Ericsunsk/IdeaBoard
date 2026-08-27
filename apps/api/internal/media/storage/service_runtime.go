@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net/textproto"
 	"net/url"
 	"os"
 	"path"
@@ -88,6 +89,63 @@ func (s *StorageService) UploadRefWithOptions(ctx context.Context, file *multipa
 		return nil, err
 	}
 	return s.uploadRefWithProfile(ctx, *profile, file, opts)
+}
+
+// UploadRefAtProfile writes an upload through the immutable profile selected
+// during ingestion planning. This prevents an operator profile switch from
+// splitting the metadata record and object across different backends.
+func (s *StorageService) UploadRefAtProfile(ctx context.Context, profileID string, file *multipart.FileHeader, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	profile, err := s.resolveProfileByID(ctx, profileID)
+	if err != nil {
+		return nil, fmt.Errorf("读取媒体存储配置失败: %w", err)
+	}
+	return s.uploadRefWithProfile(ctx, *profile, file, opts)
+}
+
+// PrepareUploadRefFromFile inspects the actual multipart bytes before
+// generating an object key. It also canonicalizes the filename and MIME header
+// so every storage adapter receives metadata derived from the image itself.
+// Callers that need to register an ingestion before writing the object (for
+// example board uploads) should use this method instead of PrepareUploadRef.
+func (s *StorageService) PrepareUploadRefFromFile(ctx context.Context, file *multipart.FileHeader, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	profile, err := s.resolveActiveProfile(ctx)
+	if err != nil {
+		return nil, err
+	}
+	facts, err := canonicalizeMultipartImageWithFacts(file)
+	if err != nil {
+		return nil, err
+	}
+	key := strings.TrimSpace(opts.ObjectKey)
+	if key == "" {
+		key, err = buildObjectKey(opts.DirPrefix, facts.Extension)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		key = canonicalObjectKeyExtension(key, facts.Extension)
+	}
+	key, err = normalizeUploadObjectKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("上传对象路径无效: %w", err)
+	}
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return nil, err
+	}
+	publicURL, urlErr := adapter.ProviderURL(profile, key)
+	if urlErr != nil && profile.Provider == StorageProviderLocal {
+		publicURL = s.publicUploadURL(ctx, key)
+		urlErr = nil
+	}
+	if urlErr != nil {
+		return nil, urlErr
+	}
+	return &StoredUploadRef{
+		URL: publicURL, StorageKey: key, StorageProfile: profile.ID,
+		MIMEType: facts.MIMEType, Width: facts.Width, Height: facts.Height,
+		Animated: facts.Animated,
+	}, nil
 }
 
 func (s *StorageService) PrepareUploadRef(ctx context.Context, filename string, opts StorageStoreOptions) (*StoredUploadRef, error) {
@@ -619,11 +677,62 @@ func (s *StorageService) isProfileReady(profile StorageProfile) bool {
 }
 
 func (s *StorageService) uploadRefWithProfile(ctx context.Context, profile StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	facts, err := canonicalizeMultipartImageWithFacts(file)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(opts.ObjectKey) != "" {
+		opts.ObjectKey = canonicalObjectKeyExtension(opts.ObjectKey, facts.Extension)
+	}
 	adapter, err := s.adapterRegistry.get(profile.Provider)
 	if err != nil {
 		return nil, err
 	}
 	return adapter.UploadRef(ctx, &profile, file, opts)
+}
+
+func canonicalObjectKeyExtension(objectKey, ext string) string {
+	trimmed := strings.TrimSpace(objectKey)
+	if trimmed == "" || ext == "" {
+		return trimmed
+	}
+	base := path.Base(trimmed)
+	if base == "." || base == "" || base == ".." {
+		return trimmed
+	}
+	base = strings.TrimSuffix(base, path.Ext(base)) + ext
+	return path.Join(path.Dir(trimmed), base)
+}
+
+func canonicalizeMultipartImageWithFacts(file *multipart.FileHeader) (imageformat.Facts, error) {
+	facts, err := imageformat.InspectFileHeader(file)
+	if err != nil {
+		return imageformat.Facts{}, fmt.Errorf("图片校验失败: %w", err)
+	}
+	if file == nil {
+		return imageformat.Facts{}, fmt.Errorf("文件内容不合法")
+	}
+	file.Filename = canonicalStorageFilename(file.Filename, facts.Extension)
+	if file.Header == nil {
+		file.Header = make(textproto.MIMEHeader)
+	}
+	file.Header.Set("Content-Type", facts.MIMEType)
+	return facts, nil
+}
+
+func canonicalStorageFilename(filename, ext string) string {
+	base := strings.TrimSpace(filepath.Base(filename))
+	if base == "" || base == "." || base == string(filepath.Separator) {
+		base = "image"
+	}
+	oldExt := filepath.Ext(base)
+	if oldExt != "" {
+		base = strings.TrimSuffix(base, oldExt)
+	}
+	if base == "" {
+		base = "image"
+	}
+	return base + ext
 }
 
 func (s *StorageService) storeRemoteRefWithProfile(ctx context.Context, profile StorageProfile, remoteURL string, opts StorageStoreOptions) (*StoredUploadRef, error) {

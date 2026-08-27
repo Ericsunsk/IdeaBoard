@@ -183,7 +183,7 @@ describe('useCanvasGraphEditing', () => {
     expect(harness.upload).toHaveBeenCalledWith(expect.any(File), 'board-a')
     expect(snapshot).toMatchObject({
       title: 'picked.png',
-      sourceImageUrl: 'https://example.com/uploaded.png',
+      sourceImageUrl: '/api/user/media-assets/42/original/content',
       sourceMediaAssetId: 42,
       sourceImageRatio: 0.5,
       outputStatus: 'ready',
@@ -216,7 +216,7 @@ describe('useCanvasGraphEditing', () => {
     expect(promptSnapshot.inputImages).toEqual([
       expect.objectContaining({
         sourceType: 'external',
-        url: 'https://example.com/uploaded.png',
+        url: '/api/user/media-assets/42/original/content',
         mediaAssetId: 42,
       }),
     ])

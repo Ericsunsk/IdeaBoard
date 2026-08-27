@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"mime/multipart"
 	"strings"
 	"sync"
 
@@ -43,13 +42,6 @@ type uploadImageResponse struct {
 	Height       int    `json:"height,omitempty"`
 	Mime         string `json:"mime,omitempty"`
 	Ext          string `json:"ext,omitempty"`
-}
-
-type uploadImageMetadata struct {
-	Width  int
-	Height int
-	Mime   string
-	Ext    string
 }
 
 func acquireUploadSlot(ctx context.Context, provider settings.MediaUploadSettingProvider) (func(), bool) {
@@ -104,7 +96,7 @@ func uploadProfileAvatarHandler(h UploadDeps) gin.HandlerFunc {
 			response.Error(c, 400, "请选择文件")
 			return
 		}
-		ext, ok := validateUploadFileHeader(c, file, 30*1024*1024, imageformat.UploadAllowedImageExtensions())
+		_, ok = validateUploadFileHeader(c, file, 30*1024*1024, imageformat.UploadAllowedImageExtensions())
 		if !ok {
 			return
 		}
@@ -126,21 +118,21 @@ func uploadProfileAvatarHandler(h UploadDeps) gin.HandlerFunc {
 			response.InternalError(c, 500, "头像上传失败", err)
 			return
 		}
-		url, err := h.StorageService.UploadWithOptions(c.Request.Context(), file, storage.StorageStoreOptions{
+		stored, err := h.StorageService.UploadRefWithOptions(c.Request.Context(), file, storage.StorageStoreOptions{
 			DirPrefix: dirPrefix,
 		})
 		if err != nil {
 			response.InternalError(c, 500, "头像上传失败", err)
 			return
 		}
-		if err := h.UserRepo.UpdateAvatarByID(c.Request.Context(), userID, url); err != nil {
-			if cleanupErr := h.StorageService.DeleteProfileAvatarByURL(c.Request.Context(), user.StorageUID, url); cleanupErr != nil {
-				slog.Warn("cleanup uploaded avatar failed", "user_id", userID, "url", url, "err", cleanupErr)
+		if err := h.UserRepo.UpdateAvatarByID(c.Request.Context(), userID, stored.URL); err != nil {
+			if cleanupErr := h.StorageService.DeleteProfileAvatarByURL(c.Request.Context(), user.StorageUID, stored.URL); cleanupErr != nil {
+				slog.Warn("cleanup uploaded avatar failed", "user_id", userID, "url", stored.URL, "err", cleanupErr)
 			}
 			response.InternalError(c, 500, "头像上传失败", err)
 			return
 		}
-		response.SuccessDTO(c, newUploadImageResponse("avatar", url, file, ext))
+		response.SuccessDTO(c, newUploadImageResponseFromStored("avatar", stored))
 	}
 }
 
@@ -158,7 +150,7 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 			response.Error(c, 400, "请选择文件")
 			return
 		}
-		ext, ok := validateUploadFileHeader(c, file, 30*1024*1024, imageformat.UploadAllowedImageExtensions())
+		_, ok = validateUploadFileHeader(c, file, 30*1024*1024, imageformat.UploadAllowedImageExtensions())
 		if !ok {
 			return
 		}
@@ -198,7 +190,9 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 		storeOpts := storage.StorageStoreOptions{
 			DirPrefix: dirPrefix,
 		}
-		prepared, err := h.StorageService.PrepareUploadRef(c.Request.Context(), file.Filename, storeOpts)
+		// Inspect bytes before planning the Media Asset so the object key and
+		// metadata use the canonical format rather than the client filename.
+		prepared, err := h.StorageService.PrepareUploadRefFromFile(c.Request.Context(), file, storeOpts)
 		if err != nil {
 			response.InternalError(c, 500, "上传失败", err)
 			return
@@ -213,27 +207,45 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 			return
 		}
 		storeOpts.ObjectKey = prepared.StorageKey
-		stored, err := h.StorageService.UploadRefWithOptions(c.Request.Context(), file, storeOpts)
+		stored, err := h.StorageService.UploadRefAtProfile(c.Request.Context(), prepared.StorageProfile, file, storeOpts)
 		if err != nil {
 			_ = h.MediaAssets.Fail(context.WithoutCancel(c.Request.Context()), handle, err)
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
-		if meta, ok := decodeUploadImageMetadata(file, ext); ok {
-			stored.Width = meta.Width
-			stored.Height = meta.Height
-			stored.MIMEType = meta.Mime
-		}
+		stored.Width = prepared.Width
+		stored.Height = prepared.Height
+		stored.MIMEType = prepared.MIMEType
+		stored.Animated = prepared.Animated
 		if err := h.MediaAssets.Complete(c.Request.Context(), handle, stored.IngestionCompletion("")); err != nil {
 			_ = h.MediaAssets.Fail(context.WithoutCancel(c.Request.Context()), handle, err)
 			_ = h.StorageService.DeleteObjectByStorageProfile(context.WithoutCancel(c.Request.Context()), stored.StorageProfile, stored.StorageKey)
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
-		payload := newUploadImageResponse("url", stored.URL, file, ext)
+		payload := newUploadImageResponseFromStored("url", stored)
 		payload.MediaAssetID = handle.AssetID
 		response.SuccessDTO(c, payload)
 	}
+}
+
+func newUploadImageResponseFromStored(urlKey string, stored *storage.StoredUploadRef) uploadImageResponse {
+	payload := uploadImageResponse{}
+	if stored == nil {
+		return payload
+	}
+	if urlKey == "avatar" {
+		payload.Avatar = stored.URL
+	} else {
+		payload.URL = stored.URL
+	}
+	payload.Width = stored.Width
+	payload.Height = stored.Height
+	payload.Mime = stored.MIMEType
+	if ext := imageformat.ImageExtensionFromMIME(stored.MIMEType); ext != "" {
+		payload.Ext = strings.TrimPrefix(ext, ".")
+	}
+	return payload
 }
 
 func adminUploadHandler(storageService *storage.StorageService, uploadSettings settings.MediaUploadSettingProvider) gin.HandlerFunc {
@@ -250,7 +262,7 @@ func adminUploadHandler(storageService *storage.StorageService, uploadSettings s
 			response.Error(c, 400, "请选择文件")
 			return
 		}
-		ext, ok := validateUploadFileHeader(c, file, 50*1024*1024, imageformat.UploadAllowedImageExtensions())
+		_, ok = validateUploadFileHeader(c, file, 50*1024*1024, imageformat.UploadAllowedImageExtensions())
 		if !ok {
 			return
 		}
@@ -259,30 +271,13 @@ func adminUploadHandler(storageService *storage.StorageService, uploadSettings s
 			response.InternalError(c, 500, "上传失败", fmt.Errorf("storage service not configured"))
 			return
 		}
-		url, err := storageService.UploadWithOptions(c.Request.Context(), file, storage.StorageStoreOptions{
+		stored, err := storageService.UploadRefWithOptions(c.Request.Context(), file, storage.StorageStoreOptions{
 			DirPrefix: storage.SiteAssetUploadDirPrefix(),
 		})
 		if err != nil {
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
-		response.SuccessDTO(c, newUploadImageResponse("url", url, file, ext))
+		response.SuccessDTO(c, newUploadImageResponseFromStored("url", stored))
 	}
-}
-
-func newUploadImageResponse(urlKey string, url string, file *multipart.FileHeader, ext string) uploadImageResponse {
-	payload := uploadImageResponse{}
-	switch urlKey {
-	case "avatar":
-		payload.Avatar = url
-	default:
-		payload.URL = url
-	}
-	if meta, ok := decodeUploadImageMetadata(file, ext); ok {
-		payload.Width = meta.Width
-		payload.Height = meta.Height
-		payload.Mime = meta.Mime
-		payload.Ext = meta.Ext
-	}
-	return payload
 }

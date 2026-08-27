@@ -3,6 +3,9 @@ package imageformat
 import (
 	"bytes"
 	"encoding/base64"
+	"image"
+	"image/png"
+	"io"
 	"strings"
 	"testing"
 )
@@ -94,6 +97,34 @@ func TestAVIFIsAllowedAndDetectedFromBytes(t *testing.T) {
 		t.Fatalf("expected avif detection, got %q", ext)
 	}
 }
+
+func TestInspectDetectedHandlesShortReads(t *testing.T) {
+	var encoded bytes.Buffer
+	if err := png.Encode(&encoded, image.NewNRGBA(image.Rect(0, 0, 2, 2))); err != nil {
+		t.Fatalf("encode png: %v", err)
+	}
+
+	facts, err := InspectDetected(&shortReadSeeker{Reader: *bytes.NewReader(encoded.Bytes())})
+	if err != nil {
+		t.Fatalf("expected short-read seeker to pass, got %v", err)
+	}
+	if facts.Extension != ".png" || facts.Width != 2 || facts.Height != 2 {
+		t.Fatalf("unexpected facts: %+v", facts)
+	}
+}
+
+type shortReadSeeker struct {
+	bytes.Reader
+}
+
+func (r *shortReadSeeker) Read(p []byte) (int, error) {
+	if len(p) > 2 {
+		p = p[:2]
+	}
+	return r.Reader.Read(p)
+}
+
+var _ io.ReadSeeker = (*shortReadSeeker)(nil)
 
 const testAVIFBase64 = "AAAAHGZ0eXBhdmlmAAAAAG1pZjFhdmlmbWlhZgAAAOBtZXRhAAAAAAAAACFoZGxyAAAAAAAAAABwaWN0AAAAAAAAAAAAAAAAAAAAAA5waXRtAAAAAAABAAAAImlsb2MAAAAAREAAAQABAAAAAAEEAAEAAAAAAAAAoQAAACNpaW5mAAAAAAABAAAAFWluZmUCAAAAAAEAAGF2MDEAAAAAYGlwcnAAAABBaXBjbwAAAAxhdjFDgURsAAAAABRpc3BlAAAAAAAAAoAAAAHgAAAAEHBpeGkAAAAAAwwMDAAAAAlpcm90AwAAABdpcG1hAAAAAAAAAAEAAQSBAgOEAAAAqW1kYXQSAAoKWSYn/vsaAhoNwjKQAUSAAOOOOEC1G3sKlYvaVm9zmuFenT+Jbbn7wihWiZQajoFIfo9fh4ogJHXITkDBR1Dq0X1/+mpbBz3ACJDYZ/cdkT+Tog4zAuH5JO6h8O5xxC/1ohrvPJmFOvChzKzeihbRYfk7eGF78rRrgaBFwNV/2xfMnjYEDVp+M3L2T+hJEoZnwaHPrB4G8pfTHWmAUA=="
 

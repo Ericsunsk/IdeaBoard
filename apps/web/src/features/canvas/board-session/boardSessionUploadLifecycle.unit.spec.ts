@@ -121,11 +121,11 @@ describe('createBoardSessionUploadLifecycle', () => {
     }).stabilizeSnapshotForSave(snapshot)
 
     expect(snapshot.imageNodes[0]?.outputImages[0]).toMatchObject({
-      url: '/uploads/canvas/user-uid/board-a/content/image-output.png',
+      url: '/api/user/media-assets/201/original/content',
       mediaAssetId: 201,
     })
     expect(snapshot.fusionNodes[0]?.outputImages[0]).toMatchObject({
-      url: '/uploads/canvas/user-uid/board-a/content/fusion-output.png',
+      url: '/api/user/media-assets/202/original/content',
       mediaAssetId: 202,
     })
     expect(snapshot.mediaRefs).toEqual([
@@ -213,16 +213,56 @@ describe('createBoardSessionUploadLifecycle', () => {
     }).stabilizeSnapshotForSave(snapshot)
 
     expect(snapshot.promptNodes[0]?.inputImages[0]).toMatchObject({
-      url: '/uploads/canvas/user-uid/board-a/content/prompt-input.png',
+      url: '/api/user/media-assets/301/original/content',
       mediaAssetId: 301,
     })
     expect(snapshot.fusionNodes[0]?.inputImages[0]).toMatchObject({
-      url: '/uploads/canvas/user-uid/board-a/content/fusion-input.png',
+      url: '/api/user/media-assets/302/original/content',
       mediaAssetId: 302,
     })
     expect(snapshot.mediaRefs).toEqual([
       { mediaAssetId: 301, refType: 'board_node', refId: 'prompt-1', role: 'input:0' },
       { mediaAssetId: 302, refType: 'board_node', refId: 'fusion-2', role: 'input:0' },
     ])
+  })
+
+  it('rewrites an existing provider URL to the stable media asset content URL', async () => {
+    const snapshot = makeCanvasBoardSnapshot({
+      imageNodes: [
+        {
+          id: 1,
+          type: 'image-node',
+          x: 0,
+          y: 0,
+          width: 280,
+          sourceImageUrl: 'https://cdn.example.com/signed/source.png?expires=1',
+          sourceMediaAssetId: 401,
+          sourceImageRatio: 1,
+          outputStatus: 'ready',
+          outputImages: [
+            {
+              url: 'https://cdn.example.com/signed/output.png?expires=1',
+              mediaAssetId: 402,
+              ratio: 1,
+            },
+          ],
+        },
+      ],
+    })
+
+    await createBoardSessionUploadLifecycle({
+      userUid: 'user-uid',
+      boardId: 'board-a',
+      warning: vi.fn(),
+    }).stabilizeSnapshotForSave(snapshot)
+
+    expect(snapshot.imageNodes[0]).toMatchObject({
+      sourceImageUrl: '/api/user/media-assets/401/original/content',
+      sourceMediaAssetId: 401,
+    })
+    expect(snapshot.imageNodes[0]?.outputImages[0]).toMatchObject({
+      url: '/api/user/media-assets/402/original/content',
+      mediaAssetId: 402,
+    })
   })
 })

@@ -1,4 +1,5 @@
 import { resolveAssetUrl } from '../config/runtimeUrls'
+import { resolveMediaAssetOriginalURL } from '../api/mediaAssetDelivery'
 
 export type TaskImageResult = {
   url: string
@@ -72,12 +73,16 @@ function isSuccessfulTaskResult(parsed: unknown): boolean {
 }
 
 export function normalizeTaskImageResult(result: TaskImageResultInput): TaskImageResult | null {
-  const url = typeof result?.url === 'string' ? normalizeTaskImageUrl(result.url) : ''
+  const mediaAssetId = toPositiveInteger(result?.mediaAssetId)
+  const url = mediaAssetId
+    ? resolveMediaAssetOriginalURL(mediaAssetId)
+    : typeof result?.url === 'string'
+      ? normalizeTaskImageUrl(result.url)
+      : ''
   if (!url) return null
   const width = toPositiveNumber(result?.width)
   const height = toPositiveNumber(result?.height)
   const mimeType = `${result?.mimeType ?? ''}`.trim()
-  const mediaAssetId = toPositiveInteger(result?.mediaAssetId)
   const resultIndex = Number(result?.result_index ?? result?.resultIndex)
   const normalized: TaskImageResult = {
     url,

@@ -33,7 +33,7 @@ describe('flowImageDirectActionTaskResult', () => {
         loadImageSize,
       ),
     ).resolves.toMatchObject({
-      url: 'https://example.com/output.png',
+      url: '/api/user/media-assets/42/original/content',
       mediaAssetId: 42,
     })
   })

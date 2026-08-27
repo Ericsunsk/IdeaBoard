@@ -322,7 +322,6 @@ export default {
     networkError: '네트워크 오류',
     readImageSizeSkipCompression: '이미지 크기를 읽을 수 없어 업로드 전 압축을 건너뛰었습니다',
     compressFallbackOriginal: '이미지 압축에 실패하여 원본 이미지를 업로드합니다',
-    uploadUnstableUrl: '업로드 실패: 반환된 링크가 현재 보드의 캔버스 업로드 URL이 아닙니다.',
     unstableImageLink: '저장 실패: {path}에서 불안정한 이미지 링크를 사용하고 있습니다. {reason}',
   },
 } as const

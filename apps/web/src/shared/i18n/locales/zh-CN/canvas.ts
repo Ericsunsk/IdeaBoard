@@ -321,7 +321,6 @@ export default {
     networkError: '网络错误',
     readImageSizeSkipCompression: '无法读取图片尺寸，已跳过上传前压缩',
     compressFallbackOriginal: '图片压缩失败，正在上传原始图片',
-    uploadUnstableUrl: '上传失败：返回的链接不是当前画布的有效上传路径。',
     unstableImageLink: '保存失败：{path} 使用了不稳定的图片链接。{reason}',
   },
 } as const
