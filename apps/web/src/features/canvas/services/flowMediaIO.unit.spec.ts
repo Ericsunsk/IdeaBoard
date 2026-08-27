@@ -1,11 +1,25 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { filenameFromImageUrl, inferImageExtension, resolveFetchUrl } from './flowMediaIO'
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+  vi.resetModules()
+})
 
 describe('flow media URL resolution', () => {
   it('uses the same-origin upload proxy for local API upload URLs', () => {
     expect(
       resolveFetchUrl('http://localhost:6000/uploads/canvas/U123/board/content/image.png'),
     ).toBe('http://localhost:3000/uploads/canvas/U123/board/content/image.png')
+  })
+
+  it('fetches API media asset URLs directly instead of proxying them as external URLs', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.com/api')
+    vi.resetModules()
+    const { resolveFetchUrl: resolveConfiguredFetchUrl } = await import('./flowMediaIO')
+    const mediaAssetURL = 'https://api.example.com/api/user/media-assets/3/original/content'
+
+    expect(resolveConfiguredFetchUrl(mediaAssetURL)).toBe(mediaAssetURL)
   })
 
   it.each([

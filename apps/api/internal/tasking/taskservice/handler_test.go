@@ -487,7 +487,23 @@ func TestCheckSubmitTaskReadinessHandlerReturnsStructuredPricingUnavailableError
 				"params":           map[string]interface{}{"model": "gpt-image-1"},
 			}))
 
-			assertMachineErrorResponse(t, rec, http.StatusServiceUnavailable, "pricing_unavailable", "暂时无法获取报价，请重试")
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status=%d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+			}
+			var body struct {
+				Code int                         `json:"code"`
+				Msg  string                      `json:"msg"`
+				Data submitTaskReadinessResponse `json:"data"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if body.Code != 0 || body.Msg != "success" || body.Data.Ready ||
+				body.Data.ErrorCode != "pricing_unavailable" ||
+				body.Data.Message != "暂时无法获取报价，请重试" ||
+				body.Data.Feature != workflow.FeatureSlugPromptGeneration {
+				t.Fatalf("unexpected readiness response: %+v", body)
+			}
 		})
 	}
 }

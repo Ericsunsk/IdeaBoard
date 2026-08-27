@@ -981,17 +981,11 @@ paths:
               $ref: '#/components/schemas/SubmitTaskReadinessRequest'
       responses:
         '200':
-          description: OK
+          description: OK; unavailable optional features are represented by ready=false and error_code
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseTaskSubmitReadiness'
-        '503':
-          description: The readiness Quote cannot currently be resolved
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PricingUnavailableError'
   /user/tasks:
     get:
       tags: [Tasks]

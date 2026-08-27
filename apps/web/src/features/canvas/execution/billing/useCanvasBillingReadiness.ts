@@ -81,6 +81,7 @@ export function createCanvasBillingReadinessStore(
   const states = reactive(new Map<string, CanvasBillingQuoteState>())
   const pending = new Map<string, Promise<void>>()
   const loadedAt = new Map<string, number>()
+  const failedAt = new Map<string, number>()
 
   function resolveReadinessState(
     readiness: SubmitTaskReadinessData,
@@ -131,6 +132,7 @@ export function createCanvasBillingReadinessStore(
   function applyReadinessForKey(key: string, readiness: SubmitTaskReadinessData): void {
     const state = resolveReadinessState(readiness)
     if (!state) return
+    failedAt.delete(key)
     states.set(key, state)
     loadedAt.set(key, now())
   }
@@ -148,6 +150,8 @@ export function createCanvasBillingReadinessStore(
     } = {},
   ): Promise<void> {
     const stateKey = buildReadinessStateKey(feature, requestOptions.request)
+    const lastFailureAt = failedAt.get(stateKey)
+    if (lastFailureAt !== undefined && now() - lastFailureAt < cacheMs) return
     const lastLoadedAt = loadedAt.get(stateKey) ?? 0
     if (!requestOptions.force && lastLoadedAt > 0 && now() - lastLoadedAt < cacheMs) return
     const existing = pending.get(stateKey)
@@ -158,6 +162,9 @@ export function createCanvasBillingReadinessStore(
     const request = fetchReadiness(feature, requestOptions.request)
       .then((readiness) => applyReadinessForKey(stateKey, readiness))
       .catch(() => {
+        // Optional Billing/provider integrations can be intentionally unavailable.
+        // Cache the failure briefly so reactive quote consumers do not create a request storm.
+        failedAt.set(stateKey, now())
         states.set(stateKey, {
           feature,
           status: 'error',

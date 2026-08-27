@@ -136,7 +136,9 @@ function shouldProxyPreviewUrl(resolvedUrl: string): boolean {
   if (typeof window === 'undefined') return false
   if (!resolvedUrl.startsWith('http://') && !resolvedUrl.startsWith('https://')) return false
   try {
-    return new URL(resolvedUrl).origin !== window.location.origin
+    const resolvedOrigin = new URL(resolvedUrl).origin
+    const apiOrigin = new URL(USER_DOWNLOAD_ENDPOINT, window.location.origin).origin
+    return resolvedOrigin !== window.location.origin && resolvedOrigin !== apiOrigin
   } catch {
     return false
   }

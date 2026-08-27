@@ -6,7 +6,6 @@
   --canvas-chrome-icon-size: 19px;
   --canvas-chrome-presence-duration: var(--motion-enter-duration);
   --canvas-chrome-presence-easing: var(--motion-enter-easing);
-  --canvas-chrome-active-color: var(--canvas-accent);
   --canvas-chrome-z-index: 100;
   z-index: var(--canvas-chrome-z-index);
   opacity: 1;

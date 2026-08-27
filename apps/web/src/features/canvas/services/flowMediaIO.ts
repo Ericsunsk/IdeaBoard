@@ -58,6 +58,9 @@ export function resolveFetchUrl(
   ) {
     return url.toString()
   }
+  // API Media endpoints are authenticated resources. Keep them on the API
+  // origin instead of sending them through the remote-image download proxy.
+  if (isApiOrigin) return url.toString()
   if (isSameOrigin) return trimmed
   if (url.protocol === 'http:' || url.protocol === 'https:') {
     if (options?.blockExternal) return ''

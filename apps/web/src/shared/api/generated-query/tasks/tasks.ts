@@ -143,7 +143,7 @@ export const getCheckUserTaskSubmitReadinessQueryKey = (
 
 export const getCheckUserTaskSubmitReadinessQueryOptions = <
   TData = Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>,
-  TError = ErrorType<PricingUnavailableError>,
+  TError = ErrorType<unknown>,
 >(
   submitTaskRequest: MaybeRefOrGetter<SubmitTaskRequest>,
   options?: {
@@ -171,11 +171,11 @@ export const getCheckUserTaskSubmitReadinessQueryOptions = <
 export type CheckUserTaskSubmitReadinessQueryResult = NonNullable<
   Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>
 >
-export type CheckUserTaskSubmitReadinessQueryError = ErrorType<PricingUnavailableError>
+export type CheckUserTaskSubmitReadinessQueryError = ErrorType<unknown>
 
 export function useCheckUserTaskSubmitReadiness<
   TData = Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>,
-  TError = ErrorType<PricingUnavailableError>,
+  TError = ErrorType<unknown>,
 >(
   submitTaskRequest: MaybeRefOrGetter<SubmitTaskRequest>,
   options?: {

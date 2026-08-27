@@ -1,6 +1,7 @@
 <template>
   <Popover
     ref="popover"
+    unstyled
     :pt="searchSavePopoverPt"
     @show="handlePopoverShow"
     @hide="handlePopoverHide"
@@ -95,7 +96,6 @@ import type { SearchResult } from '../searchResource'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { createPopoverMotionPt } from '../../../shared/motion/popoverMotion'
-import { appOverlaySurfaceClass } from '../../../shared/theme/appOverlayMenu'
 import type { PopoverPassThroughOptions } from 'primevue/popover'
 import { useSearchLibraryCoordinator } from '../searchLibraryCoordinator'
 
@@ -114,8 +114,6 @@ type OpenRequest = SearchSavePopoverRequest & { event: Event; anchor: HTMLElemen
 type PrimePopover = {
   show: (event: Event, target?: HTMLElement) => void
   hide: () => void
-  $el?: HTMLElement
-  container?: HTMLElement
 }
 
 const emit = defineEmits<{
@@ -139,9 +137,9 @@ let pendingOpen: OpenRequest | null = null
 const searchSavePopoverPt = {
   ...createPopoverMotionPt(),
   root: {
-    class: `${appOverlaySurfaceClass} !rounded-[var(--radius-ib-control)] !p-1.5 !shadow-[var(--shadow-ib-overlay-menu)] !backdrop-blur-[var(--ib-glass-blur)]`,
+    class:
+      'search-save-popover ib-page-chrome-surface rounded-[var(--radius-ib-control)] p-1.5',
   },
-  content: { class: '!p-0' },
 } satisfies PopoverPassThroughOptions
 
 const quickSavesFolder = computed(() =>
@@ -188,20 +186,6 @@ async function loadFolders(): Promise<boolean> {
   return false
 }
 
-function positionPopoverAbove() {
-  const anchor = activeRequest.value?.anchor
-  const element = popover.value?.$el || popover.value?.container
-  if (!anchor || !anchor.isConnected || !element) return
-  const rect = anchor.getBoundingClientRect()
-  const popoverWidth = element.offsetWidth || 192
-  const popoverHeight = element.offsetHeight || 220
-  let left = Math.max(16, rect.right - popoverWidth)
-  if (left + popoverWidth > window.innerWidth - 16) left = window.innerWidth - popoverWidth - 16
-  const top = rect.top - popoverHeight - 8 < 70 ? rect.bottom + 8 : rect.top - popoverHeight - 8
-  element.style.setProperty('left', `${left}px`, 'important')
-  element.style.setProperty('top', `${top}px`, 'important')
-}
-
 function show(request: OpenRequest) {
   if (!request.anchor.isConnected) return
   activeRequest.value = request
@@ -210,10 +194,6 @@ function show(request: OpenRequest) {
   emit('anchor-changed', request.anchor)
   popover.value?.show(request.event, request.anchor)
   void loadFolders()
-  void nextTick(() => {
-    positionPopoverAbove()
-    requestAnimationFrame(positionPopoverAbove)
-  })
 }
 
 async function handleUnsave(request: SearchSavePopoverRequest) {
@@ -262,7 +242,6 @@ function toggle(event: Event, request: SearchSavePopoverRequest) {
 function handlePopoverShow() {
   searchQuery.value = ''
   void nextTick(() => {
-    positionPopoverAbove()
     searchInputRef.value?.focus()
   })
 }

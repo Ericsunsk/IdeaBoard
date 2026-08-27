@@ -125,19 +125,21 @@ func (h *Handler) CheckSubmitTaskReadiness(c *gin.Context) {
 	if err != nil {
 		slog.Warn("task submit readiness failed", "user_id", userID, "feature", req.Feature, "err", err)
 		if errors.Is(err, taskbilling.ErrPricingUnavailable) {
-			response.MachineError(c, http.StatusServiceUnavailable, "pricing_unavailable", "暂时无法获取报价，请重试")
+			response.SuccessDTO(c, submitTaskReadinessResponse{
+				Ready: false, Message: "暂时无法获取报价，请重试", ErrorCode: "pricing_unavailable", Feature: req.Feature,
+			})
 			return
 		}
 		if errors.Is(err, taskbilling.ErrWalletRestricted) {
-			response.SuccessDTO(c, submitTaskReadinessResponse{Ready: false, Message: "账户受限，暂时无法使用 Idea", ErrorCode: "wallet_restricted"})
+			response.SuccessDTO(c, submitTaskReadinessResponse{Ready: false, Message: "账户受限，暂时无法使用 Idea", ErrorCode: "wallet_restricted", Feature: req.Feature})
 			return
 		}
 		var submissionErr *SubmissionError
 		if errors.As(err, &submissionErr) {
-			response.SuccessDTO(c, submitTaskReadinessResponse{Ready: false, Message: submissionErr.SafeMessage, ErrorCode: submissionErr.Code})
+			response.SuccessDTO(c, submitTaskReadinessResponse{Ready: false, Message: submissionErr.SafeMessage, ErrorCode: submissionErr.Code, Feature: req.Feature})
 			return
 		}
-		response.SuccessDTO(c, submitTaskReadinessResponse{Ready: false, Message: userFacingSubmitError(err), ErrorCode: "submission_invalid"})
+		response.SuccessDTO(c, submitTaskReadinessResponse{Ready: false, Message: userFacingSubmitError(err), ErrorCode: "submission_invalid", Feature: req.Feature})
 		return
 	}
 	ready := readiness.Billing == nil || readiness.Billing.Sufficient

@@ -112,7 +112,6 @@
   --color-canvas-accent-clear: rgba(122, 107, 213, 0);
   --color-canvas-node-bg: var(--color-canvas-surface-bg);
   --color-canvas-node-border: #e8ecf4;
-  --color-canvas-track-bg: #eef2f5;
   --color-canvas-text-primary: #272932;
   --color-canvas-text-secondary: #64748b;
   --color-canvas-text-muted: #7b8798;
@@ -134,6 +133,7 @@
   --color-ib-page-chrome-color-disabled: var(--color-board-card-text);
   --color-ib-page-chrome-focus-ring: var(--color-board-focus-ring);
   --shadow-ib-page-chrome: none;
+  --spacing-ib-overlay-gutter: 10px;
   --color-ib-overlay-bg: rgba(255, 255, 255, 0.98);
   --color-ib-overlay-border: #d8ddea;
   --color-ib-overlay-item: #4b5565;

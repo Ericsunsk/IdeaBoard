@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { WORKFLOW_FEATURE, type WorkflowFeature } from '../../../../shared/domain/workflowFeatures'
-import type { SubmitTaskReadinessData } from '../../../../shared/api/task'
+import type {
+  SubmitTaskReadinessData,
+  SubmitTaskReadinessRequestData,
+} from '../../../../shared/api/task'
 import { createCanvasBillingReadinessStore } from './useCanvasBillingReadiness'
 
 function makeReadiness(
@@ -118,5 +121,29 @@ describe('canvas billing readiness store', () => {
       status: 'error',
       reason: 'Billing information is unavailable right now.',
     })
+  })
+
+  it('caches readiness failures to avoid repeated requests for the same dynamic quote', async () => {
+    let currentTime = 1_000
+    const fetchReadiness = vi.fn(async () => {
+      throw new Error('pricing is not configured')
+    })
+    const store = createCanvasBillingReadinessStore({
+      fetchReadiness,
+      now: () => currentTime,
+      cacheMs: 60_000,
+    })
+    const request: SubmitTaskReadinessRequestData = {
+      prompt: 'quote',
+      feature: WORKFLOW_FEATURE.cutout,
+    }
+
+    await store.ensureFeature(WORKFLOW_FEATURE.cutout, { request, force: true })
+    await store.ensureFeature(WORKFLOW_FEATURE.cutout, { request, force: true })
+    expect(fetchReadiness).toHaveBeenCalledOnce()
+
+    currentTime += 60_001
+    await store.ensureFeature(WORKFLOW_FEATURE.cutout, { request, force: true })
+    expect(fetchReadiness).toHaveBeenCalledTimes(2)
   })
 })

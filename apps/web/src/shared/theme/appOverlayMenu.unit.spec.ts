@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest'
 import {
   appOverlayMenuThemeClass,
   appOverlayMenuSurfaceClass,
-  appOverlaySurfaceClass,
   createAppOverlayMenuPt,
 } from './appOverlayMenu'
 
@@ -26,11 +25,10 @@ describe('App overlay menu contract', () => {
       expect(appStyles).toContain(token)
     }
 
-    expect(appOverlaySurfaceClass).toContain('var(--color-ib-overlay-border)')
-    expect(appOverlaySurfaceClass).toContain('var(--color-ib-overlay-bg)')
+    expect(appOverlayMenuSurfaceClass).toContain('var(--color-ib-overlay-border)')
+    expect(appOverlayMenuSurfaceClass).toContain('var(--color-ib-overlay-bg)')
     expect(appOverlayMenuThemeClass).toContain('var(--color-ib-overlay-item)')
     expect(appOverlayMenuThemeClass).toContain('var(--color-ib-overlay-danger)')
-    expect(appOverlayMenuSurfaceClass).toContain(appOverlaySurfaceClass)
     expect(appOverlayMenuSurfaceClass).toContain(appOverlayMenuThemeClass)
     expect(createAppOverlayMenuPt('test').root).toEqual({
       class: expect.stringContaining('var(--shadow-ib-overlay-menu)'),

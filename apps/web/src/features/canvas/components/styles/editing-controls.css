@@ -15,16 +15,13 @@
     --node-tool-border-width,
     var(--canvas-control-border-width)
   );
-  --editing-controls-row-height: 31px;
   --editing-controls-control-height: var(--canvas-control-size-sm);
   --editing-controls-compact-control-height: calc(var(--editing-controls-control-height) - 4px);
   --editing-controls-control-radius: var(--canvas-radius-md);
   --editing-controls-control-border-color: var(--canvas-accent-border);
   --editing-controls-control-hover-border-color: var(--canvas-accent);
   --editing-controls-control-focus-border-color: var(--ib-focus-border-color);
-  --editing-controls-control-active-border-color: var(--canvas-accent);
   --editing-controls-control-bg: var(--canvas-surface-muted);
-  --editing-controls-control-active-bg: var(--canvas-node-accent-soft);
   --editing-controls-content-gap: var(--canvas-panel-content-gap);
   --editing-controls-text-size: var(--canvas-font-size-caption);
   --editing-controls-meta-text-size: var(--canvas-font-size-micro);

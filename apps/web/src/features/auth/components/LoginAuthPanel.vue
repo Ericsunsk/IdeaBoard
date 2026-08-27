@@ -36,7 +36,8 @@
             <img
               v-if="providerLogoUrls[provider]"
               :src="providerLogoUrls[provider]"
-              :class="provider === 'discord' ? 'size-5 scale-[1.12]' : 'size-5'"
+              class="size-5"
+              :class="provider === 'discord' ? 'scale-[1.12]' : ''"
               alt=""
               aria-hidden="true"
             />

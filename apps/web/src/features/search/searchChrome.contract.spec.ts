@@ -23,13 +23,20 @@ describe('Search page chrome contract', () => {
     expect(searchPage).toContain('hover:border-[var(--color-ib-page-chrome-border-hover)]')
   })
 
-  it('uses the shared overlay surface while retaining Search popover treatment', () => {
-    expect(searchSavePopover).toContain(
-      "import { appOverlaySurfaceClass } from '../../../shared/theme/appOverlayMenu'",
-    )
-    expect(searchSavePopover).toContain('`${appOverlaySurfaceClass}')
-    expect(searchSavePopover).toContain('!rounded-[var(--radius-ib-control)]')
-    expect(searchSavePopover).toContain('!shadow-[var(--shadow-ib-overlay-menu)]')
-    expect(searchSavePopover).toContain('!backdrop-blur-[var(--ib-glass-blur)]')
+  it('uses the shared page chrome surface while retaining Search popover treatment', () => {
+    expect(searchSavePopover).toContain('<Popover')
+    expect(searchSavePopover).toContain('unstyled')
+    expect(searchSavePopover).toContain('ib-page-chrome-surface')
+    expect(searchSavePopover).toContain('search-save-popover')
+    expect(searchSavePopover).toContain('rounded-[var(--radius-ib-control)]')
+    expect(searchSavePopover).not.toContain("content: { class: '!p-0' }")
+    expect(searchSavePopover).not.toContain('before:!hidden after:!hidden')
+  })
+
+  it('keeps the overlay gutter in CSS so PrimeVue can re-align safely', () => {
+    expect(searchStyles).toContain('.search-save-popover')
+    expect(searchStyles).toContain('margin-block-start: var(--spacing-ib-overlay-gutter)')
+    expect(searchStyles).toContain("[data-p-popover-flipped='true']")
+    expect(searchSavePopover).not.toContain('positionPopoverAbove')
   })
 })

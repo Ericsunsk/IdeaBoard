@@ -58,7 +58,6 @@ body.canvas-overscroll-guard {
   --canvas-tooltip-text: var(--color-canvas-tooltip-text);
   --canvas-node-bg: var(--color-canvas-node-bg);
   --canvas-node-border: var(--color-canvas-node-border);
-  --canvas-track-bg: var(--color-canvas-track-bg);
   --canvas-accent: var(--color-canvas-accent);
   --canvas-accent-hover: var(--color-canvas-accent-hover);
   --canvas-accent-strong: #6757c8;
