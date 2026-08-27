@@ -190,6 +190,25 @@ func (r *MediaAssetRegistry) GetByID(ctx context.Context, ownerUserID, assetID i
 	return r.q.GetMediaAssetByIDForOwner(ctx, dbsqlc.GetMediaAssetByIDForOwnerParams{ID: assetID, OwnerUserID: ownerUserID})
 }
 
+// FindReadyOwnedMediaAssetByChecksum returns an existing ready asset for the
+// same owner, storage profile, and content digest. Restricting the profile
+// keeps the returned URL valid when operators switch storage backends.
+func (r *MediaAssetRegistry) FindReadyOwnedMediaAssetByChecksum(ctx context.Context, ownerUserID int64, storageProfileID, checksum string) (dbsqlc.MediaAsset, bool, error) {
+	if r == nil || r.q == nil || ownerUserID <= 0 || strings.TrimSpace(storageProfileID) == "" || strings.TrimSpace(checksum) == "" {
+		return dbsqlc.MediaAsset{}, false, fmt.Errorf("invalid media checksum lookup")
+	}
+	asset, err := r.q.FindReadyOwnedMediaAssetByChecksum(ctx, dbsqlc.FindReadyOwnedMediaAssetByChecksumParams{
+		OwnerUserID: ownerUserID, StorageProfileID: strings.TrimSpace(storageProfileID), ChecksumSha256: strings.TrimSpace(checksum),
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return dbsqlc.MediaAsset{}, false, nil
+	}
+	if err != nil {
+		return dbsqlc.MediaAsset{}, false, fmt.Errorf("find media asset by checksum: %w", err)
+	}
+	return asset, true, nil
+}
+
 func (r *MediaAssetRegistry) ListDerivatives(ctx context.Context, ownerUserID, assetID int64) ([]dbsqlc.MediaDerivative, error) {
 	if r == nil || r.q == nil || ownerUserID <= 0 || assetID <= 0 {
 		return nil, fmt.Errorf("invalid media derivative lookup")

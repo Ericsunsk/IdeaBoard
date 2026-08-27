@@ -477,6 +477,19 @@ Rewards 没有 Feature Flag。发生需要立即停止兑换或管理写入的�
 <a id="upgrade-and-rollback"></a>
 ## 升级与回滚
 
+### Media storage cutover
+
+Media 统一使用 `media_assets.storage_profile_id` + `storage_key` 作为对象定位；业务表和 Canvas 只持久化 Media Asset API URL。切换 Local / S3-compatible profile 时按以下顺序执行：
+
+1. 先确认目标 profile 已通过 Admin storage test，并在隔离对象上完成 upload、read、公开 URL 和 delete smoke；确认 API 与 Web 使用同一 release manifest。
+2. 部署 API/Worker 与 Web；等待 health、River 和 derivative worker 全部 ready，再在 Admin 中 Apply 目标 storage profile。不要先手工移动 `/uploads` 文件或直接改数据库中的 `storage_key`。
+3. 用真实用户流程验证 Canvas upload/reload、Admin logo、avatar、task output 和 Library materialization；再运行 `docker exec ideaboard-api /app/ideaboard-server media-reclamation scan`，记录 `stale_uploading_assets`、`orphan_assets`、`pending_deletion_assets` 与 derivative counters。
+4. 切换后保留原 profile 及其对象至少一个 `GracePeriod`（当前 24 小时），只允许通过 Media reclamation worker 删除已确认无引用对象。确认稳定后再由 Admin 禁用旧 profile。
+
+失败时先在 Admin Apply 上一个已验证 profile，并执行 API/Web smoke；不要回滚数据库或删除对象。若失败发生在 migration 之后，按本节 image rollback + backup 评估流程处理，Media Asset 的 profile/key 记录仍是事实源。
+
+对象 orphan 检查必须以数据库引用反查 provider listing：分别导出 `media_assets` 中未删除对象和 `media_derivatives` 中 `ready` 对象的 `(storage_profile_id, storage_key)`，与各 profile 的 object listing 做集合差异；差异对象先标记、观察一个 `GracePeriod`，禁止直接批量删除。Local profile 通过挂载的 `api-uploads` volume 只读扫描，S3-compatible profile 使用 provider CLI/API 的 prefix listing；扫描输出不得包含 access key、signed URL 或用户内容。
+
 升级：
 
 ```bash

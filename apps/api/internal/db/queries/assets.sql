@@ -457,3 +457,18 @@ WHERE media_assets.id = sqlc.arg(id)
     WHERE ref.media_asset_id = media_assets.id
       AND ref.ref_type IN ('board', 'board_node', 'task_input')
   );
+
+-- name: FindReadyOwnedMediaAssetByChecksum :one
+SELECT id, asset_id, owner_user_id, storage_profile_id, storage_key,
+  url, source_url, media_kind, mime_type, width, height, size_bytes, checksum_sha256,
+  status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
+  reclaim_claim_token, reclaim_generation
+FROM media_assets
+WHERE owner_user_id = sqlc.arg(owner_user_id)
+  AND storage_profile_id = sqlc.arg(storage_profile_id)
+  AND checksum_sha256 = sqlc.arg(checksum_sha256)
+  AND checksum_sha256 <> ''
+  AND status = 'ready'
+  AND deleted_at IS NULL
+ORDER BY id ASC
+LIMIT 1;

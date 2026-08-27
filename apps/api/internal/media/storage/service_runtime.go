@@ -116,6 +116,10 @@ func (s *StorageService) PrepareUploadRefFromFile(ctx context.Context, file *mul
 	if err != nil {
 		return nil, err
 	}
+	checksum, err := checksumMultipartFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("读取上传文件 checksum 失败: %w", err)
+	}
 	key := strings.TrimSpace(opts.ObjectKey)
 	if key == "" {
 		key, err = buildObjectKey(opts.DirPrefix, facts.Extension)
@@ -144,8 +148,29 @@ func (s *StorageService) PrepareUploadRefFromFile(ctx context.Context, file *mul
 	return &StoredUploadRef{
 		URL: publicURL, StorageKey: key, StorageProfile: profile.ID,
 		MIMEType: facts.MIMEType, Width: facts.Width, Height: facts.Height,
-		Animated: facts.Animated,
+		SizeBytes: file.Size, ChecksumSHA256: checksum, Animated: facts.Animated,
 	}, nil
+}
+
+// checksumMultipartFile hashes the source before any object is written. It
+// opens an independent multipart reader, leaving adapter upload state intact.
+func checksumMultipartFile(file *multipart.FileHeader) (string, error) {
+	if file == nil {
+		return "", fmt.Errorf("文件内容不合法")
+	}
+	src, err := file.Open()
+	if err != nil {
+		return "", err
+	}
+	defer src.Close()
+	if _, err := src.Seek(0, io.SeekStart); err != nil {
+		return "", err
+	}
+	hash := sha256.New()
+	if err := copyExactWithStorageBuffer(hash, src, file.Size); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
 func (s *StorageService) PrepareUploadRef(ctx context.Context, filename string, opts StorageStoreOptions) (*StoredUploadRef, error) {
@@ -769,13 +794,15 @@ func (s *StorageService) saveUploadedFileLocalRef(ctx context.Context, file *mul
 }
 
 func (s *StorageService) saveBytesLocalRef(ctx context.Context, filename string, data []byte, opts StorageStoreOptions) (*StoredUploadRef, error) {
-	ref, err := s.saveReaderLocalRef(ctx, filename, inferStoredUploadContentType(filename, data), bytes.NewReader(data), int64(len(data)), opts)
-	if err != nil {
-		return nil, err
-	}
-	facts, err := imageformat.InspectBytes(data, filepath.Ext(filename))
+	facts, err := imageformat.InspectDetectedBytes(data)
 	if err != nil {
 		return nil, fmt.Errorf("读取图片信息失败: %w", err)
+	}
+	filename = canonicalStorageFilename(filename, facts.Extension)
+	opts.ObjectKey = canonicalObjectKeyExtension(opts.ObjectKey, facts.Extension)
+	ref, err := s.saveReaderLocalRef(ctx, filename, facts.MIMEType, bytes.NewReader(data), int64(len(data)), opts)
+	if err != nil {
+		return nil, err
 	}
 	ref.Width = facts.Width
 	ref.Height = facts.Height
@@ -1147,16 +1174,11 @@ func (s *StorageService) downloadRemoteFileWithLimit(ctx context.Context, remote
 		return nil, fmt.Errorf("远程文件超过大小限制 (%d MB)", maxSize/1024/1024)
 	}
 
-	ext := strings.ToLower(path.Ext(strings.Split(remoteURL, "?")[0]))
-	if normalized, ok := imageformat.NormalizeImageExtension(ext); ok {
-		ext = normalized
-	} else {
-		ext = imageformat.ImageExtensionFromMIME(resp.Header.Get("Content-Type"))
-	}
-	if ext == "" {
-		return nil, fmt.Errorf("仅支持 %s 图片", imageformat.SupportedUploadImageLabel())
-	}
-	facts, err := imageformat.Inspect(tmpFile, ext)
+	// The remote URL and Content-Type are advisory only. Providers commonly
+	// return a negotiated format under a stale filename (for example a JPEG at
+	// a `.png` URL), so derive the canonical extension from the bytes before
+	// constructing the managed object key.
+	facts, err := imageformat.InspectDetected(tmpFile)
 	if err != nil {
 		return nil, fmt.Errorf("远程图片校验失败: %w", err)
 	}
@@ -1164,7 +1186,7 @@ func (s *StorageService) downloadRemoteFileWithLimit(ctx context.Context, remote
 		return nil, fmt.Errorf("读取临时文件失败: %w", err)
 	}
 
-	filename := fmt.Sprintf("remote_%d%s", time.Now().UnixNano(), ext)
+	filename := fmt.Sprintf("remote_%d%s", time.Now().UnixNano(), facts.Extension)
 	cleanupTemp = false
 	return &remoteImageFile{
 		Filename:    filename,

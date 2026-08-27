@@ -39,6 +39,9 @@ CREATE INDEX idx_media_assets_owner_status ON media_assets (owner_user_id, statu
 CREATE INDEX idx_media_assets_owner_active_updated ON media_assets (owner_user_id, updated_at DESC, id DESC) WHERE deleted_at IS NULL;
 CREATE INDEX idx_media_assets_storage_key ON media_assets (storage_profile_id, storage_key);
 CREATE INDEX idx_media_assets_reclamation_due ON media_assets (reclaim_after, id) WHERE deleted_at IS NULL AND reclaim_after IS NOT NULL;
+CREATE UNIQUE INDEX uq_media_assets_owned_checksum
+  ON media_assets (owner_user_id, storage_profile_id, checksum_sha256)
+  WHERE checksum_sha256 <> '' AND status = 'ready' AND deleted_at IS NULL;
 
 -- Media lineage is intentionally metadata-only for now. It records where an
 -- asset came from without introducing a Media Transformation execution model.

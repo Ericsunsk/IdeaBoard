@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -414,14 +413,15 @@ func (s *S3CompatibleService) UploadRefWithConfig(ctx context.Context, file *mul
 }
 
 func (s *S3CompatibleService) uploadBytesWithConfigRef(ctx context.Context, filename string, data []byte, cfg *S3CompatibleConfig, opts StorageStoreOptions) (*StoredUploadRef, error) {
-	contentType := inferStoredUploadContentType(filename, data)
-	ref, err := s.uploadReaderWithConfigRef(ctx, filename, contentType, bytes.NewReader(data), int64(len(data)), cfg, opts)
-	if err != nil {
-		return nil, err
-	}
-	facts, err := imageformat.InspectBytes(data, filepath.Ext(filename))
+	facts, err := imageformat.InspectDetectedBytes(data)
 	if err != nil {
 		return nil, fmt.Errorf("读取图片信息失败: %w", err)
+	}
+	filename = canonicalStorageFilename(filename, facts.Extension)
+	opts.ObjectKey = canonicalObjectKeyExtension(opts.ObjectKey, facts.Extension)
+	ref, err := s.uploadReaderWithConfigRef(ctx, filename, facts.MIMEType, bytes.NewReader(data), int64(len(data)), cfg, opts)
+	if err != nil {
+		return nil, err
 	}
 	ref.Width = facts.Width
 	ref.Height = facts.Height

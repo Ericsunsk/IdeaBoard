@@ -3,6 +3,8 @@ package storage
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"image"
 	"image/png"
 	"mime/multipart"
@@ -48,6 +50,44 @@ func TestMultipartUploadUsesDetectedFormatForKeyAndMetadata(t *testing.T) {
 		t.Fatalf("stored metadata = %+v", stored)
 	}
 	if _, err := os.Stat(filepath.FromSlash(stored.StorageKey)); err != nil {
+		t.Fatalf("stored object missing: %v", err)
+	}
+}
+
+func TestChecksumMultipartFileMatchesPayload(t *testing.T) {
+	payload := []byte("deduplicated-media-payload")
+	file := multipartHeader(t, "client.png", payload)
+	checksum, err := checksumMultipartFile(file)
+	if err != nil {
+		t.Fatalf("checksum upload: %v", err)
+	}
+	expectedBytes := sha256.Sum256(payload)
+	if checksum != hex.EncodeToString(expectedBytes[:]) {
+		t.Fatalf("checksum = %q, want %q", checksum, hex.EncodeToString(expectedBytes[:]))
+	}
+}
+
+func TestStoreBytesUsesDetectedFormatForKeyAndMetadata(t *testing.T) {
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get cwd: %v", err)
+	}
+	tmpDir := t.TempDir()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(originalWD) })
+
+	payload := tinyPNGBytes(t)
+	service := NewStorageService(nil, nil)
+	ref, err := service.saveBytesLocalRef(context.Background(), "provider.jpg", payload, StorageStoreOptions{ObjectKey: "uploads/tasks/1/result.jpg"})
+	if err != nil {
+		t.Fatalf("store bytes: %v", err)
+	}
+	if ref.MIMEType != "image/png" || !strings.HasSuffix(ref.StorageKey, ".png") {
+		t.Fatalf("stored metadata = %+v, want canonical PNG", ref)
+	}
+	if _, err := os.Stat(filepath.FromSlash(ref.StorageKey)); err != nil {
 		t.Fatalf("stored object missing: %v", err)
 	}
 }

@@ -77,8 +77,8 @@ func TestStoreRemoteRefLocalSavesImageAndCleansTempFile(t *testing.T) {
 	defer server.Close()
 
 	service, _ := newStorageServiceTest(t)
-	stored, err := service.StoreRemoteRef(context.Background(), server.URL+"/image.png?token=secret", StorageStoreOptions{
-		AllowHosts: []string{server.URL},
+	stored, err := service.StoreRemoteRef(context.Background(), server.URL+"/image.jpg?token=secret", StorageStoreOptions{
+		AllowHosts: []string{server.URL}, ObjectKey: "uploads/remote/image.jpg",
 	})
 	if err != nil {
 		t.Fatalf("StoreRemoteRef returned error: %v", err)
@@ -126,19 +126,20 @@ func TestLocalStoredUploadURLUsesConfiguredAPIOrigin(t *testing.T) {
 	}
 }
 
-func TestDownloadRemoteFileInfersExtensionFromContentType(t *testing.T) {
+func TestDownloadRemoteFileDetectsExtensionFromBytes(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("TMPDIR", tmpDir)
 
 	imageBytes := tinyPNGBytes(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "image/png")
+		// Both URL and response metadata deliberately disagree with the bytes.
+		w.Header().Set("Content-Type", "image/jpeg")
 		_, _ = w.Write(imageBytes)
 	}))
 	defer server.Close()
 
 	service := &StorageService{}
-	remoteFile, err := service.downloadRemoteFile(context.Background(), server.URL+"/image", []string{server.URL})
+	remoteFile, err := service.downloadRemoteFile(context.Background(), server.URL+"/image.jpg", []string{server.URL})
 	if err != nil {
 		t.Fatalf("downloadRemoteFile returned error: %v", err)
 	}

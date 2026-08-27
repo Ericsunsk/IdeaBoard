@@ -77,6 +77,7 @@ type Querier interface {
 	FindIngestingPreparedGenerationMedia(ctx context.Context, arg FindIngestingPreparedGenerationMediaParams) (FindIngestingPreparedGenerationMediaRow, error)
 	FindMediaAssetStorageLocationByURL(ctx context.Context, url string) (FindMediaAssetStorageLocationByURLRow, error)
 	FindPreparedGenerationMedia(ctx context.Context, arg FindPreparedGenerationMediaParams) (FindPreparedGenerationMediaRow, error)
+	FindReadyOwnedMediaAssetByChecksum(ctx context.Context, arg FindReadyOwnedMediaAssetByChecksumParams) (MediaAsset, error)
 	FindReadyOwnedMediaAssetIDByURL(ctx context.Context, arg FindReadyOwnedMediaAssetIDByURLParams) (int64, error)
 	FinishRunningTaskAttemptsByTaskIDs(ctx context.Context, arg FinishRunningTaskAttemptsByTaskIDsParams) (int64, error)
 	FinishTaskAttempt(ctx context.Context, arg FinishTaskAttemptParams) (int64, error)

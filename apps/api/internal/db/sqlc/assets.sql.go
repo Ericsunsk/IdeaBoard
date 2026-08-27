@@ -547,6 +547,58 @@ func (q *Queries) FindPreparedGenerationMedia(ctx context.Context, arg FindPrepa
 	return i, err
 }
 
+const findReadyOwnedMediaAssetByChecksum = `-- name: FindReadyOwnedMediaAssetByChecksum :one
+SELECT id, asset_id, owner_user_id, storage_profile_id, storage_key,
+  url, source_url, media_kind, mime_type, width, height, size_bytes, checksum_sha256,
+  status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
+  reclaim_claim_token, reclaim_generation
+FROM media_assets
+WHERE owner_user_id = $1
+  AND storage_profile_id = $2
+  AND checksum_sha256 = $3
+  AND checksum_sha256 <> ''
+  AND status = 'ready'
+  AND deleted_at IS NULL
+ORDER BY id ASC
+LIMIT 1
+`
+
+type FindReadyOwnedMediaAssetByChecksumParams struct {
+	OwnerUserID      int64  `json:"owner_user_id"`
+	StorageProfileID string `json:"storage_profile_id"`
+	ChecksumSha256   string `json:"checksum_sha256"`
+}
+
+func (q *Queries) FindReadyOwnedMediaAssetByChecksum(ctx context.Context, arg FindReadyOwnedMediaAssetByChecksumParams) (MediaAsset, error) {
+	row := q.db.QueryRowContext(ctx, findReadyOwnedMediaAssetByChecksum, arg.OwnerUserID, arg.StorageProfileID, arg.ChecksumSha256)
+	var i MediaAsset
+	err := row.Scan(
+		&i.ID,
+		&i.AssetID,
+		&i.OwnerUserID,
+		&i.StorageProfileID,
+		&i.StorageKey,
+		&i.Url,
+		&i.SourceUrl,
+		&i.MediaKind,
+		&i.MimeType,
+		&i.Width,
+		&i.Height,
+		&i.SizeBytes,
+		&i.ChecksumSha256,
+		&i.Status,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.ReclaimAfter,
+		&i.ReclaimStartedAt,
+		&i.ReclaimClaimToken,
+		&i.ReclaimGeneration,
+	)
+	return i, err
+}
+
 const findReadyOwnedMediaAssetIDByURL = `-- name: FindReadyOwnedMediaAssetIDByURL :one
 SELECT id
 FROM media_assets

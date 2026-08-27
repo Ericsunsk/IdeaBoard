@@ -64,6 +64,7 @@ func (a *s3CompatibleStorageAdapter) StoreRemoteRef(ctx context.Context, profile
 		return nil, err
 	}
 	defer remoteFile.Cleanup()
+	opts.ObjectKey = canonicalObjectKeyExtension(opts.ObjectKey, filepathExt(remoteFile.Filename))
 	ref, err := a.service.s3CompatibleService.uploadReaderWithConfigRef(ctx, remoteFile.Filename, remoteFile.ContentType, remoteFile, remoteFile.Size, a.service.s3CompatibleConfigFromProfile(profile), opts)
 	if err != nil {
 		return nil, err

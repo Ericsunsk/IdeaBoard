@@ -121,6 +121,7 @@ func (a *localStorageAdapter) StoreRemoteRef(ctx context.Context, profile *Stora
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	opts.ObjectKey = canonicalObjectKeyExtension(opts.ObjectKey, filepathExt(remoteFile.Filename))
 	ref, err := a.service.saveReaderLocalRef(ctx, remoteFile.Filename, remoteFile.ContentType, remoteFile, remoteFile.Size, opts)
 	if err != nil {
 		return nil, err

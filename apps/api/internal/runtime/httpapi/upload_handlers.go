@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"ideaboard/api/internal/boards"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/ingestion"
@@ -197,6 +198,20 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
+		// Reuse an existing ready asset for identical bytes owned by this user.
+		// This keeps duplicate uploads from creating another physical object while
+		// preserving the existing board snapshot contract (asset ID + stable URL).
+		if prepared.ChecksumSHA256 != "" {
+			existing, found, lookupErr := h.MediaAssets.FindReadyOwnedMediaAssetByChecksum(c.Request.Context(), board.OwnerUserID, prepared.StorageProfile, prepared.ChecksumSHA256)
+			if lookupErr != nil {
+				response.InternalError(c, 500, "上传失败", lookupErr)
+				return
+			}
+			if found {
+				response.SuccessDTO(c, newUploadImageResponseFromAsset(existing))
+				return
+			}
+		}
 		handle, err := h.MediaAssets.Begin(c.Request.Context(), ingestion.Request{
 			OwnerUserID: board.OwnerUserID, StorageProfile: prepared.StorageProfile,
 			StorageKey: prepared.StorageKey, URL: prepared.URL,
@@ -218,6 +233,16 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 		stored.MIMEType = prepared.MIMEType
 		stored.Animated = prepared.Animated
 		if err := h.MediaAssets.Complete(c.Request.Context(), handle, stored.IngestionCompletion("")); err != nil {
+			// A concurrent identical upload may have committed first and won the
+			// checksum unique index. Re-read the canonical asset before surfacing
+			// an error so the loser still succeeds without retaining its object.
+			if existing, found, lookupErr := h.MediaAssets.FindReadyOwnedMediaAssetByChecksum(c.Request.Context(), board.OwnerUserID, stored.StorageProfile, stored.ChecksumSHA256); lookupErr == nil && found {
+				cleanupCtx := context.WithoutCancel(c.Request.Context())
+				_ = h.StorageService.DeleteObjectByStorageProfile(cleanupCtx, stored.StorageProfile, stored.StorageKey)
+				_ = h.MediaAssets.Fail(cleanupCtx, handle, err)
+				response.SuccessDTO(c, newUploadImageResponseFromAsset(existing))
+				return
+			}
 			_ = h.MediaAssets.Fail(context.WithoutCancel(c.Request.Context()), handle, err)
 			_ = h.StorageService.DeleteObjectByStorageProfile(context.WithoutCancel(c.Request.Context()), stored.StorageProfile, stored.StorageKey)
 			response.InternalError(c, 500, "上传失败", err)
@@ -243,6 +268,20 @@ func newUploadImageResponseFromStored(urlKey string, stored *storage.StoredUploa
 	payload.Height = stored.Height
 	payload.Mime = stored.MIMEType
 	if ext := imageformat.ImageExtensionFromMIME(stored.MIMEType); ext != "" {
+		payload.Ext = strings.TrimPrefix(ext, ".")
+	}
+	return payload
+}
+
+func newUploadImageResponseFromAsset(asset dbsqlc.MediaAsset) uploadImageResponse {
+	payload := uploadImageResponse{
+		URL:          asset.Url,
+		MediaAssetID: asset.ID,
+		Width:        int(asset.Width),
+		Height:       int(asset.Height),
+		Mime:         asset.MimeType,
+	}
+	if ext := imageformat.ImageExtensionFromMIME(asset.MimeType); ext != "" {
 		payload.Ext = strings.TrimPrefix(ext, ".")
 	}
 	return payload
