@@ -41,6 +41,7 @@ jobs:
           bash -n scripts/deploy-stack-test.sh
           bash -n scripts/production-deploy-entrypoint.sh
           bash -n scripts/production-deploy-entrypoint-test.sh
+          bash -n scripts/run-production-deploy.sh
           bash -n scripts/ci-change-classifier.sh
           bash -n scripts/ci-change-classifier-test.sh
           bash -n scripts/ci-gate.sh
@@ -67,6 +68,7 @@ jobs:
             scripts/deploy-stack-test.sh \
             scripts/production-deploy-entrypoint.sh \
             scripts/production-deploy-entrypoint-test.sh \
+            scripts/run-production-deploy.sh \
             scripts/ci-change-classifier.sh \
             scripts/ci-change-classifier-test.sh \
             scripts/ci-gate.sh \

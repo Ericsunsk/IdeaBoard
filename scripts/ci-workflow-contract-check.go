@@ -24,11 +24,31 @@ func main() {
 
 	checkCI(ci)
 	checkReusableWorkflows(root)
-	checkRelease(release)
+	checkRelease(root, release)
+	checkDeployOnly(root)
 	checkActionPinning(root)
 	checkLegacyWorkflows(root)
 
 	fmt.Println("CI workflow contract tests passed")
+}
+
+func checkDeployOnly(root string) {
+	workflow := loadWorkflow(root, "deploy-production.yml")
+	triggers := object(workflow, "on")
+	dispatch := object(triggers, "workflow_dispatch")
+	inputs := object(dispatch, "inputs")
+	releaseTag := object(inputs, "release_tag")
+	requireEqual(releaseTag["required"], true, "Deploy-only workflow must require release_tag")
+
+	jobs := object(workflow, "jobs")
+	deploy := object(jobs, "deploy-production")
+	requireEqual(deploy["environment"], "production", "Deploy-only workflow must target production environment")
+	step := requireStep(deploy, "Deploy existing immutable release")
+	requireEqual(step["run"], "./scripts/run-production-deploy.sh release-assets/release-manifest.json", "Deploy-only workflow must use the shared deploy client")
+
+	allText := scalarText(workflow)
+	reject(strings.Contains(allText, "docker/build-push-action"), "Deploy-only workflow must not build images")
+	reject(strings.Contains(allText, "cosign sign"), "Deploy-only workflow must not sign images")
 }
 
 func repositoryRoot() (string, error) {
@@ -115,7 +135,7 @@ func checkReusableWorkflows(root string) {
 	}
 }
 
-func checkRelease(release workflow) {
+func checkRelease(root string, release workflow) {
 	jobs := object(release, "jobs")
 	preflight := object(jobs, "preflight")
 	requireEqual(object(preflight, "permissions")["checks"], "read", "Release preflight must read CI checks")
@@ -134,14 +154,18 @@ func checkRelease(release workflow) {
 	requireEqual(object(deploy, "concurrency")["cancel-in-progress"], false, "Production deployments must not cancel in progress")
 	stream := requireStep(deploy, "Stream manifest to Production deploy entrypoint")
 	streamRun := stringValue(stream["run"])
+	requireContains(streamRun, "./scripts/run-production-deploy.sh release-assets/release-manifest.json", "Production deployment must use the shared deploy client")
+	clientBytes, err := os.ReadFile(filepath.Join(root, "scripts", "run-production-deploy.sh"))
+	failIf(err)
+	clientText := string(clientBytes)
 	for _, required := range []string{
 		"StrictHostKeyChecking=yes",
-		"UserKnownHostsFile=\"${SSH_KNOWN_HOSTS_FILE}\"",
+		"UserKnownHostsFile=\"${ssh_known_hosts_file}\"",
 		"PasswordAuthentication=no",
-		"< release-assets/release-manifest.json",
+		"< \"${manifest}\"",
 		"production-deploy-error.raw",
 	} {
-		requireContains(streamRun, required, "Production transport contract is missing "+required)
+		requireContains(clientText, required, "Production transport contract is missing "+required)
 	}
 
 	allText := scalarText(release)
