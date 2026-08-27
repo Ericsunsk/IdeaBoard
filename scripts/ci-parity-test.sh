@@ -88,6 +88,12 @@ assert_contains 'go test -race -p=4 -count=1 example.test/pkg0 example.test/pkg1
 run_parity web-smoke
 assert_contains 'npm run smoke:user'
 
+if grep -R -n -E 'playwright-cli|install-browser|PLAYWRIGHT_CLI_BROWSER' \
+  "${repo_root}/scripts/ci-parity.sh" "${repo_root}/.github/workflows"; then
+  echo 'CI browser smoke must use the pinned Playwright image and project Playwright API' >&2
+  exit 1
+fi
+
 : >"${log_file}"
 if API_TEST_DATABASE_DSN='postgres://test.invalid/ideaboard' \
   TEST_MODE=standard TEST_SHARD=0 TEST_SHARD_COUNT=1 \

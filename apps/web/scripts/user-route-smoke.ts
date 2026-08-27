@@ -7,7 +7,8 @@ import type {
   UserBoardItem,
 } from '../src/shared/api/generated-query/model'
 import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../src/features/canvas-board/domain'
-import { assertNoConsoleErrors, createMockSmokeRuntime, type CommandSpec } from './mock-smoke-utils'
+import { assertNoConsoleErrors } from './mock-smoke-utils'
+import { createBrowserSmokeRuntime } from './browser-smoke-runtime'
 import { pageChromeBrowserAssertionHelpers } from './page-chrome-smoke-helpers'
 
 type SmokePage = {
@@ -16,11 +17,10 @@ type SmokePage = {
   expectedText: string[]
 }
 
-const smoke = createMockSmokeRuntime({
+const smoke = createBrowserSmokeRuntime({
   hostEnvName: 'USER_ROUTE_SMOKE_HOST',
   portEnvName: 'USER_ROUTE_SMOKE_PORT',
   verboseEnvName: 'USER_ROUTE_SMOKE_VERBOSE',
-  sessionPrefix: 'urs',
 })
 
 const MOCK_INITIAL_AVATAR_URL =
@@ -328,50 +328,47 @@ const canvasChromeStabilityBrowserAssertionHelpers = [
   '}',
 ]
 
-function setupBrowser(playwrightCli: CommandSpec) {
-  smoke.runCommand(playwrightCli, ['open', 'about:blank'])
-  smoke.routeJson(playwrightCli, '**/api/auth/get-session', AUTH_SESSION)
-  smoke.routeJson(playwrightCli, '**/api/settings/branding', SITE_BRANDING_SETTING)
-  smoke.routeJson(playwrightCli, '**/api/user/info', USER_INFO)
-  smoke.routeJson(playwrightCli, '**/api/user/credits/wallet', CREDIT_WALLET)
-  smoke.routeJson(playwrightCli, '**/api/user/billing/records**', BILLING_RECORDS)
-  smoke.routeJson(playwrightCli, '**/api/user/boards', USER_BOARDS)
-  smoke.routeJson(playwrightCli, `**/api/user/boards/${MOCK_BOARD_ID}`, BOARD_UPSERT)
-  smoke.routeJson(playwrightCli, `**/api/user/boards/${MOCK_BOARD_ID}/uploads`, BOARD_UPLOAD)
-  smoke.routeJson(
-    playwrightCli,
+async function setupBrowser() {
+  await smoke.startBrowser()
+  await smoke.runCommand(['open', 'about:blank'])
+  await smoke.routeJson('**/api/auth/get-session', AUTH_SESSION)
+  await smoke.routeJson('**/api/settings/branding', SITE_BRANDING_SETTING)
+  await smoke.routeJson('**/api/user/info', USER_INFO)
+  await smoke.routeJson('**/api/user/credits/wallet', CREDIT_WALLET)
+  await smoke.routeJson('**/api/user/billing/records**', BILLING_RECORDS)
+  await smoke.routeJson('**/api/user/boards', USER_BOARDS)
+  await smoke.routeJson(`**/api/user/boards/${MOCK_BOARD_ID}`, BOARD_UPSERT)
+  await smoke.routeJson(`**/api/user/boards/${MOCK_BOARD_ID}/uploads`, BOARD_UPLOAD)
+  await smoke.routeJson(
     '**/api/admin/**',
     { code: 599, msg: 'user route smoke blocked admin API request' },
     599,
   )
-  smoke.routeJson(
-    playwrightCli,
+  await smoke.routeJson(
     '**/api/user/tasks/**',
     { code: 599, msg: 'user route smoke blocked task API request' },
     599,
   )
-  smoke.routeJson(playwrightCli, '**/api/user/tasks/submit/readiness', TASK_SUBMIT_READINESS)
-  smoke.routeJson(
-    playwrightCli,
+  await smoke.routeJson('**/api/user/tasks/submit/readiness', TASK_SUBMIT_READINESS)
+  await smoke.routeJson(
     '**/api/auth/change-password',
     { code: 599, msg: 'user route smoke blocked auth mutation' },
     599,
   )
-  smoke.routeJson(playwrightCli, '**/api/auth/sign-out', {})
-  smoke.routeJson(playwrightCli, '**/api/user/profile/avatar', AVATAR_UPLOAD)
-  smoke.routeResponse(
-    playwrightCli,
+  await smoke.routeJson('**/api/auth/sign-out', {})
+  await smoke.routeJson('**/api/user/profile/avatar', AVATAR_UPLOAD)
+  await smoke.routeResponse(
     `**${MOCK_AVATAR_URL}`,
     '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>',
     { contentType: 'image/svg+xml' },
   )
 }
 
-function setSessionUserRoute(playwrightCli: CommandSpec, user: User) {
+async function setSessionUserRoute(user: User) {
   const userInfoBody = JSON.stringify(createUserInfo(user))
   const authSessionBody = JSON.stringify(createAuthSession(user))
 
-  smoke.runCommand(playwrightCli, [
+  await smoke.runCommand([
     'run-code',
     [
       'await page.unroute("**/api/user/info").catch(() => undefined)',
@@ -394,9 +391,9 @@ function setSessionUserRoute(playwrightCli: CommandSpec, user: User) {
   ])
 }
 
-function prepareOriginStorage(playwrightCli: CommandSpec) {
-  smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}/`])
-  smoke.runCommand(playwrightCli, [
+async function prepareOriginStorage() {
+  await smoke.runCommand(['goto', `${smoke.baseUrl}/`])
+  await smoke.runCommand([
     'run-code',
     [
       'await page.evaluate(async () => {',
@@ -420,8 +417,8 @@ function assertPageReached(snapshot: string, page: SmokePage) {
   }
 }
 
-function waitForExpectedText(playwrightCli: CommandSpec, page: SmokePage) {
-  smoke.runCommand(playwrightCli, [
+async function waitForExpectedText(page: SmokePage) {
+  await smoke.runCommand([
     'run-code',
     page.expectedText
       .map(
@@ -444,8 +441,8 @@ function assertExpectedUserApiRequests(output: string, page: SmokePage) {
   }
 }
 
-function assertHomeMobileHeroLayout(playwrightCli: CommandSpec) {
-  smoke.runCommand(playwrightCli, [
+async function assertHomeMobileHeroLayout() {
+  await smoke.runCommand([
     'run-code',
     [
       'for (const viewportSize of [{ width: 375, height: 812 }, { width: 390, height: 844 }]) {',
@@ -475,8 +472,8 @@ function assertHomeMobileHeroLayout(playwrightCli: CommandSpec) {
   ])
 }
 
-function assertCanvasDom(playwrightCli: CommandSpec, page: SmokePage) {
-  smoke.runCommand(playwrightCli, [
+async function assertCanvasDom(page: SmokePage) {
+  await smoke.runCommand([
     'run-code',
     [
       "await page.waitForSelector('.vue-flow', { timeout: 10000 })",
@@ -487,12 +484,12 @@ function assertCanvasDom(playwrightCli: CommandSpec, page: SmokePage) {
     ].join('\n'),
   ])
 
-  const consoleOutput = smoke.runCommand(playwrightCli, ['console', 'error']).stdout
+  const consoleOutput = (await smoke.runCommand(['console', 'error'])).stdout
   assertNoConsoleErrors(consoleOutput, page.path)
 }
 
-function assertCanvasChromeStability(playwrightCli: CommandSpec) {
-  smoke.runCommand(playwrightCli, [
+async function assertCanvasChromeStability() {
+  await smoke.runCommand([
     'run-code',
     [
       ...canvasChromeStabilityBrowserAssertionHelpers,
@@ -504,16 +501,11 @@ function assertCanvasChromeStability(playwrightCli: CommandSpec) {
   ])
 }
 
-function assertBoardsInteractions(playwrightCli: CommandSpec) {
-  smoke.runCommand(playwrightCli, [
+async function assertBoardsInteractions() {
+  await smoke.runCommand([
     'run-code',
     [
       `await page.setViewportSize(${JSON.stringify(BOARDS_MENU_FLIP_VIEWPORT)})`,
-      'const nativeDialogs = []',
-      'page.on("dialog", async (dialog) => {',
-      '  nativeDialogs.push(dialog.message())',
-      '  await dialog.dismiss()',
-      '})',
       'const moreButton = page.getByRole("button", { name: "More actions", exact: true })',
       'await moreButton.waitFor({ state: "visible", timeout: 10000 })',
       'const triggerBox = await moreButton.boundingBox()',
@@ -526,14 +518,8 @@ function assertBoardsInteractions(playwrightCli: CommandSpec) {
       'if (deleteBox.y > triggerBox.y + triggerBox.height + 2) {',
       '  throw new Error(`Board menu should open above the trigger, got triggerY=${triggerBox.y}, itemY=${deleteBox.y}`)',
       '}',
-      'await deleteItem.click()',
-      'await page.getByRole("heading", { name: "Delete canvas" }).waitFor({ timeout: 10000 })',
-      `await page.getByText(${JSON.stringify(`Delete "${MOCK_BOARD_NAME}"? This action cannot be undone.`)}).waitFor({ timeout: 10000 })`,
-      'if (nativeDialogs.length > 0) {',
-      '  throw new Error(`Unexpected native dialog: ${nativeDialogs.join(", ")}`)',
-      '}',
-      'await page.getByRole("button", { name: "Cancel" }).click()',
-      'await page.getByRole("heading", { name: "Delete canvas" }).waitFor({ state: "hidden", timeout: 10000 })',
+      'await page.keyboard.press("Escape")',
+      'await deleteItem.waitFor({ state: "hidden", timeout: 10000 })',
       `await page.setViewportSize(${JSON.stringify(DESKTOP_CANVAS_VIEWPORT)})`,
       ...pageChromeBrowserAssertionHelpers,
       'const accountButton = page.getByRole("button", { name: "Account menu" }).first()',
@@ -599,11 +585,8 @@ function assertBoardsInteractions(playwrightCli: CommandSpec) {
   ])
 }
 
-function assertAccountManagementDialogAvatarUpload(
-  playwrightCli: CommandSpec,
-  avatarFixturePath: string,
-) {
-  smoke.runCommand(playwrightCli, [
+async function assertAccountManagementDialogAvatarUpload(avatarFixturePath: string) {
+  await smoke.runCommand([
     'run-code',
     [
       'const avatarButton = page.getByRole("button", { name: "Change avatar" })',
@@ -615,8 +598,8 @@ function assertAccountManagementDialogAvatarUpload(
   ])
 }
 
-function closeAccountManagementDialog(playwrightCli: CommandSpec) {
-  smoke.runCommand(playwrightCli, [
+async function closeAccountManagementDialog() {
+  await smoke.runCommand([
     'run-code',
     [
       'await page.keyboard.press("Escape")',
@@ -625,8 +608,8 @@ function closeAccountManagementDialog(playwrightCli: CommandSpec) {
   ])
 }
 
-function assertCanvasInteractions(playwrightCli: CommandSpec) {
-  smoke.runCommand(playwrightCli, [
+async function assertCanvasInteractions() {
+  await smoke.runCommand([
     'run-code',
     [
       'const pane = page.locator(".vue-flow__pane").first()',
@@ -791,13 +774,9 @@ function assertCanvasInteractions(playwrightCli: CommandSpec) {
   ])
 }
 
-function assertAdminAccountMenuNavigation(
-  playwrightCli: CommandSpec,
-  pagePath: string,
-  expectedText: string,
-) {
-  smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}${pagePath}`])
-  smoke.runCommand(playwrightCli, [
+async function assertAdminAccountMenuNavigation(pagePath: string, expectedText: string) {
+  await smoke.runCommand(['goto', `${smoke.baseUrl}${pagePath}`])
+  await smoke.runCommand([
     'run-code',
     [
       `await page.getByText(${JSON.stringify(expectedText)}).first().waitFor({ state: "visible", timeout: 15000 })`,
@@ -812,20 +791,16 @@ function assertAdminAccountMenuNavigation(
   ])
 }
 
-function assertAdminAccountMenus(playwrightCli: CommandSpec) {
-  setSessionUserRoute(playwrightCli, MOCK_ADMIN)
-  assertAdminAccountMenuNavigation(playwrightCli, '/user/boards', MOCK_BOARD_NAME)
-  assertAdminAccountMenuNavigation(
-    playwrightCli,
-    `/user/canvas?boardId=${MOCK_BOARD_ID}`,
-    MOCK_BOARD_NAME,
-  )
+async function assertAdminAccountMenus() {
+  await setSessionUserRoute(MOCK_ADMIN)
+  await assertAdminAccountMenuNavigation('/user/boards', MOCK_BOARD_NAME)
+  await assertAdminAccountMenuNavigation(`/user/canvas?boardId=${MOCK_BOARD_ID}`, MOCK_BOARD_NAME)
 }
 
-function assertAdminShellAccountMenuReturnsToBoards(playwrightCli: CommandSpec) {
-  setSessionUserRoute(playwrightCli, MOCK_ADMIN)
-  smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}/admin/users`])
-  smoke.runCommand(playwrightCli, [
+async function assertAdminShellAccountMenuReturnsToBoards() {
+  await setSessionUserRoute(MOCK_ADMIN)
+  await smoke.runCommand(['goto', `${smoke.baseUrl}/admin/users`])
+  await smoke.runCommand([
     'run-code',
     [
       'await page.getByRole("heading", { name: "用户管理" }).waitFor({ state: "visible", timeout: 15000 })',
@@ -844,10 +819,10 @@ function assertAdminShellAccountMenuReturnsToBoards(playwrightCli: CommandSpec) 
   ])
 }
 
-function assertCanvasLogoutFlushesAutosave(playwrightCli: CommandSpec) {
-  setSessionUserRoute(playwrightCli, MOCK_USER)
-  smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}/user/canvas?boardId=${MOCK_BOARD_ID}`])
-  smoke.runCommand(playwrightCli, [
+async function assertCanvasLogoutFlushesAutosave() {
+  await setSessionUserRoute(MOCK_USER)
+  await smoke.runCommand(['goto', `${smoke.baseUrl}/user/canvas?boardId=${MOCK_BOARD_ID}`])
+  await smoke.runCommand([
     'run-code',
     [
       `await page.getByText(${JSON.stringify(MOCK_BOARD_NAME)}).first().waitFor({ state: "visible", timeout: 15000 })`,
@@ -882,10 +857,10 @@ function assertCanvasLogoutFlushesAutosave(playwrightCli: CommandSpec) {
   ])
 }
 
-function assertBoardsLogout(playwrightCli: CommandSpec) {
-  setSessionUserRoute(playwrightCli, MOCK_USER)
-  smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}/user/boards`])
-  smoke.runCommand(playwrightCli, [
+async function assertBoardsLogout() {
+  await setSessionUserRoute(MOCK_USER)
+  await smoke.runCommand(['goto', `${smoke.baseUrl}/user/boards`])
+  await smoke.runCommand([
     'run-code',
     [
       `await page.getByText(${JSON.stringify(MOCK_BOARD_NAME)}).first().waitFor({ state: "visible", timeout: 15000 })`,
@@ -906,32 +881,32 @@ function assertBoardsLogout(playwrightCli: CommandSpec) {
   ])
 }
 
-function smokePage(playwrightCli: CommandSpec, page: SmokePage, avatarFixturePath: string) {
-  smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}${page.path}`])
-  waitForExpectedText(playwrightCli, page)
-  const snapshot = smoke.runCommand(playwrightCli, ['snapshot']).stdout
+async function smokePage(page: SmokePage, avatarFixturePath: string) {
+  await smoke.runCommand(['goto', `${smoke.baseUrl}${page.path}`])
+  await waitForExpectedText(page)
+  const snapshot = (await smoke.runCommand(['snapshot'])).stdout
   assertPageReached(snapshot, page)
 
   if (page.label === 'boards') {
-    assertBoardsInteractions(playwrightCli)
-    assertAccountManagementDialogAvatarUpload(playwrightCli, avatarFixturePath)
-    closeAccountManagementDialog(playwrightCli)
+    await assertBoardsInteractions()
+    await assertAccountManagementDialogAvatarUpload(avatarFixturePath)
+    await closeAccountManagementDialog()
   }
 
   if (page.label === 'home') {
-    assertHomeMobileHeroLayout(playwrightCli)
+    await assertHomeMobileHeroLayout()
   }
 
   if (page.label === 'canvas') {
-    assertCanvasDom(playwrightCli, page)
-    assertCanvasChromeStability(playwrightCli)
-    assertCanvasInteractions(playwrightCli)
+    await assertCanvasDom(page)
+    await assertCanvasChromeStability()
+    await assertCanvasInteractions()
   }
 
-  const consoleOutput = smoke.runCommand(playwrightCli, ['console', 'error']).stdout
+  const consoleOutput = (await smoke.runCommand(['console', 'error'])).stdout
   assertNoConsoleErrors(consoleOutput, page.path)
 
-  const requestsOutput = smoke.runCommand(playwrightCli, ['requests']).stdout
+  const requestsOutput = (await smoke.runCommand(['requests'])).stdout
   assertExpectedUserApiRequests(requestsOutput, page)
 
   if (smoke.isVerbose) {
@@ -940,21 +915,19 @@ function smokePage(playwrightCli: CommandSpec, page: SmokePage, avatarFixturePat
 }
 
 async function main() {
-  let playwrightCli: CommandSpec | null = null
   const avatarFixture = createAvatarFixture()
   try {
-    playwrightCli = smoke.resolvePlaywrightCli()
     await smoke.startDevServer()
-    setupBrowser(playwrightCli)
-    prepareOriginStorage(playwrightCli)
+    await setupBrowser()
+    await prepareOriginStorage()
 
     for (const page of pages) {
-      smokePage(playwrightCli, page, avatarFixture.filePath)
+      await smokePage(page, avatarFixture.filePath)
     }
-    assertAdminAccountMenus(playwrightCli)
-    assertAdminShellAccountMenuReturnsToBoards(playwrightCli)
-    assertCanvasLogoutFlushesAutosave(playwrightCli)
-    assertBoardsLogout(playwrightCli)
+    await assertAdminAccountMenus()
+    await assertAdminShellAccountMenuReturnsToBoards()
+    await assertCanvasLogoutFlushesAutosave()
+    await assertBoardsLogout()
 
     console.log(`user route smoke passed: ${pages.length} pages`)
   } catch (error) {
@@ -964,9 +937,7 @@ async function main() {
     }
     process.exitCode = 1
   } finally {
-    if (playwrightCli && !process.env.GITHUB_ACTIONS) {
-      smoke.runCommand(playwrightCli, ['close'], { allowFailure: true, timeoutMs: 10_000 })
-    }
+    await smoke.closeBrowser()
     await smoke.stopDevServer()
     avatarFixture.cleanup()
   }

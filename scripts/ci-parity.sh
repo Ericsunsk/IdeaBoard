@@ -142,8 +142,6 @@ run_web_smoke() {
       cp -a /workspace/apps/web /tmp/ideaboard-web
       cd /tmp/ideaboard-web
       npm ci --no-audit --fund=false
-      npx --yes --package @playwright/cli@0.1.18 playwright-cli install-browser chrome-for-testing
-      export PLAYWRIGHT_CLI_BROWSER=chromium
       npm run smoke:user
     '
 }
