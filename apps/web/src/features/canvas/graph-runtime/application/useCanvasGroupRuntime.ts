@@ -5,6 +5,7 @@ import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
 import type { PendingImageExecutionLease } from '../../execution/pending-execution'
 import {
   commitCanvasGraphDeleteGroupIntent,
+  CanvasGraphStaleTransactionError,
   isCanvasGraphNodeId,
   readCanvasGraphNodeBounds,
   resolveCanvasGraphNodeDimensions,
@@ -867,7 +868,11 @@ export function useCanvasGroupRuntime(
       : null
     try {
       stageNodeMembershipReconciliation(store, transaction, nodeIds, positions)
-    } catch (_error) {
+    } catch (error) {
+      // Let the drag lifecycle rebase on concurrent graph commits. Other
+      // membership failures remain non-fatal and surface through the warning
+      // path below.
+      if (error instanceof CanvasGraphStaleTransactionError) throw error
       options.onWarning(i18n.global.t('canvas.groupOps.updateFailed'))
       return
     }

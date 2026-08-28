@@ -355,7 +355,10 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
       const dy = metrics.position.y - start.y
       if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return
       const source = record.snapshot as ImageNodeItem
-      const copied = createCanvasNodeAt('image', { x: source.x + dx, y: source.y + dy })
+      // The drag transaction is committed before duplicate finalization. Use
+      // the captured drag origin so the copy follows the pointer once while
+      // the original is reset to its pre-drag position.
+      const copied = createCanvasNodeAt('image', { x: start.x + dx, y: start.y + dy })
       copied.sourceImageUrl = source.sourceImageUrl.trim()
       copied.sourceMediaAssetId = source.sourceMediaAssetId
       copied.adjustmentRecipe = source.adjustmentRecipe

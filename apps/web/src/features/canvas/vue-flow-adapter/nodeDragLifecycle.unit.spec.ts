@@ -261,4 +261,67 @@ describe('createCanvasNodeDragLifecycle', () => {
       snapshot: { x: 160, y: 120 },
     })
   })
+
+  it('rebases drag work when another graph commit lands during the gesture', () => {
+    const harness = createHarness()
+
+    harness.lifecycle.begin(['prompt-1'])
+    harness.lifecycle.handleChanges([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 160, y: 120 },
+        from: { x: 40, y: 40 },
+        dragging: true,
+      },
+    ])
+
+    harness.store.beginTransaction('node-update').updateNode('prompt-2', { x: 920 }).commit()
+
+    expect(() =>
+      harness.lifecycle.handleChanges([
+        {
+          id: 'prompt-1',
+          type: 'position',
+          position: { x: 220, y: 140 },
+          from: { x: 40, y: 40 },
+          dragging: true,
+        },
+      ]),
+    ).not.toThrow()
+
+    expect(() => harness.lifecycle.commit()).not.toThrow()
+    expect(harness.store.getNode('prompt-1')).toMatchObject({ snapshot: { x: 220, y: 140 } })
+    expect(harness.store.getNode('prompt-2')).toMatchObject({ snapshot: { x: 920 } })
+  })
+
+  it('rebases final position and selection when the transaction becomes stale before drag stop', () => {
+    const harness = createHarness()
+
+    harness.lifecycle.begin(['prompt-1'])
+    harness.lifecycle.handleChanges([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 260, y: 160 },
+        from: { x: 40, y: 40 },
+        dragging: true,
+      },
+    ])
+
+    harness.store.beginTransaction('node-update').updateNode('prompt-2', { text: 'ready' }).commit()
+
+    expect(() =>
+      harness.lifecycle.commit((store, transaction) => {
+        store
+          .getNodeIds()
+          .forEach((nodeId) => transaction.selectNode(nodeId, nodeId === 'prompt-1'))
+      }),
+    ).not.toThrow()
+    expect(harness.store.getNode('prompt-1')).toMatchObject({
+      selected: true,
+      snapshot: { x: 260, y: 160 },
+    })
+    expect(harness.store.getNode('prompt-2')).toMatchObject({ snapshot: { text: 'ready' } })
+  })
 })

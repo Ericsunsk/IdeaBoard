@@ -58,12 +58,16 @@ describe('useFlowNodeDragInteractions', () => {
       clearNodePanel: false,
       hideStrength: false,
     })
-    expect(harness.finishFlowNodeDragDuplicateTracking).toHaveBeenCalledWith(false)
+    expect(harness.finishFlowNodeDragDuplicateTracking).not.toHaveBeenCalled()
     expect(harness.commitNodeDragTransaction).not.toHaveBeenCalled()
 
     await Promise.resolve()
 
     expect(harness.commitNodeDragTransaction).toHaveBeenCalledTimes(1)
+    expect(harness.finishFlowNodeDragDuplicateTracking).toHaveBeenCalledWith(false)
+    expect(harness.commitNodeDragTransaction.mock.invocationCallOrder[0]).toBeLessThan(
+      harness.finishFlowNodeDragDuplicateTracking.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    )
   })
 
   it('only commits the latest queued drag stop', async () => {

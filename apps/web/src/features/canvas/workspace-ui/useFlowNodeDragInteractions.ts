@@ -29,12 +29,19 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
       clearNodePanel: false,
       hideStrength: false,
     })
-    options.finishFlowNodeDragDuplicateTracking(options.duplicateModifierPressed.value)
+    const isDuplicateMode = options.duplicateModifierPressed.value
     const commitToken = {}
     queueMicrotask(() => {
       if (pendingDragStopCommit !== commitToken) return
       pendingDragStopCommit = null
-      options.commitNodeDragTransaction()
+      try {
+        options.commitNodeDragTransaction()
+      } finally {
+        // Always clear duplicate tracking, even when a graph commit fails.
+        // Keeping this cleanup after commit preserves the duplicate position
+        // calculation while preventing stale Alt-drag state from leaking.
+        options.finishFlowNodeDragDuplicateTracking(isDuplicateMode)
+      }
     })
     pendingDragStopCommit = commitToken
   }

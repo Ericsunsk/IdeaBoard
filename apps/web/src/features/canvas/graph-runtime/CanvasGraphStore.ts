@@ -18,6 +18,13 @@ export type CanvasGraphNodeIdForKind<T extends CanvasGraphNodeKind> = `${T}-${nu
 export type CanvasGraphEdgeId = `connection-${number}`
 export type CanvasGraphGroupId = CanvasGroup['id']
 
+export class CanvasGraphStaleTransactionError extends Error {
+  constructor() {
+    super('CanvasGraphStore transaction is stale')
+    this.name = 'CanvasGraphStaleTransactionError'
+  }
+}
+
 export type CanvasGraphTransactionReason =
   | 'node-drag'
   | 'connect'
@@ -1181,7 +1188,7 @@ export class CanvasGraphStore {
 
   _assertTransactionCurrent(draft: CanvasGraphTransactionDraft) {
     if (this.revision !== draft.baseRevision) {
-      throw new Error('CanvasGraphStore transaction is stale')
+      throw new CanvasGraphStaleTransactionError()
     }
   }
 
