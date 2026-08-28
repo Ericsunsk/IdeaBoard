@@ -83,7 +83,9 @@ export function createImageToolNodeBindings(
     const hasCommittedMask = !!session.maskEditor.getCommittedMaskData(nodeId)
     const actionMenuVisible = ui.isImageActionPanelVisible(nodeId)
     const activeStrengthAction = ui.strengthControl.activeAction.value
-    const directGenerating = execution.isNodeExecutionActive(nodeId)
+    const directGenerating =
+      execution.isNodeExecutionActive(nodeId) ||
+      session.activeImageAdjustmentPendingNodeId.value === nodeId
     const nextBinding: ImageActionBinding = {
       actionMenuVisible,
       promptComposerVisible: ui.isImagePromptComposerVisible(nodeId),

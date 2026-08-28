@@ -280,4 +280,41 @@ describe('useCanvasGraphEditing', () => {
     harness.editing.commands.canvasFiles.dragOver({ dataTransfer } as unknown as DragEvent)
     expect(harness.markDropAsCopy).toHaveBeenCalled()
   })
+
+  it('creates a running pending adjustment node matching the source node dimensions and ratio', () => {
+    const harness = createHarness()
+    const sourceNode: ImageNodeItem = {
+      id: 10,
+      type: 'image-node',
+      x: 100,
+      y: 200,
+      width: 460,
+      sourceImageUrl: 'https://example.com/source.png',
+      sourceImageRatio: 1.5,
+      outputStatus: 'ready',
+      outputImages: [],
+    }
+
+    const createdNodeId = harness.editing.workflowPort.createPendingAdjustmentNode(
+      { x: 580, y: 200 },
+      sourceNode,
+    )
+
+    expect(createdNodeId).toMatch(/^image-\d+$/)
+    expect(harness.nodes.value).toContainEqual(
+      expect.objectContaining({
+        id: createdNodeId,
+        position: { x: 580, y: 200 },
+        data: expect.objectContaining({
+          kind: 'image',
+          snapshotNode: expect.objectContaining({
+            width: 460,
+            sourceImageRatio: 1.5,
+            outputStatus: 'running',
+            outputImages: [],
+          }),
+        }),
+      }),
+    )
+  })
 })

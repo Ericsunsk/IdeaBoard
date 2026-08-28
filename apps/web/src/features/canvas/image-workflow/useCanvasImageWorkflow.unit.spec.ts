@@ -123,7 +123,7 @@ describe('useCanvasImageWorkflow', () => {
         active: { nodeId: ref(null) },
         locks: { isChromeHidden: ref(false), isCanvasLocked: ref(false) },
         chrome: ref(null),
-        adjustment: { isApplying: ref(false), finalApplyProgress: ref(null) },
+        adjustment: { isApplying: ref(false) },
         nodeBindings: { stageFor: vi.fn(), actionFor: vi.fn() },
       },
       commands: {

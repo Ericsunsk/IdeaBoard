@@ -1,8 +1,4 @@
-import { computed, provide, readonly } from 'vue'
-import {
-  IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY,
-  type CanvasImageAdjustmentFinalApplyContext,
-} from '../image-editor/runtime/imageAdjustmentFinalApplyContext'
+import { computed } from 'vue'
 import type { CanvasImageTools } from './imageToolBindings'
 import { createImageToolChromeAdapter } from './imageToolChromeAdapter'
 import { createImageToolCommands } from './imageToolCommands'
@@ -16,11 +12,6 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions): Canvas
   const commands = createImageToolCommands(session)
   const chrome = createImageToolChromeAdapter(session, commands.chromeCommands)
   const nodeBindings = createImageToolNodeBindings(session, chrome.imageEditorRenderedPreview)
-
-  provide<CanvasImageAdjustmentFinalApplyContext>(IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY, {
-    progress: readonly(session.imageAdjustmentFinalApplyProgress),
-    cancel: () => session.cancelImageAdjustmentFinalTask(),
-  })
 
   const isChromeHidden = computed(() => !!session.imageEditorNodeId.value)
   const isCanvasLocked = computed(
@@ -41,7 +32,6 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions): Canvas
       chrome: chrome.chromeModel,
       adjustment: {
         isApplying: session.isApplyingImageEditorAdjustments,
-        finalApplyProgress: session.imageAdjustmentFinalApplyProgress,
       },
       nodeBindings: {
         stageFor: nodeBindings.stageBindingFor,

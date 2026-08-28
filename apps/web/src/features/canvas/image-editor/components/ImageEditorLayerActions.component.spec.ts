@@ -1,82 +1,106 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import ImageEditorLayerActions from './ImageEditorLayerActions.vue'
-import type { ImageAdjustmentFinalApplyProgress } from '../runtime/imageAdjustmentFinalApplyContext'
 import { renderWithUser, screen } from '../../../../test/render'
 
 function renderLayerActions(
   options: {
+    canCopyLayer?: boolean
+    canMergeLayer?: boolean
+    canRemoveLayer?: boolean
     applying?: boolean
     applyDisabled?: boolean
-    applyProgress?: ImageAdjustmentFinalApplyProgress | null
-    onCancelApply?: () => void
+    onAddLayer?: () => void
+    onCopyLayer?: () => void
+    onMergeLayer?: () => void
+    onRemoveLayer?: () => void
+    onApplyAdjustments?: () => void
   } = {},
 ) {
   return renderWithUser(
     ImageEditorLayerActions,
     {
       props: {
-        canCopyLayer: true,
-        canMergeLayer: true,
-        canRemoveLayer: true,
+        canCopyLayer: options.canCopyLayer ?? true,
+        canMergeLayer: options.canMergeLayer ?? true,
+        canRemoveLayer: options.canRemoveLayer ?? true,
         applying: options.applying ?? false,
         applyDisabled: options.applyDisabled ?? options.applying ?? false,
-        applyProgress: options.applyProgress ?? null,
-        'onCancel-apply': options.onCancelApply,
+        'onAdd-layer': options.onAddLayer,
+        'onCopy-layer': options.onCopyLayer,
+        'onMerge-layer': options.onMergeLayer,
+        'onRemove-layer': options.onRemoveLayer,
+        'onApply-adjustments': options.onApplyAdjustments,
       },
     },
-    { advanceTimers: vi.advanceTimersByTime },
   )
 }
 
 describe('ImageEditorLayerActions', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-  })
+  it('renders all layer action buttons and emits actions on click', async () => {
+    const onAddLayer = vi.fn()
+    const onCopyLayer = vi.fn()
+    const onMergeLayer = vi.fn()
+    const onRemoveLayer = vi.fn()
+    const onApplyAdjustments = vi.fn()
 
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('shows final apply progress after a short disclosure delay and emits cancel', async () => {
-    const onCancelApply = vi.fn()
     const { user } = renderLayerActions({
-      applying: true,
-      applyProgress: { phase: 'render', loaded: 25, total: 100 },
-      onCancelApply,
+      onAddLayer,
+      onCopyLayer,
+      onMergeLayer,
+      onRemoveLayer,
+      onApplyAdjustments,
     })
 
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    const addBtn = screen.getByRole('button', { name: 'Add layer' })
+    const copyBtn = screen.getByRole('button', { name: 'Duplicate layer' })
+    const mergeBtn = screen.getByRole('button', { name: 'Merge layers' })
+    const removeBtn = screen.getByRole('button', { name: 'Delete layer' })
+    const applyBtn = screen.getByRole('button', { name: 'Apply as new node' })
 
-    vi.advanceTimersByTime(199)
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(addBtn).toBeInTheDocument()
+    expect(copyBtn).toBeInTheDocument()
+    expect(mergeBtn).toBeInTheDocument()
+    expect(removeBtn).toBeInTheDocument()
+    expect(applyBtn).toBeInTheDocument()
 
-    vi.advanceTimersByTime(1)
+    await user.click(addBtn)
+    expect(onAddLayer).toHaveBeenCalledTimes(1)
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Rendering adjustments')
-    expect(screen.getByRole('status')).toHaveTextContent('25%')
+    await user.click(copyBtn)
+    expect(onCopyLayer).toHaveBeenCalledTimes(1)
 
-    await user.click(screen.getByRole('button', { name: 'Cancel apply' }))
+    await user.click(mergeBtn)
+    expect(onMergeLayer).toHaveBeenCalledTimes(1)
 
-    expect(onCancelApply).toHaveBeenCalledTimes(1)
+    await user.click(removeBtn)
+    expect(onRemoveLayer).toHaveBeenCalledTimes(1)
+
+    await user.click(applyBtn)
+    expect(onApplyAdjustments).toHaveBeenCalledTimes(1)
   })
 
-  it('does not flash final apply progress for quick apply tasks', async () => {
-    const { rerender } = renderLayerActions({
-      applying: true,
-      applyProgress: { phase: 'render', loaded: 25, total: 100 },
+  it('disables actions when capability props are false', () => {
+    renderLayerActions({
+      canCopyLayer: false,
+      canMergeLayer: false,
+      canRemoveLayer: false,
+      applyDisabled: true,
     })
 
-    vi.advanceTimersByTime(199)
-    await rerender({ applying: false, applyDisabled: false })
-    vi.advanceTimersByTime(1)
-
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Duplicate layer' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Merge layers' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete layer' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Apply as new node' })).toBeDisabled()
   })
 
-  it('hides final apply progress when idle', () => {
-    renderLayerActions()
+  it('shows applying label when applying is active', () => {
+    renderLayerActions({
+      applying: true,
+      applyDisabled: true,
+    })
 
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Cancel apply' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Applying…' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Applying…' })).toBeDisabled()
   })
+
 })

@@ -23,20 +23,18 @@
         :can-remove-layer="canRemoveSelectedLayer"
         :applying="applyingAdjustments"
         :apply-disabled="!canApplyAdjustments || applyingAdjustments"
-        :apply-progress="imageAdjustmentFinalApplyProgress"
         @add-layer="emit('add-layer')"
         @copy-layer="emit('copy-layer')"
         @merge-layer="emit('merge-layer')"
         @remove-layer="emit('remove-layer', selectedLayerId)"
         @apply-adjustments="emit('apply-adjustments')"
-        @cancel-apply="imageAdjustmentFinalApplyContext?.cancel()"
       />
     </template>
   </ImageToolChromeFrame>
 </template>
 
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed } from 'vue'
 import type {
   ImageAdjustmentKind,
   ImageEditorAdjustmentLayer,
@@ -50,7 +48,6 @@ import ImageToolChromeFrame from '../../image-tools/components/ImageToolChromeFr
 import ImageEditorLayerActions from './ImageEditorLayerActions.vue'
 import ImageEditorLayersPanel from './ImageEditorLayersPanel.vue'
 import ImageEditorPropertiesPanel from './ImageEditorPropertiesPanel.vue'
-import { IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY } from '../runtime/imageAdjustmentFinalApplyContext'
 import { hasRenderableImageEditorLayerStack } from '../services/imageAdjustmentRenderer'
 
 const props = defineProps<{
@@ -97,8 +94,4 @@ const canRemoveSelectedLayer = computed(
   () => selectedLayer.value != null && selectedLayer.value.type !== 'source',
 )
 const canApplyAdjustments = computed(() => hasRenderableImageEditorLayerStack(props.layers))
-const imageAdjustmentFinalApplyContext = inject(IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY, null)
-const imageAdjustmentFinalApplyProgress = computed(
-  () => imageAdjustmentFinalApplyContext?.progress.value ?? null,
-)
 </script>

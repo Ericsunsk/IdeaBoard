@@ -8,7 +8,7 @@ import {
 } from '../../../shared/api/mediaAssetDelivery'
 import { useMaskEditorChromeActions } from '../mask-editor/useMaskEditorChromeActions'
 import { isProcessingCancelled } from '../image-editor/runtime/processingCancelled'
-import { isCanvasGraphNodeId } from '../graph-runtime'
+import { isCanvasGraphNodeId, type CanvasGraphNodeId } from '../graph-runtime'
 import { i18n } from '../../../shared/i18n'
 import type { ImageToolChromeCommands } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
@@ -44,22 +44,76 @@ export function createImageToolCommands(session: ImageToolSession) {
       return
     }
 
-    const layers = session.imageEditorSession.imageEditorLayers.value
+    const layers = [...session.imageEditorSession.imageEditorLayers.value]
     if (!hasRenderableImageEditorLayerStack(layers)) {
       feedback.warning(i18n.global.t('canvas.tools.noEditableLayers'))
       return
     }
 
     session.isApplyingImageEditorAdjustments.value = true
-    session.imageAdjustmentFinalApplyProgress.value = { phase: 'queued' }
     const scopeId = nodeId
     session.activeImageAdjustmentFinalScopeId.value = scopeId
+
+    // The editor is a configuration surface, not the processing surface. Exit
+    // immediately so the derived node can reuse the standard AI generation UI.
+    // Bypass the exit hook because it is intentionally wired to cancel active
+    // work when the user dismisses the editor.
+    session.exitImageEditorMode({ runBeforeExit: false })
+    session.imageEditorSession.resetImageEditorSession()
+
+    const targetPoint = {
+      x: Number(sourceNode.x ?? 0) + Math.max(240, Number(sourceNode.width ?? 300) + 64),
+      y: Number(sourceNode.y ?? 0),
+    }
+
+    let pendingNodeId: CanvasGraphNodeId | null = null
+    let pendingNodeMaterialized = false
+
+    const isCurrentScope = () =>
+      board.currentBoardId.value === boardId &&
+      session.activeImageAdjustmentFinalScopeId.value === scopeId &&
+      !!board.getImageNodeSnapshot(nodeId)
+
+    const cleanupPendingNode = () => {
+      if (!pendingNodeId) return
+      const nodeIdToCleanup = pendingNodeId
+      if (!pendingNodeMaterialized) board.removeNode(nodeIdToCleanup)
+      if (session.activeImageAdjustmentPendingNodeId.value === nodeIdToCleanup) {
+        session.activeImageAdjustmentPendingNodeId.value = null
+      }
+      pendingNodeId = null
+    }
+    session.registerImageAdjustmentFinalApplyCleanup(cleanupPendingNode)
+
     try {
+      const createdId = board.createPendingAdjustmentNode(targetPoint, sourceNode)
+      if (!createdId || !isCanvasGraphNodeId(createdId)) {
+        reportGenerationFailure()
+        return
+      }
+      pendingNodeId = createdId
+      session.activeImageAdjustmentPendingNodeId.value = createdId
+      const didConnect = board.connectIntent({
+        sourceNodeId: nodeId,
+        sourcePort: 'image',
+        targetNodeId: pendingNodeId,
+        targetPort: 'image',
+      })
+      if (!didConnect) {
+        cleanupPendingNode()
+        feedback.warning(i18n.global.t('canvas.tools.autoConnectFailed'))
+        return
+      }
+
       // Keep image processing same-origin. The API endpoint resolves storage
       // access server-side, avoiding CORS failures from direct signed URLs.
       const sourceUrl = source.mediaAssetId
         ? await resolveMediaAssetProcessingURL(source.mediaAssetId)
         : source.url
+      if (!isCurrentScope()) {
+        cleanupPendingNode()
+        return
+      }
       const renderedFile = await renderImageEditorLayerStackFile(
         { url: sourceUrl, title: sourceNode.title || 'Image' },
         layers,
@@ -68,46 +122,39 @@ export function createImageToolCommands(session: ImageToolSession) {
           maxSide: 2560,
           maxPixels: 8_000_000,
           fitWithinMaxPixels: true,
-          onProgress: (progress) => {
-            if (session.activeImageAdjustmentFinalScopeId.value !== scopeId) return
-            session.imageAdjustmentFinalApplyProgress.value = {
-              phase: progress.phase,
-              ...(progress.loaded === undefined ? {} : { loaded: progress.loaded }),
-              ...(progress.total === undefined ? {} : { total: progress.total }),
-            }
-          },
         },
       )
-      if (board.currentBoardId.value !== boardId || session.imageEditorNodeId.value !== nodeId) {
+      if (!isCurrentScope()) {
+        cleanupPendingNode()
         return
       }
-      const creation = await board.createImageNodeFromFile(
-        {
-          x: Number(sourceNode.x ?? 0) + Math.max(240, Number(sourceNode.width ?? 300) + 64),
-          y: Number(sourceNode.y ?? 0) + 18,
-        },
-        renderedFile,
-      )
-      if (!creation || creation.kind === 'rejected') {
-        if (board.currentBoardId.value === boardId && session.imageEditorNodeId.value === nodeId) {
-          reportGenerationFailure()
-        }
-        return
-      }
-      if (creation.kind === 'awaiting-retry') {
-        board.connectIntent({
-          sourceNodeId: nodeId,
-          sourcePort: 'image',
-          targetNodeId: creation.nodeId,
-          targetPort: 'image',
-        })
+
+      const resultNodeId = pendingNodeId
+      if (!resultNodeId) {
         reportGenerationFailure()
         return
       }
+      const materialized = await board.applyImageFileToImageNode(resultNodeId, renderedFile)
+      if (!isCurrentScope()) {
+        cleanupPendingNode()
+        return
+      }
+      if (!materialized) {
+        cleanupPendingNode()
+        reportGenerationFailure()
+        return
+      }
+      pendingNodeMaterialized = true
+      if (!isCurrentScope()) {
+        cleanupPendingNode()
+        return
+      }
+
       const currentPlan = buildImageAdjustmentPlan(layers)
       const recipeSourceMediaAssetId =
         sourceNode.adjustmentRecipe?.sourceMediaAssetId ?? source.mediaAssetId
       if (
+        resultNodeId &&
         recipeSourceMediaAssetId &&
         currentPlan.length > 0 &&
         !hasImageEditorRasterEdits(layers) &&
@@ -121,30 +168,14 @@ export function createImageToolCommands(session: ImageToolSession) {
           [...previousPlan, ...currentPlan],
           sourceNode.adjustmentRecipe?.sourceMimeType,
         )
-        session.capabilities.board.updateSnapshotNode(creation.nodeId, (previous) =>
+        session.capabilities.board.updateSnapshotNode(resultNodeId, (previous) =>
           previous.type === 'image-node' ? { ...previous, adjustmentRecipe: recipe } : previous,
         )
       }
-      const didConnect = board.connectIntent({
-        sourceNodeId: nodeId,
-        sourcePort: 'image',
-        targetNodeId: creation.nodeId,
-        targetPort: 'image',
-      })
-      if (!didConnect) {
-        feedback.warning(i18n.global.t('canvas.tools.autoConnectFailed'))
-        return
-      }
-      session.exitImageEditorMode({ runBeforeExit: false })
-      session.imageEditorSession.resetImageEditorSession()
       feedback.succeeded(i18n.global.t('canvas.feedback.imageGenerated'))
     } catch (error) {
-      if (
-        isImageAdjustmentFinalApplyCancelled(error) ||
-        board.currentBoardId.value !== boardId ||
-        session.imageEditorNodeId.value !== nodeId ||
-        session.activeImageAdjustmentFinalScopeId.value !== scopeId
-      ) {
+      cleanupPendingNode()
+      if (isImageAdjustmentFinalApplyCancelled(error) || !isCurrentScope()) {
         return
       }
       if (error instanceof MediaAssetDerivativeNotReadyError) {
@@ -158,9 +189,9 @@ export function createImageToolCommands(session: ImageToolSession) {
       reportGenerationFailure()
     } finally {
       if (session.activeImageAdjustmentFinalScopeId.value === scopeId) {
+        session.registerImageAdjustmentFinalApplyCleanup(null)
         session.activeImageAdjustmentFinalScopeId.value = null
         session.isApplyingImageEditorAdjustments.value = false
-        session.imageAdjustmentFinalApplyProgress.value = null
       }
     }
   }

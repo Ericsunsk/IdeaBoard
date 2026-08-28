@@ -4,12 +4,10 @@ import type { Ref } from 'vue'
 import type { ImageNodeItem } from '../../canvas-board/domain'
 import type { CanvasInteractionKey } from '../workspace-ui/useFlowCanvasInteractionState'
 import type { CanvasVueFlowConnectionAdapter } from '../vue-flow-adapter'
-import type { CanvasImageNodeCreationResult } from '../graph-editing'
 import type { CanvasNodeItem } from '../../canvas-board/domain'
 import { useImageEditorMode } from '../image-editor/useImageEditorMode'
 import { useImageEditorSession } from '../image-editor/useImageEditorSession'
 import { useImageEditorCoordinateAdapter } from '../image-editor'
-import type { ImageAdjustmentFinalApplyProgress } from '../image-editor/runtime/imageAdjustmentFinalApplyContext'
 import { cancelImageAdjustmentFinalRender } from '../image-editor/services/imageAdjustmentRenderer'
 import type { ImageEditorMode } from '../image-editor/types'
 import { useImageMaskEditorOverlay } from '../mask-editor/useImageMaskEditorOverlay'
@@ -51,10 +49,12 @@ export type UseCanvasImageToolsOptions = {
     y: number,
     options?: { zoom?: number; duration?: number; interpolate?: 'smooth' },
   ) => Promise<unknown> | unknown
-  createImageNodeFromFile: (
+  createPendingAdjustmentNode: (
     point: { x: number; y: number },
-    file: File,
-  ) => Promise<CanvasImageNodeCreationResult | null>
+    sourceNode: ImageNodeItem,
+  ) => string | null
+  applyImageFileToImageNode: (nodeId: string, file: File) => Promise<boolean>
+  removeNode: (nodeId: string) => void
   connectionAdapter: Pick<CanvasVueFlowConnectionAdapter, 'connectIntent'>
   uploadImageToBoard: (file: File) => Promise<{ url: string; ratio: number }>
   openImageUrlPreview: (url: string, ratio: number) => void | Promise<void>
@@ -84,7 +84,9 @@ export type ImageToolSessionCapabilities = {
     getImageNodeDisplayPayload: UseCanvasImageToolsOptions['getImageNodeDisplayPayload']
     getImageNodeSnapshot: UseCanvasImageToolsOptions['getImageNodeSnapshot']
     updateSnapshotNode?: UseCanvasImageToolsOptions['updateSnapshotNode']
-    createImageNodeFromFile: UseCanvasImageToolsOptions['createImageNodeFromFile']
+    createPendingAdjustmentNode: UseCanvasImageToolsOptions['createPendingAdjustmentNode']
+    applyImageFileToImageNode: UseCanvasImageToolsOptions['applyImageFileToImageNode']
+    removeNode: UseCanvasImageToolsOptions['removeNode']
     connectIntent: CanvasVueFlowConnectionAdapter['connectIntent']
   }
   execution: {
@@ -139,22 +141,32 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
 
   const imageEditorSession = useImageEditorSession()
   const isApplyingImageEditorAdjustments = ref(false)
-  const imageAdjustmentFinalApplyProgress = ref<ImageAdjustmentFinalApplyProgress | null>(null)
   const activeImageAdjustmentFinalScopeId = ref<string | null>(null)
+  const activeImageAdjustmentPendingNodeId = ref<string | null>(null)
+  let imageAdjustmentFinalApplyCleanup: (() => void) | null = null
   const isImageAdjustmentMode = computed(() => imageEditorMode.value === 'adjust')
 
   const maskChromeState = useMaskEditorChromeState({
     imageEditorNodeId,
   })
 
-  function cancelImageAdjustmentFinalTask(nodeId: string | null = imageEditorNodeId.value) {
+  function cancelImageAdjustmentFinalTask(
+    nodeId: string | null = imageEditorNodeId.value ?? activeImageAdjustmentFinalScopeId.value,
+  ) {
     if (!nodeId) return
     cancelImageAdjustmentFinalRender(nodeId)
     if (activeImageAdjustmentFinalScopeId.value === nodeId) {
+      imageAdjustmentFinalApplyCleanup?.()
+      imageAdjustmentFinalApplyCleanup = null
       activeImageAdjustmentFinalScopeId.value = null
+      activeImageAdjustmentPendingNodeId.value = null
       isApplyingImageEditorAdjustments.value = false
-      imageAdjustmentFinalApplyProgress.value = null
     }
+  }
+
+  function registerImageAdjustmentFinalApplyCleanup(cleanup: (() => void) | null) {
+    imageAdjustmentFinalApplyCleanup?.()
+    imageAdjustmentFinalApplyCleanup = cleanup
   }
 
   function confirmImageEditorExit(state: { nodeId: string; mode: ImageEditorMode }) {
@@ -196,7 +208,9 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
         getImageNodeDisplayPayload: options.getImageNodeDisplayPayload,
         getImageNodeSnapshot: options.getImageNodeSnapshot,
         updateSnapshotNode: options.updateSnapshotNode,
-        createImageNodeFromFile: options.createImageNodeFromFile,
+        createPendingAdjustmentNode: options.createPendingAdjustmentNode,
+        applyImageFileToImageNode: options.applyImageFileToImageNode,
+        removeNode: options.removeNode,
         connectIntent: options.connectionAdapter.connectIntent,
       },
       execution: {
@@ -220,7 +234,7 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
     imageEditorSession,
     isImageAdjustmentMode,
     isApplyingImageEditorAdjustments,
-    imageAdjustmentFinalApplyProgress,
+    activeImageAdjustmentPendingNodeId,
     activeImageAdjustmentFinalScopeId,
     maskEditor,
     maskChromeState,
@@ -230,6 +244,7 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
     commitMask,
     exitImageEditorMode,
     cancelImageAdjustmentFinalTask,
+    registerImageAdjustmentFinalApplyCleanup,
     discardNodeEdits,
   }
 }

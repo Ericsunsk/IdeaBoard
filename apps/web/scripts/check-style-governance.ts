@@ -153,7 +153,7 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
   },
   'src/features/canvas/components/styles/canvas-vue-flow-adapter-skin.css': {
     counts: {
-      'vue-flow-internal-selector': 39,
+      'vue-flow-internal-selector': 40,
     },
     reason: 'Central adapter skin owns Vue Flow vendor DOM styling.',
   },

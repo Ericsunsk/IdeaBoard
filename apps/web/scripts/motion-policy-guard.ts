@@ -26,12 +26,6 @@ const localMotionAllowances: Record<string, LocalMotionAllowance> = {
     reason:
       'The running border is continuous execution feedback with a reduced-motion static fallback.',
   },
-  'src/features/canvas/image-editor/components/ImageEditorLayerActions.vue': {
-    properties: ['--image-editor-progress-cycle'],
-    animationEasingCount: 1,
-    reason:
-      'Indeterminate apply progress needs a continuous cycle and exposes a static reduced-motion state.',
-  },
   'src/features/canvas/components/nodes/workflows/FusionStage.vue': {
     animationEasingCount: 1,
     reason:

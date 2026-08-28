@@ -47,7 +47,9 @@ type CanvasImageWorkflowGraphPort = Pick<
   | 'getImageNodeDisplayPayload'
   | 'getImageNodeSnapshot'
   | 'updateSnapshotNode'
-  | 'createImageNodeFromFile'
+  | 'createPendingAdjustmentNode'
+  | 'applyImageFileToImageNode'
+  | 'removeNode'
   | 'connectionAdapter'
   | 'uploadImageToBoard'
   | 'clearSelectedFlowElements'
@@ -192,7 +194,9 @@ export function useCanvasImageWorkflow(
     getViewport: options.flowPaneAdapter.getViewport,
     setViewport: options.flowPaneAdapter.setViewport,
     setCenter: options.flowPaneAdapter.setCenter,
-    createImageNodeFromFile: graph.createImageNodeFromFile,
+    createPendingAdjustmentNode: graph.createPendingAdjustmentNode,
+    applyImageFileToImageNode: graph.applyImageFileToImageNode,
+    removeNode: graph.removeNode,
     connectionAdapter: graph.connectionAdapter,
     uploadImageToBoard: graph.uploadImageToBoard,
     openImageUrlPreview: options.openImageUrlPreview,

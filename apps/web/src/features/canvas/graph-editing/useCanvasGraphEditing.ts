@@ -1,6 +1,12 @@
 import type { Edge, Node } from '@vue-flow/core'
 import { onScopeDispose, watch, type Ref } from 'vue'
-import type { CanvasBoardSnapshot, CanvasNodeItem } from '../../canvas-board/domain'
+import {
+  resolveImageNodeDisplayRatio,
+  resolveImageNodeFrameSize,
+  type CanvasBoardSnapshot,
+  type CanvasNodeItem,
+  type ImageNodeItem,
+} from '../../canvas-board/domain'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { CanvasVueFlowGraphAdapter } from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import type { CanvasGraphStore } from '../graph-runtime'
@@ -192,6 +198,26 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     })
   }
 
+  function createPendingAdjustmentNode(
+    point: { x: number; y: number },
+    sourceNode: ImageNodeItem,
+  ): string | null {
+    const ratio = resolveImageNodeDisplayRatio(sourceNode)
+    const sourceWidth = Number(sourceNode.width)
+    const width =
+      Number.isFinite(sourceWidth) && sourceWidth > 0
+        ? sourceWidth
+        : resolveImageNodeFrameSize(ratio, true).width
+
+    return nodeMutations.createNodeAtPosition('image', point.x, point.y, {
+      title: sourceNode.title || 'Image',
+      width,
+      sourceImageRatio: ratio,
+      outputStatus: 'running',
+      outputImages: [],
+    })
+  }
+
   return {
     flowPane: {
       connectionAdapter: nodeMutations.connectionAdapter,
@@ -222,6 +248,9 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
       getImageNodeSnapshot,
       updateSnapshotNode,
       createImageNodeFromFile,
+      createPendingAdjustmentNode,
+      applyImageFileToImageNode,
+      deleteNode: options.deleteNode,
       uploadImageToBoard,
       getMediaInputImages: mediaInputs.getMediaInputImages,
       resolvePromptInputImageNodeIds: mediaInputs.resolvePromptInputImageNodeIds,

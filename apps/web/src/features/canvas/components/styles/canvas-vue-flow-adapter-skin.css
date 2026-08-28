@@ -165,6 +165,10 @@
   stroke: var(--canvas-minimap-viewport);
 }
 
+.vue-flow__minimap.canvas-minimap.pannable {
+  cursor: grab;
+}
+
 .vue-flow__minimap.canvas-minimap.pannable:active {
   cursor: grabbing;
 }

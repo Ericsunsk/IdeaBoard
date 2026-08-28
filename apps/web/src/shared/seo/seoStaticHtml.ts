@@ -1,4 +1,4 @@
-import type { RouteSeo } from './routeSeo'
+import type { RouteSeo } from './routeSeo.ts'
 
 function escapeHtml(value: string): string {
   return value

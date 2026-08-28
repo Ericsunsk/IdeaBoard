@@ -46,16 +46,12 @@ describe('Canvas Node and editor Motion contract', () => {
   it('stops continuous running and apply motion when reduced motion is requested', () => {
     const runningBorder = readSource('components/nodes/styles/node-shared.css')
     const fusionStage = readSource('components/nodes/workflows/FusionStage.vue')
-    const layerActions = readSource('image-editor/components/ImageEditorLayerActions.vue')
 
     expect(runningBorder).toMatch(
       /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.workflow-node\.running::before[\s\S]*animation: none;/,
     )
     expect(fusionStage).toMatch(
       /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.fusion-node-ray[\s\S]*animation: none;/,
-    )
-    expect(layerActions).toMatch(
-      /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.image-editor-layer-actions__progress-bar[\s\S]*animation: none;/,
     )
   })
 

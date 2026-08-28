@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
-import { seoStaticHtmlVitePlugin } from './scripts/seo-static-html-vite-plugin'
+import { seoStaticHtmlVitePlugin } from './scripts/seo-static-html-vite-plugin.ts'
 
 export default defineConfig({
   plugins: [vue(), tailwindcss(), seoStaticHtmlVitePlugin()],
@@ -12,7 +12,12 @@ export default defineConfig({
   },
   build: {
     manifest: true,
-    chunkSizeWarningLimit: 700,
+    // heic2any is an intentionally lazy-loaded HEIC decoder. Its WASM/runtime
+    // bundle is ~1.35 MB minified, but it is never part of the initial entry
+    // chunks (see scripts/check-bundle-size.ts optional chunk budget).
+    // Keep the warning useful for eagerly loaded code while allowing this
+    // known optional chunk to stay below its explicit 1.4 MB budget.
+    chunkSizeWarningLimit: 1_400,
     rollupOptions: {
       onwarn(warning, warn) {
         const id = warning.id || ''

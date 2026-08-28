@@ -9,7 +9,6 @@ import type {
   ImageEditorParamValue,
   ImageEditorRenderedPreview,
 } from '../image-editor/types'
-import type { ImageAdjustmentFinalApplyProgress } from '../image-editor/runtime/imageAdjustmentFinalApplyContext'
 import type { ImageMaskDrawMode } from '../mask-editor/types'
 import type { ImageStrengthAction } from '../execution'
 import type { ImageToolSession } from './imageToolSession'
@@ -113,7 +112,6 @@ export type CanvasImageTools = {
     chrome: ComputedRef<ImageToolChromeModel>
     adjustment: {
       isApplying: Ref<boolean>
-      finalApplyProgress: Ref<ImageAdjustmentFinalApplyProgress | null>
     }
     nodeBindings: {
       stageFor: (nodeId: string) => ImageToolStageBinding

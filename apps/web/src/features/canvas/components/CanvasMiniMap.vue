@@ -51,7 +51,6 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getBoundsofRects, getRectOfNodes, useVueFlow } from '@vue-flow/core'
 import { MiniMap } from '@vue-flow/minimap'
-import '@vue-flow/minimap/dist/style.css'
 import { usePointerDragSession } from '../utils/interaction/usePointerDragSession'
 
 const emit = defineEmits<{

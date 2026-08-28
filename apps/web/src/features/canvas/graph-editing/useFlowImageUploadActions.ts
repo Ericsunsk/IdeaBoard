@@ -309,10 +309,15 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
       }
       options.updateSnapshotNode(nodeId, (prev) => {
         if (prev.type !== 'image-node') return prev
+        const previousWidth = Number(prev.width)
+        const width =
+          Number.isFinite(previousWidth) && previousWidth > 0
+            ? previousWidth
+            : resolveImageNodeFrameSize(uploaded.ratio, true).width
         return {
           ...prev,
           title: resolveImageFileTitle(localUpload.file) || prev.title,
-          width: resolveImageNodeFrameSize(uploaded.ratio, true).width,
+          width,
           sourceImageUrl: uploaded.url,
           sourceMediaAssetId: uploaded.mediaAssetId,
           sourceImageRatio: uploaded.ratio,

@@ -1,16 +1,8 @@
-/* eslint-disable vue/one-component-per-file */
 import type { Node } from '@vue-flow/core'
-import { createApp, defineComponent, h, inject, nextTick, ref, shallowRef, type Ref } from 'vue'
+import { createApp, defineComponent, nextTick, ref, shallowRef, type Ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../canvas-board/domain'
-import {
-  cancelImageAdjustmentFinalRender,
-  renderImageEditorLayerStackFile,
-} from '../image-editor/services/imageAdjustmentRenderer'
-import {
-  IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY,
-  type CanvasImageAdjustmentFinalApplyContext,
-} from '../image-editor/runtime/imageAdjustmentFinalApplyContext'
+import { renderImageEditorLayerStackFile } from '../image-editor/services/imageAdjustmentRenderer'
 import { IMAGE_STRENGTH_ACTIONS, type ImageStrengthAction } from '../execution'
 import type { UseCanvasImageToolsOptions } from './imageToolSession'
 import { useCanvasImageTools, type CanvasImageTools } from '.'
@@ -22,7 +14,6 @@ vi.mock('../image-editor/services/imageAdjustmentRenderer', async (importOrigina
     await importOriginal<typeof import('../image-editor/services/imageAdjustmentRenderer')>()
   return {
     ...actual,
-    cancelImageAdjustmentFinalRender: vi.fn(),
     renderImageEditorLayerStackFile: vi.fn(),
   }
 })
@@ -48,7 +39,6 @@ vi.mock('../mask-editor/lib/maskPaintingCanvas', async (importOriginal) => {
   }
 })
 
-const cancelFinalRenderMock = vi.mocked(cancelImageAdjustmentFinalRender)
 const renderLayerStackFileMock = vi.mocked(renderImageEditorLayerStackFile)
 
 const mediaAssetRequestMock = vi.hoisted(() => vi.fn())
@@ -170,14 +160,17 @@ function mountCanvasImageTools() {
     Object.keys(imageNodeFixtures).map((id) => ({ id, data: { kind: 'image' } })) as Node[],
   )
   const connectionAdapter = { connectIntent: vi.fn(() => true) }
-  const createImageNodeFromFile = vi.fn<UseCanvasImageToolsOptions['createImageNodeFromFile']>(
-    async () => ({ kind: 'ready', nodeId: 'image-3' }),
-  )
+  const createPendingAdjustmentNode = vi.fn<
+    NonNullable<UseCanvasImageToolsOptions['createPendingAdjustmentNode']>
+  >(() => 'image-3')
+  const applyImageFileToImageNode = vi.fn<
+    NonNullable<UseCanvasImageToolsOptions['applyImageFileToImageNode']>
+  >(async () => true)
+  const removeNode = vi.fn<NonNullable<UseCanvasImageToolsOptions['removeNode']>>()
   const setViewport = vi.fn()
   const setCenter = vi.fn()
   const runInpaintAction = vi.fn()
   const activeStrengthAction = ref<ImageStrengthAction | null>(null)
-  let imageAdjustmentFinalApplyContext: CanvasImageAdjustmentFinalApplyContext | null = null
   const feedback = {
     warning: vi.fn<(message: string) => void>(),
     succeeded: vi.fn<(message: string) => void>(),
@@ -187,12 +180,6 @@ function mountCanvasImageTools() {
   const host = document.createElement('div')
   canvasWrapRef.value = host
   document.body.appendChild(host)
-  const ContextProbe = defineComponent({
-    setup() {
-      imageAdjustmentFinalApplyContext = inject(IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY, null)
-      return () => null
-    },
-  })
   const app = createApp(
     defineComponent({
       setup() {
@@ -210,7 +197,9 @@ function mountCanvasImageTools() {
           getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
           setViewport,
           setCenter,
-          createImageNodeFromFile,
+          createPendingAdjustmentNode,
+          applyImageFileToImageNode,
+          removeNode,
           connectionAdapter,
           uploadImageToBoard: async () => ({ url: 'https://example.com/ref.png', ratio: 1 }),
           openImageUrlPreview: vi.fn(),
@@ -237,7 +226,7 @@ function mountCanvasImageTools() {
           stopCanvasInteraction: vi.fn(),
           feedback,
         })
-        return () => h(ContextProbe)
+        return () => null
       },
     }),
   )
@@ -248,19 +237,15 @@ function mountCanvasImageTools() {
     activeStrengthAction,
     app,
     connectionAdapter,
-    createImageNodeFromFile,
+    createPendingAdjustmentNode,
+    applyImageFileToImageNode,
+    removeNode,
     currentBoardId,
     directActionRunningNodeIds,
     generationAvailable,
     host,
     isCanvasInteractionLocked,
     runInpaintAction,
-    cancelImageAdjustmentFinalApply: () => {
-      if (!imageAdjustmentFinalApplyContext) {
-        throw new Error('Image adjustment final apply context was not provided')
-      }
-      imageAdjustmentFinalApplyContext.cancel()
-    },
     feedback,
     runtime,
     unmount: () => {
@@ -285,7 +270,6 @@ async function flushPromises() {
 afterEach(() => {
   i18n.global.locale.value = 'en'
   vi.restoreAllMocks()
-  cancelFinalRenderMock.mockReset()
   renderLayerStackFileMock.mockReset()
   mediaAssetRequestMock.mockReset()
 })
@@ -322,7 +306,6 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(harness.runtime.viewModel.locks.isCanvasLocked.value).toBe(false)
       expect(harness.runtime.viewModel.chrome.value.isReady).toBe(false)
       expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(false)
-      expect(harness.runtime.viewModel.adjustment.finalApplyProgress.value).toBeNull()
       expect(harness.runtime.viewModel.nodeBindings.stageFor).toEqual(expect.any(Function))
       expect(harness.runtime.viewModel.nodeBindings.actionFor).toEqual(expect.any(Function))
       expect(harness.runtime.commands.lifecycle.enter).toEqual(expect.any(Function))
@@ -361,13 +344,13 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     }
   })
 
-  it('records final render progress while applying and clears it after success', async () => {
+  it('exits editor mode immediately while the derived node is pending', async () => {
     let resolveRender!: (file: File) => void
     renderLayerStackFileMock.mockImplementation(
       async (_source, _layers, options): Promise<File> =>
         new Promise((resolve) => {
-          resolveRender = resolve
           options?.onProgress?.({ phase: 'render', loaded: 24, total: 96 })
+          resolveRender = resolve
         }),
     )
     const harness = mountCanvasImageTools()
@@ -378,35 +361,38 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       const apply = harness.runtime.commands.editor.apply()
       await flushPromises()
 
+      expect(harness.runtime.viewModel.active.mode.value).toBeNull()
+      expect(harness.runtime.viewModel.active.nodeId.value).toBeNull()
       expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(true)
-      expect(harness.runtime.viewModel.adjustment.finalApplyProgress.value).toEqual({
-        phase: 'render',
-        loaded: 24,
-        total: 96,
-      })
-      expect(renderLayerStackFileMock).toHaveBeenCalledWith(
-        { url: 'https://example.com/source.png', title: 'Source' },
-        renderableLayers,
-        expect.objectContaining({
-          scopeId: 'image-1',
-          onProgress: expect.any(Function),
-        }),
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-3').directGenerating).toBe(true)
+      expect(harness.createPendingAdjustmentNode).toHaveBeenCalledWith(
+        expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+        expect.objectContaining({ id: 1 }),
       )
-
-      resolveRender(new File(['rendered'], 'rendered.webp', { type: 'image/webp' }))
-      await apply
-
-      expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(false)
-      expect(harness.runtime.viewModel.adjustment.finalApplyProgress.value).toBeNull()
-      expect(harness.feedback.warning).not.toHaveBeenCalled()
-      expect(harness.feedback.succeeded).toHaveBeenCalledWith('Image generated')
-      expect(harness.feedback.succeeded).toHaveBeenCalledTimes(1)
       expect(harness.connectionAdapter.connectIntent).toHaveBeenCalledWith({
         sourceNodeId: 'image-1',
         sourcePort: 'image',
         targetNodeId: 'image-3',
         targetPort: 'image',
       })
+      expect(renderLayerStackFileMock).toHaveBeenCalledWith(
+        { url: 'https://example.com/source.png', title: 'Source' },
+        renderableLayers,
+        expect.objectContaining({
+          scopeId: 'image-1',
+        }),
+      )
+
+      resolveRender(new File(['rendered'], 'rendered.webp', { type: 'image/webp' }))
+      await apply
+
+      expect(harness.applyImageFileToImageNode).toHaveBeenCalledWith('image-3', expect.any(File))
+      expect(harness.runtime.viewModel.active.mode.value).toBeNull()
+      expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(false)
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-3').directGenerating).toBe(false)
+      expect(harness.feedback.warning).not.toHaveBeenCalled()
+      expect(harness.feedback.succeeded).toHaveBeenCalledWith('Image generated')
+      expect(harness.feedback.succeeded).toHaveBeenCalledTimes(1)
     } finally {
       harness.unmount()
     }
@@ -460,11 +446,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
     )
     const harness = mountCanvasImageTools()
-    harness.createImageNodeFromFile.mockResolvedValueOnce({
-      kind: 'awaiting-retry',
-      nodeId: 'image-3',
-      failureMessage: 'Upload failed',
-    })
+    harness.applyImageFileToImageNode.mockResolvedValueOnce(false)
 
     try {
       prepareRenderableAdjustmentSession(harness.runtime)
@@ -474,13 +456,58 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(harness.feedback.warning).toHaveBeenCalledWith('Image generation failed')
       expect(harness.feedback.warning).toHaveBeenCalledTimes(1)
       expect(harness.feedback.succeeded).not.toHaveBeenCalled()
+      expect(harness.createPendingAdjustmentNode).toHaveBeenCalledWith(
+        expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+        expect.objectContaining({ id: 1 }),
+      )
       expect(harness.connectionAdapter.connectIntent).toHaveBeenCalledWith({
         sourceNodeId: 'image-1',
         sourcePort: 'image',
         targetNodeId: 'image-3',
         targetPort: 'image',
       })
-      expect(harness.runtime.viewModel.active.mode.value).toBe('adjust')
+      expect(harness.runtime.viewModel.active.mode.value).toBeNull()
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('removes the pending node when automatic connection is rejected', async () => {
+    renderLayerStackFileMock.mockResolvedValue(
+      new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
+    )
+    const harness = mountCanvasImageTools()
+    harness.connectionAdapter.connectIntent.mockReturnValue(false)
+
+    try {
+      prepareRenderableAdjustmentSession(harness.runtime)
+
+      await harness.runtime.commands.editor.apply()
+
+      expect(harness.removeNode).toHaveBeenCalledWith('image-3')
+      expect(harness.feedback.warning).toHaveBeenCalledWith(
+        'Image created, but automatic connection failed. Please connect it manually.',
+      )
+      expect(harness.feedback.succeeded).not.toHaveBeenCalled()
+      expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(false)
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('clears applying state when pending node creation fails synchronously', async () => {
+    const harness = mountCanvasImageTools()
+    harness.createPendingAdjustmentNode.mockImplementation(() => {
+      throw new Error('graph write failed')
+    })
+
+    try {
+      prepareRenderableAdjustmentSession(harness.runtime)
+
+      await harness.runtime.commands.editor.apply()
+
+      expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(false)
+      expect(harness.feedback.warning).toHaveBeenCalledWith('Image generation failed')
     } finally {
       harness.unmount()
     }
@@ -498,7 +525,6 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(harness.feedback.warning).toHaveBeenCalledWith('Image generation failed')
       expect(harness.feedback.warning).toHaveBeenCalledTimes(1)
       expect(harness.feedback.succeeded).not.toHaveBeenCalled()
-      expect(harness.createImageNodeFromFile).not.toHaveBeenCalled()
     } finally {
       harness.unmount()
     }
@@ -533,7 +559,6 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       await harness.runtime.commands.editor.apply()
 
       expect(renderLayerStackFileMock).not.toHaveBeenCalled()
-      expect(harness.createImageNodeFromFile).not.toHaveBeenCalled()
       expect(harness.connectionAdapter.connectIntent).not.toHaveBeenCalled()
       expect(harness.feedback.warning).toHaveBeenCalledWith(
         'Failed to write the image node to the canvas.',
@@ -544,68 +569,12 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     }
   })
 
-  it('keeps the rendered node and editor open when automatic connection is rejected', async () => {
-    renderLayerStackFileMock.mockResolvedValue(
-      new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
-    )
-    const harness = mountCanvasImageTools()
-    harness.connectionAdapter.connectIntent.mockReturnValue(false)
-
-    try {
-      prepareRenderableAdjustmentSession(harness.runtime)
-
-      await harness.runtime.commands.editor.apply()
-
-      expect(harness.createImageNodeFromFile).toHaveBeenCalledTimes(1)
-      expect(harness.connectionAdapter.connectIntent).toHaveBeenCalledTimes(1)
-      expect(harness.feedback.warning).toHaveBeenCalledWith(
-        'Image created, but automatic connection failed. Please connect it manually.',
-      )
-      expect(harness.feedback.succeeded).not.toHaveBeenCalled()
-      expect(harness.runtime.viewModel.active.nodeId.value).toBe('image-1')
-      expect(harness.runtime.viewModel.active.mode.value).toBe('adjust')
-    } finally {
-      harness.unmount()
-    }
-  })
-
-  it('cancels the active final render without showing a warning toast', async () => {
-    renderLayerStackFileMock.mockImplementation(
-      async (_source, _layers, options): Promise<File> =>
-        new Promise((_resolve, reject) => {
-          options?.onProgress?.({ phase: 'encode' })
-          window.setTimeout(() => reject(new Error('cancelled')), 0)
-        }),
-    )
-    const harness = mountCanvasImageTools()
-
-    try {
-      prepareRenderableAdjustmentSession(harness.runtime)
-
-      const apply = harness.runtime.commands.editor.apply()
-      await flushPromises()
-      harness.cancelImageAdjustmentFinalApply()
-
-      expect(cancelFinalRenderMock).toHaveBeenCalledWith('image-1')
-      expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(false)
-      expect(harness.runtime.viewModel.adjustment.finalApplyProgress.value).toBeNull()
-
-      await apply
-
-      expect(harness.feedback.warning).not.toHaveBeenCalled()
-      expect(harness.createImageNodeFromFile).not.toHaveBeenCalled()
-    } finally {
-      harness.unmount()
-    }
-  })
-
-  it('does not write an old final render result back after switching to another image node', async () => {
+  it('does not write an old final render result back after switching to another board', async () => {
     let resolveOldRender!: (file: File) => void
     renderLayerStackFileMock.mockImplementation(
-      async (_source, _layers, options): Promise<File> =>
+      async (_source, _layers): Promise<File> =>
         new Promise((resolve) => {
           resolveOldRender = resolve
-          options?.onProgress?.({ phase: 'render', loaded: 1, total: 4 })
         }),
     )
     const harness = mountCanvasImageTools()
@@ -616,20 +585,16 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       const oldApply = harness.runtime.commands.editor.apply()
       await flushPromises()
 
-      expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(true)
-      expect(harness.runtime.commands.lifecycle.enter('image-2', 'adjust')).toBe(true)
-      expect(cancelFinalRenderMock).toHaveBeenCalledWith('image-1')
-      expect(harness.runtime.viewModel.active.nodeId.value).toBe('image-2')
-      expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(false)
+      // Switch to a different board before render completes
+      harness.currentBoardId.value = 'board-other'
 
       resolveOldRender(new File(['old'], 'old.webp', { type: 'image/webp' }))
       await oldApply
 
-      expect(harness.createImageNodeFromFile).not.toHaveBeenCalled()
-      expect(harness.connectionAdapter.connectIntent).not.toHaveBeenCalled()
+      expect(harness.applyImageFileToImageNode).not.toHaveBeenCalled()
+      expect(harness.removeNode).toHaveBeenCalledWith('image-3')
       expect(harness.feedback.succeeded).not.toHaveBeenCalled()
       expect(harness.feedback.warning).not.toHaveBeenCalled()
-      expect(harness.runtime.viewModel.active.nodeId.value).toBe('image-2')
     } finally {
       harness.unmount()
     }

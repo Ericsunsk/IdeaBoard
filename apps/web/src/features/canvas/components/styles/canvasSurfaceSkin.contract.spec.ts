@@ -98,7 +98,6 @@ describe('Canvas surface skin contract', () => {
     expect(nodeStageFrame).toContain('.node-stage-frame::after')
     expect(nodeStageFrame).toContain('.node-stage-frame.is-active')
     expect(nodeStageFrame).toContain('--node-stage-frame-emphasis-shadow-primary')
-    expect(imageEditorLayerActions).toContain('@media (prefers-reduced-motion: reduce)')
     expect(maskEditorChrome).toContain(':disabled="directGenerating"')
   })
 
