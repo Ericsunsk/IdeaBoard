@@ -41,6 +41,9 @@ func TestUserEventStreamIsScopedAndCleansUp(t *testing.T) {
 	if recorder.Code != http.StatusOK || recorder.Header().Get("Cache-Control") != "no-store" || !strings.Contains(recorder.Header().Get("Content-Type"), "text/event-stream") {
 		t.Fatalf("stream response=%d headers=%v", recorder.Code, recorder.Header())
 	}
+	if got := recorder.Body.String(); got != ":connected\n\n" {
+		t.Fatalf("initial SSE frame=%q, want connected frame", got)
+	}
 	if userEvents.unsubscribed.Load() != 1 {
 		t.Fatalf("subscriptions were not cleaned up")
 	}

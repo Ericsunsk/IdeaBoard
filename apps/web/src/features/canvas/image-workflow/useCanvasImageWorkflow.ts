@@ -46,6 +46,7 @@ type CanvasImageWorkflowGraphPort = Pick<
   | 'currentBoardId'
   | 'getImageNodeDisplayPayload'
   | 'getImageNodeSnapshot'
+  | 'updateSnapshotNode'
   | 'createImageNodeFromFile'
   | 'connectionAdapter'
   | 'uploadImageToBoard'
@@ -185,6 +186,7 @@ export function useCanvasImageWorkflow(
     currentBoardId: graph.currentBoardId,
     getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
     getImageNodeSnapshot: graph.getImageNodeSnapshot,
+    updateSnapshotNode: graph.updateSnapshotNode,
     getImageStageElement: ui.getImageStageElement,
     screenToFlowCoordinate: options.flowPaneAdapter.screenToFlowCoordinate,
     getViewport: options.flowPaneAdapter.getViewport,

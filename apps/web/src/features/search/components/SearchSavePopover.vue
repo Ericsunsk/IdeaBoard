@@ -52,7 +52,7 @@
           type="button"
           class="group/fitem flex w-full cursor-pointer items-center justify-between rounded-lg border-none bg-transparent px-2.5 py-1.5 text-left text-xs text-board-page-text transition hover:bg-ib-surface-hover hover:text-board-primary disabled:opacity-50"
           :disabled="saving || !folderFactsReady"
-          @click="saveTo(quickSavesFolder?.id)"
+          @click="saveTo()"
         >
           <div class="flex min-w-0 items-center gap-2">
             <Bookmark class="size-3.5 shrink-0 text-board-primary" aria-hidden="true" />
@@ -288,7 +288,7 @@ async function handleEnterCreate() {
   const normalizedName = name.toLowerCase()
   if (!normalizedName || saving.value || normalizedName === 'all assets') return
   if (!(await loadFolders())) return
-  if (normalizedName === 'quick saves') return saveTo(quickSavesFolder.value?.id)
+  if (normalizedName === 'quick saves') return saveTo()
   const existingFolder = displayFolders.value.find(
     (folder) => folder.name.toLowerCase() === normalizedName,
   )

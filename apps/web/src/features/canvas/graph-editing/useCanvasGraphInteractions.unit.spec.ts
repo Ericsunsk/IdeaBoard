@@ -55,7 +55,7 @@ function createHarness() {
   const clear = vi.fn()
   const downloadImage = vi.fn()
   const openNodeImage = vi.fn(async () => undefined)
-  const loading = { id: 'export-loading', destroy: vi.fn() }
+  const loading = { id: 'export-loading', destroy: vi.fn(), update: vi.fn() }
   const feedback = {
     operationSucceeded: vi.fn(),
     operationWarning: vi.fn(),
@@ -132,8 +132,9 @@ describe('useCanvasGraphInteractions', () => {
     await harness.interactions.commands.exportSelectedImages()
 
     expect(harness.feedback.operationLoading).toHaveBeenCalledWith('正在导出 1 张图片…', {
-      duration: 1500,
+      duration: Number.POSITIVE_INFINITY,
     })
+    expect(harness.loading.update).toHaveBeenCalledWith('正在导出第 1/1 张图片…')
     expect(harness.feedback.operationSucceeded).toHaveBeenCalledWith('已加入导出队列：1 张')
   })
 

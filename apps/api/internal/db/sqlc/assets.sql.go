@@ -1152,14 +1152,17 @@ func (q *Queries) MarkMediaAssetFailed(ctx context.Context, arg MarkMediaAssetFa
 
 const markMediaAssetReady = `-- name: MarkMediaAssetReady :one
 UPDATE media_assets
-SET status = 'ready', updated_at = now(), url = $1, source_url = $2,
-    mime_type = $3, width = $4, height = $5,
-    size_bytes = $6, checksum_sha256 = $7, metadata = $8
-WHERE id = $9 AND owner_user_id = $10 AND status IN ('pending', 'uploading', 'failed', 'ready')
+SET status = 'ready', updated_at = now(),
+    storage_key = COALESCE(NULLIF($1::text, ''), storage_key),
+    url = $2, source_url = $3,
+    mime_type = $4, width = $5, height = $6,
+    size_bytes = $7, checksum_sha256 = $8, metadata = $9
+WHERE id = $10 AND owner_user_id = $11 AND status IN ('pending', 'uploading', 'failed', 'ready')
 RETURNING id
 `
 
 type MarkMediaAssetReadyParams struct {
+	StorageKey     string          `json:"storage_key"`
 	Url            string          `json:"url"`
 	SourceUrl      string          `json:"source_url"`
 	MimeType       string          `json:"mime_type"`
@@ -1174,6 +1177,7 @@ type MarkMediaAssetReadyParams struct {
 
 func (q *Queries) MarkMediaAssetReady(ctx context.Context, arg MarkMediaAssetReadyParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, markMediaAssetReady,
+		arg.StorageKey,
 		arg.Url,
 		arg.SourceUrl,
 		arg.MimeType,

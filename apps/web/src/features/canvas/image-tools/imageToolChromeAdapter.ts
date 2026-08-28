@@ -1,5 +1,8 @@
 import { computed } from 'vue'
-import { resolveMediaAssetOriginalURL } from '../../../shared/api/mediaAssetDelivery'
+import {
+  resolveMediaAssetDerivativeURL,
+  useMediaAssetDelivery,
+} from '../../../shared/api/mediaAssetDelivery'
 import { useImageAdjustmentRenderedPreview } from '../image-editor/useImageAdjustmentRenderedPreview'
 import { useImageEditorHistogramSource } from '../image-editor/useImageEditorHistogramSource'
 import type { ImageToolChromeCommands, ImageToolChromeModel } from './imageToolBindings'
@@ -10,6 +13,11 @@ export function createImageToolChromeAdapter(
   commands: ImageToolChromeCommands,
 ) {
   const { board, execution } = session.capabilities
+  const previewAssetId = computed(() => {
+    const nodeId = session.imageEditorNodeId.value
+    return nodeId ? (board.getImageNodeDisplayPayload(nodeId)?.mediaAssetId ?? null) : null
+  })
+  const previewDelivery = useMediaAssetDelivery(previewAssetId, 'preview')
   const { imageEditorRenderedPreview, imageEditorPreviewSource } =
     useImageAdjustmentRenderedPreview({
       isAdjustMode: session.isImageAdjustmentMode,
@@ -18,9 +26,20 @@ export function createImageToolChromeAdapter(
         const payload = session.imageEditorNodeId.value
           ? board.getImageNodeDisplayPayload(session.imageEditorNodeId.value)
           : null
-        return payload?.mediaAssetId
-          ? resolveMediaAssetOriginalURL(payload.mediaAssetId)
-          : (payload?.url ?? null)
+        if (payload?.mediaAssetId) {
+          if (previewDelivery.status.value === 'ready') {
+            const previewVariant = previewDelivery.metadata.value?.derivatives.preview
+            const format =
+              previewVariant?.format === 'jpeg' || previewVariant?.format === 'png'
+                ? previewVariant.format
+                : 'webp'
+            return resolveMediaAssetDerivativeURL(payload.mediaAssetId, 'preview', format)
+          }
+          // A derivative is the only source allowed during editing. Falling
+          // back to the persisted URL here can silently load the original.
+          return null
+        }
+        return payload?.url ?? null
       },
     })
   const { imageEditorHistogramSource } = useImageEditorHistogramSource({

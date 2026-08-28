@@ -13,6 +13,7 @@ type ToastLoadingOptions = {
 type ToastLoadingHandle = {
   id: string | number
   destroy: () => void
+  update: (content: unknown, options?: ToastLoadingOptions) => void
 }
 
 function normalizeContent(input: unknown): string {
@@ -46,6 +47,12 @@ export function useAppToast() {
     return {
       id,
       destroy: () => toast.dismiss(id),
+      update: (nextContent, nextOptions) =>
+        toast.loading(normalizeContent(nextContent), {
+          id,
+          description: nextOptions?.description,
+          duration: nextOptions?.duration ?? Number.POSITIVE_INFINITY,
+        }),
     }
   }
 

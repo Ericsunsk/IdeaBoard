@@ -64,6 +64,46 @@ const libraryImportFactSchema = v.union([
   }),
 ])
 
+const imageAdjustmentRecipeStepSchema = v.union([
+  v.strictObject({
+    kind: v.literal('hsl'),
+    params: v.strictObject({
+      hueShift: finiteNumberSchema,
+      saturationScale: finiteNumberSchema,
+      lightnessOffset: finiteNumberSchema,
+    }),
+  }),
+  v.strictObject({
+    kind: v.literal('threshold'),
+    threshold: finiteNumberSchema,
+    invert: v.boolean(),
+  }),
+  v.strictObject({
+    kind: v.literal('channel-lut'),
+    luts: v.strictObject({
+      red: v.pipe(v.array(v.pipe(finiteNumberSchema, v.integer())), v.length(256)),
+      green: v.pipe(v.array(v.pipe(finiteNumberSchema, v.integer())), v.length(256)),
+      blue: v.pipe(v.array(v.pipe(finiteNumberSchema, v.integer())), v.length(256)),
+    }),
+  }),
+  v.strictObject({
+    kind: v.literal('sharpen'),
+    params: v.strictObject({
+      amount: finiteNumberSchema,
+      radius: finiteNumberSchema,
+      threshold: finiteNumberSchema,
+      protectColor: v.boolean(),
+    }),
+  }),
+])
+
+const imageAdjustmentRecipeSchema = v.strictObject({
+  version: v.literal(1),
+  sourceMediaAssetId: positiveIntegerSchema,
+  sourceMimeType: v.optional(nonEmptyStringSchema),
+  plan: v.array(imageAdjustmentRecipeStepSchema),
+})
+
 const boardStateMediaRefSchema = v.strictObject({
   mediaAssetId: positiveIntegerSchema,
   refType: v.picklist(['board', 'board_node']),
@@ -104,6 +144,7 @@ const imageNodeItemSchema = v.strictObject({
   title: v.optional(v.string()),
   sourceImageUrl: v.string(),
   sourceMediaAssetId: v.optional(positiveIntegerSchema),
+  adjustmentRecipe: v.optional(imageAdjustmentRecipeSchema),
   sourceImageRatio: positiveFiniteNumberSchema,
   outputCount: v.optional(outputCountSchema, DEFAULT_IMAGE_NODE_OUTPUT_COUNT),
   outputResolution: v.optional(outputResolutionSchema),

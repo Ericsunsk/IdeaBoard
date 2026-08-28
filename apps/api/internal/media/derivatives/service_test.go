@@ -8,6 +8,16 @@ import (
 	"testing"
 )
 
+func TestProcessingTierIsSizedForEditorWork(t *testing.T) {
+	spec, ok := TierSpecs[TierProcessing]
+	if !ok {
+		t.Fatal("processing tier is not configured")
+	}
+	if spec.MaxSide < 2048 || spec.MaxSide > 2560 {
+		t.Fatalf("processing max side=%d, want 2048..2560", spec.MaxSide)
+	}
+}
+
 func TestRenderKeepsAspectRatioAndCapsLongestSide(t *testing.T) {
 	source := image.NewRGBA(image.Rect(0, 0, 800, 400))
 	for y := 0; y < 400; y++ {

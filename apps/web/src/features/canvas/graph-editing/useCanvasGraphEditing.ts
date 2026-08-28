@@ -220,6 +220,7 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     workflowPort: {
       getImageNodeDisplayPayload,
       getImageNodeSnapshot,
+      updateSnapshotNode,
       createImageNodeFromFile,
       uploadImageToBoard,
       getMediaInputImages: mediaInputs.getMediaInputImages,

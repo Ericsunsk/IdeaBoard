@@ -8,6 +8,7 @@ import {
   unsupportedUploadImageMessage,
 } from '../../../shared/utils/imageUploadSupport'
 import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
+import { preloadImage } from '../../../shared/media/preloadImage'
 import { resolveMediaAssetOriginalURL } from '../../../shared/api/mediaAssetDelivery'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
@@ -59,6 +60,7 @@ type UseFlowImageUploadActionsOptions = {
   setLocalUploadState: (nodeId: string, state: FlowLocalUploadState | null) => void
   createObjectUrl?: (file: File) => string
   revokeObjectUrl?: (url: string) => void
+  preloadImage?: (url: string) => Promise<boolean>
 }
 
 type LocalUpload = {
@@ -114,6 +116,10 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
     if (options.createObjectUrl) return options.createObjectUrl(file)
     if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return ''
     return URL.createObjectURL(file)
+  }
+
+  async function preloadLocalPreview(previewUrl: string): Promise<boolean> {
+    return (options.preloadImage ?? preloadImage)(previewUrl).catch(() => false)
   }
 
   function revokeObjectUrl(url: string) {
@@ -216,40 +222,25 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
       return false
     }
     const boardId = readCurrentBoardIdRef(options.currentBoardId)
-    const requestId = startNodeUploadRequest(nodeId)
-    try {
-      const uploaded = await uploadImageToBoardForBoard(file, boardId)
-      if (
-        !isBoardStillCurrent(boardId) ||
-        !isNodeUploadRequestCurrent(nodeId, requestId) ||
-        !options.getImageNodeSnapshot(nodeId)
-      ) {
-        return false
-      }
-      options.updateSnapshotNode(nodeId, (prev) => {
-        if (prev.type !== 'image-node') return prev
-        return {
-          ...prev,
-          title: resolveImageFileTitle(file) || prev.title,
-          width: resolveImageNodeFrameSize(uploaded.ratio, true).width,
-          sourceImageUrl: uploaded.url,
-          sourceMediaAssetId: uploaded.mediaAssetId,
-          sourceImageRatio: uploaded.ratio,
-          outputStatus: 'ready',
-          outputImages: [],
-        }
-      })
-      options.onNodeMutated?.(nodeId)
-      return true
-    } catch (error) {
-      const msg = userFacingErrorCopy(error, i18n.global.t('canvas.session.uploadFailed'))
-      options.onWarning(msg)
+    if (!isSupportedUploadImageFile(file)) {
+      options.onWarning(unsupportedUploadImageMessage())
       return false
-    } finally {
-      if (isNodeUploadRequestCurrent(nodeId, requestId)) {
-        nodeUploadRequests.delete(nodeId)
-      }
     }
+    if (!boardId) {
+      options.onWarning(i18n.global.t('canvas.session.missingBoardIdUpload'))
+      return false
+    }
+    const previewUrl = createObjectUrl(file)
+    const previewReady = await preloadLocalPreview(previewUrl)
+    if (!previewReady) {
+      revokeObjectUrl(previewUrl)
+      options.onWarning(i18n.global.t('canvas.session.uploadFailed'))
+      return false
+    }
+    const requestId = beginLocalUpload(nodeId, { boardId, file, previewUrl })
+    const result = await materializeLocalUpload(nodeId, requestId)
+    if (result.kind === 'failed') options.onWarning(result.message)
+    return result.kind === 'ready'
   }
 
   async function createImageNodeFromFile(
@@ -263,6 +254,18 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
     const previewRatio = await resolveLocalPreviewRatio(file)
     if (disposed || !isBoardStillCurrent(boardId)) return null
     const previewUrl = createObjectUrl(file)
+    const previewReady = await preloadLocalPreview(previewUrl)
+    if (!previewReady) {
+      revokeObjectUrl(previewUrl)
+      return {
+        kind: 'rejected',
+        failureMessage: i18n.global.t('canvas.session.uploadFailed'),
+      }
+    }
+    if (disposed || !isBoardStillCurrent(boardId)) {
+      revokeObjectUrl(previewUrl)
+      return null
+    }
     const frameSize = resolveImageNodeFrameSize(previewRatio, true)
     const nodeId = options.createNodeAtPosition('image', point.x, point.y, {
       title: resolveImageFileTitle(file),

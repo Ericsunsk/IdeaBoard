@@ -15,6 +15,7 @@ import { i18n } from '../i18n'
 import {
   getGetUserMediaAssetMetadataUrl,
   getGetUserMediaAssetOriginalContentUrl,
+  getGetUserMediaAssetDerivativeContentUrl,
 } from './generated-query/user-assets/user-assets'
 import type {
   ApiResponseMediaAssetMetadata,
@@ -22,12 +23,25 @@ import type {
   MediaAssetMetadata,
 } from './generated-query/model'
 
-export type MediaAssetDeliveryTier = 'thumb' | 'preview' | 'large-preview' | 'original'
+export type MediaAssetDeliveryTier =
+  'thumb' | 'preview' | 'large-preview' | 'processing' | 'original'
 export type MediaAssetDeliveryStatus =
   'idle' | 'loading' | 'pending' | 'processing' | 'ready' | 'failed' | 'error'
 
 export type MediaAssetDeliveryMetadata = MediaAssetMetadata
 export type MediaAssetDeliveryVariant = GeneratedMediaAssetDeliveryVariant
+
+export class MediaAssetDerivativeNotReadyError extends Error {
+  readonly tier: Exclude<MediaAssetDeliveryTier, 'original'>
+  readonly status: string
+
+  constructor(tier: Exclude<MediaAssetDeliveryTier, 'original'>, status: string) {
+    super(`Media asset ${tier} derivative is ${status}`)
+    this.name = 'MediaAssetDerivativeNotReadyError'
+    this.tier = tier
+    this.status = status
+  }
+}
 
 type CachedMetadata = {
   value: MediaAssetDeliveryMetadata
@@ -158,7 +172,9 @@ export async function getMediaAssetMetadata(
       }`,
       { method: 'GET', signal: options.signal },
     )
-    .then((response) => requireApiData(response, i18n.global.t('common.errors.mediaInfoLoadFailed')))
+    .then((response) =>
+      requireApiData(response, i18n.global.t('common.errors.mediaInfoLoadFailed')),
+    )
     .then((metadata) => {
       metadataCache.set(assetId, { value: metadata, expiresAt: resolveMetadataExpiry(metadata) })
       if (ensureKey) ensuredTiers.add(ensureKey)
@@ -172,14 +188,51 @@ export async function getMediaAssetMetadata(
 }
 
 export function resolveMediaAssetOriginalURL(assetId: number): string {
-	return resolveApiUrl(getGetUserMediaAssetOriginalContentUrl(String(assetId)))
+  return resolveApiUrl(getGetUserMediaAssetOriginalContentUrl(String(assetId)))
+}
+
+export function resolveMediaAssetDerivativeURL(
+  assetId: number,
+  tier: 'thumb' | 'preview' | 'large-preview' | 'processing' = 'large-preview',
+  format: 'webp' | 'jpeg' | 'png' = 'webp',
+): string {
+  return resolveApiUrl(getGetUserMediaAssetDerivativeContentUrl(String(assetId), tier, format))
+}
+
+export async function resolveMediaAssetProcessingURL(assetId: number): Promise<string> {
+  const maxWaitMs = 15_000
+  const initialPollIntervalMs = 400
+  const maxPollIntervalMs = 2_000
+  const startedAt = Date.now()
+  let force = false
+  let pollIntervalMs = initialPollIntervalMs
+  while (true) {
+    const metadata = await getMediaAssetMetadata(assetId, {
+      ensureTier: force ? undefined : 'processing',
+      force,
+    })
+    const variant = metadata.derivatives.processing
+    const status = variant?.status ?? 'pending'
+    if (status === 'ready' && variant?.url) {
+      const format =
+        variant.format === 'jpeg' || variant.format === 'png' ? variant.format : 'webp'
+      return resolveMediaAssetDerivativeURL(assetId, 'processing', format)
+    }
+    if (status === 'failed' || Date.now() - startedAt >= maxWaitMs) {
+      throw new MediaAssetDerivativeNotReadyError('processing', status)
+    }
+    await new Promise((resolve) => globalThis.setTimeout(resolve, pollIntervalMs))
+    force = true
+    pollIntervalMs = Math.min(maxPollIntervalMs, pollIntervalMs * 2)
+  }
 }
 
 function normalizeTier(value: unknown): MediaAssetDeliveryTier {
   return value === 'original' ||
     value === 'thumb' ||
     value === 'preview' ||
-    value === 'large-preview'
+    value === 'large-preview' ||
+    value === 'processing'
     ? value
     : 'preview'
 }
@@ -262,7 +315,8 @@ export function useMediaAssetDelivery(
       const nextMetadata = await getMediaAssetMetadata(currentAssetId, {
         signal: controller.signal,
         force,
-        ensureTier: currentTier === 'large-preview' ? currentTier : undefined,
+        ensureTier:
+          currentTier === 'large-preview' || currentTier === 'processing' ? currentTier : undefined,
       })
       if (token !== requestToken || controller.signal.aborted) return
       metadata.value = nextMetadata

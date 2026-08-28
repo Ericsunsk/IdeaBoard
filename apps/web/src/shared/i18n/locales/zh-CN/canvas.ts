@@ -296,6 +296,7 @@ export default {
     duplicateImagesFailed: '复制图片失败，请刷新画布后重试。',
     noExportableImages: '所选节点中没有可导出的图片。',
     exportingImages: '正在导出 {count} 张图片…',
+    exportingImageProgress: '正在导出第 {current}/{total} 张图片…',
     exportQueued: '已加入导出队列：{count} 张',
     exportPartiallyQueued: '已加入队列 {completed}/{total}，失败 {failed} 张',
     imageNodeMissing: '未找到图像节点。',

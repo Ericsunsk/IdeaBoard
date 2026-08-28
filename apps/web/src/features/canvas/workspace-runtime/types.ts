@@ -132,7 +132,7 @@ export type CanvasWorkspaceRuntimeCommands = {
       add: (
         candidate: CanvasLibraryImportDescriptor,
         center: { x: number; y: number },
-      ) => CanvasGraphNodeIdForKind<'image'> | null
+      ) => Promise<CanvasGraphNodeIdForKind<'image'> | null>
     }
     imageImport: {
       retry: (nodeId: string) => Promise<boolean>

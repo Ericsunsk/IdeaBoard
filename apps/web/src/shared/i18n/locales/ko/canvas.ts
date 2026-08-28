@@ -297,6 +297,7 @@ export default {
     duplicateImagesFailed: '이미지를 복제하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
     noExportableImages: '선택한 노드에 내보낼 이미지가 없습니다.',
     exportingImages: '이미지 {count}개를 내보내는 중...',
+    exportingImageProgress: '이미지 {current}/{total}개를 내보내는 중...',
     exportQueued: '내보내기 대기열에 추가됨: {count}개',
     exportPartiallyQueued: '대기열 추가 {completed}/{total}, 실패 {failed}개',
     imageNodeMissing: '이미지 노드를 찾을 수 없습니다.',

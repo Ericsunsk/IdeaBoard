@@ -20,6 +20,7 @@ var defaultTierPolicies = []TierPolicy{
 
 var onDemandTierPolicies = map[string]TierPolicy{
 	TierLargePreview: {Tier: TierLargePreview, Format: FormatWebP},
+	TierProcessing:   {Tier: TierProcessing, Format: FormatWebP},
 }
 
 func ScheduleDefault(ctx context.Context, q *dbsqlc.Queries, assetID, ownerUserID int64) ([]int64, error) {
@@ -29,27 +30,27 @@ func ScheduleDefault(ctx context.Context, q *dbsqlc.Queries, assetID, ownerUserI
 	return schedulePolicies(ctx, q, assetID, ownerUserID, defaultTierPolicies)
 }
 
-func EnsureOnDemand(ctx context.Context, q *dbsqlc.Queries, assetID, ownerUserID int64, tier string) (int64, error) {
+func EnsureOnDemand(ctx context.Context, q *dbsqlc.Queries, assetID, ownerUserID int64, tier string) (int64, bool, error) {
 	if q == nil || assetID <= 0 || ownerUserID <= 0 {
-		return 0, fmt.Errorf("invalid on-demand derivative request")
+		return 0, false, fmt.Errorf("invalid on-demand derivative request")
 	}
 	policy, ok := onDemandTierPolicies[strings.TrimSpace(tier)]
 	if !ok {
-		return 0, fmt.Errorf("unsupported on-demand derivative tier %q", tier)
+		return 0, false, fmt.Errorf("unsupported on-demand derivative tier %q", tier)
 	}
 	derivative, err := q.UpsertMediaDerivative(ctx, dbsqlc.UpsertMediaDerivativeParams{
 		MediaAssetID: assetID, OwnerUserID: ownerUserID, Tier: policy.Tier, Format: policy.Format,
 	})
 	if err != nil {
-		return 0, fmt.Errorf("upsert %s derivative: %w", policy.Tier, err)
+		return 0, false, fmt.Errorf("upsert %s derivative: %w", policy.Tier, err)
 	}
 	if derivative.Status == "ready" {
-		return derivative.ID, nil
+		return derivative.ID, false, nil
 	}
 	if _, err := q.EnqueueMediaDerivativeOutbox(ctx, derivative.ID); err != nil {
-		return 0, fmt.Errorf("enqueue %s derivative: %w", policy.Tier, err)
+		return 0, false, fmt.Errorf("enqueue %s derivative: %w", policy.Tier, err)
 	}
-	return derivative.ID, nil
+	return derivative.ID, true, nil
 }
 
 func schedulePolicies(ctx context.Context, q *dbsqlc.Queries, assetID, ownerUserID int64, policies []TierPolicy) ([]int64, error) {

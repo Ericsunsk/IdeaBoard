@@ -1,4 +1,3 @@
-import type { PreviewMimeType } from '../../utils/displayImagePreviewEncoding'
 import type { ImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
 
 export type ImageProcessingErrorCode =
@@ -24,7 +23,7 @@ export type ImageProcessingProgress = {
 }
 
 export type ImageProcessingOutputEncoding = {
-  mimeType: PreviewMimeType
+  mimeType: string
   quality?: number
 }
 
@@ -50,6 +49,10 @@ export type RenderFinalInput = {
   plan: ImageProcessingPlan
   taskId?: string
   latestOnly?: boolean
+  maxPixels?: number
+  maxSide?: number
+  fitWithinMaxPixels?: boolean
+  preserveSourceMimeType?: boolean
   onProgress?: (progress: ImageProcessingProgress) => void
 }
 

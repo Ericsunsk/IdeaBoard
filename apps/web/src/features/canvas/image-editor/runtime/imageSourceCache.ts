@@ -35,12 +35,15 @@ export type ImageSourceCacheOptions = {
 export type ImageSourceFullSizeOptions = {
   readonly maxPixels?: number
   readonly maxSide?: number
+  /** Downscale sources that exceed maxPixels instead of rejecting them. */
+  readonly fitWithinMaxPixels?: boolean
   readonly resolveOptions?: ImageSourceResolveOptions
 }
 
 type LoadImageSourceOptions = {
   readonly maxPixels?: number
   readonly maxSide?: number
+  readonly fitWithinMaxPixels?: boolean
   readonly resolveOptions?: ImageSourceResolveOptions
 }
 
@@ -82,6 +85,7 @@ export class ImageSourceCache {
     return this.getOrLoad(sourceUrl, {
       maxPixels,
       maxSide: options.maxSide,
+      fitWithinMaxPixels: options.fitWithinMaxPixels,
       resolveOptions: options.resolveOptions,
     })
   }
@@ -222,17 +226,23 @@ function resolveTargetSize(bitmap: ImageBitmap, options: LoadImageSourceOptions)
     width: Math.max(1, Math.round(bitmap.width * scale)),
     height: Math.max(1, Math.round(bitmap.height * scale)),
   }
+  const maxPixels = options.maxPixels ?? DEFAULT_FULL_SIZE_SOURCE_MAX_PIXELS
   const pixelCount = targetSize.width * targetSize.height
-  if (pixelCount > (options.maxPixels ?? DEFAULT_FULL_SIZE_SOURCE_MAX_PIXELS)) {
-    throw createCacheError('too-large')
+  if (pixelCount <= maxPixels) return targetSize
+  if (!options.fitWithinMaxPixels) throw createCacheError('too-large')
+
+  const fitScale = Math.sqrt(maxPixels / pixelCount)
+  return {
+    width: Math.max(1, Math.floor(targetSize.width * fitScale)),
+    height: Math.max(1, Math.floor(targetSize.height * fitScale)),
   }
-  return targetSize
 }
 
 function createImageSourceCacheKey(sourceUrl: string, options: LoadImageSourceOptions) {
   return [
     options.maxPixels ?? 'unbounded',
     options.maxSide ?? 'full-side',
+    options.fitWithinMaxPixels ?? false,
     options.resolveOptions?.allowSameOriginUploads ?? 'default-uploads',
     options.resolveOptions?.blockExternal ?? 'default-external',
     sourceUrl,

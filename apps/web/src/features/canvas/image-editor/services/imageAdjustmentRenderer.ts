@@ -1,5 +1,6 @@
 import { i18n } from '../../../../shared/i18n'
 import { canvasToBlob } from '../../services/flowMediaIO'
+import type { ImageAdjustmentRecipe } from '../../../canvas-board/domain'
 import type {
   ImageEditorAdjustmentLayer,
   ImageEditorLayer,
@@ -11,6 +12,7 @@ import type { ImageProcessingProgress, RenderFinalInput } from '../runtime/types
 import { createImageSourceCache, readImageSourceImageData } from '../runtime/imageSourceCache'
 import { compositeImageEditorLayerStack } from '../utils/imageEditorRasterComposite'
 import { buildImageAdjustmentPlan } from '../utils/imageAdjustmentPlanPipeline'
+import { deserializeImageAdjustmentPlan } from '../utils/imageAdjustmentRecipe'
 import {
   flattenVisibleImageEditorAdjustmentLayers,
   hasEffectiveImageEditorAdjustmentLayers,
@@ -20,7 +22,7 @@ import {
   hasImageEditorRasterEdits,
 } from '../utils/imageEditorRasterTools'
 
-type ImageAdjustmentRenderSource = {
+export type ImageAdjustmentRenderSource = {
   url: string
   title?: string
 }
@@ -30,6 +32,10 @@ const IMAGE_ADJUSTMENT_FINAL_TASK_ID = 'image-adjustment-final'
 type ImageAdjustmentRenderOptions = {
   scopeId?: string
   onProgress?: (progress: ImageProcessingProgress) => void
+  maxPixels?: number
+  maxSide?: number
+  fitWithinMaxPixels?: boolean
+  preserveSourceMimeType?: boolean
 }
 
 export async function renderImageAdjustmentFile(
@@ -41,17 +47,40 @@ export async function renderImageAdjustmentFile(
   if (plan.length === 0) {
     throw new Error(i18n.global.t('canvas.tools.noEditableLayers'))
   }
+  return renderImageAdjustmentPlanFile(source, plan, options)
+}
 
+export async function renderImageAdjustmentRecipeFile(
+  source: ImageAdjustmentRenderSource,
+  recipe: ImageAdjustmentRecipe,
+  options: ImageAdjustmentRenderOptions = {},
+): Promise<File> {
+  return renderImageAdjustmentPlanFile(source, deserializeImageAdjustmentPlan(recipe), {
+    ...options,
+    preserveSourceMimeType: true,
+    maxPixels: options.maxPixels ?? 64_000_000,
+    fitWithinMaxPixels: options.fitWithinMaxPixels ?? false,
+  })
+}
+
+async function renderImageAdjustmentPlanFile(
+  source: ImageAdjustmentRenderSource,
+  plan: ReturnType<typeof deserializeImageAdjustmentPlan>,
+  options: ImageAdjustmentRenderOptions,
+): Promise<File> {
+  if (plan.length === 0) throw new Error(i18n.global.t('canvas.tools.noEditableLayers'))
   const renderInput: RenderFinalInput = {
     source,
     plan,
     taskId: getImageAdjustmentFinalTaskId(options.scopeId),
     latestOnly: true,
+    maxPixels: options.maxPixels,
+    maxSide: options.maxSide,
+    fitWithinMaxPixels: options.fitWithinMaxPixels,
+    preserveSourceMimeType: options.preserveSourceMimeType,
   }
   if (options.onProgress !== undefined) renderInput.onProgress = options.onProgress
-
   const result = await getImageAdjustmentProcessingRuntime().renderFinal(renderInput)
-
   if (result.status === 'completed') return result.output.file
   throw new Error(result.error.message)
 }
@@ -71,7 +100,11 @@ export async function renderImageEditorLayerStackFile(
 
   options.onProgress?.({ phase: 'decode' })
   const sourceCache = createImageSourceCache({ maxEntries: 1 })
-  const sourceEntry = await sourceCache.getFullSizeSource(source.url)
+  const sourceEntry = await sourceCache.getFullSizeSource(source.url, {
+    maxPixels: options.maxPixels,
+    maxSide: options.maxSide,
+    fitWithinMaxPixels: options.fitWithinMaxPixels ?? true,
+  })
   if (!sourceEntry) throw new Error(i18n.global.t('canvas.imageEditor.errors.readImageFailed'))
 
   try {

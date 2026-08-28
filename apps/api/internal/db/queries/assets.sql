@@ -94,7 +94,9 @@ RETURNING id;
 
 -- name: MarkMediaAssetReady :one
 UPDATE media_assets
-SET status = 'ready', updated_at = now(), url = sqlc.arg(url), source_url = sqlc.arg(source_url),
+SET status = 'ready', updated_at = now(),
+    storage_key = COALESCE(NULLIF(sqlc.arg(storage_key)::text, ''), storage_key),
+    url = sqlc.arg(url), source_url = sqlc.arg(source_url),
     mime_type = sqlc.arg(mime_type), width = sqlc.arg(width), height = sqlc.arg(height),
     size_bytes = sqlc.arg(size_bytes), checksum_sha256 = sqlc.arg(checksum_sha256), metadata = sqlc.arg(metadata)
 WHERE id = sqlc.arg(id) AND owner_user_id = sqlc.arg(owner_user_id) AND status IN ('pending', 'uploading', 'failed', 'ready')

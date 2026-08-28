@@ -75,7 +75,7 @@ func (h *mediaAssetHandler) Metadata(c *gin.Context) {
 	}
 	ensureTier := strings.TrimSpace(c.Query("ensure_tier"))
 	if ensureTier != "" {
-		if ensureTier != derivatives.TierLargePreview {
+		if ensureTier != derivatives.TierLargePreview && ensureTier != derivatives.TierProcessing {
 			response.Error(c, http.StatusBadRequest, "请求的媒体派生规格无效")
 			return
 		}
@@ -204,6 +204,14 @@ func (h *mediaAssetHandler) Original(c *gin.Context) {
 		return
 	}
 	object, err := h.storage.ReadObjectAtProfile(c.Request.Context(), asset.StorageProfileID, asset.StorageKey, 100*1024*1024)
+	if err != nil {
+		// Older ingestions could persist the planned extension while storage
+		// selected a different one from the downloaded content. Keep those
+		// records readable using the canonical URL extension.
+		if fallbackKey := storage.LegacyStorageKeyFromURL(asset.StorageKey, asset.Url); fallbackKey != "" {
+			object, err = h.storage.ReadObjectAtProfile(c.Request.Context(), asset.StorageProfileID, fallbackKey, 100*1024*1024)
+		}
+	}
 	if err != nil {
 		response.InternalError(c, http.StatusInternalServerError, "读取原图失败", err)
 		return

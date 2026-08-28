@@ -128,6 +128,28 @@ describe('ImageSourceCache', () => {
     })
   })
 
+  it('fits oversized final sources within the pixel limit when requested', async () => {
+    const { contexts } = installCanvasMocks()
+    installImageMocks(8000, 4000)
+    const cache = new ImageSourceCache({ maxEntries: 2 })
+
+    const source = await cache.getFullSizeSource('https://example.com/large.png', {
+      fitWithinMaxPixels: true,
+    })
+
+    expect(source).not.toBeNull()
+    expect((source?.width ?? 0) * (source?.height ?? 0)).toBeLessThanOrEqual(24_000_000)
+    expect(source?.width).toBe(6928)
+    expect(source?.height).toBe(3464)
+    expect(contexts[0]?.drawImage).toHaveBeenCalledWith(
+      expect.objectContaining({ width: 8000, height: 4000 }),
+      0,
+      0,
+      6928,
+      3464,
+    )
+  })
+
   it('trims least-recently-used canvases when the cache reaches its limit', async () => {
     installCanvasMocks()
     installImageMocks()

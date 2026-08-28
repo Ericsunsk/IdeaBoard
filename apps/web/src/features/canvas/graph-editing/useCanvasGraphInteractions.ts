@@ -23,8 +23,16 @@ import { createImageFlowNode } from '../utils/flowImageNodeFactory'
 import { createCanvasNodeAt } from '../utils/canvasNodeFactory'
 import { resolveImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
 import type { CanvasGraphInteractionBrowserAdapter } from './interactionBrowserAdapter'
+import {
+  renderImageAdjustmentRecipeFile,
+  type ImageAdjustmentRenderSource,
+} from '../image-editor/services/imageAdjustmentRenderer'
+import { resolveMediaAssetOriginalURL } from '../../../shared/api/mediaAssetDelivery'
 
-type MessageLoadingHandle = { destroy: () => void }
+type MessageLoadingHandle = {
+  destroy: () => void
+  update?: (content: unknown, options?: { description?: string; duration?: number }) => void
+}
 
 type CanvasGraphInteractionSelectionAdapter = {
   selectedElements: { readonly value: Elements }
@@ -48,7 +56,13 @@ type UseCanvasGraphInteractionsOptions = {
   isNodeExecutionActive: (nodeId: string) => boolean
 }
 
-type ExportImageEntry = { url: string; mediaAssetId?: number; title: string }
+type ExportImageEntry = {
+  url: string
+  mediaAssetId?: number
+  title: string
+  adjustmentRecipe?: ImageNodeItem['adjustmentRecipe']
+}
+type ExportImageCandidate = Omit<ExportImageEntry, 'title'>
 
 function safeDecodeURIComponent(value: string): string {
   try {
@@ -97,12 +111,20 @@ function readOutputImages(snapshot: CanvasNodeItem): ImageNodeOutputItem[] {
 function resolveExportEntries(snapshot: CanvasNodeItem): ExportImageEntry[] {
   if (snapshot.type !== 'image-node' && snapshot.type !== 'fusion') return []
   const outputs = readOutputImages(snapshot)
-  const entries =
+  const entries: ExportImageCandidate[] =
     snapshot.type === 'image-node'
       ? [
           outputs.at(-1)
-            ? { url: outputs.at(-1)!.url, mediaAssetId: outputs.at(-1)!.mediaAssetId }
-            : { url: snapshot.sourceImageUrl, mediaAssetId: snapshot.sourceMediaAssetId },
+            ? {
+                url: outputs.at(-1)!.url,
+                mediaAssetId: outputs.at(-1)!.mediaAssetId,
+                adjustmentRecipe: snapshot.adjustmentRecipe,
+              }
+            : {
+                url: snapshot.sourceImageUrl,
+                mediaAssetId: snapshot.sourceMediaAssetId,
+                adjustmentRecipe: snapshot.adjustmentRecipe,
+              },
         ]
       : outputs.map((item) => ({ url: item.url, mediaAssetId: item.mediaAssetId }))
   return entries
@@ -110,6 +132,7 @@ function resolveExportEntries(snapshot: CanvasNodeItem): ExportImageEntry[] {
     .map((entry) => ({
       url: entry.url.trim(),
       ...(Number.isInteger(entry.mediaAssetId) ? { mediaAssetId: entry.mediaAssetId } : {}),
+      ...(entry.adjustmentRecipe ? { adjustmentRecipe: entry.adjustmentRecipe } : {}),
       title: snapshot.title?.trim() || 'image',
     }))
 }
@@ -197,6 +220,9 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
     })
     image.sourceImageUrl = payload.url
     image.sourceMediaAssetId = payload.mediaAssetId
+    image.adjustmentRecipe = source.adjustmentRecipe
+      ? structuredClone(source.adjustmentRecipe)
+      : undefined
     image.sourceImageRatio = payload.ratio
     image.outputCount = source.outputCount ?? image.outputCount
     image.width = resolveImageNodeFrameSize(payload.ratio, true).width
@@ -227,23 +253,51 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
     exportLoading?.destroy()
     const loading = options.feedback.operationLoading(
       i18n.global.t('canvas.session.exportingImages', { count: entries.length }),
-      { duration: 1500 },
+      { duration: Number.POSITIVE_INFINITY },
     )
     exportLoading = loading
     const counts = new Map<string, number>()
     let failed = 0
     try {
-      entries.forEach((entry) => {
+      for (const [index, entry] of entries.entries()) {
+        loading.update?.(
+          i18n.global.t('canvas.session.exportingImageProgress', {
+            current: index + 1,
+            total: entries.length,
+          }),
+        )
+        let renderedUrl = ''
+        let exportFileName = ''
         try {
-          options.browser.downloadImage({
-            url: entry.url,
-            ...(entry.mediaAssetId ? { mediaAssetId: entry.mediaAssetId } : {}),
-            fileName: buildUniqueExportFileName(entry, counts),
+          let downloadUrl = entry.url
+          if (entry.adjustmentRecipe) {
+            const source: ImageAdjustmentRenderSource = {
+              url: resolveMediaAssetOriginalURL(entry.adjustmentRecipe.sourceMediaAssetId),
+              title: entry.title,
+            }
+            const rendered = await renderImageAdjustmentRecipeFile(source, entry.adjustmentRecipe)
+            renderedUrl = URL.createObjectURL(rendered)
+            downloadUrl = renderedUrl
+            exportFileName = buildUniqueExportFileName(
+              { ...entry, url: rendered.name, adjustmentRecipe: undefined },
+              counts,
+            )
+          } else {
+            exportFileName = buildUniqueExportFileName(entry, counts)
+          }
+          await options.browser.downloadImage({
+            url: downloadUrl,
+            ...(!entry.adjustmentRecipe && entry.mediaAssetId
+              ? { mediaAssetId: entry.mediaAssetId }
+              : {}),
+            fileName: exportFileName,
           })
         } catch {
           failed += 1
+        } finally {
+          if (renderedUrl) URL.revokeObjectURL(renderedUrl)
         }
-      })
+      }
     } finally {
       loading.destroy()
       if (exportLoading === loading) exportLoading = null
@@ -270,16 +324,14 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
     }
     const store = options.readCanvasGraphStore()
     const selectedIds = new Set(options.selection.selectedElements.value.map((item) => item.id))
-    const candidateIds =
-      selectedIds.size > 0 ? Array.from(selectedIds) : store.getNodeIds()
+    const candidateIds = selectedIds.size > 0 ? Array.from(selectedIds) : store.getNodeIds()
     duplicateDrag.value = new Map(
       candidateIds.flatMap((flowNodeId) => {
         const graphNodeId = resolveGraphNodeId(flowNodeId)
         const record = graphNodeId ? store.getNode(graphNodeId) : undefined
-        const metrics = graphNodeId
-          ? rendererMetrics.readNodeMetrics(flowNodeId)
-          : null
-        const position = metrics?.position ?? (record ? { x: record.snapshot.x, y: record.snapshot.y } : null)
+        const metrics = graphNodeId ? rendererMetrics.readNodeMetrics(flowNodeId) : null
+        const position =
+          metrics?.position ?? (record ? { x: record.snapshot.x, y: record.snapshot.y } : null)
         return graphNodeId && record?.kind === 'image' && position
           ? [[flowNodeId, { graphNodeId, x: position.x, y: position.y }] as const]
           : []
@@ -306,6 +358,9 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
       const copied = createCanvasNodeAt('image', { x: source.x + dx, y: source.y + dy })
       copied.sourceImageUrl = source.sourceImageUrl.trim()
       copied.sourceMediaAssetId = source.sourceMediaAssetId
+      copied.adjustmentRecipe = source.adjustmentRecipe
+        ? structuredClone(source.adjustmentRecipe)
+        : undefined
       copied.sourceImageRatio = source.sourceImageRatio > 0 ? source.sourceImageRatio : 1
       copied.outputCount = source.outputCount ?? copied.outputCount
       copied.outputImages = cloneImageOutputs(source)

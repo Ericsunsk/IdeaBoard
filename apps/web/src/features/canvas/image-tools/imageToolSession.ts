@@ -5,6 +5,7 @@ import type { ImageNodeItem } from '../../canvas-board/domain'
 import type { CanvasInteractionKey } from '../workspace-ui/useFlowCanvasInteractionState'
 import type { CanvasVueFlowConnectionAdapter } from '../vue-flow-adapter'
 import type { CanvasImageNodeCreationResult } from '../graph-editing'
+import type { CanvasNodeItem } from '../../canvas-board/domain'
 import { useImageEditorMode } from '../image-editor/useImageEditorMode'
 import { useImageEditorSession } from '../image-editor/useImageEditorSession'
 import { useImageEditorCoordinateAdapter } from '../image-editor'
@@ -34,6 +35,10 @@ export type UseCanvasImageToolsOptions = {
   currentBoardId: ValueRef<string | null | undefined>
   getImageNodeDisplayPayload: (nodeId: string) => ImageNodeDisplayPayload | null
   getImageNodeSnapshot: (nodeId: string) => ImageNodeItem | null
+  updateSnapshotNode?: (
+    nodeId: string,
+    patcher: (previous: CanvasNodeItem) => CanvasNodeItem,
+  ) => void
   getImageStageElement: (nodeId: string) => HTMLElement | null
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
   getViewport: () => FlowViewport
@@ -78,6 +83,7 @@ export type ImageToolSessionCapabilities = {
     currentBoardId: ValueRef<string | null | undefined>
     getImageNodeDisplayPayload: UseCanvasImageToolsOptions['getImageNodeDisplayPayload']
     getImageNodeSnapshot: UseCanvasImageToolsOptions['getImageNodeSnapshot']
+    updateSnapshotNode?: UseCanvasImageToolsOptions['updateSnapshotNode']
     createImageNodeFromFile: UseCanvasImageToolsOptions['createImageNodeFromFile']
     connectIntent: CanvasVueFlowConnectionAdapter['connectIntent']
   }
@@ -189,6 +195,7 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
         currentBoardId: options.currentBoardId,
         getImageNodeDisplayPayload: options.getImageNodeDisplayPayload,
         getImageNodeSnapshot: options.getImageNodeSnapshot,
+        updateSnapshotNode: options.updateSnapshotNode,
         createImageNodeFromFile: options.createImageNodeFromFile,
         connectIntent: options.connectionAdapter.connectIntent,
       },

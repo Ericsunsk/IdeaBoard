@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/media/maintenance"
 	"ideaboard/api/internal/media/storage"
@@ -107,11 +108,35 @@ func (d *OutboxDispatcher) Work(ctx context.Context, job *river.Job[DispatchSche
 		return err
 	}
 	for _, id := range ids {
-		if _, err := client.Insert(ctx, JobArgs{DerivativeID: id}, &river.InsertOpts{Queue: QueueName, MaxAttempts: 5, Priority: 4, UniqueOpts: river.UniqueOpts{ByArgs: true}}); err != nil {
+		if _, err := client.Insert(ctx, JobArgs{DerivativeID: id}, DerivativeJobInsertOpts()); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// Completed jobs are historical facts, not active work. They must not block
+// a retry after a derivative is reset from failed/obsolete to pending.
+func DerivativeJobUniqueOpts() river.UniqueOpts {
+	return river.UniqueOpts{
+		ByArgs: true,
+		ByState: []rivertype.JobState{
+			rivertype.JobStateAvailable,
+			rivertype.JobStatePending,
+			rivertype.JobStateRunning,
+			rivertype.JobStateRetryable,
+			rivertype.JobStateScheduled,
+		},
+	}
+}
+
+func DerivativeJobInsertOpts() *river.InsertOpts {
+	return &river.InsertOpts{
+		Queue:       QueueName,
+		MaxAttempts: MaxAttempts,
+		Priority:    4,
+		UniqueOpts:  DerivativeJobUniqueOpts(),
+	}
 }
 
 func (d *OutboxDispatcher) reconcile(ctx context.Context) error {

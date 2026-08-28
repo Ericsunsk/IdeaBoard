@@ -672,15 +672,33 @@ func (s *S3CompatibleService) readDeliveryObject(ctx context.Context, key string
 		return nil, err
 	}
 	response, err := safehttp.GetWithAllowHosts(ctx, publicURL, 30*time.Second, outbound.AllowHosts(ctx)...)
-	if err != nil {
-		return nil, fmt.Errorf("读取文件失败: %w", err)
+	if err != nil || response == nil || response.StatusCode != http.StatusOK {
+		if response != nil {
+			_ = response.Body.Close()
+		}
+		// Private S3/R2 buckets can reject the configured public access domain
+		// even though the API credentials can create a signed GET URL.
+		signedURL, signedErr := s.SignedURLWithConfig(ctx, key, time.Minute, cfg)
+		if signedErr != nil {
+			if err != nil {
+				return nil, fmt.Errorf("读取文件失败: %w", err)
+			}
+			return nil, fmt.Errorf("读取文件失败: %w", signedErr)
+		}
+		response, err = safehttp.GetWithAllowHosts(ctx, signedURL, 30*time.Second, outbound.AllowHosts(ctx)...)
+		if err != nil {
+			return nil, fmt.Errorf("读取 signed 文件失败: %w", err)
+		}
+	}
+	if response == nil {
+		return nil, fmt.Errorf("读取文件失败: 空响应")
 	}
 	defer response.Body.Close()
 	if response.StatusCode == http.StatusNotFound {
 		return nil, errStoredObjectNotFound
 	}
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("读取文件失败: 访问域名返回 HTTP %d", response.StatusCode)
+		return nil, fmt.Errorf("读取文件失败: 存储服务返回 HTTP %d", response.StatusCode)
 	}
 
 	data, err := readStorageObject(response.Body, maxBytes)

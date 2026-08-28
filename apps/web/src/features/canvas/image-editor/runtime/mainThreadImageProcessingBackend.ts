@@ -2,6 +2,7 @@ import { processingCancelledError } from './processingCancelled'
 import { i18n } from '../../../../shared/i18n'
 import { canvasToBlob } from '../../services/flowMediaIO'
 import { detectCanvasTransparency } from '../../utils/displayImagePreviewEncoding'
+import { resolveImageExportEncoding } from './imageOutputPolicy'
 import { createCpuImageAdjustmentPlanExecutor } from './cpuPlanExecutor'
 import {
   createImageSourceCache,
@@ -47,7 +48,11 @@ class MainThreadImageProcessingBackend implements ImageProcessingBackend {
     if (input.context.signal.aborted) throw processingCancelledError()
 
     input.context.reportProgress({ phase: 'decode' })
-    const source = await this.sourceCache.getFullSizeSource(input.source.url)
+    const source = await this.sourceCache.getFullSizeSource(input.source.url, {
+      maxPixels: input.maxPixels,
+      maxSide: input.maxSide,
+      fitWithinMaxPixels: input.fitWithinMaxPixels ?? true,
+    })
     if (!source) throw new Error(i18n.global.t('canvas.imageEditor.errors.readImageFailed'))
 
     try {
@@ -63,10 +68,17 @@ class MainThreadImageProcessingBackend implements ImageProcessingBackend {
       source.context.putImageData(adjustedImageData, 0, 0)
 
       input.context.reportProgress({ phase: 'encode' })
-      const encoding = input.context.outputPolicy.resolveEncoding({
-        sourceMimeType: source.mimeType,
-        hasTransparentPixels: detectCanvasTransparency(source.context, source.width, source.height),
-      })
+      const hasTransparentPixels = detectCanvasTransparency(
+        source.context,
+        source.width,
+        source.height,
+      )
+      const encoding = input.preserveSourceMimeType
+        ? resolveImageExportEncoding(source.mimeType, hasTransparentPixels)
+        : input.context.outputPolicy.resolveEncoding({
+            sourceMimeType: source.mimeType,
+            hasTransparentPixels,
+          })
       const blob = await canvasToBlob(source.canvas, encoding.mimeType, encoding.quality)
       const outputMime = blob.type || encoding.mimeType
       const fileName = input.context.outputPolicy.resolveFileName({

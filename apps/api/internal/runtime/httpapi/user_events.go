@@ -51,6 +51,12 @@ func (h *UserEventStreamHandler) StreamUserEvents(c *gin.Context) {
 		slog.Warn("clear user events SSE write deadline failed", "err", err)
 	}
 	c.Header("Cache-Control", "no-store")
+	// Commit the response immediately so reverse proxies do not treat the
+	// authenticated stream as an idle upstream while it waits for an event.
+	if _, err := c.Writer.Write([]byte(":connected\n\n")); err != nil {
+		return
+	}
+	c.Writer.Flush()
 	heartbeat := time.NewTicker(userEventsHeartbeatInterval)
 	defer heartbeat.Stop()
 	for {

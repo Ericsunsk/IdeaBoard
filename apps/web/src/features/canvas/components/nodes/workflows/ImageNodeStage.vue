@@ -12,7 +12,7 @@
     :height="stageHeight"
     :active="active && !expandModeActive"
     :connection-drop-target="connectionDropTarget"
-    :loading="!!directGenerating && !displayImage"
+    :loading="!!directGenerating && !stageDisplayImage"
     :running="!!directGenerating || imageImportPending"
     :transparent="!!expandModeActive || isImageToolActive"
     :aria-busy="!!directGenerating || imageImportPending"
@@ -21,13 +21,13 @@
     @drop.stop="onStageDrop"
     @contextmenu.prevent.stop="onStageContextMenu"
   >
-    <template v-if="displayImage">
+    <template v-if="stageDisplayImage && sourceDisplayUrl">
       <ImageToolStagePresentation
         v-if="imageToolStageBinding && stageDisplayUrl"
         :binding="imageToolStageBinding"
       >
         <img
-          :src="stageDisplayUrl || undefined"
+          :src="stageDisplayUrl || sourceDisplayUrl"
           class="image-node-stage-image image-tool-stage-media"
           :class="{ 'is-dragging': dragging }"
           :alt="t('canvas.controls.stagePreviewAlt')"
@@ -41,8 +41,8 @@
         />
       </ImageToolStagePresentation>
       <img
-        v-else-if="stageDisplayUrl"
-        :src="stageDisplayUrl || undefined"
+        v-else
+        :src="stageDisplayUrl || sourceDisplayUrl"
         class="image-node-stage-image"
         :alt="t('canvas.controls.stagePreviewAlt')"
         draggable="false"
@@ -52,12 +52,6 @@
         @dblclick="emit('append-to-canvas')"
         @keydown.enter.prevent="emit('open-preview')"
         @keydown.space.prevent="emit('append-to-canvas')"
-      />
-      <div
-        v-else
-        class="image-node-stage-placeholder"
-        role="status"
-        :aria-label="t('canvas.controls.preparingPreview')"
       />
       <ImageCanvasExtendOverlay
         v-if="stageDisplayUrl && expandModeActive && expandOverlayStyle"
@@ -102,13 +96,13 @@
       </NodeActionButton>
     </div>
     <div
-      v-else-if="imageImportPending && !displayImage"
+      v-else-if="imageImportPending && !stageDisplayImage"
       class="image-node-stage-pending"
       aria-busy="true"
       :aria-label="t('canvas.controls.preparingPreview')"
     />
     <button
-      v-else-if="!displayImage && !emptyStateDisabled"
+      v-else-if="!stageDisplayImage && !emptyStateDisabled"
       type="button"
       class="image-node-stage-empty"
       :aria-label="emptyStageAriaLabel"
@@ -118,7 +112,7 @@
       <span>{{ emptyStateLabel }}</span>
     </button>
     <div
-      v-else-if="!displayImage"
+      v-else-if="!stageDisplayImage"
       class="image-node-stage-empty is-readonly"
       :class="{ 'is-loading': directGenerating }"
       role="status"
@@ -192,7 +186,13 @@ const stageFrameRef = ref<NodeStageFrameExpose | null>(null)
 const stageElement = computed(() => stageFrameRef.value?.stageElement ?? null)
 const isStageVisible = useElementVisibility(stageElement)
 
-const sourceDisplayUrl = computed(() => props.displayImage?.url ?? null)
+const stageDisplayImage = computed(() => {
+  const previewUrl = props.localUpload?.previewUrl?.trim()
+  if (previewUrl) return { url: previewUrl }
+  const displayImageUrl = props.displayImage?.url?.trim()
+  return displayImageUrl ? props.displayImage : null
+})
+const sourceDisplayUrl = computed(() => stageDisplayImage.value?.url ?? null)
 const imageImportFailureMessage = computed(() => {
   if (props.libraryImport?.state === 'failed') return props.libraryImport.failureMessage
   return props.localUpload?.failureMessage?.trim() ?? ''
@@ -213,7 +213,7 @@ const { maxSide: previewMaxSide } = useCanvasImagePreviewQuality({
 })
 const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, {
   maxSide: previewMaxSide,
-  mediaAssetId: () => props.displayImage?.mediaAssetId,
+  mediaAssetId: () => stageDisplayImage.value?.mediaAssetId,
   isVisible: isStageVisible,
   keepPreviousOnSourceChange: true,
 })
@@ -264,15 +264,9 @@ function submitExpand(prompt: string) {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background: #fff;
+  background: var(--canvas-node-bg);
   cursor: grab;
   user-select: none;
-}
-
-.image-node-stage-placeholder {
-  width: 100%;
-  height: 100%;
-  background: var(--canvas-node-bg);
 }
 
 .image-node-stage-import-failure {

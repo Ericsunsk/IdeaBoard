@@ -51,10 +51,18 @@ vi.mock('../mask-editor/lib/maskPaintingCanvas', async (importOriginal) => {
 const cancelFinalRenderMock = vi.mocked(cancelImageAdjustmentFinalRender)
 const renderLayerStackFileMock = vi.mocked(renderImageEditorLayerStackFile)
 
+const mediaAssetRequestMock = vi.hoisted(() => vi.fn())
+vi.mock('../../../shared/api/client', () => ({
+  api: { request: mediaAssetRequestMock },
+}))
+vi.mock('../../../shared/api/userEventStream', () => ({
+  subscribeUserEvent: vi.fn(() => vi.fn()),
+}))
+
 const imageNodeFixtures: Record<
   string,
   {
-    display: { url: string; ratio: number } | null
+    display: { url: string; ratio: number; mediaAssetId?: number } | null
     snapshot: ImageNodeItem
   }
 > = {
@@ -119,6 +127,23 @@ const imageNodeFixtures: Record<
       sourceImageRatio: 1,
       outputCount: 1,
       outputStatus: 'idle',
+      outputImages: [],
+    },
+  },
+  'image-5': {
+    display: { url: '/api/user/media-assets/3/original/content', ratio: 1, mediaAssetId: 3 },
+    snapshot: {
+      id: 5,
+      type: 'image-node',
+      title: 'Library image',
+      x: 50,
+      y: 60,
+      width: 280,
+      sourceImageUrl: 'https://cdn.example.com/library-preview.jpg',
+      sourceMediaAssetId: 3,
+      sourceImageRatio: 1,
+      outputCount: 1,
+      outputStatus: 'ready',
       outputImages: [],
     },
   },
@@ -262,6 +287,7 @@ afterEach(() => {
   vi.restoreAllMocks()
   cancelFinalRenderMock.mockReset()
   renderLayerStackFileMock.mockReset()
+  mediaAssetRequestMock.mockReset()
 })
 
 describe('useCanvasImageTools image adjustment final apply', () => {
@@ -381,6 +407,49 @@ describe('useCanvasImageTools image adjustment final apply', () => {
         targetNodeId: 'image-3',
         targetPort: 'image',
       })
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('renders materialized Library images through the same-origin processing derivative', async () => {
+    mediaAssetRequestMock.mockResolvedValue({
+      code: 0,
+      msg: '',
+      data: {
+        asset_id: 'asset-3',
+        status: 'ready',
+        mime_type: 'image/jpeg',
+        width: 2048,
+        height: 1024,
+        size_bytes: 100,
+        original: { status: 'ready', url: '/api/original.jpg' },
+        derivatives: {
+          processing: { status: 'ready', format: 'webp', url: '/api/processing.webp' },
+        },
+      },
+    })
+    renderLayerStackFileMock.mockResolvedValue(
+      new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
+    )
+    const harness = mountCanvasImageTools()
+
+    try {
+      expect(harness.runtime.commands.lifecycle.enter('image-5', 'adjust')).toBe(true)
+      harness.runtime.commands.chrome.selectAdjustmentLayer('threshold')
+      harness.runtime.commands.chrome.updateEditorAdjustmentParams({ threshold: 128, invert: true })
+
+      await harness.runtime.commands.editor.apply()
+
+      expect(renderLayerStackFileMock).toHaveBeenCalledWith(
+        {
+          url: '/api/user/media-assets/3/derivatives/processing/webp/content',
+          title: 'Library image',
+        },
+        expect.any(Array),
+        expect.objectContaining({ scopeId: 'image-5' }),
+      )
+      expect(harness.feedback.succeeded).toHaveBeenCalledWith('Image generated')
     } finally {
       harness.unmount()
     }

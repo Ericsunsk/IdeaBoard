@@ -7,9 +7,7 @@ function resolveImageNodeMediaRefRole(
   return (
     base?.mediaRefs?.find(
       (ref) =>
-        ref.refType === 'board_node' &&
-        ref.refId === refId &&
-        !ref.role?.startsWith('output:'),
+        ref.refType === 'board_node' && ref.refId === refId && !ref.role?.startsWith('output:'),
     )?.role || 'source'
   )
 }
@@ -56,6 +54,7 @@ export function rebuildCanvasBoardMediaRefs(
       refId,
       resolveImageNodeMediaRefRole(base, refId),
     )
+    appendRef(node.adjustmentRecipe?.sourceMediaAssetId, refId, 'recipe-source')
     node.outputImages.forEach((output, index) => {
       appendImageRef(output, refId, `output:${index}`)
     })

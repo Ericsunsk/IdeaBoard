@@ -184,7 +184,7 @@ export function useGetUserMediaAssetOriginalContent<
 
 export const getGetUserMediaAssetDerivativeContentUrl = (
   assetId: string,
-  tier: 'thumb' | 'preview' | 'large-preview',
+  tier: 'thumb' | 'preview' | 'large-preview' | 'processing',
   format: 'webp' | 'jpeg' | 'png',
 ) => {
   return `/user/media-assets/${encodeURIComponent(String(assetId))}/derivatives/${encodeURIComponent(String(tier))}/${encodeURIComponent(String(format))}/content`
@@ -192,7 +192,7 @@ export const getGetUserMediaAssetDerivativeContentUrl = (
 
 export const getUserMediaAssetDerivativeContent = async (
   assetId: string,
-  tier: 'thumb' | 'preview' | 'large-preview',
+  tier: 'thumb' | 'preview' | 'large-preview' | 'processing',
   format: 'webp' | 'jpeg' | 'png',
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<Blob | ApiResponseBase> => {
@@ -207,7 +207,7 @@ export const getUserMediaAssetDerivativeContent = async (
 
 export const getGetUserMediaAssetDerivativeContentQueryKey = (
   assetId: MaybeRefOrGetter<string>,
-  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview'>,
+  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview' | 'processing'>,
   format: MaybeRefOrGetter<'webp' | 'jpeg' | 'png'>,
 ) => {
   return ['user', 'media-assets', assetId, 'derivatives', tier, format, 'content'] as const
@@ -218,7 +218,7 @@ export const getGetUserMediaAssetDerivativeContentQueryOptions = <
   TError = ErrorType<unknown>,
 >(
   assetId: MaybeRefOrGetter<string>,
-  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview'>,
+  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview' | 'processing'>,
   format: MaybeRefOrGetter<'webp' | 'jpeg' | 'png'>,
   options?: {
     query?: Partial<
@@ -269,7 +269,7 @@ export function useGetUserMediaAssetDerivativeContent<
   TError = ErrorType<unknown>,
 >(
   assetId: MaybeRefOrGetter<string>,
-  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview'>,
+  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview' | 'processing'>,
   format: MaybeRefOrGetter<'webp' | 'jpeg' | 'png'>,
   options?: {
     query?: Partial<

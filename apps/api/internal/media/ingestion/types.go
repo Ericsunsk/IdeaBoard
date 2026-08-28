@@ -68,6 +68,7 @@ type Handle struct {
 }
 
 type Completion struct {
+	StorageKey     string
 	URL            string
 	SourceURL      string
 	MIMEType       string

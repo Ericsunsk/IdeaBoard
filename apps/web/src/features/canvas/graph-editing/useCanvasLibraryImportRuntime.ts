@@ -17,6 +17,7 @@ import type { CanvasVueFlowGraphAdapter } from '../vue-flow-adapter/useCanvasVue
 import type { FlowNodeData } from '../types/flowTypes'
 import type { CanvasLibraryImportDescriptor } from '../../library/libraryTransfer'
 import type { LibraryAssetMaterializer } from '../../library/libraryResource'
+import { preloadImage } from '../../../shared/media/preloadImage'
 
 type UseCanvasLibraryImportRuntimeOptions = {
   nodes: Ref<Node[]>
@@ -41,6 +42,7 @@ type UseCanvasLibraryImportRuntimeOptions = {
   selectOnlyNode: (nodeId: string) => boolean
   materialize: LibraryAssetMaterializer
   onWarning: (message: string) => void
+  preloadImage?: (url: string) => Promise<boolean>
 }
 
 type LibraryImportNode = { node: Node; data: FlowNodeData; snapshot: ImageNodeItem }
@@ -217,7 +219,17 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
     return true
   }
 
-  function start(candidate: CanvasLibraryImportDescriptor, center: { x: number; y: number }) {
+  async function start(
+    candidate: CanvasLibraryImportDescriptor,
+    center: { x: number; y: number },
+  ): Promise<CanvasGraphNodeIdForKind<'image'> | null> {
+    const previewReady = await (options.preloadImage ?? preloadImage)(candidate.previewUrl).catch(
+      () => false,
+    )
+    if (!previewReady) {
+      options.onWarning(i18n.global.t('canvas.session.libraryImportFailed'))
+      return null
+    }
     const sourceRatio = resolveRatio(candidate)
     const offset = (addSequence++ % IMPORT_OFFSET_CYCLE) * IMPORT_OFFSET
     const frame = resolveImageNodeFrameSize(sourceRatio, true)

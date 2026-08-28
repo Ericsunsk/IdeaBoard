@@ -696,7 +696,7 @@ paths:
         - name: tier
           in: path
           required: true
-          schema: { type: string, enum: [thumb, preview, large-preview] }
+          schema: { type: string, enum: [thumb, preview, large-preview, processing] }
         - name: format
           in: path
           required: true

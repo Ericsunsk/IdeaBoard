@@ -31,6 +31,7 @@ const (
 	TierThumb        = "thumb"
 	TierPreview      = "preview"
 	TierLargePreview = "large-preview"
+	TierProcessing   = "processing"
 	FormatJPEG       = "jpeg"
 	FormatPNG        = "png"
 	FormatWebP       = "webp"
@@ -44,6 +45,7 @@ var TierSpecs = map[string]TierSpec{
 	TierThumb:        {MaxSide: 256},
 	TierPreview:      {MaxSide: 640},
 	TierLargePreview: {MaxSide: 1280},
+	TierProcessing:   {MaxSide: 2560},
 }
 
 type Service struct {
@@ -121,10 +123,19 @@ func (s *Service) Process(ctx context.Context, derivativeID int64) error {
 	renderCtx, cancel := context.WithTimeout(ctx, renderDeadline)
 	defer cancel()
 	original, err := s.storage.ReadObjectAtProfile(renderCtx, asset.StorageProfileID, asset.StorageKey, maxSourceBytes)
+	sourceStorageKey := asset.StorageKey
+	if err != nil {
+		if fallbackKey := storage.LegacyStorageKeyFromURL(asset.StorageKey, asset.Url); fallbackKey != "" {
+			original, err = s.storage.ReadObjectAtProfile(renderCtx, asset.StorageProfileID, fallbackKey, maxSourceBytes)
+			if err == nil {
+				sourceStorageKey = fallbackKey
+			}
+		}
+	}
 	if err != nil {
 		return s.markFailed(ctx, q, processing.ID, "source_read_failed", err)
 	}
-	if _, err := imageformat.InspectBytes(original.Data, filepath.Ext(asset.StorageKey)); err != nil {
+	if _, err := imageformat.InspectBytes(original.Data, filepath.Ext(sourceStorageKey)); err != nil {
 		return s.markFailed(ctx, q, processing.ID, "source_limits_exceeded", err)
 	}
 	if s.renderer == nil {

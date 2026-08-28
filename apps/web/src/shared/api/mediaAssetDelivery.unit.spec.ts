@@ -30,6 +30,7 @@ function metadata(status: string, url = '/api/preview.webp') {
         thumb: { status, url },
         preview: { status, url },
         'large-preview': { status, url: '/api/large.webp' },
+        processing: { status, url: '/api/processing.webp' },
       },
     },
   }
@@ -108,5 +109,26 @@ describe('useMediaAssetDelivery', () => {
       expect.objectContaining({ method: 'GET' }),
     )
     scope.stop()
+  })
+
+  it('requests processing generation and never falls back to the original', async () => {
+    mocks.request
+      .mockResolvedValueOnce(metadata('pending'))
+      .mockResolvedValueOnce(metadata('ready'))
+    const { resolveMediaAssetProcessingURL, invalidateMediaAssetMetadata } =
+      await import('./mediaAssetDelivery')
+    invalidateMediaAssetMetadata()
+
+    await expect(resolveMediaAssetProcessingURL(42)).resolves.toBe(
+      '/api/user/media-assets/42/derivatives/processing/webp/content',
+    )
+    expect(mocks.request).toHaveBeenCalledWith(
+      '/user/media-assets/42',
+      expect.objectContaining({ method: 'GET' }),
+    )
+    expect(mocks.request).toHaveBeenCalledWith(
+      '/user/media-assets/42?ensure_tier=processing',
+      expect.objectContaining({ method: 'GET' }),
+    )
   })
 })

@@ -296,6 +296,7 @@ export default {
     duplicateImagesFailed: 'Error al duplicar imágenes. Actualice el lienzo e inténtelo de nuevo.',
     noExportableImages: 'Los nodos seleccionados no tienen imágenes para exportar.',
     exportingImages: 'Exportando imágenes: {count}...',
+    exportingImageProgress: 'Exportando imagen {current}/{total}...',
     exportQueued: 'Imágenes en cola: {count}',
     exportPartiallyQueued: 'En cola: {completed}/{total}; errores: {failed}',
     imageNodeMissing: 'Nodo de imagen no encontrado.',

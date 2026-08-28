@@ -2,12 +2,22 @@ import {
   hasRenderableImageEditorLayerStack,
   renderImageEditorLayerStackFile,
 } from '../image-editor/services/imageAdjustmentRenderer'
+import {
+  MediaAssetDerivativeNotReadyError,
+  resolveMediaAssetProcessingURL,
+} from '../../../shared/api/mediaAssetDelivery'
 import { useMaskEditorChromeActions } from '../mask-editor/useMaskEditorChromeActions'
 import { isProcessingCancelled } from '../image-editor/runtime/processingCancelled'
 import { isCanvasGraphNodeId } from '../graph-runtime'
 import { i18n } from '../../../shared/i18n'
 import type { ImageToolChromeCommands } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
+import { buildImageAdjustmentPlan } from '../image-editor/utils/imageAdjustmentPlanPipeline'
+import {
+  deserializeImageAdjustmentPlan,
+  serializeImageAdjustmentPlan,
+} from '../image-editor/utils/imageAdjustmentRecipe'
+import { hasImageEditorRasterEdits } from '../image-editor/utils/imageEditorRasterTools'
 
 export function createImageToolCommands(session: ImageToolSession) {
   const { board, execution, ui, feedback } = session.capabilities
@@ -45,11 +55,19 @@ export function createImageToolCommands(session: ImageToolSession) {
     const scopeId = nodeId
     session.activeImageAdjustmentFinalScopeId.value = scopeId
     try {
+      // Keep image processing same-origin. The API endpoint resolves storage
+      // access server-side, avoiding CORS failures from direct signed URLs.
+      const sourceUrl = source.mediaAssetId
+        ? await resolveMediaAssetProcessingURL(source.mediaAssetId)
+        : source.url
       const renderedFile = await renderImageEditorLayerStackFile(
-        { url: source.url, title: sourceNode.title || 'Image' },
+        { url: sourceUrl, title: sourceNode.title || 'Image' },
         layers,
         {
           scopeId,
+          maxSide: 2560,
+          maxPixels: 8_000_000,
+          fitWithinMaxPixels: true,
           onProgress: (progress) => {
             if (session.activeImageAdjustmentFinalScopeId.value !== scopeId) return
             session.imageAdjustmentFinalApplyProgress.value = {
@@ -86,6 +104,27 @@ export function createImageToolCommands(session: ImageToolSession) {
         reportGenerationFailure()
         return
       }
+      const currentPlan = buildImageAdjustmentPlan(layers)
+      const recipeSourceMediaAssetId =
+        sourceNode.adjustmentRecipe?.sourceMediaAssetId ?? source.mediaAssetId
+      if (
+        recipeSourceMediaAssetId &&
+        currentPlan.length > 0 &&
+        !hasImageEditorRasterEdits(layers) &&
+        session.capabilities.board.updateSnapshotNode
+      ) {
+        const previousPlan = sourceNode.adjustmentRecipe
+          ? deserializeImageAdjustmentPlan(sourceNode.adjustmentRecipe)
+          : []
+        const recipe = serializeImageAdjustmentPlan(
+          recipeSourceMediaAssetId,
+          [...previousPlan, ...currentPlan],
+          sourceNode.adjustmentRecipe?.sourceMimeType,
+        )
+        session.capabilities.board.updateSnapshotNode(creation.nodeId, (previous) =>
+          previous.type === 'image-node' ? { ...previous, adjustmentRecipe: recipe } : previous,
+        )
+      }
       const didConnect = board.connectIntent({
         sourceNodeId: nodeId,
         sourcePort: 'image',
@@ -106,6 +145,14 @@ export function createImageToolCommands(session: ImageToolSession) {
         session.imageEditorNodeId.value !== nodeId ||
         session.activeImageAdjustmentFinalScopeId.value !== scopeId
       ) {
+        return
+      }
+      if (error instanceof MediaAssetDerivativeNotReadyError) {
+        if (error.status === 'pending' || error.status === 'processing') {
+          feedback.warning(i18n.global.t('canvas.task.stillProcessing'))
+        } else {
+          reportGenerationFailure()
+        }
         return
       }
       reportGenerationFailure()

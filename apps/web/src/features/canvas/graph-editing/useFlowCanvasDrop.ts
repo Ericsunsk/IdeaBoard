@@ -26,7 +26,7 @@ type UseFlowCanvasDropOptions = {
   addLibraryAsset: (
     asset: CanvasLibraryImportDescriptor,
     point: { x: number; y: number },
-  ) => void
+  ) => Promise<unknown>
 }
 
 export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
@@ -40,7 +40,7 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     const transferTypes = Array.from(event.dataTransfer?.types ?? [])
     if (transferTypes.includes(CANVAS_LIBRARY_IMPORT_MIME)) {
       const libraryAsset = readCanvasLibraryImportTransfer(event.dataTransfer)
-      if (libraryAsset) options.addLibraryAsset(libraryAsset, point)
+      if (libraryAsset) await options.addLibraryAsset(libraryAsset, point)
       return
     }
 

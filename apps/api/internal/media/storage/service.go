@@ -3,10 +3,38 @@ package storage
 import (
 	"context"
 	"errors"
+	"net/url"
+	"path"
 	"strings"
 
 	"ideaboard/api/internal/media/ingestion"
 )
+
+// LegacyStorageKeyFromURL resolves the object key used by older ingestions
+// that persisted a planned extension while the downloaded object used the
+// extension from its final URL.
+func LegacyStorageKeyFromURL(storageKey, rawURL string) string {
+	storageKey = strings.TrimSpace(storageKey)
+	if storageKey == "" {
+		return ""
+	}
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return ""
+	}
+	urlExt := strings.ToLower(path.Ext(parsed.Path))
+	if len(urlExt) <= 1 || urlExt == "." {
+		return ""
+	}
+	keyExt := strings.ToLower(path.Ext(storageKey))
+	if keyExt == urlExt {
+		return ""
+	}
+	if keyExt == "" || keyExt == "." {
+		return storageKey + urlExt
+	}
+	return strings.TrimSuffix(storageKey, path.Ext(storageKey)) + urlExt
+}
 
 var errProviderHTTPSUnavailable = errors.New("storage profile does not expose a provider HTTPS URL")
 
@@ -32,7 +60,8 @@ type StoredUploadRef struct {
 
 func (r StoredUploadRef) IngestionCompletion(sourceURL string) ingestion.Completion {
 	return ingestion.Completion{
-		URL: r.URL, SourceURL: sourceURL, MIMEType: r.MIMEType,
+		StorageKey: r.StorageKey,
+		URL:        r.URL, SourceURL: sourceURL, MIMEType: r.MIMEType,
 		Width: r.Width, Height: r.Height, SizeBytes: r.SizeBytes,
 		ChecksumSHA256: r.ChecksumSHA256, Animated: r.Animated,
 	}

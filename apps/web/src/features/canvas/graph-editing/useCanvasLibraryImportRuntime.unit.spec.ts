@@ -46,7 +46,10 @@ function pendingNode(id = 'image-1', libraryAssetId = 7): Node<FlowNodeData> {
   }
 }
 
-function createHarness(initialNodes: Node[] = []) {
+function createHarness(
+  initialNodes: Node[] = [],
+  preloadImage: (url: string) => Promise<boolean> = async () => true,
+) {
   const nodes = shallowRef<Node[]>(initialNodes)
   const edges = shallowRef<Edge[]>([])
   const currentAttachment = ref<CanvasBoardAttachment | null>(attachment())
@@ -96,6 +99,7 @@ function createHarness(initialNodes: Node[] = []) {
     selectOnlyNode: vi.fn(() => true),
     materialize,
     onWarning,
+    preloadImage,
   })
   return {
     nodes,
@@ -109,12 +113,35 @@ function createHarness(initialNodes: Node[] = []) {
 }
 
 describe('useCanvasLibraryImportRuntime', () => {
+  it('waits for the Library preview to decode before creating a node', async () => {
+    const request = deferred<boolean>()
+    const harness = createHarness([], () => request.promise)
+    harness.materialize.mockReturnValue(new Promise(() => {}))
+    const start = harness.imports.start(
+      {
+        assetId: 7,
+        title: 'Reference',
+        previewUrl: 'https://provider.example/preview.png',
+        width: 200,
+        height: 100,
+      },
+      { x: 100, y: 200 },
+    )
+
+    await flushPromises()
+    expect(harness.nodes.value).toHaveLength(0)
+
+    request.resolve(true)
+    await start
+    expect(harness.nodes.value).toHaveLength(1)
+  })
+
   it('persists only the owned asset fact, then atomically promotes to managed Media', async () => {
     const harness = createHarness()
     const request = deferred<{ mediaAssetId: number; url: string; width: number; height: number }>()
     harness.materialize.mockReturnValue(request.promise)
 
-    const nodeId = harness.imports.start(
+    const nodeId = await harness.imports.start(
       {
         assetId: 7,
         title: 'Reference',

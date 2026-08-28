@@ -31,12 +31,13 @@ WHERE a.id = sqlc.arg(media_asset_id)
   AND a.deleted_at IS NULL
 ON CONFLICT (media_asset_id, tier) DO UPDATE
 SET status = CASE
-      WHEN media_derivatives.status = 'obsolete' THEN 'pending'
+      WHEN media_derivatives.status IN ('obsolete', 'failed') THEN 'pending'
       ELSE media_derivatives.status
     END,
     storage_profile_id = EXCLUDED.storage_profile_id,
-    error_code = CASE WHEN media_derivatives.status = 'obsolete' THEN '' ELSE media_derivatives.error_code END,
-    error_message = CASE WHEN media_derivatives.status = 'obsolete' THEN '' ELSE media_derivatives.error_message END
+    attempt_count = CASE WHEN media_derivatives.status IN ('obsolete', 'failed') THEN 0 ELSE media_derivatives.attempt_count END,
+    error_code = CASE WHEN media_derivatives.status IN ('obsolete', 'failed') THEN '' ELSE media_derivatives.error_code END,
+    error_message = CASE WHEN media_derivatives.status IN ('obsolete', 'failed') THEN '' ELSE media_derivatives.error_message END
 WHERE media_derivatives.owner_user_id = EXCLUDED.owner_user_id
 RETURNING id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
   storage_key, mime_type, width, height, size_bytes, checksum_sha256, attempt_count,
@@ -74,7 +75,7 @@ SELECT id, media_asset_id, owner_user_id, tier, format, status, storage_profile_
 FROM media_derivatives
 WHERE media_asset_id = sqlc.arg(media_asset_id)
   AND owner_user_id = sqlc.arg(owner_user_id)
-ORDER BY CASE tier WHEN 'thumb' THEN 1 WHEN 'preview' THEN 2 WHEN 'large-preview' THEN 3 ELSE 4 END,
+ORDER BY CASE tier WHEN 'thumb' THEN 1 WHEN 'preview' THEN 2 WHEN 'large-preview' THEN 3 WHEN 'processing' THEN 4 ELSE 5 END,
   format ASC;
 
 -- name: MarkMediaDerivativeProcessing :one

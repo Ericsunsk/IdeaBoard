@@ -24,3 +24,12 @@ func TestUploadImageResponseUsesAvatarFieldForStoredReference(t *testing.T) {
 		t.Fatalf("payload = %+v, want avatar response", payload)
 	}
 }
+
+func TestLegacyStorageKeyFromURLUsesCanonicalExtension(t *testing.T) {
+	if got := storage.LegacyStorageKeyFromURL("uploads/library/1/original.png", "/uploads/library/1/original.jpg"); got != "uploads/library/1/original.jpg" {
+		t.Fatalf("fallback key = %q, want .jpg key", got)
+	}
+	if got := storage.LegacyStorageKeyFromURL("uploads/library/1/original.jpg", "/uploads/library/1/original.jpg"); got != "" {
+		t.Fatalf("matching key fallback = %q, want empty", got)
+	}
+}

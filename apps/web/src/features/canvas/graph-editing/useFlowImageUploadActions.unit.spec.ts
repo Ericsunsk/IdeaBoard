@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../canvas-board/domain'
 import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
+import { unsupportedUploadImageMessage } from '../../../shared/utils/imageUploadSupport'
 import { useFlowImageUploadActions } from './useFlowImageUploadActions'
 
 const mocks = vi.hoisted(() => ({
@@ -46,8 +47,7 @@ function makeImageNode(url = ''): ImageNodeItem {
 }
 
 async function flushPromises() {
-  await Promise.resolve()
-  await Promise.resolve()
+  for (let index = 0; index < 6; index += 1) await Promise.resolve()
 }
 
 describe('useFlowImageUploadActions', () => {
@@ -120,6 +120,86 @@ describe('useFlowImageUploadActions', () => {
     expect(snapshots.get('node-1')?.sourceMediaAssetId).toBe(22)
     expect(updates).toEqual(['/api/user/media-assets/22/original/content'])
     expect(warnings).toEqual([])
+  })
+
+  it('publishes an optimistic blob preview when replacing an existing image node', async () => {
+    const currentBoardId = { value: 'board-a' }
+    const snapshots = new Map<string, ImageNodeItem>([['node-1', makeImageNode()]])
+    const upload = createDeferred<{
+      url: string
+      width: number
+      height: number
+      media_asset_id: number
+    }>()
+    const runtimeStates: Array<{ previewUrl: string; failureMessage?: string } | null> = []
+    const actions = useFlowImageUploadActions({
+      currentBoardId,
+      createNodeAtPosition: vi.fn(),
+      updateSnapshotNode: (nodeId, patcher) => {
+        const current = snapshots.get(nodeId)
+        if (current) snapshots.set(nodeId, patcher(current) as ImageNodeItem)
+      },
+      getImageNodeSnapshot: (nodeId) => snapshots.get(nodeId) ?? null,
+      uploadApi: { upload: vi.fn().mockReturnValue(upload.promise) },
+      onWarning: vi.fn(),
+      createObjectUrl: vi.fn(() => 'blob:replacement-image'),
+      revokeObjectUrl: vi.fn(),
+      setLocalUploadState: (_nodeId, state) => runtimeStates.push(state),
+    })
+
+    const task = actions.applyImageFileToImageNode('node-1', makeFile('replacement.png'))
+    await flushPromises()
+
+    expect(runtimeStates).toEqual([{ previewUrl: 'blob:replacement-image' }])
+
+    upload.resolve({ url: '/uploads/replacement.png', width: 100, height: 100, media_asset_id: 71 })
+    await expect(task).resolves.toBe(true)
+    expect(runtimeStates).toEqual([{ previewUrl: 'blob:replacement-image' }, null])
+    expect(snapshots.get('node-1')?.sourceMediaAssetId).toBe(71)
+  })
+
+  it('warns when an existing image node receives an unsupported file or has no board', async () => {
+    const unsupportedWarnings: string[] = []
+    const unsupportedActions = useFlowImageUploadActions({
+      currentBoardId: { value: 'board-a' },
+      createNodeAtPosition: vi.fn(),
+      updateSnapshotNode: vi.fn(),
+      getImageNodeSnapshot: () => makeImageNode(),
+      uploadApi: {
+        upload: vi.fn().mockResolvedValue({
+          url: '/uploads/decoded.png',
+          media_asset_id: 64,
+          width: 100,
+          height: 100,
+        }),
+      },
+      onWarning: (message) => unsupportedWarnings.push(message),
+      setLocalUploadState: vi.fn(),
+    })
+
+    await expect(
+      unsupportedActions.applyImageFileToImageNode(
+        'node-1',
+        new File(['not an image'], 'bad.txt', { type: 'text/plain' }),
+      ),
+    ).resolves.toBe(false)
+    expect(unsupportedWarnings).toEqual([unsupportedUploadImageMessage()])
+
+    const missingBoardWarnings: string[] = []
+    const missingBoardActions = useFlowImageUploadActions({
+      currentBoardId: { value: null },
+      createNodeAtPosition: vi.fn(),
+      updateSnapshotNode: vi.fn(),
+      getImageNodeSnapshot: () => makeImageNode(),
+      uploadApi: { upload: vi.fn() },
+      onWarning: (message) => missingBoardWarnings.push(message),
+      setLocalUploadState: vi.fn(),
+    })
+
+    await expect(
+      missingBoardActions.applyImageFileToImageNode('node-1', makeFile('ok.png')),
+    ).resolves.toBe(false)
+    expect(missingBoardWarnings).toEqual(['Missing board ID. Unable to upload the image.'])
   })
 
   it('ignores an image node upload that completes after switching boards', async () => {
@@ -281,6 +361,50 @@ describe('useFlowImageUploadActions', () => {
     })
     expect(runtimeStates).toEqual([{ previewUrl: 'blob:local-image' }, null])
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:local-image')
+  })
+
+  it('does not create a node until its local preview has decoded', async () => {
+    const currentBoardId = { value: 'board-a' }
+    const snapshots = new Map<string, ImageNodeItem>()
+    const decode = createDeferred<boolean>()
+    const upload = createDeferred<{
+      url: string
+      media_asset_id: number
+      width: number
+      height: number
+    }>()
+    const createNodeAtPosition = vi.fn((_kind, _x, _y, patch) => {
+      snapshots.set('image-1', { ...makeImageNode(), ...patch })
+      return 'image-1' as CanvasGraphNodeIdForKind<'image'>
+    })
+    const actions = useFlowImageUploadActions({
+      currentBoardId,
+      createNodeAtPosition,
+      updateSnapshotNode: vi.fn(),
+      getImageNodeSnapshot: (nodeId) => snapshots.get(nodeId) ?? null,
+      uploadApi: { upload: vi.fn().mockReturnValue(upload.promise) },
+      onWarning: vi.fn(),
+      createObjectUrl: vi.fn(() => 'blob:decoded-image'),
+      revokeObjectUrl: vi.fn(),
+      preloadImage: vi.fn(() => decode.promise),
+      setLocalUploadState: vi.fn(),
+    })
+
+    const task = actions.createImageNodeFromFile({ x: 10, y: 20 }, makeFile('decoded.png'))
+    await flushPromises()
+    expect(createNodeAtPosition).not.toHaveBeenCalled()
+
+    decode.resolve(true)
+    await flushPromises()
+    expect(createNodeAtPosition).toHaveBeenCalledOnce()
+
+    upload.resolve({
+      url: '/uploads/decoded.png',
+      media_asset_id: 64,
+      width: 100,
+      height: 100,
+    })
+    await expect(task).resolves.toMatchObject({ kind: 'ready', nodeId: 'image-1' })
   })
 
   it('keeps the local preview after a failed upload and retries with the same file', async () => {

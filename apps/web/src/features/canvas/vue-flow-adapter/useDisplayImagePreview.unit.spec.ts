@@ -65,6 +65,7 @@ describe('useDisplayImagePreview', () => {
                   thumb: { status: 'ready', format: 'webp', url: '/api/thumb.webp' },
                   preview: { status: 'ready', format: 'webp', url: '/api/preview.webp' },
                   'large-preview': { status: 'ready', format: 'webp', url: '/api/large.webp' },
+                  processing: { status: 'ready', format: 'webp', url: '/api/processing.webp' },
                 },
               },
             }),

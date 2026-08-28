@@ -1,13 +1,19 @@
 import { computed, toValue } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/vue'
 import type { ImageToolStageBinding } from '../../../image-tools'
 import ImageNodeStage from './ImageNodeStage.vue'
 import { render } from '../../../../../test/render'
 
+const previewState = vi.hoisted(() => ({ displayUrl: null as string | null }))
+
+afterEach(() => {
+  previewState.displayUrl = null
+})
+
 vi.mock('../../../vue-flow-adapter/useDisplayImagePreview', () => ({
   useDisplayImagePreview: (sourceUrl: Parameters<typeof toValue>[0]) => ({
-    displayUrl: computed(() => toValue(sourceUrl) ?? ''),
+    displayUrl: computed(() => previewState.displayUrl ?? toValue(sourceUrl) ?? ''),
   }),
 }))
 
@@ -17,7 +23,7 @@ function renderImageStage(toolActive: boolean) {
       nodeId: 'image-1',
       stageWidth: 280,
       stageHeight: 280,
-      displayImage: { url: '' },
+      displayImage: { url: 'https://provider.example/image.png' },
       imageToolStageBinding: { active: toolActive } as ImageToolStageBinding,
       active: false,
       dragging: false,
@@ -122,6 +128,69 @@ describe('ImageNodeStage Library import recovery', () => {
     )
     await fireEvent.click(view.getByLabelText('Retry image import'))
     expect(view.emitted('retry-image-import')).toEqual([[]])
+  })
+
+  it('shows the local blob preview before the managed Media asset is ready', () => {
+    const view = render(ImageNodeStage, {
+      props: {
+        nodeId: 'image-1',
+        stageWidth: 280,
+        stageHeight: 280,
+        displayImage: null,
+        localUpload: { previewUrl: 'blob:local-image' },
+        active: false,
+        dragging: false,
+      },
+      global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
+    })
+
+    expect(view.getByRole('button', { name: /Image node preview/ })).toHaveAttribute(
+      'src',
+      'blob:local-image',
+    )
+    expect(view.queryByLabelText('Preparing image preview')).toBeNull()
+  })
+
+  it('prefers a local blob preview over an empty persisted image URL', () => {
+    const view = render(ImageNodeStage, {
+      props: {
+        nodeId: 'image-1',
+        stageWidth: 280,
+        stageHeight: 280,
+        displayImage: { url: '' },
+        localUpload: { previewUrl: 'blob:local-image' },
+        active: false,
+        dragging: false,
+      },
+      global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
+    })
+
+    expect(view.getByRole('button', { name: /Image node preview/ })).toHaveAttribute(
+      'src',
+      'blob:local-image',
+    )
+  })
+
+  it('keeps the original source visible while a derived preview is still decoding', () => {
+    previewState.displayUrl = ''
+    const view = render(ImageNodeStage, {
+      props: {
+        nodeId: 'image-1',
+        stageWidth: 280,
+        stageHeight: 280,
+        displayImage: { url: 'blob:local-image' },
+        active: false,
+        dragging: false,
+      },
+      global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
+    })
+
+    expect(view.getByRole('button', { name: /Image node preview/ })).toHaveAttribute(
+      'src',
+      'blob:local-image',
+    )
+    expect(view.queryByLabelText('Preparing image preview')).toBeNull()
+    previewState.displayUrl = null
   })
 })
 

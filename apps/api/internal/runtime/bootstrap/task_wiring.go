@@ -166,10 +166,7 @@ func newAppTaskRuntime(
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize River client: %w", err)
 	}
 	repos.mediaAssetRegistry.SetDerivativeEnqueuer(func(ctx context.Context, derivativeID int64) error {
-		_, err := riverClient.Insert(ctx, derivatives.JobArgs{DerivativeID: derivativeID}, &river.InsertOpts{
-			Queue: derivatives.QueueName, MaxAttempts: 5, Priority: 4,
-			UniqueOpts: river.UniqueOpts{ByArgs: true},
-		})
+		_, err := riverClient.Insert(ctx, derivatives.JobArgs{DerivativeID: derivativeID}, derivatives.DerivativeJobInsertOpts())
 		return err
 	})
 	if _, err := recoverRunningTasksAfterStartup(ctx, repos.taskRepo, riverTaskWorker, riverStartupJobCanceller{client: riverClient}); err != nil {

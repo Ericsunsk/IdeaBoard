@@ -297,6 +297,7 @@ export default {
     duplicateImagesFailed: 'Failed to duplicate images. Refresh the canvas and try again.',
     noExportableImages: 'The selected nodes have no images to export.',
     exportingImages: 'Exporting images: {count}...',
+    exportingImageProgress: 'Exporting image {current}/{total}...',
     exportQueued: 'Images queued: {count}',
     exportPartiallyQueued: 'Queued {completed}/{total}; failed {failed}',
     imageNodeMissing: 'Image node not found.',

@@ -83,6 +83,25 @@ export interface ImageNodeOutputItem {
   mediaAssetId?: number
 }
 
+export type ImageAdjustmentRecipeStep =
+  | { kind: 'hsl'; params: { hueShift: number; saturationScale: number; lightnessOffset: number } }
+  | { kind: 'threshold'; threshold: number; invert: boolean }
+  | {
+      kind: 'channel-lut'
+      luts: { red: number[]; green: number[]; blue: number[] }
+    }
+  | {
+      kind: 'sharpen'
+      params: { amount: number; radius: number; threshold: number; protectColor: boolean }
+    }
+
+export interface ImageAdjustmentRecipe {
+  version: 1
+  sourceMediaAssetId: number
+  sourceMimeType?: string
+  plan: ImageAdjustmentRecipeStep[]
+}
+
 export interface BoardStateMediaRef {
   mediaAssetId: number
   refType: 'board' | 'board_node'
@@ -108,6 +127,7 @@ export interface ImageNodeItem {
   title?: string
   sourceImageUrl: string
   sourceMediaAssetId?: number
+  adjustmentRecipe?: ImageAdjustmentRecipe
   sourceImageRatio: number
   outputCount?: number
   outputResolution?: OutputResolution

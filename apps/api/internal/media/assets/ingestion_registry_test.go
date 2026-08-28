@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -71,6 +72,46 @@ func TestBoardUploadIngestionTransitionsToReadyWithDerivativeOutbox(t *testing.T
 	}
 }
 
+func TestEnsureDerivativeKeepsOutboxWhenImmediateEnqueueFails(t *testing.T) {
+	db := testdb.Open(t)
+	ctx := context.Background()
+	owner := &users.User{DisplayName: "derivative-enqueue-fallback-owner", Status: 1, Role: "user"}
+	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
+		t.Fatal(err)
+	}
+	registry := NewMediaAssetRegistry(db)
+	request := ingestion.Request{
+		OwnerUserID:    owner.ID,
+		StorageProfile: "builtin-local", StorageKey: "uploads/canvas/fallback/image.png",
+		URL:    "/uploads/canvas/fallback/image.png",
+		Origin: ingestion.BoardUploadFacts{BoardID: "derivative-enqueue-fallback"},
+	}
+	handle, err := registry.Begin(ctx, request)
+	if err != nil {
+		t.Fatalf("begin upload: %v", err)
+	}
+	stored := storage.StoredUploadRef{
+		URL: request.URL, StorageKey: request.StorageKey, StorageProfile: request.StorageProfile,
+		MIMEType: "image/png", Width: 64, Height: 64, SizeBytes: 128, ChecksumSHA256: "fallback-checksum",
+	}
+	if err := registry.Complete(ctx, handle, stored.IngestionCompletion("")); err != nil {
+		t.Fatalf("complete upload: %v", err)
+	}
+	registry.SetDerivativeEnqueuer(func(context.Context, int64) error {
+		return errors.New("river unavailable")
+	})
+	if err := registry.EnsureDerivative(ctx, owner.ID, handle.AssetID, "large-preview"); err != nil {
+		t.Fatalf("ensure derivative should tolerate immediate enqueue failure: %v", err)
+	}
+	var outboxCount int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_derivative_outbox WHERE derivative_id = (SELECT id FROM media_derivatives WHERE media_asset_id = $1 AND tier = 'large-preview')`, handle.AssetID).Scan(&outboxCount); err != nil {
+		t.Fatal(err)
+	}
+	if outboxCount != 1 {
+		t.Fatalf("outbox count=%d, want 1", outboxCount)
+	}
+}
+
 func TestLibraryMaterializationReusesManagedAssetAndQueuesDerivatives(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
@@ -92,7 +133,7 @@ func TestLibraryMaterializationReusesManagedAssetAndQueuesDerivatives(t *testing
 		t.Fatalf("begin library materialization: %v", err)
 	}
 	mediaAssetID := handle.AssetID
-	stored := storage.StoredUploadRef{URL: media.URL, StorageKey: media.StorageKey, StorageProfile: media.StorageProfile, MIMEType: "image/png", Width: 640, Height: 480, SizeBytes: 2048, ChecksumSHA256: "library-checksum"}
+	stored := storage.StoredUploadRef{URL: "/uploads/library/1/materialized/original.jpg", StorageKey: "uploads/library/1/materialized/original.jpg", StorageProfile: media.StorageProfile, MIMEType: "image/jpeg", Width: 640, Height: 480, SizeBytes: 2048, ChecksumSHA256: "library-checksum"}
 	if err := registry.Complete(ctx, handle, stored.IngestionCompletion("https://images.unsplash.com/materialized-original")); err != nil {
 		t.Fatalf("complete library materialization: %v", err)
 	}
@@ -102,6 +143,9 @@ func TestLibraryMaterializationReusesManagedAssetAndQueuesDerivatives(t *testing
 	asset, err := registry.GetByID(ctx, owner.ID, mediaAssetID)
 	if err != nil {
 		t.Fatalf("load materialized asset: %v", err)
+	}
+	if asset.StorageKey != stored.StorageKey || asset.Url != stored.URL {
+		t.Fatalf("materialized storage locator = (%q, %q), want (%q, %q)", asset.StorageKey, asset.Url, stored.StorageKey, stored.URL)
 	}
 	if asset.SourceUrl != "https://images.unsplash.com/materialized-original" {
 		t.Fatalf("media source URL = %q, want downloaded URL", asset.SourceUrl)

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"strings"
 	"time"
@@ -57,7 +58,8 @@ func (r *MediaAssetRegistry) Complete(ctx context.Context, handle ingestion.Hand
 	}()
 	q := dbsqlc.New(tx)
 	if _, err := q.MarkMediaAssetReady(ctx, dbsqlc.MarkMediaAssetReadyParams{
-		ID: handle.AssetID, OwnerUserID: handle.OwnerUserID, Url: completion.URL, SourceUrl: completion.SourceURL,
+		ID: handle.AssetID, OwnerUserID: handle.OwnerUserID, StorageKey: completion.StorageKey,
+		Url: completion.URL, SourceUrl: completion.SourceURL,
 		MimeType: completion.MIMEType, Width: int32(completion.Width), Height: int32(completion.Height), SizeBytes: completion.SizeBytes,
 		ChecksumSha256: completion.ChecksumSHA256, Metadata: metadata,
 	}); err != nil {
@@ -222,8 +224,20 @@ func (r *MediaAssetRegistry) EnsureDerivative(ctx context.Context, ownerUserID, 
 	if r == nil || r.q == nil || ownerUserID <= 0 || assetID <= 0 {
 		return fmt.Errorf("invalid media derivative request")
 	}
-	_, err := derivatives.EnsureOnDemand(ctx, r.q, assetID, ownerUserID, tier)
-	return err
+	derivativeID, needsEnqueue, err := derivatives.EnsureOnDemand(ctx, r.q, assetID, ownerUserID, tier)
+	if err != nil {
+		return err
+	}
+	// The outbox remains the durable source of truth, but enqueue immediately
+	// so an interactive Apply does not wait for the periodic dispatcher.
+	if needsEnqueue && r.derivativeEnqueuer != nil {
+		if err := r.derivativeEnqueuer(ctx, derivativeID); err != nil {
+			// The outbox is durable and will enqueue this derivative on its next
+			// reconciliation pass. Direct River insertion only reduces latency.
+			slog.Warn("immediate media derivative enqueue failed", "derivative_id", derivativeID, "err", err)
+		}
+	}
+	return nil
 }
 
 func (r *MediaAssetRegistry) beginBoardUpload(ctx context.Context, request ingestion.Request, facts ingestion.BoardUploadFacts) (ingestion.Handle, error) {

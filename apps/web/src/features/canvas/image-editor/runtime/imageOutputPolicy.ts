@@ -22,6 +22,19 @@ export function resolveImageProcessingOutputEncoding(
   }
 }
 
+export function resolveImageExportEncoding(
+  sourceMimeType: string,
+  hasTransparentPixels: boolean | null,
+): ImageProcessingOutputEncoding {
+  const normalized = sourceMimeType.trim().toLowerCase().split(';', 1)[0]
+  if (hasTransparentPixels && normalized === 'image/png') return { mimeType: 'image/png' }
+  if (normalized === 'image/jpeg' || normalized === 'image/jpg') {
+    return { mimeType: 'image/jpeg', quality: 0.92 }
+  }
+  if (normalized === 'image/png') return { mimeType: 'image/png' }
+  return { mimeType: 'image/webp', quality: 0.92 }
+}
+
 export function createImageProcessingOutputFileName(input: ImageProcessingOutputFileNameInput) {
   const suffix = normalizeFileNamePart(input.suffix ?? DEFAULT_IMAGE_PROCESSING_OUTPUT_SUFFIX)
   const fallbackBaseName = normalizeFileNamePart(

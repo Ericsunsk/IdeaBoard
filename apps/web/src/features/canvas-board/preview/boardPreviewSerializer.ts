@@ -144,6 +144,16 @@ function shouldProxyPreviewUrl(resolvedUrl: string): boolean {
   }
 }
 
+function shouldReadCrossOriginPreviewAsBlob(resolvedUrl: string): boolean {
+  if (typeof window === 'undefined') return false
+  if (!resolvedUrl.startsWith('http://') && !resolvedUrl.startsWith('https://')) return false
+  try {
+    return new URL(resolvedUrl).origin !== window.location.origin
+  } catch {
+    return false
+  }
+}
+
 function getLatestOutputPreview(node: NodeLike): NodeImagePreview | null {
   const rawOutputs = Array.isArray(node.outputImages) ? node.outputImages : []
   for (let i = rawOutputs.length - 1; i >= 0; i -= 1) {
@@ -400,20 +410,18 @@ async function loadPreviewImage(
   let revokeUrl: string | undefined
 
   if (shouldProxyPreviewUrl(resolvedUrl)) {
-    try {
-      const response = await fetch(
+    revokeUrl =
+      (await fetchPreviewObjectUrl(
         `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(resolvedUrl)}`,
-        {
-          credentials: 'include',
-        },
-      )
-      if (!response.ok) return null
-      const blob = await response.blob()
-      revokeUrl = URL.createObjectURL(blob)
-      imageSrc = revokeUrl
-    } catch {
-      return null
-    }
+      )) ?? undefined
+    if (!revokeUrl) return null
+    imageSrc = revokeUrl
+  } else if (shouldReadCrossOriginPreviewAsBlob(resolvedUrl)) {
+    // API media URLs can be cross-origin and authenticated. Loading them as an
+    // object URL keeps the preview canvas origin-clean before toDataURL().
+    revokeUrl = (await fetchPreviewObjectUrl(resolvedUrl, true)) ?? undefined
+    if (!revokeUrl) return null
+    imageSrc = revokeUrl
   }
 
   return new Promise((resolve) => {
@@ -426,6 +434,18 @@ async function loadPreviewImage(
     }
     image.src = imageSrc
   })
+}
+
+async function fetchPreviewObjectUrl(url: string, requireImage = false): Promise<string | null> {
+  try {
+    const response = await fetch(url, { credentials: 'include' })
+    if (!response.ok) return null
+    const blob = await response.blob()
+    if (requireImage && !blob.type.startsWith('image/')) return null
+    return URL.createObjectURL(blob)
+  } catch {
+    return null
+  }
 }
 
 async function buildPreviewImageMap(frames: readonly BoardPreviewFrame[]): Promise<{

@@ -108,6 +108,7 @@ export function createCanvasWorkspaceGraphRuntime(
       currentBoardId: board.boardSession.currentBoardId,
       getImageNodeDisplayPayload: editing.workflowPort.getImageNodeDisplayPayload,
       getImageNodeSnapshot: editing.workflowPort.getImageNodeSnapshot,
+      updateSnapshotNode: editing.workflowPort.updateSnapshotNode,
       createImageNodeFromFile: editing.workflowPort.createImageNodeFromFile,
       connectionAdapter: editing.flowPane.connectionAdapter,
       uploadImageToBoard: editing.workflowPort.uploadImageToBoard,
