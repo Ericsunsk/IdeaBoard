@@ -1,3 +1,3 @@
 export { useCanvasImageWorkflow } from './useCanvasImageWorkflow'
-export { default as ImageCanvasExtendOverlay } from './components/ImageCanvasExtendOverlay.vue'
+export { default as ImageOutpaintOverlay } from './components/ImageOutpaintOverlay.vue'
 export type { CanvasImageWorkflow, CanvasImageWorkflowUiAdapter } from './useCanvasImageWorkflow'

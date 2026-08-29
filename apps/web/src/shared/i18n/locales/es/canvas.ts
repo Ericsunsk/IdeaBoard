@@ -182,7 +182,7 @@ export default {
     fallbackNodeLabel: 'Nodo',
     connectHandleAria: 'Arrastre para crear una conexión en el tirador {direction} de {kind}',
   },
-  imageEditor: {
+  retouch: {
     selectEditingLayer: 'Seleccione una capa de edición',
     layersListLabel: 'Capas',
     hideLayer: 'Ocultar capa',
@@ -268,7 +268,7 @@ export default {
       processingFailed: 'Error en el procesamiento de la imagen.',
     },
   },
-  maskEditor: {
+  inpaint: {
     brushTool: 'Pincel',
     eraserTool: 'Borrador',
     brushSizeLabel: 'Tamaño del pincel',

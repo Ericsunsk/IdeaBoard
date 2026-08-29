@@ -72,12 +72,12 @@ export function createCanvasScreenNodePresentation(options: {
       openContextMenu: interactions.onFlowImageContextMenu,
       runAction: interactions.onFlowImageDirectAction,
     },
-    canvasExtend: {
-      submit: interactions.onFlowImageExpandSubmit,
-      beginHandle: interactions.onFlowExpandHandlePointerDown,
-      moveHandle: interactions.onFlowExpandHandlePointerMove,
-      endHandle: interactions.onFlowExpandHandlePointerUp,
-      beginFrame: interactions.onFlowExpandFramePointerDown,
+    outpaint: {
+      submit: interactions.onFlowImageOutpaintSubmit,
+      beginHandle: interactions.onFlowOutpaintHandlePointerDown,
+      moveHandle: interactions.onFlowOutpaintHandlePointerMove,
+      endHandle: interactions.onFlowOutpaintHandlePointerUp,
+      beginFrame: interactions.onFlowOutpaintFramePointerDown,
     },
     fusion: {
       openContextMenu: interactions.onFlowFusionContextMenu,
@@ -86,8 +86,8 @@ export function createCanvasScreenNodePresentation(options: {
   })
 
   function nodePropsFor(node: NodeProps<FlowNodeData>) {
-    const canvasExtend = viewModel.imageWorkflow.canvasExtend
-    const isExpandModeActive = canvasExtend.nodeId.value === node.id
+    const outpaint = viewModel.imageWorkflow.outpaint
+    const isOutpaintModeActive = outpaint.nodeId.value === node.id
 
     return {
       nodeId: node.id,
@@ -101,9 +101,9 @@ export function createCanvasScreenNodePresentation(options: {
       generationAvailable: isGenerationAvailable.value,
       setImageStageRef: options.imageStages.setImageStageRef,
       clearImageStageRef: options.imageStages.clearImageStageRef,
-      expandModeActive: isExpandModeActive,
-      expandOverlayStyle: isExpandModeActive ? canvasExtend.overlayStyle.value : null,
-      expandHandleRadius: canvasExtend.handleRadius,
+      outpaintModeActive: isOutpaintModeActive,
+      outpaintOverlayStyle: isOutpaintModeActive ? outpaint.overlayStyle.value : null,
+      outpaintHandleRadius: outpaint.handleRadius,
     }
   }
 

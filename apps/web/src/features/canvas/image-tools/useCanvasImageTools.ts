@@ -11,19 +11,19 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions): Canvas
   const session = createImageToolSession(options)
   const commands = createImageToolCommands(session)
   const chrome = createImageToolChromeAdapter(session, commands.chromeCommands)
-  const nodeBindings = createImageToolNodeBindings(session, chrome.imageEditorRenderedPreview)
+  const nodeBindings = createImageToolNodeBindings(session, chrome.retouchRenderedPreview)
 
-  const isChromeHidden = computed(() => !!session.imageEditorNodeId.value)
+  const isChromeHidden = computed(() => !!session.retouchNodeId.value)
   const isCanvasLocked = computed(
-    () => options.isCanvasInteractionLocked.value || !!session.imageEditorNodeId.value,
+    () => options.isCanvasInteractionLocked.value || !!session.retouchNodeId.value,
   )
 
   return {
     viewModel: {
       active: {
-        nodeId: session.imageEditorNodeId,
-        maskNodeId: session.maskEditor.maskEditorNodeId,
-        mode: session.imageEditorMode,
+        nodeId: session.retouchNodeId,
+        maskNodeId: session.inpaint.inpaintNodeId,
+        mode: session.retouchMode,
       },
       locks: {
         isChromeHidden,
@@ -31,7 +31,7 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions): Canvas
       },
       chrome: chrome.chromeModel,
       adjustment: {
-        isApplying: session.isApplyingImageEditorAdjustments,
+        isApplying: session.isApplyingRetouchAdjustments,
       },
       nodeBindings: {
         stageFor: nodeBindings.stageBindingFor,
@@ -48,8 +48,8 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions): Canvas
       editor: {
         apply: commands.applyAdjustments,
         onCanvasWheel: session.coordinates.onCanvasWheel,
-        focusAndShowChrome: session.coordinates.focusImageEditorAndShowChrome,
-        scheduleChromeAnchorUpdate: session.coordinates.scheduleImageEditorChromeAnchorUpdate,
+        focusAndShowChrome: session.coordinates.focusRetouchAndShowChrome,
+        scheduleChromeAnchorUpdate: session.coordinates.scheduleRetouchChromeAnchorUpdate,
       },
       chrome: chrome.chromeCommands,
     },

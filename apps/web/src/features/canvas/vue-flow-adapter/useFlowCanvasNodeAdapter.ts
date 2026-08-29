@@ -14,8 +14,8 @@ interface UseFlowCanvasNodeAdapterOptions {
   data: () => FlowNodeData
   uiState: () => NodeUiState | PromptNodeUiState | undefined
   imageDirectGenerating: () => boolean
-  expandModeActive: () => boolean
-  isImageEditorActive: () => boolean
+  outpaintModeActive: () => boolean
+  isRetouchActive: () => boolean
 }
 
 function resolveSnapshotNode<T>(data: FlowNodeData) {
@@ -28,14 +28,14 @@ export function useFlowCanvasNodeAdapter({
   data,
   uiState,
   imageDirectGenerating,
-  expandModeActive,
-  isImageEditorActive,
+  outpaintModeActive,
+  isRetouchActive,
 }: UseFlowCanvasNodeAdapterOptions) {
   const isPromptNode = computed(() => data().kind === 'prompt')
   const isImageNode = computed(() => data().kind === 'image')
   const isFusionNode = computed(() => data().kind === 'fusion')
   const disableHandleRailInteraction = computed(
-    () => isImageNode.value && (expandModeActive() || isImageEditorActive()),
+    () => isImageNode.value && (outpaintModeActive() || isRetouchActive()),
   )
   const promptUiState = computed<PromptNodeUiState | undefined>(
     () => uiState() as PromptNodeUiState | undefined,

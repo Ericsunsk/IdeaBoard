@@ -1,4 +1,5 @@
-h1:QcCS20jefDwT28Kp7hmPF95wbUBt+uIOltwngqUuD2Y=
+h1:wQxHbz6TxOAu0PnRgFHa65Zvv7hHgOZQYgxogsffdBE=
 20260826010000_baseline.sql h1:5gtpmEKGpUuxbwHI4X/GFC63VZLKv5BMpBiPuErl9iI=
 20260828010000_media_checksum_dedup.sql h1:KVJ4iciXRv9nvrm1occHTBKx78cKWWT/JBO0hn9nuaI=
 20260828020000_media_processing_derivative.sql h1:g+QsM7PjcSe6sb4lGLnkCU3MJX/Uaft+8AkXqNNtzOU=
+20260829010000_outpaint_v4_contract.sql h1:oSxDrd1GtsE8nyneSt8gFdzvs9kSJHGBsPo2pJ5DmJE=

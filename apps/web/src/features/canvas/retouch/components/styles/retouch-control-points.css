@@ -1,0 +1,7 @@
+:where(.retouch-curves, .retouch-threshold-control, .retouch-levels-control) {
+  --retouch-control-point-size: var(--canvas-range-thumb-size);
+  --retouch-control-point-border-width: var(--editing-controls-border-width, 1px);
+  --retouch-control-point-border-color: var(--canvas-accent);
+  --retouch-control-point-bg: #ffffff;
+  --retouch-control-point-active-bg: var(--canvas-accent);
+}

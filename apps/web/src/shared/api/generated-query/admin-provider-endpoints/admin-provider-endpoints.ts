@@ -110,10 +110,18 @@ export const createAdminProviderEndpoint = async (
   providerEndpointFormData: ProviderEndpointFormData,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseProviderEndpoint> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseProviderEndpoint>(getCreateAdminProviderEndpointUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(providerEndpointFormData),
   })
 }
@@ -261,10 +269,18 @@ export const detectAdminProviderEndpointModels = async (
   detectModelsRequest: DetectModelsRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseDetectModels> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseDetectModels>(getDetectAdminProviderEndpointModelsUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(detectModelsRequest),
   })
 }
@@ -344,10 +360,18 @@ export const updateAdminProviderEndpoint = async (
   providerEndpointFormData: ProviderEndpointFormData,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseProviderEndpoint> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseProviderEndpoint>(getUpdateAdminProviderEndpointUrl(id), {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(providerEndpointFormData),
   })
 }
@@ -510,10 +534,18 @@ export const setAdminProviderEndpointStatus = async (
   providerEndpointStatusUpdate: ProviderEndpointStatusUpdate,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseProviderEndpoint> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseProviderEndpoint>(getSetAdminProviderEndpointStatusUrl(id), {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(providerEndpointStatusUpdate),
   })
 }

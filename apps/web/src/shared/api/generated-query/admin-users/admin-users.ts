@@ -197,12 +197,20 @@ export const updateAdminOAuthProviderSettings = async (
   oAuthProviderSettingsUpdate: OAuthProviderSettingsUpdate,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseOAuthProviderSettings> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseOAuthProviderSettings>(
     getUpdateAdminOAuthProviderSettingsUrl(provider),
     {
       ...options,
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
       body: JSON.stringify(oAuthProviderSettingsUpdate),
     },
   )
@@ -301,10 +309,18 @@ export const banAdminUser = async (
   banAdminUserBody?: BanAdminUserBody,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseEmpty> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseEmpty>(getBanAdminUserUrl(publicId), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(banAdminUserBody),
   })
 }
@@ -520,10 +536,18 @@ export const updateAdminUserRole = async (
   updateAdminUserRoleBody: UpdateAdminUserRoleBody,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseEmpty> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseEmpty>(getUpdateAdminUserRoleUrl(publicId), {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateAdminUserRoleBody),
   })
 }

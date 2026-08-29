@@ -48,10 +48,18 @@ export const grantAdminCredits = async (
   adminCreditGrantRequest: AdminCreditGrantRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseCreditCommandResult> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseCreditCommandResult>(getGrantAdminCreditsUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminCreditGrantRequest),
   })
 }
@@ -121,10 +129,18 @@ export const deductAdminCredits = async (
   adminCreditDeductionRequest: AdminCreditDeductionRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseCreditCommandResult> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseCreditCommandResult>(getDeductAdminCreditsUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminCreditDeductionRequest),
   })
 }
@@ -194,10 +210,18 @@ export const refundAdminCredits = async (
   adminCreditRefundRequest: AdminCreditRefundRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseCreditCommandResult> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseCreditCommandResult>(getRefundAdminCreditsUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminCreditRefundRequest),
   })
 }
@@ -267,10 +291,18 @@ export const correctAdminCredits = async (
   adminCreditCorrectionRequest: AdminCreditCorrectionRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseCreditCommandResult> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseCreditCommandResult>(getCorrectAdminCreditsUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminCreditCorrectionRequest),
   })
 }
@@ -575,10 +607,18 @@ export const startAdminCreditReconciliation = async (
   creditReconciliationRequest: CreditReconciliationRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseCreditReconciliationRun> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseCreditReconciliationRun>(getStartAdminCreditReconciliationUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(creditReconciliationRequest),
   })
 }

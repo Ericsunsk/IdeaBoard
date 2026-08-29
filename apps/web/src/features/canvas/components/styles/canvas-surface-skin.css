@@ -1,6 +1,6 @@
 /*
  * Canvas Workspace's stable surface contract. Canvas Screen mounts this class;
- * Canvas Chrome, nodes, Vue Flow, Image Editing, Image Mask Editing, and the
+ * Canvas Chrome, nodes, Vue Flow, Retouch, Inpaint, and the
  * minimap consume its named variables without depending on Screen CSS.
  */
 html.canvas-overscroll-guard,

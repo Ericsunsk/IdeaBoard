@@ -2,8 +2,8 @@
   <div
     class="image-tool-chrome-frame"
     :style="chromeStyle"
-    :data-image-editor="mode === 'adjust' ? '' : undefined"
-    :data-image-mask-editor="mode === 'inpaint' ? '' : undefined"
+    :data-retouch="mode === 'adjust' ? '' : undefined"
+    :data-inpaint="mode === 'inpaint' ? '' : undefined"
     @pointerdown.stop
   >
     <div v-if="$slots.tools" class="image-tool-chrome-frame__tool-rail node-tool-surface">

@@ -113,7 +113,7 @@ const (
 	RuntimeControlsNone      RuntimeControlContract = "none"
 	RuntimeControlsVariation RuntimeControlContract = "variation"
 	RuntimeControlsFusion    RuntimeControlContract = "fusion"
-	RuntimeControlsExtend    RuntimeControlContract = "extend"
+	RuntimeControlsOutpaint  RuntimeControlContract = "outpaint"
 	RuntimeControlsUpscale   RuntimeControlContract = "upscale"
 )
 
@@ -318,7 +318,7 @@ var registeredImageFeatures = []registeredImageFeature{
 	}},
 	{slug: FeatureSlugOutpaint, definition: imageFillDefinition(
 		PromptPolicyOptional, RuntimeOperationOutpaint,
-		ImageInputRequired, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsExtend,
+		ImageInputRequired, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsOutpaint,
 	)},
 }
 
@@ -517,7 +517,7 @@ func CompileFeatureReadinessPlan(input CompileFeatureExecutionInput) (FeatureExe
 	return CompileFeatureExecutionPlan(CompileFeatureExecutionInput{Feature: feature, Params: params})
 }
 
-const CurrentFeatureExecutionPlanSchemaVersion = 3
+const CurrentFeatureExecutionPlanSchemaVersion = 4
 
 type durableFeatureExecutionPlan struct {
 	SchemaVersion int                       `json:"schema_version"`
@@ -553,7 +553,7 @@ type durableRuntimePlan struct {
 	ControlContract     RuntimeControlContract `json:"control_contract"`
 }
 
-type durableFeatureDefinitionV3 struct {
+type durableFeatureDefinition struct {
 	promptPolicy           PromptPolicy
 	outputCountPolicy      OutputCountPolicy
 	outputResolutionPolicy OutputResolutionPolicy
@@ -568,42 +568,42 @@ type durableFeatureDefinitionV3 struct {
 	controlContract        RuntimeControlContract
 }
 
-// durableFeatureDefinitionForV3 is an immutable schema snapshot. It must not
+// durableFeatureDefinitionForCurrentSchema is an immutable schema snapshot. It must not
 // consult the live compiler registry: semantic changes require a new schema.
-func durableFeatureDefinitionForV3(feature string) (durableFeatureDefinitionV3, bool) {
+func durableFeatureDefinitionForCurrentSchema(feature string) (durableFeatureDefinition, bool) {
 	switch feature {
 	case FeatureSlugPromptGeneration:
-		return durableImageGenerationDefinitionV3(
+		return durableImageGenerationDefinition(
 			PromptPolicyRequired, RuntimeOperationPromptGeneration, RuntimeInvocationGenerate,
 			ImageInputOptional, 4, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsNone,
 		), true
 	case FeatureSlugInpaint:
-		return durableImageFillDefinitionV3(
+		return durableImageFillDefinition(
 			PromptPolicyRequired, RuntimeOperationInpaint,
 			MaskInputRequired, RuntimeControlsNone,
 		), true
 	case FeatureSlugRender:
-		return durableImageGenerationDefinitionV3(
+		return durableImageGenerationDefinition(
 			PromptPolicyOptional, RuntimeOperationRender, RuntimeInvocationEdit,
 			ImageInputRequired, 16, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsNone,
 		), true
 	case FeatureSlugVariations:
-		return durableImageGenerationDefinitionV3(
+		return durableImageGenerationDefinition(
 			PromptPolicyOptional, RuntimeOperationVariations, RuntimeInvocationEdit,
 			ImageInputRequired, 16, MaskInputIgnored, OriginalImageExcluded, RuntimeControlsVariation,
 		), true
 	case FeatureSlugStyleFusion:
-		return durableImageGenerationDefinitionV3(
+		return durableImageGenerationDefinition(
 			PromptPolicyOptional, RuntimeOperationStyleFusion, RuntimeInvocationEdit,
 			MultipleImageInputsRequired, 4, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsFusion,
 		), true
 	case FeatureSlugOutpaint:
-		return durableImageFillDefinitionV3(
+		return durableImageFillDefinition(
 			PromptPolicyOptional, RuntimeOperationOutpaint,
-			MaskInputIgnored, RuntimeControlsExtend,
+			MaskInputIgnored, RuntimeControlsOutpaint,
 		), true
 	case FeatureSlugCutout:
-		return durableFeatureDefinitionV3{
+		return durableFeatureDefinition{
 			promptPolicy: PromptPolicyIgnored, outputCountPolicy: OutputCountPolicyFixed,
 			outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
 			routingCapability:      RoutingCapabilityBackgroundRemoval, modelRequirement: RoutingModelNotRequired,
@@ -613,7 +613,7 @@ func durableFeatureDefinitionForV3(feature string) (durableFeatureDefinitionV3, 
 			originalImagePolicy: OriginalImageIgnored, controlContract: RuntimeControlsNone,
 		}, true
 	case FeatureSlugHDUpscale:
-		return durableFeatureDefinitionV3{
+		return durableFeatureDefinition{
 			promptPolicy: PromptPolicyIgnored, outputCountPolicy: OutputCountPolicyFixed,
 			outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
 			routingCapability:      RoutingCapabilityImageUpscale, modelRequirement: RoutingModelNotRequired,
@@ -623,11 +623,11 @@ func durableFeatureDefinitionForV3(feature string) (durableFeatureDefinitionV3, 
 			originalImagePolicy: OriginalImageIgnored, controlContract: RuntimeControlsUpscale,
 		}, true
 	default:
-		return durableFeatureDefinitionV3{}, false
+		return durableFeatureDefinition{}, false
 	}
 }
 
-func durableImageGenerationDefinitionV3(
+func durableImageGenerationDefinition(
 	promptPolicy PromptPolicy,
 	operation RuntimeOperation,
 	invocation RuntimeInvocation,
@@ -636,8 +636,8 @@ func durableImageGenerationDefinitionV3(
 	maskInputPolicy MaskInputPolicy,
 	originalImagePolicy OriginalImagePolicy,
 	controlContract RuntimeControlContract,
-) durableFeatureDefinitionV3 {
-	return durableFeatureDefinitionV3{
+) durableFeatureDefinition {
+	return durableFeatureDefinition{
 		promptPolicy: promptPolicy, outputCountPolicy: OutputCountPolicySelectable,
 		outputResolutionPolicy: OutputResolutionPolicyScalable,
 		routingCapability:      RoutingCapabilityImageGeneration, modelRequirement: RoutingModelRequired,
@@ -648,13 +648,13 @@ func durableImageGenerationDefinitionV3(
 	}
 }
 
-func durableImageFillDefinitionV3(
+func durableImageFillDefinition(
 	promptPolicy PromptPolicy,
 	operation RuntimeOperation,
 	maskInputPolicy MaskInputPolicy,
 	controlContract RuntimeControlContract,
-) durableFeatureDefinitionV3 {
-	return durableFeatureDefinitionV3{
+) durableFeatureDefinition {
+	return durableFeatureDefinition{
 		promptPolicy: promptPolicy, outputCountPolicy: OutputCountPolicyFixed,
 		outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
 		routingCapability:      RoutingCapabilityImageFill, modelRequirement: RoutingModelNotRequired,
@@ -860,7 +860,7 @@ func featureExecutionPlanFromDurable(envelope durableFeatureExecutionPlan) (Feat
 			FeatureContractUnsupportedSchema, envelope.Feature, "schema_version", fmt.Sprintf("%d", envelope.SchemaVersion),
 		)
 	}
-	definition, ok := durableFeatureDefinitionForV3(envelope.Feature)
+	definition, ok := durableFeatureDefinitionForCurrentSchema(envelope.Feature)
 	if !ok {
 		return FeatureExecutionPlan{}, newFeatureContractValidationError(
 			FeatureContractInvalidDurablePlan, envelope.Feature, "feature", envelope.Feature,
@@ -939,7 +939,7 @@ func validateDurableOutputV1(feature string, output durableOutputPlan, routing d
 	return nil
 }
 
-func validateDurableRuntimeV1(feature string, definition durableFeatureDefinitionV3, runtime durableRuntimePlan) error {
+func validateDurableRuntimeV1(feature string, definition durableFeatureDefinition, runtime durableRuntimePlan) error {
 	if violation := validateRuntimeMediaPolicy(
 		runtimeMediaPolicy{
 			imageInputPolicy:   definition.imageInputPolicy,

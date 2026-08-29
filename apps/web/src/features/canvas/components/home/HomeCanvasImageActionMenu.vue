@@ -107,7 +107,7 @@ const actionMenuMotion = createPopoverMotionTransition()
 const outputResolution = computed(() => props.outputResolution ?? '1k')
 
 function resolveItemBillingFeature(item: ImageActionMenuItem): WorkflowFeature | null {
-  if (item.action === IMAGE_NODE_ACTION.imageInpaint) return WORKFLOW_FEATURE.inpaint
+  if (item.action === IMAGE_NODE_ACTION.inpaint) return WORKFLOW_FEATURE.inpaint
   return WORKFLOW_FEATURE_SLUGS.includes(item.action as WorkflowFeature)
     ? (item.action as WorkflowFeature)
     : null
@@ -118,7 +118,7 @@ function buildItemReadinessRequest(item: ImageActionMenuItem) {
     outputCount: props.outputCount,
     outputResolution: outputResolution.value,
   }
-  if (item.action === IMAGE_NODE_ACTION.imageInpaint) {
+  if (item.action === IMAGE_NODE_ACTION.inpaint) {
     return buildInpaintReadinessRequest()
   }
   if (item.action === IMAGE_NODE_ACTION.outpaint || isImageTaskAction(item.action)) {

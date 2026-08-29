@@ -248,7 +248,7 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 		}
 	case workflow.FeatureSlugOutpaint:
 		if c, ok := workflow.ReadOutpaintContract(params); ok {
-			p.Extend = &tasks.OutpaintParams{
+			p.Outpaint = &tasks.OutpaintParams{
 				TargetWidth: c.TargetWidth, TargetHeight: c.TargetHeight,
 				ImageOffsetX: c.ImageOffsetX, ImageOffsetY: c.ImageOffsetY,
 			}

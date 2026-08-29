@@ -1,13 +1,13 @@
 import type { SubmitTaskData } from '../../../../shared/api/task'
 import type {
-  CanvasExtendExecutionPlan,
+  OutpaintExecutionPlan,
   ImageActionExecutionPlan,
   ImageInpaintExecutionPlan,
   ImageExecutionInput,
   PromptGenerationExecutionPlan,
   PreparedFusionExecutionPlan,
 } from '../planning/ImageExecutionPlan'
-import { resolveCanvasExtendPixelGeometry, type CanvasExtendRect } from '../../utils/canvasExtendGeometry'
+import { resolveOutpaintPixelGeometry, type OutpaintRect } from '../../utils/outpaintGeometry'
 import {
   buildExecutionTaskRequest,
   EXECUTION_FEATURE,
@@ -25,7 +25,7 @@ import type { OutputResolution } from '../../../../shared/domain/generationContr
 import type { PromptAspectRatio } from '../../../canvas-board/domain'
 import { i18n } from '../../../../shared/i18n'
 import {
-  IMAGE_CANVAS_EXTEND_ACTION,
+  IMAGE_OUTPAINT_ACTION,
   IMAGE_HD_UPSCALE_ACTION,
   isImageDirectTaskAction,
   resolveHdScale,
@@ -108,8 +108,8 @@ export function buildInpaintReadinessRequest(): SubmitTaskData {
   })
 }
 
-export function buildCanvasExtendReadinessRequest(): SubmitTaskData {
-  const execution = requireImageActionExecution(IMAGE_CANVAS_EXTEND_ACTION)
+export function buildOutpaintReadinessRequest(): SubmitTaskData {
+  const execution = requireImageActionExecution(IMAGE_OUTPAINT_ACTION)
   return buildExecutionTaskRequest({
     prompt: '',
     feature: execution.feature,
@@ -118,7 +118,7 @@ export function buildCanvasExtendReadinessRequest(): SubmitTaskData {
       output_resolution: 'default',
       original_image_width: 1024,
       original_image_height: 1024,
-      extend: { target_width: 1032, target_height: 1024, image_offset_x: 0, image_offset_y: 0 },
+      outpaint: { target_width: 1032, target_height: 1024, image_offset_x: 0, image_offset_y: 0 },
     },
   })
 }
@@ -140,7 +140,7 @@ export function buildImageActionReadinessRequest(
   action: ImageExecutionAction,
   options: ImageActionReadinessOptions = {},
 ): SubmitTaskData {
-  if (action === IMAGE_CANVAS_EXTEND_ACTION) return buildCanvasExtendReadinessRequest()
+  if (action === IMAGE_OUTPAINT_ACTION) return buildOutpaintReadinessRequest()
   if (action === IMAGE_HD_UPSCALE_ACTION) return buildHdUpscaleReadinessRequest()
   if (isImageDirectTaskAction(action)) return buildDirectActionReadinessRequest(action, options)
   throw new Error(`Unsupported image execution action ${action}`)
@@ -226,18 +226,18 @@ export function buildImageInpaintTaskRequest(input: ImageInpaintTaskRequestInput
   })
 }
 
-export function buildCanvasExtendTaskRequest(input: {
+export function buildOutpaintTaskRequest(input: {
   source: ImageExecutionInput
   imageSize: ExecutionImageSize | null
-  frameRect: CanvasExtendRect
-  originalImageRect: CanvasExtendRect
+  frameRect: OutpaintRect
+  originalImageRect: OutpaintRect
   prompt?: string
 }): SubmitTaskData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
   const prompt = `${input.prompt ?? ''}`.trim()
-  const execution = requireImageActionExecution(IMAGE_CANVAS_EXTEND_ACTION)
+  const execution = requireImageActionExecution(IMAGE_OUTPAINT_ACTION)
   if (!input.imageSize) throw new Error(i18n.global.t('canvas.execution.outpaintMissingOriginalSize'))
-  const geometry = resolveCanvasExtendPixelGeometry(input.imageSize, input.frameRect, input.originalImageRect)
+  const geometry = resolveOutpaintPixelGeometry(input.imageSize, input.frameRect, input.originalImageRect)
   return buildExecutionTaskRequest({
     prompt,
     feature: execution.feature,
@@ -247,7 +247,7 @@ export function buildCanvasExtendTaskRequest(input: {
       output_resolution: 'default',
       original_image_width: input.imageSize.width,
       original_image_height: input.imageSize.height,
-      extend: {
+      outpaint: {
         target_width: geometry.targetWidth,
         target_height: geometry.targetHeight,
         image_offset_x: geometry.imageOffsetX,
@@ -302,7 +302,7 @@ export function buildFusionTaskRequest(input: FusionTaskRequestInput): SubmitTas
 
 type ImageExecutionTaskRequestPlan =
   | ImageActionExecutionPlan
-  | CanvasExtendExecutionPlan
+  | OutpaintExecutionPlan
   | PromptGenerationExecutionPlan
   | PreparedFusionExecutionPlan
 
@@ -334,8 +334,8 @@ export function buildImageExecutionTaskRequest(
         })
       }
       throw new Error(`Unsupported image task action ${plan.action}`)
-    case 'canvas-extend':
-      return buildCanvasExtendTaskRequest({
+    case 'outpaint':
+      return buildOutpaintTaskRequest({
         source: plan.source,
         imageSize,
         frameRect: plan.frameRect,

@@ -27,9 +27,9 @@ func TestNormalizeStructuredPromptContractParamsMovesFlatVariationParams(t *test
 	}
 }
 
-func TestNormalizeStructuredPromptContractParamsNormalizesExtendContract(t *testing.T) {
+func TestNormalizeStructuredPromptContractParamsNormalizesOutpaintContract(t *testing.T) {
 	params := map[string]interface{}{
-		"extend": map[string]interface{}{
+		"outpaint": map[string]interface{}{
 			"target_width":   1280,
 			"target_height":  768,
 			"image_offset_x": 0,
@@ -41,12 +41,12 @@ func TestNormalizeStructuredPromptContractParamsNormalizesExtendContract(t *test
 		t.Fatalf("NormalizeStructuredPromptContractParams returned error: %v", err)
 	}
 
-	extend, ok := params[ParamKeyExtend].(map[string]interface{})
+	outpaint, ok := params[ParamKeyOutpaint].(map[string]interface{})
 	if !ok {
-		t.Fatalf("extend = %#v, want object", params[ParamKeyExtend])
+		t.Fatalf("outpaint = %#v, want object", params[ParamKeyOutpaint])
 	}
-	if extend["target_width"] != float64(1280) {
-		t.Fatalf("target_width = %#v, want 1280", extend["target_width"])
+	if outpaint["target_width"] != float64(1280) {
+		t.Fatalf("target_width = %#v, want 1280", outpaint["target_width"])
 	}
 }
 
@@ -159,10 +159,10 @@ func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 			wantAbsent: []string{"output_quality", "upscale_factor"},
 		},
 		{
-			name: "image extend",
+			name: "image outpaint",
 			params: &tasks.WorkflowTaskParams{
 				Feature: FeatureSlugOutpaint,
-				Extend: &tasks.OutpaintParams{
+				Outpaint: &tasks.OutpaintParams{
 					TargetWidth:  1280,
 					TargetHeight: 768,
 					ImageOffsetX: 32,
@@ -170,8 +170,8 @@ func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 				},
 			},
 			want: map[string]interface{}{
-				"feature": FeatureSlugOutpaint,
-				"extend":  map[string]interface{}{"target_width": 1280, "target_height": 768, "image_offset_x": 32, "image_offset_y": 16},
+				"feature":  FeatureSlugOutpaint,
+				"outpaint": map[string]interface{}{"target_width": 1280, "target_height": 768, "image_offset_x": 32, "image_offset_y": 16},
 			},
 		},
 		{

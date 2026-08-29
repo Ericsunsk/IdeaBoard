@@ -1,5 +1,5 @@
 export type DismissTransientCanvasUiOptions = {
-  closeExpand?: boolean
+  closeOutpaint?: boolean
   closeBoardHeader?: boolean
   closeContextMenu?: boolean
   clearNodePanel?: boolean
@@ -9,7 +9,7 @@ export type DismissTransientCanvasUiOptions = {
 export type DismissTransientCanvasUi = (options?: DismissTransientCanvasUiOptions) => void
 
 type UseFlowTransientUiDismissalOptions = {
-  cancelFlowExpandMode: () => void
+  cancelFlowOutpaintMode: () => void
   closeBoardHeaderEditing: () => void
   closeNodeContextMenu: () => void
   clearActiveNodePanel: () => void
@@ -21,7 +21,7 @@ export function useFlowTransientUiDismissal(options: UseFlowTransientUiDismissal
     const clearNodePanel = request.clearNodePanel ?? true
     const hideStrength = request.hideStrength ?? true
 
-    if (request.closeExpand) options.cancelFlowExpandMode()
+    if (request.closeOutpaint) options.cancelFlowOutpaintMode()
     if (request.closeBoardHeader) options.closeBoardHeaderEditing()
     if (request.closeContextMenu) options.closeNodeContextMenu()
     if (clearNodePanel !== false) options.clearActiveNodePanel()

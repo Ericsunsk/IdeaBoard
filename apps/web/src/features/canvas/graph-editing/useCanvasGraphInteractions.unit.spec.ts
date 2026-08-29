@@ -172,13 +172,13 @@ describe('useCanvasGraphInteractions', () => {
 
     expect(harness.interactions.viewModel.hasSelectedNodes.value).toBe(true)
     harness.interactions.commands.clearSelection()
-    harness.interactions.runtimePort.startInteraction('image-mask-editor')
+    harness.interactions.runtimePort.startInteraction('inpaint')
 
     expect(harness.clear).toHaveBeenCalledWith(harness.selectedElements.value)
     expect(harness.interactions.viewModel.isInteractionActive.value).toBe(true)
     expect(harness.interactions.viewModel.isInteractionLocked.value).toBe(true)
 
-    harness.interactions.runtimePort.stopInteraction('image-mask-editor')
+    harness.interactions.runtimePort.stopInteraction('inpaint')
     expect(harness.interactions.viewModel.isInteractionLocked.value).toBe(false)
   })
 

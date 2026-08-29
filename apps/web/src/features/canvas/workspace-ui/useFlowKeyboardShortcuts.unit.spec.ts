@@ -82,7 +82,7 @@ describe('useFlowKeyboardShortcuts', () => {
     })
     const editingSurface = document.createElement('button')
     editingSurface.type = 'button'
-    editingSurface.dataset.imageEditor = ''
+    editingSurface.dataset.retouch = ''
     document.body.appendChild(editingSurface)
 
     try {

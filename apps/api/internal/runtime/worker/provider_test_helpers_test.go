@@ -201,7 +201,7 @@ func providerRuntimeIntentForTest(params map[string]interface{}) (workflow.Runti
 	case workflow.FeatureSlugStyleFusion:
 		return workflow.RuntimeOperationStyleFusion, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsFusion
 	case workflow.FeatureSlugOutpaint:
-		return workflow.RuntimeOperationOutpaint, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsExtend
+		return workflow.RuntimeOperationOutpaint, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsOutpaint
 	case workflow.FeatureSlugCutout:
 		return workflow.RuntimeOperationBackgroundRemoval, workflow.RuntimeInvocationTransform, workflow.RuntimeControlsNone
 	case workflow.FeatureSlugHDUpscale:

@@ -251,7 +251,7 @@ describe('ImageExecutionPlan', () => {
       prompt: 'redraw',
       maskDataUrl: 'data:image/png;base64,mask',
     })
-    const extend = planner.planCanvasExtendAction('image-1', {
+    const extend = planner.planOutpaintAction('image-1', {
       frameRect: { left: -20, top: 0, width: 140, height: 100 },
       originalImageRect: { left: 0, top: 0, width: 100, height: 100 },
     })
@@ -261,7 +261,7 @@ describe('ImageExecutionPlan', () => {
     expect(extend.outputCount).toBe(1)
   })
 
-  it('rejects canvas extend plans with no extension', () => {
+  it('rejects outpaint plans with no extension', () => {
     const planner = createImageExecutionPlanner(() => ({
       nodes: [
         {
@@ -273,7 +273,7 @@ describe('ImageExecutionPlan', () => {
     }))
 
     expect(() =>
-      planner.planCanvasExtendAction('image-1', {
+      planner.planOutpaintAction('image-1', {
         frameRect: { left: 0, top: 0, width: 100, height: 100 },
         originalImageRect: { left: 0, top: 0, width: 100, height: 100 },
       }),

@@ -127,7 +127,7 @@ describe('useFlowImageWorkflowExecution', () => {
     expect(core.snapshot().executions).toEqual([])
   })
 
-  it('uses the complete extend request for readiness and submission', async () => {
+  it('uses the complete outpaint request for readiness and submission', async () => {
     const assertReady = vi.fn<PendingImageWorkflowTaskTransport['assertReady']>(
       async () => undefined,
     )
@@ -141,7 +141,7 @@ describe('useFlowImageWorkflowExecution', () => {
     })
 
     await harness.execution.executeImageWorkflow({
-      kind: 'canvas-extend',
+      kind: 'outpaint',
       activationId: 'extend',
       sourceNodeId: 'image-1',
       source: { url: 'https://example.com/a.png', ratio: 1 },
@@ -162,7 +162,7 @@ describe('useFlowImageWorkflowExecution', () => {
         output_count: 1,
         original_image_width: 1200,
         original_image_height: 800,
-        extend: { target_width: 1920, target_height: 1120, image_offset_x: 480, image_offset_y: 80 },
+        outpaint: { target_width: 1920, target_height: 1120, image_offset_x: 480, image_offset_y: 80 },
       },
     })
     expect(submit.mock.calls[0]?.[0]).toBe(readinessRequest)
@@ -182,7 +182,7 @@ describe('useFlowImageWorkflowExecution', () => {
     })
 
     await harness.execution.executeImageWorkflow({
-      kind: 'image-inpaint',
+      kind: 'inpaint',
       activationId: 'inpaint',
       sourceNodeId: 'image-1',
       source: { url: 'https://example.com/a.png', ratio: 1 },

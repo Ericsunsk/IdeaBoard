@@ -44,11 +44,11 @@ export type CanvasNodePresentationIntentCommands = {
       strength?: number,
     ) => void
   }
-  canvasExtend: {
+  outpaint: {
     submit: (nodeId: string, prompt: string) => void
     beginHandle: (
       nodeId: string,
-      anchor: CanvasNodeIntentOf<'canvas-extend-handle-pointerdown'>['anchor'],
+      anchor: CanvasNodeIntentOf<'outpaint-handle-pointerdown'>['anchor'],
       event: PointerEvent,
     ) => void
     moveHandle: (event: PointerEvent) => void
@@ -125,8 +125,8 @@ export function createCanvasNodePresentationIntentRouter(
       case 'image-context-menu-requested':
         commands.image.openContextMenu(intent.nodeId, intent.event)
         return
-      case 'canvas-extend-submitted':
-        commands.canvasExtend.submit(intent.nodeId, intent.prompt)
+      case 'outpaint-submitted':
+        commands.outpaint.submit(intent.nodeId, intent.prompt)
         return
       case 'action-requested':
         commands.image.runAction(
@@ -137,17 +137,17 @@ export function createCanvasNodePresentationIntentRouter(
           intent.strength,
         )
         return
-      case 'canvas-extend-handle-pointerdown':
-        commands.canvasExtend.beginHandle(intent.nodeId, intent.anchor, intent.event)
+      case 'outpaint-handle-pointerdown':
+        commands.outpaint.beginHandle(intent.nodeId, intent.anchor, intent.event)
         return
-      case 'canvas-extend-handle-pointermove':
-        commands.canvasExtend.moveHandle(intent.event)
+      case 'outpaint-handle-pointermove':
+        commands.outpaint.moveHandle(intent.event)
         return
-      case 'canvas-extend-handle-pointerup':
-        commands.canvasExtend.endHandle(intent.event)
+      case 'outpaint-handle-pointerup':
+        commands.outpaint.endHandle(intent.event)
         return
-      case 'canvas-extend-frame-pointerdown':
-        commands.canvasExtend.beginFrame(intent.nodeId, intent.event)
+      case 'outpaint-frame-pointerdown':
+        commands.outpaint.beginFrame(intent.nodeId, intent.event)
         return
       case 'fusion-context-menu-requested':
         commands.fusion.openContextMenu(intent.nodeId, intent.event)

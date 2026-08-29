@@ -30,7 +30,7 @@ export interface SubmitTaskRequestParams {
   output_resolution?: OutputResolution
   prompt_upsampling?: boolean
   variation?: VariationsParams
-  extend?: OutpaintParams
+  outpaint?: OutpaintParams
   hd?: HDUpscaleParams
   fusion?: StyleFusionParams
 }

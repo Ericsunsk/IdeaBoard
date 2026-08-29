@@ -124,10 +124,18 @@ export const createAdminAccount = async (
   adminAccountCreateRequest: AdminAccountCreateRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseAdminAccount> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseAdminAccount>(getCreateAdminAccountUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminAccountCreateRequest),
   })
 }
@@ -332,10 +340,18 @@ export const updateAdminAccount = async (
   adminAccountUpdateRequest: AdminAccountUpdateRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseEmpty> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseEmpty>(getUpdateAdminAccountUrl(id), {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminAccountUpdateRequest),
   })
 }
@@ -483,10 +499,18 @@ export const patchAdminAccountModel = async (
   adminAccountModelPatchRequest: AdminAccountModelPatchRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseAdminAccount> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseAdminAccount>(getPatchAdminAccountModelUrl(id), {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminAccountModelPatchRequest),
   })
 }

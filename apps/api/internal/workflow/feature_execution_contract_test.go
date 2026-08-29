@@ -96,7 +96,7 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 			operation: RuntimeOperationOutpaint, imageInputCount: 1, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationTransform, imageInputPolicy: ImageInputRequired,
 			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageForwardWhenPresent,
-			controlContract: RuntimeControlsExtend,
+			controlContract: RuntimeControlsOutpaint,
 		},
 	}
 
@@ -282,7 +282,7 @@ func TestCompileFeatureExecutionPlanRejectsInvalidRuntimeMediaByFeature(t *testi
 		{name: "inpaint needs mask", feature: FeatureSlugInpaint, params: FeatureExecutionParams{ImageInputCount: 1}, field: "mask_input"},
 		{name: "sketch needs image", feature: FeatureSlugRender, field: "image_input_count"},
 		{name: "variation needs image", feature: FeatureSlugVariations, field: "image_input_count"},
-		{name: "extend needs image", feature: FeatureSlugOutpaint, field: "image_input_count"},
+		{name: "outpaint needs image", feature: FeatureSlugOutpaint, field: "image_input_count"},
 		{name: "fusion needs multiple images", feature: FeatureSlugStyleFusion, params: FeatureExecutionParams{ImageInputCount: 1}, field: "image_input_count"},
 		{name: "fusion caps images at four", feature: FeatureSlugStyleFusion, params: FeatureExecutionParams{ImageInputCount: 5}, field: "image_input_count"},
 		{name: "non mask operation rejects mask", feature: FeatureSlugRender, params: FeatureExecutionParams{ImageInputCount: 1, HasMaskInput: true}, field: "mask_input"},
@@ -414,6 +414,111 @@ func TestFeatureExecutionPlanDurableRoundTripPreservesCanonicalFacts(t *testing.
 	}
 }
 
+// TestMigratedV3ExecutionPlanFixturesDecode verifies the JSON seam used by
+// the v4 database migration. Legacy plans are represented as schema v3
+// payloads, then transformed exactly as the migration contract requires:
+// bump the schema version, rename only the outpaint control discriminator,
+// and preserve every other feature fact (including the absence of a kind
+// field). Keeping these fixtures here prevents a migration from introducing
+// fields that the fail-closed durable decoder cannot consume.
+func TestMigratedV3ExecutionPlanFixturesDecode(t *testing.T) {
+	tests := []struct {
+		name       string
+		feature    string
+		params     FeatureExecutionParams
+		operation  RuntimeOperation
+		outpaintV3 bool
+	}{
+		{name: "prompt generation", feature: FeatureSlugPromptGeneration, operation: RuntimeOperationPromptGeneration},
+		{name: "inpaint", feature: FeatureSlugInpaint, params: FeatureExecutionParams{ImageInputCount: 1, HasMaskInput: true}, operation: RuntimeOperationInpaint},
+		{name: "outpaint", feature: FeatureSlugOutpaint, params: FeatureExecutionParams{ImageInputCount: 1}, operation: RuntimeOperationOutpaint, outpaintV3: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			plan, err := CompileFeatureExecutionPlan(CompileFeatureExecutionInput{
+				Feature: test.feature,
+				Params:  test.params,
+			})
+			if err != nil {
+				t.Fatalf("compile: %v", err)
+			}
+			payload, err := EncodeFeatureExecutionPlan(plan)
+			if err != nil {
+				t.Fatalf("encode: %v", err)
+			}
+
+			legacy := map[string]any{}
+			if err := json.Unmarshal(payload, &legacy); err != nil {
+				t.Fatalf("decode fixture: %v", err)
+			}
+			legacy["schema_version"] = 3
+			if test.outpaintV3 {
+				runtime, ok := legacy["runtime"].(map[string]any)
+				if !ok {
+					t.Fatalf("runtime fixture has type %T", legacy["runtime"])
+				}
+				runtime["control_contract"] = "extend"
+				// Some historical records carried this discriminator in the
+				// nested plan. It is intentionally removed by v4 migration;
+				// it is not part of the durable v4 schema.
+				legacy["kind"] = "canvas-extend"
+			}
+
+			// Simulate the expected *post-migration* durable payload. In
+			// particular, migration must not inject a `kind` discriminator:
+			// durableFeatureExecutionPlan has no such field and decoding is
+			// intentionally fail-closed for unknown keys.
+			migrated := legacy
+			migrated["schema_version"] = CurrentFeatureExecutionPlanSchemaVersion
+			if test.outpaintV3 {
+				runtime := migrated["runtime"].(map[string]any)
+				runtime["control_contract"] = string(RuntimeControlsOutpaint)
+			}
+			delete(migrated, "kind")
+			migratedPayload, err := json.Marshal(migrated)
+			if err != nil {
+				t.Fatalf("encode migrated fixture: %v", err)
+			}
+
+			decoded, err := DecodeFeatureExecutionPlan(migratedPayload)
+			if err != nil {
+				t.Fatalf("decode migrated v3 fixture: %v\npayload=%s", err, migratedPayload)
+			}
+			if decoded.Feature() != test.feature || decoded.RuntimeOperation() != test.operation {
+				t.Fatalf("decoded facts=(feature=%q, operation=%q), want=(%q, %q)", decoded.Feature(), decoded.RuntimeOperation(), test.feature, test.operation)
+			}
+		})
+	}
+}
+
+func TestLegacyOutpaintControlContractRequiresMigration(t *testing.T) {
+	plan, err := CompileFeatureExecutionPlan(CompileFeatureExecutionInput{
+		Feature: FeatureSlugOutpaint,
+		Params:  FeatureExecutionParams{ImageInputCount: 1},
+	})
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	payload, err := EncodeFeatureExecutionPlan(plan)
+	if err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	legacy := map[string]any{}
+	if err := json.Unmarshal(payload, &legacy); err != nil {
+		t.Fatalf("decode fixture: %v", err)
+	}
+	legacy["schema_version"] = CurrentFeatureExecutionPlanSchemaVersion
+	legacy["runtime"].(map[string]any)["control_contract"] = "extend"
+	legacyPayload, err := json.Marshal(legacy)
+	if err != nil {
+		t.Fatalf("encode legacy fixture: %v", err)
+	}
+	if _, err := DecodeFeatureExecutionPlan(legacyPayload); err == nil {
+		t.Fatal("legacy outpaint control_contract=extend unexpectedly decoded; migration must rename it to outpaint")
+	}
+}
+
 func TestFeatureExecutionPlanJSONUsesVersionedDurableSeam(t *testing.T) {
 	plan, err := CompileFeatureExecutionPlan(CompileFeatureExecutionInput{Feature: FeatureSlugPromptGeneration})
 	if err != nil {
@@ -423,7 +528,7 @@ func TestFeatureExecutionPlanJSONUsesVersionedDurableSeam(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if string(payload) == `{}` || !strings.Contains(string(payload), `"schema_version":3`) {
+	if string(payload) == `{}` || !strings.Contains(string(payload), `"schema_version":4`) {
 		t.Fatalf("plan did not use versioned durable encoding: %s", payload)
 	}
 	var decoded FeatureExecutionPlan
@@ -451,7 +556,7 @@ func TestDecodeFeatureExecutionPlanFailsClosed(t *testing.T) {
 	}{
 		{
 			name:    "unknown schema",
-			payload: strings.Replace(string(payload), `"schema_version":3`, `"schema_version":99`, 1),
+			payload: strings.Replace(string(payload), `"schema_version":4`, `"schema_version":99`, 1),
 			code:    FeatureContractUnsupportedSchema,
 		},
 		{
@@ -574,7 +679,7 @@ func TestCompileFeatureExecutionPlanReturnsRecognizableValidationErrors(t *testi
 			code:  FeatureContractUnsupportedResolution, field: "output_resolution",
 		},
 		{
-			name:  "image extend rejects scaled resolution",
+			name:  "image outpaint rejects scaled resolution",
 			input: CompileFeatureExecutionInput{Feature: FeatureSlugOutpaint, Params: FeatureExecutionParams{OutputResolution: &resolution4K}},
 			code:  FeatureContractUnsupportedResolution, field: "output_resolution",
 		},

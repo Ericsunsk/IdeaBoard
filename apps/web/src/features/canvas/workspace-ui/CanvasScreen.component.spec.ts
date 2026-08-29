@@ -277,11 +277,11 @@ function createRuntime() {
     onFlowImagePromptGenerate: vi.fn(),
     onFlowFusionPromptGenerate: vi.fn(),
     onFlowPromptGenerate: vi.fn(),
-    onFlowImageExpandSubmit: vi.fn(),
-    onFlowExpandHandlePointerDown: vi.fn(),
-    onFlowExpandFramePointerDown: vi.fn(),
-    onFlowExpandHandlePointerMove: vi.fn(),
-    onFlowExpandHandlePointerUp: vi.fn(),
+    onFlowImageOutpaintSubmit: vi.fn(),
+    onFlowOutpaintHandlePointerDown: vi.fn(),
+    onFlowOutpaintFramePointerDown: vi.fn(),
+    onFlowOutpaintHandlePointerMove: vi.fn(),
+    onFlowOutpaintHandlePointerUp: vi.fn(),
   }
 
   return {
@@ -309,7 +309,7 @@ function createRuntime() {
         },
         imageWorkflow: {
           tools: imageToolsViewModel,
-          canvasExtend: { nodeId: ref(null), overlayStyle: ref(null), handleRadius: 4 },
+          outpaint: { nodeId: ref(null), overlayStyle: ref(null), handleRadius: 4 },
         },
       },
       commands: {
@@ -394,7 +394,7 @@ function createRuntime() {
           isGenerationAvailable: vi.fn(() => true),
           tools: imageToolCommands,
           interactions: imageWorkflowInteractions,
-          cancelCanvasExtend: vi.fn(),
+          cancelOutpaint: vi.fn(),
           hideStrengthControl: vi.fn(),
         },
       },

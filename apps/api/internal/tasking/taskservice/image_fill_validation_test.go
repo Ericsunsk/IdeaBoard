@@ -15,16 +15,16 @@ func TestValidateImageFillDimensions(t *testing.T) {
 		name        string
 		feature     string
 		controls    *tasks.GenerationControls
-		extend      *tasks.OutpaintParams
+		outpaint    *tasks.OutpaintParams
 		wantMessage string
 	}{
 		{
-			name:    "extend accepts aligned dimensions within limits",
+			name:    "outpaint accepts aligned dimensions within limits",
 			feature: workflow.FeatureSlugOutpaint,
 			controls: &tasks.GenerationControls{
 				OriginalWidth: 1001, OriginalHeight: 1001,
 			},
-			extend: &tasks.OutpaintParams{TargetWidth: 1201, TargetHeight: 1001},
+			outpaint: &tasks.OutpaintParams{TargetWidth: 1201, TargetHeight: 1001},
 		},
 		{
 			name:    "inpaint accepts matching four megapixel dimensions",
@@ -41,12 +41,12 @@ func TestValidateImageFillDimensions(t *testing.T) {
 			wantMessage: "扩图需要提供目标尺寸和原图偏移",
 		},
 		{
-			name:    "rejects smaller extend target",
+			name:    "rejects smaller outpaint target",
 			feature: workflow.FeatureSlugOutpaint,
 			controls: &tasks.GenerationControls{
 				OriginalWidth: 1024, OriginalHeight: 768,
 			},
-			extend:      &tasks.OutpaintParams{TargetWidth: 1000, TargetHeight: 768},
+			outpaint:    &tasks.OutpaintParams{TargetWidth: 1000, TargetHeight: 768},
 			wantMessage: "扩图目标尺寸不能小于原图尺寸",
 		},
 		{
@@ -55,7 +55,7 @@ func TestValidateImageFillDimensions(t *testing.T) {
 			controls: &tasks.GenerationControls{
 				OriginalWidth: 1024, OriginalHeight: 768,
 			},
-			extend:      &tasks.OutpaintParams{TargetWidth: 1280, TargetHeight: 768, ImageOffsetX: -1},
+			outpaint:    &tasks.OutpaintParams{TargetWidth: 1280, TargetHeight: 768, ImageOffsetX: -1},
 			wantMessage: "扩图偏移不能让原图超出目标画布",
 		},
 		{
@@ -73,7 +73,7 @@ func TestValidateImageFillDimensions(t *testing.T) {
 			controls: &tasks.GenerationControls{
 				OriginalWidth: 1024, OriginalHeight: 1024,
 			},
-			extend:      &tasks.OutpaintParams{TargetWidth: 4097, TargetHeight: 1024},
+			outpaint:    &tasks.OutpaintParams{TargetWidth: 4097, TargetHeight: 1024},
 			wantMessage: "目标图片超过图像填充服务的 4096 边长或约 4MP 限制",
 		},
 		{
@@ -89,7 +89,7 @@ func TestValidateImageFillDimensions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateImageFillDimensions(tt.feature, &tasks.WorkflowTaskParams{Controls: tt.controls, Extend: tt.extend})
+			err := validateImageFillDimensions(tt.feature, &tasks.WorkflowTaskParams{Controls: tt.controls, Outpaint: tt.outpaint})
 			if tt.wantMessage == "" {
 				if err != nil {
 					t.Fatalf("validateImageFillDimensions() error = %v", err)
@@ -118,7 +118,7 @@ func TestTaskIntakeRejectsImageFillDimensionsBeforeProviderLookup(t *testing.T) 
 		Params: map[string]interface{}{
 			"original_image_width":  1024,
 			"original_image_height": 1024,
-			"extend": map[string]interface{}{
+			"outpaint": map[string]interface{}{
 				"target_width": 5000, "target_height": 1024,
 				"image_offset_x": 0, "image_offset_y": 0,
 			},
@@ -170,7 +170,7 @@ func TestSubmitTaskRejectsImageFillDimensionsBeforeSubmissionTransaction(t *test
 		Params: map[string]interface{}{
 			"original_image_width":  1024,
 			"original_image_height": 1024,
-			"extend": map[string]interface{}{
+			"outpaint": map[string]interface{}{
 				"target_width": 5000, "target_height": 1024,
 				"image_offset_x": 0, "image_offset_y": 0,
 			},

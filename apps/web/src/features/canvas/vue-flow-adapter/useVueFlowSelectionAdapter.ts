@@ -56,7 +56,7 @@ export function useVueFlowSelectionAdapter(options: UseVueFlowSelectionAdapterOp
     clearSelection()
     options.onSelectionChanged?.([])
     options.dismissTransientCanvasUi({
-      closeExpand: true,
+      closeOutpaint: true,
       closeBoardHeader: true,
       closeContextMenu: true,
     })
@@ -64,14 +64,14 @@ export function useVueFlowSelectionAdapter(options: UseVueFlowSelectionAdapterOp
 
   function onFlowNodeClick() {
     if (options.activeTool.value === 'hand') return
-    options.dismissTransientCanvasUi({ closeExpand: true })
+    options.dismissTransientCanvasUi({ closeOutpaint: true })
     options.onSelectionChanged?.(readSelectedElements())
   }
 
   function onFlowNodeMouseDown(...args: [string, MouseEvent]) {
     const event = args[1]
     if (event.button === 0) {
-      options.dismissTransientCanvasUi({ closeExpand: true })
+      options.dismissTransientCanvasUi({ closeOutpaint: true })
     }
   }
 
@@ -88,7 +88,7 @@ export function useVueFlowSelectionAdapter(options: UseVueFlowSelectionAdapterOp
     if (options.activeTool.value !== 'select') return
     selectionController.beginMarquee(event)
     options.dismissTransientCanvasUi({
-      closeExpand: true,
+      closeOutpaint: true,
       closeBoardHeader: true,
       closeContextMenu: true,
     })

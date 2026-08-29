@@ -192,12 +192,20 @@ export const createAdminStorageProfile = async (
   params?: CreateAdminStorageProfileParams,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseStorageProfileWithMessage> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseStorageProfileWithMessage>(
     getCreateAdminStorageProfileUrl(params),
     {
       ...options,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
       body: JSON.stringify(storageProfilePayload),
     },
   )
@@ -308,12 +316,20 @@ export const updateAdminStorageProfile = async (
   params?: UpdateAdminStorageProfileParams,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseStorageProfileWithMessage> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseStorageProfileWithMessage>(
     getUpdateAdminStorageProfileUrl(id, params),
     {
       ...options,
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
       body: JSON.stringify(storageProfilePayload),
     },
   )

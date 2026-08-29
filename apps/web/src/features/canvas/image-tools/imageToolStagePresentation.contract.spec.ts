@@ -11,12 +11,12 @@ describe('Image Tool stage presentation contract', () => {
       'utf8',
     )
     const maskOverlay = readFileSync(
-      resolve(canvasRoot, 'mask-editor/components/ImageMaskEditorOverlay.vue'),
+      resolve(canvasRoot, 'inpaint/components/ImageInpaintOverlay.vue'),
       'utf8',
     )
 
-    expect(stage).not.toContain('ImageMaskEditorOverlay')
-    expect(stage).not.toContain('ImageEditorRasterOverlay')
+    expect(stage).not.toContain('ImageInpaintOverlay')
+    expect(stage).not.toContain('RetouchRasterOverlay')
     expect(stage).toContain('imageToolStageBinding?.active')
     expect(stage).not.toContain('imageToolStageBinding?.mode')
     expect(stage).not.toContain('imageToolStageBinding?.renderedPreview')

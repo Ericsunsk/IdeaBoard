@@ -58,9 +58,9 @@
           :empty-icon-variant="imageEmptyIconVariant"
           :input-locked="imageInputLocked"
           :action-binding="props.imagePresentation.actionBinding"
-          :expand-mode-active="!!props.expandModeActive"
-          :expand-overlay-style="props.expandOverlayStyle ?? null"
-          :expand-handle-radius="props.expandHandleRadius ?? 4"
+          :outpaint-mode-active="!!props.outpaintModeActive"
+          :outpaint-overlay-style="props.outpaintOverlayStyle ?? null"
+          :outpaint-handle-radius="props.outpaintHandleRadius ?? 4"
           :image-tool-stage-binding="props.imagePresentation.stageBinding"
           @node-mousedown="noopMouse"
           @update:title="onImageParameterChanged('title', $event)"
@@ -74,12 +74,12 @@
           @reset="onImageResetRequest"
           @retry-image-import="onImageImportRetryRequest"
           @contextmenu="onImageContextMenuRequest"
-          @expand-submit="onImageCanvasExtendSubmit"
+          @outpaint-submit="onImageOutpaintSubmit"
           @action="onImageActionRequest"
-          @expand-handle-pointerdown="onImageCanvasExtendHandlePointerDown"
-          @expand-handle-pointermove="onImageCanvasExtendHandlePointerMove"
-          @expand-handle-pointerup="onImageCanvasExtendHandlePointerUp"
-          @expand-frame-pointerdown="onImageCanvasExtendFramePointerDown"
+          @outpaint-handle-pointerdown="onImageOutpaintHandlePointerDown"
+          @outpaint-handle-pointermove="onImageOutpaintHandlePointerMove"
+          @outpaint-handle-pointerup="onImageOutpaintHandlePointerUp"
+          @outpaint-frame-pointerdown="onImageOutpaintFramePointerDown"
         />
       </div>
     </template>
@@ -133,7 +133,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
-import type { CanvasExtendDragAnchor } from '../image-workflow/useImageCanvasExtendOverlay'
+import type { OutpaintDragAnchor } from '../image-workflow/useImageOutpaintOverlay'
 import { useFlowCanvasNodeAdapter } from '../vue-flow-adapter/useFlowCanvasNodeAdapter'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
 import type {
@@ -163,9 +163,9 @@ const props = withDefaults(
     imagePresentation: ImageNodePresentationBinding
     setImageStageRef?: (nodeId: string, element: Element | null) => void
     clearImageStageRef?: (nodeId: string, element?: Element | null) => void
-    expandModeActive?: boolean
-    expandOverlayStyle?: Record<string, string> | null
-    expandHandleRadius?: number
+    outpaintModeActive?: boolean
+    outpaintOverlayStyle?: Record<string, string> | null
+    outpaintHandleRadius?: number
   }>(),
   {
     selected: false,
@@ -177,9 +177,9 @@ const props = withDefaults(
     generationAvailable: true,
     setImageStageRef: () => undefined,
     clearImageStageRef: () => undefined,
-    expandModeActive: false,
-    expandOverlayStyle: null,
-    expandHandleRadius: 4,
+    outpaintModeActive: false,
+    outpaintOverlayStyle: null,
+    outpaintHandleRadius: 4,
   },
 )
 
@@ -192,7 +192,7 @@ const { t } = useI18n()
 
 const showDefaultDragZone = false
 const flowCanvasNodeRef = ref<HTMLElement | null>(null)
-const isImageEditorActive = computed(() => props.imagePresentation.stageBinding?.mode != null)
+const isRetouchActive = computed(() => props.imagePresentation.stageBinding?.mode != null)
 const { zoomLevel } = useCanvasViewportContext()
 const nodeStyle = computed(() => ({
   '--canvas-node-ui-scale': String(resolveCanvasNodeUiScale(zoomLevel.value)),
@@ -218,8 +218,8 @@ const {
   data: () => props.data,
   uiState: () => props.uiState,
   imageDirectGenerating: () => props.imagePresentation.actionBinding.directGenerating,
-  expandModeActive: () => !!props.expandModeActive,
-  isImageEditorActive: () => isImageEditorActive.value,
+  outpaintModeActive: () => !!props.outpaintModeActive,
+  isRetouchActive: () => isRetouchActive.value,
 })
 const hasRenderedNode = computed(
   () =>
@@ -330,9 +330,9 @@ function onNodeMouseDown(event: MouseEvent) {
   emit('node-mousedown', props.nodeId, event)
 }
 
-function onImageCanvasExtendSubmit(prompt: string) {
+function onImageOutpaintSubmit(prompt: string) {
   emit('node-intent', {
-    type: 'canvas-extend-submitted',
+    type: 'outpaint-submitted',
     nodeId: props.nodeId,
     prompt,
   })
@@ -417,37 +417,37 @@ function onImageActionRequest(
     strength,
   })
 }
-function onImageCanvasExtendHandlePointerDown(payload: {
-  anchor: CanvasExtendDragAnchor
+function onImageOutpaintHandlePointerDown(payload: {
+  anchor: OutpaintDragAnchor
   event: PointerEvent
 }) {
   emit('node-intent', {
-    type: 'canvas-extend-handle-pointerdown',
+    type: 'outpaint-handle-pointerdown',
     nodeId: props.nodeId,
     anchor: payload.anchor,
     event: payload.event,
   })
 }
 
-function onImageCanvasExtendHandlePointerMove(event: PointerEvent) {
+function onImageOutpaintHandlePointerMove(event: PointerEvent) {
   emit('node-intent', {
-    type: 'canvas-extend-handle-pointermove',
+    type: 'outpaint-handle-pointermove',
     nodeId: props.nodeId,
     event,
   })
 }
 
-function onImageCanvasExtendHandlePointerUp(event: PointerEvent) {
+function onImageOutpaintHandlePointerUp(event: PointerEvent) {
   emit('node-intent', {
-    type: 'canvas-extend-handle-pointerup',
+    type: 'outpaint-handle-pointerup',
     nodeId: props.nodeId,
     event,
   })
 }
 
-function onImageCanvasExtendFramePointerDown(event: PointerEvent) {
+function onImageOutpaintFramePointerDown(event: PointerEvent) {
   emit('node-intent', {
-    type: 'canvas-extend-frame-pointerdown',
+    type: 'outpaint-frame-pointerdown',
     nodeId: props.nodeId,
     event,
   })

@@ -24,7 +24,7 @@ const generationPlan = {
 function createCommandHarness(isGenerationAvailable = () => true) {
   const planner: ImageWorkflowPlanner = {
     planImageDirectAction: vi.fn(() => generationPlan),
-    planCanvasExtendAction: vi.fn(() => generationPlan),
+    planOutpaintAction: vi.fn(() => generationPlan),
     planImageInpaintAction: vi.fn(() => generationPlan),
     planPromptGeneration: vi.fn(() => generationPlan),
     planFusionPromptGeneration: vi.fn(() => generationPlan),

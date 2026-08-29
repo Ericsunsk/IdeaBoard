@@ -4298,7 +4298,7 @@ components:
         prompt_upsampling: { type: boolean }
         variation:
           $ref: '#/components/schemas/VariationsParams'
-        extend:
+        outpaint:
           $ref: '#/components/schemas/OutpaintParams'
         hd:
           $ref: '#/components/schemas/HDUpscaleParams'
@@ -4320,7 +4320,7 @@ components:
           $ref: '#/components/schemas/GenerationControls'
         variation:
           $ref: '#/components/schemas/VariationsParams'
-        extend:
+        outpaint:
           $ref: '#/components/schemas/OutpaintParams'
         hd:
           $ref: '#/components/schemas/HDUpscaleParams'

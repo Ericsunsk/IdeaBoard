@@ -238,7 +238,7 @@ export function useCanvasGroupPointerInteraction(options: UseCanvasGroupPointerI
     event.preventDefault()
     event.stopPropagation()
     options.dismissTransientCanvasUi({
-      closeExpand: true,
+      closeOutpaint: true,
       closeBoardHeader: true,
       closeContextMenu: true,
       clearNodePanel: false,

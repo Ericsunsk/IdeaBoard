@@ -1,6 +1,6 @@
 /*
  * Canvas editing-controls CSS contract.
- * Shared by image-editor and mask-editor controls. Public classes use the
+ * Shared by retouch and inpaint controls. Public classes use the
  * editing-controls-* prefix and may consume node-tool variables, but they stay
  * Canvas-owned and must not leak into non-Canvas surfaces.
  */
@@ -37,7 +37,7 @@
     var(--canvas-accent) 48%,
     var(--canvas-accent-strong) 100%
   );
-  --image-editor-levels-output-range-gradient: var(--editing-controls-tonal-range-gradient);
+  --retouch-levels-output-range-gradient: var(--editing-controls-tonal-range-gradient);
 }
 
 .editing-controls-panel {

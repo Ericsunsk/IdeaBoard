@@ -109,10 +109,18 @@ export const upsertUserBoard = async (
   userBoardUpsertRequest: UserBoardUpsertRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseUserBoard> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseUserBoard>(getUpsertUserBoardUrl(boardId), {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(userBoardUpsertRequest),
   })
 }
@@ -324,10 +332,18 @@ export const inviteBoardMember = async (
   inviteBoardMemberRequest: InviteBoardMemberRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseBoardMember> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseBoardMember>(getInviteBoardMemberUrl(boardId), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(inviteBoardMemberRequest),
   })
 }
@@ -406,12 +422,20 @@ export const updateBoardMemberRole = async (
   updateBoardMemberRoleRequest: UpdateBoardMemberRoleRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseBoardMember> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseBoardMember>(
     getUpdateBoardMemberRoleUrl(boardId, memberPublicId),
     {
       ...options,
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
       body: JSON.stringify(updateBoardMemberRoleRequest),
     },
   )
@@ -679,10 +703,18 @@ export const createBoardShareToken = async (
   createBoardShareTokenRequest: CreateBoardShareTokenRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseBoardShareToken> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseBoardShareToken>(getCreateBoardShareTokenUrl(boardId), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createBoardShareTokenRequest),
   })
 }
@@ -853,10 +885,18 @@ export const joinBoardByShareToken = async (
   joinBoardByShareTokenBody: JoinBoardByShareTokenBody,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseUserBoard> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseUserBoard>(getJoinBoardByShareTokenUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(joinBoardByShareTokenBody),
   })
 }

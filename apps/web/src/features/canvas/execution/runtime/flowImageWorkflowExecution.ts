@@ -14,7 +14,7 @@ import { loadImageSizeFromUrl } from '../media/imageSize'
 import {
   prepareFusionExecutionPlan,
   type ActivatedImageExecutionPlan,
-  type CanvasExtendExecutionPlan,
+  type OutpaintExecutionPlan,
   type FusionExecutionPlan,
   type ImageActionExecutionPlan,
   type ImageInpaintExecutionPlan,
@@ -142,8 +142,8 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     })
   }
 
-  async function executeCanvasExtend(
-    plan: CanvasExtendExecutionPlan & { activationId: string },
+  async function executeOutpaint(
+    plan: OutpaintExecutionPlan & { activationId: string },
   ): Promise<void> {
     const attachment = requireCurrentAttachment()
     const taskRequest = buildImageExecutionTaskRequest(
@@ -215,9 +215,9 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     switch (plan.kind) {
       case 'image-action':
         return await executeImageAction(plan)
-      case 'canvas-extend':
-        return await executeCanvasExtend(plan)
-      case 'image-inpaint':
+      case 'outpaint':
+        return await executeOutpaint(plan)
+      case 'inpaint':
         return await executeImageInpaint(plan)
       case 'prompt-generation':
         return await executePromptGeneration(plan)

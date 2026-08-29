@@ -6,7 +6,7 @@ const (
 	Media         = "media"
 	Controls      = "controls"
 	Variation     = "variation"
-	Extend        = "extend"
+	Outpaint        = "outpaint"
 	HD            = "hd"
 	Fusion        = "fusion"
 	Extra         = "extra"
@@ -61,7 +61,7 @@ var canonicalTaskParamKeys = keySet(
 	Media,
 	Controls,
 	Variation,
-	Extend,
+	Outpaint,
 	HD,
 	Fusion,
 	Extra,
@@ -75,7 +75,7 @@ var providerReservedKeys = keySet(
 	Media,
 	Controls,
 	Variation,
-	Extend,
+	Outpaint,
 	HD,
 	Fusion,
 	Extra,
@@ -121,7 +121,7 @@ var submitTaskParamKeys = keySet(
 	OutputCount,
 	PromptUpsampling,
 	Variation,
-	Extend,
+	Outpaint,
 	HD,
 	Fusion,
 )

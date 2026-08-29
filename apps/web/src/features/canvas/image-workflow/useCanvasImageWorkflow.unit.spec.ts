@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => {
   return {
     planner: {
       planImageDirectAction: vi.fn(() => plan),
-      planCanvasExtendAction: vi.fn(() => plan),
+      planOutpaintAction: vi.fn(() => plan),
       planImageInpaintAction: vi.fn(() => plan),
       planPromptGeneration: vi.fn(() => plan),
       planFusionPromptGeneration: vi.fn(() => plan),
@@ -289,12 +289,12 @@ describe('useCanvasImageWorkflow', () => {
     }
   })
 
-  it('keeps local editor and canvas-extend intents out of Task submission', () => {
+  it('keeps local editor and outpaint intents out of Task submission', () => {
     const { options } = createOptions()
     const workflow = useCanvasImageWorkflow(options as never)
     const handlers = workflow.commands.interactions
 
-    handlers.onFlowImageDirectAction('image-1', IMAGE_NODE_ACTION.localImageEditor)
+    handlers.onFlowImageDirectAction('image-1', IMAGE_NODE_ACTION.retouch)
     handlers.onFlowImageDirectAction('image-1', IMAGE_NODE_ACTION.outpaint)
 
     const imageTools = mocks.useCanvasImageTools.mock.results[0]?.value

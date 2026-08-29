@@ -1,17 +1,17 @@
 import { computed } from 'vue'
-import type { ImageEditorModeState } from '../image-editor/useImageEditorMode'
+import type { RetouchModeState } from '../retouch/useRetouchMode'
 
 type ValueRef<T> = {
   readonly value: T
 }
 
-export type ImageToolInpaintState = ImageEditorModeState & { mode: 'inpaint' }
+export type ImageToolInpaintState = RetouchModeState & { mode: 'inpaint' }
 
 export function createImageToolMaskOverlayState(
-  imageEditorState: ValueRef<ImageEditorModeState | null>,
+  retouchState: ValueRef<RetouchModeState | null>,
 ) {
   return computed(() => {
-    const state = imageEditorState.value
+    const state = retouchState.value
     return state?.mode === 'inpaint' ? (state as ImageToolInpaintState) : null
   })
 }

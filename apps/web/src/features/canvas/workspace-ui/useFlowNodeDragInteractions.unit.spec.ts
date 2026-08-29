@@ -39,7 +39,7 @@ describe('useFlowNodeDragInteractions', () => {
 
     harness.interactions.onNodeDragStart(['node-a'])
 
-    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ closeExpand: true })
+    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ closeOutpaint: true })
     expect(harness.beginNodeDragTransaction).toHaveBeenCalledTimes(1)
     expect(harness.beginNodeDragTransaction).toHaveBeenCalledWith(['node-a'])
     expect(harness.beginFlowNodeDragDuplicateTracking).toHaveBeenCalledWith(true)
@@ -48,13 +48,13 @@ describe('useFlowNodeDragInteractions', () => {
     )
   })
 
-  it('only closes expand mode when a node drag stops', async () => {
+  it('only closes outpaint mode when a node drag stops', async () => {
     const harness = createHarness()
 
     harness.interactions.onNodeDragStop()
 
     expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({
-      closeExpand: true,
+      closeOutpaint: true,
       clearNodePanel: false,
       hideStrength: false,
     })

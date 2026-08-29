@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => {
   return {
     planner: {
       planImageDirectAction: vi.fn(() => plan),
-      planCanvasExtendAction: vi.fn(() => plan),
+      planOutpaintAction: vi.fn(() => plan),
       planImageInpaintAction: vi.fn(() => plan),
       planImagePromptGeneration: vi.fn(() => plan),
       planImagePromptGenerationFromSource: vi.fn(() => plan),

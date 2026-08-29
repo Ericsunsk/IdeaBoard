@@ -45,10 +45,18 @@ export const createAdminRewardCode = async (
   adminRewardCodeCreateRequest: AdminRewardCodeCreateRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseCreatedRewardCode> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseCreatedRewardCode>(getCreateAdminRewardCodeUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminRewardCodeCreateRequest),
   })
 }
@@ -122,10 +130,18 @@ export const searchAdminRewardCodes = async (
   adminRewardCodeSearchRequest: AdminRewardCodeSearchRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseRewardCodePage> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseRewardCodePage>(getSearchAdminRewardCodesUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminRewardCodeSearchRequest),
   })
 }
@@ -200,10 +216,18 @@ export const updateAdminRewardCode = async (
   adminRewardCodeUpdateRequest: AdminRewardCodeUpdateRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseUpdatedRewardCode> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseUpdatedRewardCode>(getUpdateAdminRewardCodeUrl(id), {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminRewardCodeUpdateRequest),
   })
 }
@@ -553,10 +577,18 @@ export const setAdminRewardCodeEnabled = async (
   adminRewardCodeEnabledRequest: AdminRewardCodeEnabledRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseRewardCode> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseRewardCode>(getSetAdminRewardCodeEnabledUrl(id), {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminRewardCodeEnabledRequest),
   })
 }

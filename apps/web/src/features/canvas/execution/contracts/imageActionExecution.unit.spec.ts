@@ -5,7 +5,7 @@ import {
   DEFAULT_IMAGE_ACTION_STRENGTHS,
   IMAGE_ACTION_EXECUTION_REGISTRY,
   IMAGE_ACTION_EXECUTION_REGISTRY_LIST,
-  IMAGE_CANVAS_EXTEND_ACTION,
+  IMAGE_OUTPAINT_ACTION,
   IMAGE_DIRECT_TASK_ACTIONS,
   IMAGE_EXECUTION_MODE,
   IMAGE_HD_UPSCALE_ACTION,
@@ -41,7 +41,7 @@ describe('imageActionExecution', () => {
     expect(isImageDirectTaskAction(IMAGE_NODE_ACTION.cutout)).toBe(true)
     expect(isImageDirectTaskAction(IMAGE_HD_UPSCALE_ACTION)).toBe(false)
     expect(isImageTaskAction(IMAGE_HD_UPSCALE_ACTION)).toBe(true)
-    expect(isImageTaskAction(IMAGE_CANVAS_EXTEND_ACTION)).toBe(false)
+    expect(isImageTaskAction(IMAGE_OUTPAINT_ACTION)).toBe(false)
     expect(isImageStrengthAction(IMAGE_NODE_ACTION.variations)).toBe(true)
     expect(isImageStrengthAction(IMAGE_HD_UPSCALE_ACTION)).toBe(true)
     expect(DEFAULT_IMAGE_ACTION_STRENGTHS).toEqual({
@@ -59,9 +59,9 @@ describe('imageActionExecution', () => {
       mode: IMAGE_EXECUTION_MODE.hdUpscaleTask,
       feature: IMAGE_HD_UPSCALE_ACTION,
     })
-    expect(IMAGE_ACTION_EXECUTION_REGISTRY[IMAGE_CANVAS_EXTEND_ACTION]).toMatchObject({
-      mode: IMAGE_EXECUTION_MODE.canvasExtend,
-      feature: IMAGE_CANVAS_EXTEND_ACTION,
+    expect(IMAGE_ACTION_EXECUTION_REGISTRY[IMAGE_OUTPAINT_ACTION]).toMatchObject({
+      mode: IMAGE_EXECUTION_MODE.outpaint,
+      feature: IMAGE_OUTPAINT_ACTION,
     })
   })
 })

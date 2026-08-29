@@ -2,34 +2,34 @@ import type { Node } from '@vue-flow/core'
 import { createApp, defineComponent, nextTick, ref, shallowRef, type Ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../canvas-board/domain'
-import { renderImageEditorLayerStackFile } from '../image-editor/services/imageAdjustmentRenderer'
+import { renderRetouchLayerStackFile } from '../retouch/services/imageAdjustmentRenderer'
 import { IMAGE_STRENGTH_ACTIONS, type ImageStrengthAction } from '../execution'
 import type { UseCanvasImageToolsOptions } from './imageToolSession'
 import { useCanvasImageTools, type CanvasImageTools } from '.'
 import { i18n } from '../../../shared/i18n'
 import { loadLocaleMessages } from '../../../shared/i18n/userLocale'
 
-vi.mock('../image-editor/services/imageAdjustmentRenderer', async (importOriginal) => {
+vi.mock('../retouch/services/imageAdjustmentRenderer', async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import('../image-editor/services/imageAdjustmentRenderer')>()
+    await importOriginal<typeof import('../retouch/services/imageAdjustmentRenderer')>()
   return {
     ...actual,
-    renderImageEditorLayerStackFile: vi.fn(),
+    renderRetouchLayerStackFile: vi.fn(),
   }
 })
 
-vi.mock('../image-editor/useImageAdjustmentRenderedPreview', async () => {
+vi.mock('../retouch/useImageAdjustmentRenderedPreview', async () => {
   const { computed } = await import('vue')
   return {
     useImageAdjustmentRenderedPreview: vi.fn(() => ({
-      imageEditorRenderedPreview: computed(() => null),
-      imageEditorPreviewSource: computed(() => null),
+      retouchRenderedPreview: computed(() => null),
+      retouchPreviewSource: computed(() => null),
     })),
   }
 })
 
-vi.mock('../mask-editor/lib/maskPaintingCanvas', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../mask-editor/lib/maskPaintingCanvas')>()
+vi.mock('../inpaint/lib/maskPaintingCanvas', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../inpaint/lib/maskPaintingCanvas')>()
   return {
     ...actual,
     buildMaskCommitResult: vi.fn(() => ({
@@ -39,7 +39,7 @@ vi.mock('../mask-editor/lib/maskPaintingCanvas', async (importOriginal) => {
   }
 })
 
-const renderLayerStackFileMock = vi.mocked(renderImageEditorLayerStackFile)
+const renderLayerStackFileMock = vi.mocked(renderRetouchLayerStackFile)
 
 const mediaAssetRequestMock = vi.hoisted(() => vi.fn())
 vi.mock('../../../shared/api/client', () => ({
@@ -283,7 +283,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(harness.runtime.viewModel.active.mode.value).toBeNull()
       expect(harness.runtime.commands.lifecycle.enter('image-1', 'adjust')).toBe(true)
       expect(harness.runtime.commands.lifecycle.enter('image-1', 'inpaint')).toBe(true)
-      session.maskEditor.setMaskCanvasRef('image-1', canvas)
+      session.inpaint.setMaskCanvasRef('image-1', canvas)
       expect(harness.runtime.commands.lifecycle.enter('image-2', 'inpaint')).toBe(true)
       expect(harness.runtime.viewModel.active.nodeId.value).toBe('image-2')
       harness.runtime.commands.lifecycle.cancel()
@@ -612,7 +612,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(stageBinding.active).toBe(true)
       expect(stageBinding.mode).toBe('inpaint')
       expect(stageBinding.nodeId).toBe('image-1')
-      expect(stageBinding.session.maskEditor.maskEditorOverlayStyle.value).toEqual({
+      expect(stageBinding.session.inpaint.inpaintOverlayStyle.value).toEqual({
         left: '40px',
         top: '0px',
         width: '240px',
@@ -659,7 +659,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       const stageAfter = harness.runtime.viewModel.nodeBindings.stageFor('image-1')
 
       expect(stageAfter).toBe(stageBefore)
-      expect(stageAfter.session.maskEditor.brushSize.value).toBe(48)
+      expect(stageAfter.session.inpaint.brushSize.value).toBe(48)
       expect(harness.runtime.viewModel.nodeBindings.stageFor('image-1')).toBe(stageAfter)
 
       const actionBefore = harness.runtime.viewModel.nodeBindings.actionFor('image-1')
@@ -733,7 +733,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       const maskCanvas = document.createElement('canvas')
       maskCanvas.width = 4
       maskCanvas.height = 4
-      node2StageBinding.session.maskEditor.setMaskCanvasRef('image-2', maskCanvas)
+      node2StageBinding.session.inpaint.setMaskCanvasRef('image-2', maskCanvas)
       harness.runtime.commands.chrome.submitMaskPrompt('重绘 image-2')
 
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-2').promptPlaceholder).toBe(
@@ -758,7 +758,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       canvas.height = 4
       harness.runtime.viewModel.nodeBindings
         .stageFor('image-1')
-        .session.maskEditor.setMaskCanvasRef('image-1', canvas)
+        .session.inpaint.setMaskCanvasRef('image-1', canvas)
 
       harness.runtime.commands.chrome.submitMaskPrompt('重绘这块区域')
 
@@ -788,7 +788,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(chromeModel.mode).toBe('inpaint')
       expect(chromeModel.mask.brushSize).toBe(36)
       expect(chromeModel.mask.layerOpacity).toBe(40)
-      expect(stageBinding.session.maskEditor.brushSize.value).toBe(36)
+      expect(stageBinding.session.inpaint.brushSize.value).toBe(36)
       expect(actionBinding.promptComposerVisible).toBe(true)
       expect('getCommittedMaskData' in harness.runtime).toBe(false)
       expect('clearCommittedMaskData' in harness.runtime).toBe(false)

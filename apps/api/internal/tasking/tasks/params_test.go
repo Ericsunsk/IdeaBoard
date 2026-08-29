@@ -4,7 +4,7 @@ import "testing"
 
 func TestUnmarshalParamsPreservesUnknownKeysInExtra(t *testing.T) {
 	params, err := UnmarshalParams(`{
-		"schema_version": 3,
+		"schema_version": 4,
 		"feature": "hd-upscale",
 		"hd": {"scale": 2.0},
 		"provider_only": {"mode": "test"},
@@ -36,7 +36,7 @@ func TestUnmarshalParamsRejectsMissingAndUnsupportedSchemaVersions(t *testing.T)
 		"missing": `{"feature":"prompt-generation"}`,
 		"zero":    `{"schema_version":0}`,
 		"legacy":  `{"schema_version":1}`,
-		"future":  `{"schema_version":4}`,
+		"future":  `{"schema_version":5}`,
 	}
 	for name, raw := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -49,10 +49,10 @@ func TestUnmarshalParamsRejectsMissingAndUnsupportedSchemaVersions(t *testing.T)
 
 func TestUnmarshalParamsRejectsLegacyPersistedMediaURLs(t *testing.T) {
 	tests := []string{
-		`{"schema_version":3,"image_urls":["https://legacy.example/input.png"]}`,
-		`{"schema_version":3,"media":{"inputs":[{"asset_id":1,"url":"https://legacy.example/input.png"}]}}`,
-		`{"schema_version":3,"generation":{"media":[{"input_index":0,"role":"input","asset_id":1,"ref":"https://legacy.example/input.png"}]}}`,
-		`{"schema_version":3,"extra":{"original_image_url":"https://legacy.example/input.png"}}`,
+		`{"schema_version":4,"image_urls":["https://legacy.example/input.png"]}`,
+		`{"schema_version":4,"media":{"inputs":[{"asset_id":1,"url":"https://legacy.example/input.png"}]}}`,
+		`{"schema_version":4,"generation":{"media":[{"input_index":0,"role":"input","asset_id":1,"ref":"https://legacy.example/input.png"}]}}`,
+		`{"schema_version":4,"extra":{"original_image_url":"https://legacy.example/input.png"}}`,
 	}
 	for _, raw := range tests {
 		if _, err := UnmarshalParams(raw); err == nil {

@@ -68,7 +68,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 		{
 			feature: workflow.FeatureSlugOutpaint,
 			images:  []string{"https://example.com/extend.png"},
-			params: map[string]interface{}{"extend": map[string]interface{}{
+			params: map[string]interface{}{"outpaint": map[string]interface{}{
 				"target_width": 1280, "target_height": 768,
 				"image_offset_x": 0, "image_offset_y": 0,
 			},
@@ -432,7 +432,7 @@ func TestTaskIntakeRequiresImageFillSystemPrompt(t *testing.T) {
 			feature: workflow.FeatureSlugOutpaint,
 			params: map[string]interface{}{
 				"original_image_width": 1024, "original_image_height": 768,
-				"extend": map[string]interface{}{
+				"outpaint": map[string]interface{}{
 					"target_width": 1280, "target_height": 768,
 					"image_offset_x": 0, "image_offset_y": 0,
 				},

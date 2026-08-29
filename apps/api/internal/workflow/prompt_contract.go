@@ -9,7 +9,7 @@ import (
 
 const (
 	ParamKeyVariation = paramkeys.Variation
-	ParamKeyExtend    = paramkeys.Extend
+	ParamKeyOutpaint  = paramkeys.Outpaint
 	ParamKeyHD        = paramkeys.HD
 	ParamKeyFusion    = paramkeys.Fusion
 )
@@ -46,7 +46,7 @@ func (c VariationsPromptContract) PromptVariables() map[string]interface{} {
 }
 
 func ReadOutpaintContract(params map[string]interface{}) (OutpaintContract, bool) {
-	obj, ok := readWorkflowObjectParam(params, ParamKeyExtend)
+	obj, ok := readWorkflowObjectParam(params, ParamKeyOutpaint)
 	if !ok {
 		return OutpaintContract{}, false
 	}
@@ -167,27 +167,27 @@ func normalizeVariationsContract(params map[string]interface{}) error {
 }
 
 func normalizeOutpaintContract(params map[string]interface{}) error {
-	obj, err := requiredWorkflowObjectParam(params, ParamKeyExtend)
+	obj, err := requiredWorkflowObjectParam(params, ParamKeyOutpaint)
 	if err != nil {
 		return err
 	}
 	for _, key := range []string{paramkeys.TargetWidth, paramkeys.TargetHeight, paramkeys.ImageOffsetX, paramkeys.ImageOffsetY} {
 		value, ok := readNumberField(obj, key)
 		if !ok {
-			return fmt.Errorf("extend.%s 必须是数字", key)
+			return fmt.Errorf("outpaint.%s 必须是数字", key)
 		}
 		if math.IsNaN(value) || math.IsInf(value, 0) || math.Trunc(value) != value {
-			return fmt.Errorf("extend.%s 必须是整数", key)
+			return fmt.Errorf("outpaint.%s 必须是整数", key)
 		}
 		if (key == paramkeys.TargetWidth || key == paramkeys.TargetHeight) && value <= 0 {
-			return fmt.Errorf("extend.%s 必须是正整数", key)
+			return fmt.Errorf("outpaint.%s 必须是正整数", key)
 		}
 		if (key == paramkeys.ImageOffsetX || key == paramkeys.ImageOffsetY) && value < 0 {
-			return fmt.Errorf("extend.%s 不能为负数", key)
+			return fmt.Errorf("outpaint.%s 不能为负数", key)
 		}
 		obj[key] = value
 	}
-	params[ParamKeyExtend] = obj
+	params[ParamKeyOutpaint] = obj
 	return nil
 }
 

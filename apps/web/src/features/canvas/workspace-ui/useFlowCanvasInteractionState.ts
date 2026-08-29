@@ -1,9 +1,9 @@
 import { computed, ref } from 'vue'
 
 export type CanvasInteractionKey =
-  | 'canvas-extend-overlay'
-  | 'image-editor-raster'
-  | 'image-mask-editor'
+  | 'outpaint-overlay'
+  | 'retouch-raster'
+  | 'inpaint'
   | 'flow-viewport'
   | 'viewport-pan'
   | 'node-drag'
@@ -11,8 +11,8 @@ export type CanvasInteractionKey =
 const CANVAS_LOCKING_INTERACTIONS = new Set<CanvasInteractionKey>([
   // Pixel-editing modes bind pointer input to image-local coordinates, so viewport changes
   // are locked only while those tools are active.
-  'image-editor-raster',
-  'image-mask-editor',
+  'retouch-raster',
+  'inpaint',
 ])
 
 export function useFlowCanvasInteractionState() {

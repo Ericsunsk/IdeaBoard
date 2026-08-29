@@ -1,23 +1,23 @@
 import {
-  hasRenderableImageEditorLayerStack,
-  renderImageEditorLayerStackFile,
-} from '../image-editor/services/imageAdjustmentRenderer'
+  hasRenderableRetouchLayerStack,
+  renderRetouchLayerStackFile,
+} from '../retouch/services/imageAdjustmentRenderer'
 import {
   MediaAssetDerivativeNotReadyError,
   resolveMediaAssetProcessingURL,
 } from '../../../shared/api/mediaAssetDelivery'
-import { useMaskEditorChromeActions } from '../mask-editor/useMaskEditorChromeActions'
-import { isProcessingCancelled } from '../image-editor/runtime/processingCancelled'
+import { useInpaintChromeActions } from '../inpaint/useInpaintChromeActions'
+import { isProcessingCancelled } from '../retouch/runtime/processingCancelled'
 import { isCanvasGraphNodeId, type CanvasGraphNodeId } from '../graph-runtime'
 import { i18n } from '../../../shared/i18n'
 import type { ImageToolChromeCommands } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
-import { buildImageAdjustmentPlan } from '../image-editor/utils/imageAdjustmentPlanPipeline'
+import { buildImageAdjustmentPlan } from '../retouch/utils/imageAdjustmentPlanPipeline'
 import {
   deserializeImageAdjustmentPlan,
   serializeImageAdjustmentPlan,
-} from '../image-editor/utils/imageAdjustmentRecipe'
-import { hasImageEditorRasterEdits } from '../image-editor/utils/imageEditorRasterTools'
+} from '../retouch/utils/imageAdjustmentRecipe'
+import { hasRetouchRasterEdits } from '../retouch/utils/retouchRasterTools'
 
 export function createImageToolCommands(session: ImageToolSession) {
   const { board, execution, ui, feedback } = session.capabilities
@@ -27,10 +27,10 @@ export function createImageToolCommands(session: ImageToolSession) {
   }
 
   async function applyAdjustments() {
-    if (session.isApplyingImageEditorAdjustments.value) return
+    if (session.isApplyingRetouchAdjustments.value) return
 
-    const nodeId = session.imageEditorNodeId.value
-    if (!nodeId || session.imageEditorMode.value !== 'adjust') return
+    const nodeId = session.retouchNodeId.value
+    if (!nodeId || session.retouchMode.value !== 'adjust') return
     if (!isCanvasGraphNodeId(nodeId)) {
       feedback.warning(i18n.global.t('canvas.tools.nodeWriteFailed'))
       return
@@ -44,13 +44,13 @@ export function createImageToolCommands(session: ImageToolSession) {
       return
     }
 
-    const layers = [...session.imageEditorSession.imageEditorLayers.value]
-    if (!hasRenderableImageEditorLayerStack(layers)) {
+    const layers = [...session.retouchSession.retouchLayers.value]
+    if (!hasRenderableRetouchLayerStack(layers)) {
       feedback.warning(i18n.global.t('canvas.tools.noEditableLayers'))
       return
     }
 
-    session.isApplyingImageEditorAdjustments.value = true
+    session.isApplyingRetouchAdjustments.value = true
     const scopeId = nodeId
     session.activeImageAdjustmentFinalScopeId.value = scopeId
 
@@ -58,8 +58,8 @@ export function createImageToolCommands(session: ImageToolSession) {
     // immediately so the derived node can reuse the standard AI generation UI.
     // Bypass the exit hook because it is intentionally wired to cancel active
     // work when the user dismisses the editor.
-    session.exitImageEditorMode({ runBeforeExit: false })
-    session.imageEditorSession.resetImageEditorSession()
+    session.exitRetouchMode({ runBeforeExit: false })
+    session.retouchSession.resetRetouchSession()
 
     const targetPoint = {
       x: Number(sourceNode.x ?? 0) + Math.max(240, Number(sourceNode.width ?? 300) + 64),
@@ -114,7 +114,7 @@ export function createImageToolCommands(session: ImageToolSession) {
         cleanupPendingNode()
         return
       }
-      const renderedFile = await renderImageEditorLayerStackFile(
+      const renderedFile = await renderRetouchLayerStackFile(
         { url: sourceUrl, title: sourceNode.title || 'Image' },
         layers,
         {
@@ -157,7 +157,7 @@ export function createImageToolCommands(session: ImageToolSession) {
         resultNodeId &&
         recipeSourceMediaAssetId &&
         currentPlan.length > 0 &&
-        !hasImageEditorRasterEdits(layers) &&
+        !hasRetouchRasterEdits(layers) &&
         session.capabilities.board.updateSnapshotNode
       ) {
         const previousPlan = sourceNode.adjustmentRecipe
@@ -191,15 +191,15 @@ export function createImageToolCommands(session: ImageToolSession) {
       if (session.activeImageAdjustmentFinalScopeId.value === scopeId) {
         session.registerImageAdjustmentFinalApplyCleanup(null)
         session.activeImageAdjustmentFinalScopeId.value = null
-        session.isApplyingImageEditorAdjustments.value = false
+        session.isApplyingRetouchAdjustments.value = false
       }
     }
   }
 
-  const maskChromeActions = useMaskEditorChromeActions({
-    maskEditorNodeId: session.maskEditor.maskEditorNodeId,
-    commitMaskEditorMode: session.commitMask,
-    getCommittedMaskData: session.maskEditor.getCommittedMaskData,
+  const maskChromeActions = useInpaintChromeActions({
+    inpaintNodeId: session.inpaint.inpaintNodeId,
+    commitInpaintMode: session.commitMask,
+    getCommittedMaskData: session.inpaint.getCommittedMaskData,
     clearActiveNodePanel: ui.clearActiveNodePanel,
     hideStrengthControl: ui.hideStrengthControl,
     runInpaintAction: execution.runInpaintAction,
@@ -207,23 +207,23 @@ export function createImageToolCommands(session: ImageToolSession) {
   })
 
   const chromeCommands: ImageToolChromeCommands = {
-    setMaskDrawMode: session.maskEditor.setDrawMode,
-    setMaskBrushSize: session.maskEditor.setBrushSize,
-    setMaskLayerOpacity: session.maskChromeState.setMaskEditorLayerOpacity,
-    clearMask: session.maskEditor.clearMask,
-    undoMask: session.maskEditor.undoMask,
-    redoMask: session.maskEditor.redoMask,
-    submitMaskPrompt: maskChromeActions.onMaskEditorChromeSubmit,
-    selectAdjustmentLayer: session.imageEditorSession.selectImageAdjustmentLayer,
-    selectEditorLayer: session.imageEditorSession.selectImageEditorLayer,
-    setEditorLayerVisible: session.imageEditorSession.setImageEditorLayerVisible,
-    addEditorLayer: session.imageEditorSession.addImageEditorLayer,
-    copyEditorLayer: session.imageEditorSession.copyImageEditorLayer,
-    mergeEditorLayer: session.imageEditorSession.mergeImageEditorLayer,
-    removeEditorLayer: session.imageEditorSession.removeImageEditorLayer,
-    updateEditorParam: session.imageEditorSession.updateSelectedImageEditorLayerParam,
+    setMaskDrawMode: session.inpaint.setDrawMode,
+    setMaskBrushSize: session.inpaint.setBrushSize,
+    setMaskLayerOpacity: session.maskChromeState.setInpaintLayerOpacity,
+    clearMask: session.inpaint.clearMask,
+    undoMask: session.inpaint.undoMask,
+    redoMask: session.inpaint.redoMask,
+    submitMaskPrompt: maskChromeActions.onInpaintChromeSubmit,
+    selectAdjustmentLayer: session.retouchSession.selectImageAdjustmentLayer,
+    selectEditorLayer: session.retouchSession.selectRetouchLayer,
+    setEditorLayerVisible: session.retouchSession.setRetouchLayerVisible,
+    addEditorLayer: session.retouchSession.addRetouchLayer,
+    copyEditorLayer: session.retouchSession.copyRetouchLayer,
+    mergeEditorLayer: session.retouchSession.mergeRetouchLayer,
+    removeEditorLayer: session.retouchSession.removeRetouchLayer,
+    updateEditorParam: session.retouchSession.updateSelectedRetouchLayerParam,
     updateEditorAdjustmentParams:
-      session.imageEditorSession.updateSelectedImageEditorAdjustmentParams,
+      session.retouchSession.updateSelectedRetouchAdjustmentParams,
     applyAdjustments,
   }
 

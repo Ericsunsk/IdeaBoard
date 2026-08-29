@@ -127,31 +127,31 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the stable count-picker style hooks preserved by the generic output option picker refactor.',
     },
   ],
-  'src/features/canvas/image-editor/components/ImageEditorHistogramPlot.component.spec.ts': [
+  'src/features/canvas/retouch/components/RetouchHistogramPlot.component.spec.ts': [
     {
       reason:
         'Verifies the active marker visual state for the reusable SVG histogram interaction surface.',
     },
   ],
-  'src/features/canvas/image-editor/components/ImageEditorLevelsControl.component.spec.ts': [
+  'src/features/canvas/retouch/components/RetouchLevelsControl.component.spec.ts': [
     {
       reason:
         'Verifies SVG marker, guide-line, and numeric control visual classes for the levels editor.',
     },
   ],
-  'src/features/canvas/image-editor/components/ImageEditorSharpenControl.component.spec.ts': [
+  'src/features/canvas/retouch/components/RetouchSharpenControl.component.spec.ts': [
     {
       reason:
         'Verifies the tonal track class contract that keeps the radius and threshold sliders visible.',
     },
   ],
-  'src/features/canvas/image-editor/components/ImageEditorThresholdControl.component.spec.ts': [
+  'src/features/canvas/retouch/components/RetouchThresholdControl.component.spec.ts': [
     {
       reason:
         'Verifies SVG threshold marker, guide-line, and control visual classes for the threshold editor.',
     },
   ],
-  'src/features/canvas/mask-editor/components/ImageMaskEditorOverlay.component.spec.ts': [
+  'src/features/canvas/inpaint/components/ImageInpaintOverlay.component.spec.ts': [
     {
       reason:
         'Verifies the brush cursor visibility class after pointer movement in the mask overlay.',

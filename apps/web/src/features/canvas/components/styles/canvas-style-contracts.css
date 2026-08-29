@@ -1,8 +1,8 @@
 /*
  * Canvas feature CSS contracts.
  * CanvasPage loads this once for public Canvas classes shared across node,
- * toolbar, image-editor, and mask-editor components. Component-private styles
- * stay in the owning .vue or local image-editor CSS file.
+ * toolbar, retouch, and inpaint components. Component-private styles
+ * stay in the owning .vue or local retouch CSS file.
  */
 
 @import './canvas-chrome.css';

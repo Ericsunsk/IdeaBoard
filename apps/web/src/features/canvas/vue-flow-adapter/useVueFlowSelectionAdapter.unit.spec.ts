@@ -77,7 +77,7 @@ describe('useVueFlowSelectionAdapter', () => {
     harness.adapter.commands.onPaneClick()
 
     expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({
-      closeExpand: true,
+      closeOutpaint: true,
       closeBoardHeader: true,
       closeContextMenu: true,
     })
@@ -104,7 +104,7 @@ describe('useVueFlowSelectionAdapter', () => {
     expect(vueFlowMocks.findNode).not.toHaveBeenCalled()
     expect(vueFlowMocks.addSelectedNodes).not.toHaveBeenCalled()
     expect(vueFlowMocks.removeSelectedElements).not.toHaveBeenCalled()
-    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ closeExpand: true })
+    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ closeOutpaint: true })
   })
 
   it('does not select a node while the hand tool is active but still dismisses transient UI', () => {
@@ -118,7 +118,7 @@ describe('useVueFlowSelectionAdapter', () => {
 
     expect(vueFlowMocks.findNode).not.toHaveBeenCalled()
     expect(vueFlowMocks.addSelectedNodes).not.toHaveBeenCalled()
-    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ closeExpand: true })
+    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ closeOutpaint: true })
   })
 
   it('removes edge selection after marquee selection', () => {

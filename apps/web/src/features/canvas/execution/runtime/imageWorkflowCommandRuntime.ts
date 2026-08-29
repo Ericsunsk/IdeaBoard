@@ -6,7 +6,7 @@ import {
   type ImageExecutionInput,
   type ImageExecutionPlan,
 } from '../planning/ImageExecutionPlan'
-import type { CanvasExtendRect } from '../../utils/canvasExtendGeometry'
+import type { OutpaintRect } from '../../utils/outpaintGeometry'
 import { createCanvasActivationId } from '../task-runner/taskClientActionIds'
 import { i18n } from '../../../../shared/i18n'
 
@@ -21,9 +21,9 @@ export type RunImageInpaintActionOptions = {
   maskDataUrl: string
 }
 
-export type CanvasExtendRectIntent = {
-  frameRect: CanvasExtendRect
-  originalImageRect: CanvasExtendRect
+export type OutpaintRectIntent = {
+  frameRect: OutpaintRect
+  originalImageRect: OutpaintRect
   prompt?: string
 }
 
@@ -33,7 +33,7 @@ export type ImageWorkflowPlanner = {
     action: ImageTaskAction,
     options?: RunImageDirectActionOptions,
   ) => ImageExecutionPlan
-  planCanvasExtendAction: (nodeId: string, intent: CanvasExtendRectIntent) => ImageExecutionPlan
+  planOutpaintAction: (nodeId: string, intent: OutpaintRectIntent) => ImageExecutionPlan
   planImageInpaintAction: (
     nodeId: string,
     inpaint: RunImageInpaintActionOptions,
@@ -68,7 +68,7 @@ export type ImageWorkflowCommands = {
     action: ImageTaskAction,
     options?: RunImageDirectActionOptions,
   ) => Promise<void>
-  runCanvasExtendAction: (nodeId: string, intent: CanvasExtendRectIntent) => Promise<void>
+  runOutpaintAction: (nodeId: string, intent: OutpaintRectIntent) => Promise<void>
   runImageInpaintAction: (nodeId: string, inpaint: RunImageInpaintActionOptions) => Promise<void>
   runFusionPromptGeneration: (
     nodeId: string,
@@ -133,8 +133,8 @@ export function createImageWorkflowCommands(options: {
     )
   }
 
-  async function runCanvasExtendAction(nodeId: string, intent: CanvasExtendRectIntent) {
-    await executePlannedAction(() => options.planner.planCanvasExtendAction(nodeId, intent))
+  async function runOutpaintAction(nodeId: string, intent: OutpaintRectIntent) {
+    await executePlannedAction(() => options.planner.planOutpaintAction(nodeId, intent))
   }
 
   async function runImageInpaintAction(nodeId: string, inpaint: RunImageInpaintActionOptions) {
@@ -175,7 +175,7 @@ export function createImageWorkflowCommands(options: {
     isNodeExecutionActive: options.workflow.isNodeExecutionActive,
     reattachPendingImageResults: options.workflow.reattachPendingImageResults,
     runImageDirectAction,
-    runCanvasExtendAction,
+    runOutpaintAction,
     runImageInpaintAction,
     runFusionPromptGeneration,
     runPromptGeneration,

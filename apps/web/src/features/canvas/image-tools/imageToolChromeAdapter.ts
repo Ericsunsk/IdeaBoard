@@ -3,8 +3,8 @@ import {
   resolveMediaAssetDerivativeURL,
   useMediaAssetDelivery,
 } from '../../../shared/api/mediaAssetDelivery'
-import { useImageAdjustmentRenderedPreview } from '../image-editor/useImageAdjustmentRenderedPreview'
-import { useImageEditorHistogramSource } from '../image-editor/useImageEditorHistogramSource'
+import { useImageAdjustmentRenderedPreview } from '../retouch/useImageAdjustmentRenderedPreview'
+import { useRetouchHistogramSource } from '../retouch/useRetouchHistogramSource'
 import type { ImageToolChromeCommands, ImageToolChromeModel } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
 
@@ -14,17 +14,17 @@ export function createImageToolChromeAdapter(
 ) {
   const { board, execution } = session.capabilities
   const previewAssetId = computed(() => {
-    const nodeId = session.imageEditorNodeId.value
+    const nodeId = session.retouchNodeId.value
     return nodeId ? (board.getImageNodeDisplayPayload(nodeId)?.mediaAssetId ?? null) : null
   })
   const previewDelivery = useMediaAssetDelivery(previewAssetId, 'preview')
-  const { imageEditorRenderedPreview, imageEditorPreviewSource } =
+  const { retouchRenderedPreview, retouchPreviewSource } =
     useImageAdjustmentRenderedPreview({
       isAdjustMode: session.isImageAdjustmentMode,
-      layers: session.imageEditorSession.imageEditorLayers,
+      layers: session.retouchSession.retouchLayers,
       sourceUrl: () => {
-        const payload = session.imageEditorNodeId.value
-          ? board.getImageNodeDisplayPayload(session.imageEditorNodeId.value)
+        const payload = session.retouchNodeId.value
+          ? board.getImageNodeDisplayPayload(session.retouchNodeId.value)
           : null
         if (payload?.mediaAssetId) {
           if (previewDelivery.status.value === 'ready') {
@@ -42,35 +42,35 @@ export function createImageToolChromeAdapter(
         return payload?.url ?? null
       },
     })
-  const { imageEditorHistogramSource } = useImageEditorHistogramSource({
+  const { retouchHistogramSource } = useRetouchHistogramSource({
     isAdjustMode: session.isImageAdjustmentMode,
-    layers: session.imageEditorSession.imageEditorLayers,
-    selectedAdjustmentLayer: session.imageEditorSession.selectedImageEditorAdjustmentLayer,
-    previewSource: imageEditorPreviewSource,
+    layers: session.retouchSession.retouchLayers,
+    selectedAdjustmentLayer: session.retouchSession.selectedRetouchAdjustmentLayer,
+    previewSource: retouchPreviewSource,
   })
 
   const chromeModel = computed<ImageToolChromeModel>(() => {
-    const nodeId = session.imageEditorNodeId.value
+    const nodeId = session.retouchNodeId.value
     return {
       nodeId,
-      mode: session.imageEditorMode.value,
-      anchorRect: session.coordinates.imageEditorChromeAnchorRect.value,
-      isReady: session.coordinates.isImageEditorChromeReady.value,
+      mode: session.retouchMode.value,
+      anchorRect: session.coordinates.retouchChromeAnchorRect.value,
+      isReady: session.coordinates.isRetouchChromeReady.value,
       mask: {
-        drawMode: session.maskEditor.drawMode.value,
-        brushSize: session.maskEditor.brushSize.value,
-        layerOpacity: session.maskChromeState.maskEditorLayerOpacity.value,
+        drawMode: session.inpaint.drawMode.value,
+        brushSize: session.inpaint.brushSize.value,
+        layerOpacity: session.maskChromeState.inpaintLayerOpacity.value,
         directGenerating: nodeId ? execution.isNodeExecutionActive(nodeId) : false,
-        canUndo: session.maskEditor.canUndoMask.value,
-        canRedo: session.maskEditor.canRedoMask.value,
+        canUndo: session.inpaint.canUndoMask.value,
+        canRedo: session.inpaint.canRedoMask.value,
       },
       editor: {
-        layers: session.imageEditorSession.imageEditorLayers.value,
-        selectedLayerId: session.imageEditorSession.selectedImageEditorLayerId.value,
+        layers: session.retouchSession.retouchLayers.value,
+        selectedLayerId: session.retouchSession.selectedRetouchLayerId.value,
         selectedAdjustmentLayer:
-          session.imageEditorSession.selectedImageEditorAdjustmentLayer.value,
-        histogramSource: imageEditorHistogramSource.value,
-        applyingAdjustments: session.isApplyingImageEditorAdjustments.value,
+          session.retouchSession.selectedRetouchAdjustmentLayer.value,
+        histogramSource: retouchHistogramSource.value,
+        applyingAdjustments: session.isApplyingRetouchAdjustments.value,
       },
     }
   })
@@ -78,6 +78,6 @@ export function createImageToolChromeAdapter(
   return {
     chromeModel,
     chromeCommands: commands,
-    imageEditorRenderedPreview,
+    retouchRenderedPreview,
   }
 }

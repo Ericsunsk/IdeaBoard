@@ -2,14 +2,14 @@ import { describe, expect, it, vi } from 'vitest'
 import { useFlowTransientUiDismissal } from './useFlowTransientUiDismissal'
 
 function createHarness() {
-  const cancelFlowExpandMode = vi.fn()
+  const cancelFlowOutpaintMode = vi.fn()
   const closeBoardHeaderEditing = vi.fn()
   const closeNodeContextMenu = vi.fn()
   const clearActiveNodePanel = vi.fn()
   const hideStrengthControl = vi.fn()
 
   const { dismissTransientCanvasUi } = useFlowTransientUiDismissal({
-    cancelFlowExpandMode,
+    cancelFlowOutpaintMode,
     closeBoardHeaderEditing,
     closeNodeContextMenu,
     clearActiveNodePanel,
@@ -18,7 +18,7 @@ function createHarness() {
 
   return {
     dismissTransientCanvasUi,
-    cancelFlowExpandMode,
+    cancelFlowOutpaintMode,
     closeBoardHeaderEditing,
     closeNodeContextMenu,
     clearActiveNodePanel,
@@ -34,7 +34,7 @@ describe('useFlowTransientUiDismissal', () => {
 
     expect(harness.clearActiveNodePanel).toHaveBeenCalledTimes(1)
     expect(harness.hideStrengthControl).toHaveBeenCalledTimes(1)
-    expect(harness.cancelFlowExpandMode).not.toHaveBeenCalled()
+    expect(harness.cancelFlowOutpaintMode).not.toHaveBeenCalled()
     expect(harness.closeBoardHeaderEditing).not.toHaveBeenCalled()
     expect(harness.closeNodeContextMenu).not.toHaveBeenCalled()
   })
@@ -43,12 +43,12 @@ describe('useFlowTransientUiDismissal', () => {
     const harness = createHarness()
 
     harness.dismissTransientCanvasUi({
-      closeExpand: true,
+      closeOutpaint: true,
       closeBoardHeader: true,
       closeContextMenu: true,
     })
 
-    expect(harness.cancelFlowExpandMode).toHaveBeenCalledTimes(1)
+    expect(harness.cancelFlowOutpaintMode).toHaveBeenCalledTimes(1)
     expect(harness.closeBoardHeaderEditing).toHaveBeenCalledTimes(1)
     expect(harness.closeNodeContextMenu).toHaveBeenCalledTimes(1)
     expect(harness.clearActiveNodePanel).toHaveBeenCalledTimes(1)
@@ -59,12 +59,12 @@ describe('useFlowTransientUiDismissal', () => {
     const harness = createHarness()
 
     harness.dismissTransientCanvasUi({
-      closeExpand: true,
+      closeOutpaint: true,
       clearNodePanel: false,
       hideStrength: false,
     })
 
-    expect(harness.cancelFlowExpandMode).toHaveBeenCalledTimes(1)
+    expect(harness.cancelFlowOutpaintMode).toHaveBeenCalledTimes(1)
     expect(harness.clearActiveNodePanel).not.toHaveBeenCalled()
     expect(harness.hideStrengthControl).not.toHaveBeenCalled()
   })

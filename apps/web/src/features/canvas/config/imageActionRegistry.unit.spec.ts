@@ -7,7 +7,7 @@ import {
   IMAGE_NODE_ACTION,
 } from './imageActionRegistry'
 import {
-  IMAGE_CANVAS_EXTEND_ACTION,
+  IMAGE_OUTPAINT_ACTION,
   IMAGE_HD_UPSCALE_ACTION,
   isImageStrengthAction,
 } from '../execution'
@@ -23,8 +23,8 @@ describe('imageActionRegistry', () => {
       IMAGE_NODE_ACTION.render,
       IMAGE_NODE_ACTION.hdUpscale,
       IMAGE_NODE_ACTION.outpaint,
-      IMAGE_NODE_ACTION.imageInpaint,
-      IMAGE_NODE_ACTION.localImageEditor,
+      IMAGE_NODE_ACTION.inpaint,
+      IMAGE_NODE_ACTION.retouch,
     ])
   })
 
@@ -67,14 +67,14 @@ describe('imageActionRegistry', () => {
     expect(IMAGE_ACTION_REGISTRY[IMAGE_HD_UPSCALE_ACTION].mode).toBe(
       IMAGE_ACTION_MODE.hdUpscaleTask,
     )
-    expect(IMAGE_ACTION_REGISTRY[IMAGE_CANVAS_EXTEND_ACTION].mode).toBe(
-      IMAGE_ACTION_MODE.canvasExtend,
+    expect(IMAGE_ACTION_REGISTRY[IMAGE_OUTPAINT_ACTION].mode).toBe(
+      IMAGE_ACTION_MODE.outpaint,
     )
-    expect(IMAGE_ACTION_REGISTRY[IMAGE_NODE_ACTION.imageInpaint].mode).toBe(
+    expect(IMAGE_ACTION_REGISTRY[IMAGE_NODE_ACTION.inpaint].mode).toBe(
       IMAGE_ACTION_MODE.inpaint,
     )
-    expect(IMAGE_ACTION_REGISTRY[IMAGE_NODE_ACTION.localImageEditor].mode).toBe(
-      IMAGE_ACTION_MODE.localImageEditor,
+    expect(IMAGE_ACTION_REGISTRY[IMAGE_NODE_ACTION.retouch].mode).toBe(
+      IMAGE_ACTION_MODE.retouch,
     )
   })
 })

@@ -17,7 +17,7 @@ import {
   ACTIVE_NODE_PANEL_KIND,
   type ActiveNodePanel,
 } from '../workspace-ui/useFlowActiveNodePanels'
-import type { ImageEditorMode } from '../image-editor'
+import type { RetouchMode } from '../retouch'
 
 type FusionPromptParamPatch = Extract<
   FlowSnapshotParamPatch,
@@ -25,17 +25,17 @@ type FusionPromptParamPatch = Extract<
 >
 
 export type ImageActionIntentRouterOptions = {
-  flowImageEditorNodeId: Ref<string | null>
+  flowRetouchNodeId: Ref<string | null>
   consumeSuppressedStrengthClick: (action: ImageStrengthAction) => boolean
   openActiveNodePanel: (panel: ActiveNodePanel) => void
   clearActiveNodePanel: () => void
   hideStrengthControl: () => void
   selectFlowNodeForContextMenu: (nodeId: string) => void
-  cancelFlowExpandMode: () => void
-  cancelFlowMaskEditorMode: () => void
-  enterFlowExpandMode: (nodeId: string) => boolean
-  enterFlowImageEditorMode: (nodeId: string, mode: ImageEditorMode) => boolean
-  focusImageEditorAndShowChrome: (nodeId: string) => void | Promise<void>
+  cancelFlowOutpaintMode: () => void
+  cancelFlowInpaintMode: () => void
+  enterFlowOutpaintMode: (nodeId: string) => boolean
+  enterFlowRetouchMode: (nodeId: string, mode: RetouchMode) => boolean
+  focusRetouchAndShowChrome: (nodeId: string) => void | Promise<void>
   runImageDirectAction: (
     nodeId: string,
     action: ImageTaskAction,
@@ -55,8 +55,8 @@ export type ImageActionIntentRouterOptions = {
 export function createImageActionIntentRouter(options: ImageActionIntentRouterOptions) {
   function onFlowImageContextMenu(nodeId: string, event: MouseEvent) {
     event.preventDefault()
-    if (options.flowImageEditorNodeId.value === nodeId) return
-    options.cancelFlowExpandMode()
+    if (options.flowRetouchNodeId.value === nodeId) return
+    options.cancelFlowOutpaintMode()
     options.selectFlowNodeForContextMenu(nodeId)
     options.openActiveNodePanel({ kind: ACTIVE_NODE_PANEL_KIND.imageTools, nodeId })
     options.hideStrengthControl()
@@ -64,7 +64,7 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
 
   function onFlowFusionContextMenu(nodeId: string, event: MouseEvent) {
     event.preventDefault()
-    options.cancelFlowExpandMode()
+    options.cancelFlowOutpaintMode()
     options.selectFlowNodeForContextMenu(nodeId)
     options.openActiveNodePanel({ kind: ACTIVE_NODE_PANEL_KIND.fusionPrompt, nodeId })
     options.hideStrengthControl()
@@ -78,9 +78,9 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
     strength?: number,
   ) {
     const actionMode = IMAGE_ACTION_REGISTRY[action].mode
-    if (actionMode === IMAGE_ACTION_MODE.canvasExtend) {
-      options.cancelFlowMaskEditorMode()
-      const entered = options.enterFlowExpandMode(nodeId)
+    if (actionMode === IMAGE_ACTION_MODE.outpaint) {
+      options.cancelFlowInpaintMode()
+      const entered = options.enterFlowOutpaintMode(nodeId)
       options.clearActiveNodePanel()
       options.hideStrengthControl()
       if (!entered) options.onWarning(i18n.global.t('canvas.tools.cannotOutpaint'))
@@ -88,21 +88,21 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
     }
     if (
       actionMode === IMAGE_ACTION_MODE.inpaint ||
-      actionMode === IMAGE_ACTION_MODE.localImageEditor
+      actionMode === IMAGE_ACTION_MODE.retouch
     ) {
-      options.cancelFlowExpandMode()
-      const editorMode = actionMode === IMAGE_ACTION_MODE.localImageEditor ? 'adjust' : 'inpaint'
-      const entered = options.enterFlowImageEditorMode(nodeId, editorMode)
+      options.cancelFlowOutpaintMode()
+      const editorMode = actionMode === IMAGE_ACTION_MODE.retouch ? 'adjust' : 'inpaint'
+      const entered = options.enterFlowRetouchMode(nodeId, editorMode)
       options.clearActiveNodePanel()
       options.hideStrengthControl()
       if (!entered) {
         const warningKey =
-          actionMode === IMAGE_ACTION_MODE.localImageEditor
+          actionMode === IMAGE_ACTION_MODE.retouch
             ? 'canvas.tools.imageNotEditable'
             : 'canvas.tools.cannotInpaint'
         options.onWarning(i18n.global.t(warningKey))
       } else {
-        void options.focusImageEditorAndShowChrome(nodeId)
+        void options.focusRetouchAndShowChrome(nodeId)
       }
       return
     }
@@ -117,8 +117,8 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
     ) {
       return
     }
-    options.cancelFlowExpandMode()
-    options.cancelFlowMaskEditorMode()
+    options.cancelFlowOutpaintMode()
+    options.cancelFlowInpaintMode()
     options.clearActiveNodePanel()
     options.hideStrengthControl()
     void options.runImageDirectAction(
@@ -140,8 +140,8 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
     outputCount: number,
     aspectRatio: PromptAspectRatio,
   ) {
-    options.cancelFlowExpandMode()
-    options.cancelFlowMaskEditorMode()
+    options.cancelFlowOutpaintMode()
+    options.cancelFlowInpaintMode()
     options.clearActiveNodePanel()
     options.hideStrengthControl()
     options.onFlowNodeParamUpdate(nodeId, { key: 'prompt', value: prompt })

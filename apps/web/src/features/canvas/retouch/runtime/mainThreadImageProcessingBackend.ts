@@ -1,0 +1,145 @@
+import { processingCancelledError } from './processingCancelled'
+import { i18n } from '../../../../shared/i18n'
+import { canvasToBlob } from '../../services/flowMediaIO'
+import { detectCanvasTransparency } from '../../utils/displayImagePreviewEncoding'
+import { resolveImageExportEncoding } from './imageOutputPolicy'
+import { createCpuImageAdjustmentPlanExecutor } from './cpuPlanExecutor'
+import {
+  createImageSourceCache,
+  readImageSourceImageData,
+  type ImageSourceCache,
+} from './imageSourceCache'
+import type { ImageAdjustmentPlanExecutor } from './planExecutorTypes'
+import type {
+  ImageProcessingBackend,
+  ImageProcessingBackendFinalInput,
+  ImageProcessingBackendPreviewInput,
+  RenderPreviewOutput,
+  RenderFinalOutput,
+} from './types'
+
+const DEFAULT_PREVIEW_MAX_SIDE = 960
+
+export type MainThreadImageProcessingBackendOptions = {
+  sourceCache?: ImageSourceCache
+  planExecutor?: ImageAdjustmentPlanExecutor
+}
+
+export function createMainThreadImageProcessingBackend(
+  options: MainThreadImageProcessingBackendOptions = {},
+): ImageProcessingBackend {
+  return new MainThreadImageProcessingBackend(
+    options.sourceCache ?? createImageSourceCache(),
+    options.planExecutor ?? createCpuImageAdjustmentPlanExecutor(),
+  )
+}
+
+class MainThreadImageProcessingBackend implements ImageProcessingBackend {
+  private readonly sourceCache: ImageSourceCache
+  private readonly planExecutor: ImageAdjustmentPlanExecutor
+
+  constructor(sourceCache: ImageSourceCache, planExecutor: ImageAdjustmentPlanExecutor) {
+    this.sourceCache = sourceCache
+    this.planExecutor = planExecutor
+  }
+
+  async renderFinal(input: ImageProcessingBackendFinalInput): Promise<RenderFinalOutput> {
+    if (input.plan.length === 0) throw new Error(i18n.global.t('canvas.tools.noEditableLayers'))
+    if (input.context.signal.aborted) throw processingCancelledError()
+
+    input.context.reportProgress({ phase: 'decode' })
+    const source = await this.sourceCache.getFullSizeSource(input.source.url, {
+      maxPixels: input.maxPixels,
+      maxSide: input.maxSide,
+      fitWithinMaxPixels: input.fitWithinMaxPixels ?? true,
+    })
+    if (!source) throw new Error(i18n.global.t('canvas.retouch.errors.readImageFailed'))
+
+    try {
+      input.context.reportProgress({ phase: 'render' })
+      const imageData = readImageSourceImageData(source)
+      const adjustedImageData = await this.planExecutor.execute({
+        imageData,
+        plan: input.plan,
+        signal: input.context.signal,
+        onProgress: input.context.reportProgress,
+      })
+      if (input.context.signal.aborted) throw processingCancelledError()
+      source.context.putImageData(adjustedImageData, 0, 0)
+
+      input.context.reportProgress({ phase: 'encode' })
+      const hasTransparentPixels = detectCanvasTransparency(
+        source.context,
+        source.width,
+        source.height,
+      )
+      const encoding = input.preserveSourceMimeType
+        ? resolveImageExportEncoding(source.mimeType, hasTransparentPixels)
+        : input.context.outputPolicy.resolveEncoding({
+            sourceMimeType: source.mimeType,
+            hasTransparentPixels,
+          })
+      const blob = await canvasToBlob(source.canvas, encoding.mimeType, encoding.quality)
+      const outputMime = blob.type || encoding.mimeType
+      const fileName = input.context.outputPolicy.resolveFileName({
+        title: input.source.title,
+        mimeType: outputMime,
+      })
+      if (input.context.signal.aborted) throw processingCancelledError()
+
+      input.context.reportProgress({ phase: 'complete' })
+      return {
+        file: new File([blob], fileName, { type: outputMime }),
+        width: source.width,
+        height: source.height,
+        mimeType: outputMime,
+      }
+    } finally {
+      this.sourceCache.releaseSource(source)
+    }
+  }
+
+  async renderPreview(input: ImageProcessingBackendPreviewInput): Promise<RenderPreviewOutput> {
+    if (input.context.signal.aborted) throw processingCancelledError()
+
+    input.context.reportProgress({ phase: 'decode' })
+    const source = await this.sourceCache.getFullSizeSource(input.source.url, {
+      maxSide: resolvePreviewMaxSide(input.sizeStrategy),
+    })
+    if (!source) throw new Error(i18n.global.t('canvas.retouch.errors.readImageFailed'))
+
+    input.context.reportProgress({ phase: 'render' })
+    const sourceImageData = readImageSourceImageData(source)
+    const previewImageData =
+      input.plan.length > 0
+        ? await this.planExecutor.execute({
+            imageData: cloneImageDataForPreview(sourceImageData),
+            plan: input.plan,
+            signal: input.context.signal,
+            onProgress: input.context.reportProgress,
+          })
+        : cloneImageDataForPreview(sourceImageData)
+    if (input.context.signal.aborted) throw processingCancelledError()
+
+    input.context.reportProgress({ phase: 'complete' })
+    return {
+      sourceImageData,
+      previewImageData,
+      width: source.width,
+      height: source.height,
+    }
+  }
+
+  dispose() {
+    this.sourceCache.dispose()
+    this.planExecutor.dispose?.()
+  }
+}
+
+function resolvePreviewMaxSide(input: ImageProcessingBackendPreviewInput['sizeStrategy']) {
+  return Math.max(1, Math.floor(input?.maxSide ?? DEFAULT_PREVIEW_MAX_SIDE))
+}
+
+function cloneImageDataForPreview(imageData: ImageData): ImageData {
+  return new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height)
+}

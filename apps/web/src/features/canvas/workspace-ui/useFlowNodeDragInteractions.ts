@@ -17,7 +17,7 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
   function onNodeDragStart(nodeIds: readonly string[]) {
     if (options.isNodeDragLocked?.()) return
     pendingDragStopCommit = null
-    options.dismissTransientCanvasUi({ closeExpand: true })
+    options.dismissTransientCanvasUi({ closeOutpaint: true })
     options.beginNodeDragTransaction(nodeIds)
     options.beginFlowNodeDragDuplicateTracking(options.duplicateModifierPressed.value)
   }
@@ -25,7 +25,7 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
   function onNodeDragStop() {
     if (options.isNodeDragLocked?.()) return
     options.dismissTransientCanvasUi({
-      closeExpand: true,
+      closeOutpaint: true,
       clearNodePanel: false,
       hideStrength: false,
     })

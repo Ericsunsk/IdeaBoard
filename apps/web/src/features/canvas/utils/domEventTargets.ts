@@ -1,7 +1,7 @@
 export const CANVAS_EDITING_SURFACE_SELECTOR = [
   '[data-flow-editing-surface]',
-  '[data-image-editor]',
-  '[data-image-mask-editor]',
+  '[data-retouch]',
+  '[data-inpaint]',
 ].join(',')
 
 export function isEditableEventTarget(target: EventTarget | null): boolean {

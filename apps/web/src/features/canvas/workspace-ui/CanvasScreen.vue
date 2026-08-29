@@ -293,7 +293,7 @@ const imageTools = {
 }
 const {
   viewModel: {
-    locks: { isChromeHidden: isImageEditorChromeHidden, isCanvasLocked: isFlowCanvasLocked },
+    locks: { isChromeHidden: isRetouchChromeHidden, isCanvasLocked: isFlowCanvasLocked },
   },
 } = imageTools
 const { isFlowInteractionActive, isFlowViewportPanInteractionActive } = viewModel.graphEditing
@@ -365,8 +365,8 @@ function handleMiniMapDragMove(payload: { delta: Parameters<typeof onMiniMapDrag
 }
 
 const chromeProps = computed(() => ({
-  inert: isImageEditorChromeHidden.value,
-  isHidden: isImageEditorChromeHidden.value,
+  inert: isRetouchChromeHidden.value,
+  isHidden: isRetouchChromeHidden.value,
   board: canvasChromeBoard.value,
   account: canvasChromeAccount.value,
   tools: {
@@ -413,8 +413,8 @@ const vueFlowProps = computed(() => {
 
 const minimapProps = computed(() => ({
   enabled: isCanvasMinimapEnabled.value,
-  inert: isImageEditorChromeHidden.value,
-  isHidden: isImageEditorChromeHidden.value,
+  inert: isRetouchChromeHidden.value,
+  isHidden: isRetouchChromeHidden.value,
 }))
 
 function updateBoardNameDraft(value: string) {

@@ -1,6 +1,6 @@
 import type { PromptAspectRatio } from '../../canvas-board/domain'
 import type { ImageNodeAction } from '../config/imageActionRegistry'
-import type { CanvasExtendDragAnchor } from '../image-workflow/useImageCanvasExtendOverlay'
+import type { OutpaintDragAnchor } from '../image-workflow/useImageOutpaintOverlay'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 
 export type CanvasNodePresentationIntent =
@@ -29,7 +29,7 @@ export type CanvasNodePresentationIntent =
   | { type: 'append-to-canvas-requested'; nodeId: string }
   | { type: 'reset-requested'; nodeId: string }
   | { type: 'image-context-menu-requested'; nodeId: string; event: MouseEvent }
-  | { type: 'canvas-extend-submitted'; nodeId: string; prompt: string }
+  | { type: 'outpaint-submitted'; nodeId: string; prompt: string }
   | {
       type: 'action-requested'
       nodeId: string
@@ -39,14 +39,14 @@ export type CanvasNodePresentationIntent =
       strength?: number
     }
   | {
-      type: 'canvas-extend-handle-pointerdown'
+      type: 'outpaint-handle-pointerdown'
       nodeId: string
-      anchor: CanvasExtendDragAnchor
+      anchor: OutpaintDragAnchor
       event: PointerEvent
     }
-  | { type: 'canvas-extend-handle-pointermove'; nodeId: string; event: PointerEvent }
-  | { type: 'canvas-extend-handle-pointerup'; nodeId: string; event: PointerEvent }
-  | { type: 'canvas-extend-frame-pointerdown'; nodeId: string; event: PointerEvent }
+  | { type: 'outpaint-handle-pointermove'; nodeId: string; event: PointerEvent }
+  | { type: 'outpaint-handle-pointerup'; nodeId: string; event: PointerEvent }
+  | { type: 'outpaint-frame-pointerdown'; nodeId: string; event: PointerEvent }
   | { type: 'fusion-context-menu-requested'; nodeId: string; event: MouseEvent }
   | {
       type: 'fusion-generation-requested'

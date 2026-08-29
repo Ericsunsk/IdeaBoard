@@ -567,7 +567,7 @@ func TestTaskStatEventUsesFrozenRequestedOutputCount(t *testing.T) {
 	event, ok, err := taskStatEventFromTask(&tasks.Task{
 		TaskID:      "multi-output-event",
 		UserID:      20,
-		Params:      `{"schema_version":3,"generation":{"requested_output_count":3}}`,
+		Params:      `{"schema_version":4,"generation":{"requested_output_count":3}}`,
 		Status:      tasks.StatusCompleted,
 		CompletedAt: &completedAt,
 	}, nil)

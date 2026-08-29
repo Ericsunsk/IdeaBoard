@@ -5,16 +5,16 @@
     :data-image-node-id="nodeId"
     :data-flow-node-id="flowNodeId || undefined"
     :class="{
-      'is-expand-mode': !!expandModeActive,
-      'is-image-editor-active': isImageToolActive,
+      'is-outpaint-mode': !!outpaintModeActive,
+      'is-retouch-active': isImageToolActive,
     }"
     layout="center"
     :height="stageHeight"
-    :active="active && !expandModeActive"
+    :active="active && !outpaintModeActive"
     :connection-drop-target="connectionDropTarget"
     :loading="!!directGenerating && !stageDisplayImage"
     :running="!!directGenerating || imageImportPending"
-    :transparent="!!expandModeActive || isImageToolActive"
+    :transparent="!!outpaintModeActive || isImageToolActive"
     :aria-busy="!!directGenerating || imageImportPending"
     :aria-label="t('canvas.controls.stageLabel')"
     @dragover.stop="onStageDragOver"
@@ -53,15 +53,15 @@
         @keydown.enter.prevent="emit('open-preview')"
         @keydown.space.prevent="emit('append-to-canvas')"
       />
-      <ImageCanvasExtendOverlay
-        v-if="stageDisplayUrl && expandModeActive && expandOverlayStyle"
-        :overlay-style="expandOverlayStyle"
-        :handle-radius="expandHandleRadius ?? 4"
-        @submit="submitExpand"
-        @handle-pointerdown="emit('expand-handle-pointerdown', $event)"
-        @handle-pointermove="emit('expand-handle-pointermove', $event)"
-        @handle-pointerup="emit('expand-handle-pointerup', $event)"
-        @frame-pointerdown="emit('expand-frame-pointerdown', $event)"
+      <ImageOutpaintOverlay
+        v-if="stageDisplayUrl && outpaintModeActive && outpaintOverlayStyle"
+        :overlay-style="outpaintOverlayStyle"
+        :handle-radius="outpaintHandleRadius ?? 4"
+        @submit="submitOutpaint"
+        @handle-pointerdown="emit('outpaint-handle-pointerdown', $event)"
+        @handle-pointermove="emit('outpaint-handle-pointermove', $event)"
+        @handle-pointerup="emit('outpaint-handle-pointerup', $event)"
+        @frame-pointerdown="emit('outpaint-frame-pointerdown', $event)"
       />
       <div v-if="!libraryImport && !localUpload" class="image-node-stage-actions">
         <NodeActionButton
@@ -130,14 +130,14 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useElementVisibility } from '@vueuse/core'
 import { useCanvasViewportContext } from '../../../vue-flow-adapter/useCanvasViewportContext'
-import type { CanvasExtendDragAnchor } from '../../../image-workflow/useImageCanvasExtendOverlay'
+import type { OutpaintDragAnchor } from '../../../image-workflow/useImageOutpaintOverlay'
 import type { ImageToolStageBinding } from '../../../image-tools'
 import type { LibraryImportFact } from '../../../../canvas-board/domain'
 import type { FlowLocalUploadState } from '../../../types/flowTypes'
 import { useCanvasImagePreviewQuality } from '../../../vue-flow-adapter/useCanvasImagePreviewQuality'
 import { useDisplayImagePreview } from '../../../vue-flow-adapter/useDisplayImagePreview'
 import ImageToolStagePresentation from '../../../image-tools/components/ImageToolStagePresentation.vue'
-import ImageCanvasExtendOverlay from '../../../image-workflow/components/ImageCanvasExtendOverlay.vue'
+import ImageOutpaintOverlay from '../../../image-workflow/components/ImageOutpaintOverlay.vue'
 import ComposingOrb from './ComposingOrb.vue'
 import NodeActionButton from '../primitives/NodeActionButton.vue'
 import NodeEmptyStateIcon from '../primitives/NodeEmptyStateIcon.vue'
@@ -154,9 +154,9 @@ const props = defineProps<{
   inputLocked?: boolean
   emptyIconVariant?: 'image' | 'fusion'
   directGenerating?: boolean
-  expandModeActive?: boolean
-  expandOverlayStyle?: Record<string, string> | null
-  expandHandleRadius?: number
+  outpaintModeActive?: boolean
+  outpaintOverlayStyle?: Record<string, string> | null
+  outpaintHandleRadius?: number
   imageToolStageBinding?: ImageToolStageBinding | null
   active: boolean
   connectionDropTarget?: boolean
@@ -171,14 +171,14 @@ const emit = defineEmits<{
   (e: 'reset'): void
   (e: 'retry-image-import'): void
   (e: 'contextmenu', event: MouseEvent): void
-  (e: 'expand-submit', prompt: string): void
+  (e: 'outpaint-submit', prompt: string): void
   (
-    e: 'expand-handle-pointerdown',
-    payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent },
+    e: 'outpaint-handle-pointerdown',
+    payload: { anchor: OutpaintDragAnchor; event: PointerEvent },
   ): void
-  (e: 'expand-handle-pointermove', event: PointerEvent): void
-  (e: 'expand-handle-pointerup', event: PointerEvent): void
-  (e: 'expand-frame-pointerdown', event: PointerEvent): void
+  (e: 'outpaint-handle-pointermove', event: PointerEvent): void
+  (e: 'outpaint-handle-pointerup', event: PointerEvent): void
+  (e: 'outpaint-frame-pointerdown', event: PointerEvent): void
 }>()
 
 type NodeStageFrameExpose = { stageElement: HTMLElement | null }
@@ -203,7 +203,7 @@ const imageImportPending = computed(
     (!!props.localUpload && !imageImportFailureMessage.value),
 )
 const isImageToolActive = computed(() => !!props.imageToolStageBinding?.active)
-const forceFullPreviewQuality = computed(() => !!props.expandModeActive || isImageToolActive.value)
+const forceFullPreviewQuality = computed(() => !!props.outpaintModeActive || isImageToolActive.value)
 const canvasViewport = useCanvasViewportContext()
 const { maxSide: previewMaxSide } = useCanvasImagePreviewQuality({
   stageWidth: () => props.stageWidth,
@@ -254,8 +254,8 @@ function onStageContextMenu(event: MouseEvent) {
   emit('contextmenu', event)
 }
 
-function submitExpand(prompt: string) {
-  emit('expand-submit', prompt)
+function submitOutpaint(prompt: string) {
+  emit('outpaint-submit', prompt)
 }
 </script>
 
@@ -309,8 +309,8 @@ function submitExpand(prompt: string) {
   cursor: default;
 }
 
-.image-node-stage.is-expand-mode .image-node-stage-image,
-.image-node-stage.is-image-editor-active .image-node-stage-image {
+.image-node-stage.is-outpaint-mode .image-node-stage-image,
+.image-node-stage.is-retouch-active .image-node-stage-image {
   pointer-events: none;
 }
 
@@ -381,12 +381,12 @@ function submitExpand(prompt: string) {
   pointer-events: auto;
 }
 
-.image-node-stage.is-expand-mode .image-node-stage-actions {
+.image-node-stage.is-outpaint-mode .image-node-stage-actions {
   opacity: 0;
   pointer-events: none;
 }
 
-.image-node-stage.is-image-editor-active .image-node-stage-actions {
+.image-node-stage.is-retouch-active .image-node-stage-actions {
   opacity: 0;
   pointer-events: none;
 }

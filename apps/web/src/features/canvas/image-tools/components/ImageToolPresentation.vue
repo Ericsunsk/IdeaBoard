@@ -1,5 +1,5 @@
 <template>
-  <ImageMaskEditorChrome
+  <ImageInpaintChrome
     v-if="
       chromeModel.nodeId &&
       chromeModel.mode === 'inpaint' &&
@@ -21,7 +21,7 @@
     @redo-mask="chromeCommands.redoMask"
     @submit="chromeCommands.submitMaskPrompt"
   />
-  <ImageEditorChrome
+  <RetouchChrome
     v-if="
       chromeModel.nodeId &&
       chromeModel.mode === 'adjust' &&
@@ -49,8 +49,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ImageEditorChrome } from '../../image-editor'
-import { ImageMaskEditorChrome } from '../../mask-editor'
+import { RetouchChrome } from '../../retouch'
+import { ImageInpaintChrome } from '../../inpaint'
 import type { ImageToolPresentationBinding } from '../imageToolBindings'
 
 const props = defineProps<{ imageTools: ImageToolPresentationBinding }>()

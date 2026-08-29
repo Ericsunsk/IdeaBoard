@@ -32,10 +32,18 @@ export const createBillingQuote = async (
   billingQuoteRequest: BillingQuoteRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseBillingQuote> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseBillingQuote>(getCreateBillingQuoteUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(billingQuoteRequest),
   })
 }

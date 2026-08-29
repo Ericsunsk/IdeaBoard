@@ -31,7 +31,7 @@ type providerRequest struct {
 	Scale            float64
 	OriginalWidth    int
 	OriginalHeight   int
-	Extend           *tasks.OutpaintParams
+	Outpaint           *tasks.OutpaintParams
 	OpenAI           openAIProviderControls
 	Google           googleProviderControls
 }
@@ -92,9 +92,9 @@ func (p providerTaskParams) providerRequest(prompt string, resolvedModel string)
 		request.OriginalWidth = int(math.Round(p.Canonical.Controls.OriginalWidth))
 		request.OriginalHeight = int(math.Round(p.Canonical.Controls.OriginalHeight))
 	}
-	if p.Canonical != nil && p.Canonical.Extend != nil {
-		extend := *p.Canonical.Extend
-		request.Extend = &extend
+	if p.Canonical != nil && p.Canonical.Outpaint != nil {
+		outpaint := *p.Canonical.Outpaint
+		request.Outpaint = &outpaint
 	}
 	return request, nil
 }
@@ -148,9 +148,9 @@ func validateCanonicalRuntimeControls(params *tasks.WorkflowTaskParams, contract
 	unexpected := func(expected string) error {
 		return fmt.Errorf("task canonical controls do not match execution plan: expected %s", expected)
 	}
-	rejectOtherControls := func(variation, extend, hd, fusion bool) error {
+	rejectOtherControls := func(variation, outpaint, hd, fusion bool) error {
 		if (params.Variation != nil) != variation ||
-			(params.Extend != nil) != extend ||
+			(params.Outpaint != nil) != outpaint ||
 			(params.HD != nil) != hd ||
 			(params.Fusion != nil) != fusion {
 			return unexpected(string(contract))
@@ -170,13 +170,13 @@ func validateCanonicalRuntimeControls(params *tasks.WorkflowTaskParams, contract
 			return fmt.Errorf("task variation controls are invalid")
 		}
 		return nil
-	case workflow.RuntimeControlsExtend:
+	case workflow.RuntimeControlsOutpaint:
 		if err := rejectOtherControls(false, true, false, false); err != nil {
 			return err
 		}
-		extend := params.Extend
-		if extend.TargetWidth <= 0 || extend.TargetHeight <= 0 || extend.ImageOffsetX < 0 || extend.ImageOffsetY < 0 {
-			return fmt.Errorf("task image extend controls are invalid")
+		outpaint := params.Outpaint
+		if outpaint.TargetWidth <= 0 || outpaint.TargetHeight <= 0 || outpaint.ImageOffsetX < 0 || outpaint.ImageOffsetY < 0 {
+			return fmt.Errorf("task image outpaint controls are invalid")
 		}
 		return nil
 	case workflow.RuntimeControlsUpscale:

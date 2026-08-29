@@ -1,7 +1,0 @@
-:where(.image-editor-curves, .image-editor-threshold-control, .image-editor-levels-control) {
-  --image-editor-control-point-size: var(--canvas-range-thumb-size);
-  --image-editor-control-point-border-width: var(--editing-controls-border-width, 1px);
-  --image-editor-control-point-border-color: var(--canvas-accent);
-  --image-editor-control-point-bg: #ffffff;
-  --image-editor-control-point-active-bg: var(--canvas-accent);
-}

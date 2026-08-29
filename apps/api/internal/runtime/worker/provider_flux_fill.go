@@ -45,11 +45,11 @@ func (c *ProviderExecutor) callFluxFill(ctx context.Context, account *accounts.A
 		payload["mask_url"] = maskURL
 		route = "/inpaint"
 	case workflow.RuntimeOperationOutpaint:
-		if request.Extend == nil || request.OriginalWidth <= 0 || request.OriginalHeight <= 0 {
+		if request.Outpaint == nil || request.OriginalWidth <= 0 || request.OriginalHeight <= 0 {
 			return providerCallResult{}, fmt.Errorf("图像填充扩图缺少原图尺寸或扩展参数")
 		}
-		width, height := request.Extend.TargetWidth, request.Extend.TargetHeight
-		offsetX, offsetY := request.Extend.ImageOffsetX, request.Extend.ImageOffsetY
+		width, height := request.Outpaint.TargetWidth, request.Outpaint.TargetHeight
+		offsetX, offsetY := request.Outpaint.ImageOffsetX, request.Outpaint.ImageOffsetY
 		if offsetX < 0 || offsetY < 0 || offsetX+request.OriginalWidth > width || offsetY+request.OriginalHeight > height {
 			return providerCallResult{}, fmt.Errorf("图像填充扩图 geometry 无效")
 		}

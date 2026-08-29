@@ -2,20 +2,20 @@ import { describe, expect, it } from 'vitest'
 import type { SubmitTaskData } from '../../../../shared/api/task'
 import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
 import {
-  IMAGE_CANVAS_EXTEND_ACTION,
+  IMAGE_OUTPAINT_ACTION,
   IMAGE_HD_UPSCALE_ACTION,
   resolveHdScale,
 } from '../contracts/imageActionExecution'
 import { EXECUTION_FEATURE } from '../contracts/executionContract'
 import type {
-  CanvasExtendExecutionPlan,
+  OutpaintExecutionPlan,
   ImageActionExecutionPlan,
   ImageInpaintExecutionPlan,
   PreparedFusionExecutionPlan,
   PromptGenerationExecutionPlan,
 } from '../planning/ImageExecutionPlan'
 import {
-  buildCanvasExtendTaskRequest,
+  buildOutpaintTaskRequest,
   buildDirectActionTaskRequest,
   buildFusionTaskRequest,
   buildHdUpscaleTaskRequest,
@@ -23,7 +23,7 @@ import {
   buildImageActionReadinessRequest,
   buildImageInpaintTaskRequest,
   buildInpaintReadinessRequest,
-  buildCanvasExtendReadinessRequest,
+  buildOutpaintReadinessRequest,
   buildPreparedImageInpaintTaskRequest,
   buildPromptGenerationTaskRequest,
 } from './flowImageTaskRequests'
@@ -94,7 +94,7 @@ describe('flowImageTaskRequests', () => {
         custom_height: 1024,
       },
     })
-    expect(buildCanvasExtendReadinessRequest()).toMatchObject({
+    expect(buildOutpaintReadinessRequest()).toMatchObject({
       prompt: '',
       feature: EXECUTION_FEATURE.outpaint,
       params: {
@@ -102,7 +102,7 @@ describe('flowImageTaskRequests', () => {
         output_resolution: 'default',
         original_image_width: 1024,
         original_image_height: 1024,
-        extend: { target_width: 1032, target_height: 1024, image_offset_x: 0, image_offset_y: 0 },
+        outpaint: { target_width: 1032, target_height: 1024, image_offset_x: 0, image_offset_y: 0 },
       },
     })
   })
@@ -284,8 +284,8 @@ describe('flowImageTaskRequests', () => {
     expect(request.params).not.toHaveProperty('reference_image_urls')
   })
 
-  it('builds image extend params under the nested extend contract', () => {
-    const request = buildCanvasExtendTaskRequest({
+  it('builds outpaint params under the nested outpaint contract', () => {
+    const request = buildOutpaintTaskRequest({
       source,
       imageSize: { width: 1000, height: 750 },
       frameRect: { left: -40, top: -10, width: 160, height: 140 },
@@ -299,7 +299,7 @@ describe('flowImageTaskRequests', () => {
       output_resolution: 'default',
       original_image_width: 1000,
       original_image_height: 750,
-      extend: {
+      outpaint: {
         target_width: 1600,
         target_height: 1050,
         image_offset_x: 400,
@@ -310,11 +310,11 @@ describe('flowImageTaskRequests', () => {
 	 expect(request.params).not.toHaveProperty('custom_height')
   })
 
-  it('builds canvas extend readiness from the same action contract', () => {
-    expect(buildImageActionReadinessRequest(IMAGE_CANVAS_EXTEND_ACTION)).toMatchObject({
+  it('builds outpaint readiness from the same action contract', () => {
+    expect(buildImageActionReadinessRequest(IMAGE_OUTPAINT_ACTION)).toMatchObject({
       feature: EXECUTION_FEATURE.outpaint,
       params: {
-        extend: {
+        outpaint: {
           target_width: 1032,
         },
       },
@@ -424,7 +424,7 @@ describe('flowImageTaskRequests', () => {
     })
   })
 
-  it('builds image execution task requests for direct action, prompt, text, extend, and fusion branches', () => {
+  it('builds image execution task requests for direct action, prompt, text, outpaint, and fusion branches', () => {
     const actionPlan: ImageActionExecutionPlan = {
       kind: 'image-action',
       sourceNodeId: 'image-1',
@@ -444,8 +444,8 @@ describe('flowImageTaskRequests', () => {
       aspectRatio: 'auto',
       resultOptions: {},
     }
-    const extendPlan: CanvasExtendExecutionPlan = {
-      kind: 'canvas-extend',
+    const outpaintPlan: OutpaintExecutionPlan = {
+      kind: 'outpaint',
       sourceNodeId: 'image-1',
       source,
       prompt: 'extend horizon',
@@ -480,11 +480,11 @@ describe('flowImageTaskRequests', () => {
     })
     expect(buildImageExecutionTaskRequest(textPlan)).not.toHaveProperty('image_urls')
     expect(buildImageExecutionTaskRequest(textPlan)).toMatchObject({ params: { output_count: 1 } })
-    expect(buildImageExecutionTaskRequest(extendPlan, { width: 1000, height: 1000 })).toMatchObject({
+    expect(buildImageExecutionTaskRequest(outpaintPlan, { width: 1000, height: 1000 })).toMatchObject({
       feature: EXECUTION_FEATURE.outpaint,
       image_urls: [source.url],
       params: {
-        extend: {
+        outpaint: {
           target_width: 1100,
           target_height: 1000,
         },
@@ -503,7 +503,7 @@ describe('flowImageTaskRequests', () => {
 
   it('uses the prepared inpaint request builder for image inpaint plans', () => {
     const plan: ImageInpaintExecutionPlan = {
-      kind: 'image-inpaint',
+      kind: 'inpaint',
       sourceNodeId: 'image-1',
       source,
       prompt: 'replace object',

@@ -33,13 +33,13 @@ func validateImageFillDimensions(featureSlug string, params *tasks.WorkflowTaskP
 	}
 	switch featureSlug {
 	case workflow.FeatureSlugOutpaint:
-		if params.Extend == nil {
+		if params.Outpaint == nil {
 			return validation.New("扩图需要提供目标尺寸和原图偏移")
 		}
 		targetWidth, targetHeight, err := validateImageFillSize(
 			"目标图片",
-			float64(params.Extend.TargetWidth),
-			float64(params.Extend.TargetHeight),
+			float64(params.Outpaint.TargetWidth),
+			float64(params.Outpaint.TargetHeight),
 		)
 		if err != nil {
 			return err
@@ -47,8 +47,8 @@ func validateImageFillDimensions(featureSlug string, params *tasks.WorkflowTaskP
 		if targetWidth < originalWidth || targetHeight < originalHeight {
 			return validation.New("扩图目标尺寸不能小于原图尺寸")
 		}
-		offsetX := int64(params.Extend.ImageOffsetX)
-		offsetY := int64(params.Extend.ImageOffsetY)
+		offsetX := int64(params.Outpaint.ImageOffsetX)
+		offsetY := int64(params.Outpaint.ImageOffsetY)
 		if offsetX < 0 || offsetY < 0 ||
 			offsetX > targetWidth-originalWidth ||
 			offsetY > targetHeight-originalHeight {

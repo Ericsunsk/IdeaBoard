@@ -1,8 +1,8 @@
 import type { ComputedRef, Ref } from 'vue'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
 import type { ActiveNodePanel, ActiveNodePanelKind } from '../workspace-ui/useFlowActiveNodePanels'
-import type { CanvasExtendDragAnchor } from './useImageCanvasExtendOverlay'
-import { useImageCanvasExtendOverlay } from './useImageCanvasExtendOverlay'
+import type { OutpaintDragAnchor } from './useImageOutpaintOverlay'
+import { useImageOutpaintOverlay } from './useImageOutpaintOverlay'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { ImageNodeAction } from '../config/imageActionRegistry'
 import type { CanvasVueFlowAdapter } from '../vue-flow-adapter'
@@ -11,7 +11,7 @@ import {
   type CanvasImageTools,
   type UseCanvasImageToolsOptions,
 } from '../image-tools'
-import { useFlowExpandInteractionHandlers } from './canvasExtendIntent'
+import { useFlowOutpaintInteractionHandlers } from './outpaintIntent'
 import {
   createImageActionIntentRouter,
   type ImageActionIntentRouterOptions,
@@ -33,7 +33,7 @@ type CanvasImageWorkflowExecutionPort = Pick<
   | 'runPromptGeneration'
   | 'runFusionPromptGeneration'
   | 'runImageDirectAction'
-  | 'runCanvasExtendAction'
+  | 'runOutpaintAction'
   | 'isGenerationAvailable'
   | 'isNodeExecutionActive'
   | 'hydratePendingImageLeases'
@@ -89,7 +89,7 @@ export type CanvasImageWorkflowOptions = {
 export type CanvasImageWorkflow = {
   viewModel: {
     tools: CanvasImageTools['viewModel']
-    canvasExtend: {
+    outpaint: {
       nodeId: ComputedRef<string | null>
       overlayStyle: ComputedRef<Record<string, string> | null>
       handleRadius: number
@@ -120,17 +120,17 @@ export type CanvasImageWorkflow = {
         outputCount: number,
         aspectRatio: PromptAspectRatio,
       ) => void
-      onFlowImageExpandSubmit: (nodeId: string, prompt: string) => void
-      onFlowExpandHandlePointerDown: (
+      onFlowImageOutpaintSubmit: (nodeId: string, prompt: string) => void
+      onFlowOutpaintHandlePointerDown: (
         nodeId: string,
-        anchor: CanvasExtendDragAnchor,
+        anchor: OutpaintDragAnchor,
         event: PointerEvent,
       ) => void
-      onFlowExpandFramePointerDown: (nodeId: string, event: PointerEvent) => void
-      onFlowExpandHandlePointerMove: (event: PointerEvent) => void
-      onFlowExpandHandlePointerUp: (event: PointerEvent) => void
+      onFlowOutpaintFramePointerDown: (nodeId: string, event: PointerEvent) => void
+      onFlowOutpaintHandlePointerMove: (event: PointerEvent) => void
+      onFlowOutpaintHandlePointerUp: (event: PointerEvent) => void
     }
-    cancelCanvasExtend: () => void
+    cancelOutpaint: () => void
     hideStrengthControl: () => void
   }
 }
@@ -163,7 +163,7 @@ export function useCanvasImageWorkflow(
     onCancel: ui.panels.clear,
   })
 
-  const canvasExtend = useImageCanvasExtendOverlay({
+  const outpaint = useImageOutpaintOverlay({
     activeTool: ui.activeTool,
     getImageStageElement: ui.getImageStageElement,
     nodes: graph.nodes,
@@ -172,7 +172,7 @@ export function useCanvasImageWorkflow(
     stopCanvasInteraction: graph.stopCanvasInteraction,
     onBeforePointerCancel: graph.clearSelectedFlowElements,
     onCommit: async (payload) => {
-      await execution.runCanvasExtendAction(payload.nodeId, {
+      await execution.runOutpaintAction(payload.nodeId, {
         frameRect: payload.frameRect,
         originalImageRect: payload.originalImageRect,
         prompt: payload.prompt,
@@ -225,17 +225,17 @@ export function useCanvasImageWorkflow(
   })
 
   const imageActions = createImageActionIntentRouter({
-    flowImageEditorNodeId: imageTools.viewModel.active.nodeId,
+    flowRetouchNodeId: imageTools.viewModel.active.nodeId,
     consumeSuppressedStrengthClick: strengthControl.consumeSuppressedStrengthClick,
     openActiveNodePanel: ui.panels.open,
     clearActiveNodePanel: ui.panels.clear,
     hideStrengthControl: strengthControl.hideStrengthControl,
     selectFlowNodeForContextMenu: options.flowPaneAdapter.selectOnlyNode,
-    cancelFlowExpandMode: canvasExtend.cancelExpandMode,
-    cancelFlowMaskEditorMode: imageTools.commands.lifecycle.cancel,
-    enterFlowExpandMode: canvasExtend.enterExpandMode,
-    enterFlowImageEditorMode: imageTools.commands.lifecycle.enter,
-    focusImageEditorAndShowChrome: imageTools.commands.editor.focusAndShowChrome,
+    cancelFlowOutpaintMode: outpaint.cancelOutpaintMode,
+    cancelFlowInpaintMode: imageTools.commands.lifecycle.cancel,
+    enterFlowOutpaintMode: outpaint.enterOutpaintMode,
+    enterFlowRetouchMode: imageTools.commands.lifecycle.enter,
+    focusRetouchAndShowChrome: imageTools.commands.editor.focusAndShowChrome,
     runImageDirectAction: execution.runImageDirectAction,
     runFusionPromptGeneration: execution.runFusionPromptGeneration,
     onFlowNodeParamUpdate: markImageWorkflowNodeDirty,
@@ -243,27 +243,27 @@ export function useCanvasImageWorkflow(
     getActionStrength: strengthControl.getActionStrength,
   })
   const promptGeneration = createPromptGenerationIntent({
-    cancelFlowExpandMode: canvasExtend.cancelExpandMode,
-    cancelFlowMaskEditorMode: imageTools.commands.lifecycle.cancel,
+    cancelFlowOutpaintMode: outpaint.cancelOutpaintMode,
+    cancelFlowInpaintMode: imageTools.commands.lifecycle.cancel,
     getMediaInputImages: graph.getMediaInputImages,
     runPromptGeneration: execution.runPromptGeneration,
   })
-  const canvasExtendInteractions = useFlowExpandInteractionHandlers({
-    flowExpandNodeId: canvasExtend.expandNodeId,
+  const outpaintInteractions = useFlowOutpaintInteractionHandlers({
+    flowOutpaintNodeId: outpaint.outpaintNodeId,
     clearActiveNodePanel: ui.panels.clear,
     hideStrengthControl: strengthControl.hideStrengthControl,
-    commitFlowExpandMode: canvasExtend.commitExpandMode,
-    beginFlowExpandHandleResize: canvasExtend.beginHandleResize,
-    beginFlowExpandFrameDrag: canvasExtend.beginFrameDrag,
+    commitFlowOutpaintMode: outpaint.commitOutpaintMode,
+    beginFlowOutpaintHandleResize: outpaint.beginHandleResize,
+    beginFlowOutpaintFrameDrag: outpaint.beginFrameDrag,
   })
 
   return {
     viewModel: {
       tools: imageTools.viewModel,
-      canvasExtend: {
-        nodeId: canvasExtend.expandNodeId,
-        overlayStyle: canvasExtend.expandOverlayStyle,
-        handleRadius: canvasExtend.handleRadius,
+      outpaint: {
+        nodeId: outpaint.outpaintNodeId,
+        overlayStyle: outpaint.outpaintOverlayStyle,
+        handleRadius: outpaint.handleRadius,
       },
     },
     commands: {
@@ -272,11 +272,11 @@ export function useCanvasImageWorkflow(
       interactions: {
         ...imageActions,
         ...promptGeneration,
-        ...canvasExtendInteractions,
-        onFlowExpandHandlePointerMove: canvasExtend.onHandlePointerMove,
-        onFlowExpandHandlePointerUp: canvasExtend.onHandlePointerUp,
+        ...outpaintInteractions,
+        onFlowOutpaintHandlePointerMove: outpaint.onHandlePointerMove,
+        onFlowOutpaintHandlePointerUp: outpaint.onHandlePointerUp,
       },
-      cancelCanvasExtend: canvasExtend.cancelExpandMode,
+      cancelOutpaint: outpaint.cancelOutpaintMode,
       hideStrengthControl: strengthControl.hideStrengthControl,
     },
     hydratePendingImageLeases: execution.hydratePendingImageLeases,

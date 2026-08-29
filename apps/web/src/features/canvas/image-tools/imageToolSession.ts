@@ -5,13 +5,13 @@ import type { ImageNodeItem } from '../../canvas-board/domain'
 import type { CanvasInteractionKey } from '../workspace-ui/useFlowCanvasInteractionState'
 import type { CanvasVueFlowConnectionAdapter } from '../vue-flow-adapter'
 import type { CanvasNodeItem } from '../../canvas-board/domain'
-import { useImageEditorMode } from '../image-editor/useImageEditorMode'
-import { useImageEditorSession } from '../image-editor/useImageEditorSession'
-import { useImageEditorCoordinateAdapter } from '../image-editor'
-import { cancelImageAdjustmentFinalRender } from '../image-editor/services/imageAdjustmentRenderer'
-import type { ImageEditorMode } from '../image-editor/types'
-import { useImageMaskEditorOverlay } from '../mask-editor/useImageMaskEditorOverlay'
-import { useMaskEditorChromeState } from '../mask-editor/useMaskEditorChromeState'
+import { useRetouchMode } from '../retouch/useRetouchMode'
+import { useRetouchSession } from '../retouch/useRetouchSession'
+import { useRetouchCoordinateAdapter } from '../retouch'
+import { cancelImageAdjustmentFinalRender } from '../retouch/services/imageAdjustmentRenderer'
+import type { RetouchMode } from '../retouch/types'
+import { useImageInpaintOverlay } from '../inpaint/useImageInpaintOverlay'
+import { useInpaintChromeState } from '../inpaint/useInpaintChromeState'
 import type { ImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import { createImageToolMaskOverlayState } from './maskOverlayAdapter'
@@ -106,24 +106,24 @@ export type ImageToolSessionCapabilities = {
 export type ImageToolSession = Omit<ReturnType<typeof createImageToolSession>, 'options'>
 
 export function createImageToolSession(options: UseCanvasImageToolsOptions) {
-  const imageEditor = useImageEditorMode({
+  const retouch = useRetouchMode({
     nodes: options.nodes,
     activeTool: options.activeTool,
     getImageNodeDisplayPayload: options.getImageNodeDisplayPayload,
     onBeforePointerCancel: options.clearSelectedFlowElements,
-    onBeforeExit: (state) => confirmImageEditorExit(state),
+    onBeforeExit: (state) => confirmRetouchExit(state),
   })
   const {
-    imageEditorMode,
-    imageEditorNodeId,
-    enterImageEditorMode: enterImageEditorModeBase,
-    exitImageEditorMode,
-  } = imageEditor
+    retouchMode,
+    retouchNodeId,
+    enterRetouchMode: enterRetouchModeBase,
+    exitRetouchMode,
+  } = retouch
 
-  const coordinates = useImageEditorCoordinateAdapter({
+  const coordinates = useRetouchCoordinateAdapter({
     nodes: options.nodes,
     canvasWrapRef: options.canvasWrapRef,
-    imageEditorState: imageEditor.imageEditorState,
+    retouchState: retouch.retouchState,
     getImageNodeDisplayPayload: options.getImageNodeDisplayPayload,
     getImageStageElement: options.getImageStageElement,
     screenToFlowCoordinate: options.screenToFlowCoordinate,
@@ -132,26 +132,26 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
     setCenter: options.setCenter,
   })
 
-  const maskEditor = useImageMaskEditorOverlay({
-    inpaintEditorState: createImageToolMaskOverlayState(imageEditor.imageEditorState),
-    imageRect: coordinates.imageEditorImageRect,
+  const inpaint = useImageInpaintOverlay({
+    inpaintEditorState: createImageToolMaskOverlayState(retouch.retouchState),
+    imageRect: coordinates.retouchImageRect,
     startCanvasInteraction: options.startCanvasInteraction,
     stopCanvasInteraction: options.stopCanvasInteraction,
   })
 
-  const imageEditorSession = useImageEditorSession()
-  const isApplyingImageEditorAdjustments = ref(false)
+  const retouchSession = useRetouchSession()
+  const isApplyingRetouchAdjustments = ref(false)
   const activeImageAdjustmentFinalScopeId = ref<string | null>(null)
   const activeImageAdjustmentPendingNodeId = ref<string | null>(null)
   let imageAdjustmentFinalApplyCleanup: (() => void) | null = null
-  const isImageAdjustmentMode = computed(() => imageEditorMode.value === 'adjust')
+  const isImageAdjustmentMode = computed(() => retouchMode.value === 'adjust')
 
-  const maskChromeState = useMaskEditorChromeState({
-    imageEditorNodeId,
+  const maskChromeState = useInpaintChromeState({
+    retouchNodeId,
   })
 
   function cancelImageAdjustmentFinalTask(
-    nodeId: string | null = imageEditorNodeId.value ?? activeImageAdjustmentFinalScopeId.value,
+    nodeId: string | null = retouchNodeId.value ?? activeImageAdjustmentFinalScopeId.value,
   ) {
     if (!nodeId) return
     cancelImageAdjustmentFinalRender(nodeId)
@@ -160,7 +160,7 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
       imageAdjustmentFinalApplyCleanup = null
       activeImageAdjustmentFinalScopeId.value = null
       activeImageAdjustmentPendingNodeId.value = null
-      isApplyingImageEditorAdjustments.value = false
+      isApplyingRetouchAdjustments.value = false
     }
   }
 
@@ -169,36 +169,36 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
     imageAdjustmentFinalApplyCleanup = cleanup
   }
 
-  function confirmImageEditorExit(state: { nodeId: string; mode: ImageEditorMode }) {
+  function confirmRetouchExit(state: { nodeId: string; mode: RetouchMode }) {
     cancelImageAdjustmentFinalTask(state.nodeId)
     return true
   }
 
-  function enter(nodeId: string, mode: ImageEditorMode): boolean {
-    const entered = enterImageEditorModeBase(nodeId, mode)
+  function enter(nodeId: string, mode: RetouchMode): boolean {
+    const entered = enterRetouchModeBase(nodeId, mode)
     if (!entered) return false
-    if (!coordinates.imageEditorImageRect.value) {
-      exitImageEditorMode({ runBeforeExit: false })
+    if (!coordinates.retouchImageRect.value) {
+      exitRetouchMode({ runBeforeExit: false })
       return false
     }
-    if (mode === 'adjust') imageEditorSession.resetImageEditorSession()
+    if (mode === 'adjust') retouchSession.resetRetouchSession()
     return true
   }
 
   function cancel() {
-    exitImageEditorMode()
+    exitRetouchMode()
   }
 
   function commitMask() {
-    const didCommit = maskEditor.commitMaskDraft()
+    const didCommit = inpaint.commitMaskDraft()
     if (!didCommit) return false
     cancelImageAdjustmentFinalTask()
-    exitImageEditorMode({ runBeforeExit: false })
+    exitRetouchMode({ runBeforeExit: false })
     return true
   }
 
   function discardNodeEdits(nodeId: string) {
-    maskEditor.clearCommittedMaskData(nodeId)
+    inpaint.clearCommittedMaskData(nodeId)
   }
 
   return {
@@ -229,20 +229,20 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
         succeeded: options.feedback.succeeded,
       },
     } satisfies ImageToolSessionCapabilities,
-    imageEditorMode,
-    imageEditorNodeId,
-    imageEditorSession,
+    retouchMode,
+    retouchNodeId,
+    retouchSession,
     isImageAdjustmentMode,
-    isApplyingImageEditorAdjustments,
+    isApplyingRetouchAdjustments,
     activeImageAdjustmentPendingNodeId,
     activeImageAdjustmentFinalScopeId,
-    maskEditor,
+    inpaint,
     maskChromeState,
     coordinates,
     enter,
     cancel,
     commitMask,
-    exitImageEditorMode,
+    exitRetouchMode,
     cancelImageAdjustmentFinalTask,
     registerImageAdjustmentFinalApplyCleanup,
     discardNodeEdits,

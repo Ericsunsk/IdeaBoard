@@ -182,7 +182,7 @@ export default {
     fallbackNodeLabel: '节点',
     connectHandleAria: '拖动以在 {kind} {direction} 锚点创建连线',
   },
-  imageEditor: {
+  retouch: {
     selectEditingLayer: '选择编辑图层',
     layersListLabel: '图层',
     hideLayer: '隐藏图层',
@@ -268,7 +268,7 @@ export default {
       processingFailed: '图像处理失败。',
     },
   },
-  maskEditor: {
+  inpaint: {
     brushTool: '画笔',
     eraserTool: '橡皮擦',
     brushSizeLabel: '画笔大小',

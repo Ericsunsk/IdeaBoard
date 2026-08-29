@@ -183,7 +183,7 @@ export default {
     fallbackNodeLabel: '노드',
     connectHandleAria: '{kind} {direction} 핸들에서 드래그하여 연결 만들기',
   },
-  imageEditor: {
+  retouch: {
     selectEditingLayer: '편집 레이어 선택',
     layersListLabel: '레이어',
     hideLayer: '레이어 숨기기',
@@ -269,7 +269,7 @@ export default {
       processingFailed: '이미지 처리에 실패했습니다.',
     },
   },
-  maskEditor: {
+  inpaint: {
     brushTool: '브러시',
     eraserTool: '지우개',
     brushSizeLabel: '브러시 크기',

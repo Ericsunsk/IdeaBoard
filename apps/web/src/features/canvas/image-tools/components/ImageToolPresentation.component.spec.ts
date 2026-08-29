@@ -10,7 +10,7 @@ import type {
 import ImageToolPresentation from './ImageToolPresentation.vue'
 
 const MaskChromeStub = defineComponent({
-  name: 'ImageMaskEditorChrome',
+  name: 'ImageInpaintChrome',
   props: {
     brushSize: { type: Number, required: true },
     maskLayerOpacity: { type: Number, required: true },
@@ -29,7 +29,7 @@ const MaskChromeStub = defineComponent({
 })
 
 const EditorChromeStub = defineComponent({
-  name: 'ImageEditorChrome',
+  name: 'RetouchChrome',
   props: { selectedLayerId: { type: String, required: true } },
   emits: ['select-adjustment'],
   template: `
@@ -99,7 +99,7 @@ function renderPresentation(model: ImageToolChromeModel, commands = createChrome
         } satisfies ImageToolPresentationBinding,
       },
       global: {
-        stubs: { ImageMaskEditorChrome: MaskChromeStub, ImageEditorChrome: EditorChromeStub },
+        stubs: { ImageInpaintChrome: MaskChromeStub, RetouchChrome: EditorChromeStub },
       },
     }),
     commands,

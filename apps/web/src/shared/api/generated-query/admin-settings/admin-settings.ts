@@ -112,10 +112,18 @@ export const updateAdminRegistrationSetting = async (
   updateAdminRegistrationSettingBody: UpdateAdminRegistrationSettingBody,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseRegistrationSetting> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseRegistrationSetting>(getUpdateAdminRegistrationSettingUrl(), {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateAdminRegistrationSettingBody),
   })
 }
@@ -266,10 +274,18 @@ export const updateAdminBrandingSetting = async (
   brandingSetting: BrandingSetting,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseBrandingSetting> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseBrandingSetting>(getUpdateAdminBrandingSettingUrl(), {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(brandingSetting),
   })
 }
@@ -413,10 +429,18 @@ export const updateAdminMediaUploadSetting = async (
   mediaUploadSetting: MediaUploadSetting,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseMediaUploadSetting> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseMediaUploadSetting>(getUpdateAdminMediaUploadSettingUrl(), {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(mediaUploadSetting),
   })
 }
@@ -560,10 +584,18 @@ export const updateAdminRateLimitSettings = async (
   rateLimitSetting: RateLimitSetting,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseRateLimitSetting> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseRateLimitSetting>(getUpdateAdminRateLimitSettingsUrl(), {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(rateLimitSetting),
   })
 }
@@ -706,10 +738,18 @@ export const updateAdminOutboundPolicy = async (
   outboundPolicyUpdateRequest: OutboundPolicyUpdateRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseOutboundPolicySetting> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseOutboundPolicySetting>(getUpdateAdminOutboundPolicyUrl(), {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(outboundPolicyUpdateRequest),
   })
 }

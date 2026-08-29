@@ -27,9 +27,9 @@ const nodeMotionSources = [
 const editorMotionSources = [
   'components/styles/canvas-range-input.css',
   'components/styles/editing-controls.css',
-  'image-editor/components/ImageEditorLayerActions.vue',
-  'image-editor/components/ImageEditorLayersPanel.vue',
-  'mask-editor/components/ImageMaskEditorOverlay.vue',
+  'retouch/components/RetouchLayerActions.vue',
+  'retouch/components/RetouchLayersPanel.vue',
+  'inpaint/components/ImageInpaintOverlay.vue',
 ].map(readSource)
 
 describe('Canvas Node and editor Motion contract', () => {
@@ -56,7 +56,7 @@ describe('Canvas Node and editor Motion contract', () => {
   })
 
   it('keeps precision cursors free from transform animation', () => {
-    const maskOverlay = readSource('mask-editor/components/ImageMaskEditorOverlay.vue')
+    const maskOverlay = readSource('inpaint/components/ImageInpaintOverlay.vue')
 
     expect(maskOverlay).not.toMatch(/transition:\s*transform/)
   })

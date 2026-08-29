@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ImageNodeAction } from '../config/imageActionRegistry'
-import type { CanvasExtendDragAnchor } from '../image-workflow/useImageCanvasExtendOverlay'
+import type { OutpaintDragAnchor } from '../image-workflow/useImageOutpaintOverlay'
 import type { CanvasNodePresentationIntent } from '../node-presentation'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 import { createCanvasNodePresentationIntentRouter } from './createCanvasNodePresentationIntentRouter'
@@ -29,7 +29,7 @@ function createCommandSurface() {
       generateFromPrompt: vi.fn(),
       runAction: vi.fn(),
     },
-    canvasExtend: {
+    outpaint: {
       submit: vi.fn(),
       beginHandle: vi.fn(),
       moveHandle: vi.fn(),
@@ -51,7 +51,7 @@ describe('Canvas Node presentation intent routing seam', () => {
     const image = { url: 'https://example.com/input.png', ratio: 1 }
     const patch = {} as FlowSnapshotParamPatch
     const action = {} as ImageNodeAction
-    const anchor = {} as CanvasExtendDragAnchor
+    const anchor = {} as OutpaintDragAnchor
     const dragEvent = new DragEvent('drop')
     const mouseEvent = new MouseEvent('contextmenu')
     const pointerEvent = new PointerEvent('pointerdown')
@@ -143,8 +143,8 @@ describe('Canvas Node presentation intent routing seam', () => {
         args: [nodeId, mouseEvent],
       },
       {
-        intent: { type: 'canvas-extend-submitted', nodeId, prompt: 'extend' },
-        command: commands.canvasExtend.submit,
+        intent: { type: 'outpaint-submitted', nodeId, prompt: 'extend' },
+        command: commands.outpaint.submit,
         args: [nodeId, 'extend'],
       },
       {
@@ -153,23 +153,23 @@ describe('Canvas Node presentation intent routing seam', () => {
         args: [nodeId, action, '', 1, undefined],
       },
       {
-        intent: { type: 'canvas-extend-handle-pointerdown', nodeId, anchor, event: pointerEvent },
-        command: commands.canvasExtend.beginHandle,
+        intent: { type: 'outpaint-handle-pointerdown', nodeId, anchor, event: pointerEvent },
+        command: commands.outpaint.beginHandle,
         args: [nodeId, anchor, pointerEvent],
       },
       {
-        intent: { type: 'canvas-extend-handle-pointermove', nodeId, event: pointerEvent },
-        command: commands.canvasExtend.moveHandle,
+        intent: { type: 'outpaint-handle-pointermove', nodeId, event: pointerEvent },
+        command: commands.outpaint.moveHandle,
         args: [pointerEvent],
       },
       {
-        intent: { type: 'canvas-extend-handle-pointerup', nodeId, event: pointerEvent },
-        command: commands.canvasExtend.endHandle,
+        intent: { type: 'outpaint-handle-pointerup', nodeId, event: pointerEvent },
+        command: commands.outpaint.endHandle,
         args: [pointerEvent],
       },
       {
-        intent: { type: 'canvas-extend-frame-pointerdown', nodeId, event: pointerEvent },
-        command: commands.canvasExtend.beginFrame,
+        intent: { type: 'outpaint-frame-pointerdown', nodeId, event: pointerEvent },
+        command: commands.outpaint.beginFrame,
         args: [nodeId, pointerEvent],
       },
       {

@@ -43,7 +43,7 @@ describe('useCanvasImagePreviewQuality', () => {
     ).toBe(CANVAS_IMAGE_PREVIEW_MAX_SIDE.full)
   })
 
-  it('forces full quality while image editing or expand tools are active', () => {
+  it('forces full quality while retouch or outpaint tools are active', () => {
     expect(
       resolveCanvasImagePreviewMaxSide({
         stageWidth: 280,

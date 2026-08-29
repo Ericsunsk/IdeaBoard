@@ -1,15 +1,15 @@
 import type { ComponentPublicInstance, ComputedRef, Ref } from 'vue'
 import type {
   ImageAdjustmentKind,
-  ImageEditorAdjustmentLayer,
-  ImageEditorAdjustmentWholeParams,
-  ImageEditorLayer,
-  ImageEditorMode,
-  ImageEditorParamKey,
-  ImageEditorParamValue,
-  ImageEditorRenderedPreview,
-} from '../image-editor/types'
-import type { ImageMaskDrawMode } from '../mask-editor/types'
+  RetouchAdjustmentLayer,
+  RetouchAdjustmentWholeParams,
+  RetouchLayer,
+  RetouchMode,
+  RetouchParamKey,
+  RetouchParamValue,
+  RetouchRenderedPreview,
+} from '../retouch/types'
+import type { ImageMaskDrawMode } from '../inpaint/types'
 import type { ImageStrengthAction } from '../execution'
 import type { ImageToolSession } from './imageToolSession'
 
@@ -23,8 +23,8 @@ export type ImageToolAnchorRect = {
 export type ImageToolStageBinding = {
   nodeId: string
   active: boolean
-  mode: ImageEditorMode | null
-  renderedPreview: ImageEditorRenderedPreview | null
+  mode: RetouchMode | null
+  renderedPreview: RetouchRenderedPreview | null
   session: ImageToolSession
 }
 
@@ -58,7 +58,7 @@ export type ImageActionBinding = {
 
 export type ImageToolChromeModel = {
   nodeId: string | null
-  mode: ImageEditorMode | null
+  mode: RetouchMode | null
   anchorRect: ImageToolAnchorRect | null
   isReady: boolean
   mask: {
@@ -70,9 +70,9 @@ export type ImageToolChromeModel = {
     canRedo: boolean
   }
   editor: {
-    layers: ImageEditorLayer[]
+    layers: RetouchLayer[]
     selectedLayerId: string
-    selectedAdjustmentLayer: ImageEditorAdjustmentLayer | null
+    selectedAdjustmentLayer: RetouchAdjustmentLayer | null
     histogramSource: ImageData | null
     applyingAdjustments: boolean
   }
@@ -93,8 +93,8 @@ export type ImageToolChromeCommands = {
   copyEditorLayer: () => void
   mergeEditorLayer: () => void
   removeEditorLayer: (layerId: string) => void
-  updateEditorParam: (key: ImageEditorParamKey, value: ImageEditorParamValue) => void
-  updateEditorAdjustmentParams: (params: ImageEditorAdjustmentWholeParams) => void
+  updateEditorParam: (key: RetouchParamKey, value: RetouchParamValue) => void
+  updateEditorAdjustmentParams: (params: RetouchAdjustmentWholeParams) => void
   applyAdjustments: () => Promise<void>
 }
 
@@ -103,7 +103,7 @@ export type CanvasImageTools = {
     active: {
       nodeId: ComputedRef<string | null>
       maskNodeId: ComputedRef<string | null>
-      mode: ComputedRef<ImageEditorMode | null>
+      mode: ComputedRef<RetouchMode | null>
     }
     locks: {
       isChromeHidden: ComputedRef<boolean>
@@ -120,7 +120,7 @@ export type CanvasImageTools = {
   }
   commands: {
     lifecycle: {
-      enter: (nodeId: string, mode: ImageEditorMode) => boolean
+      enter: (nodeId: string, mode: RetouchMode) => boolean
       cancel: () => void
       commit: () => boolean
       discardNodeEdits: (nodeId: string) => void

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { useFlowCanvasInteractionState } from './useFlowCanvasInteractionState'
 
 describe('useFlowCanvasInteractionState', () => {
-  it('keeps viewport, node drag, and canvas extend interactions render-only', () => {
+  it('keeps viewport, node drag, and outpaint interactions render-only', () => {
     const state = useFlowCanvasInteractionState()
 
     state.startCanvasInteraction('flow-viewport')
@@ -21,11 +21,11 @@ describe('useFlowCanvasInteractionState', () => {
     expect(state.isViewportPanInteractionActive.value).toBe(true)
     expect(state.isCanvasInteractionLocked.value).toBe(false)
 
-    state.startCanvasInteraction('canvas-extend-overlay')
+    state.startCanvasInteraction('outpaint-overlay')
     expect(state.isCanvasInteractionActive.value).toBe(true)
     expect(state.isCanvasInteractionLocked.value).toBe(false)
 
-    state.stopCanvasInteraction('canvas-extend-overlay')
+    state.stopCanvasInteraction('outpaint-overlay')
     state.stopCanvasInteraction('viewport-pan')
     state.stopCanvasInteraction('node-drag')
 
@@ -37,12 +37,12 @@ describe('useFlowCanvasInteractionState', () => {
     const state = useFlowCanvasInteractionState()
 
     state.startCanvasInteraction('flow-viewport')
-    state.startCanvasInteraction('image-editor-raster')
+    state.startCanvasInteraction('retouch-raster')
 
     expect(state.isCanvasInteractionActive.value).toBe(true)
     expect(state.isCanvasInteractionLocked.value).toBe(true)
 
-    state.stopCanvasInteraction('image-editor-raster')
+    state.stopCanvasInteraction('retouch-raster')
 
     expect(state.isCanvasInteractionActive.value).toBe(true)
     expect(state.isCanvasInteractionLocked.value).toBe(false)
@@ -51,16 +51,16 @@ describe('useFlowCanvasInteractionState', () => {
   it('stays locked while any pixel-editing interaction remains active', () => {
     const state = useFlowCanvasInteractionState()
 
-    state.startCanvasInteraction('image-editor-raster')
-    state.startCanvasInteraction('image-mask-editor')
+    state.startCanvasInteraction('retouch-raster')
+    state.startCanvasInteraction('inpaint')
 
     expect(state.isCanvasInteractionLocked.value).toBe(true)
 
-    state.stopCanvasInteraction('image-editor-raster')
+    state.stopCanvasInteraction('retouch-raster')
 
     expect(state.isCanvasInteractionLocked.value).toBe(true)
 
-    state.stopCanvasInteraction('image-mask-editor')
+    state.stopCanvasInteraction('inpaint')
 
     expect(state.isCanvasInteractionLocked.value).toBe(false)
   })

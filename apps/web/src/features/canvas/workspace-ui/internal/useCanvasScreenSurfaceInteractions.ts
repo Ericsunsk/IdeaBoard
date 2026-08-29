@@ -29,16 +29,16 @@ export function useCanvasScreenSurfaceInteractions(options: {
     viewModel: viewModel.imageWorkflow.tools,
     commands: commands.imageWorkflow.tools,
   }
-  const { hideStrengthControl, cancelCanvasExtend } = commands.imageWorkflow
-  const { nodeId: flowExpandNodeId } = viewModel.imageWorkflow.canvasExtend
+  const { hideStrengthControl, cancelOutpaint } = commands.imageWorkflow
+  const { nodeId: flowOutpaintNodeId } = viewModel.imageWorkflow.outpaint
   const {
     viewModel: {
-      active: { nodeId: flowImageEditorNodeId, maskNodeId: flowMaskEditorNodeId },
+      active: { nodeId: flowRetouchNodeId, maskNodeId: flowInpaintNodeId },
       locks: { isCanvasLocked: isFlowCanvasLocked },
     },
     commands: {
       lifecycle: { discardNodeEdits: discardFlowImageToolNodeEdits },
-      editor: { scheduleChromeAnchorUpdate: scheduleImageEditorChromeAnchorUpdate },
+      editor: { scheduleChromeAnchorUpdate: scheduleRetouchChromeAnchorUpdate },
     },
   } = imageTools
 
@@ -48,7 +48,7 @@ export function useCanvasScreenSurfaceInteractions(options: {
       options.activePanels.activeNodePanel.value !== null,
   )
   const { dismissTransientCanvasUi } = useFlowTransientUiDismissal({
-    cancelFlowExpandMode: cancelCanvasExtend,
+    cancelFlowOutpaintMode: cancelOutpaint,
     closeBoardHeaderEditing: commands.boardSession.closeBoardHeaderEditing,
     closeNodeContextMenu: contextMenu.close,
     clearActiveNodePanel: options.activePanels.clearActiveNodePanel,
@@ -60,8 +60,8 @@ export function useCanvasScreenSurfaceInteractions(options: {
     ignore: [
       '.node-tool-surface',
       '.canvas-node-context-menu',
-      '[data-image-mask-editor]',
-      '[data-image-editor]',
+      '[data-inpaint]',
+      '[data-retouch]',
     ],
     ownerDocument: () =>
       options.canvasWrapRef.value?.ownerDocument ??
@@ -85,9 +85,9 @@ export function useCanvasScreenSurfaceInteractions(options: {
     () =>
       options.activeTool.value === 'select' &&
       !isFlowCanvasLocked.value &&
-      !flowImageEditorNodeId.value &&
-      !flowMaskEditorNodeId.value &&
-      !flowExpandNodeId.value,
+      !flowRetouchNodeId.value &&
+      !flowInpaintNodeId.value &&
+      !flowOutpaintNodeId.value,
   )
 
   function onFlowNodeClick(payload: NodeMouseEvent) {
@@ -101,7 +101,7 @@ export function useCanvasScreenSurfaceInteractions(options: {
     if (!isCanvasGroupInteractionEnabled.value) return false
     const didDelete = commands.graphEditing.grouping.deleteSelectedGroup()
     if (didDelete) {
-      dismissTransientCanvasUi({ closeExpand: true, closeContextMenu: true })
+      dismissTransientCanvasUi({ closeOutpaint: true, closeContextMenu: true })
     }
     return didDelete
   }
@@ -168,7 +168,7 @@ export function useCanvasScreenSurfaceInteractions(options: {
   function onFlowMove(payload: Parameters<typeof commands.viewportControls.onFlowMove>[0]) {
     commands.viewportControls.onFlowMove(payload)
     if (!payload.flowTransform || !imageTools.viewModel.chrome.value.isReady) return
-    scheduleImageEditorChromeAnchorUpdate()
+    scheduleRetouchChromeAnchorUpdate()
   }
 
   function toggleCanvasMinimapBase() {
@@ -183,7 +183,7 @@ export function useCanvasScreenSurfaceInteractions(options: {
     dismissTransientCanvasUi,
     clearFlowSelection: selection.commands.clearSelection,
     onCanvasDropDragOver: commands.graphEditing.onCanvasDragOver,
-    isFlowExpandActive: () => !!flowExpandNodeId.value,
+    isFlowOutpaintActive: () => !!flowOutpaintNodeId.value,
     isBoardHeaderEditingActive: () =>
       viewModel.boardChrome.isBoardMenuOpen.value || viewModel.boardChrome.isRenamingBoard.value,
   })
@@ -203,14 +203,14 @@ export function useCanvasScreenSurfaceInteractions(options: {
 
   function onNodesChange(changes: NodeChange[]) {
     if (changes.some((change) => change.type === 'remove')) {
-      dismissTransientCanvasUi({ closeExpand: true, closeContextMenu: true })
+      dismissTransientCanvasUi({ closeOutpaint: true, closeContextMenu: true })
     }
     commands.flowPane.onNodesChange(changes)
   }
 
   function handleNodeContextMenuCreate(kind: CanvasCreatableNodeKind) {
     contextMenu.createNode(kind, commands.graphEditing.createNodeAtPosition)
-    dismissTransientCanvasUi({ closeExpand: true })
+    dismissTransientCanvasUi({ closeOutpaint: true })
   }
 
   return {

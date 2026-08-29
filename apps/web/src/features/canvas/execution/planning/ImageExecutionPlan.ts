@@ -14,9 +14,9 @@ import { i18n } from '../../../../shared/i18n'
 import { EXECUTION_FUSION_META } from '../contracts/executionContract'
 import type { ImageTaskAction } from '../contracts/imageActionExecution'
 import {
-  resolveCanvasExtendIntent,
-  type CanvasExtendRect,
-} from '../../utils/canvasExtendGeometry'
+  resolveOutpaintIntent,
+  type OutpaintRect,
+} from '../../utils/outpaintGeometry'
 import {
   resolveImageNodeLayoutAnchor,
   type ImageNodeLayoutAnchor,
@@ -50,21 +50,21 @@ export type ImageActionExecutionPlan = {
   resultOptions: ImageExecutionResultOptions
 }
 
-export type CanvasExtendExecutionPlan = {
-  kind: 'canvas-extend'
+export type OutpaintExecutionPlan = {
+  kind: 'outpaint'
   sourceNodeId: string
   source: ImageExecutionInput
   prompt: string
   outputCount: number
-  frameRect: CanvasExtendRect
-  originalImageRect: CanvasExtendRect
+  frameRect: OutpaintRect
+  originalImageRect: OutpaintRect
   targetRatio: number
   targetWidth: number
   resultOptions: ImageExecutionResultOptions
 }
 
 export type ImageInpaintExecutionPlan = {
-  kind: 'image-inpaint'
+  kind: 'inpaint'
   sourceNodeId: string
   source: ImageExecutionInput
   prompt: string
@@ -113,7 +113,7 @@ export type PreparedFusionExecutionPlan = FusionExecutionPlan & {
 
 export type ImageExecutionPlan =
   | ImageActionExecutionPlan
-  | CanvasExtendExecutionPlan
+  | OutpaintExecutionPlan
   | ImageInpaintExecutionPlan
   | PromptGenerationExecutionPlan
   | FusionExecutionPlan
@@ -248,10 +248,10 @@ function readNodeWidth(node: FlowGraphNode | undefined, fallbackWidth: number): 
   return Number.isFinite(width) && width > 0 ? width : fallbackWidth
 }
 
-function resolveCanvasExtendResultWidth(
+function resolveOutpaintResultWidth(
   sourceWidthValue: unknown,
-  frameRect: CanvasExtendRect,
-  originalImageRect: CanvasExtendRect,
+  frameRect: OutpaintRect,
+  originalImageRect: OutpaintRect,
   fallbackRatio: number,
 ): number {
   const sourceWidth = Number(sourceWidthValue)
@@ -327,27 +327,27 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     }
   }
 
-  function planCanvasExtendAction(
+  function planOutpaintAction(
     nodeId: string,
     intent: {
-      frameRect: CanvasExtendRect
-      originalImageRect: CanvasExtendRect
+      frameRect: OutpaintRect
+      originalImageRect: OutpaintRect
       prompt?: string
     },
-  ): CanvasExtendExecutionPlan {
+  ): OutpaintExecutionPlan {
     const graph = readGraph()
     const source = requireImageExecutionImage(graph, nodeId)
-    const resolvedIntent = resolveCanvasExtendIntent(intent.frameRect, intent.originalImageRect)
+    const resolvedIntent = resolveOutpaintIntent(intent.frameRect, intent.originalImageRect)
     if (!resolvedIntent.hasExtension) failPlanning(i18n.global.t('canvas.execution.dragOutpaintFrameFirst'))
     const { targetRatio } = resolvedIntent
-    const targetWidth = resolveCanvasExtendResultWidth(
+    const targetWidth = resolveOutpaintResultWidth(
       source.resultAnchor.width,
       resolvedIntent.frameRect,
       resolvedIntent.originalImageRect,
       targetRatio,
     )
     return {
-      kind: 'canvas-extend',
+      kind: 'outpaint',
       sourceNodeId: nodeId,
       source: source.input,
       prompt: `${intent.prompt ?? ''}`.trim(),
@@ -378,7 +378,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     const rawMaskDataUrl = `${inpaint.maskDataUrl ?? ''}`.trim()
     if (!rawMaskDataUrl) failPlanning(i18n.global.t('canvas.execution.markInpaintAreaFirst'))
     return {
-      kind: 'image-inpaint',
+      kind: 'inpaint',
       sourceNodeId: nodeId,
       source: source.input,
       prompt,
@@ -490,7 +490,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
   }
 
   return {
-    planCanvasExtendAction,
+    planOutpaintAction,
     planFusionPromptGeneration,
     planImageDirectAction,
     planImageInpaintAction,

@@ -25,11 +25,11 @@ const imageToolStagePresentation = readSource(
 const vueFlowAdapterSkin = readSource('components/styles/canvas-vue-flow-adapter-skin.css')
 const canvasMiniMap = readSource('components/CanvasMiniMap.vue')
 const nodeHandleRail = readSource('components/FlowCanvasNodeHandleRail.vue')
-const imageEditorLayerActions = readSource('image-editor/components/ImageEditorLayerActions.vue')
-const imageEditorHistogram = readSource(
-  'image-editor/components/styles/image-editor-histogram-plot.css',
+const retouchLayerActions = readSource('retouch/components/RetouchLayerActions.vue')
+const retouchHistogram = readSource(
+  'retouch/components/styles/retouch-histogram-plot.css',
 )
-const maskEditorChrome = readSource('mask-editor/components/ImageMaskEditorChrome.vue')
+const inpaintChrome = readSource('inpaint/components/ImageInpaintChrome.vue')
 
 describe('Canvas surface skin contract', () => {
   it('mounts one feature-local surface owner instead of declaring the stable token table in Canvas Screen', () => {
@@ -62,9 +62,9 @@ describe('Canvas surface skin contract', () => {
       nodeStageFrame,
       vueFlowAdapterSkin,
       canvasMiniMap,
-      imageEditorLayerActions,
-      imageEditorHistogram,
-      maskEditorChrome,
+      retouchLayerActions,
+      retouchHistogram,
+      inpaintChrome,
     ]
 
     consumers.forEach((consumer) => {
@@ -98,7 +98,7 @@ describe('Canvas surface skin contract', () => {
     expect(nodeStageFrame).toContain('.node-stage-frame::after')
     expect(nodeStageFrame).toContain('.node-stage-frame.is-active')
     expect(nodeStageFrame).toContain('--node-stage-frame-emphasis-shadow-primary')
-    expect(maskEditorChrome).toContain(':disabled="directGenerating"')
+    expect(inpaintChrome).toContain(':disabled="directGenerating"')
   })
 
   it('owns tooltips at the Canvas feature boundary without legacy node-only contracts', () => {

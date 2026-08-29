@@ -106,7 +106,7 @@ Canvas Node creation、file/drop upload、media-input mutation、image preview �
 _Avoid_: private Flow commands, Screen-owned upload sequence, selection/export/interaction state
 
 **Task**:
-Canvas Workspace 提交到后端的 image generation 或 image editing job。
+Canvas Workspace 提交到后端的 image generation 或 retouch job。
 _Avoid_: Execution plan, pending node
 
 **Execution Plan**:
@@ -128,15 +128,15 @@ _Avoid_: content fingerprint, Task ID
 provider unavailable 等外部能力不可用时的 Canvas recovery state。Generation command 可以短暂禁用并提示 retry，但 Canvas editing、selection、layout 和 local draft 保存必须继续可用。
 _Avoid_: Canvas disabled state, permanent workflow shutdown
 
-**Image Editing**:
+**Retouch**:
 image node 的非破坏性 adjustment mode，包含 adjustment layers 和 rendered previews。
 _Avoid_: Mask editing
 
-**Image Mask Editing**:
+**Inpaint**:
 image node 的 mask authoring mode，包含 brush state、mask preview 和 committed mask data。
 
 **Mask Draft**:
-Image Mask Editing 激活时的 in-progress mask state。
+Inpaint 激活时的 in-progress mask state。
 _Avoid_: Committed mask
 
 **Committed Mask**:
@@ -151,8 +151,8 @@ _Avoid_: executionMaskDataUrl
 _Avoid_: maskDataUrl
 
 **Image Tool Session**:
-一个 Canvas Workspace 内对 Image Editing、Image Mask Editing、chrome state、node bindings 和 workflow actions 的 active coordination。
-_Avoid_: Image editing domain, mask domain
+一个 Canvas Workspace 内对 Retouch、Inpaint、chrome state、node bindings 和 workflow actions 的 active coordination。
+_Avoid_: Retouch domain, mask domain
 
 ## Module Ownership
 
@@ -169,7 +169,7 @@ _Avoid_: Image editing domain, mask domain
 | `workspace-chrome`    | Canvas Workspace 的 chrome layout shell，拥有 Board header、right action/account group、left tool palette、bottom status/zoom controls、minimap anchoring、chrome geometry 和 interaction shell。                                                           | CanvasPage 传入 board/session/tool/account/status state 与 commands/actions；Canvas Chrome module 输出 chrome layout components。Provider-bound pieces such as minimap can be mounted inside the Vue Flow subtree through the module seam. 目标 public seam 应收口在 `workspace-chrome/index.ts` 或同等 feature-local barrel，暴露 chrome components/types，而不是暴露 positioning class recipe。 | top/right/bottom/left anchoring、inset、z-index、pointer-events、visibility animation、responsive placement、round-control slots、group gap、CSS class names 和 DOM grouping 是 module 内部 contract。调用方不手写这些 geometry，也不依赖 legacy chrome class variants。                                                                                                            |
 | `execution`           | Image action 的执行 contract 和 planning boundary，把 Canvas Node/input 转成 `Execution Plan` 和 task request 所需的 typed params。                                                                                                                         | `execution/index.ts` 导出的 feature/action constants、execution contract builders、size/ratio helpers、`createImageExecutionPlanner()`、plan/result types。                                                                                                                                                                                                                                    | Feature-specific params assembly、media preparation、local inpaint helpers、task-runner 和 result-node materialization 不应泄漏成页面 API。`Execution Plan` 不是 `Task`，也不代表 pending UI state。                                                                                                                                                                                |
 | `task-lifecycle`      | Canvas Task 的通用 cancellation policy owner，负责 task id normalization、bounded retry 和最终 failure reporting。                                                                                                                                          | `task-lifecycle/index.ts` 导出的 `createCanvasTaskLifecycle()` 与 `cancelTasks()` command。Delete lifecycle 只提交由 Execution Runtime exact lease 解析出的 task ids；late-submit compensation 复用同一 command。                                                                                                                                                                              | Task API adapter、retry delays、scheduler 和最终 warning 属于 module implementation。Workspace composition root 只装配 adapter，不实现 cancellation policy；删除与 stale-submit 链路不提供跳过 Task cancellation 的 fallback。                                                                                                                                                      |
-| `image-workflow`      | Canvas Workspace 中运行 image workflow 的 deep module：协调 Image Tool Session、direct action intent、execution planning、Task submission、pending/completed result materialization、feedback、prompt generation 和 canvas extend。                         | 页面只使用 `viewModel.imageWorkflow` 读取 Image Tool 与 canvas-extend state，并通过 `commands.imageWorkflow` 的 `tools`、`interactions`、`isGenerationAvailable`、`cancelCanvasExtend` 和 `hideStrengthControl` 发出 intent。Workspace composition root 只注入 graph、execution、Flow Pane、UI adapter 和 feedback dependencies；完整 Session 在 workflow 内一次性组装。                       | `imageActionIntentRouter`、`promptGenerationIntent`、`canvasExtendIntent`、strength control、`useImageWorkflowExecution`、Task submission sequencing、provider degradation、pending result snapshot、Result Materializer、poll/reattach、media upload/local inpaint fallback 和 node placement 都是 implementation。页面不直接提交 Task、调用 planner 或 materialize result nodes。 |
+| `image-workflow`      | Canvas Workspace 中运行 image workflow 的 deep module：协调 Image Tool Session、direct action intent、execution planning、Task submission、pending/completed result materialization、feedback、prompt generation 和 outpaint。                         | 页面只使用 `viewModel.imageWorkflow` 读取 Image Tool 与 outpaint state，并通过 `commands.imageWorkflow` 的 `tools`、`interactions`、`isGenerationAvailable`、`cancelOutpaint` 和 `hideStrengthControl` 发出 intent。Workspace composition root 只注入 graph、execution、Flow Pane、UI adapter 和 feedback dependencies；完整 Session 在 workflow 内一次性组装。                       | `imageActionIntentRouter`、`promptGenerationIntent`、`outpaintIntent`、strength control、`useImageWorkflowExecution`、Task submission sequencing、provider degradation、pending result snapshot、Result Materializer、poll/reattach、media upload/local inpaint fallback 和 node placement 都是 implementation。页面不直接提交 Task、调用 planner 或 materialize result nodes。 |
 
 ### Page Boundary
 
@@ -188,7 +188,7 @@ Canvas Chrome module 是 Canvas Workspace 的 chrome geometry 和 interaction sh
 - 它拥有 interaction shell：pointer-events layering、z-index、dismiss/hidden state、visibility animation、responsive placement、fixed control dimensions、round-control slots 和 group gaps。
 - 它接收 CanvasPage 或 workspace runtime 提供的 state/actions，例如 session status、tool selection、account/menu state、save/share/navigation commands、zoom/status actions。它不从 Vue Flow projection 反推业务事实，也不直接执行 graph mutation。
 - 它只拥有 minimap 的 chrome anchoring。Minimap internal drawing、math、drag behavior 和 viewport sync 仍属于对应 adapter/runtime；需要 Vue Flow provider 的 minimap DOM 可以通过 `CanvasChromeMiniMap` seam 挂在 Vue Flow subtree 内。
-- 它不拥有 graph runtime、Vue Flow adapter、image editor/mask editor runtime、image workflow execution、task submission、result-node materialization 或 board-session persistence。
+- 它不拥有 graph runtime、Vue Flow adapter、retouch/inpaint runtime、image workflow execution、task submission、result-node materialization 或 board-session persistence。
 
 ### Vue Flow Adapter Boundary
 

@@ -62,7 +62,7 @@ func TestFeatureSystemPromptDoesNotContainHiddenConstraintSnippet(t *testing.T) 
 		"user prompt",
 		"outpaint",
 		map[string]interface{}{
-			"extend": map[string]interface{}{
+			"outpaint": map[string]interface{}{
 				"target_width": 1024, "target_height": 1280,
 				"image_offset_x": 0, "image_offset_y": 256,
 			},

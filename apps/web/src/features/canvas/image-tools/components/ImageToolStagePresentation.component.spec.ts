@@ -47,7 +47,7 @@ function createCanvasOverlayStub(className: string) {
   })
 }
 
-const MaskOverlayStub = createCanvasOverlayStub('image-mask-editor-overlay')
+const MaskOverlayStub = createCanvasOverlayStub('inpaint-overlay')
 const RenderedPreviewStub = defineComponent({
   props: {
     preview: { type: Object, required: true },
@@ -61,14 +61,14 @@ function createBinding(
   mode: ImageToolStageBinding['mode'],
   nodeId = 'node-1',
   options: {
-    maskEditorNodeId?: string
+    inpaintNodeId?: string
     maskOverlayStyle?: Record<string, string>
     renderedPreview?: ImageToolStageBinding['renderedPreview']
   } = {},
 ) {
   const setMaskCanvasRef = vi.fn()
   const onCanvasPointerDown = vi.fn()
-  const maskEditorNodeId = options.maskEditorNodeId ?? nodeId
+  const inpaintNodeId = options.inpaintNodeId ?? nodeId
 
   return {
     binding: {
@@ -76,16 +76,16 @@ function createBinding(
       mode,
       renderedPreview: options.renderedPreview ?? null,
       session: {
-        maskEditor: {
-          maskEditorNodeId: ref(maskEditorNodeId),
-          maskEditorOverlayStyle: computed(
+        inpaint: {
+          inpaintNodeId: ref(inpaintNodeId),
+          inpaintOverlayStyle: computed(
             () => options.maskOverlayStyle ?? { width: '20.2px', height: '10.6px' },
           ),
           brushSize: ref(20),
           setMaskCanvasRef,
           onCanvasPointerDown,
         },
-        maskChromeState: { maskEditorLayerOpacity: ref(50) },
+        maskChromeState: { inpaintLayerOpacity: ref(50) },
       },
     } as unknown as ImageToolStageBinding,
     onCanvasPointerDown,
@@ -111,7 +111,7 @@ function renderPresentation(binding: ImageToolStageBinding) {
   const view = render(Harness, {
     global: {
       stubs: {
-        ImageMaskEditorOverlay: MaskOverlayStub,
+        ImageInpaintOverlay: MaskOverlayStub,
         RenderedImagePreviewCanvas: RenderedPreviewStub,
       },
     },
@@ -132,8 +132,8 @@ describe('ImageToolStagePresentation', () => {
     const view = renderPresentation(current.binding)
 
     expect(view.container.querySelector('[data-stage-image]')).toBeTruthy()
-    expect(view.container.querySelector('.image-editor-raster-overlay')).toBeNull()
-    expect(view.container.querySelector('.image-mask-editor-overlay')).toBeNull()
+    expect(view.container.querySelector('.retouch-raster-overlay')).toBeNull()
+    expect(view.container.querySelector('.inpaint-overlay')).toBeNull()
 
     cleanup()
 
@@ -162,7 +162,7 @@ describe('ImageToolStagePresentation', () => {
   it('renders the inpaint canvas at its derived mask dimensions and forwards its pointer event', () => {
     const current = createBinding('inpaint')
     const view = renderPresentation(current.binding)
-    const canvas = view.container.querySelector<HTMLCanvasElement>('.image-mask-editor-overlay')
+    const canvas = view.container.querySelector<HTMLCanvasElement>('.inpaint-overlay')
     const pointerDown = new Event('pointerdown', { bubbles: true }) as PointerEvent
 
     expect(canvas).toBeInstanceOf(HTMLCanvasElement)
@@ -192,7 +192,7 @@ describe('ImageToolStagePresentation', () => {
 
     await view.setBinding(adjust.binding)
 
-    expect(view.container.querySelector('.image-mask-editor-overlay')).toBeNull()
+    expect(view.container.querySelector('.inpaint-overlay')).toBeNull()
     expect(secondInpaint.setMaskCanvasRef).toHaveBeenCalledWith('node-2', null)
   })
 })

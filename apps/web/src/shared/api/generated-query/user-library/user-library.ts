@@ -108,10 +108,18 @@ export const createLibraryFolder = async (
   libraryFolderRequest: LibraryFolderRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseLibraryFolder> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseLibraryFolder>(getCreateLibraryFolderUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(libraryFolderRequest),
   })
 }
@@ -182,10 +190,18 @@ export const renameLibraryFolder = async (
   libraryFolderRequest: LibraryFolderRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseLibraryFolder> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseLibraryFolder>(getRenameLibraryFolderUrl(folderId), {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(libraryFolderRequest),
   })
 }
@@ -415,10 +431,18 @@ export const saveLibraryAsset = async (
   librarySaveAssetRequest: LibrarySaveAssetRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseLibraryAsset> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseLibraryAsset>(getSaveLibraryAssetUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(librarySaveAssetRequest),
   })
 }
@@ -486,10 +510,18 @@ export const lookupLibraryAssets = async (
   libraryLookupRequest: LibraryLookupRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseLibraryAssetList> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseLibraryAssetList>(getLookupLibraryAssetsUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(libraryLookupRequest),
   })
 }
@@ -635,10 +667,18 @@ export const moveLibraryAsset = async (
   libraryMoveAssetRequest: LibraryMoveAssetRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseLibraryAsset> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseLibraryAsset>(getMoveLibraryAssetUrl(assetId), {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(libraryMoveAssetRequest),
   })
 }

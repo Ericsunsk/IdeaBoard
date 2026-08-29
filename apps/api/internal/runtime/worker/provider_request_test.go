@@ -108,12 +108,12 @@ func TestProviderRequestShapesOnlyDeclaredRuntimeControlContract(t *testing.T) {
 		t.Fatalf("variation controls = %#v", variation)
 	}
 
-	extend := newProviderRequest(
+	outpaint := newProviderRequest(
 		"", 0, 0, params, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationOutpaint,
-		workflow.RuntimeInvocationEdit, workflow.RuntimeControlsExtend,
+		workflow.RuntimeInvocationEdit, workflow.RuntimeControlsOutpaint,
 	)
-	if extend.OpenAI.VariationStrength != nil || extend.Scale != 0 {
-		t.Fatalf("extend controls = %#v", extend)
+	if outpaint.OpenAI.VariationStrength != nil || outpaint.Scale != 0 {
+		t.Fatalf("outpaint controls = %#v", outpaint)
 	}
 
 	upscale := newProviderRequest(
@@ -136,7 +136,7 @@ func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T
 			OriginalWidth:  640,
 			OriginalHeight: 480,
 		},
-		Extend: &tasks.OutpaintParams{
+		Outpaint: &tasks.OutpaintParams{
 			TargetWidth:  768,
 			TargetHeight: 480,
 			ImageOffsetX: 0,
@@ -167,8 +167,8 @@ func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T
 	if got.Provider["original_image_width"] != float64(640) || got.Provider["original_image_height"] != float64(480) {
 		t.Fatalf("original size = %#v x %#v", got.Provider["original_image_width"], got.Provider["original_image_height"])
 	}
-	if got.Provider["extend"] == nil {
-		t.Fatalf("extend = %#v, want canonical geometry", got.Provider["extend"])
+	if got.Provider["outpaint"] == nil {
+		t.Fatalf("outpaint = %#v, want canonical geometry", got.Provider["outpaint"])
 	}
 	if _, exists := got.Provider["media"]; exists {
 		t.Fatalf("provider map should not expose canonical media object: %#v", got.Provider)
@@ -365,8 +365,8 @@ func TestParseAndNormalizeTaskParamsRejectsCanonicalControlsOutsidePlanContract(
 		"variation": func(params *tasks.WorkflowTaskParams) {
 			params.Variation = &tasks.VariationsParams{Strength: 40}
 		},
-		"extend": func(params *tasks.WorkflowTaskParams) {
-			params.Extend = &tasks.OutpaintParams{TargetWidth: 768, TargetHeight: 480}
+		"outpaint": func(params *tasks.WorkflowTaskParams) {
+			params.Outpaint = &tasks.OutpaintParams{TargetWidth: 768, TargetHeight: 480}
 		},
 		"upscale": func(params *tasks.WorkflowTaskParams) {
 			params.HD = &tasks.HDUpscaleParams{Scale: 2}

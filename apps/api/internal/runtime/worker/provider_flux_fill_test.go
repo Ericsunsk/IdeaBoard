@@ -41,7 +41,7 @@ func TestCallFluxFillOutpaintUsesPromptSeedAndGeometryContract(t *testing.T) {
 		ImageRefs:      []string{inputURL},
 		OriginalWidth:  640,
 		OriginalHeight: 480,
-		Extend: &tasks.OutpaintParams{
+		Outpaint: &tasks.OutpaintParams{
 			TargetWidth:  960,
 			TargetHeight: 720,
 			ImageOffsetX: 160,

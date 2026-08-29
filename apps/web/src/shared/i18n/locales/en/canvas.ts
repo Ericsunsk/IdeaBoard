@@ -183,7 +183,7 @@ export default {
     fallbackNodeLabel: 'Node',
     connectHandleAria: 'Drag to create a connection at the {kind} {direction} handle',
   },
-  imageEditor: {
+  retouch: {
     selectEditingLayer: 'Select an editing layer',
     layersListLabel: 'Layers',
     hideLayer: 'Hide layer',
@@ -269,7 +269,7 @@ export default {
       processingFailed: 'Image processing failed.',
     },
   },
-  maskEditor: {
+  inpaint: {
     brushTool: 'Brush',
     eraserTool: 'Eraser',
     brushSizeLabel: 'Brush size',

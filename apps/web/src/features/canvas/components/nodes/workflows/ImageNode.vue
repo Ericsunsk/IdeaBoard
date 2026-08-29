@@ -8,11 +8,11 @@
     :dragging="dragging"
     :copy-mode="copyMode"
     :class="{
-      'is-expand-mode': !!expandModeActive,
-      'is-image-editor-active': isImageEditorActive,
+      'is-outpaint-mode': !!outpaintModeActive,
+      'is-retouch-active': isRetouchActive,
     }"
     rounded-header
-    :header-hidden="!!expandModeActive || isImageEditorActive"
+    :header-hidden="!!outpaintModeActive || isRetouchActive"
     @node-mousedown="emit('node-mousedown', $event)"
     @update:title="emit('update:title', $event)"
     @delete="emit('delete')"
@@ -23,7 +23,7 @@
     <div
       class="relative flex flex-col gap-2 overflow-visible rounded-[11px] p-0"
       :class="
-        expandModeActive || isImageEditorActive ? 'bg-transparent' : 'bg-[var(--canvas-node-bg)]'
+        outpaintModeActive || isRetouchActive ? 'bg-transparent' : 'bg-[var(--canvas-node-bg)]'
       "
       @contextmenu.stop
     >
@@ -39,9 +39,9 @@
         :input-locked="inputLocked"
         :empty-icon-variant="emptyIconVariant"
         :direct-generating="actionBinding.directGenerating"
-        :expand-mode-active="expandModeActive"
-        :expand-overlay-style="expandOverlayStyle"
-        :expand-handle-radius="expandHandleRadius"
+        :outpaint-mode-active="outpaintModeActive"
+        :outpaint-overlay-style="outpaintOverlayStyle"
+        :outpaint-handle-radius="outpaintHandleRadius"
         :image-tool-stage-binding="imageToolStageBinding"
         :active="active"
         :connection-drop-target="connectionDropTarget"
@@ -53,11 +53,11 @@
         @reset="emit('reset')"
         @retry-image-import="emit('retry-image-import')"
         @contextmenu="onImageStageContextMenu"
-        @expand-submit="submitExpand"
-        @expand-handle-pointerdown="emit('expand-handle-pointerdown', $event)"
-        @expand-handle-pointermove="emit('expand-handle-pointermove', $event)"
-        @expand-handle-pointerup="emit('expand-handle-pointerup', $event)"
-        @expand-frame-pointerdown="emit('expand-frame-pointerdown', $event)"
+        @outpaint-submit="submitOutpaint"
+        @outpaint-handle-pointerdown="emit('outpaint-handle-pointerdown', $event)"
+        @outpaint-handle-pointermove="emit('outpaint-handle-pointermove', $event)"
+        @outpaint-handle-pointerup="emit('outpaint-handle-pointerup', $event)"
+        @outpaint-frame-pointerdown="emit('outpaint-frame-pointerdown', $event)"
       />
 
       <NodeFloatingControls v-if="showImageActionMenu || showPromptComposer">
@@ -96,7 +96,7 @@ import {
 } from '../../../../canvas-board/domain'
 import type { ImageNodeAction } from '../../../config/imageActionRegistry'
 import type { OutputResolution } from '../../../../../shared/domain/generationContract'
-import type { CanvasExtendDragAnchor } from '../../../image-workflow/useImageCanvasExtendOverlay'
+import type { OutpaintDragAnchor } from '../../../image-workflow/useImageOutpaintOverlay'
 import type { ImageActionBinding, ImageToolStageBinding } from '../../../image-tools'
 import type { FlowLocalUploadState } from '../../../types/flowTypes'
 import HomeCanvasImageActionMenu from '../../home/HomeCanvasImageActionMenu.vue'
@@ -121,9 +121,9 @@ const props = defineProps<{
   emptyIconVariant?: 'image' | 'fusion'
   inputLocked?: boolean
   actionBinding: ImageActionBinding
-  expandModeActive?: boolean
-  expandOverlayStyle?: Record<string, string> | null
-  expandHandleRadius?: number
+  outpaintModeActive?: boolean
+  outpaintOverlayStyle?: Record<string, string> | null
+  outpaintHandleRadius?: number
   imageToolStageBinding?: ImageToolStageBinding | null
 }>()
 
@@ -140,7 +140,7 @@ const emit = defineEmits<{
   (e: 'reset'): void
   (e: 'retry-image-import'): void
   (e: 'contextmenu', event: MouseEvent): void
-  (e: 'expand-submit', prompt: string): void
+  (e: 'outpaint-submit', prompt: string): void
   (
     e: 'action',
     action: ImageNodeAction,
@@ -149,18 +149,18 @@ const emit = defineEmits<{
     strength?: number,
   ): void
   (
-    e: 'expand-handle-pointerdown',
-    payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent },
+    e: 'outpaint-handle-pointerdown',
+    payload: { anchor: OutpaintDragAnchor; event: PointerEvent },
   ): void
-  (e: 'expand-handle-pointermove', event: PointerEvent): void
-  (e: 'expand-handle-pointerup', event: PointerEvent): void
-  (e: 'expand-frame-pointerdown', event: PointerEvent): void
+  (e: 'outpaint-handle-pointermove', event: PointerEvent): void
+  (e: 'outpaint-handle-pointerup', event: PointerEvent): void
+  (e: 'outpaint-frame-pointerdown', event: PointerEvent): void
 }>()
 
 const { t } = useI18n()
 
 const emptyIconVariant = computed(() => props.emptyIconVariant ?? 'image')
-const isImageEditorActive = computed(() => props.imageToolStageBinding?.mode != null)
+const isRetouchActive = computed(() => props.imageToolStageBinding?.mode != null)
 
 const showImageActionMenu = computed(
   () =>
@@ -168,7 +168,7 @@ const showImageActionMenu = computed(
     !props.localUpload &&
     props.actionBinding.actionMenuVisible &&
     !!props.displayImage &&
-    !isImageEditorActive.value,
+    !isRetouchActive.value,
 )
 const showPromptComposer = computed(
   () =>
@@ -176,7 +176,7 @@ const showPromptComposer = computed(
     !props.localUpload &&
     props.actionBinding.promptComposerVisible &&
     !!props.displayImage &&
-    !props.expandModeActive,
+    !props.outpaintModeActive,
 )
 type StageExpose = { stageElement: HTMLElement | null }
 const imageStageRef = ref<StageExpose | null>(null)
@@ -198,8 +198,8 @@ function submitAction(action: ImageNodeAction, strength?: number) {
   emit('action', action, promptDraft.value.trim(), outputCountValue.value, strength)
 }
 
-function submitExpand(prompt: string) {
-  emit('expand-submit', prompt)
+function submitOutpaint(prompt: string) {
+  emit('outpaint-submit', prompt)
 }
 
 function selectOutputCount(value: number) {
@@ -207,7 +207,7 @@ function selectOutputCount(value: number) {
 }
 
 function onImageStageContextMenu(event: MouseEvent) {
-  if (isImageEditorActive.value) {
+  if (isRetouchActive.value) {
     event.preventDefault()
     event.stopPropagation()
     return

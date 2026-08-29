@@ -6,8 +6,8 @@ import { IMAGE_EXECUTION_MODE, isImageStrengthAction, type ImageStrengthAction }
 
 export const IMAGE_NODE_ACTION = {
   ...WORKFLOW_IMAGE_NODE_ACTION,
-  imageInpaint: 'image-inpaint',
-  localImageEditor: 'local-image-editor',
+  inpaint: 'inpaint',
+  retouch: 'retouch',
 } as const
 
 export type ImageNodeAction = (typeof IMAGE_NODE_ACTION)[keyof typeof IMAGE_NODE_ACTION]
@@ -15,9 +15,9 @@ export type ImageNodeAction = (typeof IMAGE_NODE_ACTION)[keyof typeof IMAGE_NODE
 export const IMAGE_ACTION_MODE = {
   directTask: IMAGE_EXECUTION_MODE.directTask,
   hdUpscaleTask: IMAGE_EXECUTION_MODE.hdUpscaleTask,
-  canvasExtend: IMAGE_EXECUTION_MODE.canvasExtend,
+  outpaint: IMAGE_EXECUTION_MODE.outpaint,
   inpaint: 'inpaint',
-  localImageEditor: 'local-image-editor',
+  retouch: 'retouch',
 } as const
 
 export type ImageActionMode = (typeof IMAGE_ACTION_MODE)[keyof typeof IMAGE_ACTION_MODE]
@@ -28,7 +28,7 @@ export type ImageActionMenuIcon =
   | 'render'
   | 'hd'
   | 'outpaint'
-  | 'image-inpaint'
+  | 'inpaint'
   | 'retouch'
 
 type WorkflowImageNodeAction = Extract<ImageNodeAction, WorkflowFeature>
@@ -57,7 +57,7 @@ function workflowImageAction(
 }
 
 function localImageAction(
-  action: typeof IMAGE_NODE_ACTION.imageInpaint | typeof IMAGE_NODE_ACTION.localImageEditor,
+  action: typeof IMAGE_NODE_ACTION.inpaint | typeof IMAGE_NODE_ACTION.retouch,
   labelKey: string,
   config: { mode: ImageActionMode; icon: ImageActionMenuIcon },
 ): ImageActionRegistryItem {
@@ -82,15 +82,15 @@ export const IMAGE_ACTION_REGISTRY_LIST: readonly ImageActionRegistryItem[] = [
     icon: 'hd',
   }),
   workflowImageAction(IMAGE_NODE_ACTION.outpaint, {
-    mode: IMAGE_ACTION_MODE.canvasExtend,
+    mode: IMAGE_ACTION_MODE.outpaint,
     icon: 'outpaint',
   }),
-  localImageAction(IMAGE_NODE_ACTION.imageInpaint, 'canvas.imageAction.inpaint', {
+  localImageAction(IMAGE_NODE_ACTION.inpaint, 'canvas.imageAction.inpaint', {
     mode: IMAGE_ACTION_MODE.inpaint,
-    icon: 'image-inpaint',
+    icon: 'inpaint',
   }),
-  localImageAction(IMAGE_NODE_ACTION.localImageEditor, 'canvas.imageAction.editImage', {
-    mode: IMAGE_ACTION_MODE.localImageEditor,
+  localImageAction(IMAGE_NODE_ACTION.retouch, 'canvas.imageAction.editImage', {
+    mode: IMAGE_ACTION_MODE.retouch,
     icon: 'retouch',
   }),
 ]

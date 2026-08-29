@@ -10,7 +10,7 @@ function createCanvasElement() {
 
 function createHarness(
   options: {
-    expandActive?: boolean
+    outpaintActive?: boolean
     boardHeaderActive?: boolean
     screenToFlowCoordinate?: (point: { x: number; y: number }) => { x: number; y: number }
   } = {},
@@ -31,7 +31,7 @@ function createHarness(
     dismissTransientCanvasUi,
     clearFlowSelection,
     onCanvasDropDragOver,
-    isFlowExpandActive: () => options.expandActive ?? false,
+    isFlowOutpaintActive: () => options.outpaintActive ?? false,
     isBoardHeaderEditingActive: () => options.boardHeaderActive ?? false,
   })
 
@@ -54,7 +54,7 @@ describe('useFlowCanvasShellInteractions', () => {
 
     expect(event.defaultPrevented).toBe(true)
     expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({
-      closeExpand: true,
+      closeOutpaint: true,
       closeBoardHeader: true,
     })
     expect(harness.clearFlowSelection).toHaveBeenCalledTimes(1)
@@ -82,15 +82,15 @@ describe('useFlowCanvasShellInteractions', () => {
     })
   })
 
-  it('keeps Escape priority for expand and board header before general dismissal', () => {
-    const expandHarness = createHarness({ expandActive: true })
-    expect(expandHarness.shell.onEscapeShortcut()).toBe(true)
-    expect(expandHarness.dismissTransientCanvasUi).toHaveBeenCalledWith({
-      closeExpand: true,
+  it('keeps Escape priority for outpaint and board header before general dismissal', () => {
+    const outpaintHarness = createHarness({ outpaintActive: true })
+    expect(outpaintHarness.shell.onEscapeShortcut()).toBe(true)
+    expect(outpaintHarness.dismissTransientCanvasUi).toHaveBeenCalledWith({
+      closeOutpaint: true,
       clearNodePanel: false,
       hideStrength: false,
     })
-    expect(expandHarness.clearFlowSelection).not.toHaveBeenCalled()
+    expect(outpaintHarness.clearFlowSelection).not.toHaveBeenCalled()
 
     const headerHarness = createHarness({ boardHeaderActive: true })
     expect(headerHarness.shell.onEscapeShortcut()).toBe(true)

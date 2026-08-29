@@ -108,10 +108,18 @@ export const publishAdminBillingPrice = async (
   adminBillingPricePublishRequest: AdminBillingPricePublishRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseBillingPriceSet> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseBillingPriceSet>(getPublishAdminBillingPriceUrl(sku), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminBillingPricePublishRequest),
   })
 }
@@ -285,12 +293,20 @@ export const setAdminBillableItemAvailability = async (
   adminBillableItemAvailabilityRequest: AdminBillableItemAvailabilityRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseBillableItemAvailability> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
   return orvalMutator<ApiResponseBillableItemAvailability>(
     getSetAdminBillableItemAvailabilityUrl(sku),
     {
       ...options,
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
       body: JSON.stringify(adminBillableItemAvailabilityRequest),
     },
   )

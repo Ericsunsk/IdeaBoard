@@ -63,13 +63,13 @@ export function createImageToolNodeBindings(
   const stageBindingCache = new Map<string, ImageToolStageBinding>()
   const actionBindingCache = new Map<string, ImageActionBinding>()
   function stageBindingFor(nodeId: string): ImageToolStageBinding {
-    const mode = session.imageEditorNodeId.value === nodeId ? session.imageEditorMode.value : null
+    const mode = session.retouchNodeId.value === nodeId ? session.retouchMode.value : null
     const nextBinding: ImageToolStageBinding = {
       nodeId,
       active: mode != null,
       mode,
       renderedPreview:
-        session.imageEditorNodeId.value === nodeId && session.imageEditorMode.value === 'adjust'
+        session.retouchNodeId.value === nodeId && session.retouchMode.value === 'adjust'
           ? renderedPreview.value
           : null,
       session,
@@ -80,7 +80,7 @@ export function createImageToolNodeBindings(
   }
 
   function actionBindingFor(nodeId: string): ImageActionBinding {
-    const hasCommittedMask = !!session.maskEditor.getCommittedMaskData(nodeId)
+    const hasCommittedMask = !!session.inpaint.getCommittedMaskData(nodeId)
     const actionMenuVisible = ui.isImageActionPanelVisible(nodeId)
     const activeStrengthAction = ui.strengthControl.activeAction.value
     const directGenerating =

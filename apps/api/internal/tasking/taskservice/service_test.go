@@ -93,12 +93,12 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 			want:     "SYS 融合但不要太夸张 weights=Image 1: 60%, Image 2: 40%",
 		},
 		{
-			name:       "canvas extend",
+			name:       "canvas outpaint",
 			feature:    workflow.FeatureSlugOutpaint,
 			basePrompt: "user prompt",
 			userPrompt: "右侧延展为工作室背景",
 			params: map[string]interface{}{
-				"extend": map[string]interface{}{
+				"outpaint": map[string]interface{}{
 					"target_width": 1280, "target_height": 768,
 					"image_offset_x": 0, "image_offset_y": 0,
 				},
@@ -354,7 +354,7 @@ func TestOutpaintEmptyUserPromptCanStillBuildConfiguredPrompt(t *testing.T) {
 		"",
 		workflow.FeatureSlugOutpaint,
 		map[string]interface{}{
-			"extend": map[string]interface{}{
+			"outpaint": map[string]interface{}{
 				"target_width": 1280, "target_height": 768,
 				"image_offset_x": 0, "image_offset_y": 0,
 			},
@@ -737,7 +737,7 @@ func TestWorkflowTaskParamsFromMapDoesNotPreserveKnownContractKeysInExtra(t *tes
 		"quality":                 "high",
 		"output_count":            2,
 		"prompt_upsampling":       false,
-		"extend":                  map[string]interface{}{"target_width": 1280, "target_height": 768, "image_offset_x": 0, "image_offset_y": 0},
+		"outpaint":                map[string]interface{}{"target_width": 1280, "target_height": 768, "image_offset_x": 0, "image_offset_y": 0},
 		"provider_specific_param": "keep-me",
 	}
 
@@ -767,7 +767,7 @@ func TestWorkflowTaskParamsFromMapDoesNotPreserveKnownContractKeysInExtra(t *tes
 		"quality",
 		"output_count",
 		"prompt_upsampling",
-		"extend",
+		"outpaint",
 	} {
 		if _, exists := typedParams.Extra[key]; exists {
 			t.Fatalf("known submit param %s leaked into Extra: %#v", key, typedParams.Extra)
@@ -779,8 +779,8 @@ func TestWorkflowTaskParamsFromMapDoesNotPreserveKnownContractKeysInExtra(t *tes
 	if typedParams.Controls == nil || typedParams.Controls.CustomWidth != 640 || typedParams.Controls.OutputCount != 2 {
 		t.Fatalf("controls = %#v, want canonical controls", typedParams.Controls)
 	}
-	if typedParams.Extend == nil || typedParams.Extend.TargetWidth != 1280 {
-		t.Fatalf("extend = %#v, want target_width 1280", typedParams.Extend)
+	if typedParams.Outpaint == nil || typedParams.Outpaint.TargetWidth != 1280 {
+		t.Fatalf("outpaint = %#v, want target_width 1280", typedParams.Outpaint)
 	}
 }
 
@@ -1302,7 +1302,7 @@ func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 			"model":                 "gpt-image-1",
 			"original_image_width":  1024,
 			"original_image_height": 768,
-			"extend": map[string]interface{}{
+			"outpaint": map[string]interface{}{
 				"target_width": 1280, "target_height": 768,
 				"image_offset_x": 0, "image_offset_y": 0,
 			},
@@ -1316,12 +1316,12 @@ func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 	if err := json.Unmarshal([]byte(submissionStore.calls[0].canonical.Params()), &params); err != nil {
 		t.Fatalf("unmarshal task params: %v", err)
 	}
-	extend, ok := params["extend"].(map[string]interface{})
+	outpaint, ok := params["outpaint"].(map[string]interface{})
 	if !ok {
-		t.Fatalf("extend = %#v, want object", params["extend"])
+		t.Fatalf("outpaint = %#v, want object", params["outpaint"])
 	}
-	if extend["target_width"] != float64(1280) {
-		t.Fatalf("target_width = %#v, want 1280", extend["target_width"])
+	if outpaint["target_width"] != float64(1280) {
+		t.Fatalf("target_width = %#v, want 1280", outpaint["target_width"])
 	}
 	if _, exists := params["image_urls"]; exists {
 		t.Fatalf("did not expect provider image_urls in stored params: %#v", params)
