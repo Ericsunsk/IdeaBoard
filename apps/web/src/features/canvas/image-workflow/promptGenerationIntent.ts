@@ -8,7 +8,7 @@ export type PromptGenerationIntentOptions = {
   getMediaInputImages: (nodeId: string) => MediaInputImage[]
   runPromptGeneration: (
     nodeId: string,
-    referenceImages: readonly { url: string; ratio: number }[],
+    referenceImages: readonly { url: string; ratio: number; mediaAssetId?: number }[],
     prompt: string,
     outputCount: number,
     aspectRatio: PromptAspectRatio,
@@ -28,7 +28,11 @@ export function createPromptGenerationIntent(options: PromptGenerationIntentOpti
     const inputImages = options.getMediaInputImages(promptNodeId)
     void options.runPromptGeneration(
       promptNodeId,
-      inputImages.map((item) => ({ url: item.url, ratio: item.ratio })),
+      inputImages.map((item) => ({
+        url: item.url,
+        ratio: item.ratio,
+        ...(item.mediaAssetId ? { mediaAssetId: item.mediaAssetId } : {}),
+      })),
       prompt,
       outputCount,
       normalizedAspectRatio,

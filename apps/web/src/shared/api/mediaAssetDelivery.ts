@@ -260,9 +260,14 @@ export function useMediaAssetDelivery(
   let abortController: AbortController | null = null
   let unsubscribeInvalidation: (() => void) | null = null
   let refreshTimer = 0
+  let retryTimer = 0
+  let retryDelayMs = 800
 
   function reset() {
     window.clearTimeout(refreshTimer)
+    window.clearTimeout(retryTimer)
+    retryTimer = 0
+    retryDelayMs = 800
     metadata.value = null
     url.value = ''
     status.value = 'idle'
@@ -324,7 +329,17 @@ export function useMediaAssetDelivery(
       const nextStatus = (variant?.status || nextMetadata.status) as MediaAssetDeliveryStatus
       status.value = nextStatus
       url.value = variant?.status === 'ready' && variant.url ? resolveAssetUrl(variant.url) : ''
-      if (url.value) scheduleRefresh(url.value, currentAssetId, currentTier)
+      if (url.value) {
+        retryDelayMs = 800
+        scheduleRefresh(url.value, currentAssetId, currentTier)
+      } else if (nextStatus === 'pending' || nextStatus === 'processing') {
+        window.clearTimeout(retryTimer)
+        retryTimer = window.setTimeout(() => {
+          retryTimer = 0
+          retryDelayMs = Math.min(2_000, retryDelayMs * 2)
+          void load(currentAssetId, currentTier, true)
+        }, retryDelayMs)
+      }
     } catch (loadError) {
       if (controller.signal.aborted || token !== requestToken) return
       status.value = 'error'
@@ -338,6 +353,7 @@ export function useMediaAssetDelivery(
       requestToken += 1
       abortController?.abort()
       window.clearTimeout(refreshTimer)
+      window.clearTimeout(retryTimer)
       unsubscribeInvalidation?.()
     })
   }

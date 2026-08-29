@@ -160,11 +160,12 @@ function normalizeExecutionRatio(value: unknown): number {
 }
 
 function toImageExecutionInput(
-  anchor: Pick<ImageNodeLayoutAnchor, 'url' | 'ratio'>,
+  anchor: Pick<ImageNodeLayoutAnchor, 'url' | 'ratio' | 'mediaAssetId'>,
 ): ImageExecutionInput {
   return {
     url: anchor.url.trim(),
     ratio: normalizeExecutionRatio(anchor.ratio),
+    ...(anchor.mediaAssetId ? { mediaAssetId: anchor.mediaAssetId } : {}),
   }
 }
 
@@ -402,6 +403,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     const normalizedReferences = referenceImages.map((image) => ({
       url: `${image.url ?? ''}`.trim(),
       ratio: normalizeExecutionRatio(image.ratio),
+      ...(image.mediaAssetId ? { mediaAssetId: image.mediaAssetId } : {}),
     }))
     if (normalizedReferences.some((image) => !image.url)) failPlanning(i18n.global.t('canvas.execution.referenceImageMissingUrl'))
     const graph = readGraph()

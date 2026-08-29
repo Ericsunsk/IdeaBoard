@@ -34,6 +34,7 @@ import {
   createCanvasTaskClientActionId,
   withTaskClientActionId,
 } from '../task-runner/taskClientActionIds'
+import { resolveMediaAssetProcessingURL } from '../../../../shared/api/mediaAssetDelivery'
 
 export type FlowImageWorkflowExecutionPlan = ActivatedImageExecutionPlan
 
@@ -122,23 +123,32 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     return attachment
   }
 
+  async function resolveExecutionSource<T extends { url: string; mediaAssetId?: number }>(
+    source: T,
+  ): Promise<T> {
+    if (!source.mediaAssetId) return source
+    const url = await resolveMediaAssetProcessingURL(source.mediaAssetId)
+    return { ...source, url }
+  }
+
   async function executeImageAction(
     plan: ImageActionExecutionPlan & { activationId: string },
   ): Promise<void> {
     const attachment = requireCurrentAttachment()
+    const source = await resolveExecutionSource(plan.source)
     const taskRequest = buildImageExecutionTaskRequest(
-      plan,
-      await loadImageSizeFromUrl(plan.source.url),
+      { ...plan, source },
+      await loadImageSizeFromUrl(source.url),
     )
     await workflowRunner.execute({
-      source: plan.source,
+      source,
       sourceNodeId: plan.sourceNodeId,
       resultOptions: plan.resultOptions,
       attachment,
       outputCount: plan.outputCount,
       taskRequest,
       readinessRequest: buildImageActionReadinessRequest(plan.action),
-      fallbackRatio: plan.source.ratio,
+      fallbackRatio: source.ratio,
     })
   }
 
@@ -146,12 +156,13 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     plan: OutpaintExecutionPlan & { activationId: string },
   ): Promise<void> {
     const attachment = requireCurrentAttachment()
+    const source = await resolveExecutionSource(plan.source)
     const taskRequest = buildImageExecutionTaskRequest(
-      plan,
-      await loadImageSizeFromUrl(plan.source.url),
+      { ...plan, source },
+      await loadImageSizeFromUrl(source.url),
     )
     await workflowRunner.execute({
-      source: plan.source,
+      source,
       sourceNodeId: plan.sourceNodeId,
       attachment,
       outputCount: plan.outputCount,
@@ -167,20 +178,21 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
   ): Promise<void> {
     const attachment = requireCurrentAttachment()
     const boardId = attachment.boardId
+    const source = await resolveExecutionSource(plan.source)
     const [maskImageUrl, imageSize] = await Promise.all([
       prepareFlowInpaintMask(plan.rawMaskDataUrl, boardId),
-      loadImageSizeFromUrl(plan.source.url),
+      loadImageSizeFromUrl(source.url),
     ])
-    const taskRequest = buildPreparedImageInpaintTaskRequest({ plan, maskImageUrl, imageSize })
+    const taskRequest = buildPreparedImageInpaintTaskRequest({ plan: { ...plan, source }, maskImageUrl, imageSize })
     await workflowRunner.execute({
-      source: plan.source,
+      source,
       sourceNodeId: plan.sourceNodeId,
       attachment,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
       taskRequest,
       readinessRequest: taskRequest,
-      fallbackRatio: plan.source.ratio,
+      fallbackRatio: source.ratio,
     })
   }
 
@@ -194,10 +206,19 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     plan: FusionExecutionPlan & { activationId: string },
   ): Promise<void> {
     const attachment = requireCurrentAttachment()
-    const imageSizes = await Promise.all(
-      plan.inputImages.map((input) => loadImageSizeFromUrl(input.url)),
+    const resolvedInputs = await Promise.all(
+      plan.inputImages.map(async (input) => resolveExecutionSource(input)),
     )
-    const preparedPlan = prepareFusionExecutionPlan(plan, imageSizes)
+    const resolvedPlan = {
+      ...plan,
+      inputImages: resolvedInputs,
+      imageUrls: resolvedInputs.map((input) => input.url),
+      source: await resolveExecutionSource(plan.source),
+    }
+    const imageSizes = await Promise.all(
+      resolvedInputs.map((input) => loadImageSizeFromUrl(input.url)),
+    )
+    const preparedPlan = prepareFusionExecutionPlan(resolvedPlan, imageSizes)
     const taskRequest = buildImageExecutionTaskRequest(preparedPlan)
     await workflowRunner.execute({
       source: preparedPlan.source,

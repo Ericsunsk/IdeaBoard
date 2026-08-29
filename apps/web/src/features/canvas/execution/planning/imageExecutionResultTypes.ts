@@ -1,6 +1,7 @@
 export type ImageExecutionInput = {
   url: string
   ratio: number
+  mediaAssetId?: number
 }
 
 export type ImageResultAnchor = {

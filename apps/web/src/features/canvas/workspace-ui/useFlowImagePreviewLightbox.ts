@@ -244,11 +244,16 @@ export function useFlowImagePreviewLightbox() {
     instance.loadAndOpen(index, dataSource)
   }
 
-  async function openImageUrlPreview(src: string, ratio = 1) {
-    const url = normalizeImageUrl(src)
+  async function openImageUrlPreview(src: string, ratio = 1, mediaAssetId?: number) {
+    const candidate: LightboxCandidate = {
+      src: normalizeImageUrl(src),
+      ratio,
+      ...(mediaAssetId ? { mediaAssetId } : {}),
+    }
+    const url = await resolveOriginalCandidateSource(candidate)
     if (!url) return
     const requestId = ++previewRequestId
-    const dataSource = [await createLightboxItem({ src: url, ratio })]
+    const dataSource = [await createLightboxItem({ ...candidate, src: url })]
     if (isDisposed || requestId !== previewRequestId) return
 
     const instance = ensureLightbox()

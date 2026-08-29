@@ -66,9 +66,12 @@ export function resolveImageNodeLayoutAnchor(
 
   const width = Number(imageNode.width)
   const fallbackWidth = Number(options.fallbackWidth)
+  const latestOutput = resolveImageNodeLatestOutput(imageNode)
+  const mediaAssetId = Number(latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId)
   return {
     url,
     ratio: resolveImageNodeDisplayRatio(imageNode),
+    ...(Number.isInteger(mediaAssetId) && mediaAssetId > 0 ? { mediaAssetId } : {}),
     x: Number(node.position?.x ?? imageNode.x ?? 0),
     y: Number(node.position?.y ?? imageNode.y ?? 0),
     width:

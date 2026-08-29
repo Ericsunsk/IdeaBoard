@@ -34,6 +34,7 @@ export interface ResolvedFlowInputImage {
   sourceNodeId?: string
   url: string
   ratio: number
+  mediaAssetId?: number
 }
 
 export type FlowConnectedInputPort = 'image' | 'prompt'
@@ -44,6 +45,7 @@ export type FlowSnapshotNodeLike = {
   type?: unknown
   outputImages?: unknown
   sourceImageUrl?: unknown
+  sourceMediaAssetId?: unknown
   sourceImageRatio?: unknown
   outputStatus?: unknown
 }
@@ -132,6 +134,20 @@ export function resolveSourceImageFromNode(
   return (latestOutput?.url || '').trim()
 }
 
+function resolveSourceMediaAssetIdFromNode(
+  nodeType: CanvasConnectionNodeType,
+  snapshotNode: FlowSnapshotNodeLike,
+): number | undefined {
+  const raw =
+    nodeType === 'image'
+      ? isImageNodeSnapshot(snapshotNode)
+        ? snapshotNode.sourceMediaAssetId
+        : undefined
+      : readLatestOutputImage(snapshotNode)?.mediaAssetId
+  const mediaAssetId = Number(raw)
+  return Number.isInteger(mediaAssetId) && mediaAssetId > 0 ? mediaAssetId : undefined
+}
+
 function resolveConnectedNodeInput(
   options: FlowExecutionGraphOptions,
   targetNodeId: string,
@@ -203,20 +219,37 @@ export function resolveConnectedImageInputs(
         sourceNodeId?: unknown
         url?: unknown
         ratio?: unknown
+        mediaAssetId?: unknown
       }
       const id = typeof record.id === 'string' ? record.id : ''
       const sourceType =
         record.sourceType === 'node' || record.sourceType === 'external' ? record.sourceType : null
       const sourceId = typeof record.sourceId === 'string' ? record.sourceId : ''
       const sourceNodeId = typeof record.sourceNodeId === 'string' ? record.sourceNodeId : undefined
+      const mediaAssetId = Number(record.mediaAssetId)
       const url = typeof record.url === 'string' ? record.url.trim() : ''
       const ratio = Number(record.ratio)
       if (!id || !sourceType || !sourceId || !url || !Number.isFinite(ratio) || ratio <= 0) return
       if (sourceNodeId) {
-        normalizedSnapshot.push({ id, sourceType, sourceId, sourceNodeId, url, ratio })
+        normalizedSnapshot.push({
+          id,
+          sourceType,
+          sourceId,
+          sourceNodeId,
+          url,
+          ratio,
+          ...(Number.isInteger(mediaAssetId) && mediaAssetId > 0 ? { mediaAssetId } : {}),
+        })
         return
       }
-      normalizedSnapshot.push({ id, sourceType, sourceId, url, ratio })
+      normalizedSnapshot.push({
+        id,
+        sourceType,
+        sourceId,
+        url,
+        ratio,
+        ...(Number.isInteger(mediaAssetId) && mediaAssetId > 0 ? { mediaAssetId } : {}),
+      })
     })
   }
 
@@ -244,6 +277,9 @@ export function resolveConnectedImageInputs(
       sourceNodeId: sourceNode.id,
       url,
       ratio: resolveFlowSourceImageRatio(sourceKind, snapshotNode),
+      ...(resolveSourceMediaAssetIdFromNode(sourceKind, snapshotNode)
+        ? { mediaAssetId: resolveSourceMediaAssetIdFromNode(sourceKind, snapshotNode) }
+        : {}),
     })
   })
 

@@ -30,6 +30,7 @@ import {
   defaultCanvasTaskSubmissionAdapter,
   type CanvasTaskSubmissionAdapter,
 } from './canvasTaskSubmissionAdapter'
+import { resolveMediaAssetProcessingURL } from '../../../../shared/api/mediaAssetDelivery'
 
 export type CanvasExecutionWorkspaceState = {
   readonly executionCore: PendingImageExecutionCore
@@ -143,16 +144,27 @@ export function useCanvasExecutionWorkspace(
     plan: ActivatedImageExecutionPlan & { kind: 'prompt-generation' },
   ): Promise<void> {
     const attachment = requireAttachment()
-    const taskRequest = buildImageExecutionTaskRequest(plan)
+    const resolvedReferences = await Promise.all(
+      plan.referenceImages.map(async (image) =>
+        image.mediaAssetId
+          ? { ...image, url: await resolveMediaAssetProcessingURL(image.mediaAssetId) }
+          : image,
+      ),
+    )
+    const source = plan.source.mediaAssetId
+      ? { ...plan.source, url: await resolveMediaAssetProcessingURL(plan.source.mediaAssetId) }
+      : plan.source
+    const resolvedPlan = { ...plan, source, referenceImages: resolvedReferences }
+    const taskRequest = buildImageExecutionTaskRequest(resolvedPlan)
     await workflowRunner.execute({
-      source: plan.source,
+      source,
       sourceNodeId: plan.sourceNodeId,
       attachment,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
       taskRequest,
       readinessRequest: taskRequest,
-      fallbackRatio: plan.source.ratio,
+      fallbackRatio: source.ratio,
     })
   }
 

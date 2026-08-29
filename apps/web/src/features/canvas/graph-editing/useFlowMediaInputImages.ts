@@ -49,7 +49,7 @@ type UseFlowMediaInputImagesOptions = {
   graphAdapter: CanvasVueFlowGraphAdapter
   markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
   getImageNodeDisplayPayload: (nodeId: string) => ImageNodeDisplayPayload | null
-  openImageUrlPreview: (src: string, ratio?: number) => Promise<void>
+  openImageUrlPreview: (src: string, ratio?: number, mediaAssetId?: number) => Promise<void>
   onWarning: (message: string) => void
 }
 
@@ -297,8 +297,8 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
     if (file) await addMediaInputImageFile(nodeId, file)
   }
 
-  function onFlowMediaInputImagePreview(image: { url: string; ratio: number }) {
-    void options.openImageUrlPreview(image.url, image.ratio)
+  function onFlowMediaInputImagePreview(image: { url: string; ratio: number; mediaAssetId?: number }) {
+    void options.openImageUrlPreview(image.url, image.ratio, image.mediaAssetId)
   }
 
   function onFlowMediaInputImageRemove(nodeId: string, imageId: string) {
