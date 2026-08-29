@@ -21,13 +21,13 @@
     @drop.stop="onStageDrop"
     @contextmenu.prevent.stop="onStageContextMenu"
   >
-    <template v-if="stageDisplayImage && sourceDisplayUrl">
+    <template v-if="stageDisplayImage && renderedStageUrl">
       <ImageToolStagePresentation
         v-if="imageToolStageBinding && stageDisplayUrl"
         :binding="imageToolStageBinding"
       >
         <img
-          :src="stageDisplayUrl || sourceDisplayUrl"
+          :src="renderedStageUrl"
           class="image-node-stage-image image-tool-stage-media"
           :class="{ 'is-dragging': dragging }"
           :alt="t('canvas.controls.stagePreviewAlt')"
@@ -42,7 +42,7 @@
       </ImageToolStagePresentation>
       <img
         v-else
-        :src="stageDisplayUrl || sourceDisplayUrl"
+        :src="renderedStageUrl"
         class="image-node-stage-image"
         :alt="t('canvas.controls.stagePreviewAlt')"
         draggable="false"
@@ -96,7 +96,7 @@
       </NodeActionButton>
     </div>
     <div
-      v-else-if="imageImportPending && !stageDisplayImage"
+      v-else-if="(imageImportPending || mediaAssetPending) && !renderedStageUrl"
       class="image-node-stage-pending"
       aria-busy="true"
       :aria-label="t('canvas.controls.preparingPreview')"
@@ -217,6 +217,17 @@ const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl,
   isVisible: isStageVisible,
   keepPreviousOnSourceChange: true,
 })
+// Media assets are authenticated API resources. Do not bind their API URL as
+// an optimistic <img> fallback while the signed delivery URL is loading; a
+// cross-origin simple GET has no Origin header and is rejected by CORS. Local
+// and external sources retain the immediate optimistic fallback behavior.
+const renderedStageUrl = computed(() => {
+  if (stageDisplayImage.value?.mediaAssetId) return stageDisplayUrl.value
+  return stageDisplayUrl.value || sourceDisplayUrl.value
+})
+const mediaAssetPending = computed(
+  () => !!stageDisplayImage.value?.mediaAssetId && !stageDisplayUrl.value,
+)
 const { t } = useI18n()
 const emptyStateLabel = computed(() =>
   props.inputLocked ? t('canvas.controls.waiting') : t('canvas.controls.uploadOrDropImage'),

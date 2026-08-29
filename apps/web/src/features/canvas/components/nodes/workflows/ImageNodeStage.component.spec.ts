@@ -12,8 +12,14 @@ afterEach(() => {
 })
 
 vi.mock('../../../vue-flow-adapter/useDisplayImagePreview', () => ({
-  useDisplayImagePreview: (sourceUrl: Parameters<typeof toValue>[0]) => ({
-    displayUrl: computed(() => previewState.displayUrl ?? toValue(sourceUrl) ?? ''),
+  useDisplayImagePreview: (
+    sourceUrl: Parameters<typeof toValue>[0],
+    options?: { mediaAssetId?: Parameters<typeof toValue>[0] },
+  ) => ({
+    displayUrl: computed(() => {
+      if (toValue(options?.mediaAssetId)) return previewState.displayUrl ?? ''
+      return previewState.displayUrl ?? toValue(sourceUrl) ?? ''
+    }),
   }),
 }))
 
@@ -191,6 +197,23 @@ describe('ImageNodeStage Library import recovery', () => {
     )
     expect(view.queryByLabelText('Preparing image preview')).toBeNull()
     previewState.displayUrl = null
+  })
+
+  it('does not bind the authenticated API URL while a media delivery URL is loading', () => {
+    const view = render(ImageNodeStage, {
+      props: {
+        nodeId: 'image-1',
+        stageWidth: 280,
+        stageHeight: 280,
+        displayImage: { url: '/api/user/media-assets/5/original/content', mediaAssetId: 5 },
+        active: false,
+        dragging: false,
+      },
+      global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
+    })
+
+    expect(view.queryByRole('button', { name: /Image node preview/ })).toBeNull()
+    expect(view.getByLabelText('Preparing image preview')).toBeTruthy()
   })
 })
 
