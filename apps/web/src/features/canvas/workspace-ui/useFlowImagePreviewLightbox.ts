@@ -125,17 +125,24 @@ async function createLightboxItem(candidate: LightboxCandidate): Promise<Lightbo
   }
 }
 
-async function resolveOriginalCandidateSource(candidate: LightboxCandidate): Promise<string> {
+async function resolveOriginalCandidateSource(candidate: LightboxCandidate): Promise<string | null> {
   if (!candidate.mediaAssetId) return candidate.src
   try {
     const metadata = await getMediaAssetMetadata(candidate.mediaAssetId)
     if (metadata.original.status === 'ready' && metadata.original.url) {
       return normalizeImageUrl(metadata.original.url)
     }
+    // Authenticated API content URLs are not safe <img> sources when the API
+    // origin differs from the app origin. Prefer any ready signed derivative
+    // instead of falling back to `/original/content` and triggering CORS.
+    for (const tier of ['processing', 'large-preview', 'preview', 'thumb'] as const) {
+      const variant = metadata.derivatives[tier]
+      if (variant?.status === 'ready' && variant.url) return normalizeImageUrl(variant.url)
+    }
   } catch {
-    return resolveMediaAssetOriginalURL(candidate.mediaAssetId)
+    return null
   }
-  return resolveMediaAssetOriginalURL(candidate.mediaAssetId)
+  return null
 }
 
 function collectOutputItems(outputImages: ImageNodeItem['outputImages']): ImageNodeOutputItem[] {
@@ -203,12 +210,31 @@ export function useFlowImagePreviewLightbox() {
     const sourceOffset = hasSourceCandidate ? 1 : 0
     const latestOutputIndex =
       outputItems.length > 0 ? sourceOffset + outputItems.length - 1 : Math.max(0, sourceOffset - 1)
-    const index = target === 'source' ? 0 : Math.max(0, latestOutputIndex)
-    const dataSource = await Promise.all(
-      candidates.map(async (candidate) =>
-        createLightboxItem({ ...candidate, src: await resolveOriginalCandidateSource(candidate) }),
-      ),
+    const requestedIndex = target === 'source' ? 0 : Math.max(0, latestOutputIndex)
+    const resolvedCandidates = await Promise.all(
+      candidates.map(async (candidate) => {
+        const src = await resolveOriginalCandidateSource(candidate)
+        return src ? { ...candidate, src } : null
+      }),
     )
+    const availableOriginalIndexes = resolvedCandidates.reduce<number[]>(
+      (indexes, candidate, index) => {
+        if (candidate !== null) indexes.push(index)
+        return indexes
+      },
+      [],
+    )
+    const dataSource = await Promise.all(
+      resolvedCandidates
+        .filter((candidate): candidate is LightboxCandidate => candidate !== null)
+        .map((candidate) => createLightboxItem(candidate)),
+    )
+    if (dataSource.length === 0) return
+    const requestedAvailableIndex = availableOriginalIndexes.indexOf(requestedIndex)
+    const index =
+      requestedAvailableIndex >= 0
+        ? requestedAvailableIndex
+        : Math.min(dataSource.length - 1, Math.max(0, requestedIndex))
     if (isDisposed || requestId !== previewRequestId) return
 
     const instance = ensureLightbox()

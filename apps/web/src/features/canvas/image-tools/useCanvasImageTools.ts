@@ -15,7 +15,10 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions): Canvas
 
   const isChromeHidden = computed(() => !!session.retouchNodeId.value)
   const isCanvasLocked = computed(
-    () => options.isCanvasInteractionLocked.value || !!session.retouchNodeId.value,
+    () =>
+      options.isCanvasInteractionLocked.value ||
+      !!session.retouchNodeId.value ||
+      session.isApplyingRetouchAdjustments.value,
   )
 
   return {

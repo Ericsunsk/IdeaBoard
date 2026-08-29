@@ -364,6 +364,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(harness.runtime.viewModel.active.mode.value).toBeNull()
       expect(harness.runtime.viewModel.active.nodeId.value).toBeNull()
       expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(true)
+      expect(harness.runtime.viewModel.locks.isCanvasLocked.value).toBe(true)
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-3').directGenerating).toBe(true)
       expect(harness.createPendingAdjustmentNode).toHaveBeenCalledWith(
         expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
@@ -389,6 +390,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(harness.applyImageFileToImageNode).toHaveBeenCalledWith('image-3', expect.any(File))
       expect(harness.runtime.viewModel.active.mode.value).toBeNull()
       expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(false)
+      expect(harness.runtime.viewModel.locks.isCanvasLocked.value).toBe(false)
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-3').directGenerating).toBe(false)
       expect(harness.feedback.warning).not.toHaveBeenCalled()
       expect(harness.feedback.succeeded).toHaveBeenCalledWith('Image generated')

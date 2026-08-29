@@ -218,9 +218,10 @@ const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl,
   keepPreviousOnSourceChange: true,
 })
 // Media assets are authenticated API resources. Do not bind their API URL as
-// an optimistic <img> fallback while the signed delivery URL is loading; a
-// cross-origin simple GET has no Origin header and is rejected by CORS. Local
-// and external sources retain the immediate optimistic fallback behavior.
+// an optimistic <img> fallback while the signed delivery URL is loading: the
+// API URL is not a durable cross-origin image source and can fail before the
+// authenticated delivery metadata resolves. Local and external sources retain
+// the immediate optimistic fallback behavior.
 const renderedStageUrl = computed(() => {
   if (stageDisplayImage.value?.mediaAssetId) return stageDisplayUrl.value
   return stageDisplayUrl.value || sourceDisplayUrl.value
