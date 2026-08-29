@@ -179,9 +179,9 @@ func TestParseAndNormalizeTaskParamsRejectsInvalidDurableContracts(t *testing.T)
 	tests := map[string]string{
 		"missing schema": `{"feature":"prompt-generation"}`,
 		"legacy schema":  `{"schema_version":1,"feature":"prompt-generation"}`,
-		"future schema":  `{"schema_version":3,"feature":"prompt-generation"}`,
-		"missing plan":   `{"schema_version":3,"feature":"prompt-generation"}`,
-		"malformed plan": `{"schema_version":3,"feature":"prompt-generation","execution_plan":{"schema_version":1}}`,
+		"future schema":  `{"schema_version":99,"feature":"prompt-generation"}`,
+		"missing plan":   `{"schema_version":4,"feature":"prompt-generation"}`,
+		"malformed plan": `{"schema_version":4,"feature":"prompt-generation","execution_plan":{"schema_version":1}}`,
 	}
 	for name, raw := range tests {
 		t.Run(name, func(t *testing.T) {

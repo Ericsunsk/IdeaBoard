@@ -60,7 +60,7 @@ func TestStoreSubmitTaskClaimsMediaRefInTaskRiverTransaction(t *testing.T) {
 			}
 			store := NewStore(pool, taskstore.NewRepository(db), riverClient, submissionRiverTestQueue, submissionRiverTestMaxAttempts, nil)
 			canonical, err := NewCanonicalRequest(CanonicalRequestInput{
-				UserID: owner.ID, UserPrompt: "media", Prompt: "media", Params: `{"schema_version":3}`,
+				UserID: owner.ID, UserPrompt: "media", Prompt: "media", Params: `{"schema_version":4}`,
 				ClientActionID: clientActionID, Feature: "test-non-billable",
 				Generation: &tasks.GenerationRequestSnapshot{
 					SchemaVersion: tasks.CurrentParamsSchemaVersion, Feature: "test-non-billable", Primitive: "image-to-image",

@@ -341,7 +341,7 @@ func TestPostgresTaskAssignerFailsClosedOnInvalidExecutionPlan(t *testing.T) {
 
 	createAssignerAccount(t, db, "invalid-plan-provider", 2)
 	createAssignerTaskWithOptions(t, db, "pending-invalid-plan", 0, tasks.StatusPending, "", "", assignerTaskOptions{
-		ParamsJSON: `{"schema_version":3,"feature":"prompt-generation","execution_plan":{"schema_version":1}}`,
+		ParamsJSON: `{"schema_version":4,"feature":"prompt-generation","execution_plan":{"schema_version":1}}`,
 	})
 
 	if _, err := assigner.Assign(ctx, &tasks.TaskPayload{TaskID: "pending-invalid-plan", RiverJobID: 132}); err == nil {
@@ -790,7 +790,7 @@ func TestPostgresTaskAssignerRejectsInvalidPlanBeforeRunningLeaseReuse(t *testin
 
 	accountID := createAssignerAccount(t, db, "invalid-reuse", 1)
 	createAssignerTaskWithOptions(t, db, "running-invalid-reuse", accountID, tasks.StatusRunning, "river:134:existing", "gpt-image-1", assignerTaskOptions{
-		ParamsJSON: `{"schema_version":3,"feature":"prompt-generation"}`,
+		ParamsJSON: `{"schema_version":4,"feature":"prompt-generation"}`,
 	})
 
 	if _, err := assigner.Assign(ctx, &tasks.TaskPayload{TaskID: "running-invalid-reuse", RiverJobID: 134}); err == nil {

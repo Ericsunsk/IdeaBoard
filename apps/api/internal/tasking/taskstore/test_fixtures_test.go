@@ -40,7 +40,7 @@ func createRepositoryTestTask(t testing.TB, repo *Repository, ctx context.Contex
 		return fmt.Errorf("invalid repository task fixture")
 	}
 	if task.Params == "" {
-		task.Params = `{"schema_version":3}`
+		task.Params = `{"schema_version":4}`
 	}
 	if task.AccountID != nil {
 		accountID := tasks.IDValue(task.AccountID)

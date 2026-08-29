@@ -150,7 +150,7 @@ WHERE id = $1`, account.ProviderEndpointID).Scan(&apiType, &protocol, &endpointN
 	leaseToken := "lease-" + taskID
 	task := &tasks.Task{
 		TaskID: taskID, UserID: 1,
-		Params:                     `{"schema_version":3}`,
+		Params:                     `{"schema_version":4}`,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
 		AssignedCredentialID:       tasks.IDPtr(credentialID),
 		AccountID:                  tasks.IDPtr(account.ID),

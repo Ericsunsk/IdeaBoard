@@ -6,7 +6,7 @@ const (
 	Media         = "media"
 	Controls      = "controls"
 	Variation     = "variation"
-	Outpaint        = "outpaint"
+	Outpaint      = "outpaint"
 	HD            = "hd"
 	Fusion        = "fusion"
 	Extra         = "extra"

@@ -31,7 +31,7 @@ type providerRequest struct {
 	Scale            float64
 	OriginalWidth    int
 	OriginalHeight   int
-	Outpaint           *tasks.OutpaintParams
+	Outpaint         *tasks.OutpaintParams
 	OpenAI           openAIProviderControls
 	Google           googleProviderControls
 }
