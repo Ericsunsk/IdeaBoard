@@ -119,9 +119,7 @@ describe('useMediaAssetDelivery', () => {
       await import('./mediaAssetDelivery')
     invalidateMediaAssetMetadata()
 
-    await expect(resolveMediaAssetProcessingURL(42)).resolves.toBe(
-      '/api/user/media-assets/42/derivatives/processing/webp/content',
-    )
+    await expect(resolveMediaAssetProcessingURL(42)).resolves.toBe('/api/processing.webp')
     expect(mocks.request).toHaveBeenCalledWith(
       '/user/media-assets/42',
       expect.objectContaining({ method: 'GET' }),

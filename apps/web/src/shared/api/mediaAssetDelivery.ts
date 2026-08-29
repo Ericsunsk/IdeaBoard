@@ -214,9 +214,10 @@ export async function resolveMediaAssetProcessingURL(assetId: number): Promise<s
     const variant = metadata.derivatives.processing
     const status = variant?.status ?? 'pending'
     if (status === 'ready' && variant?.url) {
-      const format =
-        variant.format === 'jpeg' || variant.format === 'png' ? variant.format : 'webp'
-      return resolveMediaAssetDerivativeURL(assetId, 'processing', format)
+      // The metadata URL is a signed storage URL. Returning the API content
+      // endpoint here would require the browser session Cookie, which the
+      // backend Worker does not have when it prepares generation media.
+      return variant.url
     }
     if (status === 'failed' || Date.now() - startedAt >= maxWaitMs) {
       throw new MediaAssetDerivativeNotReadyError('processing', status)
