@@ -54,6 +54,7 @@ func TestOriginPolicyDecideKeepsTransportHeadersAtTheSeam(t *testing.T) {
 	policy := newOriginPolicy("development", []string{"https://app.example.com"})
 	req := httptest.NewRequest(http.MethodOptions, "/api/health", nil)
 	req.Header.Set("Origin", "https://app.example.com")
+	req.Header.Set("Access-Control-Request-Method", http.MethodPost)
 	decision := policy.Decide(req)
 	if !decision.Allowed || !decision.Preflight {
 		t.Fatalf("decision = %+v, want allowed preflight", decision)

@@ -69,4 +69,15 @@ describe('runtime URL helpers', () => {
       }),
     ).toEqual({ sourceImageUrl: '/uploads/canvas/U123/board/content/image.png' })
   })
+
+  it('ignores malformed development API and asset overrides', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'https://user:pass@example.com/api?token=leak')
+    vi.stubEnv('VITE_PUBLIC_ASSET_BASE_URL', 'javascript:alert(1)')
+    vi.resetModules()
+
+    const { API_BASE_URL, PUBLIC_ASSET_BASE_URL } = await import('./runtimeUrls')
+
+    expect(API_BASE_URL).toBe('/api')
+    expect(PUBLIC_ASSET_BASE_URL).toBe('')
+  })
 })

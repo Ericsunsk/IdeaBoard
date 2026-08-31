@@ -1,5 +1,6 @@
 import { isProductionRuntime } from './runtimeEnv.js'
 import { isValidSecretEncryptionKey } from './secretCipher.js'
+import { normalizeOrigin } from './origin.js'
 
 export type EnvSource = Record<string, string | undefined>
 type DatabaseSSLMode = 'disable' | 'require' | 'verify-full'
@@ -34,15 +35,8 @@ function isUnsafeProductionSecret(value: string): boolean {
 }
 
 function validateProductionURL(name: string, value: string, options: { requireHTTPS?: boolean } = {}) {
-  try {
-    const parsed = new URL(value)
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      throw new Error('invalid protocol')
-    }
-    if (options.requireHTTPS && parsed.protocol !== 'https:') {
-      throw new Error('insecure protocol')
-    }
-  } catch {
+  const normalized = normalizeOrigin(value)
+  if (!normalized || (options.requireHTTPS && !normalized.startsWith('https://'))) {
     if (options.requireHTTPS) {
       throw new Error(`${name} must be a valid https URL when NODE_ENV=production`)
     }
@@ -110,7 +104,7 @@ export function loadEnv(source: EnvSource) {
     }
     validateProductionURL('BETTER_AUTH_URL', authBaseURL, { requireHTTPS: true })
     for (const origin of trustedOrigins) {
-      validateProductionURL('AUTH_TRUSTED_ORIGINS entry', origin)
+      validateProductionURL('AUTH_TRUSTED_ORIGINS entry', origin, { requireHTTPS: true })
     }
   }
 

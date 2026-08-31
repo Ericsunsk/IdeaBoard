@@ -12,11 +12,4 @@ func TestNewAppContainerRejectsMissingPublicOriginsBeforeOpeningResources(t *tes
 	if err == nil || !strings.Contains(err.Error(), "PUBLIC_ORIGIN is required") {
 		t.Fatalf("newAppContainer() error = %v, want missing public origin", err)
 	}
-
-	_, err = newAppContainer(&config.Config{
-		PublicOrigins: config.PublicOriginsConfig{Web: "https://app.example.com"},
-	})
-	if err == nil || !strings.Contains(err.Error(), "API_BASE_URL is required") {
-		t.Fatalf("newAppContainer() error = %v, want missing API_BASE_URL", err)
-	}
 }

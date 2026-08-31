@@ -5,10 +5,28 @@ function trimTrailingSlashes(value: string): string {
   return value.replace(/\/+$/, '')
 }
 
+function isValidRuntimeBaseURL(value: string): boolean {
+  if (value.startsWith('/')) return true
+  try {
+    const parsed = new URL(value)
+    return (
+      (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+      Boolean(parsed.host) &&
+      !parsed.username &&
+      !parsed.password &&
+      !parsed.search &&
+      !parsed.hash
+    )
+  } catch {
+    return false
+  }
+}
+
 function normalizeBaseURL(value: string | undefined, fallback: string): string {
   const trimmed = (value || '').trim()
   if (!trimmed) return fallback
   if (trimmed === '/') return ''
+  if (!isValidRuntimeBaseURL(trimmed)) return fallback
   return trimTrailingSlashes(trimmed)
 }
 
@@ -24,7 +42,7 @@ function isLoopbackHostname(hostname: string): boolean {
 
 function defaultAuthBaseURL(): string {
   if (typeof window !== 'undefined') return window.location.origin
-  return 'http://localhost:5173'
+  return ''
 }
 
 // Production is served behind the same-origin gateway. Ignore legacy absolute

@@ -70,7 +70,7 @@ VPS 侧至少同步：
 ```bash
 # /opt/stacks/ideaboard/docker/.env
 PUBLIC_ORIGIN=https://ideaboard.art
-# API_BASE_URL=https://api.ideaboard.art
+# API_BASE_URL=https://api.example.com
 ```
 
 `PUBLIC_ORIGIN` 以及设置时的 `API_BASE_URL` 必须是没有 path、凭证、query 或 fragment 的 http(s) Origin。`PUBLIC_ORIGIN` 是 canonical source，用于浏览器跳转与分享链接；`API_BASE_URL` 仅在 API 独立 host 时作为 override，用于 Stripe Webhook 和服务间 API 地址。浏览器请求必须通过 `ideaboard.art` 的 same-origin Gateway，API 启动时会 fail closed 校验。

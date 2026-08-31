@@ -65,7 +65,11 @@ func (c PublicOriginsConfig) Validate() error {
 	if err := validatePublicOrigin("PUBLIC_ORIGIN", c.Web); err != nil {
 		return err
 	}
-	return validatePublicOrigin("API_BASE_URL", c.API)
+	apiOrigin := c.API
+	if strings.TrimSpace(apiOrigin) == "" {
+		apiOrigin = c.Web
+	}
+	return validatePublicOrigin("API_BASE_URL", apiOrigin)
 }
 
 func (c PublicOriginsConfig) WebURL(path string) string {
@@ -76,17 +80,25 @@ func (c PublicOriginsConfig) WebURL(path string) string {
 }
 
 func (c PublicOriginsConfig) APIURL(path string) string {
-	if validatePublicOrigin("API_BASE_URL", c.API) != nil {
+	origin := c.API
+	if strings.TrimSpace(origin) == "" {
+		origin = c.Web
+	}
+	if validatePublicOrigin("API_BASE_URL", origin) != nil {
 		return ""
 	}
-	return joinPublicOrigin(c.API, path)
+	return joinPublicOrigin(origin, path)
 }
 
 func (c PublicOriginsConfig) APIParsedURL() *url.URL {
-	if validatePublicOrigin("API_BASE_URL", c.API) != nil {
+	origin := c.API
+	if strings.TrimSpace(origin) == "" {
+		origin = c.Web
+	}
+	if validatePublicOrigin("API_BASE_URL", origin) != nil {
 		return nil
 	}
-	parsed, err := url.Parse(c.API)
+	parsed, err := url.Parse(origin)
 	if err != nil {
 		return nil
 	}

@@ -195,6 +195,59 @@ describe("AuthAdmissionPolicy", () => {
     assert.equal(settingsReads, 0);
   });
 
+  it("rejects malformed Origins instead of normalizing them into an allowlisted host", async () => {
+    const policy = createAuthAdmissionPolicy({
+      trustedOrigins: ["https://app.example.com"],
+      getSettings: async () => ({
+        registrationEnabled: true,
+        windowSeconds: 60,
+        maxRequests: 30,
+      }),
+    });
+
+    for (const origin of [
+      "https://app.example.com/path",
+      "https://app.example.com?query=1",
+      "https://user:pass@app.example.com",
+      "javascript://app.example.com",
+    ]) {
+      assert.deepEqual(
+        await policy.admitRequest({
+          method: "POST",
+          path: "/sign-in/email",
+          origin,
+          requestIP: "203.0.113.8",
+        }),
+        { allowed: false, reason: "origin_not_allowed" },
+      );
+    }
+  });
+
+  it("canonicalizes default Origin ports in CORS responses", async () => {
+    const policy = createAuthAdmissionPolicy({
+      trustedOrigins: ["https://app.example.com"],
+      getSettings: async () => ({
+        registrationEnabled: true,
+        windowSeconds: 60,
+        maxRequests: 30,
+      }),
+    });
+
+    assert.deepEqual(
+      await policy.admitRequest({
+        method: "OPTIONS",
+        path: "/sign-in/email",
+        origin: "https://app.example.com:443",
+        requestIP: "203.0.113.8",
+      }),
+      {
+        allowed: true,
+        corsOrigin: "https://app.example.com",
+        preflight: true,
+      },
+    );
+  });
+
   it("keeps sign-in available when registration is disabled", async () => {
     const policy = createAuthAdmissionPolicy({
       trustedOrigins: [],

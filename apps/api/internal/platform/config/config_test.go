@@ -32,15 +32,24 @@ var configEnvKeys = []string{
 }
 
 func TestPublicOriginsValidateAndResolveCanonicalURLs(t *testing.T) {
-	t.Run("requires both deployment origins", func(t *testing.T) {
+	t.Run("requires canonical public origin", func(t *testing.T) {
 		for _, origins := range []PublicOriginsConfig{
 			{},
-			{Web: "https://app.example.com"},
 			{API: "https://api.example.com"},
 		} {
 			if err := origins.Validate(); err == nil {
 				t.Fatalf("Validate(%+v) succeeded, want error", origins)
 			}
+		}
+	})
+
+	t.Run("defaults API origin to public origin", func(t *testing.T) {
+		origins := PublicOriginsConfig{Web: "https://app.example.com"}
+		if err := origins.Validate(); err != nil {
+			t.Fatalf("Validate() error = %v", err)
+		}
+		if got := origins.APIURL("/api/health"); got != "https://app.example.com/api/health" {
+			t.Fatalf("APIURL() = %q", got)
 		}
 	})
 

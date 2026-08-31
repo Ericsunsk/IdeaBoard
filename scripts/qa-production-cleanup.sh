@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Remove only explicitly marked QA resources through authenticated APIs.
 # Dry-run is the default; media objects are reclaimed by the existing worker.
-api_base_url="${QA_API_BASE_URL:-https://api.ideaboard.art}"
+api_base_url="${QA_API_BASE_URL:-${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN or QA_API_BASE_URL}}"
 cookie_file="${QA_COOKIE_FILE:-}"
 owner_public_id="${QA_OWNER_PUBLIC_ID:-}"
 run_id="${QA_TEST_RUN_ID:-}"
@@ -41,30 +41,38 @@ actual_owner="$(jq -r '.data.user.public_id // .user.public_id // empty' <<<"$in
 boards_json="$(curl_api "$api_base_url/api/user/boards")"
 assets_json="$(curl_api "$api_base_url/api/user/library/assets?limit=100")"
 
-for id in "${board_ids[@]}"; do
-  name="$(jq -r --arg id "$id" '.data.list[]? | select(.board_id == $id) | .name // empty' <<<"$boards_json")"
-  [[ -n "$name" ]] || die "board $id is not visible to the authenticated owner"
-  [[ "$name" == *"$run_id"* ]] || die "board $id marker guard failed"
-  printf 'BOARD %s %s\n' "$id" "$name"
-done
-for id in "${library_asset_ids[@]}"; do
-  row="$(jq -c --arg id "$id" '.data.items[]? | select((.id|tostring) == $id)' <<<"$assets_json")"
-  [[ -n "$row" ]] || die "library asset $id is not visible to the authenticated owner"
-  marker_text="$(jq -r '[.title, .source_id, .author] | map(select(. != null)) | join(" ")' <<<"$row")"
-  [[ "$marker_text" == *"$run_id"* ]] || die "library asset $id marker guard failed"
-  printf 'ASSET %s %s\n' "$id" "$(jq -r '.title // .source_id // "(untitled)"' <<<"$row")"
-done
+if (( ${#board_ids[@]} > 0 )); then
+  for id in "${board_ids[@]}"; do
+    name="$(jq -r --arg id "$id" '.data.list[]? | select(.board_id == $id) | .name // empty' <<<"$boards_json")"
+    [[ -n "$name" ]] || die "board $id is not visible to the authenticated owner"
+    [[ "$name" == *"$run_id"* ]] || die "board $id marker guard failed"
+    printf 'BOARD %s %s\n' "$id" "$name"
+  done
+fi
+if (( ${#library_asset_ids[@]} > 0 )); then
+  for id in "${library_asset_ids[@]}"; do
+    row="$(jq -c --arg id "$id" '.data.items[]? | select((.id|tostring) == $id)' <<<"$assets_json")"
+    [[ -n "$row" ]] || die "library asset $id is not visible to the authenticated owner"
+    marker_text="$(jq -r '[.title, .source_id, .author] | map(select(. != null)) | join(" ")' <<<"$row")"
+    [[ "$marker_text" == *"$run_id"* ]] || die "library asset $id marker guard failed"
+    printf 'ASSET %s %s\n' "$id" "$(jq -r '.title // .source_id // "(untitled)"' <<<"$row")"
+  done
+fi
 
 if (( ! confirm )); then
   echo 'DRY-RUN: no resources deleted. Re-run with --confirm after reviewing the list.'
   exit 0
 fi
-for id in "${board_ids[@]}"; do
-  curl_api --request DELETE "$api_base_url/api/user/boards/$id" >/dev/null
-  printf 'DELETED BOARD %s\n' "$id"
-done
-for id in "${library_asset_ids[@]}"; do
-  curl_api --request DELETE "$api_base_url/api/user/library/assets/$id" >/dev/null
-  printf 'DELETED ASSET %s\n' "$id"
-done
+if (( ${#board_ids[@]} > 0 )); then
+  for id in "${board_ids[@]}"; do
+    curl_api --request DELETE "$api_base_url/api/user/boards/$id" >/dev/null
+    printf 'DELETED BOARD %s\n' "$id"
+  done
+fi
+if (( ${#library_asset_ids[@]} > 0 )); then
+  for id in "${library_asset_ids[@]}"; do
+    curl_api --request DELETE "$api_base_url/api/user/library/assets/$id" >/dev/null
+    printf 'DELETED ASSET %s\n' "$id"
+  done
+fi
 echo 'Cleanup complete. Media objects remain under the reclamation worker grace period.'

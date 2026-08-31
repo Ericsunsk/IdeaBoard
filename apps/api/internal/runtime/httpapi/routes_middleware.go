@@ -11,8 +11,9 @@ import (
 )
 
 func registerGlobalMiddleware(r *gin.Engine, deps Dependencies) {
-	r.Use(rateLimitMiddleware(deps.RateLimit))
 	r.Use(deps.CORSMiddleware)
+	// Reject disallowed cross-origin requests before they consume application rate-limit budget.
+	r.Use(rateLimitMiddleware(deps.RateLimit))
 	r.Use(globalRequestBodyLimitMiddleware())
 }
 

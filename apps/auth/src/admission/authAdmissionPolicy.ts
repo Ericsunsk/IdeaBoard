@@ -4,6 +4,7 @@ import {
   isSignUpPath,
   normalizeAuthPath,
 } from "../infrastructure/authUtils.js";
+import { normalizeOrigin } from "../infrastructure/origin.js";
 import { supportedSocialProviders } from "../social-identity/catalog.js";
 
 type RateLimitEntry = {
@@ -73,8 +74,9 @@ export function createAuthAdmissionPolicy(
 
   return {
     async admitRequest(input) {
-      const corsOrigin = input.origin.trim();
-      if (corsOrigin && !allowedOrigins.has(normalizeOrigin(corsOrigin))) {
+      const rawOrigin = input.origin.trim();
+      const corsOrigin = rawOrigin ? normalizeOrigin(rawOrigin) : "";
+      if (rawOrigin && (!corsOrigin || !allowedOrigins.has(corsOrigin))) {
         return { allowed: false, reason: "origin_not_allowed" };
       }
 
@@ -299,16 +301,5 @@ function cleanupExpiredRateLimits(
 ): void {
   for (const [key, entry] of store) {
     if (entry.resetAtMs <= nowMs) store.delete(key);
-  }
-}
-
-function normalizeOrigin(raw: string): string {
-  try {
-    const parsed = new URL(raw.trim());
-    const protocol = parsed.protocol.toLowerCase();
-    if (protocol !== "http:" && protocol !== "https:") return "";
-    return `${protocol}//${parsed.host.toLowerCase()}`;
-  } catch {
-    return "";
   }
 }

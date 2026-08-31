@@ -20,8 +20,13 @@ chmod +x "$fake_bin/curl"
 cookie="$test_root/cookies"; touch "$cookie"
 run_cleanup() {
   PATH="$fake_bin:$PATH" QA_TEST_REQUESTS="$requests" QA_COOKIE_FILE="$cookie" \
-    QA_OWNER_PUBLIC_ID='00000000-0000-0000-0000-000000000001' QA_TEST_RUN_ID='qa-20260831-abc123' \
-    QA_API_BASE_URL='https://api.example.test' "$script_dir/qa-production-cleanup.sh" "$@"
+    QA_OWNER_PUBLIC_ID="${QA_OWNER_PUBLIC_ID:-00000000-0000-0000-0000-000000000001}" QA_TEST_RUN_ID="${QA_TEST_RUN_ID:-qa-20260831-abc123}" \
+    QA_API_BASE_URL='https://api.example.test' PUBLIC_ORIGIN='https://ideaboard.test' "$script_dir/qa-production-cleanup.sh" "$@"
+}
+run_cleanup_with_public_origin() {
+  PATH="$fake_bin:$PATH" QA_TEST_REQUESTS="$requests" QA_COOKIE_FILE="$cookie" \
+    QA_OWNER_PUBLIC_ID="${QA_OWNER_PUBLIC_ID:-00000000-0000-0000-0000-000000000001}" QA_TEST_RUN_ID="${QA_TEST_RUN_ID:-qa-20260831-abc123}" \
+    QA_API_BASE_URL= PUBLIC_ORIGIN='https://ideaboard.test' "$script_dir/qa-production-cleanup.sh" "$@"
 }
 output="$(run_cleanup --board-id qa-board-1 --library-asset-id 7)"
 grep -Fq 'DRY-RUN: no resources deleted' <<<"$output"
@@ -34,4 +39,7 @@ grep -Fq -- '--request DELETE' "$requests"
 if run_cleanup --board-id other-board >/dev/null 2>&1; then echo 'marker guard failed' >&2; exit 1; fi
 if QA_OWNER_PUBLIC_ID='00000000-0000-0000-0000-000000000002' run_cleanup --board-id qa-board-1 >/dev/null 2>&1; then echo 'owner guard failed' >&2; exit 1; fi
 if QA_TEST_RUN_ID='production-test' run_cleanup --board-id qa-board-1 >/dev/null 2>&1; then echo 'run-id validation failed' >&2; exit 1; fi
+: >"$requests"
+run_cleanup_with_public_origin --board-id qa-board-1 >/dev/null
+grep -Fq 'https://ideaboard.test/api/user/info' "$requests"
 echo 'QA production cleanup contract tests passed'

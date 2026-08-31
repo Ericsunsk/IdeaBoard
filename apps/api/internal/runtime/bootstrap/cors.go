@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -39,16 +40,21 @@ type originDecision struct {
 }
 
 type originPolicy struct {
-	production bool
-	allowed    map[string]bool
+	production       bool
+	allowed          map[string]bool
+	allowlistInvalid bool
 }
 
 func newOriginPolicy(appEnv string, allowedOrigins []string) originPolicy {
-	allowed := buildAllowedOriginSet(allowedOrigins)
-	if isProductionRuntime(appEnv) && len(allowed) > 0 {
+	allowed, configured, invalid := buildAllowedOriginSet(allowedOrigins)
+	if isProductionRuntime(appEnv) && configured {
 		slog.Warn("生产环境已配置 APP_CORS_ALLOWED_ORIGINS，但 Gateway 仅支持 same-origin；该 allowlist 将被忽略。")
 	}
-	return originPolicy{production: isProductionRuntime(appEnv), allowed: allowed}
+	return originPolicy{
+		production:       isProductionRuntime(appEnv),
+		allowed:          allowed,
+		allowlistInvalid: invalid,
+	}
 }
 
 func (p originPolicy) Decide(request *http.Request) originDecision {
@@ -59,6 +65,9 @@ func (p originPolicy) Decide(request *http.Request) originDecision {
 		return originDecision{Allowed: true}
 	}
 	if p.production {
+		return originDecision{}
+	}
+	if p.allowlistInvalid {
 		return originDecision{}
 	}
 	if len(p.allowed) == 0 {
@@ -72,9 +81,46 @@ func (p originPolicy) Decide(request *http.Request) originDecision {
 		return originDecision{}
 	}
 	if request.Method == http.MethodOptions {
+		if !isAllowedPreflight(request) {
+			return originDecision{}
+		}
 		return originDecision{Allowed: true, Preflight: true, Headers: corsResponseHeaders(origin)}
 	}
 	return originDecision{Allowed: true, Headers: corsResponseHeaders(origin)}
+}
+
+var allowedCORSMethods = map[string]bool{
+	http.MethodGet:     true,
+	http.MethodPost:    true,
+	http.MethodPut:     true,
+	http.MethodDelete:  true,
+	http.MethodPatch:   true,
+	http.MethodOptions: true,
+}
+
+var allowedCORSHeaders = map[string]bool{
+	"content-type":     true,
+	"authorization":    true,
+	"cookie":           true,
+	"x-requested-with": true,
+	"idempotency-key":  true,
+}
+
+func isAllowedPreflight(request *http.Request) bool {
+	method := strings.ToUpper(strings.TrimSpace(request.Header.Get("Access-Control-Request-Method")))
+	if !allowedCORSMethods[method] || method == http.MethodOptions {
+		return false
+	}
+	for _, rawHeader := range strings.Split(request.Header.Get("Access-Control-Request-Headers"), ",") {
+		header := strings.ToLower(strings.TrimSpace(rawHeader))
+		if header == "" {
+			continue
+		}
+		if !allowedCORSHeaders[header] {
+			return false
+		}
+	}
+	return true
 }
 
 func corsResponseHeaders(origin string) map[string]string {
@@ -101,19 +147,26 @@ func isSameOriginRequest(request *http.Request) bool {
 	} else if forwarded := strings.ToLower(strings.TrimSpace(request.Header.Get("X-Forwarded-Proto"))); forwarded == "http" || forwarded == "https" {
 		scheme = forwarded
 	}
-	return origin == scheme+"://"+strings.ToLower(strings.TrimSpace(request.Host))
+	return origin == normalizeCORSOrigin(scheme+"://"+strings.TrimSpace(request.Host))
 }
 
-func buildAllowedOriginSet(origins []string) map[string]bool {
+func buildAllowedOriginSet(origins []string) (map[string]bool, bool, bool) {
 	allowed := make(map[string]bool, len(origins))
+	configured := false
+	invalid := false
 	for _, origin := range origins {
+		if strings.TrimSpace(origin) == "" {
+			continue
+		}
+		configured = true
 		normalized := normalizeCORSOrigin(origin)
 		if normalized == "" {
+			invalid = true
 			continue
 		}
 		allowed[normalized] = true
 	}
-	return allowed
+	return allowed, configured, invalid
 }
 
 func normalizeCORSOrigin(raw string) string {
@@ -122,12 +175,35 @@ func normalizeCORSOrigin(raw string) string {
 		return ""
 	}
 	parsed, err := url.Parse(trimmed)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.User != nil ||
+		(parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return ""
 	}
 	scheme := strings.ToLower(parsed.Scheme)
 	if scheme != "http" && scheme != "https" {
 		return ""
 	}
-	return scheme + "://" + strings.ToLower(parsed.Host)
+	hostname := strings.ToLower(parsed.Hostname())
+	if hostname == "" {
+		return ""
+	}
+	port := parsed.Port()
+	if port != "" {
+		portNumber, err := strconv.Atoi(port)
+		if err != nil || portNumber < 1 || portNumber > 65535 {
+			return ""
+		}
+		if (scheme == "http" && port == "80") || (scheme == "https" && port == "443") {
+			port = ""
+		}
+	}
+	if strings.Contains(hostname, ":") {
+		hostname = "[" + hostname + "]"
+	}
+	return scheme + "://" + hostname + func() string {
+		if port == "" {
+			return ""
+		}
+		return ":" + port
+	}()
 }

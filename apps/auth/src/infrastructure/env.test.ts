@@ -125,26 +125,24 @@ describe('loadEnv production guard', () => {
   })
 
   it('rejects invalid production AUTH_TRUSTED_ORIGINS entries', () => {
-    assert.throws(
-      () =>
-        loadEnv(productionSource({
-          AUTH_TRUSTED_ORIGINS: 'https://app.example.com,not-a-url',
-        })),
-      /AUTH_TRUSTED_ORIGINS entry must be a valid http\(s\) URL when NODE_ENV=production/,
-    )
+    for (const value of [
+      'https://app.example.com,not-a-url',
+      'https://app.example.com/path',
+      'https://user:pass@app.example.com',
+      'https://app.example.com?query=1',
+    ]) {
+      assert.throws(
+        () => loadEnv(productionSource({ AUTH_TRUSTED_ORIGINS: value })),
+        /AUTH_TRUSTED_ORIGINS entry must be a valid https URL when NODE_ENV=production/,
+      )
+    }
   })
 
-  it('does not force HTTPS for production AUTH_TRUSTED_ORIGINS entries', () => {
-    const config = loadEnv(
-      productionSource({
-        AUTH_TRUSTED_ORIGINS: 'http://app.example.com, https://admin.example.com',
-      }),
+  it('requires HTTPS for production AUTH_TRUSTED_ORIGINS entries', () => {
+    assert.throws(
+      () => loadEnv(productionSource({ AUTH_TRUSTED_ORIGINS: 'http://app.example.com' })),
+      /AUTH_TRUSTED_ORIGINS entry must be a valid https URL when NODE_ENV=production/,
     )
-
-    assert.deepEqual(config.auth.trustedOrigins, [
-      'http://app.example.com',
-      'https://admin.example.com',
-    ])
   })
 
   it('accepts only allowlisted DB_SSLMODE values', () => {

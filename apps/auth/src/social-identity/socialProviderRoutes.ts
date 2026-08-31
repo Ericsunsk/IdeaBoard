@@ -6,6 +6,7 @@ import {
   type SocialProviderSettingsService,
 } from "./socialProviderSettings.js";
 import { authInternalRoutes } from "../generated/auth-internal/routes.gen.js";
+import { normalizeOrigin } from "../infrastructure/origin.js";
 
 type SocialProviderRouteService = Pick<
   SocialProviderSettingsService,
@@ -49,9 +50,13 @@ export function registerSocialProviderRoutes(
     request: FastifyRequest,
     reply: import("fastify").FastifyReply,
   ) => {
-    const origin = getHeaderValue(request.headers.origin).trim();
-    if (!origin) return;
-    if (!(options.trustedOrigins ?? []).includes(origin)) {
+    const rawOrigin = getHeaderValue(request.headers.origin).trim();
+    if (!rawOrigin) return;
+    const origin = normalizeOrigin(rawOrigin);
+    const trustedOrigins = new Set(
+      (options.trustedOrigins ?? []).map(normalizeOrigin).filter(Boolean),
+    );
+    if (!origin || !trustedOrigins.has(origin)) {
       sendError(reply, 403, "origin is not trusted");
       return reply;
     }

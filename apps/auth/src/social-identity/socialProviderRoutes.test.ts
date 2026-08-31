@@ -93,6 +93,24 @@ describe("social provider HTTP contracts", () => {
       "https://app.ideaboard.art",
     );
 
+    const canonicalized = await app.inject({
+      method: "GET",
+      url: "/api/auth/capabilities",
+      headers: { origin: "https://APP.ideaboard.art:443/" },
+    });
+    assert.equal(canonicalized.statusCode, 200);
+    assert.equal(
+      canonicalized.headers["access-control-allow-origin"],
+      "https://app.ideaboard.art",
+    );
+
+    const malformed = await app.inject({
+      method: "GET",
+      url: "/api/auth/capabilities",
+      headers: { origin: "https://app.ideaboard.art/path" },
+    });
+    assert.equal(malformed.statusCode, 403);
+
     const denied = await app.inject({
       method: "GET",
       url: "/api/auth/capabilities",
