@@ -555,6 +555,52 @@ func (r *MediaAssetRegistry) LocateStoredUpload(ctx context.Context, lookup stor
 	}, true, nil
 }
 
+func (r *MediaAssetRegistry) LocateStoredDerivative(ctx context.Context, lookup storage.StoredDerivativeLookup) (storage.StoredUploadLocation, bool, error) {
+	if r == nil || r.q == nil || lookup.AssetID <= 0 || strings.TrimSpace(lookup.Tier) == "" {
+		return storage.StoredUploadLocation{}, false, fmt.Errorf("invalid media derivative lookup")
+	}
+	row, err := r.q.GetReadyMediaDerivativeStorageLocationByAssetID(ctx, dbsqlc.GetReadyMediaDerivativeStorageLocationByAssetIDParams{
+		MediaAssetID: lookup.AssetID,
+		Tier:         strings.TrimSpace(lookup.Tier),
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return storage.StoredUploadLocation{}, false, nil
+	}
+	if err != nil {
+		return storage.StoredUploadLocation{}, false, fmt.Errorf("locate media derivative: %w", err)
+	}
+	return storage.StoredUploadLocation{StorageProfileID: row.StorageProfileID, StorageKey: row.StorageKey}, true, nil
+}
+
+func (r *MediaAssetRegistry) ValidateProcessingInputReadiness(ctx context.Context, userID int64, assetIDs []int64) error {
+	if r == nil || r.q == nil || userID <= 0 {
+		return fmt.Errorf("media derivative registry is unavailable")
+	}
+	seen := make(map[int64]struct{}, len(assetIDs))
+	for _, assetID := range assetIDs {
+		if assetID <= 0 {
+			return fmt.Errorf("媒体 AssetID 无效: %d", assetID)
+		}
+		if _, ok := seen[assetID]; ok {
+			continue
+		}
+		seen[assetID] = struct{}{}
+		derivative, err := r.q.GetMediaDerivativeByAssetTier(ctx, dbsqlc.GetMediaDerivativeByAssetTierParams{
+			MediaAssetID: assetID, OwnerUserID: userID, Tier: "processing-input",
+		})
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("媒体 Asset %d 的 processing-input derivative 不存在", assetID)
+		}
+		if err != nil {
+			return fmt.Errorf("读取媒体 Asset %d 的 processing-input derivative 失败: %w", assetID, err)
+		}
+		if derivative.Status != "ready" {
+			return fmt.Errorf("媒体 Asset %d 的 processing-input derivative 状态为 %s", assetID, derivative.Status)
+		}
+	}
+	return nil
+}
+
 func ingestionHandle(assetID int64, existingReady bool, request ingestion.Request) ingestion.Handle {
 	return ingestion.Handle{
 		AssetID:        assetID,

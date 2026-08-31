@@ -3,6 +3,8 @@ package storage
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +12,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lib/pq"
+
+	"ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/tasking/taskmedia"
@@ -18,12 +23,16 @@ import (
 
 type fixedAssetLocator map[int64]StoredUploadLocation
 
+type uploadOnlyAssetLocator map[int64]StoredUploadLocation
+
 type recordingTaskResultRegistry struct {
 	nextID      int64
 	started     []ingestion.Request
 	completed   []ingestion.Handle
 	completions []ingestion.Completion
 	failed      []ingestion.Handle
+	existing    *dbsqlc.MediaAsset
+	completeErr error
 }
 
 func (r *recordingTaskResultRegistry) Begin(_ context.Context, request ingestion.Request) (ingestion.Handle, error) {
@@ -40,6 +49,9 @@ func (r *recordingTaskResultRegistry) Begin(_ context.Context, request ingestion
 }
 
 func (r *recordingTaskResultRegistry) Complete(_ context.Context, handle ingestion.Handle, completion ingestion.Completion) error {
+	if r.completeErr != nil {
+		return r.completeErr
+	}
 	r.completed = append(r.completed, handle)
 	r.completions = append(r.completions, completion)
 	return nil
@@ -50,7 +62,24 @@ func (r *recordingTaskResultRegistry) Fail(_ context.Context, handle ingestion.H
 	return nil
 }
 
+func (r *recordingTaskResultRegistry) FindReadyOwnedMediaAssetByChecksum(_ context.Context, _ int64, _ string, _ string) (dbsqlc.MediaAsset, bool, error) {
+	if r.existing == nil {
+		return dbsqlc.MediaAsset{}, false, nil
+	}
+	return *r.existing, true, nil
+}
+
 func (l fixedAssetLocator) LocateStoredUpload(_ context.Context, lookup StoredUploadLookup) (StoredUploadLocation, bool, error) {
+	location, ok := l[lookup.AssetID]
+	return location, ok, nil
+}
+
+func (l fixedAssetLocator) LocateStoredDerivative(_ context.Context, lookup StoredDerivativeLookup) (StoredUploadLocation, bool, error) {
+	location, ok := l[lookup.AssetID]
+	return location, ok, nil
+}
+
+func (l uploadOnlyAssetLocator) LocateStoredUpload(_ context.Context, lookup StoredUploadLookup) (StoredUploadLocation, bool, error) {
 	location, ok := l[lookup.AssetID]
 	return location, ok, nil
 }
@@ -114,6 +143,21 @@ func TestRuntimeTaskMediaStoreRejectsLocalAssetWithoutProviderURL(t *testing.T) 
 	}}}}
 	if _, err := store.ResolveRuntimeMedia(t.Context(), params); err == nil {
 		t.Fatal("expected local asset without a provider URL to be rejected")
+	}
+}
+
+func TestRuntimeTaskMediaStoreNeverFallsBackToOriginalAsset(t *testing.T) {
+	service, _ := newStorageServiceTest(t)
+	service.assetLocator = uploadOnlyAssetLocator{93: {
+		StorageProfileID: builtinLocalProfileID(),
+		StorageKey:       "uploads/canvas/owner/board/content/image.png",
+	}}
+	store := NewRuntimeTaskMediaStore(service, &recordingTaskResultRegistry{})
+	params := &tasks.WorkflowTaskParams{Media: &tasks.MediaInputs{Inputs: []tasks.MediaRef{{
+		AssetID: 93, Role: tasks.MediaRoleInput,
+	}}}}
+	if _, err := store.ResolveRuntimeMedia(t.Context(), params); err == nil || !strings.Contains(err.Error(), "衍生图解析器未配置") {
+		t.Fatalf("expected processing derivative lookup failure without fallback, got %v", err)
 	}
 }
 
@@ -238,6 +282,56 @@ func TestRuntimeTaskMediaStoreMaterializeBytesResultStoresOutput(t *testing.T) {
 		t.Fatalf("output storage fields = %#v", output)
 	}
 	assertLocalUploadBytes(t, output.StorageKey, imageBytes)
+}
+
+func TestRuntimeTaskMediaStoreMaterializeBytesResultReusesChecksumAsset(t *testing.T) {
+	withTempWorkingDir(t)
+	imageBytes := tinyPNGBytes(t)
+	digest := sha256.Sum256(imageBytes)
+	service, _ := newStorageServiceTest(t)
+	canonical := &dbsqlc.MediaAsset{
+		ID: 77, OwnerUserID: 42, StorageProfileID: builtinLocalProfileID(),
+		StorageKey: "uploads/tasks/42/existing/result.png", Url: "https://cdn.example/existing.png",
+		MimeType: "image/png", Width: 1, Height: 1, SizeBytes: int64(len(imageBytes)),
+		ChecksumSha256: hex.EncodeToString(digest[:]), Status: "ready",
+	}
+	registry := &recordingTaskResultRegistry{existing: canonical}
+	adapter := NewRuntimeTaskMediaStore(service, registry)
+
+	materialized, err := adapter.MaterializeBytesResult(context.Background(), 42, "task-dedup", "result.png", "upstream://image", imageBytes, taskmedia.ResultMaterializeOptions{})
+	if err != nil {
+		t.Fatalf("MaterializeBytesResult returned error: %v", err)
+	}
+	if got := materialized.Items[0].ImageURL; got != canonical.Url {
+		t.Fatalf("materialized URL = %q, want canonical %q", got, canonical.Url)
+	}
+	if materialized.Items[0].Output.MediaAssetID == nil || *materialized.Items[0].Output.MediaAssetID != canonical.ID {
+		t.Fatalf("materialized asset = %#v, want %d", materialized.Items[0].Output.MediaAssetID, canonical.ID)
+	}
+	if len(registry.completed) != 0 {
+		t.Fatalf("deduplicated result should not complete new asset: %#v", registry.completed)
+	}
+	if len(registry.failed) != 1 {
+		t.Fatalf("deduplicated uploading asset should be failed/cleaned: %#v", registry.failed)
+	}
+}
+
+func TestRuntimeTaskMediaStoreMaterializeBytesResultConvergesAfterChecksumConflict(t *testing.T) {
+	withTempWorkingDir(t)
+	imageBytes := tinyPNGBytes(t)
+	digest := sha256.Sum256(imageBytes)
+	canonical := &dbsqlc.MediaAsset{ID: 88, OwnerUserID: 42, StorageProfileID: builtinLocalProfileID(), StorageKey: "uploads/tasks/42/existing/result.png", Url: "https://cdn.example/existing.png", MimeType: "image/png", Width: 1, Height: 1, SizeBytes: int64(len(imageBytes)), ChecksumSha256: hex.EncodeToString(digest[:]), Status: "ready"}
+	registry := &recordingTaskResultRegistry{existing: canonical, completeErr: &pq.Error{Code: "23505", Constraint: "uq_media_assets_owned_checksum"}}
+	service, _ := newStorageServiceTest(t)
+	adapter := NewRuntimeTaskMediaStore(service, registry)
+
+	materialized, err := adapter.MaterializeBytesResult(context.Background(), 42, "task-dedup-race", "result.png", "upstream://image", imageBytes, taskmedia.ResultMaterializeOptions{})
+	if err != nil {
+		t.Fatalf("MaterializeBytesResult returned error: %v", err)
+	}
+	if materialized.Items[0].ImageURL != canonical.Url || len(registry.failed) != 1 {
+		t.Fatalf("result did not converge on canonical asset: materialized=%#v failed=%#v", materialized, registry.failed)
+	}
 }
 
 func assertLocalUploadBytes(t *testing.T, objectKey string, want []byte) {

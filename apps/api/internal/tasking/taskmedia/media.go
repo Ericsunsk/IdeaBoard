@@ -33,6 +33,15 @@ type RuntimeMediaResolver interface {
 	ResolveRuntimeMedia(context.Context, *tasks.WorkflowTaskParams) (*tasks.RuntimeMediaInputs, error)
 }
 
+// ProcessingInputReadiness validates that every durable image Asset used by a
+// task already has the provider-neutral processing derivative materialized.
+// Submission and runtime resolution share this seam so a task is never
+// charged and queued only to fail later because its input derivative is still
+// being rendered.
+type ProcessingInputReadiness interface {
+	ValidateProcessingInputReadiness(context.Context, int64, []int64) error
+}
+
 type ResultMaterializer interface {
 	MaterializeRemoteResults(ctx context.Context, userID int64, taskID string, sourceURLs []string, opts ResultMaterializeOptions) (MaterializedResults, error)
 	MaterializeBytesResult(ctx context.Context, userID int64, taskID string, filename string, sourceURL string, data []byte, opts ResultMaterializeOptions) (MaterializedResults, error)

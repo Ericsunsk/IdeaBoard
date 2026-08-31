@@ -11,9 +11,56 @@ import (
 
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/prompts"
+	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/workflow"
 )
+
+type processingReadinessStub struct {
+	err   error
+	calls [][]int64
+}
+
+func (s *processingReadinessStub) ValidateProcessingInputReadiness(_ context.Context, _ int64, assetIDs []int64) error {
+	s.calls = append(s.calls, append([]int64(nil), assetIDs...))
+	return s.err
+}
+
+var _ taskmedia.ProcessingInputReadiness = (*processingReadinessStub)(nil)
+
+type assetAwareMediaValidator struct{}
+
+func (assetAwareMediaValidator) ValidateSubmitMediaRef(context.Context, int64, string) error {
+	return nil
+}
+func (assetAwareMediaValidator) ValidateSubmitMediaAssetIDs(context.Context, int64, []int64) error {
+	return nil
+}
+
+var _ taskmedia.Validator = assetAwareMediaValidator{}
+
+func TestTaskIntakeReadinessRejectsMissingProcessingInputDerivative(t *testing.T) {
+	readiness := &processingReadinessStub{err: errors.New("derivative pending")}
+	intake := NewTaskIntake(TaskIntakeDeps{
+		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+			ID: 101, Capabilities: []string{"image-generation"}, Models: []accounts.AccountModel{{Name: "model", Enabled: true}},
+		}}},
+		Media:          assetAwareMediaValidator{},
+		MediaReadiness: readiness,
+	})
+	_, err := intake.CompileReadiness(t.Context(), 42, &tasks.SubmitTaskRequest{
+		Feature: workflow.FeatureSlugVariations,
+		Params: map[string]interface{}{
+			"image_asset_ids": []int64{9},
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "media_processing_input_not_ready") {
+		t.Fatalf("expected processing input readiness error, got %v", err)
+	}
+	if len(readiness.calls) != 1 || len(readiness.calls[0]) != 1 || readiness.calls[0][0] != 9 {
+		t.Fatalf("readiness calls = %#v", readiness.calls)
+	}
+}
 
 func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t *testing.T) {
 	var intake = NewTaskIntake(TaskIntakeDeps{
@@ -228,7 +275,7 @@ func TestTaskIntakeReadinessDoesNotRequireExecutionMedia(t *testing.T) {
 				params["custom_width"] = 1024
 				params["custom_height"] = 768
 			}
-			compiled, err := intake.CompileReadiness(t.Context(), &tasks.SubmitTaskRequest{
+			compiled, err := intake.CompileReadiness(t.Context(), 42, &tasks.SubmitTaskRequest{
 				Feature: feature,
 				Params:  params,
 			})
@@ -441,7 +488,7 @@ func TestTaskIntakeRequiresImageFillSystemPrompt(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.feature, func(t *testing.T) {
-			_, err := intake.CompileReadiness(t.Context(), &tasks.SubmitTaskRequest{
+			_, err := intake.CompileReadiness(t.Context(), 42, &tasks.SubmitTaskRequest{
 				Feature: test.feature,
 				Params:  test.params,
 			})

@@ -18,6 +18,42 @@ func TestProcessingTierIsSizedForEditorWork(t *testing.T) {
 	}
 }
 
+func TestProcessingInputProfileIsProviderNeutralAndBounded(t *testing.T) {
+	profile := ProcessingInputProfile()
+	if profile.Name != ProfileProcessingInput {
+		t.Fatalf("profile name=%q, want %q", profile.Name, ProfileProcessingInput)
+	}
+	if profile.MaxSide != 2048 || profile.MaxPixels != 4*1024*1024 || profile.MaxBytes != 20*1024*1024 {
+		t.Fatalf("unexpected processing input profile: %#v", profile)
+	}
+	profile.MaxSide = 1
+	if ProcessingInputProfile().MaxSide == 1 {
+		t.Fatal("processing input profile must be returned by value")
+	}
+}
+
+func TestProcessingInputProfileValidatesFacts(t *testing.T) {
+	profile := ProcessingInputProfile()
+	for _, test := range []struct {
+		name string
+		w, h int
+		size int64
+		want bool
+	}{
+		{name: "valid", w: 2048, h: 2048, size: 1024, want: true},
+		{name: "side", w: 2049, h: 1, size: 1024},
+		{name: "pixels", w: 2048, h: 2049, size: 1024},
+		{name: "bytes", w: 1, h: 1, size: 20*1024*1024 + 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := profile.ValidateInputFacts(test.w, test.h, test.size)
+			if (err == nil) != test.want {
+				t.Fatalf("ValidateInputFacts() err=%v, wantValid=%v", err, test.want)
+			}
+		})
+	}
+}
+
 func TestRenderKeepsAspectRatioAndCapsLongestSide(t *testing.T) {
 	source := image.NewRGBA(image.Rect(0, 0, 800, 400))
 	for y := 0; y < 400; y++ {

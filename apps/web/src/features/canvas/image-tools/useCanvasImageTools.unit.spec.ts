@@ -412,7 +412,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
         size_bytes: 100,
         original: { status: 'ready', url: '/api/original.jpg' },
         derivatives: {
-          processing: { status: 'ready', format: 'webp', url: '/api/processing.webp' },
+          'processing-input': { status: 'ready', format: 'webp', url: '/api/processing-input.webp' },
         },
       },
     })
@@ -430,7 +430,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
 
       expect(renderLayerStackFileMock).toHaveBeenCalledWith(
         {
-          url: '/api/processing.webp',
+          url: '/api/processing-input.webp',
           title: 'Library image',
         },
         expect.any(Array),

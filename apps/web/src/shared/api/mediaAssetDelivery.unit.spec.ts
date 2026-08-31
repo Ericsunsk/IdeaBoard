@@ -31,6 +31,7 @@ function metadata(status: string, url = '/api/preview.webp') {
         preview: { status, url },
         'large-preview': { status, url: '/api/large.webp' },
         processing: { status, url: '/api/processing.webp' },
+        'processing-input': { status, url: '/api/processing-input.webp' },
       },
     },
   }
@@ -119,13 +120,13 @@ describe('useMediaAssetDelivery', () => {
       await import('./mediaAssetDelivery')
     invalidateMediaAssetMetadata()
 
-    await expect(resolveMediaAssetProcessingURL(42)).resolves.toBe('/api/processing.webp')
+    await expect(resolveMediaAssetProcessingURL(42)).resolves.toBe('/api/processing-input.webp')
     expect(mocks.request).toHaveBeenCalledWith(
       '/user/media-assets/42',
       expect.objectContaining({ method: 'GET' }),
     )
     expect(mocks.request).toHaveBeenCalledWith(
-      '/user/media-assets/42?ensure_tier=processing',
+      '/user/media-assets/42?ensure_tier=processing-input',
       expect.objectContaining({ method: 'GET' }),
     )
   })

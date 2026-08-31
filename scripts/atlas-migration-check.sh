@@ -35,7 +35,7 @@ resolve_added_migrations() {
     "${migration_prefix#/}"'/*.sql' || true
 }
 
-destructive_pattern='^[[:space:]]*(DROP[[:space:]]+(TABLE|COLUMN|SCHEMA|INDEX|TYPE|VIEW|MATERIALIZED[[:space:]]+VIEW|SEQUENCE|FUNCTION|TRIGGER)([[:space:]]|;|$)|TRUNCATE([[:space:]]|;|$)|ALTER[[:space:]]+TABLE[[:space:]].*[[:space:]]DROP([[:space:]]|;|$))'
+destructive_pattern='^[[:space:]]*(DROP[[:space:]]+(TABLE|COLUMN|SCHEMA|INDEX|TYPE|VIEW|MATERIALIZED[[:space:]]+VIEW|SEQUENCE|FUNCTION|TRIGGER)([[:space:]]|;|$)|TRUNCATE([[:space:]]|;|$)|ALTER[[:space:]]+TABLE[[:space:]].*[[:space:]]DROP[[:space:]]+(TABLE|COLUMN|SCHEMA|INDEX|TYPE|VIEW|MATERIALIZED[[:space:]]+VIEW|SEQUENCE|FUNCTION|TRIGGER)([[:space:]]|;|$))'
 
 check_destructive_changes() {
   local relative_path path

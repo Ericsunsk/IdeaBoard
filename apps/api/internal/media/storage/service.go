@@ -80,6 +80,11 @@ type StoredUploadLookup struct {
 	ObjectKey string
 }
 
+type StoredDerivativeLookup struct {
+	AssetID int64
+	Tier    string
+}
+
 type StoredUploadLocation struct {
 	StorageProfileID string
 	StorageKey       string
@@ -87,6 +92,10 @@ type StoredUploadLocation struct {
 
 type StoredUploadLocator interface {
 	LocateStoredUpload(context.Context, StoredUploadLookup) (StoredUploadLocation, bool, error)
+}
+
+type StoredDerivativeLocator interface {
+	LocateStoredDerivative(context.Context, StoredDerivativeLookup) (StoredUploadLocation, bool, error)
 }
 
 type StorageService struct {

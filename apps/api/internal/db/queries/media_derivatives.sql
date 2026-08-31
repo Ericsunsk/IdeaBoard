@@ -68,6 +68,16 @@ SELECT id, media_asset_id, owner_user_id, tier, format, status, storage_profile_
 FROM media_derivatives
 WHERE id = sqlc.arg(id);
 
+-- name: GetReadyMediaDerivativeStorageLocationByAssetID :one
+SELECT d.storage_profile_id, d.storage_key
+FROM media_derivatives AS d
+JOIN media_assets AS a ON a.id = d.media_asset_id AND a.owner_user_id = d.owner_user_id
+WHERE d.media_asset_id = sqlc.arg(media_asset_id)
+  AND d.tier = sqlc.arg(tier)
+  AND d.status = 'ready'
+  AND a.status = 'ready'
+  AND a.deleted_at IS NULL;
+
 -- name: ListMediaDerivativesByAsset :many
 SELECT id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
   storage_key, mime_type, width, height, size_bytes, checksum_sha256, attempt_count,
@@ -183,6 +193,7 @@ WHERE a.status = 'ready'
   AND (
     NOT EXISTS (SELECT 1 FROM media_derivatives AS d WHERE d.media_asset_id = a.id AND d.tier = 'thumb')
     OR NOT EXISTS (SELECT 1 FROM media_derivatives AS d WHERE d.media_asset_id = a.id AND d.tier = 'preview')
+    OR NOT EXISTS (SELECT 1 FROM media_derivatives AS d WHERE d.media_asset_id = a.id AND d.tier = 'processing-input')
   )
 ORDER BY a.updated_at ASC, a.id ASC
 LIMIT sqlc.arg(row_limit);

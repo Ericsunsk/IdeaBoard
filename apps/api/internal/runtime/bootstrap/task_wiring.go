@@ -180,10 +180,11 @@ func newAppTaskRuntime(
 	submissionStore := tasksubmission.NewStore(dbs.riverPool, repos.taskRepo, riverClient, taskqueue.RiverQueueDefault, taskqueue.RiverMaxAttemptsDefault, taskBillingService)
 	taskService := taskservice.NewService(taskservice.ServiceDeps{
 		TaskIntake: taskservice.NewTaskIntake(taskservice.TaskIntakeDeps{
-			Accounts:      repos.accountRepo,
-			Prompts:       repos.featurePromptRepo,
-			Media:         submitMediaValidator,
-			MediaPreparer: generationMediaPreparer,
+			Accounts:       repos.accountRepo,
+			Prompts:        repos.featurePromptRepo,
+			Media:          submitMediaValidator,
+			MediaReadiness: repos.mediaAssetRegistry,
+			MediaPreparer:  generationMediaPreparer,
 		}),
 		TaskRepo:            repos.taskRepo,
 		SubmissionStore:     submissionStore,

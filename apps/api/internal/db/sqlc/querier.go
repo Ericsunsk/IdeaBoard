@@ -120,6 +120,7 @@ type Querier interface {
 	GetQuickSavesFolder(ctx context.Context, ownerUserID int64) (LibraryFolder, error)
 	GetReadyLibraryMaterializedMediaAsset(ctx context.Context, arg GetReadyLibraryMaterializedMediaAssetParams) (MediaAsset, error)
 	GetReadyMediaAssetStorageLocationByID(ctx context.Context, id int64) (GetReadyMediaAssetStorageLocationByIDRow, error)
+	GetReadyMediaDerivativeStorageLocationByAssetID(ctx context.Context, arg GetReadyMediaDerivativeStorageLocationByAssetIDParams) (GetReadyMediaDerivativeStorageLocationByAssetIDRow, error)
 	GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64) (GetRuntimeAccountByIDWithSecretRow, error)
 	GetRuntimeAccountForAssignment(ctx context.Context, arg GetRuntimeAccountForAssignmentParams) (GetRuntimeAccountForAssignmentRow, error)
 	GetRuntimeCredentialByID(ctx context.Context, arg GetRuntimeCredentialByIDParams) (ApiAccountSecret, error)

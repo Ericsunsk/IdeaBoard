@@ -36,7 +36,7 @@ const (
 	maxProviderRawOutputStringLen  = 300
 	maxProviderRawOutputDepth      = 4
 	maxProviderRawOutputArrayItems = 5
-	minimumFluxFillTimeout         = 5 * time.Minute
+	minimumFluxFillTimeout         = 15 * time.Minute
 )
 
 const (

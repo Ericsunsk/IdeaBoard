@@ -136,7 +136,7 @@ func TestTaskIntakeReadinessRejectsImageFillDimensionsBeforeProviderLookup(t *te
 	accountsStore := &countingImageFillAccountStore{}
 	intake := NewTaskIntake(TaskIntakeDeps{Accounts: accountsStore})
 
-	_, err := intake.CompileReadiness(t.Context(), &tasks.SubmitTaskRequest{
+	_, err := intake.CompileReadiness(t.Context(), 42, &tasks.SubmitTaskRequest{
 		Feature: workflow.FeatureSlugInpaint,
 		Params: map[string]interface{}{
 			"original_image_width":  1024,

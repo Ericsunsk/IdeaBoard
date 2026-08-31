@@ -722,7 +722,7 @@ paths:
         - name: tier
           in: path
           required: true
-          schema: { type: string, enum: [thumb, preview, large-preview, processing] }
+          schema: { type: string, enum: [thumb, preview, large-preview, processing, processing-input] }
         - name: format
           in: path
           required: true
@@ -6612,7 +6612,7 @@ components:
           items: { type: string, minLength: 1, maxLength: 128 }
         ensure_tier:
           type: string
-          enum: [large-preview, processing]
+          enum: [large-preview, processing, processing-input]
 
     MediaAssetMetadataBatch:
       type: object

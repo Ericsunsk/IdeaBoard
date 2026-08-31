@@ -91,7 +91,7 @@ CREATE TABLE media_derivatives (
   last_attempt_at TIMESTAMPTZ(3),
   CONSTRAINT uq_media_derivatives_asset_tier UNIQUE (media_asset_id, tier),
   CONSTRAINT uq_media_derivatives_id_owner UNIQUE (id, owner_user_id),
-  CONSTRAINT ck_media_derivatives_tier CHECK (tier IN ('thumb', 'preview', 'large-preview', 'processing')),
+  CONSTRAINT ck_media_derivatives_tier CHECK (tier IN ('thumb', 'preview', 'large-preview', 'processing', 'processing-input')),
   CONSTRAINT ck_media_derivatives_format CHECK (format IN ('webp', 'jpeg', 'png')),
   CONSTRAINT ck_media_derivatives_status CHECK (status IN ('pending', 'processing', 'ready', 'failed', 'obsolete')),
   CONSTRAINT ck_media_derivatives_storage_profile_id_not_blank CHECK (btrim(storage_profile_id) <> ''),

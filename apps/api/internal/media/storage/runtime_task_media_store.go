@@ -3,10 +3,13 @@ package storage
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"strings"
 
+	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/media/ingestion"
+	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/tasks"
 )
@@ -20,6 +23,7 @@ type MediaIngestionRegistry interface {
 	Begin(context.Context, ingestion.Request) (ingestion.Handle, error)
 	Complete(context.Context, ingestion.Handle, ingestion.Completion) error
 	Fail(context.Context, ingestion.Handle, error) error
+	FindReadyOwnedMediaAssetByChecksum(context.Context, int64, string, string) (dbsqlc.MediaAsset, bool, error)
 }
 
 var _ taskmedia.ResultMaterializer = (*RuntimeTaskMediaStore)(nil)
@@ -56,7 +60,7 @@ func (s *RuntimeTaskMediaStore) ResolveRuntimeMedia(ctx context.Context, params 
 		if existing := urls[assetID]; existing != "" {
 			return existing, nil
 		}
-		providerURL, err := s.service.ResolveProviderAssetURL(ctx, assetID)
+		providerURL, err := s.service.ResolveProviderDerivativeURL(ctx, assetID, "processing-input")
 		if err != nil {
 			return "", err
 		}
@@ -123,7 +127,21 @@ func (s *RuntimeTaskMediaStore) MaterializeRemoteResults(ctx context.Context, us
 			s.failTaskResult(ctx, handle, err)
 			return taskmedia.MaterializedResults{}, fmt.Errorf("持久化任务结果图片失败: index=%d: 存储引用为空", index)
 		}
-		if err := s.registry.Complete(ctx, handle, ref.IngestionCompletion(sourceURL)); err != nil {
+		completion := ref.IngestionCompletion(sourceURL)
+		if reused, ok, err := s.reuseReadyAsset(ctx, handle, completion); err != nil {
+			s.failTaskResult(ctx, handle, err)
+			return taskmedia.MaterializedResults{}, fmt.Errorf("查找重复任务结果媒体失败: index=%d: %w", index, err)
+		} else if ok {
+			items = append(items, taskmedia.MaterializedResult{ImageURL: reused.Url, Output: taskOutputFromMediaAsset(taskID, reused, sourceURL, index)})
+			continue
+		}
+		if err := s.registry.Complete(ctx, handle, completion); err != nil {
+			if database.IsDuplicateConstraintError(err) {
+				if reused, ok, lookupErr := s.reuseReadyAsset(ctx, handle, completion); lookupErr == nil && ok {
+					items = append(items, taskmedia.MaterializedResult{ImageURL: reused.Url, Output: taskOutputFromMediaAsset(taskID, reused, sourceURL, index)})
+					continue
+				}
+			}
 			s.failTaskResult(ctx, handle, err)
 			return taskmedia.MaterializedResults{}, fmt.Errorf("完成任务结果媒体摄取失败: index=%d: %w", index, err)
 		}
@@ -156,7 +174,19 @@ func (s *RuntimeTaskMediaStore) MaterializeBytesResult(ctx context.Context, user
 		s.failTaskResult(ctx, handle, err)
 		return taskmedia.MaterializedResults{}, fmt.Errorf("持久化任务结果图片失败: 存储引用为空")
 	}
-	if err := s.registry.Complete(ctx, handle, ref.IngestionCompletion(sourceURL)); err != nil {
+	completion := ref.IngestionCompletion(sourceURL)
+	if reused, ok, err := s.reuseReadyAsset(ctx, handle, completion); err != nil {
+		s.failTaskResult(ctx, handle, err)
+		return taskmedia.MaterializedResults{}, fmt.Errorf("查找重复任务结果媒体失败: %w", err)
+	} else if ok {
+		return taskmedia.MaterializedResults{Items: []taskmedia.MaterializedResult{{ImageURL: reused.Url, Output: taskOutputFromMediaAsset(taskID, reused, sourceURL, 0)}}}, nil
+	}
+	if err := s.registry.Complete(ctx, handle, completion); err != nil {
+		if database.IsDuplicateConstraintError(err) {
+			if reused, ok, lookupErr := s.reuseReadyAsset(ctx, handle, completion); lookupErr == nil && ok {
+				return taskmedia.MaterializedResults{Items: []taskmedia.MaterializedResult{{ImageURL: reused.Url, Output: taskOutputFromMediaAsset(taskID, reused, sourceURL, 0)}}}, nil
+			}
+		}
 		s.failTaskResult(ctx, handle, err)
 		return taskmedia.MaterializedResults{}, fmt.Errorf("完成任务结果媒体摄取失败: %w", err)
 	}
@@ -168,6 +198,30 @@ func (s *RuntimeTaskMediaStore) MaterializeBytesResult(ctx context.Context, user
 			Output:   output,
 		}},
 	}, nil
+}
+
+// reuseReadyAsset converges concurrent task-result materialization on the
+// owner's canonical ready asset. The newly downloaded object is discarded and
+// its uploading asset is failed after the winner has been identified.
+func (s *RuntimeTaskMediaStore) reuseReadyAsset(ctx context.Context, handle ingestion.Handle, completion ingestion.Completion) (dbsqlc.MediaAsset, bool, error) {
+	if strings.TrimSpace(completion.ChecksumSHA256) == "" {
+		return dbsqlc.MediaAsset{}, false, nil
+	}
+	existing, found, err := s.registry.FindReadyOwnedMediaAssetByChecksum(ctx, handle.OwnerUserID, handle.StorageProfile, completion.ChecksumSHA256)
+	if err != nil || !found {
+		return dbsqlc.MediaAsset{}, found, err
+	}
+	if handle.ExistingReady || existing.ID == handle.AssetID {
+		return existing, true, nil
+	}
+	cleanupCtx := context.WithoutCancel(ctx)
+	if err := s.service.DeleteObjectByStorageProfile(cleanupCtx, handle.StorageProfile, handle.StorageKey); err != nil {
+		slog.Warn("discard duplicate task result object failed", "asset_id", handle.AssetID, "storage_profile", handle.StorageProfile, "storage_key", handle.StorageKey, "err", err)
+	}
+	if err := s.registry.Fail(cleanupCtx, handle, fmt.Errorf("任务结果复用已有媒体 Asset %d", existing.ID)); err != nil {
+		slog.Error("mark duplicate task result ingestion failed", "asset_id", handle.AssetID, "err", err)
+	}
+	return existing, true, nil
 }
 
 func (s *RuntimeTaskMediaStore) beginTaskResult(ctx context.Context, userID int64, taskID string, resultIndex int, sourceURL string) (ingestion.Handle, error) {
@@ -199,8 +253,12 @@ func (s *RuntimeTaskMediaStore) failTaskResult(ctx context.Context, handle inges
 		return
 	}
 	cleanupCtx := context.WithoutCancel(ctx)
-	_ = s.service.DeleteObjectByStorageProfile(cleanupCtx, handle.StorageProfile, handle.StorageKey)
-	_ = s.registry.Fail(cleanupCtx, handle, cause)
+	if err := s.service.DeleteObjectByStorageProfile(cleanupCtx, handle.StorageProfile, handle.StorageKey); err != nil {
+		slog.Warn("cleanup failed task result object failed", "asset_id", handle.AssetID, "storage_profile", handle.StorageProfile, "storage_key", handle.StorageKey, "err", err)
+	}
+	if err := s.registry.Fail(cleanupCtx, handle, cause); err != nil {
+		slog.Error("mark failed task result ingestion failed", "asset_id", handle.AssetID, "err", err)
+	}
 }
 
 func taskOutputFromStoredUploadRef(taskID string, ref *StoredUploadRef, sourceURL string, resultIndex int) tasks.TaskOutput {
@@ -222,6 +280,12 @@ func taskOutputFromStoredUploadRef(taskID string, ref *StoredUploadRef, sourceUR
 		StorageProfile: ref.StorageProfile,
 		ResultIndex:    resultIndex,
 	}
+}
+
+func taskOutputFromMediaAsset(taskID string, asset dbsqlc.MediaAsset, sourceURL string, resultIndex int) tasks.TaskOutput {
+	return tasks.TaskOutput{TaskID: taskID, Role: "image", URL: asset.Url, StorageKey: asset.StorageKey,
+		MIMEType: asset.MimeType, Width: int(asset.Width), Height: int(asset.Height), SizeBytes: asset.SizeBytes,
+		ChecksumSHA256: asset.ChecksumSha256, SourceURL: sourceURL, StorageProfile: asset.StorageProfileID, ResultIndex: resultIndex}
 }
 
 func taskMediaStoredObject(obj *StoredUploadObject) *taskmedia.StoredObject {

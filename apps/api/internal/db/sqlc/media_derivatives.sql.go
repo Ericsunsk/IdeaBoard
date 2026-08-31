@@ -193,6 +193,34 @@ func (q *Queries) GetMediaDerivativeForDelivery(ctx context.Context, arg GetMedi
 	return i, err
 }
 
+const getReadyMediaDerivativeStorageLocationByAssetID = `-- name: GetReadyMediaDerivativeStorageLocationByAssetID :one
+SELECT d.storage_profile_id, d.storage_key
+FROM media_derivatives AS d
+JOIN media_assets AS a ON a.id = d.media_asset_id AND a.owner_user_id = d.owner_user_id
+WHERE d.media_asset_id = $1
+  AND d.tier = $2
+  AND d.status = 'ready'
+  AND a.status = 'ready'
+  AND a.deleted_at IS NULL
+`
+
+type GetReadyMediaDerivativeStorageLocationByAssetIDParams struct {
+	MediaAssetID int64  `json:"media_asset_id"`
+	Tier         string `json:"tier"`
+}
+
+type GetReadyMediaDerivativeStorageLocationByAssetIDRow struct {
+	StorageProfileID string `json:"storage_profile_id"`
+	StorageKey       string `json:"storage_key"`
+}
+
+func (q *Queries) GetReadyMediaDerivativeStorageLocationByAssetID(ctx context.Context, arg GetReadyMediaDerivativeStorageLocationByAssetIDParams) (GetReadyMediaDerivativeStorageLocationByAssetIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getReadyMediaDerivativeStorageLocationByAssetID, arg.MediaAssetID, arg.Tier)
+	var i GetReadyMediaDerivativeStorageLocationByAssetIDRow
+	err := row.Scan(&i.StorageProfileID, &i.StorageKey)
+	return i, err
+}
+
 const listMediaAssetSources = `-- name: ListMediaAssetSources :many
 SELECT id, media_asset_id, source_asset_id, owner_user_id, source_role, source_index, metadata, created_at
 FROM media_asset_sources
@@ -424,6 +452,7 @@ WHERE a.status = 'ready'
   AND (
     NOT EXISTS (SELECT 1 FROM media_derivatives AS d WHERE d.media_asset_id = a.id AND d.tier = 'thumb')
     OR NOT EXISTS (SELECT 1 FROM media_derivatives AS d WHERE d.media_asset_id = a.id AND d.tier = 'preview')
+    OR NOT EXISTS (SELECT 1 FROM media_derivatives AS d WHERE d.media_asset_id = a.id AND d.tier = 'processing-input')
   )
 ORDER BY a.updated_at ASC, a.id ASC
 LIMIT $1

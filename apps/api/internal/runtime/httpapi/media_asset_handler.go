@@ -84,7 +84,7 @@ func (h *mediaAssetHandler) Metadata(c *gin.Context) {
 	}
 	ensureTier := strings.TrimSpace(c.Query("ensure_tier"))
 	if ensureTier != "" {
-		if ensureTier != derivatives.TierLargePreview && ensureTier != derivatives.TierProcessing {
+		if ensureTier != derivatives.TierLargePreview && ensureTier != derivatives.TierProcessing && ensureTier != derivatives.TierProcessingInput {
 			response.Error(c, http.StatusBadRequest, "请求的媒体派生规格无效")
 			return
 		}
@@ -126,7 +126,7 @@ func (h *mediaAssetHandler) MetadataBatch(c *gin.Context) {
 		return
 	}
 	ensureTier := strings.TrimSpace(req.EnsureTier)
-	if ensureTier != "" && ensureTier != derivatives.TierLargePreview && ensureTier != derivatives.TierProcessing {
+	if ensureTier != "" && ensureTier != derivatives.TierLargePreview && ensureTier != derivatives.TierProcessing && ensureTier != derivatives.TierProcessingInput {
 		response.Error(c, http.StatusBadRequest, "请求的媒体派生规格无效")
 		return
 	}

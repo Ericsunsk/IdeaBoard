@@ -7,7 +7,10 @@ const (
 
 	MinTimeoutSeconds     = 1
 	DefaultTimeoutSeconds = 120
-	MaxTimeoutSeconds     = 600
+	// Provider calls may include serverless GPU cold-start and model load time.
+	// Keep the account budget aligned with the longest supported image-fill
+	// operation instead of timing out the worker before the upstream contract.
+	MaxTimeoutSeconds = 900
 )
 
 func NormalizeMaxConcurrent(value int) int {

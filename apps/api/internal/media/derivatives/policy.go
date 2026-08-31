@@ -16,11 +16,13 @@ type TierPolicy struct {
 var defaultTierPolicies = []TierPolicy{
 	{Tier: TierThumb, Format: FormatWebP},
 	{Tier: TierPreview, Format: FormatWebP},
+	{Tier: TierProcessingInput, Format: FormatWebP},
 }
 
 var onDemandTierPolicies = map[string]TierPolicy{
-	TierLargePreview: {Tier: TierLargePreview, Format: FormatWebP},
-	TierProcessing:   {Tier: TierProcessing, Format: FormatWebP},
+	TierLargePreview:    {Tier: TierLargePreview, Format: FormatWebP},
+	TierProcessing:      {Tier: TierProcessing, Format: FormatWebP},
+	TierProcessingInput: {Tier: TierProcessingInput, Format: FormatWebP},
 }
 
 func ScheduleDefault(ctx context.Context, q *dbsqlc.Queries, assetID, ownerUserID int64) ([]int64, error) {

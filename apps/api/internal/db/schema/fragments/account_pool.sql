@@ -64,7 +64,7 @@ CREATE TABLE api_accounts (
   CONSTRAINT chk_api_accounts_provider_endpoint_id_positive CHECK (provider_endpoint_id > 0),
   CONSTRAINT chk_api_accounts_status CHECK (status IN (0, 1)),
   CONSTRAINT chk_api_accounts_max_concurrent CHECK (max_concurrent BETWEEN 1 AND 64),
-  CONSTRAINT chk_api_accounts_timeout CHECK (timeout BETWEEN 1 AND 600),
+  CONSTRAINT chk_api_accounts_timeout CHECK (timeout BETWEEN 1 AND 900),
   CONSTRAINT chk_api_accounts_fail_count CHECK (fail_count >= 0),
   CONSTRAINT chk_api_accounts_weight CHECK (weight > 0),
   CONSTRAINT chk_api_accounts_deleted_status CHECK (deleted_at IS NULL OR status = 0),

@@ -34,7 +34,7 @@ var errNoAvailableAPIAccount = errors.New("no available API account")
 // into the canonical Tasking request shared by Readiness and Submit.
 type TaskIntake interface {
 	Compile(context.Context, int64, *tasks.SubmitTaskRequest) (CanonicalTaskRequest, error)
-	CompileReadiness(context.Context, *tasks.SubmitTaskRequest) (TaskReadinessCompilation, error)
+	CompileReadiness(context.Context, int64, *tasks.SubmitTaskRequest) (TaskReadinessCompilation, error)
 	PrepareMedia(context.Context, int64, CanonicalTaskRequest) (CanonicalTaskRequest, error)
 }
 
@@ -54,29 +54,32 @@ type AccountStore interface {
 }
 
 type TaskIntakeDeps struct {
-	Accounts      AccountStore
-	Prompts       FeaturePromptStore
-	Media         taskmedia.Validator
-	MediaPreparer taskmedia.GenerationMediaPreparer
+	Accounts       AccountStore
+	Prompts        FeaturePromptStore
+	Media          taskmedia.Validator
+	MediaReadiness taskmedia.ProcessingInputReadiness
+	MediaPreparer  taskmedia.GenerationMediaPreparer
 }
 
 type taskIntake struct {
-	accounts      AccountStore
-	prompts       FeaturePromptStore
-	media         taskmedia.Validator
-	mediaPreparer taskmedia.GenerationMediaPreparer
+	accounts       AccountStore
+	prompts        FeaturePromptStore
+	media          taskmedia.Validator
+	mediaReadiness taskmedia.ProcessingInputReadiness
+	mediaPreparer  taskmedia.GenerationMediaPreparer
 }
 
 func NewTaskIntake(deps TaskIntakeDeps) TaskIntake {
 	return &taskIntake{
-		accounts:      deps.Accounts,
-		prompts:       deps.Prompts,
-		media:         deps.Media,
-		mediaPreparer: deps.MediaPreparer,
+		accounts:       deps.Accounts,
+		prompts:        deps.Prompts,
+		media:          deps.Media,
+		mediaReadiness: deps.MediaReadiness,
+		mediaPreparer:  deps.MediaPreparer,
 	}
 }
 
-func (i *taskIntake) CompileReadiness(ctx context.Context, req *tasks.SubmitTaskRequest) (TaskReadinessCompilation, error) {
+func (i *taskIntake) CompileReadiness(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (TaskReadinessCompilation, error) {
 	if req == nil {
 		return TaskReadinessCompilation{}, validation.New("请求参数错误")
 	}
@@ -110,6 +113,9 @@ func (i *taskIntake) CompileReadiness(ctx context.Context, req *tasks.SubmitTask
 		return TaskReadinessCompilation{}, err
 	}
 	if err := validateImageFillDimensions(featureSlug, typedParams); err != nil {
+		return TaskReadinessCompilation{}, err
+	}
+	if err := i.validateProcessingInputReadiness(ctx, userID, submitRequestAssetIDs(req)); err != nil {
 		return TaskReadinessCompilation{}, err
 	}
 	if requiresImageFillSystemPrompt(featureSlug) {
@@ -148,9 +154,7 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	if err := i.validateImageURLs(ctx, userID, req.ImageURLs); err != nil {
 		return CanonicalTaskRequest{}, err
 	}
-	assetIDs := append([]int64(nil), req.ImageAssetIDs...)
-	assetIDs = append(assetIDs, req.ReferenceImageAssetIDs...)
-	assetIDs = append(assetIDs, mediaAssetIDsFromParams(req.Params)...)
+	assetIDs := submitRequestAssetIDs(req)
 	if err := i.validateImageAssetIDs(ctx, userID, assetIDs); err != nil {
 		return CanonicalTaskRequest{}, err
 	}
@@ -290,12 +294,22 @@ func mediaAssetIDsFromParams(params map[string]interface{}) []int64 {
 		return nil
 	}
 	assetIDs := collectInt64List(params[paramkeys.ImageAssetIDs])
+	assetIDs = append(assetIDs, collectInt64List(params[paramkeys.ReferenceImageAssetIDs])...)
 	for _, key := range []string{paramkeys.OriginalImageAssetID, paramkeys.MaskImageAssetID} {
 		if assetID, ok := readInt64Param(params[key]); ok {
 			assetIDs = append(assetIDs, assetID)
 		}
 	}
 	return assetIDs
+}
+
+func submitRequestAssetIDs(req *tasks.SubmitTaskRequest) []int64 {
+	if req == nil {
+		return nil
+	}
+	assetIDs := append([]int64(nil), req.ImageAssetIDs...)
+	assetIDs = append(assetIDs, req.ReferenceImageAssetIDs...)
+	return append(assetIDs, mediaAssetIDsFromParams(req.Params)...)
 }
 
 func requiresImageFillSystemPrompt(featureSlug string) bool {
@@ -331,11 +345,28 @@ func (i *taskIntake) PrepareMedia(ctx context.Context, userID int64, canonical C
 	if err != nil {
 		return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", err)
 	}
+	assetIDs := make([]int64, 0, len(prepared.Media))
+	for _, media := range prepared.Media {
+		assetIDs = append(assetIDs, media.AssetID)
+	}
+	if err := i.validateProcessingInputReadiness(ctx, userID, assetIDs); err != nil {
+		return CanonicalTaskRequest{}, err
+	}
 	updated, err := canonical.WithGenerationSnapshot(prepared)
 	if err != nil {
 		return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", err)
 	}
 	return updated, nil
+}
+
+func (i *taskIntake) validateProcessingInputReadiness(ctx context.Context, userID int64, assetIDs []int64) error {
+	if len(assetIDs) == 0 || i == nil || i.mediaReadiness == nil {
+		return nil
+	}
+	if err := i.mediaReadiness.ValidateProcessingInputReadiness(ctx, userID, assetIDs); err != nil {
+		return newSubmissionError("media_processing_input_not_ready", "参考图片仍在处理中，请稍后重试", err)
+	}
+	return nil
 }
 
 func (i *taskIntake) validateImageURLs(ctx context.Context, userID int64, imageURLs []string) error {
