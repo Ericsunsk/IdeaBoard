@@ -43,7 +43,7 @@ func TestTaskIntakeReadinessRejectsMissingProcessingInputDerivative(t *testing.T
 	readiness := &processingReadinessStub{err: errors.New("derivative pending")}
 	intake := NewTaskIntake(TaskIntakeDeps{
 		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID: 101, Capabilities: []string{"image-generation"}, Models: []accounts.AccountModel{{Name: "model", Enabled: true}},
+			ID: 101, Capabilities: []string{"generation"}, Models: []accounts.AccountModel{{Name: "model", Enabled: true}},
 		}}},
 		Media:          assetAwareMediaValidator{},
 		MediaReadiness: readiness,
@@ -66,7 +66,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 	var intake = NewTaskIntake(TaskIntakeDeps{
 		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
 			ID:           101,
-			Capabilities: []string{"background-removal", "image-upscale", "image-fill"},
+			Capabilities: []string{"cutout", "upscale", "fill"},
 			Models:       []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
 		}}},
 		Prompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
@@ -100,17 +100,17 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 		},
 		{feature: workflow.FeatureSlugCutout, images: []string{"https://example.com/remove.png"}},
 		{
-			feature: workflow.FeatureSlugStyleFusion,
+			feature: workflow.FeatureSlugFusion,
 			images:  []string{"https://example.com/a.png", "https://example.com/b.png"},
 			params: map[string]interface{}{
 				"fusion": map[string]interface{}{"input_weights": []float64{3, 1}},
 			},
 		},
-		{feature: workflow.FeatureSlugPromptGeneration},
+		{feature: workflow.FeatureSlugGeneration},
 		{
-			feature: workflow.FeatureSlugHDUpscale,
+			feature: workflow.FeatureSlugUpscale,
 			images:  []string{"https://example.com/upscale.png"},
-			params:  map[string]interface{}{"hd": map[string]interface{}{"scale": 2.0}},
+			params:  map[string]interface{}{"upscale": map[string]interface{}{"scale": 2.0}},
 		},
 		{
 			feature: workflow.FeatureSlugOutpaint,
@@ -128,7 +128,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 	for _, tt := range tests {
 		t.Run(tt.feature, func(t *testing.T) {
 			outputCount := 2
-			if tt.feature == workflow.FeatureSlugCutout || tt.feature == workflow.FeatureSlugHDUpscale || tt.feature == workflow.FeatureSlugInpaint || tt.feature == workflow.FeatureSlugOutpaint {
+			if tt.feature == workflow.FeatureSlugCutout || tt.feature == workflow.FeatureSlugUpscale || tt.feature == workflow.FeatureSlugInpaint || tt.feature == workflow.FeatureSlugOutpaint {
 				outputCount = 1
 			}
 			requestParams := map[string]interface{}{"output_count": outputCount}
@@ -153,7 +153,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 			}
 
 			wantQuantity := int64(2)
-			if tt.feature == workflow.FeatureSlugCutout || tt.feature == workflow.FeatureSlugHDUpscale || tt.feature == workflow.FeatureSlugInpaint || tt.feature == workflow.FeatureSlugOutpaint {
+			if tt.feature == workflow.FeatureSlugCutout || tt.feature == workflow.FeatureSlugUpscale || tt.feature == workflow.FeatureSlugInpaint || tt.feature == workflow.FeatureSlugOutpaint {
 				wantQuantity = 1
 			}
 			billingRequest := canonical.BillingRequest()
@@ -196,7 +196,7 @@ func TestTaskIntakeRejectsOutputCountOutsideCanonicalContract(t *testing.T) {
 		t.Run(fmt.Sprint(outputCount), func(t *testing.T) {
 			_, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 				Prompt:         "generate",
-				Feature:        workflow.FeatureSlugPromptGeneration,
+				Feature:        workflow.FeatureSlugGeneration,
 				ClientActionID: "invalid-output-count",
 				Params:         map[string]interface{}{"output_count": outputCount},
 			})
@@ -211,20 +211,20 @@ func TestTaskIntakeRejectsDedicatedImageTransformGenerationControls(t *testing.T
 	intake := NewTaskIntake(TaskIntakeDeps{
 		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
 			ID:           101,
-			Capabilities: []string{"background-removal", "image-upscale"},
+			Capabilities: []string{"cutout", "upscale"},
 			Models:       []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
 		}}},
 		Media: testSubmitMediaValidator{},
 	})
 
-	for _, feature := range []string{workflow.FeatureSlugCutout, workflow.FeatureSlugHDUpscale} {
+	for _, feature := range []string{workflow.FeatureSlugCutout, workflow.FeatureSlugUpscale} {
 		t.Run(feature, func(t *testing.T) {
 			params := map[string]interface{}{
 				"output_count":      99,
 				"output_resolution": "4k",
 			}
-			if feature == workflow.FeatureSlugHDUpscale {
-				params["hd"] = map[string]interface{}{"scale": 2.5}
+			if feature == workflow.FeatureSlugUpscale {
+				params["upscale"] = map[string]interface{}{"scale": 2.5}
 			}
 			_, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 				Prompt: "ignored", Feature: feature, ClientActionID: "ignored-controls-" + feature, Params: params,
@@ -240,7 +240,7 @@ func TestTaskIntakeAllowsModelessRemoveBackgroundAccount(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
 		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
 			ID:           101,
-			Capabilities: []string{"background-removal"},
+			Capabilities: []string{"cutout"},
 		}}},
 		Media: testSubmitMediaValidator{},
 	})
@@ -258,7 +258,7 @@ func TestTaskIntakeReadinessDoesNotRequireExecutionMedia(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
 		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
 			ID:           101,
-			Capabilities: []string{"background-removal", "image-fill"},
+			Capabilities: []string{"cutout", "fill"},
 			Models:       []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 		}}},
 		Prompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
@@ -386,22 +386,22 @@ func TestTaskIntakePrepareMediaFailsClosedWithoutPreparer(t *testing.T) {
 	}
 }
 
-func TestTaskIntakeCompilesPromptGenerationPrimitiveAndOrderedReferences(t *testing.T) {
+func TestTaskIntakeCompilesGenerationPrimitiveAndOrderedReferences(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
 		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
 			ID: 101, Models: []accounts.AccountModel{{Name: "runtime-model", Enabled: true}},
 		}}},
 		Prompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
-			workflow.FeatureSlugPromptGeneration: {
+			workflow.FeatureSlugGeneration: {
 				Prompt:                "Create an image. {{user_prompt}}",
-				UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(workflow.FeatureSlugPromptGeneration),
+				UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(workflow.FeatureSlugGeneration),
 			},
 		}},
 		Media: testSubmitMediaValidator{},
 	})
 
 	textRequest, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
-		Feature: workflow.FeatureSlugPromptGeneration, ClientActionID: "prompt-text",
+		Feature: workflow.FeatureSlugGeneration, ClientActionID: "prompt-text",
 		Params: map[string]interface{}{"output_count": 2},
 	})
 	if err != nil {
@@ -413,7 +413,7 @@ func TestTaskIntakeCompilesPromptGenerationPrimitiveAndOrderedReferences(t *test
 
 	refs := []string{"https://example.com/one.png", "https://example.com/two.png", "https://example.com/three.png"}
 	imageRequest, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
-		Prompt: "keep this order", Feature: workflow.FeatureSlugPromptGeneration,
+		Prompt: "keep this order", Feature: workflow.FeatureSlugGeneration,
 		ImageURLs: refs, ClientActionID: "prompt-image",
 		Params: map[string]interface{}{"output_count": 4},
 	})
@@ -430,7 +430,7 @@ func TestTaskIntakeCompilesPromptGenerationPrimitiveAndOrderedReferences(t *test
 		}
 	}
 	billing := imageRequest.BillingRequest()
-	if billing == nil || billing.Feature != workflow.FeatureSlugPromptGeneration || billing.Quantity != 4 {
+	if billing == nil || billing.Feature != workflow.FeatureSlugGeneration || billing.Quantity != 4 {
 		t.Fatalf("billing=%+v", billing)
 	}
 }
@@ -446,7 +446,7 @@ func TestTaskIntakeAllowsMissingSystemPrompt(t *testing.T) {
 
 	canonical, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "repeatable textile pattern",
-		Feature:        workflow.FeatureSlugPromptGeneration,
+		Feature:        workflow.FeatureSlugGeneration,
 		ClientActionID: "missing-system-prompt",
 	})
 	if err != nil {
@@ -461,7 +461,7 @@ func TestTaskIntakeRequiresImageFillSystemPrompt(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
 		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
 			ID:           101,
-			Capabilities: []string{"image-fill"},
+			Capabilities: []string{"fill"},
 		}}},
 	})
 	tests := []struct {
@@ -512,7 +512,7 @@ func TestTaskIntakePreservesPromptCauseBehindStableError(t *testing.T) {
 
 	_, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "repeatable textile pattern",
-		Feature:        workflow.FeatureSlugPromptGeneration,
+		Feature:        workflow.FeatureSlugGeneration,
 		ClientActionID: "prompt-cause",
 	})
 	if !errors.Is(err, cause) {

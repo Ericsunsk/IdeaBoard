@@ -3,44 +3,52 @@ package providerendpoints
 import "testing"
 
 func TestNormalizeProtocolCapabilitiesEnforcesCompatibility(t *testing.T) {
-	protocol, capabilities, err := NormalizeProtocolCapabilities(ProtocolImageURLJSONImage, []string{CapabilityBackgroundRemoval})
-	if err != nil || protocol != ProtocolImageURLJSONImage || len(capabilities) != 1 {
+	protocol, capabilities, err := NormalizeProtocolCapabilities(ProtocolImagePipeline, []string{CapabilityCutout})
+	if err != nil || protocol != ProtocolImagePipeline || len(capabilities) != 1 {
 		t.Fatalf("custom protocol normalization = %q, %v, %v", protocol, capabilities, err)
 	}
-	if capabilities[0] != CapabilityBackgroundRemoval {
+	if capabilities[0] != CapabilityCutout {
 		t.Fatalf("custom protocol capabilities = %v", capabilities)
 	}
-	if _, _, err := NormalizeProtocolCapabilities(ProtocolImageURLJSONImage, nil); err == nil {
+	protocol, capabilities, err = NormalizeProtocolCapabilities(ProtocolImageURLJSONImage, []string{CapabilityCutout})
+	if err != nil || protocol != ProtocolImagePipeline || len(capabilities) != 1 {
+		t.Fatalf("custom protocol alias normalization = %q, %v, %v", protocol, capabilities, err)
+	}
+	if _, _, err := NormalizeProtocolCapabilities(ProtocolImagePipeline, nil); err == nil {
 		t.Fatal("image processing protocol without a selected capability should fail")
 	}
-	if _, _, err := NormalizeProtocolCapabilities(ProtocolImageURLJSONImage, []string{CapabilityBackgroundRemoval, CapabilityImageUpscale}); err == nil {
+	if _, _, err := NormalizeProtocolCapabilities(ProtocolImagePipeline, []string{CapabilityCutout, CapabilityUpscale}); err == nil {
 		t.Fatal("image processing protocol with multiple capabilities should fail")
 	}
-	if _, _, err := NormalizeProtocolCapabilities(ProtocolImageURLJSONImage, []string{CapabilityImageGeneration}); err == nil {
+	if _, _, err := NormalizeProtocolCapabilities(ProtocolImagePipeline, []string{CapabilityGeneration}); err == nil {
 		t.Fatal("image processing protocol with an unsupported capability should fail")
 	}
-	protocol, capabilities, err = NormalizeProtocolCapabilities(ProtocolFluxFillJSONImage, []string{CapabilityImageFill})
-	if err != nil || protocol != ProtocolFluxFillJSONImage || len(capabilities) != 1 || capabilities[0] != CapabilityImageFill {
-		t.Fatalf("flux fill protocol normalization = %q, %v, %v", protocol, capabilities, err)
+	protocol, capabilities, err = NormalizeProtocolCapabilities(ProtocolImageFill, []string{CapabilityFill})
+	if err != nil || protocol != ProtocolImageFill || len(capabilities) != 1 || capabilities[0] != CapabilityFill {
+		t.Fatalf("image fill protocol normalization = %q, %v, %v", protocol, capabilities, err)
+	}
+	protocol, capabilities, err = NormalizeProtocolCapabilities(ProtocolFluxFillJSONImage, []string{CapabilityFill})
+	if err != nil || protocol != ProtocolImageFill || len(capabilities) != 1 || capabilities[0] != CapabilityFill {
+		t.Fatalf("flux fill alias normalization = %q, %v, %v", protocol, capabilities, err)
 	}
 	protocol, capabilities, err = NormalizeProtocolCapabilities(ProtocolModelAPI, nil)
-	if err != nil || protocol != ProtocolModelAPI || len(capabilities) != 1 || capabilities[0] != CapabilityImageGeneration {
+	if err != nil || protocol != ProtocolModelAPI || len(capabilities) != 1 || capabilities[0] != CapabilityGeneration {
 		t.Fatalf("model protocol normalization = %q, %v, %v", protocol, capabilities, err)
 	}
 }
 
 func TestProtocolSupportsCapabilityChecksExactCapability(t *testing.T) {
-	if !ProtocolSupportsCapability(ProtocolModelAPI, CapabilityImageGeneration) {
+	if !ProtocolSupportsCapability(ProtocolModelAPI, CapabilityGeneration) {
 		t.Fatal("model protocol should support image generation")
 	}
-	if ProtocolSupportsCapability(ProtocolModelAPI, CapabilityImageUpscale) {
-		t.Fatal("model protocol should not support image upscale")
+	if ProtocolSupportsCapability(ProtocolModelAPI, CapabilityUpscale) {
+		t.Fatal("model protocol should not support upscale")
 	}
-	if !ProtocolSupportsCapability(ProtocolFluxFillJSONImage, CapabilityImageFill) {
-		t.Fatal("flux fill protocol should support image fill")
+	if !ProtocolSupportsCapability(ProtocolImageFill, CapabilityFill) {
+		t.Fatal("image fill protocol should support image fill")
 	}
-	if ProtocolSupportsCapability(ProtocolFluxFillJSONImage, CapabilityImageGeneration) {
-		t.Fatal("flux fill protocol should not support image generation")
+	if ProtocolSupportsCapability(ProtocolImageFill, CapabilityGeneration) {
+		t.Fatal("image fill protocol should not support image generation")
 	}
 }
 
@@ -63,13 +71,37 @@ func TestCustomProtocolDoesNotSupportModelDetection(t *testing.T) {
 	if ProtocolSupportsModelDetection(ProtocolImageURLJSONImage) {
 		t.Fatal("custom protocol must not expose model detection")
 	}
-	if !AllowsModellessAccounts(ProtocolImageURLJSONImage, []string{CapabilityBackgroundRemoval}) {
-		t.Fatal("background-removal endpoint should allow model-less accounts")
+	if !AllowsModellessAccounts(ProtocolImageURLJSONImage, []string{CapabilityCutout}) {
+		t.Fatal("cutout endpoint should allow model-less accounts")
 	}
-	if AllowsModellessAccounts(ProtocolImageURLJSONImage, []string{CapabilityBackgroundRemoval, CapabilityImageUpscale}) {
+	if AllowsModellessAccounts(ProtocolImageURLJSONImage, []string{CapabilityCutout, CapabilityUpscale}) {
 		t.Fatal("combined image transform endpoint should not allow model-less accounts")
 	}
-	if !AllowsModellessAccounts(ProtocolFluxFillJSONImage, []string{CapabilityImageFill}) {
-		t.Fatal("image-fill endpoint should allow model-less accounts")
+	if !AllowsModellessAccounts(ProtocolFluxFillJSONImage, []string{CapabilityFill}) {
+		t.Fatal("fill endpoint should allow model-less accounts")
+	}
+}
+
+func TestProtocolRegistryResolvesAliasesAndRuntimeAdapters(t *testing.T) {
+	canonical, ok := CanonicalProtocol(ProtocolFluxFillJSONImage)
+	if !ok || canonical != ProtocolImageFill {
+		t.Fatalf("canonical flux protocol = %q, %v", canonical, ok)
+	}
+	if !ProtocolSupportsAPIType(ProtocolImageURLJSONImage, " self-hosted ") {
+		t.Fatal("image pipeline alias should accept self-hosted API type")
+	}
+	if ProtocolSupportsAPIType(ProtocolFluxFillJSONImage, "google-ai") {
+		t.Fatal("image fill alias should reject Google API types")
+	}
+	route, ok := RuntimeAdapterFor(ProtocolImageURLJSONImage, "upscale")
+	if !ok || route != RuntimeAdapterUpscale {
+		t.Fatalf("upscale route = %q, %v", route, ok)
+	}
+	route, ok = RuntimeAdapterFor(ProtocolFluxFillJSONImage, "outpaint")
+	if !ok || route != RuntimeAdapterFluxFill {
+		t.Fatalf("flux outpaint route = %q, %v", route, ok)
+	}
+	if _, ok := RuntimeAdapterFor(ProtocolModelAPI, "inpaint"); ok {
+		t.Fatal("model protocol must reject inpaint")
 	}
 }

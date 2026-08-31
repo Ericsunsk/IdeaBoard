@@ -16,9 +16,9 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 		want string
 		ok   bool
 	}{
-		{name: "canonical slug", raw: FeatureSlugStyleFusion, want: FeatureSlugStyleFusion, ok: true},
+		{name: "canonical slug", raw: FeatureSlugFusion, want: FeatureSlugFusion, ok: true},
 		{name: "underscore slug is rejected", raw: "style_fusion", want: "", ok: false},
-		{name: "mixed case is rejected", raw: "  HD_Upscale  ", want: "", ok: false},
+		{name: "mixed case is rejected", raw: "  UP_SCALE  ", want: "", ok: false},
 		{name: "unknown feature is not in allowlist", raw: "unknown-feature", want: "", ok: false},
 		{name: "unsupported slug", raw: "unknown-workflow", want: "", ok: false},
 		{name: "invalid characters", raw: "style fusion", want: "", ok: false},
@@ -37,13 +37,13 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 
 func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 	canonical := []string{
-		FeatureSlugPromptGeneration,
+		FeatureSlugGeneration,
 		FeatureSlugInpaint,
 		FeatureSlugRender,
 		FeatureSlugVariations,
 		FeatureSlugCutout,
-		FeatureSlugStyleFusion,
-		FeatureSlugHDUpscale,
+		FeatureSlugFusion,
+		FeatureSlugUpscale,
 		FeatureSlugOutpaint,
 	}
 
@@ -74,13 +74,13 @@ func TestCanonicalFeatureRegistryMatchesProductionRouting(t *testing.T) {
 func TestAIImageFeatureSlugsAreTheCanonicalWorkflowContract(t *testing.T) {
 	got := AIImageFeatureSlugs()
 	want := []string{
-		FeatureSlugPromptGeneration,
+		FeatureSlugGeneration,
 		FeatureSlugInpaint,
 		FeatureSlugRender,
 		FeatureSlugVariations,
 		FeatureSlugCutout,
-		FeatureSlugStyleFusion,
-		FeatureSlugHDUpscale,
+		FeatureSlugFusion,
+		FeatureSlugUpscale,
 		FeatureSlugOutpaint,
 	}
 	if !slices.Equal(got, want) {
@@ -158,7 +158,7 @@ func TestResolveWorkflowFeatureSlug(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "missing feature returns empty", params: map[string]interface{}{}, want: "", wantErr: false},
-		{name: "canonical feature key", params: map[string]interface{}{"feature": FeatureSlugStyleFusion}, want: FeatureSlugStyleFusion, wantErr: false},
+		{name: "canonical feature key", params: map[string]interface{}{"feature": FeatureSlugFusion}, want: FeatureSlugFusion, wantErr: false},
 		{name: "unsupported feature returns error", params: map[string]interface{}{"feature": "unknown-feature"}, want: "", wantErr: true},
 	}
 

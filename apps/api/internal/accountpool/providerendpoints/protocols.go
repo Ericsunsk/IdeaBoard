@@ -7,13 +7,15 @@ import (
 )
 
 const (
-	ProtocolModelAPI            = "model-api"
-	ProtocolImageURLJSONImage   = "image-url-json-to-image"
-	ProtocolFluxFillJSONImage   = "flux-fill-json-image"
-	CapabilityImageGeneration   = "image-generation"
-	CapabilityBackgroundRemoval = "background-removal"
-	CapabilityImageUpscale      = "image-upscale"
-	CapabilityImageFill         = "image-fill"
+	ProtocolModelAPI          = "model-api"
+	ProtocolImagePipeline     = "image-pipeline"
+	ProtocolImageURLJSONImage = "image-url-json-to-image"
+	ProtocolImageFill         = "image-fill"
+	ProtocolFluxFillJSONImage = "flux-fill-json-image"
+	CapabilityGeneration      = "generation"
+	CapabilityCutout          = "cutout"
+	CapabilityUpscale         = "upscale"
+	CapabilityFill            = "fill"
 )
 
 type ProtocolDefinition struct {
@@ -21,32 +23,122 @@ type ProtocolDefinition struct {
 	Capabilities []string `json:"capabilities"`
 }
 
-var protocolCapabilities = map[string][]string{
-	ProtocolModelAPI:          {CapabilityImageGeneration},
-	ProtocolImageURLJSONImage: {CapabilityBackgroundRemoval, CapabilityImageUpscale},
-	ProtocolFluxFillJSONImage: {CapabilityImageFill},
+// Runtime adapter kinds are deliberately provider-agnostic. The worker maps
+// these values to concrete adapters; the registry owns the protocol contract.
+const (
+	RuntimeAdapterModelImage = "model-image"
+	RuntimeAdapterCutout     = "cutout"
+	RuntimeAdapterUpscale    = "upscale"
+	RuntimeAdapterFluxFill   = "flux-fill"
+)
+
+type protocolSpec struct {
+	definition      ProtocolDefinition
+	aliases         []string
+	allowedAPITypes []string
+	adapters        map[string]string
+}
+
+var protocolSpecs = map[string]protocolSpec{
+	ProtocolModelAPI: {
+		definition: ProtocolDefinition{ID: ProtocolModelAPI, Capabilities: []string{CapabilityGeneration}},
+		adapters: map[string]string{
+			"generation": RuntimeAdapterModelImage,
+			"render":     RuntimeAdapterModelImage,
+			"variations": RuntimeAdapterModelImage,
+			"fusion":     RuntimeAdapterModelImage,
+		},
+	},
+	ProtocolImagePipeline: {
+		definition:      ProtocolDefinition{ID: ProtocolImagePipeline, Capabilities: []string{CapabilityCutout, CapabilityUpscale}},
+		aliases:         []string{ProtocolImageURLJSONImage},
+		allowedAPITypes: []string{"openai-compatible", "self-hosted"},
+		adapters: map[string]string{
+			"cutout":  RuntimeAdapterCutout,
+			"upscale": RuntimeAdapterUpscale,
+		},
+	},
+	ProtocolImageFill: {
+		definition:      ProtocolDefinition{ID: ProtocolImageFill, Capabilities: []string{CapabilityFill}},
+		aliases:         []string{ProtocolFluxFillJSONImage},
+		allowedAPITypes: []string{"openai-compatible", "self-hosted"},
+		adapters: map[string]string{
+			"inpaint":  RuntimeAdapterFluxFill,
+			"outpaint": RuntimeAdapterFluxFill,
+		},
+	},
+}
+
+var canonicalProtocols = []string{
+	ProtocolModelAPI,
+	ProtocolImagePipeline,
+	ProtocolImageFill,
 }
 
 func ProtocolRegistry() []ProtocolDefinition {
-	ids := make([]string, 0, len(protocolCapabilities))
-	for id := range protocolCapabilities {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	result := make([]ProtocolDefinition, 0, len(ids))
-	for _, id := range ids {
-		result = append(result, ProtocolDefinition{ID: id, Capabilities: append([]string(nil), protocolCapabilities[id]...)})
+	result := make([]ProtocolDefinition, 0, len(canonicalProtocols))
+	for _, id := range canonicalProtocols {
+		spec := protocolSpecs[id]
+		result = append(result, ProtocolDefinition{ID: spec.definition.ID, Capabilities: append([]string(nil), spec.definition.Capabilities...)})
 	}
 	return result
 }
 
+func CanonicalProtocol(protocol string) (string, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(protocol))
+	if _, ok := protocolSpecs[normalized]; ok {
+		return normalized, true
+	}
+	for canonical, spec := range protocolSpecs {
+		for _, alias := range spec.aliases {
+			if normalized == alias {
+				return canonical, true
+			}
+		}
+	}
+	return "", false
+}
+
+func ProtocolSupportsAPIType(protocol, apiType string) bool {
+	canonical, ok := CanonicalProtocol(protocol)
+	if !ok {
+		return false
+	}
+	apiType = strings.ToLower(strings.TrimSpace(apiType))
+	if apiType == "" {
+		return false
+	}
+	spec := protocolSpecs[canonical]
+	if len(spec.allowedAPITypes) == 0 {
+		switch apiType {
+		case "openai-compatible", "self-hosted", "google-ai", "google-cloud":
+			return true
+		default:
+			return false
+		}
+	}
+	return containsCapability(spec.allowedAPITypes, apiType)
+}
+
+func RuntimeAdapterFor(protocol, operation string) (string, bool) {
+	canonical, ok := CanonicalProtocol(protocol)
+	if !ok {
+		return "", false
+	}
+	spec := protocolSpecs[canonical]
+	operation = strings.ToLower(strings.TrimSpace(operation))
+	route, ok := spec.adapters[operation]
+	return route, ok
+}
+
 func NormalizeProtocolCapabilities(protocol string, requested []string) (string, []string, error) {
-	protocol = strings.ToLower(strings.TrimSpace(protocol))
-	allowed, ok := protocolCapabilities[protocol]
+	var ok bool
+	protocol, ok = CanonicalProtocol(protocol)
 	if !ok {
 		return "", nil, fmt.Errorf("不支持的 ProviderEndpoint Protocol")
 	}
-	if protocol == ProtocolImageURLJSONImage || protocol == ProtocolFluxFillJSONImage {
+	allowed := protocolSpecs[protocol].definition.Capabilities
+	if protocol == ProtocolImagePipeline || protocol == ProtocolImageFill {
 		if len(requested) != 1 {
 			return "", nil, fmt.Errorf("图片处理 API 必须选择一个处理功能")
 		}
@@ -64,10 +156,10 @@ func NormalizeProtocolCapabilities(protocol string, requested []string) (string,
 func ValidateProtocolAPIType(protocol, apiType string) error {
 	protocol = strings.ToLower(strings.TrimSpace(protocol))
 	apiType = strings.ToLower(strings.TrimSpace(apiType))
-	if protocol != ProtocolImageURLJSONImage && protocol != ProtocolFluxFillJSONImage {
-		return nil
-	}
-	if apiType != "openai-compatible" && apiType != "self-hosted" {
+	if !ProtocolSupportsAPIType(protocol, apiType) {
+		if canonical, ok := CanonicalProtocol(protocol); !ok || len(protocolSpecs[canonical].allowedAPITypes) == 0 {
+			return nil
+		}
 		return fmt.Errorf("端点请求格式 %q 仅支持 self-hosted 或 openai-compatible 服务类型", protocol)
 	}
 	return nil
@@ -91,19 +183,28 @@ func requestedCapabilities(capability string) []string {
 }
 
 func ProtocolSupportsModelDetection(protocol string) bool {
-	return strings.TrimSpace(protocol) == ProtocolModelAPI
+	canonical, ok := CanonicalProtocol(protocol)
+	return ok && canonical == ProtocolModelAPI
 }
 
 func ProtocolSupportsCapability(protocol, capability string) bool {
-	allowed, ok := protocolCapabilities[strings.ToLower(strings.TrimSpace(protocol))]
-	return ok && containsCapability(allowed, strings.ToLower(strings.TrimSpace(capability)))
+	canonical, ok := CanonicalProtocol(protocol)
+	if !ok {
+		return false
+	}
+	allowed := protocolSpecs[canonical].definition.Capabilities
+	return containsCapability(allowed, strings.ToLower(strings.TrimSpace(capability)))
 }
 
 func AllowsModellessAccounts(protocol string, capabilities []string) bool {
 	if len(capabilities) != 1 {
 		return false
 	}
-	return (strings.TrimSpace(protocol) == ProtocolImageURLJSONImage &&
-		(capabilities[0] == CapabilityBackgroundRemoval || capabilities[0] == CapabilityImageUpscale)) ||
-		(strings.TrimSpace(protocol) == ProtocolFluxFillJSONImage && capabilities[0] == CapabilityImageFill)
+	p, ok := CanonicalProtocol(protocol)
+	if !ok {
+		return false
+	}
+	return ((p == ProtocolImagePipeline) &&
+		(capabilities[0] == CapabilityCutout || capabilities[0] == CapabilityUpscale)) ||
+		((p == ProtocolImageFill) && capabilities[0] == CapabilityFill)
 }

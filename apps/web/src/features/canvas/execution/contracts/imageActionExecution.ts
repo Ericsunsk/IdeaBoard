@@ -4,7 +4,7 @@ import { EXECUTION_META, type ExecutionFeature } from './executionContract'
 
 export const IMAGE_EXECUTION_MODE = {
   directTask: 'direct-task',
-  hdUpscaleTask: 'hd-upscale-task',
+  upscaleTask: 'upscale-task',
   outpaint: 'outpaint',
 } as const
 
@@ -20,13 +20,13 @@ export const IMAGE_DIRECT_TASK_ACTIONS = [
 
 export type ImageDirectTaskAction = (typeof IMAGE_DIRECT_TASK_ACTIONS)[number]
 
-export const IMAGE_HD_UPSCALE_ACTION = IMAGE_NODE_ACTION.hdUpscale
-export type ImageHdUpscaleTaskAction = typeof IMAGE_HD_UPSCALE_ACTION
+export const IMAGE_UPSCALE_ACTION = IMAGE_NODE_ACTION.upscale
+export type ImageUpscaleTaskAction = typeof IMAGE_UPSCALE_ACTION
 
 export const IMAGE_OUTPAINT_ACTION = IMAGE_NODE_ACTION.outpaint
 export type ImageOutpaintAction = typeof IMAGE_OUTPAINT_ACTION
 
-export type ImageTaskAction = ImageDirectTaskAction | ImageHdUpscaleTaskAction
+export type ImageTaskAction = ImageDirectTaskAction | ImageUpscaleTaskAction
 export type ImageExecutionAction = ImageTaskAction | ImageOutpaintAction
 
 export type ImageActionStrengthConfig = {
@@ -34,15 +34,15 @@ export type ImageActionStrengthConfig = {
   min: number
   max: number
   step: number
-  paramPath?: 'variation.strength' | 'hd.scale'
+  paramPath?: 'variation.strength' | 'upscale.scale'
 }
 
 export type ImageStrengthAction =
-  typeof IMAGE_NODE_ACTION.variations | typeof IMAGE_HD_UPSCALE_ACTION
+  typeof IMAGE_NODE_ACTION.variations | typeof IMAGE_UPSCALE_ACTION
 
 export const IMAGE_STRENGTH_ACTIONS = [
   IMAGE_NODE_ACTION.variations,
-  IMAGE_HD_UPSCALE_ACTION,
+  IMAGE_UPSCALE_ACTION,
 ] as const satisfies readonly ImageStrengthAction[]
 
 export type ImageActionExecutionConfig = {
@@ -91,14 +91,14 @@ export const IMAGE_ACTION_EXECUTION_REGISTRY_LIST = [
   createWorkflowExecutionConfig(IMAGE_NODE_ACTION.render, {
     mode: IMAGE_EXECUTION_MODE.directTask,
   }),
-  createWorkflowExecutionConfig(IMAGE_NODE_ACTION.hdUpscale, {
-    mode: IMAGE_EXECUTION_MODE.hdUpscaleTask,
+  createWorkflowExecutionConfig(IMAGE_NODE_ACTION.upscale, {
+    mode: IMAGE_EXECUTION_MODE.upscaleTask,
     strength: {
       defaultValue: 2,
       min: 1,
       max: 4,
       step: 0.1,
-      paramPath: 'hd.scale',
+      paramPath: 'upscale.scale',
     },
   }),
   createWorkflowExecutionConfig(IMAGE_NODE_ACTION.outpaint, {
@@ -119,13 +119,13 @@ export const IMAGE_ACTION_EXECUTION_REGISTRY = Object.fromEntries(
 
 export const DEFAULT_IMAGE_ACTION_STRENGTHS = {
   [IMAGE_NODE_ACTION.variations]: DEFAULT_IMAGE_ACTION_STRENGTH,
-  [IMAGE_HD_UPSCALE_ACTION]: 2,
+  [IMAGE_UPSCALE_ACTION]: 2,
 } as const satisfies Record<ImageStrengthAction, number>
 
 const IMAGE_DIRECT_TASK_ACTION_SET: ReadonlySet<string> = new Set(IMAGE_DIRECT_TASK_ACTIONS)
 const IMAGE_TASK_ACTION_SET: ReadonlySet<string> = new Set([
   ...IMAGE_DIRECT_TASK_ACTIONS,
-  IMAGE_HD_UPSCALE_ACTION,
+  IMAGE_UPSCALE_ACTION,
 ])
 const IMAGE_STRENGTH_ACTION_SET: ReadonlySet<string> = new Set(IMAGE_STRENGTH_ACTIONS)
 
@@ -155,7 +155,7 @@ export function requireImageActionExecution(
   return execution
 }
 
-export const DEFAULT_HD_SCALE = 2
+export const DEFAULT_UPSCALE_SCALE = 2
 
 export function getImageActionStrengthConfig(action: ImageStrengthAction): ImageActionStrengthConfig {
   const config = requireImageActionExecution(action).strength
@@ -163,7 +163,7 @@ export function getImageActionStrengthConfig(action: ImageStrengthAction): Image
   return config
 }
 
-export function resolveHdScale(strength?: number): number {
-  if (!Number.isFinite(strength)) return DEFAULT_HD_SCALE
+export function resolveUpscaleScale(strength?: number): number {
+  if (!Number.isFinite(strength)) return DEFAULT_UPSCALE_SCALE
   return Math.round(Math.max(1, Math.min(4, strength as number)) * 10) / 10
 }

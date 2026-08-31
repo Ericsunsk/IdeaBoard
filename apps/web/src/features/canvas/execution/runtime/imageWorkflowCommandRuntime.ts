@@ -38,14 +38,14 @@ export type ImageWorkflowPlanner = {
     nodeId: string,
     inpaint: RunImageInpaintActionOptions,
   ) => ImageExecutionPlan
-  planPromptGeneration: (
+  planGeneration: (
     anchorNodeId: string,
     referenceImages: readonly ImageExecutionInput[],
     prompt: string,
     outputCount: number,
     aspectRatio: PromptAspectRatio,
   ) => ImageExecutionPlan
-  planFusionPromptGeneration: (
+  planFusionGeneration: (
     nodeId: string,
     prompt: string,
     outputCount: number,
@@ -70,13 +70,13 @@ export type ImageWorkflowCommands = {
   ) => Promise<void>
   runOutpaintAction: (nodeId: string, intent: OutpaintRectIntent) => Promise<void>
   runImageInpaintAction: (nodeId: string, inpaint: RunImageInpaintActionOptions) => Promise<void>
-  runFusionPromptGeneration: (
+  runFusionGeneration: (
     nodeId: string,
     prompt: string,
     outputCount: number,
     aspectRatio: PromptAspectRatio,
   ) => Promise<void>
-  runPromptGeneration: (
+  runGeneration: (
     anchorNodeId: string,
     referenceImages: readonly ImageExecutionInput[],
     prompt: string,
@@ -141,7 +141,7 @@ export function createImageWorkflowCommands(options: {
     await executePlannedAction(() => options.planner.planImageInpaintAction(nodeId, inpaint))
   }
 
-  async function runPromptGeneration(
+  async function runGeneration(
     anchorNodeId: string,
     referenceImages: readonly ImageExecutionInput[],
     prompt: string,
@@ -149,7 +149,7 @@ export function createImageWorkflowCommands(options: {
     aspectRatio: PromptAspectRatio,
   ) {
     await executePlannedAction(() =>
-      options.planner.planPromptGeneration(
+      options.planner.planGeneration(
         anchorNodeId,
         referenceImages,
         prompt,
@@ -159,14 +159,14 @@ export function createImageWorkflowCommands(options: {
     )
   }
 
-  async function runFusionPromptGeneration(
+  async function runFusionGeneration(
     nodeId: string,
     prompt: string,
     outputCount: number,
     aspectRatio: PromptAspectRatio,
   ) {
     await executePlannedAction(() =>
-      options.planner.planFusionPromptGeneration(nodeId, prompt, outputCount, aspectRatio),
+      options.planner.planFusionGeneration(nodeId, prompt, outputCount, aspectRatio),
     )
   }
 
@@ -177,7 +177,7 @@ export function createImageWorkflowCommands(options: {
     runImageDirectAction,
     runOutpaintAction,
     runImageInpaintAction,
-    runFusionPromptGeneration,
-    runPromptGeneration,
+    runFusionGeneration,
+    runGeneration,
   }
 }

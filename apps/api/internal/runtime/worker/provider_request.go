@@ -148,10 +148,10 @@ func validateCanonicalRuntimeControls(params *tasks.WorkflowTaskParams, contract
 	unexpected := func(expected string) error {
 		return fmt.Errorf("task canonical controls do not match execution plan: expected %s", expected)
 	}
-	rejectOtherControls := func(variation, outpaint, hd, fusion bool) error {
+	rejectOtherControls := func(variation, outpaint, upscale, fusion bool) error {
 		if (params.Variation != nil) != variation ||
 			(params.Outpaint != nil) != outpaint ||
-			(params.HD != nil) != hd ||
+			(params.Upscale != nil) != upscale ||
 			(params.Fusion != nil) != fusion {
 			return unexpected(string(contract))
 		}
@@ -183,7 +183,7 @@ func validateCanonicalRuntimeControls(params *tasks.WorkflowTaskParams, contract
 		if err := rejectOtherControls(false, false, true, false); err != nil {
 			return err
 		}
-		scale := params.HD.Scale
+		scale := params.Upscale.Scale
 		if math.IsNaN(scale) || math.IsInf(scale, 0) || scale < 1 || scale > 4 || math.Abs(scale*10-math.Round(scale*10)) > 1e-9 {
 			return fmt.Errorf("task upscale controls are invalid")
 		}
@@ -286,17 +286,17 @@ func newProviderRequest(
 		ImageRefs:        imageRefs,
 		MaskRefs:         maskRefs,
 		CanvasRef:        canvasRef,
-		Scale:            readHDUpscaleScale(providerParams, controlContract),
+		Scale:            readUpscaleScale(providerParams, controlContract),
 		OpenAI:           controls.OpenAI,
 		Google:           controls.Google,
 	}
 }
 
-func readHDUpscaleScale(params map[string]interface{}, controlContract workflow.RuntimeControlContract) float64 {
+func readUpscaleScale(params map[string]interface{}, controlContract workflow.RuntimeControlContract) float64 {
 	if controlContract != workflow.RuntimeControlsUpscale {
 		return 0
 	}
-	contract, ok := workflow.ReadHDUpscaleContract(params)
+	contract, ok := workflow.ReadUpscaleContract(params)
 	if !ok {
 		return 0
 	}

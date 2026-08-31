@@ -14,7 +14,7 @@ export type ImageNodeAction = (typeof IMAGE_NODE_ACTION)[keyof typeof IMAGE_NODE
 
 export const IMAGE_ACTION_MODE = {
   directTask: IMAGE_EXECUTION_MODE.directTask,
-  hdUpscaleTask: IMAGE_EXECUTION_MODE.hdUpscaleTask,
+  upscaleTask: IMAGE_EXECUTION_MODE.upscaleTask,
   outpaint: IMAGE_EXECUTION_MODE.outpaint,
   inpaint: 'inpaint',
   retouch: 'retouch',
@@ -26,7 +26,7 @@ export type ImageActionMenuIcon =
   | 'cutout'
   | 'variations'
   | 'render'
-  | 'hd'
+  | 'upscale'
   | 'outpaint'
   | 'inpaint'
   | 'retouch'
@@ -77,9 +77,9 @@ export const IMAGE_ACTION_REGISTRY_LIST: readonly ImageActionRegistryItem[] = [
     mode: IMAGE_ACTION_MODE.directTask,
     icon: 'render',
   }),
-  workflowImageAction(IMAGE_NODE_ACTION.hdUpscale, {
-    mode: IMAGE_ACTION_MODE.hdUpscaleTask,
-    icon: 'hd',
+  workflowImageAction(IMAGE_NODE_ACTION.upscale, {
+    mode: IMAGE_ACTION_MODE.upscaleTask,
+    icon: 'upscale',
   }),
   workflowImageAction(IMAGE_NODE_ACTION.outpaint, {
     mode: IMAGE_ACTION_MODE.outpaint,

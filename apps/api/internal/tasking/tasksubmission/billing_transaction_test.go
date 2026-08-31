@@ -518,7 +518,7 @@ WHERE snapshots.task_id = $1`, result.TaskID).Scan(&snapshotFeature, &state); er
 
 func seedPatternBillingProduct(t *testing.T, service *billing.Service, unitCredits int64) taskbilling.Request {
 	t.Helper()
-	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPromptGeneration, "1k", 1)
+	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugGeneration, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
 	}

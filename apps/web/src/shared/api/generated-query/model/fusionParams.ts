@@ -4,10 +4,10 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { StyleFusionParamsMode } from './styleFusionParamsMode'
+import type { FusionParamsMode } from './fusionParamsMode'
 
-export interface StyleFusionParams {
-  mode?: StyleFusionParamsMode
+export interface FusionParams {
+  mode?: FusionParamsMode
   /**
    * @minItems 1
    * @items.minimum 0

@@ -11,14 +11,14 @@ describe('workflowFeatureRegistry projections', () => {
       { key: '{{user_prompt}}', tone: 'prompt' },
       { key: '{{variation_strength}}', tone: 'control' },
     ])
-    expect(getWorkflowFeaturePromptVariables(WORKFLOW_FEATURE.styleFusion)).toEqual([
+    expect(getWorkflowFeaturePromptVariables(WORKFLOW_FEATURE.fusion)).toEqual([
       { key: '{{user_prompt}}', tone: 'prompt' },
       { key: '{{fusion_input_weights}}', tone: 'control' },
     ])
     expect(getWorkflowFeaturePromptVariables(WORKFLOW_FEATURE.cutout)).toEqual([])
   })
 
-  it('hides user_prompt when image-fill providers receive it separately', () => {
+  it('hides user_prompt when fill providers receive it separately', () => {
     expect(getWorkflowFeaturePromptVariables(WORKFLOW_FEATURE.inpaint)).toEqual([])
     expect(getWorkflowFeaturePromptVariables(WORKFLOW_FEATURE.outpaint)).toEqual([])
   })

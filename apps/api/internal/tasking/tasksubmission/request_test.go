@@ -22,9 +22,9 @@ func canonicalExecutionPlanFixture(feature string, count int) (workflow.FeatureE
 	resolution := ""
 	imageInputCount := 1
 	switch feature {
-	case workflow.FeatureSlugPromptGeneration:
+	case workflow.FeatureSlugGeneration:
 		imageInputCount = 0
-	case workflow.FeatureSlugStyleFusion:
+	case workflow.FeatureSlugFusion:
 		imageInputCount = 2
 	}
 	plan, err := workflow.CompileFeatureExecutionPlan(workflow.CompileFeatureExecutionInput{
@@ -60,7 +60,7 @@ func TestNewCanonicalRequestRejectsMismatchedBillingProduct(t *testing.T) {
 		Feature:        "variations",
 		ClientActionID: "action-1",
 		BillingRequest: &taskbilling.Request{
-			Feature:          "prompt-generation",
+			Feature:          "generation",
 			OutputResolution: "1k",
 			Quantity:         1,
 		},
@@ -105,10 +105,10 @@ func TestNewCanonicalRequestRejectsMissingBillingForBillableWorkflow(t *testing.
 
 func TestNewCanonicalRequestRejectsMissingExecutionPlanForAIImageWorkflow(t *testing.T) {
 	_, err := NewCanonicalRequest(CanonicalRequestInput{
-		UserID: 42, Feature: workflow.FeatureSlugPromptGeneration,
+		UserID: 42, Feature: workflow.FeatureSlugGeneration,
 		ClientActionID: "missing-plan",
 		BillingRequest: &taskbilling.Request{
-			Feature: workflow.FeatureSlugPromptGeneration, OutputResolution: "1k", Quantity: 1,
+			Feature: workflow.FeatureSlugGeneration, OutputResolution: "1k", Quantity: 1,
 		},
 	})
 	if err == nil {
@@ -117,13 +117,13 @@ func TestNewCanonicalRequestRejectsMissingExecutionPlanForAIImageWorkflow(t *tes
 }
 
 func TestNewCanonicalRequestRejectsPersistedExecutionPlanMismatch(t *testing.T) {
-	plan, _ := canonicalExecutionPlanForTest(t, workflow.FeatureSlugPromptGeneration, 1)
+	plan, _ := canonicalExecutionPlanForTest(t, workflow.FeatureSlugGeneration, 1)
 	_, styleParams := canonicalExecutionPlanForTest(t, workflow.FeatureSlugVariations, 1)
 	_, err := NewCanonicalRequest(CanonicalRequestInput{
-		UserID: 42, Feature: workflow.FeatureSlugPromptGeneration, Params: styleParams,
+		UserID: 42, Feature: workflow.FeatureSlugGeneration, Params: styleParams,
 		ClientActionID: "mismatched-plan", ExecutionPlan: &plan,
 		BillingRequest: &taskbilling.Request{
-			Feature: workflow.FeatureSlugPromptGeneration, OutputResolution: "1k", Quantity: 1,
+			Feature: workflow.FeatureSlugGeneration, OutputResolution: "1k", Quantity: 1,
 		},
 	})
 	if err == nil {
@@ -146,7 +146,7 @@ func TestCanonicalRequestOwnsBillingFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	inputBilling.Feature = "prompt-generation"
+	inputBilling.Feature = "generation"
 	inputBilling.Quantity = 9
 	billingRequest := request.BillingRequest()
 	if billingRequest == nil || billingRequest.Feature != "variations" || billingRequest.Quantity != 1 {

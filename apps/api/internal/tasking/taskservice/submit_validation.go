@@ -97,7 +97,7 @@ func mediaRefsFromAssetIDs(assetIDs []int64, role string) []tasks.MediaRef {
 	return refs
 }
 
-func normalizeStyleFusionParams(params map[string]interface{}) error {
+func normalizeFusionParams(params map[string]interface{}) error {
 	if params == nil {
 		return nil
 	}
@@ -116,7 +116,7 @@ func normalizeStyleFusionParams(params map[string]interface{}) error {
 	if _, ok := fusion[paramkeys.InputWeights]; !ok {
 		return fmt.Errorf("fusion 参数缺少 fusion.input_weights")
 	}
-	weights, ok := workflow.ReadStyleFusionInputWeights(params)
+	weights, ok := workflow.ReadFusionInputWeights(params)
 	if !ok {
 		return fmt.Errorf("fusion 权重必须是数字数组")
 	}
@@ -306,13 +306,13 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 				ImageOffsetX: c.ImageOffsetX, ImageOffsetY: c.ImageOffsetY,
 			}
 		}
-	case workflow.FeatureSlugHDUpscale:
-		if c, ok := workflow.ReadHDUpscaleContract(params); ok {
-			p.HD = &tasks.HDUpscaleParams{Scale: c.Scale}
+	case workflow.FeatureSlugUpscale:
+		if c, ok := workflow.ReadUpscaleContract(params); ok {
+			p.Upscale = &tasks.UpscaleParams{Scale: c.Scale}
 		}
-	case workflow.FeatureSlugStyleFusion:
-		if c, ok := workflow.ReadStyleFusionPromptContract(params); ok {
-			p.Fusion = &tasks.StyleFusionParams{
+	case workflow.FeatureSlugFusion:
+		if c, ok := workflow.ReadFusionPromptContract(params); ok {
+			p.Fusion = &tasks.FusionParams{
 				Mode:         c.Mode,
 				InputWeights: c.InputWeights,
 			}
@@ -327,8 +327,8 @@ func workflowMediaInputsFromMap(params map[string]interface{}, featureSlug strin
 	hasMedia := false
 
 	inputWeights := []float64(nil)
-	if featureSlug == workflow.FeatureSlugStyleFusion {
-		if weights, ok := workflow.ReadStyleFusionInputWeights(params); ok {
+	if featureSlug == workflow.FeatureSlugFusion {
+		if weights, ok := workflow.ReadFusionInputWeights(params); ok {
 			inputWeights = weights
 		}
 	}

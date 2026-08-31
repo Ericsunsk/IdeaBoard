@@ -250,8 +250,8 @@ type providerRuntimeAdapter uint8
 
 const (
 	providerRuntimeAdapterModelImage providerRuntimeAdapter = iota + 1
-	providerRuntimeAdapterBackgroundRemoval
-	providerRuntimeAdapterImageUpscale
+	providerRuntimeAdapterCutout
+	providerRuntimeAdapterUpscale
 	providerRuntimeAdapterFluxFill
 )
 
@@ -546,10 +546,10 @@ func (c *ProviderExecutor) callProviderWithRequest(ctx context.Context, exec res
 	// The dispatcher owns only protocol/operation selection. Concrete adapters
 	// keep their provider-specific HTTP and payload contracts.
 	switch exec.adapter {
-	case providerRuntimeAdapterBackgroundRemoval:
-		return c.callBackgroundRemoval(ctx, account, exec.request, exec.timeout)
-	case providerRuntimeAdapterImageUpscale:
-		return c.callImageUpscale(ctx, account, exec.request, exec.timeout)
+	case providerRuntimeAdapterCutout:
+		return c.callCutout(ctx, account, exec.request, exec.timeout)
+	case providerRuntimeAdapterUpscale:
+		return c.callUpscale(ctx, account, exec.request, exec.timeout)
 	case providerRuntimeAdapterFluxFill:
 		return c.callFluxFill(ctx, account, exec.request, exec.runtimeOperation, exec.timeout)
 	case providerRuntimeAdapterModelImage:
@@ -567,35 +567,28 @@ func providerRuntimeAdapterFor(apiType string, protocol string, operation workfl
 	if !workflow.IsSupportedProviderAPIType(apiType) {
 		return 0, fmt.Errorf("unsupported API type %q", apiType)
 	}
-	switch strings.TrimSpace(protocol) {
-	case providerendpoints.ProtocolModelAPI:
-		switch operation {
-		case workflow.RuntimeOperationPromptGeneration,
-			workflow.RuntimeOperationRender,
-			workflow.RuntimeOperationVariations,
-			workflow.RuntimeOperationStyleFusion:
-			return providerRuntimeAdapterModelImage, nil
-		}
-	case providerendpoints.ProtocolImageURLJSONImage:
-		if apiType != workflow.ProviderOpenAICompatible && apiType != workflow.ProviderSelfHosted {
-			return 0, fmt.Errorf("endpoint protocol %q does not support API type %q", protocol, apiType)
-		}
-		switch operation {
-		case workflow.RuntimeOperationBackgroundRemoval:
-			return providerRuntimeAdapterBackgroundRemoval, nil
-		case workflow.RuntimeOperationImageUpscale:
-			return providerRuntimeAdapterImageUpscale, nil
-		}
-	case providerendpoints.ProtocolFluxFillJSONImage:
-		if apiType != workflow.ProviderOpenAICompatible && apiType != workflow.ProviderSelfHosted {
-			return 0, fmt.Errorf("endpoint protocol %q does not support API type %q", protocol, apiType)
-		}
-		switch operation {
-		case workflow.RuntimeOperationInpaint, workflow.RuntimeOperationOutpaint:
-			return providerRuntimeAdapterFluxFill, nil
-		}
+	canonical, known := providerendpoints.CanonicalProtocol(protocol)
+	if !known {
+		return 0, fmt.Errorf("endpoint protocol %q does not support runtime operation %q", strings.TrimSpace(protocol), operation)
 	}
-	return 0, fmt.Errorf("endpoint protocol %q does not support runtime operation %q", strings.TrimSpace(protocol), operation)
+	if !providerendpoints.ProtocolSupportsAPIType(canonical, apiType) {
+		return 0, fmt.Errorf("endpoint protocol %q does not support API type %q", protocol, apiType)
+	}
+	route, ok := providerendpoints.RuntimeAdapterFor(canonical, string(operation))
+	if !ok {
+		return 0, fmt.Errorf("endpoint protocol %q does not support runtime operation %q", strings.TrimSpace(protocol), operation)
+	}
+	switch route {
+	case providerendpoints.RuntimeAdapterModelImage:
+		return providerRuntimeAdapterModelImage, nil
+	case providerendpoints.RuntimeAdapterCutout:
+		return providerRuntimeAdapterCutout, nil
+	case providerendpoints.RuntimeAdapterUpscale:
+		return providerRuntimeAdapterUpscale, nil
+	case providerendpoints.RuntimeAdapterFluxFill:
+		return providerRuntimeAdapterFluxFill, nil
+	}
+	return 0, fmt.Errorf("unsupported provider runtime adapter %q", route)
 }
 
 func (c *ProviderExecutor) callProviderBatchWithRequest(ctx context.Context, exec resolvedProviderExecution) (providerCallResult, error) {

@@ -42,7 +42,7 @@ func TestAIImageWorkflowBillingContractUsesCurrentProviderPoolAndConvergesFacts(
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
-	billingRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugPromptGeneration, "1k", 1)
+	billingRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugGeneration, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestAIImageWorkflowBillingContractUsesCurrentProviderPoolAndConvergesFacts(
 
 	request := &tasks.SubmitTaskRequest{
 		Prompt:         "repeatable geometric pattern",
-		Feature:        workflow.FeatureSlugPromptGeneration,
+		Feature:        workflow.FeatureSlugGeneration,
 		ClientActionID: fmt.Sprintf("workflow-contract-%d", runID),
 	}
 	if _, err := taskService.CheckSubmitTaskReadiness(ctx, 42, request); err == nil {
@@ -219,8 +219,8 @@ func saturateWorkflowContractProvider(
 		UserID:      1,
 		Prompt:      "occupy Provider capacity",
 		UserPrompt:  "occupy Provider capacity",
-		Params:      marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{SchemaVersion: tasks.CurrentParamsSchemaVersion, Feature: workflow.FeatureSlugPromptGeneration}),
-		FeatureSlug: workflow.FeatureSlugPromptGeneration,
+		Params:      marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{SchemaVersion: tasks.CurrentParamsSchemaVersion, Feature: workflow.FeatureSlugGeneration}),
+		FeatureSlug: workflow.FeatureSlugGeneration,
 		Priority:    tasks.TaskPriorityDefault,
 		Status:      tasks.StatusPending,
 	}); err != nil {

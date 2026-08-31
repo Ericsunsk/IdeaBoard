@@ -67,7 +67,7 @@ describe('useCanvasExecutionWorkspace', () => {
       taskAdapter: { assertTaskRequestReady: vi.fn(async () => undefined), submitTaskRequest: vi.fn(async () => ({ taskId: 'task-1' })) },
       waitTaskImageResults: async () => [{ url: 'https://example.com/result.png', width: 400, height: 200, resultIndex: 0 }], loadImageSize: async () => ({ width: 400, height: 200 }),
     })
-    await workspace.commands.runPromptGeneration({ kind: 'prompt-generation', sourceNodeId: 'prompt-1', source: { url: '', ratio: 1 }, referenceImages: [], prompt: 'draw', outputCount: 1, aspectRatio: 'auto', resultOptions: {} } as never)
+    await workspace.commands.runGeneration({ kind: 'generation', sourceNodeId: 'prompt-1', source: { url: '', ratio: 1 }, referenceImages: [], prompt: 'draw', outputCount: 1, aspectRatio: 'auto', resultOptions: {} } as never)
     expect(attachPendingTaskIds).toHaveBeenCalledWith([expect.objectContaining({
       resultNodeId: 'image-1', resultIndex: 0, taskId: 'task-1', clientActionId: expect.any(String),
     })])

@@ -18,7 +18,7 @@ import {
   type FusionExecutionPlan,
   type ImageActionExecutionPlan,
   type ImageInpaintExecutionPlan,
-  type PromptGenerationExecutionPlan,
+  type GenerationExecutionPlan,
 } from '../planning/ImageExecutionPlan'
 import { resolveTaskImageResultAtIndexDisplay } from '../result-nodes/flowImageDirectActionTaskResult'
 import { usePendingImageResultExecution } from '../result-nodes/usePendingImageResultNodes'
@@ -196,10 +196,10 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     })
   }
 
-  async function executePromptGeneration(
-    plan: PromptGenerationExecutionPlan & { activationId: string },
+  async function executeGeneration(
+    plan: GenerationExecutionPlan & { activationId: string },
   ): Promise<void> {
-    await executionWorkspace.commands.runPromptGeneration(plan)
+    await executionWorkspace.commands.runGeneration(plan)
   }
 
   async function executeFusion(
@@ -240,8 +240,8 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
         return await executeOutpaint(plan)
       case 'inpaint':
         return await executeImageInpaint(plan)
-      case 'prompt-generation':
-        return await executePromptGeneration(plan)
+      case 'generation':
+        return await executeGeneration(plan)
       case 'fusion':
         return await executeFusion(plan)
     }

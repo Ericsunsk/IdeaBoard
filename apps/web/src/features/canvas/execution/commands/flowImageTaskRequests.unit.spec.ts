@@ -3,8 +3,8 @@ import type { SubmitTaskData } from '../../../../shared/api/task'
 import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
 import {
   IMAGE_OUTPAINT_ACTION,
-  IMAGE_HD_UPSCALE_ACTION,
-  resolveHdScale,
+  IMAGE_UPSCALE_ACTION,
+  resolveUpscaleScale,
 } from '../contracts/imageActionExecution'
 import { EXECUTION_FEATURE } from '../contracts/executionContract'
 import type {
@@ -12,20 +12,20 @@ import type {
   ImageActionExecutionPlan,
   ImageInpaintExecutionPlan,
   PreparedFusionExecutionPlan,
-  PromptGenerationExecutionPlan,
+  GenerationExecutionPlan,
 } from '../planning/ImageExecutionPlan'
 import {
   buildOutpaintTaskRequest,
   buildDirectActionTaskRequest,
   buildFusionTaskRequest,
-  buildHdUpscaleTaskRequest,
+  buildUpscaleTaskRequest,
   buildImageExecutionTaskRequest,
   buildImageActionReadinessRequest,
   buildImageInpaintTaskRequest,
   buildInpaintReadinessRequest,
   buildOutpaintReadinessRequest,
   buildPreparedImageInpaintTaskRequest,
-  buildPromptGenerationTaskRequest,
+  buildGenerationTaskRequest,
 } from './flowImageTaskRequests'
 
 const source = {
@@ -47,11 +47,11 @@ describe('flowImageTaskRequests', () => {
     expect(request).not.toHaveProperty('image_urls')
   })
 
-  it('normalizes HD slider strength to a 1.0-4.0 scale', () => {
-    expect(resolveHdScale(undefined)).toBe(2)
-    expect(resolveHdScale(0)).toBe(1)
-    expect(resolveHdScale(2.34)).toBe(2.3)
-    expect(resolveHdScale(5)).toBe(4)
+  it('normalizes upscale slider strength to a 1.0-4.0 scale', () => {
+    expect(resolveUpscaleScale(undefined)).toBe(2)
+    expect(resolveUpscaleScale(0)).toBe(1)
+    expect(resolveUpscaleScale(2.34)).toBe(2.3)
+    expect(resolveUpscaleScale(5)).toBe(4)
   })
 
   it('builds task readiness requests from the execution contract', () => {
@@ -64,11 +64,11 @@ describe('flowImageTaskRequests', () => {
         },
       },
     })
-    expect(buildImageActionReadinessRequest(IMAGE_HD_UPSCALE_ACTION)).toMatchObject({
+    expect(buildImageActionReadinessRequest(IMAGE_UPSCALE_ACTION)).toMatchObject({
       prompt: '',
-      feature: EXECUTION_FEATURE.hdUpscale,
+      feature: EXECUTION_FEATURE.upscale,
       params: {
-        hd: {
+        upscale: {
           scale: 2,
         },
       },
@@ -94,7 +94,7 @@ describe('flowImageTaskRequests', () => {
     })
   })
 
-  it('builds valid quote-only image-fill readiness placeholders', () => {
+  it('builds valid quote-only fill readiness placeholders', () => {
     expect(buildInpaintReadinessRequest()).toMatchObject({
       prompt: '[inpaint] submit readiness',
       feature: EXECUTION_FEATURE.inpaint,
@@ -120,8 +120,8 @@ describe('flowImageTaskRequests', () => {
     })
   })
 
-  it('builds prompt-generation requests with output count independent from ordered refs', () => {
-    const request = buildPromptGenerationTaskRequest({
+  it('builds generation requests with output count independent from ordered refs', () => {
+    const request = buildGenerationTaskRequest({
       prompt: '  repeatable textile pattern  ',
       aspectRatio: '1:1',
       imageUrls: ['https://assets.example.com/ref-1.png', 'https://assets.example.com/ref-2.png'],
@@ -131,7 +131,7 @@ describe('flowImageTaskRequests', () => {
     expect(request).toEqual({
       prompt: 'repeatable textile pattern',
       priority: 1,
-      feature: EXECUTION_FEATURE.promptGeneration,
+      feature: EXECUTION_FEATURE.generation,
       image_urls: ['https://assets.example.com/ref-1.png', 'https://assets.example.com/ref-2.png'],
       params: { output_count: 3, output_resolution: '1k', ratio: '1:1' },
     })
@@ -193,8 +193,8 @@ describe('flowImageTaskRequests', () => {
     expect(request.params).not.toHaveProperty('output_format')
   })
 
-  it('keeps HD output size at the source size and sends only scale', () => {
-    const request = buildHdUpscaleTaskRequest({
+  it('keeps upscale output size at the source size and sends only scale', () => {
+    const request = buildUpscaleTaskRequest({
       source,
       imageSize: { width: 1200, height: 800 },
       prompt: 'ignored prompt',
@@ -207,12 +207,12 @@ describe('flowImageTaskRequests', () => {
       custom_height: 800,
       original_image_width: 1200,
       original_image_height: 800,
-      hd: {
+      upscale: {
         scale: 3.2,
       },
     })
-    expect(request.params?.hd).not.toHaveProperty('output_quality')
-    expect(request.params?.hd).not.toHaveProperty('size_policy')
+    expect(request.params?.upscale).not.toHaveProperty('output_quality')
+    expect(request.params?.upscale).not.toHaveProperty('size_policy')
     expect(request.params).not.toHaveProperty('upscale_factor')
     expect(request.params).not.toHaveProperty('upscale_mode')
     expect(request.params).not.toHaveProperty('output_count')
@@ -220,8 +220,8 @@ describe('flowImageTaskRequests', () => {
     expect(request.prompt).toBe('')
   })
 
-  it('prefers the media asset ID over an empty runtime URL for HD upscale', () => {
-    const request = buildHdUpscaleTaskRequest({
+  it('prefers the media asset ID over an empty runtime URL for upscale', () => {
+    const request = buildUpscaleTaskRequest({
       source: { ...source, mediaAssetId: 42 },
       imageSize: { width: 1200, height: 800 },
       prompt: '',
@@ -257,7 +257,7 @@ describe('flowImageTaskRequests', () => {
         prompt,
         outputCount: 4,
       }),
-      buildHdUpscaleTaskRequest({
+      buildUpscaleTaskRequest({
         source,
         imageSize: null,
         prompt,
@@ -270,11 +270,11 @@ describe('flowImageTaskRequests', () => {
       EXECUTION_FEATURE.variations,
       EXECUTION_FEATURE.render,
       EXECUTION_FEATURE.cutout,
-      EXECUTION_FEATURE.hdUpscale,
+      EXECUTION_FEATURE.upscale,
     ])
     for (const request of requests) {
       expect(request.image_urls).toEqual([source.url])
-      if (request.feature === EXECUTION_FEATURE.hdUpscale) {
+      if (request.feature === EXECUTION_FEATURE.upscale) {
         expect(request.prompt).toBe('')
         expect(request.params).not.toHaveProperty('output_count')
         expect(request.params).not.toHaveProperty('output_resolution')
@@ -348,7 +348,7 @@ describe('flowImageTaskRequests', () => {
 
   it('builds Fusion weighted reference params without submitting', () => {
     const request = buildFusionTaskRequest({
-      prompt: '[style-fusion] blend references',
+      prompt: '[fusion] blend references',
       imageUrls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
       inputWeights: [0.35, 0.65],
       outputCount: 3,
@@ -359,8 +359,8 @@ describe('flowImageTaskRequests', () => {
     })
 
     expect(request).toMatchObject({
-      prompt: '[style-fusion] blend references',
-      feature: EXECUTION_FEATURE.styleFusion,
+      prompt: '[fusion] blend references',
+      feature: EXECUTION_FEATURE.fusion,
       image_urls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
       params: {
         output_count: 3,
@@ -375,7 +375,7 @@ describe('flowImageTaskRequests', () => {
 
   it('builds Fusion weighted reference params with size and aspect ratio', () => {
     const request = buildFusionTaskRequest({
-      prompt: '[style-fusion] blend references',
+      prompt: '[fusion] blend references',
       imageUrls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
       inputWeights: [0.4, 0.6],
       sizeSource: { width: 1024, height: 768 },
@@ -384,8 +384,8 @@ describe('flowImageTaskRequests', () => {
     })
 
     expect(request).toMatchObject({
-      prompt: '[style-fusion] blend references',
-      feature: EXECUTION_FEATURE.styleFusion,
+      prompt: '[fusion] blend references',
+      feature: EXECUTION_FEATURE.fusion,
       image_urls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
       params: {
         custom_width: 1280,
@@ -408,7 +408,7 @@ describe('flowImageTaskRequests', () => {
       kind: 'fusion',
       sourceNodeId: 'fusion-1',
       source,
-      taskPrompt: '[style-fusion] blend references',
+      taskPrompt: '[fusion] blend references',
       outputCount: 2,
       aspectRatio: '4:3',
       inputImages: [],
@@ -432,8 +432,8 @@ describe('flowImageTaskRequests', () => {
     } satisfies PreparedFusionExecutionPlan
 
     expect(buildImageExecutionTaskRequest(plan)).toMatchObject({
-      prompt: '[style-fusion] blend references',
-      feature: EXECUTION_FEATURE.styleFusion,
+      prompt: '[fusion] blend references',
+      feature: EXECUTION_FEATURE.fusion,
       image_urls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
       params: {
         custom_width: 1200,
@@ -459,8 +459,8 @@ describe('flowImageTaskRequests', () => {
       outputCount: 1,
       resultOptions: {},
     }
-    const textPlan: PromptGenerationExecutionPlan = {
-      kind: 'prompt-generation',
+    const textPlan: GenerationExecutionPlan = {
+      kind: 'generation',
       sourceNodeId: 'prompt-1',
       source: { url: '', ratio: 1 },
       referenceImages: [],
@@ -485,7 +485,7 @@ describe('flowImageTaskRequests', () => {
       kind: 'fusion',
       sourceNodeId: 'fusion-1',
       source,
-      taskPrompt: '[style-fusion] blend',
+      taskPrompt: '[fusion] blend',
       outputCount: 1,
       aspectRatio: 'auto',
       inputImages: [],
@@ -501,7 +501,7 @@ describe('flowImageTaskRequests', () => {
 
     expect(buildImageExecutionTaskRequest(actionPlan).feature).toBe(EXECUTION_FEATURE.cutout)
     expect(buildImageExecutionTaskRequest(textPlan)).toMatchObject({
-      feature: EXECUTION_FEATURE.promptGeneration,
+      feature: EXECUTION_FEATURE.generation,
     })
     expect(buildImageExecutionTaskRequest(textPlan)).not.toHaveProperty('image_urls')
     expect(buildImageExecutionTaskRequest(textPlan)).toMatchObject({ params: { output_count: 1 } })
@@ -516,7 +516,7 @@ describe('flowImageTaskRequests', () => {
       },
     })
     expect(buildImageExecutionTaskRequest(fusionPlan)).toMatchObject({
-      feature: EXECUTION_FEATURE.styleFusion,
+      feature: EXECUTION_FEATURE.fusion,
       image_urls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
       params: {
         fusion: {

@@ -28,7 +28,7 @@ func TestNewProviderRequestCollectsProviderMediaRefs(t *testing.T) {
 	req := newProviderRequest(
 		"prompt", 640, 480, params, "gemini-image",
 		resolvedProviderRequestFacts{primitive: workflow.GenerationPrimitiveTextToImage, outputCount: 1, outputResolution: workflow.OutputResolution1K},
-		workflow.RuntimeOperationPromptGeneration, workflow.RuntimeInvocationGenerate, workflow.RuntimeControlsNone,
+		workflow.RuntimeOperationGeneration, workflow.RuntimeInvocationGenerate, workflow.RuntimeControlsNone,
 	)
 
 	wantOpenAI := []string{
@@ -61,7 +61,7 @@ func TestNewProviderRequestConsumesResolvedOutputFacts(t *testing.T) {
 		"output_resolution": "4k",
 	}, "gpt-image-1", resolvedProviderRequestFacts{
 		primitive: workflow.GenerationPrimitiveTextToImage, outputCount: 2, outputResolution: workflow.OutputResolution2K,
-	}, workflow.RuntimeOperationPromptGeneration, workflow.RuntimeInvocationGenerate, workflow.RuntimeControlsNone)
+	}, workflow.RuntimeOperationGeneration, workflow.RuntimeInvocationGenerate, workflow.RuntimeControlsNone)
 	if req.OutputCount != 2 || req.OutputResolution != workflow.OutputResolution2K {
 		t.Fatalf("resolved output facts = count:%d resolution:%q", req.OutputCount, req.OutputResolution)
 	}
@@ -89,11 +89,11 @@ func TestProviderRequestShapesOnlyDeclaredRuntimeControlContract(t *testing.T) {
 	params := map[string]interface{}{
 		"variation":          map[string]interface{}{"strength": 40},
 		"variation_strength": 40,
-		"hd":                 map[string]interface{}{"scale": 2.0},
+		"upscale":            map[string]interface{}{"scale": 2.0},
 	}
 
 	none := newProviderRequest(
-		"", 0, 0, params, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationPromptGeneration,
+		"", 0, 0, params, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationGeneration,
 		workflow.RuntimeInvocationGenerate, workflow.RuntimeControlsNone,
 	)
 	if none.OpenAI.VariationStrength != nil || none.Scale != 0 {
@@ -117,7 +117,7 @@ func TestProviderRequestShapesOnlyDeclaredRuntimeControlContract(t *testing.T) {
 	}
 
 	upscale := newProviderRequest(
-		"", 0, 0, params, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationImageUpscale,
+		"", 0, 0, params, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationUpscale,
 		workflow.RuntimeInvocationTransform, workflow.RuntimeControlsUpscale,
 	)
 	if upscale.Scale != 2 || upscale.OpenAI.VariationStrength != nil {
@@ -177,11 +177,11 @@ func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T
 
 func TestParseAndNormalizeTaskParamsRejectsInvalidDurableContracts(t *testing.T) {
 	tests := map[string]string{
-		"missing schema": `{"feature":"prompt-generation"}`,
-		"legacy schema":  `{"schema_version":1,"feature":"prompt-generation"}`,
-		"future schema":  `{"schema_version":99,"feature":"prompt-generation"}`,
-		"missing plan":   `{"schema_version":4,"feature":"prompt-generation"}`,
-		"malformed plan": `{"schema_version":4,"feature":"prompt-generation","execution_plan":{"schema_version":1}}`,
+		"missing schema": `{"feature":"generation"}`,
+		"legacy schema":  `{"schema_version":1,"feature":"generation"}`,
+		"future schema":  `{"schema_version":99,"feature":"generation"}`,
+		"missing plan":   `{"schema_version":5,"feature":"generation"}`,
+		"malformed plan": `{"schema_version":5,"feature":"generation","execution_plan":{"schema_version":1}}`,
 	}
 	for name, raw := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -201,17 +201,17 @@ func TestProviderRuntimeAdapterForUsesProtocolAndRuntimeOperation(t *testing.T) 
 		want      providerRuntimeAdapter
 		wantErr   bool
 	}{
-		{name: "model prompt", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationPromptGeneration, want: providerRuntimeAdapterModelImage},
+		{name: "model prompt", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationGeneration, want: providerRuntimeAdapterModelImage},
 		{name: "image fill on model protocol", apiType: workflow.ProviderGoogleAI, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationInpaint, wantErr: true},
-		{name: "background removal", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationBackgroundRemoval, want: providerRuntimeAdapterBackgroundRemoval},
-		{name: "upscale", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationImageUpscale, want: providerRuntimeAdapterImageUpscale},
+		{name: "cutout", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationCutout, want: providerRuntimeAdapterCutout},
+		{name: "upscale", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationUpscale, want: providerRuntimeAdapterUpscale},
 		{name: "self-hosted flux fill", apiType: workflow.ProviderSelfHosted, protocol: providerendpoints.ProtocolFluxFillJSONImage, operation: workflow.RuntimeOperationOutpaint, want: providerRuntimeAdapterFluxFill},
-		{name: "transform API type mismatch", apiType: workflow.ProviderGoogleAI, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationImageUpscale, wantErr: true},
-		{name: "transform on model protocol", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationBackgroundRemoval, wantErr: true},
-		{name: "generation on transform protocol", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationPromptGeneration, wantErr: true},
+		{name: "transform API type mismatch", apiType: workflow.ProviderGoogleAI, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationUpscale, wantErr: true},
+		{name: "transform on model protocol", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationCutout, wantErr: true},
+		{name: "generation on transform protocol", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationGeneration, wantErr: true},
 		{name: "unknown operation", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperation("unknown"), wantErr: true},
-		{name: "missing protocol", apiType: workflow.ProviderOpenAICompatible, operation: workflow.RuntimeOperationPromptGeneration, wantErr: true},
-		{name: "missing API type", protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationPromptGeneration, wantErr: true},
+		{name: "missing protocol", apiType: workflow.ProviderOpenAICompatible, operation: workflow.RuntimeOperationGeneration, wantErr: true},
+		{name: "missing API type", protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationGeneration, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -229,7 +229,7 @@ func TestProviderRuntimeAdapterForUsesProtocolAndRuntimeOperation(t *testing.T) 
 func TestCallDrawingAPIRejectsUnknownDurableOperationBeforeProviderIO(t *testing.T) {
 	raw := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       workflow.FeatureSlugPromptGeneration,
+		Feature:       workflow.FeatureSlugGeneration,
 	})
 	var params map[string]interface{}
 	if err := json.Unmarshal([]byte(raw), &params); err != nil {
@@ -280,7 +280,7 @@ func TestCallDrawingAPIRejectsUnknownDurableOperationBeforeProviderIO(t *testing
 func TestCallDrawingAPIRejectsProtocolOperationMismatchBeforeProviderIO(t *testing.T) {
 	raw := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       workflow.FeatureSlugPromptGeneration,
+		Feature:       workflow.FeatureSlugGeneration,
 	})
 	providerCalls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
@@ -359,7 +359,7 @@ func TestParseAndNormalizeTaskParamsRejectsFactsForgedAroundValidPlan(t *testing
 func TestParseAndNormalizeTaskParamsRejectsCanonicalControlsOutsidePlanContract(t *testing.T) {
 	base := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       workflow.FeatureSlugPromptGeneration,
+		Feature:       workflow.FeatureSlugGeneration,
 	})
 	tests := map[string]func(*tasks.WorkflowTaskParams){
 		"variation": func(params *tasks.WorkflowTaskParams) {
@@ -369,10 +369,10 @@ func TestParseAndNormalizeTaskParamsRejectsCanonicalControlsOutsidePlanContract(
 			params.Outpaint = &tasks.OutpaintParams{TargetWidth: 768, TargetHeight: 480}
 		},
 		"upscale": func(params *tasks.WorkflowTaskParams) {
-			params.HD = &tasks.HDUpscaleParams{Scale: 2}
+			params.Upscale = &tasks.UpscaleParams{Scale: 2}
 		},
 		"fusion": func(params *tasks.WorkflowTaskParams) {
-			params.Fusion = &tasks.StyleFusionParams{Mode: "weighted_reference", InputWeights: []float64{1}}
+			params.Fusion = &tasks.FusionParams{Mode: "weighted_reference", InputWeights: []float64{1}}
 		},
 	}
 	for name, mutate := range tests {
@@ -461,7 +461,7 @@ func TestPrepareProviderExecutionCompletesPreflightBeforeLocalMediaIO(t *testing
 func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
 	raw := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       "style-fusion",
+		Feature:       "fusion",
 		Media: &tasks.MediaInputs{
 			Inputs: []tasks.MediaRef{
 				{AssetID: 1, Role: "input", Weight: 0.75},
@@ -477,14 +477,14 @@ func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
 		},
 		Generation: &tasks.GenerationRequestSnapshot{
 			SchemaVersion:        tasks.CurrentParamsSchemaVersion,
-			Feature:              "style-fusion",
+			Feature:              "fusion",
 			Primitive:            string(workflow.GenerationPrimitiveImageToImage),
 			UserPrompt:           "融合两张图",
 			CompiledPrompt:       "融合两张图",
-			TemplateFingerprint:  "test-style-fusion",
+			TemplateFingerprint:  "test-fusion",
 			RequestedOutputCount: 1,
 		},
-		Fusion: &tasks.StyleFusionParams{
+		Fusion: &tasks.FusionParams{
 			Mode:         "weighted_reference",
 			InputWeights: []float64{0.75, 0.25},
 		},
@@ -530,17 +530,17 @@ func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
 		t.Fatalf("unexpected OpenAI controls: %#v", req.OpenAI)
 	}
 	if !req.OpenAI.UseEditEndpoint {
-		t.Fatalf("style-fusion should compile to OpenAI edit controls: %#v", req.OpenAI)
+		t.Fatalf("fusion should compile to OpenAI edit controls: %#v", req.OpenAI)
 	}
 	if req.Google.AspectRatio != "" {
 		t.Fatalf("unexpected Google controls: %#v", req.Google)
 	}
 }
 
-func TestPrepareProviderExecutionAllowsPromptGenerationControls(t *testing.T) {
+func TestPrepareProviderExecutionAllowsGenerationControls(t *testing.T) {
 	raw := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       workflow.FeatureSlugPromptGeneration,
+		Feature:       workflow.FeatureSlugGeneration,
 		Controls: &tasks.GenerationControls{
 			Ratio:       "4:3",
 			OutputCount: 2,
@@ -548,7 +548,7 @@ func TestPrepareProviderExecutionAllowsPromptGenerationControls(t *testing.T) {
 	})
 	account := &accounts.ApiAccount{
 		ID:       1,
-		Name:     "prompt-generation-provider",
+		Name:     "generation-provider",
 		ApiKey:   "key",
 		ApiType:  workflow.ProviderOpenAICompatible,
 		Protocol: providerendpoints.ProtocolModelAPI,
@@ -558,7 +558,7 @@ func TestPrepareProviderExecutionAllowsPromptGenerationControls(t *testing.T) {
 		context.Background(),
 		runtimeAccountAccessForTest(account),
 		&tasks.TaskPayload{
-			TaskID: "task-prompt-generation-provider-hints",
+			TaskID: "task-generation-provider-hints",
 			UserID: 42,
 			Prompt: "repeatable textile pattern",
 			Params: raw,
@@ -571,21 +571,21 @@ func TestPrepareProviderExecutionAllowsPromptGenerationControls(t *testing.T) {
 	if exec.request.OutputCount != 2 {
 		t.Fatalf("output_count = %d, want 2", exec.request.OutputCount)
 	}
-	if exec.runtimeOperation != workflow.RuntimeOperationPromptGeneration {
-		t.Fatalf("runtime operation = %q, want prompt-generation", exec.runtimeOperation)
+	if exec.runtimeOperation != workflow.RuntimeOperationGeneration {
+		t.Fatalf("runtime operation = %q, want generation", exec.runtimeOperation)
 	}
 }
 
 func TestProviderTaskParamsPreferCanonicalFeature(t *testing.T) {
 	params := newProviderTaskParams(&tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       "style-fusion",
+		Feature:       "fusion",
 		Extra: map[string]interface{}{
 			"feature": "inpaint",
 		},
 	}, nil)
 
-	if params.Provider["feature"] != "style-fusion" {
+	if params.Provider["feature"] != "fusion" {
 		t.Fatalf("provider params should keep canonical feature, got %#v", params.Provider)
 	}
 }

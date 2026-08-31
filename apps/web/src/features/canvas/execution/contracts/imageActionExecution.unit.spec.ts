@@ -8,7 +8,7 @@ import {
   IMAGE_OUTPAINT_ACTION,
   IMAGE_DIRECT_TASK_ACTIONS,
   IMAGE_EXECUTION_MODE,
-  IMAGE_HD_UPSCALE_ACTION,
+  IMAGE_UPSCALE_ACTION,
   isImageDirectTaskAction,
   isImageStrengthAction,
   isImageTaskAction,
@@ -22,7 +22,7 @@ describe('imageActionExecution', () => {
       IMAGE_NODE_ACTION.cutout,
       IMAGE_NODE_ACTION.variations,
       IMAGE_NODE_ACTION.render,
-      IMAGE_NODE_ACTION.hdUpscale,
+      IMAGE_NODE_ACTION.upscale,
       IMAGE_NODE_ACTION.outpaint,
     ])
     for (const item of IMAGE_ACTION_EXECUTION_REGISTRY_LIST) {
@@ -39,14 +39,14 @@ describe('imageActionExecution', () => {
       IMAGE_NODE_ACTION.render,
     ])
     expect(isImageDirectTaskAction(IMAGE_NODE_ACTION.cutout)).toBe(true)
-    expect(isImageDirectTaskAction(IMAGE_HD_UPSCALE_ACTION)).toBe(false)
-    expect(isImageTaskAction(IMAGE_HD_UPSCALE_ACTION)).toBe(true)
+    expect(isImageDirectTaskAction(IMAGE_UPSCALE_ACTION)).toBe(false)
+    expect(isImageTaskAction(IMAGE_UPSCALE_ACTION)).toBe(true)
     expect(isImageTaskAction(IMAGE_OUTPAINT_ACTION)).toBe(false)
     expect(isImageStrengthAction(IMAGE_NODE_ACTION.variations)).toBe(true)
-    expect(isImageStrengthAction(IMAGE_HD_UPSCALE_ACTION)).toBe(true)
+    expect(isImageStrengthAction(IMAGE_UPSCALE_ACTION)).toBe(true)
     expect(DEFAULT_IMAGE_ACTION_STRENGTHS).toEqual({
       [IMAGE_NODE_ACTION.variations]: DEFAULT_IMAGE_ACTION_STRENGTH,
-      [IMAGE_HD_UPSCALE_ACTION]: 2,
+      [IMAGE_UPSCALE_ACTION]: 2,
     })
   })
 
@@ -55,9 +55,9 @@ describe('imageActionExecution', () => {
       mode: IMAGE_EXECUTION_MODE.directTask,
       feature: IMAGE_NODE_ACTION.cutout,
     })
-    expect(IMAGE_ACTION_EXECUTION_REGISTRY[IMAGE_HD_UPSCALE_ACTION]).toMatchObject({
-      mode: IMAGE_EXECUTION_MODE.hdUpscaleTask,
-      feature: IMAGE_HD_UPSCALE_ACTION,
+    expect(IMAGE_ACTION_EXECUTION_REGISTRY[IMAGE_UPSCALE_ACTION]).toMatchObject({
+      mode: IMAGE_EXECUTION_MODE.upscaleTask,
+      feature: IMAGE_UPSCALE_ACTION,
     })
     expect(IMAGE_ACTION_EXECUTION_REGISTRY[IMAGE_OUTPAINT_ACTION]).toMatchObject({
       mode: IMAGE_EXECUTION_MODE.outpaint,

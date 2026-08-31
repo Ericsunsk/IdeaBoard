@@ -165,7 +165,6 @@ export function useSearchScreenRuntime(options: SearchScreenRuntimeOptions) {
       }),
       heading: computed(() => session().query.heading.value),
       references: computed(() => session().vision.references.value),
-      hasPendingReferences: computed(() => session().vision.hasPendingReferences.value),
       referenceSlotCount: computed(() => session().vision.referenceSlotCount.value),
       canAddReference: computed(() => session().vision.canAddReference.value),
       visionState: computed(() => session().vision.state.value),
@@ -236,9 +235,6 @@ export function useSearchScreenRuntime(options: SearchScreenRuntimeOptions) {
       },
       useLibraryReference(asset: Parameters<SearchSession['vision']['addLibraryAsset']>[0]) {
         session().vision.addLibraryAsset(asset)
-      },
-      isReferencePending(key: string) {
-        return session().vision.isReferencePending(key)
       },
     },
     results: {

@@ -5,13 +5,14 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProviderAPIType } from './providerAPIType'
+import type { ProviderCapability } from './providerCapability'
 
 export interface ProviderEndpoint {
   id: number
   api_type: ProviderAPIType
   protocol: string
   /** @minItems 1 */
-  capabilities: string[]
+  capabilities: ProviderCapability[]
   name: string
   base_url: string
   api_key_configured: boolean

@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   createVisionReferenceCollection,
-  MAX_REFERENCE_BYTES,
   MAX_REFERENCE_COUNT,
 } from './visionReferenceCollection'
 
@@ -10,30 +9,24 @@ function reference(key: string, file?: File) {
 }
 
 describe('visionReferenceCollection', () => {
-  it('deduplicates references and counts pending slots', () => {
+  it('deduplicates references and tracks slot count and capacity', () => {
     const collection = createVisionReferenceCollection()
     expect(collection.add(reference('a'))).toBe(true)
     expect(collection.add(reference('a'))).toBe(false)
-    expect(collection.begin('b')).toBe(true)
-    expect(collection.slotCount.value).toBe(2)
-    expect(collection.hasPending.value).toBe(true)
-    expect(collection.add(reference('b'))).toBe(false)
+    expect(collection.slotCount.value).toBe(1)
+    expect(collection.has('a')).toBe(true)
+    expect(collection.has('b')).toBe(false)
+    expect(collection.canAdd.value).toBe(true)
   })
 
-  it('reserves bytes before materializing a remote reference', () => {
+  it('calculates currentBytes from local file references', () => {
     const collection = createVisionReferenceCollection()
-    expect(collection.begin('remote')).toBe(true)
-    expect(collection.appendPreview('remote', 'https://example.com/remote.jpg')).toBe(true)
-    expect(collection.reserveBytes('remote', MAX_REFERENCE_BYTES + 1)).toBe(false)
-    expect(collection.reserveBytes('remote', 1024)).toBe(true)
-    expect(collection.materialize('remote', new File(['image'], 'remote.jpg', { type: 'image/jpeg' }))).toBe(true)
-    expect(collection.hasPending.value).toBe(true)
-    collection.finish('remote')
-    expect(collection.hasPending.value).toBe(false)
-    expect(collection.references.value[0]?.file).toBeInstanceOf(File)
+    expect(collection.currentBytes()).toBe(0)
+    collection.add(reference('local', new File(['hello-bytes'], 'test.png', { type: 'image/png' })))
+    expect(collection.currentBytes()).toBe(11)
   })
 
-  it('removes local object URLs and rolls back failed references', () => {
+  it('removes local object URLs on remove and clear', () => {
     const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
     const collection = createVisionReferenceCollection([
       reference('local', new File(['image'], 'local.jpg', { type: 'image/jpeg' })),
@@ -42,12 +35,7 @@ describe('visionReferenceCollection', () => {
 
     expect(collection.remove('local')).toBe(true)
     expect(revoke).toHaveBeenCalledWith('blob:local')
-
-    collection.begin('remote')
-    collection.appendPreview('remote', 'blob:remote')
-    expect(collection.fail('remote')).toBe(true)
     expect(collection.references.value).toHaveLength(0)
-    expect(revoke).toHaveBeenCalledWith('blob:remote')
     revoke.mockRestore()
   })
 

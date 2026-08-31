@@ -22,16 +22,16 @@ describe('flowImageDirectActionExecutor', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.get.mockReset()
-    mocks.submit.mockResolvedValue({ task_id: 'task-hd' })
+    mocks.submit.mockResolvedValue({ task_id: 'task-upscale' })
   })
 
   it('submits a prepared task request and returns the task id', async () => {
     const request: SubmitTaskData = {
       prompt: 'generate',
-      feature: 'prompt-generation',
+      feature: 'generation',
     }
 
-    await expect(submitTaskRequest(request)).resolves.toEqual({ taskId: 'task-hd' })
+    await expect(submitTaskRequest(request)).resolves.toEqual({ taskId: 'task-upscale' })
     expect(mocks.submit).toHaveBeenCalledWith(request)
   })
 

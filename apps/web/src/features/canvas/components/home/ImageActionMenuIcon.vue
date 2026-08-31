@@ -25,7 +25,7 @@ const iconMap: Record<ImageActionMenuIcon, Component> = {
   'cutout': BorderInner,
   'variations': Spark,
   'render': EditPencil,
-  hd: Hd,
+  upscale: Hd,
   'outpaint': Expand,
   'inpaint': DesignPencil,
   'retouch': AdobePhotoshop,

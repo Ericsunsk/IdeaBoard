@@ -19,7 +19,7 @@ func TestAIImageReadinessReturnsQuoteAndWalletAvailability(t *testing.T) {
 	billingService := billing.NewService(pool)
 	creditService := credits.NewService(pool)
 	service := NewService(billingService, creditService)
-	request, err := AIImageRequest(workflow.FeatureSlugPromptGeneration, "1k", 1)
+	request, err := AIImageRequest(workflow.FeatureSlugGeneration, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +225,7 @@ func TestSettleTerminalUsesPersistedOutputCount(t *testing.T) {
 			db, pool := testdb.OpenWithPool(t)
 			taskID := "settle-terminal-" + testCase.name
 			seedTaskBillingFacts(t, pool, taskID, 1, 100, 25)
-			insertTerminalSettlementTask(t, db, taskID, workflow.FeatureSlugPromptGeneration)
+			insertTerminalSettlementTask(t, db, taskID, workflow.FeatureSlugGeneration)
 			for index := 0; index < testCase.outputCount; index++ {
 				if _, err := db.ExecContext(t.Context(), `INSERT INTO task_outputs (task_id, output_kind, role, url, result_index) VALUES ($1, 'remote', 'image', $2, $3)`, taskID, fmt.Sprintf("https://example.com/%d.png", index), index); err != nil {
 					t.Fatal(err)
@@ -273,7 +273,7 @@ WHERE business_reference_id = $1
 func TestSettleTerminalFailsClosedForIncompleteBillingFacts(t *testing.T) {
 	t.Run("billed task without snapshot", func(t *testing.T) {
 		db, _ := testdb.OpenWithPool(t)
-		insertTerminalSettlementTask(t, db, "settle-terminal-no-snapshot", workflow.FeatureSlugPromptGeneration)
+		insertTerminalSettlementTask(t, db, "settle-terminal-no-snapshot", workflow.FeatureSlugGeneration)
 
 		assertSettlementIntegrityError(t, db, "settle-terminal-no-snapshot")
 	})
@@ -298,7 +298,7 @@ func TestDatabaseRejectsTaskBillingFactMutationAndIllegalSettlement(t *testing.T
 	billingService := billing.NewService(pool)
 	creditService := credits.NewService(pool)
 	service := NewService(billingService, creditService)
-	request, _ := AIImageRequest(workflow.FeatureSlugPromptGeneration, "1k", 1)
+	request, _ := AIImageRequest(workflow.FeatureSlugGeneration, "1k", 1)
 	sku, _ := ResolveSKU(request)
 	if _, err := billingService.PublishPrice(t.Context(), featurePriceInput(sku, "Pattern", 0)); err != nil {
 		t.Fatal(err)
@@ -374,7 +374,7 @@ func seedTaskBillingFacts(t *testing.T, pool *pgxpool.Pool, taskID string, userI
 	billingService := billing.NewService(pool)
 	creditService := credits.NewService(pool)
 	service := NewService(billingService, creditService)
-	request, err := AIImageRequest(workflow.FeatureSlugPromptGeneration, "1k", 1)
+	request, err := AIImageRequest(workflow.FeatureSlugGeneration, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
 	}

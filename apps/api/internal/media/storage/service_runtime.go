@@ -332,73 +332,6 @@ func (s *StorageService) ReadObjectAtProfile(ctx context.Context, profileID, obj
 	return adapter.Read(ctx, profile, objectKey, maxBytes)
 }
 
-func (s *StorageService) ResolveSignedURLAtProfile(ctx context.Context, profileID, objectKey string, expiry time.Duration) (string, bool, error) {
-	profile, err := s.resolveProfileByID(ctx, profileID)
-	if err != nil {
-		return "", false, fmt.Errorf("读取媒体存储配置失败: %w", err)
-	}
-	if canonicalizeStorageProvider(profile.Provider) == StorageProviderLocal {
-		return "", false, nil
-	}
-	adapter, err := s.adapterRegistry.get(profile.Provider)
-	if err != nil {
-		return "", false, err
-	}
-	url, err := adapter.SignedURL(ctx, profile, objectKey, expiry)
-	if err != nil {
-		return "", true, err
-	}
-	return url, true, nil
-}
-
-func (s *StorageService) ResolveProviderURLAtProfile(ctx context.Context, profileID, objectKey string) (string, error) {
-	profile, err := s.resolveProfileByID(ctx, profileID)
-	if err != nil {
-		return "", fmt.Errorf("读取媒体存储配置失败: %w", err)
-	}
-	adapter, err := s.adapterRegistry.get(profile.Provider)
-	if err != nil {
-		return "", err
-	}
-	return adapter.ProviderURL(profile, objectKey)
-}
-
-// ResolveProviderAssetURL resolves an immutable Asset fact through its owning
-// Storage Profile. It never follows the current profile selected by operators.
-func (s *StorageService) ResolveProviderAssetURL(ctx context.Context, assetID int64) (string, error) {
-	if s == nil || s.assetLocator == nil || assetID <= 0 {
-		return "", fmt.Errorf("媒体资产解析器未配置")
-	}
-	location, found, err := s.assetLocator.LocateStoredUpload(ctx, StoredUploadLookup{AssetID: assetID})
-	if err != nil {
-		return "", fmt.Errorf("定位媒体资产失败: %w", err)
-	}
-	if !found {
-		return "", fmt.Errorf("媒体资产不存在或已不可用")
-	}
-	key, err := normalizeUploadObjectKey(location.StorageKey)
-	if err != nil {
-		return "", fmt.Errorf("媒体资产存储路径无效: %w", err)
-	}
-	profile, err := s.resolveProfileByID(ctx, location.StorageProfileID)
-	if err != nil {
-		return "", fmt.Errorf("读取媒体资产存储配置失败: %w", err)
-	}
-	adapter, err := s.adapterRegistry.get(profile.Provider)
-	if err != nil {
-		return "", err
-	}
-	resolved, err := adapter.ProviderURL(profile, key)
-	if err != nil {
-		return "", err
-	}
-	parsed, err := url.Parse(strings.TrimSpace(resolved))
-	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
-		return "", fmt.Errorf("媒体资产未配置 Provider 可访问的 HTTPS URL")
-	}
-	return parsed.String(), nil
-}
-
 // ResolveProviderDerivativeURL resolves a ready derivative through the
 // immutable storage profile recorded on that derivative. There is deliberately
 // no fallback to the original Asset: processing endpoints must receive the
@@ -686,6 +619,14 @@ func (s *StorageService) resolveProfileFromUploadURL(ctx context.Context, rawURL
 	parsed, err := url.Parse(trimmed)
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
 		return nil, fmt.Errorf("图片地址格式错误")
+	}
+	// Local uploads may be persisted as an absolute public-web URL. Resolve
+	// that URL back to the builtin local adapter before probing S3 profiles.
+	if s != nil && s.publicAPIOrigin != "" && strings.HasPrefix("/"+strings.TrimPrefix(parsed.Path, "/"), "/uploads/") {
+		publicOrigin, originErr := url.Parse(s.publicAPIOrigin)
+		if originErr == nil && strings.EqualFold(publicOrigin.Scheme, parsed.Scheme) && strings.EqualFold(publicOrigin.Host, parsed.Host) {
+			return s.resolveProfileByID(ctx, builtinLocalProfileID())
+		}
 	}
 	profiles, err := s.loadProfilesWithSecrets(ctx)
 	if err != nil {

@@ -1,13 +1,13 @@
 /** 画布、节点、连线、分组、预览、下载与图像工作流文案。 */
 export default {
   features: {
-    promptGeneration: '文生图',
+    generation: '文生图',
     inpaint: '局部重绘',
     render: '渲染',
     variations: '变化衍生',
     cutout: '抠图',
-    styleFusion: '图像融合',
-    hdUpscale: '超分辨率',
+    fusion: '图像融合',
+    upscale: '超分辨率',
     outpaint: '画面扩展',
   },
   imageAction: {

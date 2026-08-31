@@ -114,7 +114,7 @@ func TestTaskIntakeRejectsImageFillDimensionsBeforeProviderLookup(t *testing.T) 
 		Prompt:         "补全右侧背景",
 		Feature:        workflow.FeatureSlugOutpaint,
 		ImageURLs:      []string{"https://example.com/source.png"},
-		ClientActionID: "invalid-image-fill-size",
+		ClientActionID: "invalid-fill-size",
 		Params: map[string]interface{}{
 			"original_image_width":  1024,
 			"original_image_height": 1024,
@@ -195,6 +195,6 @@ func (s *countingImageFillAccountStore) GetAllEnabled(context.Context) ([]*accou
 	s.calls++
 	return []*accounts.ApiAccount{{
 		ID:           101,
-		Capabilities: []string{string(workflow.RoutingCapabilityImageFill)},
+		Capabilities: []string{string(workflow.RoutingCapabilityFill)},
 	}}, nil
 }

@@ -192,7 +192,7 @@ SELECT
     WHEN series <= $2::bigint THEN $3::bigint
     ELSE $3::bigint + 1 + ((series - $2::bigint - 1) % ($4::bigint - 1))
   END,
-  'prompt-generation',
+  'generation',
   $5,
   'Usage Load Test',
   $6,

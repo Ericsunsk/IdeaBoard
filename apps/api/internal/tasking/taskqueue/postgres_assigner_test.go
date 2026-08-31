@@ -37,9 +37,9 @@ func TestTaskLeaseTokenBindsToRiverJobID(t *testing.T) {
 
 func TestTaskExecutionPlanProvidesRoutingRequirement(t *testing.T) {
 	tests := map[string]workflow.RoutingCapability{
-		workflow.FeatureSlugCutout:      workflow.RoutingCapabilityBackgroundRemoval,
-		workflow.FeatureSlugHDUpscale:   workflow.RoutingCapabilityImageUpscale,
-		workflow.FeatureSlugStyleFusion: workflow.RoutingCapabilityImageGeneration,
+		workflow.FeatureSlugCutout:  workflow.RoutingCapabilityCutout,
+		workflow.FeatureSlugUpscale: workflow.RoutingCapabilityUpscale,
+		workflow.FeatureSlugFusion:  workflow.RoutingCapabilityGeneration,
 	}
 	for feature, want := range tests {
 		plan, err := taskExecutionPlan(assignerExecutionParams(t, feature, workflow.OutputResolution1K))
@@ -173,10 +173,10 @@ func TestPostgresTaskAssignerRoutesModelessTaskFromExecutionPlan(t *testing.T) {
 	ctx := context.Background()
 
 	generationAccount := createAssignerAccount(t, db, "generation-only", 2)
-	setAssignerEndpointCapabilities(t, db, generationAccount, string(workflow.RoutingCapabilityImageGeneration))
+	setAssignerEndpointCapabilities(t, db, generationAccount, string(workflow.RoutingCapabilityGeneration))
 	backgroundAccount := createAssignerAccount(t, db, "background-modeless", 2)
 	setAssignerEndpointProtocol(t, db, backgroundAccount, "image-url-json-to-image")
-	setAssignerEndpointCapabilities(t, db, backgroundAccount, string(workflow.RoutingCapabilityBackgroundRemoval))
+	setAssignerEndpointCapabilities(t, db, backgroundAccount, string(workflow.RoutingCapabilityCutout))
 	setAssignerModelEnabled(t, db, backgroundAccount, "gpt-image-1", false)
 	createAssignerTaskWithOptions(t, db, "pending-background-modeless", 0, tasks.StatusPending, "", "", assignerTaskOptions{
 		ParamsJSON: assignerExecutionParams(t, workflow.FeatureSlugCutout, workflow.OutputResolutionDefault),
@@ -184,7 +184,7 @@ func TestPostgresTaskAssignerRoutesModelessTaskFromExecutionPlan(t *testing.T) {
 
 	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID: "pending-background-modeless", RiverJobID: 130,
-		Params: assignerExecutionParams(t, workflow.FeatureSlugPromptGeneration, workflow.OutputResolution1K),
+		Params: assignerExecutionParams(t, workflow.FeatureSlugGeneration, workflow.OutputResolution1K),
 	})
 	if err != nil {
 		t.Fatalf("Assign failed: %v", err)
@@ -200,13 +200,13 @@ func TestPostgresTaskAssignerRoutesUpscaleCapabilityFromExecutionPlan(t *testing
 	ctx := context.Background()
 
 	backgroundAccount := createAssignerAccount(t, db, "background-only", 2)
-	setAssignerEndpointCapabilities(t, db, backgroundAccount, string(workflow.RoutingCapabilityBackgroundRemoval))
+	setAssignerEndpointCapabilities(t, db, backgroundAccount, string(workflow.RoutingCapabilityCutout))
 	upscaleAccount := createAssignerAccount(t, db, "upscale-modeless", 2)
 	setAssignerEndpointProtocol(t, db, upscaleAccount, "image-url-json-to-image")
-	setAssignerEndpointCapabilities(t, db, upscaleAccount, string(workflow.RoutingCapabilityImageUpscale))
+	setAssignerEndpointCapabilities(t, db, upscaleAccount, string(workflow.RoutingCapabilityUpscale))
 	setAssignerModelEnabled(t, db, upscaleAccount, "gpt-image-1", false)
 	createAssignerTaskWithOptions(t, db, "pending-upscale-modeless", 0, tasks.StatusPending, "", "", assignerTaskOptions{
-		ParamsJSON: assignerExecutionParams(t, workflow.FeatureSlugHDUpscale, workflow.OutputResolutionDefault),
+		ParamsJSON: assignerExecutionParams(t, workflow.FeatureSlugUpscale, workflow.OutputResolutionDefault),
 	})
 
 	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{TaskID: "pending-upscale-modeless", RiverJobID: 135})
@@ -231,12 +231,12 @@ func TestPostgresTaskAssignerRoutesModelessImageFillTasks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			db := newPostgresAssignerTestDB(t)
 			assigner := NewPostgresTaskAssigner(db)
-			accountID := createAssignerAccount(t, db, "image-fill-modeless", 2)
+			accountID := createAssignerAccount(t, db, "fill-modeless", 2)
 			setAssignerEndpointProtocol(t, db, accountID, "flux-fill-json-image")
-			setAssignerEndpointCapabilities(t, db, accountID, string(workflow.RoutingCapabilityImageFill))
+			setAssignerEndpointCapabilities(t, db, accountID, string(workflow.RoutingCapabilityFill))
 			setAssignerModelEnabled(t, db, accountID, "gpt-image-1", false)
 
-			taskID := "pending-image-fill-" + strings.ReplaceAll(tt.name, " ", "-")
+			taskID := "pending-fill-" + strings.ReplaceAll(tt.name, " ", "-")
 			createAssignerTaskWithOptions(t, db, taskID, 0, tasks.StatusPending, "", "", assignerTaskOptions{
 				ParamsJSON: assignerExecutionParams(t, tt.feature, workflow.OutputResolutionDefault),
 			})
@@ -248,7 +248,7 @@ func TestPostgresTaskAssignerRoutesModelessImageFillTasks(t *testing.T) {
 				t.Fatalf("Assign failed: %v", err)
 			}
 			if assignment.Status != AssignStatusAssigned || assignment.AccountID != accountID || assignment.ResolvedModel != "" {
-				t.Fatalf("assignment=%+v, want modeless image-fill account %d", assignment, accountID)
+				t.Fatalf("assignment=%+v, want modeless fill account %d", assignment, accountID)
 			}
 		})
 	}
@@ -260,9 +260,9 @@ func TestPostgresTaskAssignerRejectsResolutionMismatchFromExecutionPlan(t *testi
 	ctx := context.Background()
 
 	accountID := createAssignerAccount(t, db, "one-k-only", 2)
-	setAssignerEndpointCapabilities(t, db, accountID, string(workflow.RoutingCapabilityImageGeneration))
+	setAssignerEndpointCapabilities(t, db, accountID, string(workflow.RoutingCapabilityGeneration))
 	createAssignerTaskWithOptions(t, db, "pending-two-k", 0, tasks.StatusPending, "", "", assignerTaskOptions{
-		ParamsJSON: assignerExecutionParams(t, workflow.FeatureSlugPromptGeneration, workflow.OutputResolution2K),
+		ParamsJSON: assignerExecutionParams(t, workflow.FeatureSlugGeneration, workflow.OutputResolution2K),
 	})
 
 	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{TaskID: "pending-two-k", RiverJobID: 131})
@@ -280,9 +280,9 @@ func TestPostgresTaskAssignerRoutesDefaultResolutionAsProviderBaseline(t *testin
 	ctx := context.Background()
 
 	accountID := createAssignerAccount(t, db, "default-resolution", 2)
-	setAssignerEndpointCapabilities(t, db, accountID, string(workflow.RoutingCapabilityImageGeneration))
+	setAssignerEndpointCapabilities(t, db, accountID, string(workflow.RoutingCapabilityGeneration))
 	createAssignerTaskWithOptions(t, db, "pending-default-resolution", 0, tasks.StatusPending, "", "", assignerTaskOptions{
-		ParamsJSON: assignerExecutionParams(t, workflow.FeatureSlugPromptGeneration, workflow.OutputResolutionDefault),
+		ParamsJSON: assignerExecutionParams(t, workflow.FeatureSlugGeneration, workflow.OutputResolutionDefault),
 	})
 
 	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{TaskID: "pending-default-resolution", RiverJobID: 133})
@@ -320,7 +320,7 @@ func TestPostgresTaskAssignerRoutesResolutionToMatchingModel(t *testing.T) {
 			setAssignerEndpointModelCapabilities(t, db, accountID, "four-k-model", false, true)
 			taskID := "pending-resolution-" + tt.name
 			createAssignerTaskWithOptions(t, db, taskID, 0, tasks.StatusPending, "", "", assignerTaskOptions{
-				ParamsJSON: assignerExecutionParams(t, workflow.FeatureSlugPromptGeneration, tt.resolution),
+				ParamsJSON: assignerExecutionParams(t, workflow.FeatureSlugGeneration, tt.resolution),
 			})
 
 			assignment, err := assigner.Assign(context.Background(), &tasks.TaskPayload{TaskID: taskID, RiverJobID: 134})
@@ -341,7 +341,7 @@ func TestPostgresTaskAssignerFailsClosedOnInvalidExecutionPlan(t *testing.T) {
 
 	createAssignerAccount(t, db, "invalid-plan-provider", 2)
 	createAssignerTaskWithOptions(t, db, "pending-invalid-plan", 0, tasks.StatusPending, "", "", assignerTaskOptions{
-		ParamsJSON: `{"schema_version":4,"feature":"prompt-generation","execution_plan":{"schema_version":1}}`,
+		ParamsJSON: `{"schema_version":5,"feature":"generation","execution_plan":{"schema_version":1}}`,
 	})
 
 	if _, err := assigner.Assign(ctx, &tasks.TaskPayload{TaskID: "pending-invalid-plan", RiverJobID: 132}); err == nil {
@@ -464,7 +464,7 @@ func TestPostgresTaskAssignerWritesRuntimeAssignmentSnapshot(t *testing.T) {
 
 	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-snapshot",
-		Params:     `{"feature":"prompt-generation","model":"gpt-image-1"}`,
+		Params:     `{"feature":"generation","model":"gpt-image-1"}`,
 		RiverJobID: 111,
 	})
 	if err != nil {
@@ -790,7 +790,7 @@ func TestPostgresTaskAssignerRejectsInvalidPlanBeforeRunningLeaseReuse(t *testin
 
 	accountID := createAssignerAccount(t, db, "invalid-reuse", 1)
 	createAssignerTaskWithOptions(t, db, "running-invalid-reuse", accountID, tasks.StatusRunning, "river:134:existing", "gpt-image-1", assignerTaskOptions{
-		ParamsJSON: `{"schema_version":4,"feature":"prompt-generation"}`,
+		ParamsJSON: `{"schema_version":5,"feature":"generation"}`,
 	})
 
 	if _, err := assigner.Assign(ctx, &tasks.TaskPayload{TaskID: "running-invalid-reuse", RiverJobID: 134}); err == nil {
@@ -927,7 +927,7 @@ VALUES ('openai-compatible', 'model-api', $1, $2, 1)
 RETURNING id`, "assigner-channel-"+name, "https://example.com/"+name).Scan(&channelID); err != nil {
 		t.Fatalf("create channel %q failed: %v", name, err)
 	}
-	if _, err := db.Exec(`INSERT INTO provider_endpoint_capabilities (provider_endpoint_id, capability) VALUES ($1, 'image-generation')`, channelID); err != nil {
+	if _, err := db.Exec(`INSERT INTO provider_endpoint_capabilities (provider_endpoint_id, capability) VALUES ($1, 'generation')`, channelID); err != nil {
 		t.Fatalf("create channel capability %q failed: %v", name, err)
 	}
 	var id int64
@@ -1119,7 +1119,7 @@ func createAssignerTaskWithOptions(t *testing.T, db *sql.DB, taskID string, acco
 	}
 	paramsJSON := opts.ParamsJSON
 	if paramsJSON == "" {
-		paramsJSON = assignerExecutionParams(t, workflow.FeatureSlugPromptGeneration, workflow.OutputResolution1K)
+		paramsJSON = assignerExecutionParams(t, workflow.FeatureSlugGeneration, workflow.OutputResolution1K)
 	}
 	_, err := db.Exec(`
 	INSERT INTO tasks (
@@ -1168,13 +1168,13 @@ func assignerExecutionParams(t *testing.T, feature string, resolution string) st
 	imageInputCount := 0
 	hasMaskInput := false
 	switch feature {
-	case workflow.FeatureSlugPromptGeneration:
-	case workflow.FeatureSlugStyleFusion:
+	case workflow.FeatureSlugGeneration:
+	case workflow.FeatureSlugFusion:
 		imageInputCount = 2
 	case workflow.FeatureSlugInpaint:
 		imageInputCount = 1
 		hasMaskInput = true
-	case workflow.FeatureSlugCutout, workflow.FeatureSlugHDUpscale:
+	case workflow.FeatureSlugCutout, workflow.FeatureSlugUpscale:
 		imageInputCount = 1
 		resolution = workflow.OutputResolutionDefault
 	default:

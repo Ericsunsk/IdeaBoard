@@ -183,7 +183,7 @@ func providerRequestFactsForTest(params map[string]interface{}, operation workfl
 		}
 	}
 	primitive := workflow.GenerationPrimitiveTextToImage
-	if operation != workflow.RuntimeOperationPromptGeneration {
+	if operation != workflow.RuntimeOperationGeneration {
 		primitive = workflow.GenerationPrimitiveImageToImage
 	}
 	return resolvedProviderRequestFacts{primitive: primitive, outputCount: count, outputResolution: resolution}
@@ -198,16 +198,16 @@ func providerRuntimeIntentForTest(params map[string]interface{}) (workflow.Runti
 		return workflow.RuntimeOperationRender, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsNone
 	case workflow.FeatureSlugVariations:
 		return workflow.RuntimeOperationVariations, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsVariation
-	case workflow.FeatureSlugStyleFusion:
-		return workflow.RuntimeOperationStyleFusion, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsFusion
+	case workflow.FeatureSlugFusion:
+		return workflow.RuntimeOperationFusion, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsFusion
 	case workflow.FeatureSlugOutpaint:
 		return workflow.RuntimeOperationOutpaint, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsOutpaint
 	case workflow.FeatureSlugCutout:
-		return workflow.RuntimeOperationBackgroundRemoval, workflow.RuntimeInvocationTransform, workflow.RuntimeControlsNone
-	case workflow.FeatureSlugHDUpscale:
-		return workflow.RuntimeOperationImageUpscale, workflow.RuntimeInvocationTransform, workflow.RuntimeControlsUpscale
+		return workflow.RuntimeOperationCutout, workflow.RuntimeInvocationTransform, workflow.RuntimeControlsNone
+	case workflow.FeatureSlugUpscale:
+		return workflow.RuntimeOperationUpscale, workflow.RuntimeInvocationTransform, workflow.RuntimeControlsUpscale
 	default:
-		return workflow.RuntimeOperationPromptGeneration, workflow.RuntimeInvocationGenerate, workflow.RuntimeControlsNone
+		return workflow.RuntimeOperationGeneration, workflow.RuntimeInvocationGenerate, workflow.RuntimeControlsNone
 	}
 }
 

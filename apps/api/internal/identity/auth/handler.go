@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"net/url"
+	"strings"
 	"time"
 
 	"ideaboard/api/internal/identity/principal"
@@ -50,6 +52,21 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 
 	response.SuccessDTO(c, currentUserResponse{User: currentUserPublicInfo{
 		PublicID: user.PublicID.String(), DisplayName: user.DisplayName, StorageNamespace: user.StorageUID,
-		Avatar: user.Avatar, Role: user.Role, Status: user.Status, CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt,
+		Avatar: canonicalProfileAvatarURL(user.Avatar), Role: user.Role, Status: user.Status, CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt,
 	}})
+}
+
+func canonicalProfileAvatarURL(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil || !strings.HasPrefix("/"+strings.TrimPrefix(parsed.Path, "/"), "/uploads/") {
+		return trimmed
+	}
+	if parsed.IsAbs() && !strings.EqualFold(parsed.Host, "ideaboard.art") {
+		return trimmed
+	}
+	return "/api/user/profile/avatar/content"
 }

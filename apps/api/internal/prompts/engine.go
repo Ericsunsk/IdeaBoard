@@ -32,11 +32,11 @@ var featurePromptVariableProviders = map[string]featurePromptVariableProvider{
 }
 
 var featurePromptBindings = map[string][]promptTemplateBinding{
-	workflow.FeatureSlugStyleFusion: {
+	workflow.FeatureSlugFusion: {
 		{
 			placeholder: paramkeys.PromptPlaceholderFusionInputWeights,
 			paramKey:    paramkeys.PromptPathFusionInputWeights,
-			reader:      readStyleFusionInputWeightsPromptParam,
+			reader:      readFusionInputWeightsPromptParam,
 			formatter:   formatImageWeightsTemplateValue,
 		},
 	},
@@ -106,8 +106,8 @@ func readDirectPromptParam(params map[string]interface{}, key string) (interface
 	return value, ok
 }
 
-func readStyleFusionInputWeightsPromptParam(params map[string]interface{}, _ string) (interface{}, bool) {
-	return workflow.ReadStyleFusionInputWeights(params)
+func readFusionInputWeightsPromptParam(params map[string]interface{}, _ string) (interface{}, bool) {
+	return workflow.ReadFusionInputWeights(params)
 }
 
 func variationsPromptVariables(params map[string]interface{}) map[string]interface{} {

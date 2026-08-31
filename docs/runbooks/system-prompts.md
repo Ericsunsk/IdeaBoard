@@ -14,7 +14,7 @@
 
 ### 2.1 Prompt Node
 
-对应 Feature：`prompt-generation`。
+对应 Feature：`generation`。
 
 - 负责文生图和图生图。
 - 用户文字是必填主输入；`trim` 后为空时不进入生成流程。
@@ -24,18 +24,18 @@
 
 ### 2.2 Image Node
 
-对应 Feature：`render`、`variations`、`cutout`、`hd-upscale`、
+对应 Feature：`render`、`variations`、`cutout`、`upscale`、
 `inpaint`、`outpaint`。
 
 - 图片是主输入。
 - Prompt-driven Image Feature 的用户文字只能作为显式辅助要求；没有辅助文字时仍按图片和结构化控制执行。
 - `variations` 的 `variation_strength` 控制变化幅度。
-- `cutout` 与 `hd-upscale` 由 Modal 专用端点处理，不读取用户文字或 System Prompt；HD 只接受结构化 `hd.scale`。
+- `cutout` 与 `upscale` 由 Modal 专用端点处理，不读取用户文字或 System Prompt；只接受结构化 `upscale.scale`。
 - Prompt-driven Image Feature 保持自己的 Prompt Contract，不归入 Prompt Node 或其他功能。
 
 ### 2.3 Fusion Node
 
-对应 Feature：`style-fusion`。
+对应 Feature：`fusion`。
 
 - 必须有 2 到 4 张输入图片。
 - 图片顺序和融合权重由运行时计算并提供。
@@ -72,14 +72,14 @@
 
 | Feature | 允许的变量 |
 | --- | --- |
-| `prompt-generation` | `{{user_prompt}}` |
+| `generation` | `{{user_prompt}}` |
 | `inpaint` | `{{user_prompt}}` |
 | `render` | `{{user_prompt}}` |
 | `variations` | `{{user_prompt}}`、`{{variation_strength}}` |
 | `cutout` | 无（由 Modal 专用端点处理） |
-| `hd-upscale` | 无（由 Modal 专用端点处理） |
+| `upscale` | 无（由 Modal 专用端点处理） |
 | `outpaint` | `{{user_prompt}}` |
-| `style-fusion` | `{{user_prompt}}`、`{{fusion_input_weights}}` |
+| `fusion` | `{{user_prompt}}`、`{{fusion_input_weights}}` |
 
 以下内容不是模板变量：`image_urls`、`reference_image_urls`、`mask_image_url`、
 `mask_image_urls`、URL、base64、multipart 字段、尺寸、模型、质量和 output count。
@@ -88,7 +88,7 @@
 
 下面的模板是当前已确认稳定链路的初始配置。每个模板同时提供中文版和 English Version；模板中的变量必须保持原样书写。
 
-### 4.1 `prompt-generation` · Prompt Node
+### 4.1 `generation` · Prompt Node
 
 #### 中文版
 
@@ -306,7 +306,7 @@ Do not combine multiple results into one image or output collages, comparison sh
 Do not output explanations, analysis, or prompt text; output images only.
 ```
 
-### 4.4 `style-fusion` · Fusion Node
+### 4.4 `fusion` · Fusion Node
 
 #### 中文版
 

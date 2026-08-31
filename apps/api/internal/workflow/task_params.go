@@ -112,9 +112,9 @@ func flattenWorkflowFeatureParams(out map[string]interface{}, params *tasks.Work
 			paramkeys.ImageOffsetY: params.Outpaint.ImageOffsetY,
 		}
 	}
-	if params.HD != nil {
-		out[ParamKeyHD] = map[string]interface{}{
-			paramkeys.Scale: params.HD.Scale,
+	if params.Upscale != nil {
+		out[ParamKeyUpscale] = map[string]interface{}{
+			paramkeys.Scale: params.Upscale.Scale,
 		}
 	}
 	if params.Fusion != nil {

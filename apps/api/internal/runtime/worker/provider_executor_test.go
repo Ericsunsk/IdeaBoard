@@ -88,7 +88,7 @@ func TestResolveProviderTimeoutGrantsFluxFillColdStartBudget(t *testing.T) {
 	if got := resolveProviderTimeout(account, providerRuntimeAdapterFluxFill); got != minimumFluxFillTimeout {
 		t.Fatalf("Flux Fill timeout = %v, want %v", got, minimumFluxFillTimeout)
 	}
-	if got := resolveProviderTimeout(account, providerRuntimeAdapterBackgroundRemoval); got != 120*time.Second {
-		t.Fatalf("background removal timeout = %v, want %v", got, 120*time.Second)
+	if got := resolveProviderTimeout(account, providerRuntimeAdapterCutout); got != 120*time.Second {
+		t.Fatalf("cutout timeout = %v, want %v", got, 120*time.Second)
 	}
 }

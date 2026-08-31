@@ -1,7 +1,16 @@
 export type ProviderApiTypeValue = 'openai-compatible' | 'self-hosted' | 'google-ai' | 'google-cloud'
-export type ProviderProtocolValue = 'model-api' | 'image-url-json-to-image' | 'flux-fill-json-image'
-export type ProviderCapabilityValue = 'image-generation' | 'background-removal' | 'image-upscale' | 'image-fill'
-export type ProviderProcessingCapabilityValue = Exclude<ProviderCapabilityValue, 'image-generation'>
+export type ProviderProtocolValue =
+  | 'model-api'
+  | 'image-pipeline'
+  | 'image-url-json-to-image'
+  | 'image-fill'
+  | 'flux-fill-json-image'
+export type ProviderCapabilityValue =
+  | 'generation'
+  | 'cutout'
+  | 'upscale'
+  | 'fill'
+export type ProviderProcessingCapabilityValue = Exclude<ProviderCapabilityValue, 'generation'>
 
 export type AdminProviderAccountLimitRange = {
   min: number

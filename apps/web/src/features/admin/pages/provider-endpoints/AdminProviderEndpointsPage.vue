@@ -154,19 +154,19 @@
                   {{ card.providerEndpoint.protocolLabel }}
                 </span>
                 <span
-                  v-if="card.providerEndpoint.protocol === 'image-url-json-to-image'"
+                  v-if="isImagePipelineProtocol(card.providerEndpoint.protocol)"
                   class="text-admin-text-3"
                 >
                   ·
                   {{
-                    getAdminProviderEndpointCapabilityLabel(card.providerEndpoint.capabilities[0])
+                    card.providerEndpoint.capabilities[0]
                   }}
                 </span>
               </div>
 
               <div class="flex shrink-0 items-center gap-2">
                 <span
-                  v-if="card.providerEndpoint.protocol === 'image-url-json-to-image'"
+                  v-if="isImagePipelineProtocol(card.providerEndpoint.protocol)"
                   :class="
                     card.providerEndpoint.apiKeyConfigured
                       ? 'text-admin-success font-medium'
@@ -343,14 +343,14 @@
 
       <AdminFormField
         v-slot="{ describedbyId, invalid }"
-        label="请求格式"
+        label="服务协议"
         for="admin-provider-endpoint-protocol"
         :error="providerEndpointFormErrors.protocol"
       >
         <Select
           v-model="providerEndpointForm.protocol"
           input-id="admin-provider-endpoint-protocol"
-          aria-label="请求格式"
+          aria-label="服务协议"
           class="w-full"
           :options="providerProtocolOptions"
           option-label="label"
@@ -362,7 +362,7 @@
       </AdminFormField>
 
       <AdminFormField
-        v-if="providerEndpointForm.protocol === 'image-url-json-to-image'"
+        v-if="isImagePipelineProtocol(providerEndpointForm.protocol)"
         v-slot="{ describedbyId, invalid }"
         label="处理功能"
         for="admin-provider-endpoint-capability"
@@ -773,8 +773,9 @@ import { useAdminProviderConfigFeedback } from '../../provider-config/useAdminPr
 import SearchProviderCard from '../../provider-config/SearchProviderCard.vue'
 import AdminLogoPickerPopover from '../../provider-config/AdminLogoPickerPopover.vue'
 import {
-  getAdminProviderEndpointCapabilityLabel,
   getAdminProviderEndpointProtocolLabel,
+  isImageFillProtocol,
+  isImagePipelineProtocol,
   isModellessProviderEndpoint,
   isModellessProviderProtocol,
 } from '../../provider-config/providerConfigPayload'
@@ -832,7 +833,7 @@ const providerProcessingCapabilityOptions = computed(() => {
     (item) => item.id === providerEndpointForm.value.protocol,
   )
   return (protocol?.capabilities ?? []).map((capability) => ({
-    label: getAdminProviderEndpointCapabilityLabel(capability),
+    label: capability,
     value: capability,
   }))
 })
@@ -850,10 +851,10 @@ function clearProviderEndpointFormError(field: keyof typeof providerEndpointForm
 }
 
 function handleProtocolChange(protocol: string) {
-  if (protocol === 'flux-fill-json-image') {
+  if (isImageFillProtocol(protocol)) {
     providerEndpointForm.value.apiType = 'self-hosted'
-    providerEndpointForm.value.capability = 'image-fill'
-  } else if (protocol === 'image-url-json-to-image') {
+    providerEndpointForm.value.capability = 'fill'
+  } else if (isImagePipelineProtocol(protocol)) {
     providerEndpointForm.value.apiType = 'self-hosted'
     providerEndpointForm.value.capability = ''
   } else {

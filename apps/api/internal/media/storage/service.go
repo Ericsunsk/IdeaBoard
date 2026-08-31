@@ -111,8 +111,8 @@ func NewStorageService(profileRepo *StorageProfileRepository, assetLocator Store
 	return newStorageService(profileRepo, assetLocator, "")
 }
 
-// NewStorageServiceWithPublicAPI binds local upload URLs to the API origin so
-// browsers on a separate web origin do not resolve /uploads against the web host.
+// NewStorageServiceWithPublicAPI binds local upload URLs to the public web
+// origin so browser-visible references stay on the same-origin Gateway.
 func NewStorageServiceWithPublicAPI(profileRepo *StorageProfileRepository, assetLocator StoredUploadLocator, publicAPIOrigin string) *StorageService {
 	return newStorageService(profileRepo, assetLocator, publicAPIOrigin)
 }

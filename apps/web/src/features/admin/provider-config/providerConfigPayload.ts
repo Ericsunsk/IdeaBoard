@@ -29,7 +29,6 @@ export const ADMIN_PROVIDER_ENDPOINT_API_TYPE_OPTIONS: Array<{
   value: ProviderApiTypeValue
 }> = [
   { label: 'OpenAI Compatible', value: DEFAULT_ADMIN_PROVIDER_ENDPOINT_API_TYPE },
-  { label: 'Self-hosted HTTP', value: SELF_HOSTED_ADMIN_PROVIDER_ENDPOINT_API_TYPE },
   { label: 'Google AI Studio', value: GOOGLE_ADMIN_PROVIDER_ENDPOINT_API_TYPE },
   {
     label: 'Gemini Enterprise Agent Platform',
@@ -37,37 +36,66 @@ export const ADMIN_PROVIDER_ENDPOINT_API_TYPE_OPTIONS: Array<{
   },
 ]
 
+const providerProtocolRegistry: Record<
+  ProviderProtocolValue,
+  {
+    label: string
+    capabilities: readonly ProviderProcessingCapabilityValue[]
+  }
+> = {
+  'model-api': {
+    label: '生图模型',
+    capabilities: [],
+  },
+  'image-pipeline': {
+    label: '图像微服务',
+    capabilities: ['cutout', 'upscale'],
+  },
+  'image-url-json-to-image': {
+    label: '图像微服务',
+    capabilities: ['cutout', 'upscale'],
+  },
+  'image-fill': {
+    label: 'Image Fill',
+    capabilities: ['fill'],
+  },
+  'flux-fill-json-image': {
+    label: 'Image Fill',
+    capabilities: ['fill'],
+  },
+}
+
+const canonicalProviderProtocols: readonly ProviderProtocolValue[] = [
+  'model-api',
+  'image-pipeline',
+  'image-fill',
+]
+
 export const ADMIN_PROVIDER_ENDPOINT_PROTOCOL_OPTIONS: Array<{
   label: string
   value: ProviderProtocolValue
-}> = [
-  { label: '生图模型 API', value: 'model-api' },
-  { label: '图片处理 API', value: 'image-url-json-to-image' },
-  { label: '图像填充（扩图 / 局部重绘）', value: 'flux-fill-json-image' },
-]
+}> = canonicalProviderProtocols.map((value) => ({
+  label: providerProtocolRegistry[value].label,
+  value,
+}))
 
-const adminProviderEndpointApiTypeLabelByValue = new Map(
-  ADMIN_PROVIDER_ENDPOINT_API_TYPE_OPTIONS.map((item) => [item.value, item.label]),
+const adminProviderEndpointApiTypeLabelByValue = new Map([
+  ...ADMIN_PROVIDER_ENDPOINT_API_TYPE_OPTIONS.map((item) => [item.value, item.label] as const),
+  [SELF_HOSTED_ADMIN_PROVIDER_ENDPOINT_API_TYPE, 'Self-hosted HTTP'],
+])
+
+const adminProviderEndpointProtocolLabelByValue = new Map<string, string>([
+  ...Object.entries(providerProtocolRegistry).map(([value, spec]) => [value, spec.label] as const),
+])
+
+const modellessProviderProtocols = new Set<ProviderProtocolValue>(
+  Object.entries(providerProtocolRegistry)
+    .filter(([, spec]) => spec.capabilities.length > 0)
+    .map(([protocol]) => protocol as ProviderProtocolValue),
 )
-
-const adminProviderEndpointProtocolLabelByValue = new Map(
-  ADMIN_PROVIDER_ENDPOINT_PROTOCOL_OPTIONS.map((item) => [item.value, item.label]),
+const modellessProviderCapabilities = new Set<ProviderProcessingCapabilityValue>(
+  Object.values(providerProtocolRegistry).flatMap((spec) => spec.capabilities),
 )
-
-const adminProviderEndpointCapabilityLabelByValue = new Map<string, string>([
-  ['background-removal', '抠图'],
-  ['image-upscale', 'HD'],
-  ['image-fill', '图像填充（扩图 / 局部重绘）'],
-])
-const modellessProviderProtocols = new Set<ProviderProtocolValue>([
-  'image-url-json-to-image',
-  'flux-fill-json-image',
-])
-const modellessProviderCapabilities = new Set<ProviderProcessingCapabilityValue>([
-  'background-removal',
-  'image-upscale',
-  'image-fill',
-])
 
 export function getAdminProviderEndpointApiTypeLabel(value: string) {
   return (
@@ -83,12 +111,16 @@ export function getAdminProviderEndpointProtocolLabel(value: string) {
   )
 }
 
-export function getAdminProviderEndpointCapabilityLabel(value?: string) {
-  return adminProviderEndpointCapabilityLabelByValue.get(value || '') || value || '未配置'
-}
-
 export function isModellessProviderProtocol(value: string) {
   return modellessProviderProtocols.has(value as ProviderProtocolValue)
+}
+
+export function isImagePipelineProtocol(value: string) {
+  return value === 'image-pipeline' || value === 'image-url-json-to-image'
+}
+
+export function isImageFillProtocol(value: string) {
+  return value === 'image-fill' || value === 'flux-fill-json-image'
 }
 
 export function isModellessProviderCapability(

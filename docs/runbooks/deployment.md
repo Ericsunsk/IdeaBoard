@@ -34,9 +34,8 @@
 
 ```mermaid
 graph LR
-    Browser((浏览器)) --> Pages["Cloudflare Pages<br>app.example.com"]
-    Browser --> ApiDomain["api.example.com"]
-    ApiDomain --> CFProxy["Cloudflare DNS/Proxy"]
+    Browser((浏览器)) --> Gateway["ideaboard.art<br>same-origin Gateway"]
+    Gateway --> CFProxy["Cloudflare DNS/Proxy"]
     CFProxy --> EdgeProxy["VPS Reverse Proxy<br>:443"]
     EdgeProxy -- "/api/auth" --> Auth["ideaboard-auth<br>127.0.0.1:6001"]
     EdgeProxy -- "/api /uploads" --> API["ideaboard-api<br>127.0.0.1:6000"]
@@ -47,9 +46,9 @@ graph LR
 
 生产职责边界：
 
-- Cloudflare Pages 托管 `apps/web/dist`。
-- Cloudflare DNS/Proxy 暴露 `api.example.com` 并提供 WAF / Rate Limiting / Cache Rules。
-- VPS 宿主机 Nginx 只反代 `/api/*`、`/api/auth/*`、`/uploads/*` 到 Docker Compose 中的 API/Auth。
+- Cloudflare Pages 托管 `apps/web/dist`，并由 `ideaboard.art` Gateway 暴露应用。
+- Cloudflare DNS/Proxy 暴露 `ideaboard.art` 并提供 WAF / Rate Limiting / Cache Rules。
+- VPS 宿主机 Nginx 反代同域 `/api/*`、`/api/auth/*`、`/uploads/*` 到 Docker Compose 中的 API/Auth。
 - Docker Compose 管理 API、Auth、PostgreSQL、NATS JetStream 与 `api-uploads` volume。
 - River 任务队列写入 PostgreSQL；JetStream 只承载状态事件、audit 与实时 fanout。
 
@@ -63,25 +62,25 @@ Pages 项目建议配置：
 | Build command | `npm run build` |
 | Build output directory | `dist` |
 | Environment variable | `NODE_VERSION=22.23.2` |
-| Environment variable | `VITE_API_BASE_URL=https://api.example.com/api` |
-| Auth public origin | Derived from `VITE_API_BASE_URL` by removing the trailing `/api` |
+| Environment variable | Leave `VITE_API_BASE_URL` and `VITE_PUBLIC_ASSET_BASE_URL` empty (same-origin Gateway) |
+| Auth public origin | Derived from the current browser origin (`ideaboard.art`) |
 
 VPS 侧至少同步：
 
 ```bash
 # /opt/stacks/ideaboard/docker/.env
-APP_BASE_URL=https://app.example.com
-API_BASE_URL=https://api.example.com
+APP_BASE_URL=https://ideaboard.art
+API_BASE_URL=https://ideaboard.art
 ```
 
-这两个值必须是没有 path、凭证、query 或 fragment 的 http(s) Origin。它们是唯一事实源：`APP_BASE_URL` 用于浏览器跳转与分享链接，`API_BASE_URL` 用于 Stripe Webhook 和本地上传素材；API 启动时会 fail closed 校验。
+这两个值必须是没有 path、凭证、query 或 fragment 的 http(s) Origin。它们是唯一事实源：`APP_BASE_URL` 用于浏览器跳转与分享链接，`API_BASE_URL` 用于 Stripe Webhook 和服务间 API 地址；浏览器请求必须通过 `ideaboard.art` 的 same-origin Gateway，API 启动时会 fail closed 校验。
 
 Cloudflare DNS 配置：
 
 ```text
 Type: A 或 AAAA
-Name: api
-Value: VPS 公网 IP
+Name: @
+Value: VPS 公网 IP（`ideaboard.art` Gateway）
 Proxy status: Proxied
 ```
 
@@ -90,14 +89,14 @@ VPS 防火墙只开放 SSH、80、443。API/Auth 容器只绑定 `127.0.0.1:6000
 <a id="cloudflare-edge-hardening"></a>
 ## Cloudflare 加固
 
-生产 API 域名默认使用 `Proxied`；临时切到 `DNS only` 时，Cloudflare WAF、Rate Limiting、Cache Rules 和源站 allowlist 均不再生效，上线前必须切回并复验。
+生产 Gateway 域名默认使用 `Proxied`；临时切到 `DNS only` 时，Cloudflare WAF、Rate Limiting、Cache Rules 和源站 allowlist 均不再生效，上线前必须切回并复验。
 
 - Origin 防火墙：VPS 安全组 / `ufw` 只开放 SSH、80、443；80/443 入站只允许 Cloudflare IP ranges 到达源站，或使用等价的源站防火墙策略。
 - 真实客户端 IP：宿主机反代层只信任 Cloudflare 来源，并通过 `CF-Connecting-IP` 恢复真实客户端 IP，再向 API/Auth 传递 `X-Real-IP`、`X-Forwarded-For`、`X-Forwarded-Proto`。
 - Cache Rules：对 `/api/*`、`/api/auth/*`、SSE 任务状态接口、上传写入接口，以及所有带 `Authorization` 或 session Cookie 的请求设置 bypass cache。`/uploads/*` 可单独按素材访问策略缓存。
 - Metrics：API 使用独立 Prometheus listener；compose 默认仅将 `9091` 绑定到宿主机 `127.0.0.1`。监控系统抓取 `/metrics`，Nginx/Cloudflare 不得代理该端口或路径。
 - Rate Limiting / WAF：至少覆盖 `/api/auth/*`、管理员接口、上传接口、任务提交接口。对 `POST /api/user/rewards/redeem` 按可信客户端 IP 设置初始 `60 attempts / 10 minutes` coarse limit；Cloudflare 使用 `CF-Connecting-IP`，源站反代仅在请求确由 Cloudflare allowlist 到达时信任该值。该 edge rule 与应用内 per-user `10 attempts / 10 minutes` limiter 共同生效。首次启用建议先用 log / challenge / captcha 灰度观察误伤，再切换到 block。
-- Pages 环境隔离：production 与 preview 使用独立 `VITE_API_BASE_URL`、`VITE_PUBLIC_ASSET_BASE_URL`；preview 不连接生产 API/Auth/数据库。
+- Pages 环境隔离：production 的 `VITE_API_BASE_URL`、`VITE_PUBLIC_ASSET_BASE_URL` 必须为空并使用同域 Gateway；preview 不连接生产 API/Auth/数据库。
 - HTTPS / HSTS：SSL/TLS 使用 `Full (strict)`；Always Use HTTPS 和 HSTS 先灰度，不要一开始启用 `preload` 或 `includeSubDomains`。
 
 <a id="recommended-docker"></a>
@@ -320,7 +319,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-如果 VPS 已经有 certbot 或自管的 `443 ssl` server block，可以把生成文件里的 `/api`、`/api/auth`、`/uploads` location 合并进现有 API 域名 server block。
+如果 VPS 已经有 certbot 或自管的 `443 ssl` server block，可以把生成文件里的 `/api`、`/api/auth`、`/uploads` location 合并进现有 `ideaboard.art` server block。同时必须在该 HTTPS vhost（以及 Nginx Proxy Manager 对应的 HTTPS Proxy Host）中保留 `api.ideaboard.art` 的独立 reject 规则，返回 `444` 或直接拒绝连接，避免 retired API hostname 在 TLS 层落入主站 vhost。
 
 默认 upstream 是宿主机 loopback 端口：
 
@@ -330,9 +329,9 @@ NGINX_AUTH_UPSTREAM=http://127.0.0.1:6001
 NGINX_AUTH_HEALTH_UPSTREAM=http://127.0.0.1:6001/api/health
 ```
 
-如需明确绑定 API 域名，可设置 `NGINX_SERVER_NAME=api.example.com` 后重新执行 `ideaboard nginx-conf`。
+如需明确绑定主站域名，可设置 `NGINX_SERVER_NAME=ideaboard.art` 后重新执行 `ideaboard nginx-conf`。
 
-如果 API 域名使用 Cloudflare `Proxied`，并且 VPS 防火墙已限制 80/443 只接受 Cloudflare IP ranges，可以生成真实客户端 IP include：
+如果 Gateway 域名使用 Cloudflare `Proxied`，并且 VPS 防火墙已限制 80/443 只接受 Cloudflare IP ranges，可以生成真实客户端 IP include：
 
 ```bash
 ideaboard cloudflare-real-ip-conf /tmp/cloudflare-real-ip.conf

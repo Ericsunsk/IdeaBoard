@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"image"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -56,6 +57,22 @@ func TestLibraryVisionHostAllowlist(t *testing.T) {
 	}
 	if isLibraryImageHost("evil.example") {
 		t.Fatal("unexpected host allowed")
+	}
+}
+
+func TestVisionImageAllowHostsIncludesCuratedCDNs(t *testing.T) {
+	restore := outbound.ConfigurePolicyProvider(visionTestOutboundPolicy{hosts: []string{"vision.example"}})
+	defer restore()
+
+	got := visionImageAllowHosts(context.Background())
+	want := []string{"vision.example", "images.unsplash.com", "plus.unsplash.com", "images.pexels.com"}
+	if len(got) != len(want) {
+		t.Fatalf("allow hosts = %#v, want %#v", got, want)
+	}
+	for index, host := range want {
+		if got[index] != host {
+			t.Fatalf("allow hosts[%d] = %q, want %q", index, got[index], host)
+		}
 	}
 }
 
@@ -134,7 +151,7 @@ func TestMultipartVisionInputReaderResolvesLibraryAssetForOwner(t *testing.T) {
 	request.Header.Set("Content-Type", writer.FormDataContentType())
 	reader := &visionLibraryAssetReaderStub{asset: library.Asset{OriginalURL: "https://evil.example/image.png"}}
 
-	_, err := (multipartVisionInputReader{libraryReader: reader}).Read(request, 42)
+	_, err := (multipartVisionInputReader{materializer: visionReferenceMaterializer{libraryReader: reader}}).Read(request, 42)
 	if !errors.Is(err, ErrVisionImageUnavailable) {
 		t.Fatalf("Read() error = %v, want ErrVisionImageUnavailable", err)
 	}
@@ -426,5 +443,129 @@ func TestExtractCloudflareWorkersAIVisionCombinesMultipleImages(t *testing.T) {
 	}
 	if extraction.Query != "cafe interior" {
 		t.Fatalf("extraction = %#v, want query 'cafe interior'", extraction)
+	}
+}
+
+func TestParseExternalReferences(t *testing.T) {
+	validRaw := []string{
+		`{"provider":"unsplash","id":"abc-1","preview_url":"https://images.unsplash.com/photo-1"}`,
+		`{"provider":"pexels","id":"def-2","preview_url":"https://images.pexels.com/photo-2"}`,
+		`{"provider":"unsplash","id":"abc-1","preview_url":"https://images.unsplash.com/photo-1"}`, // duplicate
+	}
+	refs, err := parseExternalReferences(validRaw)
+	if err != nil {
+		t.Fatalf("parseExternalReferences() error = %v", err)
+	}
+	if len(refs) != 2 {
+		t.Fatalf("len(refs) = %d, want 2", len(refs))
+	}
+	if refs[0].Provider != "unsplash" || refs[0].ID != "abc-1" || refs[1].Provider != "pexels" || refs[1].ID != "def-2" {
+		t.Fatalf("unexpected parsed refs: %#v", refs)
+	}
+
+	// Invalid provider
+	if _, err := parseExternalReferences([]string{`{"provider":"evil","id":"1","preview_url":"https://evil.com/1"}`}); err != ErrVisionInput {
+		t.Fatalf("expected ErrVisionInput for evil provider, got %v", err)
+	}
+
+	// Malformed JSON
+	if _, err := parseExternalReferences([]string{"not-json"}); err != ErrVisionInput {
+		t.Fatalf("expected ErrVisionInput for malformed json, got %v", err)
+	}
+
+	// Missing fields
+	if _, err := parseExternalReferences([]string{`{"provider":"unsplash","id":""}`}); err != ErrVisionInput {
+		t.Fatalf("expected ErrVisionInput for missing fields, got %v", err)
+	}
+}
+
+func TestReadExternalVisionImageDisallowsInvalidHosts(t *testing.T) {
+	ref := VisionExternalReference{
+		Provider:   "unsplash",
+		ID:         "abc",
+		PreviewURL: "https://evil.example/image.jpg",
+	}
+	_, err := readExternalVisionImage(context.Background(), ref)
+	if !errors.Is(err, ErrVisionImageUnavailable) {
+		t.Fatalf("expected ErrVisionImageUnavailable for evil host, got %v", err)
+	}
+
+	// Provider mismatch (unsplash provider with pexels host)
+	mismatchRef := VisionExternalReference{
+		Provider:   "unsplash",
+		ID:         "abc",
+		PreviewURL: "https://images.pexels.com/image.jpg",
+	}
+	_, err = readExternalVisionImage(context.Background(), mismatchRef)
+	if !errors.Is(err, ErrVisionImageUnavailable) {
+		t.Fatalf("expected ErrVisionImageUnavailable for mismatched provider host, got %v", err)
+	}
+}
+
+func TestReadExternalVisionImageMaterializesAllowedCDN(t *testing.T) {
+	called := false
+	previous := visionImageRequest
+	visionImageRequest = func(_ context.Context, request *http.Request) (*http.Response, error) {
+		called = true
+		if request.URL.Hostname() != "images.unsplash.com" {
+			t.Fatalf("request host = %q, want images.unsplash.com", request.URL.Hostname())
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"image/png; charset=utf-8"}},
+			Body:       io.NopCloser(bytes.NewReader(validVisionImage().Data)),
+		}, nil
+	}
+	t.Cleanup(func() { visionImageRequest = previous })
+
+	image, err := readExternalVisionImage(context.Background(), VisionExternalReference{
+		Provider:   "unsplash",
+		ID:         "abc",
+		PreviewURL: "https://images.unsplash.com/photo-abc",
+	})
+	if err != nil {
+		t.Fatalf("readExternalVisionImage() error = %v", err)
+	}
+	if !called || image.ContentType != "image/png" || !bytes.Equal(image.Data, validVisionImage().Data) {
+		t.Fatalf("materialized image = %#v, called = %v", image, called)
+	}
+}
+
+func TestMultipartVisionInputReaderWithExternalReferences(t *testing.T) {
+	previous := visionImageRequest
+	visionImageRequest = func(_ context.Context, request *http.Request) (*http.Response, error) {
+		if request.URL.Hostname() != "images.unsplash.com" {
+			t.Fatalf("request host = %q, want images.unsplash.com", request.URL.Hostname())
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"image/png"}},
+			Body:       io.NopCloser(bytes.NewReader(validVisionImage().Data)),
+		}, nil
+	}
+	t.Cleanup(func() { visionImageRequest = previous })
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	refJSON := `{"provider":"unsplash","id":"p1","preview_url":"https://images.unsplash.com/p1.png"}`
+	if err := writer.WriteField("external_references[]", refJSON); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.WriteField("user_text", "warm aesthetic"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+
+	input, err := (multipartVisionInputReader{}).Read(request, 1)
+	if err != nil {
+		t.Fatalf("Read() error = %v", err)
+	}
+	if len(input.Images) != 1 || input.UserText != "warm aesthetic" {
+		t.Fatalf("input = %#v", input)
 	}
 }

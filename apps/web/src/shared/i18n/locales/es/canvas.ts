@@ -1,13 +1,13 @@
 /** Textos de lienzo, nodos, conexiones, grupos, vista previa, descarga y flujos de trabajo de imágenes. */
 export default {
   features: {
-    promptGeneration: 'Texto a imagen',
+    generation: 'Texto a imagen',
     inpaint: 'Pintar dentro',
     render: 'Renderizar',
     variations: 'Variaciones',
     cutout: 'Recorte',
-    styleFusion: 'Fusión de imágenes',
-    hdUpscale: 'Escalar',
+    fusion: 'Fusión de imágenes',
+    upscale: 'Escalar',
     outpaint: 'Extender lienzo',
   },
   imageAction: {

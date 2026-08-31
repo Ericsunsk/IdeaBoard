@@ -8,7 +8,7 @@ import {
 } from './imageActionRegistry'
 import {
   IMAGE_OUTPAINT_ACTION,
-  IMAGE_HD_UPSCALE_ACTION,
+  IMAGE_UPSCALE_ACTION,
   isImageStrengthAction,
 } from '../execution'
 
@@ -21,7 +21,7 @@ describe('imageActionRegistry', () => {
       IMAGE_NODE_ACTION.cutout,
       IMAGE_NODE_ACTION.variations,
       IMAGE_NODE_ACTION.render,
-      IMAGE_NODE_ACTION.hdUpscale,
+      IMAGE_NODE_ACTION.upscale,
       IMAGE_NODE_ACTION.outpaint,
       IMAGE_NODE_ACTION.inpaint,
       IMAGE_NODE_ACTION.retouch,
@@ -43,7 +43,7 @@ describe('imageActionRegistry', () => {
       items
         .filter((item) => isImageStrengthAction(item.action))
         .map((item) => item.strengthAction),
-    ).toEqual([IMAGE_NODE_ACTION.variations, IMAGE_NODE_ACTION.hdUpscale])
+    ).toEqual([IMAGE_NODE_ACTION.variations, IMAGE_NODE_ACTION.upscale])
   })
 
   it('does not expose submit authority fields that runtime does not consume', () => {
@@ -64,8 +64,8 @@ describe('imageActionRegistry', () => {
   })
 
   it('keeps task and local tool modes explicit', () => {
-    expect(IMAGE_ACTION_REGISTRY[IMAGE_HD_UPSCALE_ACTION].mode).toBe(
-      IMAGE_ACTION_MODE.hdUpscaleTask,
+    expect(IMAGE_ACTION_REGISTRY[IMAGE_UPSCALE_ACTION].mode).toBe(
+      IMAGE_ACTION_MODE.upscaleTask,
     )
     expect(IMAGE_ACTION_REGISTRY[IMAGE_OUTPAINT_ACTION].mode).toBe(
       IMAGE_ACTION_MODE.outpaint,

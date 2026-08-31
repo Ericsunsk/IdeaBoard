@@ -81,7 +81,7 @@ func TestBillableCatalogMergesRegistryAndPersistedFacts(t *testing.T) {
 	registry, err := NewBillableItemRegistry([]BillableItemDefinition{
 		{SKU: "ai-image:inpaint", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "局部重绘", Description: "只修改选区", SortOrder: 10},
 		{SKU: "ai-image:cutout", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "抠图", SortOrder: 20, PricingVariants: []OutputResolution{OutputResolutionDefault}},
-		{SKU: "ai-image:hd-upscale", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "HD", SortOrder: 30},
+		{SKU: "ai-image:upscale", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "Upscale", SortOrder: 30},
 		{SKU: "ai-image:outpaint", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "扩图", SortOrder: 40},
 	})
 	if err != nil {
@@ -104,7 +104,7 @@ func TestBillableCatalogMergesRegistryAndPersistedFacts(t *testing.T) {
 	}
 	assertCatalogCard(t, items[0], "ai-image:inpaint", BillableItemStatusActive, "局部重绘")
 	assertCatalogCard(t, items[1], "ai-image:cutout", BillableItemStatusDisabled, "抠图")
-	assertCatalogCard(t, items[2], "ai-image:hd-upscale", BillableItemStatusUnpriced, "HD")
+	assertCatalogCard(t, items[2], "ai-image:upscale", BillableItemStatusUnpriced, "Upscale")
 	assertCatalogCard(t, items[3], "ai-image:outpaint", BillableItemStatusActive, "扩图")
 	assertCatalogCard(t, items[4], "legacy:removed", BillableItemStatusArchived, "旧功能")
 }

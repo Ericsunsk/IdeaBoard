@@ -192,13 +192,13 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	if err := workflow.NormalizeStructuredPromptContractParams(params, featureSlug); err != nil {
 		return CanonicalTaskRequest{}, err
 	}
-	if featureSlug == workflow.FeatureSlugPromptGeneration {
-		if err := workflow.ValidatePromptGenerationSubmitContract(params); err != nil {
+	if featureSlug == workflow.FeatureSlugGeneration {
+		if err := workflow.ValidateGenerationSubmitContract(params); err != nil {
 			return CanonicalTaskRequest{}, err
 		}
 	}
-	if featureSlug == workflow.FeatureSlugStyleFusion {
-		if err := normalizeStyleFusionParams(params); err != nil {
+	if featureSlug == workflow.FeatureSlugFusion {
+		if err := normalizeFusionParams(params); err != nil {
 			return CanonicalTaskRequest{}, err
 		}
 	}

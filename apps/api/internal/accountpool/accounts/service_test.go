@@ -15,7 +15,7 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 		want string
 		ok   bool
 	}{
-		{name: "canonical slug is valid", raw: "style-fusion", want: "style-fusion", ok: true},
+		{name: "canonical slug is valid", raw: "fusion", want: "fusion", ok: true},
 		{name: "cutout slug is valid", raw: "cutout", want: "cutout", ok: true},
 		{name: "underscore slug is invalid", raw: "style_fusion", want: "", ok: false},
 		{name: "unsupported slug is invalid", raw: "unknown-workflow", want: "", ok: false},
@@ -34,7 +34,7 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 
 func TestApplyFeatureSystemPromptUsesCanonicalKeys(t *testing.T) {
 	params := map[string]interface{}{
-		"hd": map[string]interface{}{
+		"upscale": map[string]interface{}{
 			"scale": 2.0,
 		},
 	}
@@ -42,11 +42,11 @@ func TestApplyFeatureSystemPromptUsesCanonicalKeys(t *testing.T) {
 	got := prompts.ApplyFeatureSystemPromptWithConfig(
 		"base prompt",
 		"user prompt",
-		"hd-upscale",
+		"upscale",
 		params,
 		prompts.FeaturePromptRuntimeConfig{
 			Prompt:                "SYS={{user_prompt}}",
-			UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy("hd-upscale"),
+			UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy("upscale"),
 		},
 	)
 

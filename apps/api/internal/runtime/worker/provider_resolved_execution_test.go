@@ -18,7 +18,7 @@ import (
 func TestResolveProviderExecutionUsesAssignmentSnapshotAfterLiveConfigChanges(t *testing.T) {
 	account := &accounts.RuntimeAccountAccess{ID: 17, Name: "live-account-name", APIKey: "secret", Timeout: 45}
 	assignment := resolvedExecutionAssignment("http://127.0.0.1:18080/v1", workflow.ProviderGoogleAI, providerendpoints.ProtocolModelAPI, "models/frozen-image")
-	task := resolvedExecutionTask(t, workflow.FeatureSlugPromptGeneration)
+	task := resolvedExecutionTask(t, workflow.FeatureSlugGeneration)
 
 	exec, err := (&ProviderExecutor{}).resolveProviderExecution(context.Background(), account, task, assignment)
 	if err != nil {
@@ -80,7 +80,7 @@ func TestResolveProviderExecutionEnforcesSnapshotModelPolicy(t *testing.T) {
 
 	t.Run("model required", func(t *testing.T) {
 		assignment := resolvedExecutionAssignment("http://127.0.0.1:18080/v1", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolModelAPI, "")
-		_, err := executor.resolveProviderExecution(context.Background(), account, resolvedExecutionTask(t, workflow.FeatureSlugPromptGeneration), assignment)
+		_, err := executor.resolveProviderExecution(context.Background(), account, resolvedExecutionTask(t, workflow.FeatureSlugGeneration), assignment)
 		if err == nil || !strings.Contains(err.Error(), "未分配模型") {
 			t.Fatalf("error = %v, want missing model", err)
 		}
@@ -92,7 +92,7 @@ func TestResolveProviderExecutionEnforcesSnapshotModelPolicy(t *testing.T) {
 		if err != nil {
 			t.Fatalf("resolve modelless execution: %v", err)
 		}
-		if exec.resolvedModel != "" || exec.request.Model != "" || exec.adapter != providerRuntimeAdapterBackgroundRemoval {
+		if exec.resolvedModel != "" || exec.request.Model != "" || exec.adapter != providerRuntimeAdapterCutout {
 			t.Fatalf("modelless execution = %+v", exec)
 		}
 
@@ -106,7 +106,7 @@ func TestResolveProviderExecutionEnforcesSnapshotModelPolicy(t *testing.T) {
 func TestResolveProviderExecutionRejectsProtocolURLAndAPITypeBeforeProviderIO(t *testing.T) {
 	executor := &ProviderExecutor{}
 	account := &accounts.RuntimeAccountAccess{ID: 17, Name: "account", APIKey: "secret"}
-	task := resolvedExecutionTask(t, workflow.FeatureSlugPromptGeneration)
+	task := resolvedExecutionTask(t, workflow.FeatureSlugGeneration)
 
 	t.Run("protocol operation mismatch", func(t *testing.T) {
 		assignment := resolvedExecutionAssignment("http://127.0.0.1:18080/transform", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolImageURLJSONImage, "gpt-image-1")
@@ -137,7 +137,7 @@ func TestResolveProviderExecutionRejectsProtocolURLAndAPITypeBeforeProviderIO(t 
 func TestResolveProviderExecutionDoesNotMutateInputs(t *testing.T) {
 	account := &accounts.RuntimeAccountAccess{ID: 17, Name: " account ", APIKey: " secret ", Timeout: 30}
 	assignment := resolvedExecutionAssignment("http://127.0.0.1:18080/v1", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolModelAPI, "gpt-image-1")
-	task := resolvedExecutionTask(t, workflow.FeatureSlugPromptGeneration)
+	task := resolvedExecutionTask(t, workflow.FeatureSlugGeneration)
 	accountBefore := *account
 	assignmentBefore := assignment
 	taskBefore := *task
@@ -174,7 +174,7 @@ func resolvedExecutionTask(t *testing.T, feature string) *tasks.TaskPayload {
 	t.Helper()
 	params := &tasks.WorkflowTaskParams{SchemaVersion: tasks.CurrentParamsSchemaVersion, Feature: feature}
 	switch feature {
-	case workflow.FeatureSlugCutout, workflow.FeatureSlugHDUpscale:
+	case workflow.FeatureSlugCutout, workflow.FeatureSlugUpscale:
 		params.Media = &tasks.MediaInputs{Inputs: []tasks.MediaRef{{AssetID: 1, Role: "input"}}}
 	}
 	return &tasks.TaskPayload{

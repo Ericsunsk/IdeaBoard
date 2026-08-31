@@ -81,7 +81,7 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 	}{
 		{
 			name:       "style fusion",
-			feature:    workflow.FeatureSlugStyleFusion,
+			feature:    workflow.FeatureSlugFusion,
 			basePrompt: "base fusion prompt",
 			userPrompt: "融合但不要太夸张",
 			params: map[string]interface{}{
@@ -107,17 +107,17 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 			want:     "SYS 右侧延展为工作室背景",
 		},
 		{
-			name:       "hd-upscale",
-			feature:    workflow.FeatureSlugHDUpscale,
+			name:       "upscale",
+			feature:    workflow.FeatureSlugUpscale,
 			basePrompt: "",
 			userPrompt: "",
 			params: map[string]interface{}{
-				"hd": map[string]interface{}{
+				"upscale": map[string]interface{}{
 					"scale": 2.0,
 				},
 			},
-			template: "SYS HD",
-			want:     "SYS HD ",
+			template: "SYS Upscale",
+			want:     "SYS Upscale ",
 		},
 	}
 
@@ -393,15 +393,15 @@ func TestResolveTaskBillingRequestUsesAIWorkflowRegistry(t *testing.T) {
 			resolution := "1k"
 			if feature == workflow.FeatureSlugInpaint ||
 				feature == workflow.FeatureSlugCutout ||
-				feature == workflow.FeatureSlugHDUpscale ||
+				feature == workflow.FeatureSlugUpscale ||
 				feature == workflow.FeatureSlugOutpaint {
 				resolution = "default"
 			}
 			imageInputCount := 1
 			switch feature {
-			case workflow.FeatureSlugPromptGeneration:
+			case workflow.FeatureSlugGeneration:
 				imageInputCount = 0
-			case workflow.FeatureSlugStyleFusion:
+			case workflow.FeatureSlugFusion:
 				imageInputCount = 2
 			}
 			plan, err := workflow.CompileFeatureExecutionPlan(workflow.CompileFeatureExecutionInput{
@@ -588,7 +588,7 @@ func TestSubmitTaskInputLimits(t *testing.T) {
 	})
 }
 
-func TestNormalizeStyleFusionParams(t *testing.T) {
+func TestNormalizeFusionParams(t *testing.T) {
 	t.Run("normalizes canonical weights", func(t *testing.T) {
 		params := map[string]interface{}{
 			"image_urls": []string{"https://example.com/a.png", "https://example.com/b.png"},
@@ -597,8 +597,8 @@ func TestNormalizeStyleFusionParams(t *testing.T) {
 			},
 		}
 
-		if err := normalizeStyleFusionParams(params); err != nil {
-			t.Fatalf("normalizeStyleFusionParams returned error: %v", err)
+		if err := normalizeFusionParams(params); err != nil {
+			t.Fatalf("normalizeFusionParams returned error: %v", err)
 		}
 		fusion, ok := params["fusion"].(map[string]interface{})
 		if !ok {
@@ -667,8 +667,8 @@ func TestNormalizeStyleFusionParams(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := normalizeStyleFusionParams(tt.params); err == nil {
-				t.Fatalf("expected normalizeStyleFusionParams error")
+			if err := normalizeFusionParams(tt.params); err == nil {
+				t.Fatalf("expected normalizeFusionParams error")
 			}
 		})
 	}
@@ -676,7 +676,7 @@ func TestNormalizeStyleFusionParams(t *testing.T) {
 
 func TestWorkflowTaskParamsFromMapPreservesExtraAndFusionContract(t *testing.T) {
 	params := map[string]interface{}{
-		"feature": "style-fusion",
+		"feature": "fusion",
 		"model":   "gpt-image-1",
 		"image_urls": []string{
 			"https://example.com/a.png",
@@ -689,7 +689,7 @@ func TestWorkflowTaskParamsFromMapPreservesExtraAndFusionContract(t *testing.T) 
 		"provider_only": "keep-me",
 	}
 
-	typedParams, err := workflowTaskParamsFromMap(params, workflow.FeatureSlugStyleFusion)
+	typedParams, err := workflowTaskParamsFromMap(params, workflow.FeatureSlugFusion)
 	if err != nil {
 		t.Fatalf("workflowTaskParamsFromMap returned error: %v", err)
 	}
@@ -919,12 +919,12 @@ func TestSubmitTaskPreservesSubmissionStoreCause(t *testing.T) {
 			{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
 		}},
 		SubmissionStore: &recordingSubmissionStore{err: cause},
-		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugPromptGeneration, ""),
+		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugGeneration, ""),
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
 		Prompt:         "draw a pattern",
-		Feature:        workflow.FeatureSlugPromptGeneration,
+		Feature:        workflow.FeatureSlugGeneration,
 		ClientActionID: "submission-store-cause",
 	})
 	if !errors.Is(err, cause) {
@@ -944,12 +944,12 @@ func TestSubmitTaskMissingSubmissionStoreReturnsTypedSafeError(t *testing.T) {
 		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 			{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
 		}},
-		PromptStore: featurePromptStoreForTest(workflow.FeatureSlugPromptGeneration, ""),
+		PromptStore: featurePromptStoreForTest(workflow.FeatureSlugGeneration, ""),
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(context.Background(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "draw a pattern",
-		Feature:        workflow.FeatureSlugPromptGeneration,
+		Feature:        workflow.FeatureSlugGeneration,
 		ClientActionID: "missing-submission-store",
 	})
 	if !errors.Is(err, errTaskSubmissionStoreUnavailable) {
@@ -969,12 +969,12 @@ func TestCheckSubmitTaskReadinessMissingBillingReturnsTypedSafeError(t *testing.
 		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 			{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
 		}},
-		PromptStore: featurePromptStoreForTest(workflow.FeatureSlugPromptGeneration, ""),
+		PromptStore: featurePromptStoreForTest(workflow.FeatureSlugGeneration, ""),
 	}, ServiceOptions{})
 
 	_, err := svc.CheckSubmitTaskReadiness(context.Background(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "draw a pattern",
-		Feature:        workflow.FeatureSlugPromptGeneration,
+		Feature:        workflow.FeatureSlugGeneration,
 		ClientActionID: "missing-billing-service",
 	})
 	if !errors.Is(err, errTaskBillingUnavailable) {
@@ -1039,7 +1039,7 @@ func TestReadinessDoesNotPrepareMediaButSubmitDoes(t *testing.T) {
 	}
 }
 
-func TestSubmitTaskRejectsConflictingPromptGenerationModeBeforeSubmission(t *testing.T) {
+func TestSubmitTaskRejectsConflictingGenerationModeBeforeSubmission(t *testing.T) {
 	ctx := context.Background()
 	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 		{
@@ -1054,18 +1054,18 @@ func TestSubmitTaskRejectsConflictingPromptGenerationModeBeforeSubmission(t *tes
 	svc := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo:     accountRepo,
 		SubmissionStore: submissionStore,
-		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugPromptGeneration, "template {{user_prompt}}"),
+		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugGeneration, "template {{user_prompt}}"),
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
 		Prompt:  "repeatable textile pattern",
-		Feature: workflow.FeatureSlugPromptGeneration,
+		Feature: workflow.FeatureSlugGeneration,
 		Params: map[string]interface{}{
 			"mode": "text-to-image",
 		},
 	})
 	if err == nil {
-		t.Fatalf("expected prompt-generation contract validation error")
+		t.Fatalf("expected generation contract validation error")
 	}
 	if !strings.Contains(err.Error(), "不接受显式 mode") {
 		t.Fatalf("error=%q, want inferred mode contract message", err.Error())
@@ -1175,7 +1175,7 @@ func TestSubmitTaskRejectsInvalidClientActionID(t *testing.T) {
 	}
 }
 
-func TestSubmitTaskNormalizesStyleFusionContract(t *testing.T) {
+func TestSubmitTaskNormalizesFusionContract(t *testing.T) {
 	ctx := context.Background()
 	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 		{
@@ -1191,13 +1191,13 @@ func TestSubmitTaskNormalizesStyleFusionContract(t *testing.T) {
 		AccountRepo:     accountRepo,
 		SubmissionStore: submissionStore,
 		MediaValidator:  testSubmitMediaValidator{},
-		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugStyleFusion, "gpt-image-1"),
+		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugFusion, "gpt-image-1"),
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
 		Prompt:         "融合但不要太夸张",
-		Feature:        workflow.FeatureSlugStyleFusion,
-		ClientActionID: "style-fusion-normalize",
+		Feature:        workflow.FeatureSlugFusion,
+		ClientActionID: "fusion-normalize",
 		ImageURLs: []string{
 			"https://example.com/a.png",
 			"https://example.com/b.png",
@@ -1224,8 +1224,8 @@ func TestSubmitTaskNormalizesStyleFusionContract(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unmarshal queue params: %v", err)
 	}
-	if typedParams.Feature != workflow.FeatureSlugStyleFusion {
-		t.Fatalf("typed feature=%q, want style-fusion", typedParams.Feature)
+	if typedParams.Feature != workflow.FeatureSlugFusion {
+		t.Fatalf("typed feature=%q, want fusion", typedParams.Feature)
 	}
 	if typedParams.Media == nil || len(typedParams.Media.Inputs) != 2 {
 		t.Fatalf("typed media inputs=%#v, want two inputs", typedParams.Media)
@@ -1252,8 +1252,8 @@ func TestSubmitTaskNormalizesStyleFusionContract(t *testing.T) {
 		math.Abs(weights[1].(float64)-1.0/3.0) > 0.000001 {
 		t.Fatalf("fusion input_weights=%#v, want normalized 2:1", weights)
 	}
-	if params["feature"] != workflow.FeatureSlugStyleFusion {
-		t.Fatalf("feature=%#v, want style-fusion", params["feature"])
+	if params["feature"] != workflow.FeatureSlugFusion {
+		t.Fatalf("feature=%#v, want fusion", params["feature"])
 	}
 	if _, ok := params["fusion"].(map[string]interface{}); !ok {
 		t.Fatalf("fusion = %#v, want nested object preserved", params["fusion"])
@@ -1276,7 +1276,7 @@ func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 		{
 			ID:           101,
-			Capabilities: []string{"image-fill"},
+			Capabilities: []string{"fill"},
 			Models: []accounts.AccountModel{{
 				Name:    "gpt-image-1",
 				Enabled: true,
@@ -1398,10 +1398,10 @@ func (s *fakeSubmitAccountStore) GetAllEnabled(context.Context) ([]*accounts.Api
 		if hasEnabledModel {
 			hasImageGeneration := false
 			for _, capability := range copyAccount.Capabilities {
-				hasImageGeneration = hasImageGeneration || capability == "image-generation"
+				hasImageGeneration = hasImageGeneration || capability == "generation"
 			}
 			if !hasImageGeneration {
-				copyAccount.Capabilities = append(copyAccount.Capabilities, "image-generation")
+				copyAccount.Capabilities = append(copyAccount.Capabilities, "generation")
 			}
 		}
 		result = append(result, &copyAccount)

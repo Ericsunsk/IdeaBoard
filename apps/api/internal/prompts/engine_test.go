@@ -45,7 +45,7 @@ func TestApplyFeatureSystemPromptNonVariationsStillAppendsBasePrompt(t *testing.
 	got := ApplyFeatureSystemPrompt(
 		"user prompt",
 		"user prompt",
-		"prompt-generation",
+		"generation",
 		nil,
 		func(string) (string, error) {
 			return "SYS", nil
@@ -61,7 +61,7 @@ func TestApplyFeatureSystemPromptDoesNotAppendHiddenConstraints(t *testing.T) {
 	got := ApplyFeatureSystemPrompt(
 		"user prompt",
 		"user prompt",
-		"style-fusion",
+		"fusion",
 		nil,
 		func(string) (string, error) {
 			return "SYS-CONFIG", nil
@@ -116,7 +116,7 @@ func TestApplyFeatureSystemPromptTemplateWithoutUserPromptStillKeepsBasePrompt(t
 	got := ApplyFeatureSystemPrompt(
 		"user prompt",
 		"user prompt",
-		"style-fusion",
+		"fusion",
 		map[string]interface{}{
 			"fusion": map[string]interface{}{
 				"input_weights": []interface{}{0.6, 0.4},
@@ -136,7 +136,7 @@ func TestApplyFeatureSystemPromptInvalidFusionWeightsLeavePlaceholderUnresolved(
 	got := ApplyFeatureSystemPrompt(
 		"",
 		"",
-		"style-fusion",
+		"fusion",
 		map[string]interface{}{
 			"fusion": map[string]interface{}{
 				"input_weights": []interface{}{0.5, "invalid", 0.25},
@@ -156,14 +156,14 @@ func TestApplyFeatureSystemPromptDoesNotExposeAssetOrDeprecatedVariables(t *test
 	got := ApplyFeatureSystemPrompt(
 		"",
 		"",
-		"hd-upscale",
+		"upscale",
 		map[string]interface{}{
 			"category":           "dress",
 			"pattern_mode":       "tile",
 			"original_image_url": "https://img.example/original.png",
 			"mask_image_url":     "https://img.example/mask.png",
 			"use_mask":           true,
-			"hd":                 map[string]interface{}{"scale": 2.0},
+			"upscale":                 map[string]interface{}{"scale": 2.0},
 		},
 		func(string) (string, error) {
 			return "SYS {{category}} {{pattern_mode}} {{original_image_url}} {{mask_image_url}} {{use_mask}} {{unknown}}", nil
@@ -187,7 +187,7 @@ func TestApplyFeatureSystemPromptTemplateWithUserPromptDoesNotAppendBasePromptTw
 	got := ApplyFeatureSystemPrompt(
 		"user prompt",
 		"user prompt",
-		"style-fusion",
+		"fusion",
 		nil,
 		func(string) (string, error) {
 			return "SYS {{user_prompt}}", nil

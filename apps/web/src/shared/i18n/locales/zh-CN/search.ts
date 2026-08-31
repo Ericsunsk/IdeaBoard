@@ -8,10 +8,8 @@ export default {
   loadingMore: '正在加载更多灵感',
   allLoaded: '已加载全部灵感',
   queryTooLong: '搜索关键词不能超过 200 个字符',
-  preparingReferences: '正在准备参考图，请稍候',
   stillProcessing: '搜索仍在处理中，请稍后重试。',
   invalidVisionResult: '视觉搜索返回了无效结果，请重试。',
-  referenceNotUsable: '该图片无法用作搜索参考图，请重试。',
   priceFree: '免费',
   priceUnavailable: '视觉搜索价格暂不可用',
   loadFailed: '无法搜索灵感',
@@ -71,7 +69,6 @@ export default {
     default: '热门灵感',
   },
   buttons: {
-    preparingReferences: '准备参考图中',
     searching: '搜索中',
     search: '搜索',
     searchWithPrice: '搜索 · {price}',

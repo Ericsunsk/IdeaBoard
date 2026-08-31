@@ -11,7 +11,7 @@ describe('generation contract', () => {
   it('accepts only the two execution primitives', () => {
     expect(parseGenerationPrimitive(GENERATION_PRIMITIVE.textToImage)).toBe('text-to-image')
     expect(parseGenerationPrimitive(GENERATION_PRIMITIVE.imageToImage)).toBe('image-to-image')
-    expect(parseGenerationPrimitive('prompt-generation')).toBeNull()
+    expect(parseGenerationPrimitive('generation')).toBeNull()
     expect(parseGenerationPrimitive('TEXT-TO-IMAGE')).toBeNull()
   })
 

@@ -203,6 +203,11 @@ export const extractUserVisionSearch = async (
       formData.append(`library_asset_ids`, value.toString()),
     )
   }
+  if (extractUserVisionSearchBody.external_references !== undefined) {
+    extractUserVisionSearchBody.external_references.forEach((value) =>
+      formData.append(`external_references`, value),
+    )
+  }
   if (extractUserVisionSearchBody.user_text !== undefined) {
     formData.append(`user_text`, extractUserVisionSearchBody.user_text)
   }

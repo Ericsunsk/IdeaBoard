@@ -103,7 +103,7 @@ const showPromptComposer = computed(() => !!props.promptComposerVisible)
 const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectRatio))
 const outputCountValue = computed(() => requireImageNodeOutputCount(props.node.outputCount))
 const billingQuote = useCanvasBillingQuote(
-  () => WORKFLOW_FEATURE.styleFusion,
+  () => WORKFLOW_FEATURE.fusion,
   () => showPromptComposer.value && canGenerate.value,
   () =>
     buildFusionBillingReadinessRequest({

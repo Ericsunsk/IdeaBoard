@@ -98,10 +98,10 @@ func TestStoreRemoteRefLocalSavesImageAndCleansTempFile(t *testing.T) {
 	assertDirEmpty(t, tmpDir)
 }
 
-func TestLocalStoredUploadURLUsesConfiguredAPIOrigin(t *testing.T) {
+func TestLocalStoredUploadURLUsesConfiguredWebOrigin(t *testing.T) {
 	withTempWorkingDir(t)
 
-	service := NewStorageServiceWithPublicAPI(nil, nil, "https://api.example.com")
+	service := NewStorageServiceWithPublicAPI(nil, nil, "https://ideaboard.art")
 	profile := benchmarkLocalProfile()
 	adapter, err := service.adapterRegistry.get(StorageProviderLocal)
 	if err != nil {
@@ -114,8 +114,8 @@ func TestLocalStoredUploadURLUsesConfiguredAPIOrigin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StoreBytesRef returned error: %v", err)
 	}
-	if stored.URL != "https://api.example.com/uploads/site/assets/logo.png" {
-		t.Fatalf("stored URL = %q, want API-origin URL", stored.URL)
+	if stored.URL != "https://ideaboard.art/uploads/site/assets/logo.png" {
+		t.Fatalf("stored URL = %q, want web-origin URL", stored.URL)
 	}
 	storedBytes, err := os.ReadFile(filepath.FromSlash("uploads/site/assets/logo.png"))
 	if err != nil {

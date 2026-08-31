@@ -36,6 +36,22 @@ describe('runtime URL helpers', () => {
     )
   })
 
+  it('forces same-origin API and asset bases for production builds', async () => {
+    vi.stubEnv('MODE', 'production')
+    vi.stubEnv('PROD', true)
+    vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.com/api')
+    vi.stubEnv('VITE_PUBLIC_ASSET_BASE_URL', 'https://assets.example.com')
+    vi.resetModules()
+
+    const { API_BASE_URL, PUBLIC_ASSET_BASE_URL, resolveApiUrl, resolveAssetUrl } =
+      await import('./runtimeUrls')
+
+    expect(API_BASE_URL).toBe('/api')
+    expect(PUBLIC_ASSET_BASE_URL).toBe('')
+    expect(resolveApiUrl('/user/tasks')).toBe('/api/user/tasks')
+    expect(resolveAssetUrl('/uploads/image.png')).toBe('/uploads/image.png')
+  })
+
   it('canonicalizes local API upload URLs for the Vite proxy', async () => {
     vi.resetModules()
 

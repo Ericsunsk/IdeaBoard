@@ -16,7 +16,7 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
-func TestCallBackgroundRemovalUsesJSONContractAndKeepsBinaryResult(t *testing.T) {
+func TestCallCutoutUsesJSONContractAndKeepsBinaryResult(t *testing.T) {
 	const inputURL = "https://media.ideaboard.art/uploads/canvas/demo/source.jpg"
 	responseBytes := []byte("fake-png")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -32,14 +32,14 @@ func TestCallBackgroundRemovalUsesJSONContractAndKeepsBinaryResult(t *testing.T)
 	defer server.Close()
 
 	executor := &ProviderExecutor{publicOrigins: config.PublicOriginsConfig{API: "https://media.ideaboard.art"}}
-	result, err := executor.callBackgroundRemoval(context.Background(), &accounts.ApiAccount{
+	result, err := executor.callCutout(context.Background(), &accounts.ApiAccount{
 		ApiKey:       "secret",
 		Protocol:     providerendpoints.ProtocolImageURLJSONImage,
-		Capabilities: []string{providerendpoints.CapabilityBackgroundRemoval},
+		Capabilities: []string{providerendpoints.CapabilityCutout},
 		ProxyURL:     server.URL + "/matting",
 	}, providerRequest{ImageRefs: []string{inputURL}}, time.Second)
 	if err != nil {
-		t.Fatalf("callBackgroundRemoval: %v", err)
+		t.Fatalf("callCutout: %v", err)
 	}
 	if !strings.HasPrefix(result.ImageURL, "data:image/webp; charset=utf-8;base64,") {
 		t.Fatalf("result URL = %q", result.ImageURL)
@@ -51,7 +51,7 @@ func TestCallBackgroundRemovalUsesJSONContractAndKeepsBinaryResult(t *testing.T)
 	}
 }
 
-func TestBackgroundRemovalInputURLResolvesUploadReference(t *testing.T) {
+func TestCutoutInputURLResolvesUploadReference(t *testing.T) {
 	executor := &ProviderExecutor{publicOrigins: config.PublicOriginsConfig{API: "https://media.ideaboard.art"}}
 	got, err := executor.imageTransformInputURL(providerRequest{ImageRefs: []string{"/uploads/canvas/demo/source.jpg"}}, "抠图")
 	if err != nil {
@@ -62,14 +62,14 @@ func TestBackgroundRemovalInputURLResolvesUploadReference(t *testing.T) {
 	}
 }
 
-func TestBackgroundRemovalInputURLRejectsHTTP(t *testing.T) {
+func TestCutoutInputURLRejectsHTTP(t *testing.T) {
 	executor := &ProviderExecutor{}
 	if _, err := executor.imageTransformInputURL(providerRequest{ImageRefs: []string{"http://media.ideaboard.art/source.jpg"}}, "抠图"); err == nil {
 		t.Fatal("expected HTTP input URL to be rejected")
 	}
 }
 
-func TestCallBackgroundRemovalRejectsNonImageContentType(t *testing.T) {
+func TestCallCutoutRejectsNonImageContentType(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"error":"not an image"}`))
@@ -77,7 +77,7 @@ func TestCallBackgroundRemovalRejectsNonImageContentType(t *testing.T) {
 	defer server.Close()
 
 	executor := &ProviderExecutor{}
-	_, err := executor.callBackgroundRemoval(context.Background(), &accounts.ApiAccount{
+	_, err := executor.callCutout(context.Background(), &accounts.ApiAccount{
 		ApiKey: "secret", ProxyURL: server.URL,
 	}, providerRequest{ImageRefs: []string{"https://media.ideaboard.art/source.jpg"}}, time.Second)
 	if err == nil || !strings.Contains(err.Error(), "Content-Type") {
@@ -85,7 +85,7 @@ func TestCallBackgroundRemovalRejectsNonImageContentType(t *testing.T) {
 	}
 }
 
-func TestCallImageUpscaleUsesScaleContractAndSingleImage(t *testing.T) {
+func TestCallUpscaleUsesScaleContractAndSingleImage(t *testing.T) {
 	const inputURL = "https://media.ideaboard.art/uploads/canvas/demo/source.jpg"
 	var got map[string]interface{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -98,10 +98,10 @@ func TestCallImageUpscaleUsesScaleContractAndSingleImage(t *testing.T) {
 	defer server.Close()
 
 	executor := &ProviderExecutor{}
-	result, err := executor.callImageUpscale(context.Background(), &accounts.ApiAccount{
+	result, err := executor.callUpscale(context.Background(), &accounts.ApiAccount{
 		ApiKey:       "secret",
 		Protocol:     providerendpoints.ProtocolImageURLJSONImage,
-		Capabilities: []string{providerendpoints.CapabilityImageUpscale},
+		Capabilities: []string{providerendpoints.CapabilityUpscale},
 		ProxyURL:     server.URL,
 	}, providerRequest{
 		ImageRefs:        []string{inputURL, "https://media.ideaboard.art/uploads/canvas/demo/ignored.jpg"},
@@ -111,7 +111,7 @@ func TestCallImageUpscaleUsesScaleContractAndSingleImage(t *testing.T) {
 		Scale:            2.3,
 	}, time.Second)
 	if err != nil {
-		t.Fatalf("callImageUpscale: %v", err)
+		t.Fatalf("callUpscale: %v", err)
 	}
 	if got["image_url"] != inputURL || got["scale"] != 2.3 || got["output_format"] != "png" {
 		t.Fatalf("payload = %#v, want image_url, scale and output_format", got)
@@ -124,13 +124,13 @@ func TestCallImageUpscaleUsesScaleContractAndSingleImage(t *testing.T) {
 	}
 }
 
-func TestCallImageUpscaleRejectsInvalidScale(t *testing.T) {
+func TestCallUpscaleRejectsInvalidScale(t *testing.T) {
 	executor := &ProviderExecutor{}
 	for _, scale := range []float64{0.9, 4.1} {
-		_, err := executor.callImageUpscale(context.Background(), &accounts.ApiAccount{
+		_, err := executor.callUpscale(context.Background(), &accounts.ApiAccount{
 			ApiKey:       "secret",
 			Protocol:     providerendpoints.ProtocolImageURLJSONImage,
-			Capabilities: []string{providerendpoints.CapabilityImageUpscale},
+			Capabilities: []string{providerendpoints.CapabilityUpscale},
 			ProxyURL:     "https://upscale.example/modal",
 		}, providerRequest{ImageRefs: []string{"https://media.ideaboard.art/source.jpg"}, Scale: scale}, time.Second)
 		if err == nil || !strings.Contains(err.Error(), "scale") {
@@ -139,7 +139,7 @@ func TestCallImageUpscaleRejectsInvalidScale(t *testing.T) {
 	}
 }
 
-func TestBackgroundRemovalBatchIgnoresRequestedOutputCount(t *testing.T) {
+func TestCutoutBatchIgnoresRequestedOutputCount(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
@@ -154,8 +154,8 @@ func TestBackgroundRemovalBatchIgnoresRequestedOutputCount(t *testing.T) {
 		apiType:                 workflow.ProviderOpenAICompatible,
 		protocol:                providerendpoints.ProtocolImageURLJSONImage,
 		apiKey:                  "secret",
-		runtimeOperation:        workflow.RuntimeOperationBackgroundRemoval,
-		adapter:                 providerRuntimeAdapterBackgroundRemoval,
+		runtimeOperation:        workflow.RuntimeOperationCutout,
+		adapter:                 providerRuntimeAdapterCutout,
 		timeout:                 time.Second,
 		request:                 providerRequest{ImageRefs: []string{"https://media.ideaboard.art/source.jpg"}, OutputCount: 4},
 	})

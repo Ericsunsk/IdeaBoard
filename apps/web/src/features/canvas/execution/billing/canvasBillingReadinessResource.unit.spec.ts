@@ -18,13 +18,13 @@ describe('canvas billing readiness request contracts', () => {
   })
 
   it('uses the request output count for presentation quote refreshes', async () => {
-    const readiness = { ready: true, feature: 'prompt-generation' } as const
+    const readiness = { ready: true, feature: 'generation' } as const
     mocks.checkSubmitReadiness.mockResolvedValue(readiness)
 
     await expect(
-      fetchCanvasBillingReadiness('prompt-generation', {
+      fetchCanvasBillingReadiness('generation', {
         prompt: 'presentation quote',
-        feature: 'prompt-generation',
+        feature: 'generation',
         params: { output_count: 1 },
       }),
     ).resolves.toEqual(readiness)
@@ -41,8 +41,8 @@ describe('canvas billing readiness request contracts', () => {
         aspectRatio: '1:1',
       }),
     ).toMatchObject({
-      prompt: '[style-fusion] submit readiness',
-      feature: 'style-fusion',
+      prompt: '[fusion] submit readiness',
+      feature: 'fusion',
       image_urls: ['/uploads/a.png', '/uploads/b.png'],
       params: {
         ratio: '1:1',
@@ -55,7 +55,7 @@ describe('canvas billing readiness request contracts', () => {
   })
 
   it('quotes Fusion at the selected output count', async () => {
-    const readiness = { ready: true, feature: 'style-fusion' } as const
+    const readiness = { ready: true, feature: 'fusion' } as const
     mocks.checkSubmitReadiness.mockResolvedValue(readiness)
     const request = buildFusionBillingReadinessRequest({
       imageUrls: ['/uploads/a.png', '/uploads/b.png'],
@@ -63,7 +63,7 @@ describe('canvas billing readiness request contracts', () => {
       outputCount: 3,
     })
 
-    await fetchCanvasBillingReadiness('style-fusion', request ?? undefined)
+    await fetchCanvasBillingReadiness('fusion', request ?? undefined)
 
     expect(mocks.checkSubmitReadiness).toHaveBeenCalledWith(
       expect.objectContaining({

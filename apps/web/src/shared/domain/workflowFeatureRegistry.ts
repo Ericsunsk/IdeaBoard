@@ -17,13 +17,13 @@ const WORKFLOW_FEATURE_PROMPT_VARIABLES: Readonly<
     { key: '{{user_prompt}}', tone: 'prompt' },
     { key: '{{variation_strength}}', tone: 'control' },
   ],
-  [WORKFLOW_FEATURE.styleFusion]: [
+  [WORKFLOW_FEATURE.fusion]: [
     { key: '{{user_prompt}}', tone: 'prompt' },
     { key: '{{fusion_input_weights}}', tone: 'control' },
   ],
   [WORKFLOW_FEATURE.cutout]: [],
-  [WORKFLOW_FEATURE.promptGeneration]: [{ key: '{{user_prompt}}', tone: 'prompt' }],
-  [WORKFLOW_FEATURE.hdUpscale]: [],
+  [WORKFLOW_FEATURE.generation]: [{ key: '{{user_prompt}}', tone: 'prompt' }],
+  [WORKFLOW_FEATURE.upscale]: [],
   [WORKFLOW_FEATURE.outpaint]: [],
 }
 
@@ -38,7 +38,7 @@ export interface WorkflowFeatureImageActionText {
   title: string
 }
 
-/** Locale keys mirror slugs (`hd-upscale` -> `canvas.features.hdUpscale`). */
+/** Locale keys mirror slugs (`upscale` -> `canvas.features.upscale`). */
 export function workflowFeatureLabelKey(slug: WorkflowFeature): string {
   const camel = slug.replace(/-([a-z])/g, (_, character: string) => character.toUpperCase())
   return `canvas.features.${camel}`

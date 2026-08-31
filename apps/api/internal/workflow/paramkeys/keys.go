@@ -7,7 +7,7 @@ const (
 	Controls      = "controls"
 	Variation     = "variation"
 	Outpaint      = "outpaint"
-	HD            = "hd"
+	Upscale       = "upscale"
 	Fusion        = "fusion"
 	Extra         = "extra"
 	Generation    = "generation"
@@ -66,7 +66,7 @@ var canonicalTaskParamKeys = keySet(
 	Controls,
 	Variation,
 	Outpaint,
-	HD,
+	Upscale,
 	Fusion,
 	Extra,
 	Generation,
@@ -80,7 +80,7 @@ var providerReservedKeys = keySet(
 	Controls,
 	Variation,
 	Outpaint,
-	HD,
+	Upscale,
 	Fusion,
 	Extra,
 	Generation,
@@ -134,7 +134,7 @@ var submitTaskParamKeys = keySet(
 	PromptUpsampling,
 	Variation,
 	Outpaint,
-	HD,
+	Upscale,
 	Fusion,
 )
 

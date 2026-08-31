@@ -4,11 +4,11 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { HDUpscaleParams } from './hDUpscaleParams'
+import type { FusionParams } from './fusionParams'
 import type { OutpaintParams } from './outpaintParams'
 import type { OutputResolution } from './outputResolution'
 import type { RequestedOutputCount } from './requestedOutputCount'
-import type { StyleFusionParams } from './styleFusionParams'
+import type { UpscaleParams } from './upscaleParams'
 import type { VariationsParams } from './variationsParams'
 
 export interface SubmitTaskRequestParams {
@@ -35,6 +35,6 @@ export interface SubmitTaskRequestParams {
   prompt_upsampling?: boolean
   variation?: VariationsParams
   outpaint?: OutpaintParams
-  hd?: HDUpscaleParams
-  fusion?: StyleFusionParams
+  upscale?: UpscaleParams
+  fusion?: FusionParams
 }

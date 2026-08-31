@@ -67,7 +67,19 @@ export async function searchInspiration(input: {
   return request
 }
 
-export type VisionReference = { file?: File; libraryAssetID?: number; previewUrl: string; key: string }
+export type VisionExternalReference = {
+  provider: string
+  id: string
+  preview_url: string
+}
+
+export type VisionReference = {
+  file?: File
+  libraryAssetID?: number
+  externalReference?: VisionExternalReference
+  previewUrl: string
+  key: string
+}
 
 export async function extractVisionSearch(input: {
   references: VisionReference[]
@@ -81,6 +93,9 @@ export async function extractVisionSearch(input: {
         images: input.references.flatMap((reference) => (reference.file ? [reference.file] : [])),
         library_asset_ids: input.references.flatMap((reference) =>
           reference.libraryAssetID ? [reference.libraryAssetID] : [],
+        ),
+        external_references: input.references.flatMap((reference) =>
+          reference.externalReference ? [JSON.stringify(reference.externalReference)] : [],
         ),
         user_text: input.userText || undefined,
       },

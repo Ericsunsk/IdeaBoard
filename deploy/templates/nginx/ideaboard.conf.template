@@ -1,6 +1,10 @@
-map $http_x_forwarded_proto $proxy_x_forwarded_proto {
-    default $http_x_forwarded_proto;
-    "" $scheme;
+server {
+    # Retired cross-origin API hostname must never fall through to the app vhost.
+    # If TLS is terminated by an outer Nginx/NPM vhost, duplicate this reject
+    # server_name there as well; HTTPS must not fall through to primary.
+    listen 80;
+    server_name ${NGINX_LEGACY_API_SERVER_NAME};
+    return 444;
 }
 
 server {
@@ -18,13 +22,21 @@ server {
     root ${NGINX_WEB_ROOT};
     index index.html;
 
+    # Same-origin gateway contract: mark every response on /api/**, /api/auth/**,
+    # /uploads/**, and SSE routes as uncacheable, and disable proxy buffering on
+    # SSE/streaming routes, so authenticated and state-changing traffic can never
+    # be cached by an intermediary. (proxy_cache is not configured anywhere; this
+    # is response-header-only enforcement.)
+
     location = /api/health {
         proxy_pass ${NGINX_API_UPSTREAM};
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Proto $proxy_x_forwarded_proto;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+        add_header Pragma "no-cache" always;
     }
 
     location = /api/auth/health {
@@ -33,7 +45,9 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Proto $proxy_x_forwarded_proto;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+        add_header Pragma "no-cache" always;
     }
 
     location /api/auth/ {
@@ -43,7 +57,9 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Proto $proxy_x_forwarded_proto;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+        add_header Pragma "no-cache" always;
     }
 
     location /api/user/tasks/ {
@@ -54,12 +70,33 @@ server {
         proxy_read_timeout 10m;
         proxy_send_timeout 10m;
         add_header X-Accel-Buffering "no" always;
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+        add_header Pragma "no-cache" always;
         proxy_set_header Connection "";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Proto $proxy_x_forwarded_proto;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Long-lived task event stream (SSE): flush state transitions promptly.
+    location = /api/user/events {
+        proxy_pass ${NGINX_API_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
+        add_header X-Accel-Buffering "no" always;
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+        add_header Pragma "no-cache" always;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     location /api/ {
@@ -69,7 +106,9 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Proto $proxy_x_forwarded_proto;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+        add_header Pragma "no-cache" always;
     }
 
     location /uploads/ {
@@ -79,7 +118,9 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Proto $proxy_x_forwarded_proto;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+        add_header Pragma "no-cache" always;
     }
 
     location / {

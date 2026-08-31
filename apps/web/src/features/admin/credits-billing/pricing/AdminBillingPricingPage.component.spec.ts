@@ -48,7 +48,7 @@ describe('AdminBillingPricingPage', () => {
 
     expect(await screen.findByText('局部重绘')).toBeVisible()
     expect(screen.getByText('抠图')).toBeVisible()
-    expect(screen.getByText('HD')).toBeVisible()
+    expect(screen.getByText('Upscale')).toBeVisible()
     expect(screen.getAllByText('Image 节点')).toHaveLength(3)
     expect(screen.getByText('已移除功能')).toBeVisible()
     expect(screen.getByText('未定价')).toBeVisible()
@@ -93,7 +93,7 @@ describe('AdminBillingPricingPage', () => {
     renderPricingPage()
 
     expect(await screen.findByText('风格延展')).toBeVisible()
-    expectTextOrder(['风格延展', '抠图', '局部重绘', 'HD', '已移除功能'])
+    expectTextOrder(['风格延展', '抠图', '局部重绘', 'Upscale', '已移除功能'])
   })
 
   it('shows an empty state when no products are registered', async () => {
@@ -387,10 +387,10 @@ function makeCatalogItems() {
       current_prices: { default: price },
     },
     {
-      sku: 'ai-image:hd-upscale',
+      sku: 'ai-image:upscale',
       namespace: 'ai-image',
       product_kind: 'workflow-feature',
-      display_name: 'HD',
+      display_name: 'Upscale',
       sort_order: 30,
       status: 'disabled',
       pricing_variants: ['default'],

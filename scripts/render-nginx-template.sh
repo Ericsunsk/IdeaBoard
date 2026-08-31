@@ -18,9 +18,18 @@ NGINX_WEB_ROOT="${NGINX_WEB_ROOT:-/opt/ideaboard/apps/web/dist}"
 NGINX_ROOT_DIRECTIVE="${NGINX_ROOT_DIRECTIVE:-try_files \$uri \$uri/ /index.html}"
 NGINX_REAL_IP_INCLUDE="${NGINX_REAL_IP_INCLUDE:-}"
 NGINX_SERVER_NAME="${NGINX_SERVER_NAME:-_}"
+NGINX_LEGACY_API_SERVER_NAME="${NGINX_LEGACY_API_SERVER_NAME:-api.ideaboard.art}"
 
-if [[ "$NGINX_SERVER_NAME" == *";"* || "$NGINX_SERVER_NAME" == *$'\n'* || "$NGINX_SERVER_NAME" == *$'\r'* ]]; then
-  echo "NGINX_SERVER_NAME must not contain semicolons or newlines." >&2
+for server_name_var in NGINX_SERVER_NAME NGINX_LEGACY_API_SERVER_NAME; do
+  server_name_value="${!server_name_var}"
+  if [[ "$server_name_value" == *";"* || "$server_name_value" == *$'\n'* || "$server_name_value" == *$'\r'* ]]; then
+    echo "$server_name_var must not contain semicolons or newlines." >&2
+    exit 1
+  fi
+done
+
+if [[ "$NGINX_SERVER_NAME" == "$NGINX_LEGACY_API_SERVER_NAME" ]]; then
+  echo "NGINX_SERVER_NAME and NGINX_LEGACY_API_SERVER_NAME must be different." >&2
   exit 1
 fi
 
@@ -49,6 +58,7 @@ trap cleanup EXIT
 
 sed \
   -e "s|\${NGINX_SERVER_NAME}|$(escape_sed_replacement "$NGINX_SERVER_NAME")|g" \
+  -e "s|\${NGINX_LEGACY_API_SERVER_NAME}|$(escape_sed_replacement "$NGINX_LEGACY_API_SERVER_NAME")|g" \
   -e "s|\${NGINX_API_UPSTREAM}|$(escape_sed_replacement "$NGINX_API_UPSTREAM")|g" \
   -e "s|\${NGINX_AUTH_UPSTREAM}|$(escape_sed_replacement "$NGINX_AUTH_UPSTREAM")|g" \
   -e "s|\${NGINX_AUTH_HEALTH_UPSTREAM}|$(escape_sed_replacement "$NGINX_AUTH_HEALTH_UPSTREAM")|g" \

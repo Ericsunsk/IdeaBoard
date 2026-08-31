@@ -1,11 +1,11 @@
 export const WORKFLOW_FEATURE = {
-  promptGeneration: 'prompt-generation',
+  generation: 'generation',
   inpaint: 'inpaint',
   cutout: 'cutout',
-  styleFusion: 'style-fusion',
+  fusion: 'fusion',
   render: 'render',
   variations: 'variations',
-  hdUpscale: 'hd-upscale',
+  upscale: 'upscale',
   outpaint: 'outpaint',
 } as const
 

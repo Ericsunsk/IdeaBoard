@@ -103,7 +103,7 @@ describe('Canvas Node presentation intent routing seam', () => {
       },
       {
         intent: {
-          type: 'prompt-generation-requested',
+          type: 'generation-requested',
           nodeId,
           prompt: 'make it',
           outputCount: 2,

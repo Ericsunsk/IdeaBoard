@@ -6,16 +6,15 @@
  */
 
 export type ExtractUserVisionSearchBody = {
-  /**
-   * @minItems 1
-   * @maxItems 4
-   */
+  /** @maxItems 4 */
   images?: Blob[]
   /**
    * @maxItems 4
    * @items.minimum 1
    */
   library_asset_ids?: number[]
+  /** @maxItems 4 */
+  external_references?: string[]
   /** @maxLength 200 */
   user_text?: string
 }

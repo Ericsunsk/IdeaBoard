@@ -6,7 +6,7 @@ import { CanvasBillingPreflightError, createPendingImageExecutionCore } from '..
 
 const mocks = vi.hoisted(() => {
   const plan = {
-    kind: 'prompt-generation',
+    kind: 'generation',
     sourceNodeId: 'prompt-1',
     source: { url: '', ratio: 1 },
     referenceImages: [],
@@ -20,10 +20,10 @@ const mocks = vi.hoisted(() => {
       planImageDirectAction: vi.fn(() => plan),
       planOutpaintAction: vi.fn(() => plan),
       planImageInpaintAction: vi.fn(() => plan),
-      planImagePromptGeneration: vi.fn(() => plan),
-      planImagePromptGenerationFromSource: vi.fn(() => plan),
-      planPromptGeneration: vi.fn(() => plan),
-      planFusionPromptGeneration: vi.fn(() => plan),
+      planImageGeneration: vi.fn(() => plan),
+      planImageGenerationFromSource: vi.fn(() => plan),
+      planGeneration: vi.fn(() => plan),
+      planFusionGeneration: vi.fn(() => plan),
     },
     workflow: {
       executeImageWorkflow: vi.fn(async () => undefined),
@@ -90,7 +90,7 @@ describe('useImageWorkflowExecution', () => {
     mocks.executionOptions?.onWarning(i18n.global.t('canvas.execution.generationUnavailable'))
 
     expect(runtime.isGenerationAvailable()).toBe(false)
-    await runtime.runPromptGeneration('prompt-1', [], 'draw this', 1, 'auto')
+    await runtime.runGeneration('prompt-1', [], 'draw this', 1, 'auto')
 
     expect(mocks.workflow.executeImageWorkflow).not.toHaveBeenCalled()
     expect(feedback.warning).toHaveBeenCalledWith(
@@ -100,9 +100,9 @@ describe('useImageWorkflowExecution', () => {
     vi.setSystemTime(15_001)
 
     expect(runtime.isGenerationAvailable()).toBe(true)
-    await runtime.runPromptGeneration('prompt-1', [], 'draw this', 1, 'auto')
+    await runtime.runGeneration('prompt-1', [], 'draw this', 1, 'auto')
 
-    expect(mocks.planner.planPromptGeneration).toHaveBeenCalledWith(
+    expect(mocks.planner.planGeneration).toHaveBeenCalledWith(
       'prompt-1',
       [],
       'draw this',

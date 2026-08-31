@@ -70,22 +70,16 @@ describe('useVisionQueryLifecycle', () => {
     clearCachedVisionReferences('user-a')
   })
 
-  it('accepts Library, File, and Search result references through one lifecycle', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        headers: { get: () => 'image/jpeg' },
-        blob: async () => new Blob(['image'], { type: 'image/jpeg' }),
-      })),
-    )
+  it('accepts Library, File, and Search result references without browser fetching external image', async () => {
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
     const { lifecycle } = createLifecycle()
 
     lifecycle.addLibraryAsset(libraryAsset as never)
     lifecycle.handleFileInput({
       target: { files: [new File(['file'], 'local.jpg', { type: 'image/jpeg' })], value: 'selected' },
     } as unknown as Event)
-    await lifecycle.addSearchResult({
+    lifecycle.addSearchResult({
       provider: 'pexels',
       id: 'photo-2',
       preview_url: 'https://images.example/photo-2.jpg',
@@ -93,8 +87,14 @@ describe('useVisionQueryLifecycle', () => {
     } as never)
 
     expect(lifecycle.references.value).toHaveLength(3)
-    expect(lifecycle.references.value[2]?.file).toBeInstanceOf(File)
-    expect(lifecycle.hasPendingReferences.value).toBe(false)
+    expect(lifecycle.references.value[0]?.libraryAssetID).toBe(7)
+    expect(lifecycle.references.value[1]?.file).toBeInstanceOf(File)
+    expect(lifecycle.references.value[2]?.externalReference).toEqual({
+      provider: 'pexels',
+      id: 'photo-2',
+      preview_url: 'https://images.example/photo-2.jpg',
+    })
+    expect(fetchSpy).not.toHaveBeenCalled()
     lifecycle.dispose()
   })
 
@@ -174,71 +174,32 @@ describe('useVisionQueryLifecycle', () => {
     lifecycle.dispose()
   })
 
-  it('cancels preparation and extraction when a reference is removed', async () => {
-    let resolveFetch!: (value: { ok: boolean; headers: { get: () => string }; blob: () => Promise<Blob> }) => void
-    let signal!: AbortSignal
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(
-        (_url: string, init?: RequestInit) =>
-          new Promise((resolve) => {
-            signal = init?.signal as AbortSignal
-            resolveFetch = resolve
-          }),
-      ),
-    )
+  it('removes a reference and updates route when last reference is removed', () => {
     const { lifecycle } = createLifecycle()
-    const pending = lifecycle.addSearchResult({
+    lifecycle.addSearchResult({
       provider: 'unsplash',
       id: 'photo-cancelled',
       preview_url: 'https://images.example/photo-cancelled.jpg',
     } as never)
-    await vi.waitFor(() => expect(lifecycle.hasPendingReferences.value).toBe(true))
+    expect(lifecycle.references.value).toHaveLength(1)
 
     lifecycle.removeReference('unsplash:photo-cancelled')
-    expect(signal.aborted).toBe(true)
-    resolveFetch({
-      ok: true,
-      headers: { get: () => 'image/jpeg' },
-      blob: async () => new Blob(['image'], { type: 'image/jpeg' }),
-    })
-    await pending
-
     expect(lifecycle.references.value).toHaveLength(0)
+    expect(mocks.replace).toHaveBeenCalledWith(
+      expect.objectContaining({ path: '/user/search', query: { q: 'warm cafe' } }),
+    )
     lifecycle.dispose()
   })
 
-  it('prepares batch references concurrently and aborts all preparations on clear', async () => {
-    const pendingResponses: Array<(value: { ok: boolean; headers: { get: () => string }; blob: () => Promise<Blob> }) => void> = []
-    const signals: AbortSignal[] = []
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(
-        (_url: string, init?: RequestInit) =>
-          new Promise((resolve) => {
-            signals.push(init?.signal as AbortSignal)
-            pendingResponses.push(resolve)
-          }),
-      ),
-    )
+  it('adds batch references directly and clears them on clear', () => {
     const { lifecycle } = createLifecycle()
-    const pending = lifecycle.addSearchResults([
+    lifecycle.addSearchResults([
       { provider: 'unsplash', id: 'first', preview_url: 'https://images.example/first.jpg' },
       { provider: 'pexels', id: 'second', preview_url: 'https://images.example/second.jpg' },
     ] as never)
-    await vi.waitFor(() => expect(signals).toHaveLength(2))
 
+    expect(lifecycle.references.value).toHaveLength(2)
     lifecycle.clearReferences()
-    expect(signals.every((signal) => signal.aborted)).toBe(true)
-    for (const resolve of pendingResponses) {
-      resolve({
-        ok: true,
-        headers: { get: () => 'image/jpeg' },
-        blob: async () => new Blob(['image'], { type: 'image/jpeg' }),
-      })
-    }
-    await pending
-
     expect(lifecycle.references.value).toEqual([])
     lifecycle.dispose()
   })

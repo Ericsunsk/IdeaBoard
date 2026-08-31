@@ -12,7 +12,7 @@ import {
   getCachedVisionReferences,
   setCachedVisionReferences,
 } from './visionReferencePersistence'
-import { searchReferenceKey, toVisionReference } from './searchLibraryBridge'
+import { searchReferenceKey, searchResultToVisionReference, toVisionReference } from './searchLibraryBridge'
 import {
   extractVisionSearch,
   isSearchQueryWithinLimit,
@@ -38,8 +38,8 @@ type VisionQueryLifecycleOptions = {
 }
 
 /**
- * Owns the full paid Vision query lifecycle: reference ingress, preparation,
- * cached edit drafts, price feedback, extraction, and result handoff.
+ * Owns the full paid Vision query lifecycle: reference ingress, cached edit
+ * drafts, price feedback, extraction, and result handoff.
  */
 export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
   const router = options.router ?? useRouter()
@@ -54,6 +54,7 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
         key: cached.key,
         previewUrl: cached.previewUrl,
         libraryAssetID: cached.libraryAssetID,
+        externalReference: cached.externalReference,
       }))
   const collection = createVisionReferenceCollection(initialReferences)
   const { references } = collection
@@ -61,11 +62,9 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
   const state = ref<'idle' | 'extracting' | 'ready'>('idle')
   const error = ref('')
   const price = ref<number | null>(null)
-  const hasPendingReferences = collection.hasPending
   const referenceSlotCount = collection.slotCount
   const canAddReference = collection.canAdd
   const buttonTitle = computed(() => {
-    if (hasPendingReferences.value) return i18n.global.t('search.buttons.preparingReferences')
     if (state.value === 'extracting') return i18n.global.t('search.buttons.searching')
     if (references.value.length === 0 || price.value === null) return i18n.global.t('search.buttons.search')
     return i18n.global.t('search.buttons.searchWithPrice', {
@@ -78,7 +77,6 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
   let idempotencyKey: string | null = null
   let idempotencyFingerprint: string | null = null
   let activeExtraction: { fingerprint: string; promise: Promise<void> } | null = null
-  const referencePreparationControllers = new Map<string, AbortController>()
 
   function resetExtraction() {
     cancelExtraction()
@@ -106,10 +104,6 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
       return Promise.resolve()
     }
     options.queryError.value = ''
-    if (hasPendingReferences.value) {
-      options.queryError.value = i18n.global.t('search.preparingReferences')
-      return Promise.resolve()
-    }
     if (references.value.length === 0) return Promise.resolve()
     if (!options.isAuthenticated()) {
       options.requireLogin({ kind: 'vision-search', query })
@@ -171,13 +165,12 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
   }
 
   async function resumeAfterAuthentication(): Promise<void> {
-    // Cached Library references restore an edit draft only. This method is only
-    // called after the explicit in-memory pending Vision action has survived login.
+    // Cached references restore an edit draft only. This method is called after
+    // the explicit in-memory Vision action has survived login.
     await submit()
   }
 
   function removeReference(key: string) {
-    cancelReferencePreparation(key)
     collection.remove(key)
     if (references.value.length > 0) {
       markStale()
@@ -192,7 +185,6 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
   }
 
   function clearReferences() {
-    cancelAllReferencePreparation()
     collection.clear()
     clearCachedVisionReferences(cacheScope)
     resetExtraction()
@@ -237,7 +229,7 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
 
   function addLibraryAsset(asset: LibraryAssetView) {
     const key = searchReferenceKey(asset.provider, asset.source_id)
-    if (collection.has(key) || collection.isPending(key)) return
+    if (collection.has(key)) return
     if (!canAddReference.value) {
       toast.warning(i18n.global.t('search.errors.maxReferenceImages'))
       return
@@ -247,76 +239,22 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
     options.queryError.value = ''
   }
 
-  async function addSearchResult(result: SearchResult) {
+  function addSearchResult(result: SearchResult) {
     const key = searchReferenceKey(result.provider, result.id)
-    if (collection.has(key) || collection.isPending(key)) return
+    if (collection.has(key)) return
     if (!canAddReference.value) {
       toast.warning(i18n.global.t('search.errors.maxReferenceImages'))
       return
     }
-    if (!collection.begin(key)) return
+    collection.add(searchResultToVisionReference(result))
     markStale()
     options.queryError.value = ''
-    const controller = new AbortController()
-    referencePreparationControllers.set(key, controller)
-    const thumbnailUrl = result.thumbnail_url
-    let decodeUrl: string | null = null
-    let collectionOwnsDecodeUrl = false
-    const isCurrentPreparation = () =>
-      referencePreparationControllers.get(key) === controller && collection.isPending(key)
+  }
 
-    try {
-      if (thumbnailUrl && !collection.appendPreview(key, thumbnailUrl)) return
-      const response = await fetch(result.preview_url, { cache: 'force-cache', signal: controller.signal })
-      if (!response.ok) throw new Error('reference preview request failed')
-      const blob = await response.blob()
-      const contentType = blob.type || response.headers.get('content-type')?.split(';', 1)[0] || ''
-      if (!contentType.startsWith('image/') || blob.size === 0 || blob.size > MAX_REFERENCE_BYTES) {
-        throw new Error('reference preview is not a valid image')
-      }
-      if (!isCurrentPreparation()) return
-      if (!collection.reserveBytes(key, blob.size)) {
-        throw new Error('reference previews exceed the request size limit')
-      }
-      decodeUrl = URL.createObjectURL(blob)
-      await decodePreviewImage(decodeUrl)
-      if (!isCurrentPreparation()) return
-      if (!thumbnailUrl) {
-        if (!collection.appendPreview(key, decodeUrl)) return
-        collectionOwnsDecodeUrl = true
-      }
-      const file = new File([blob], `${result.provider}-${result.id}.jpg`, { type: contentType })
-      if (!collection.materialize(key, file)) throw new Error('reference preview state changed')
-    } catch (cause) {
-      if (isAbortError(cause) || !isCurrentPreparation()) return
-      collection.fail(key)
-      options.queryError.value = i18n.global.t('search.referenceNotUsable')
-    } finally {
-      if (decodeUrl && !collectionOwnsDecodeUrl) URL.revokeObjectURL(decodeUrl)
-      if (isCurrentPreparation()) collection.finish(key)
-      if (referencePreparationControllers.get(key) === controller) {
-        referencePreparationControllers.delete(key)
-      }
-      if (!hasPendingReferences.value && options.queryError.value === i18n.global.t('search.preparingReferences')) {
-        options.queryError.value = ''
-      }
+  function addSearchResults(results: SearchResult[]) {
+    for (const result of results) {
+      addSearchResult(result)
     }
-  }
-
-  async function addSearchResults(results: SearchResult[]): Promise<void> {
-    await Promise.all(results.map((result) => addSearchResult(result)))
-  }
-
-  function cancelReferencePreparation(key: string) {
-    const controller = referencePreparationControllers.get(key)
-    if (!controller) return
-    referencePreparationControllers.delete(key)
-    controller.abort()
-  }
-
-  function cancelAllReferencePreparation() {
-    for (const controller of referencePreparationControllers.values()) controller.abort()
-    referencePreparationControllers.clear()
   }
 
   function refreshPrice() {
@@ -337,7 +275,6 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
 
   function transferReferences(): VisionReference[] {
     cancelExtraction()
-    cancelAllReferencePreparation()
     return collection.take()
   }
 
@@ -345,7 +282,6 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
     priceController?.abort()
     priceController = null
     cancelExtraction()
-    cancelAllReferencePreparation()
     collection.clear()
   }
 
@@ -354,7 +290,6 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
 
   return {
     references,
-    hasPendingReferences,
     referenceSlotCount,
     canAddReference,
     fileInput,
@@ -362,7 +297,6 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
     error,
     price,
     buttonTitle,
-    isReferencePending: collection.isPending,
     submit,
     resumeAfterAuthentication,
     removeReference,
@@ -382,18 +316,13 @@ function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError'
 }
 
-async function decodePreviewImage(src: string): Promise<void> {
-  const image = new Image()
-  image.src = src
-  if (typeof image.decode === 'function') await image.decode()
-}
-
 function createRequestFingerprint(query: string, references: VisionReference[]): string {
   return JSON.stringify({
     userText: query,
     references: references.map((reference) => ({
       key: reference.key,
       libraryAssetID: reference.libraryAssetID ?? null,
+      externalReference: reference.externalReference ?? null,
       file: reference.file
         ? {
             name: reference.file.name,

@@ -222,7 +222,7 @@ func TestCollectGoogleImageRefsIncludesReferenceImageURLs(t *testing.T) {
 			"",
 			"https://img.example/ref-b.png",
 		},
-	}, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationPromptGeneration, workflow.RuntimeInvocationGenerate, workflow.RuntimeControlsNone)
+	}, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationGeneration, workflow.RuntimeInvocationGenerate, workflow.RuntimeControlsNone)
 	refs := providerGoogleImageRefs(req)
 	want := []string{
 		"data:image/png;base64,aGVsbG8=",
@@ -256,7 +256,7 @@ func TestReadGoogleProviderParamsDerivesModelRefsAndImagenControls(t *testing.T)
 	imagenReq := newProviderRequest("prompt", 0, 0, map[string]interface{}{
 		"output_count": 4,
 		"ratio":        "16:9",
-	}, "models/imagen-4.0-generate-001", resolvedProviderRequestFacts{outputCount: 4}, workflow.RuntimeOperationPromptGeneration, workflow.RuntimeInvocationGenerate, workflow.RuntimeControlsNone)
+	}, "models/imagen-4.0-generate-001", resolvedProviderRequestFacts{outputCount: 4}, workflow.RuntimeOperationGeneration, workflow.RuntimeInvocationGenerate, workflow.RuntimeControlsNone)
 	imagenParams := readGoogleProviderParams(imagenReq)
 	if imagenParams.Model != "imagen-4.0-generate-001" {
 		t.Fatalf("imagen model = %q", imagenParams.Model)
@@ -382,7 +382,7 @@ func TestCallDrawingAPIRoutesGooglePlatformToNativeProvider(t *testing.T) {
 		Prompt: "draw a cat",
 		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Feature:       workflow.FeatureSlugPromptGeneration,
+			Feature:       workflow.FeatureSlugGeneration,
 		}),
 	}
 
@@ -435,7 +435,7 @@ func TestCallDrawingAPIRoutesGoogleCloudToNativeProvider(t *testing.T) {
 		Prompt: "draw a poster",
 		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Feature:       workflow.FeatureSlugPromptGeneration,
+			Feature:       workflow.FeatureSlugGeneration,
 		}),
 	}
 

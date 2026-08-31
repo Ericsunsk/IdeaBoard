@@ -16,7 +16,7 @@ export type CanvasNodePresentationIntentCommands = {
       nodeId: string,
       prompt: string,
       outputCount: number,
-      aspectRatio: CanvasNodeIntentOf<'prompt-generation-requested'>['aspectRatio'],
+      aspectRatio: CanvasNodeIntentOf<'generation-requested'>['aspectRatio'],
     ) => void
   }
   node: {
@@ -99,7 +99,7 @@ export function createCanvasNodePresentationIntentRouter(
       case 'media-input-remove-requested':
         commands.mediaInput.remove(intent.nodeId, intent.imageId)
         return
-      case 'prompt-generation-requested':
+      case 'generation-requested':
         commands.prompt.generate(
           intent.nodeId,
           intent.prompt,

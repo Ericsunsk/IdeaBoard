@@ -27,7 +27,7 @@ function createOptions() {
     },
     execution: {
       runImageDirectAction: vi.fn(),
-      runFusionPromptGeneration: vi.fn(),
+      runFusionGeneration: vi.fn(),
     },
     params: { updateNodeParam: vi.fn() },
   }
@@ -79,7 +79,7 @@ describe('createImageActionIntentRouter', () => {
       key: 'aspectRatio',
       value: '16:9',
     })
-    expect(options.execution.runFusionPromptGeneration).toHaveBeenCalledWith(
+    expect(options.execution.runFusionGeneration).toHaveBeenCalledWith(
       'fusion-1',
       'A study',
       2,

@@ -27,13 +27,13 @@ func TestWorkflowRegistryUsesFeatureLevelBillingIdentities(t *testing.T) {
 		}
 	}
 	want := []string{
-		"ai-image:prompt-generation",
+		"ai-image:generation",
 		"ai-image:inpaint",
 		"ai-image:render",
 		"ai-image:variations",
 		"ai-image:cutout",
-		"ai-image:style-fusion",
-		"ai-image:hd-upscale",
+		"ai-image:fusion",
+		"ai-image:upscale",
 		"ai-image:outpaint",
 	}
 	if !slices.Equal(skus, want) {

@@ -20,8 +20,8 @@ describe('provider config payload mapping', () => {
     expect(
       createProviderEndpointSavePayload({
         apiType: 'google-cloud',
-        protocol: 'image-url-json-to-image',
-        capability: 'background-removal',
+        protocol: 'image-pipeline',
+        capability: 'cutout',
         name: 'Modal Image Processing',
         baseUrl: 'https://example.com/matting',
         apiKey: 'modal-secret',
@@ -29,8 +29,8 @@ describe('provider config payload mapping', () => {
       }),
     ).toEqual({
       api_type: 'self-hosted',
-      protocol: 'image-url-json-to-image',
-      capability: 'background-removal',
+      protocol: 'image-pipeline',
+      capability: 'cutout',
       name: 'Modal Image Processing',
       base_url: 'https://example.com/matting',
       api_key: 'modal-secret',
@@ -40,19 +40,19 @@ describe('provider config payload mapping', () => {
     expect(
       createProviderEndpointSavePayload({
         apiType: 'google-cloud',
-        protocol: 'flux-fill-json-image',
-        capability: 'image-fill',
-        name: 'Modal Flux Fill',
-        baseUrl: 'https://example.com/flux-fill',
+        protocol: 'image-fill',
+        capability: 'fill',
+        name: 'Modal Image Fill',
+        baseUrl: 'https://example.com/fill',
         apiKey: 'modal-secret',
         status: 1,
       }),
     ).toEqual({
       api_type: 'self-hosted',
-      protocol: 'flux-fill-json-image',
-      capability: 'image-fill',
-      name: 'Modal Flux Fill',
-      base_url: 'https://example.com/flux-fill',
+      protocol: 'image-fill',
+      capability: 'fill',
+      name: 'Modal Image Fill',
+      base_url: 'https://example.com/fill',
       api_key: 'modal-secret',
       status: 1,
     })
@@ -215,21 +215,23 @@ describe('provider config payload mapping', () => {
 
   it('identifies capability endpoints that do not require a model', () => {
     expect(isModellessProviderProtocol('model-api')).toBe(false)
+    expect(isModellessProviderProtocol('image-pipeline')).toBe(true)
     expect(isModellessProviderProtocol('image-url-json-to-image')).toBe(true)
+    expect(isModellessProviderProtocol('image-fill')).toBe(true)
     expect(isModellessProviderProtocol('flux-fill-json-image')).toBe(true)
     expect(
       isModellessProviderEndpoint(
         makeProviderEndpoint({
-          protocol: 'image-url-json-to-image',
-          capabilities: ['background-removal'],
+          protocol: 'image-pipeline',
+          capabilities: ['cutout'],
         }),
       ),
     ).toBe(true)
     expect(
       isModellessProviderEndpoint(
         makeProviderEndpoint({
-          protocol: 'flux-fill-json-image',
-          capabilities: ['image-fill'],
+          protocol: 'image-fill',
+          capabilities: ['fill'],
         }),
       ),
     ).toBe(true)
@@ -237,7 +239,7 @@ describe('provider config payload mapping', () => {
       isModellessProviderEndpoint(
         makeProviderEndpoint({
           protocol: 'image-url-json-to-image',
-          capabilities: ['image-upscale'],
+          capabilities: ['upscale'],
         }),
       ),
     ).toBe(true)
@@ -252,7 +254,7 @@ function makeProviderEndpoint(
     id: 7,
     apiType: 'google-ai',
     protocol: 'model-api',
-    capabilities: ['image-generation'],
+    capabilities: ['generation'],
     name: 'Google ProviderEndpoint',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     apiKeyConfigured: false,
@@ -270,7 +272,7 @@ function makeAccount(overrides: Partial<ProviderAccountRecord> = {}): ProviderAc
     providerEndpointId: 7,
     apiType: 'google-ai',
     protocol: 'model-api',
-    capabilities: ['image-generation'],
+    capabilities: ['generation'],
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     models: [],
     secretConfigured: true,

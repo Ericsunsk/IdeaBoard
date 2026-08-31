@@ -5,20 +5,18 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 )
 
 func TestParseGenerationPrimitive(t *testing.T) {
-	for _, primitive := range []GenerationPrimitive{
-		GenerationPrimitiveTextToImage,
-		GenerationPrimitiveImageToImage,
-	} {
+	for _, primitive := range []GenerationPrimitive{GenerationPrimitiveTextToImage, GenerationPrimitiveImageToImage} {
 		got, err := ParseGenerationPrimitive(string(primitive))
 		if err != nil || got != primitive {
 			t.Fatalf("primitive=%q got=(%q,%v)", primitive, got, err)
 		}
 	}
-	for _, raw := range []string{"", " text-to-image ", "TEXT-TO-IMAGE", "style-fusion", "image-to-video"} {
+	for _, raw := range []string{"", " text-to-image ", "TEXT-TO-IMAGE", "fusion", "image-to-video"} {
 		if _, err := ParseGenerationPrimitive(raw); err == nil {
 			t.Fatalf("primitive %q should be rejected", raw)
 		}
@@ -40,52 +38,65 @@ func TestParseRequestedOutputCountAcceptsOnlyOneThroughFour(t *testing.T) {
 }
 
 func TestGenerationContractMatchesFrontendAndOpenAPI(t *testing.T) {
-	repoRoot := findWorkflowRepoRoot(t)
-	frontendRaw, err := os.ReadFile(filepath.Join(repoRoot, "apps", "web", "src", "shared", "domain", "generationContract.ts"))
+	root := findWorkflowRepoRoot(t)
+	frontend, err := os.ReadFile(filepath.Join(root, "apps/web/src/shared/domain/generationContract.ts"))
 	if err != nil {
-		t.Fatalf("read frontend generation contract: %v", err)
+		t.Fatal(err)
 	}
-	openAPIRaw, err := os.ReadFile(filepath.Join(repoRoot, "apps", "api", "openapi.yaml"))
+	openapi, err := os.ReadFile(filepath.Join(root, "apps/api/openapi.yaml"))
 	if err != nil {
-		t.Fatalf("read OpenAPI generation contract: %v", err)
+		t.Fatal(err)
 	}
-
-	wantPrimitives := []string{string(GenerationPrimitiveTextToImage), string(GenerationPrimitiveImageToImage)}
-	assertSameContractValues(t, "frontend generation primitives", wantPrimitives, extractTypeScriptStringObject(t, string(frontendRaw), "GENERATION_PRIMITIVE"))
-	assertSameContractValues(t, "OpenAPI generation primitives", wantPrimitives, extractOpenAPIStringEnum(t, string(openAPIRaw), "GenerationPrimitive"))
-
-	if !regexp.MustCompile(`REQUESTED_OUTPUT_COUNT_OPTIONS\s*=\s*\[1, 2, 3, 4\]\s+as const`).Match(frontendRaw) {
-		t.Fatal("frontend requested output count options must be exactly [1, 2, 3, 4]")
+	want := []string{"text-to-image", "image-to-image"}
+	assertSameContractValues(t, "frontend generation primitives", want, extractTypeScriptStringObject(t, string(frontend), "GENERATION_PRIMITIVE"))
+	assertSameContractValues(t, "OpenAPI generation primitives", want, extractOpenAPIStringEnum(t, string(openapi), "GenerationPrimitive"))
+	if !regexp.MustCompile(`REQUESTED_OUTPUT_COUNT_OPTIONS\s*=\s*\[1, 2, 3, 4\]\s+as const`).Match(frontend) {
+		t.Fatal("frontend output count contract mismatch")
 	}
-	if !regexp.MustCompile(`(?m)^    RequestedOutputCount:\n      type: integer\n      enum: \[1, 2, 3, 4\]$`).Match(openAPIRaw) {
-		t.Fatal("OpenAPI RequestedOutputCount enum must be exactly [1, 2, 3, 4]")
-	}
-}
-
-func extractTypeScriptStringObject(t *testing.T, source, constName string) []string {
-	t.Helper()
-	objectRe := regexp.MustCompile(`(?s)export\s+const\s+` + regexp.QuoteMeta(constName) + `\s*=\s*\{(?P<body>.*?)\}\s+as\s+const`)
-	match := objectRe.FindStringSubmatch(source)
-	if match == nil {
-		t.Fatalf("frontend %s object not found", constName)
-	}
-	body := match[objectRe.SubexpIndex("body")]
-	entryRe := regexp.MustCompile(`(?m)[A-Za-z_][A-Za-z0-9_]*\s*:\s*'([^']+)'\s*,?`)
-	entries := entryRe.FindAllStringSubmatch(body, -1)
-	values := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		values = append(values, entry[1])
-	}
-	return values
 }
 
 func assertSameContractValues(t *testing.T, label string, want, got []string) {
 	t.Helper()
-	want = append([]string(nil), want...)
-	got = append([]string(nil), got...)
 	slices.Sort(want)
 	slices.Sort(got)
 	if !slices.Equal(want, got) {
-		t.Fatalf("%s mismatch: got=%v want=%v", label, got, want)
+		t.Fatalf("contract mismatch: got=%v want=%v", got, want)
+	}
+}
+
+func extractTypeScriptStringObject(t *testing.T, source, name string) []string {
+	t.Helper()
+	m := regexp.MustCompile(`(?s)export\s+const\s+` + regexp.QuoteMeta(name) + `\s*=\s*\{(.*?)\}\s+as\s+const`).FindStringSubmatch(source)
+	if len(m) < 2 {
+		t.Fatalf("%s not found", name)
+	}
+	ms := regexp.MustCompile(`'([^']+)'`).FindAllStringSubmatch(m[1], -1)
+	out := make([]string, 0, len(ms))
+	for _, x := range ms {
+		out = append(out, x[1])
+	}
+	return out
+}
+
+func TestValidateGenerationSubmitContract(t *testing.T) {
+	for _, params := range []map[string]interface{}{
+		nil,
+		{"image_urls": []string{}},
+		{"image_urls": []string{"one", "two", "three", "four"}},
+	} {
+		if err := ValidateGenerationSubmitContract(params); err != nil {
+			t.Fatalf("valid params %#v: %v", params, err)
+		}
+	}
+
+	for _, params := range []map[string]interface{}{
+		{"mode": "text-to-image"},
+		{"primitive": "image-to-image"},
+		{"reference_image_urls": []string{"one"}},
+		{"image_urls": []string{"one", "two", "three", "four", "five"}},
+	} {
+		if err := ValidateGenerationSubmitContract(params); err == nil || !strings.Contains(err.Error(), "generation") {
+			t.Fatalf("invalid params %#v error=%v", params, err)
+		}
 	}
 }

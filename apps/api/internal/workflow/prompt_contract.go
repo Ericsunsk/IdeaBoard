@@ -10,7 +10,7 @@ import (
 const (
 	ParamKeyVariation = paramkeys.Variation
 	ParamKeyOutpaint  = paramkeys.Outpaint
-	ParamKeyHD        = paramkeys.HD
+	ParamKeyUpscale   = paramkeys.Upscale
 	ParamKeyFusion    = paramkeys.Fusion
 )
 
@@ -25,7 +25,7 @@ type OutpaintContract struct {
 	ImageOffsetY int
 }
 
-type HDUpscaleContract struct{ Scale float64 }
+type UpscaleContract struct{ Scale float64 }
 
 func ReadVariationsPromptContract(params map[string]interface{}) (VariationsPromptContract, bool) {
 	obj, ok := readWorkflowObjectParam(params, ParamKeyVariation)
@@ -74,34 +74,34 @@ func ReadOutpaintContract(params map[string]interface{}) (OutpaintContract, bool
 	}, true
 }
 
-func ReadHDUpscaleContract(params map[string]interface{}) (HDUpscaleContract, bool) {
-	obj, ok := readWorkflowObjectParam(params, ParamKeyHD)
+func ReadUpscaleContract(params map[string]interface{}) (UpscaleContract, bool) {
+	obj, ok := readWorkflowObjectParam(params, ParamKeyUpscale)
 	if !ok {
-		return HDUpscaleContract{}, false
+		return UpscaleContract{}, false
 	}
 	scale, ok := readNumberField(obj, paramkeys.Scale)
 	if !ok {
-		return HDUpscaleContract{}, false
+		return UpscaleContract{}, false
 	}
-	return HDUpscaleContract{Scale: scale}, true
+	return UpscaleContract{Scale: scale}, true
 }
 
-type StyleFusionPromptContract struct {
+type FusionPromptContract struct {
 	Mode         string
 	InputWeights []float64
 }
 
-func ReadStyleFusionPromptContract(params map[string]interface{}) (StyleFusionPromptContract, bool) {
+func ReadFusionPromptContract(params map[string]interface{}) (FusionPromptContract, bool) {
 	obj, ok := readWorkflowObjectParam(params, ParamKeyFusion)
 	if !ok {
-		return StyleFusionPromptContract{}, false
+		return FusionPromptContract{}, false
 	}
 	mode, _ := readStringField(obj, paramkeys.Mode)
-	weights, _ := ReadStyleFusionInputWeights(params)
+	weights, _ := ReadFusionInputWeights(params)
 	if len(weights) == 0 {
-		return StyleFusionPromptContract{}, false
+		return FusionPromptContract{}, false
 	}
-	return StyleFusionPromptContract{Mode: mode, InputWeights: weights}, true
+	return FusionPromptContract{Mode: mode, InputWeights: weights}, true
 }
 
 func readStringField(obj map[string]interface{}, key string) (string, bool) {
@@ -122,10 +122,10 @@ func NormalizeStructuredPromptContractParams(params map[string]interface{}, feat
 		return normalizeVariationsContract(params)
 	case FeatureSlugOutpaint:
 		return normalizeOutpaintContract(params)
-	case FeatureSlugHDUpscale:
-		return normalizeHDUpscaleContract(params)
-	case FeatureSlugStyleFusion:
-		return normalizeStyleFusionContract(params)
+	case FeatureSlugUpscale:
+		return normalizeUpscaleContract(params)
+	case FeatureSlugFusion:
+		return normalizeFusionContract(params)
 	default:
 		return nil
 	}
@@ -146,7 +146,7 @@ func buildProviderPromptParams(params map[string]interface{}) map[string]interfa
 	if contract, ok := ReadVariationsPromptContract(params); ok {
 		out[paramkeys.VariationStrength] = contract.Strength
 	}
-	if contract, ok := ReadStyleFusionPromptContract(params); ok {
+	if contract, ok := ReadFusionPromptContract(params); ok {
 		out[paramkeys.FusionInputWeights] = contract.InputWeights
 	}
 	return out
@@ -191,29 +191,29 @@ func normalizeOutpaintContract(params map[string]interface{}) error {
 	return nil
 }
 
-func normalizeHDUpscaleContract(params map[string]interface{}) error {
-	obj, err := requiredWorkflowObjectParam(params, ParamKeyHD)
+func normalizeUpscaleContract(params map[string]interface{}) error {
+	obj, err := requiredWorkflowObjectParam(params, ParamKeyUpscale)
 	if err != nil {
 		return err
 	}
 	scale, ok := readNumberField(obj, paramkeys.Scale)
 	if !ok {
-		return fmt.Errorf("hd.scale 必须是数字")
+		return fmt.Errorf("upscale.scale 必须是数字")
 	}
 	if scale < 1 || scale > 4 || math.Abs(scale*10-math.Round(scale*10)) > 1e-9 {
-		return fmt.Errorf("hd.scale 必须是 1.0-4.0 且步长为 0.1")
+		return fmt.Errorf("upscale.scale 必须是 1.0-4.0 且步长为 0.1")
 	}
 	obj[paramkeys.Scale] = math.Round(scale*10) / 10
-	params[ParamKeyHD] = obj
+	params[ParamKeyUpscale] = obj
 	return nil
 }
 
-func normalizeStyleFusionContract(params map[string]interface{}) error {
+func normalizeFusionContract(params map[string]interface{}) error {
 	obj, err := requiredWorkflowObjectParam(params, ParamKeyFusion)
 	if err != nil {
 		return err
 	}
-	weights, ok := ReadStyleFusionInputWeights(params)
+	weights, ok := ReadFusionInputWeights(params)
 	if !ok || len(weights) == 0 {
 		return fmt.Errorf("fusion.input_weights 至少需要一个权重")
 	}

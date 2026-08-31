@@ -8,7 +8,7 @@ import {
   buildFusionTaskRequest,
   buildImageActionReadinessRequest,
   buildInpaintReadinessRequest,
-  buildPromptGenerationTaskRequest,
+  buildGenerationTaskRequest,
 } from '../commands/flowImageTaskRequests'
 import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import {
@@ -21,18 +21,18 @@ function buildCanvasBillingReadinessRequest(feature: WorkflowFeature): SubmitTas
   switch (feature) {
     case WORKFLOW_FEATURE.inpaint:
       return buildInpaintReadinessRequest()
-    case WORKFLOW_FEATURE.promptGeneration:
-      return buildPromptGenerationTaskRequest({
+    case WORKFLOW_FEATURE.generation:
+      return buildGenerationTaskRequest({
         prompt: '',
         aspectRatio: 'auto',
         outputCount: 1,
       })
-    case WORKFLOW_FEATURE.styleFusion:
+    case WORKFLOW_FEATURE.fusion:
       throw new Error('Fusion readiness requires current image inputs')
     case WORKFLOW_FEATURE.cutout:
     case WORKFLOW_FEATURE.variations:
     case WORKFLOW_FEATURE.render:
-    case WORKFLOW_FEATURE.hdUpscale:
+    case WORKFLOW_FEATURE.upscale:
     case WORKFLOW_FEATURE.outpaint:
       return buildImageActionReadinessRequest(feature)
   }
@@ -69,7 +69,7 @@ export function buildFusionBillingReadinessRequest(input: {
     .slice(0, 4)
   if (imageUrls.length < 2) return null
   return buildFusionTaskRequest({
-    prompt: '[style-fusion] submit readiness',
+    prompt: '[fusion] submit readiness',
     imageUrls,
     inputWeights: imageUrls.map(() => 1 / imageUrls.length),
     outputCount: input.outputCount,

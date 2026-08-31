@@ -49,7 +49,10 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 	storageService := storage.NewStorageServiceWithPublicAPI(
 		repos.storageProfileRepo,
 		repos.mediaAssetRegistry,
-		cfg.PublicOrigins.API,
+		// Browser-visible upload references must resolve through the same-origin
+		// gateway. API_BASE_URL remains reserved for webhooks and server-side
+		// integrations; using it here would leak api.ideaboard.art into the SPA.
+		cfg.PublicOrigins.Web,
 	)
 	if err := storageService.EnsureDefaultProfiles(ctx); err != nil {
 		return appDomainServices{}, fmt.Errorf("failed to ensure default storage profiles: %w", err)

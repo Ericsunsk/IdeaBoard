@@ -205,7 +205,7 @@ RETURNING id`,
 	if err != nil {
 		t.Fatalf("create river test channel failed: %v", err)
 	}
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO provider_endpoint_capabilities (provider_endpoint_id, capability) VALUES ($1, 'image-generation')`, id); err != nil {
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO provider_endpoint_capabilities (provider_endpoint_id, capability) VALUES ($1, 'generation')`, id); err != nil {
 		t.Fatalf("create river test channel capability failed: %v", err)
 	}
 	return id

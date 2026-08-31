@@ -91,7 +91,7 @@ import { useImageInputSlots } from '../primitives/useImageInputSlots'
 import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../../canvas-board/domain'
 import { WORKFLOW_FEATURE } from '../../../../../shared/domain/workflowFeatures'
 import { useCanvasBillingQuote } from '../../../execution'
-import { buildPromptGenerationTaskRequest } from '../../../execution/commands/flowImageTaskRequests'
+import { buildGenerationTaskRequest } from '../../../execution/commands/flowImageTaskRequests'
 
 const props = defineProps<{
   node: PromptNodeItem
@@ -127,10 +127,10 @@ const maxInputImages = 4
 const outputCount = computed(() => requireImageNodeOutputCount(props.node.outputCount))
 const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectRatio))
 const billingQuote = useCanvasBillingQuote(
-  () => WORKFLOW_FEATURE.promptGeneration,
+  () => WORKFLOW_FEATURE.generation,
   () => props.active,
   () =>
-    buildPromptGenerationTaskRequest({
+    buildGenerationTaskRequest({
       prompt: '',
       aspectRatio: 'auto',
       outputCount: outputCount.value,

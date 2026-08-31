@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/identity/principal"
@@ -69,7 +68,7 @@ type mediaAssetBatchDTO struct {
 
 func (h *mediaAssetHandler) Metadata(c *gin.Context) {
 	identity, ok := principal.Require(c)
-	if !ok || h == nil || h.assets == nil || h.storage == nil {
+	if !ok || h == nil || h.assets == nil {
 		return
 	}
 	assetID := strings.TrimSpace(c.Param("asset_id"))
@@ -108,12 +107,12 @@ func (h *mediaAssetHandler) Metadata(c *gin.Context) {
 	response.SuccessDTO(c, result)
 }
 
-// MetadataBatch returns metadata and signed delivery URLs for several owned assets
+// MetadataBatch returns metadata and same-origin delivery URLs for several owned assets
 // in one request. Missing or unauthorized assets are omitted to avoid leaking
 // ownership information across the batch boundary.
 func (h *mediaAssetHandler) MetadataBatch(c *gin.Context) {
 	identity, ok := principal.Require(c)
-	if !ok || h == nil || h.assets == nil || h.storage == nil {
+	if !ok || h == nil || h.assets == nil {
 		return
 	}
 	var req mediaAssetBatchRequest
@@ -185,14 +184,10 @@ func (h *mediaAssetHandler) buildMetadata(c *gin.Context, ownerUserID int64, ass
 		Derivatives: make(map[string]mediaAssetDerivativeDTO, len(derivatives.TierSpecs)),
 	}
 	if asset.Status == "ready" {
+		// Keep media URLs on the same-origin gateway. In particular, do not
+		// expose S3 signed URLs to the browser; the content endpoint reads via
+		// the owning storage profile and preserves the gateway security boundary.
 		result.Original.URL = "/api/user/media-assets/" + asset.AssetID + "/original/content"
-		signedURL, supported, err := h.storage.ResolveSignedURLAtProfile(c.Request.Context(), asset.StorageProfileID, asset.StorageKey, time.Hour)
-		if err != nil {
-			return mediaAssetDTO{}, fmt.Errorf("生成原图访问地址失败: %w", err)
-		}
-		if supported {
-			result.Original.URL = signedURL
-		}
 	}
 	for tier := range derivatives.TierSpecs {
 		result.Derivatives[tier] = mediaAssetDerivativeDTO{Status: "pending"}
@@ -201,13 +196,6 @@ func (h *mediaAssetHandler) buildMetadata(c *gin.Context, ownerUserID int64, ass
 		item := mediaAssetDerivativeDTO{Status: row.Status, Format: row.Format, Width: row.Width, Height: row.Height, SizeBytes: row.SizeBytes, ErrorCode: row.ErrorCode}
 		if row.Status == "ready" {
 			item.URL = fmt.Sprintf("/api/user/media-assets/%s/derivatives/%s/%s/content", asset.AssetID, row.Tier, row.Format)
-			signedURL, supported, err := h.storage.ResolveSignedURLAtProfile(c.Request.Context(), row.StorageProfileID, row.StorageKey, time.Hour)
-			if err != nil {
-				return mediaAssetDTO{}, fmt.Errorf("生成媒体派生访问地址失败: %w", err)
-			}
-			if supported {
-				item.URL = signedURL
-			}
 		}
 		result.Derivatives[row.Tier] = item
 	}

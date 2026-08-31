@@ -56,7 +56,7 @@ func TestCallOpenAINon200ReturnsTypedUpstreamHTTPError(t *testing.T) {
 		ApiKey:   "test-key",
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
-	params := map[string]interface{}{"feature": "prompt-generation"}
+	params := map[string]interface{}{"feature": "generation"}
 
 	_, err := c.callOpenAIForTest(context.Background(), account, "prompt", 1024, 1024, time.Second, params, "gpt-image-1")
 	if err == nil {

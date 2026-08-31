@@ -14,7 +14,7 @@ function makeReadiness(
     ready: true,
     feature,
     billing: {
-      sku: 'ai-image:prompt-generation',
+      sku: 'ai-image:generation',
       output_resolution: '1k',
       display_name: 'Pattern generation',
       price_version_id: 1,
@@ -61,8 +61,8 @@ describe('canvas billing readiness store', () => {
     const fetchReadiness = vi.fn(async (feature: WorkflowFeature) => makeReadiness(feature))
     const store = createCanvasBillingReadinessStore({ fetchReadiness })
 
-    await store.ensureFeature(WORKFLOW_FEATURE.promptGeneration)
-    expect(store.getFeatureState(WORKFLOW_FEATURE.promptGeneration)).toMatchObject({
+    await store.ensureFeature(WORKFLOW_FEATURE.generation)
+    expect(store.getFeatureState(WORKFLOW_FEATURE.generation)).toMatchObject({
       status: 'ready',
       unitCredits: 4,
       totalCredits: 4,
@@ -71,9 +71,9 @@ describe('canvas billing readiness store', () => {
     })
 
     store.applyReadiness(
-      makeReadiness(WORKFLOW_FEATURE.promptGeneration, {
+      makeReadiness(WORKFLOW_FEATURE.generation, {
         billing: {
-          ...makeReadiness(WORKFLOW_FEATURE.promptGeneration).billing!,
+          ...makeReadiness(WORKFLOW_FEATURE.generation).billing!,
           price_version_id: 2,
           price_version: 2,
           unit_credits: 6,
@@ -83,7 +83,7 @@ describe('canvas billing readiness store', () => {
       }),
     )
 
-    expect(store.getFeatureState(WORKFLOW_FEATURE.promptGeneration)).toMatchObject({
+    expect(store.getFeatureState(WORKFLOW_FEATURE.generation)).toMatchObject({
       status: 'ready',
       unitCredits: 6,
       totalCredits: 24,

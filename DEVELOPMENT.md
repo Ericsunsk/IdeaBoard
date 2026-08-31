@@ -197,7 +197,7 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | ---- | ---- |
 | [CanvasPage.vue](./apps/web/src/features/canvas/pages/CanvasPage.vue) | Canvas route page |
 | [executionContract.ts](./apps/web/src/features/canvas/execution/contracts/executionContract.ts) | 前端 workflow feature contract |
-| [useFlowPromptGenerationOrchestrator.ts](./apps/web/src/features/canvas/composables/useFlowPromptGenerationOrchestrator.ts) | Prompt/node execution orchestration |
+| [generationIntent.ts](./apps/web/src/features/canvas/image-workflow/generationIntent.ts) | Prompt/node execution orchestration |
 | [useFlowImageActionOrchestrator.ts](./apps/web/src/features/canvas/composables/useFlowImageActionOrchestrator.ts) | Image node direct actions |
 | [taskEvents.ts](./apps/web/src/shared/api/taskEvents.ts) | Task SSE events |
 | [features.go](./apps/api/internal/workflow/features.go) | 后端 canonical feature contract |
@@ -265,9 +265,8 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | `variations` | 风格延展 |
 | `inpaint` | 局部重绘 |
 | `cutout` | 抠图 |
-| `style-fusion` | 多图融合 |
-| `pattern-gen` | 图案生成 |
-| `hd-upscale` | HD |
+| `fusion` | 多图融合 |
+| `upscale` | 放大 |
 | `outpaint` | 扩图 |
 
 Rules:

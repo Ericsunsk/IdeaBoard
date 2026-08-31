@@ -8,7 +8,7 @@ import (
 )
 
 // SchemaVersion tracks the WorkflowTaskParams schema carried by task records.
-const CurrentParamsSchemaVersion = 4
+const CurrentParamsSchemaVersion = 5
 
 // WorkflowTaskParams is the typed contract for task parameters flowing
 // from frontend submit through API, River, and into the worker/provider layer.
@@ -36,10 +36,10 @@ type WorkflowTaskParams struct {
 
 	// Feature-specific canonical prompt contracts. Keep these in sync with
 	// workflow/prompt_contract.go and SYSTEM_PROMPT.md.
-	Variation *VariationsParams  `json:"variation,omitempty"`
-	Outpaint  *OutpaintParams    `json:"outpaint,omitempty"`
-	HD        *HDUpscaleParams   `json:"hd,omitempty"`
-	Fusion    *StyleFusionParams `json:"fusion,omitempty"`
+	Variation *VariationsParams `json:"variation,omitempty"`
+	Outpaint  *OutpaintParams   `json:"outpaint,omitempty"`
+	Upscale   *UpscaleParams    `json:"upscale,omitempty"`
+	Fusion    *FusionParams     `json:"fusion,omitempty"`
 
 	// Provider hints (passthrough, not validated).
 	// Extra carries provider-specific parameters that don't have a
@@ -215,11 +215,11 @@ type OutpaintParams struct {
 	ImageOffsetY int `json:"image_offset_y"`
 }
 
-type HDUpscaleParams struct {
+type UpscaleParams struct {
 	Scale float64 `json:"scale"`
 }
 
-type StyleFusionParams struct {
+type FusionParams struct {
 	Mode         string    `json:"mode,omitempty"`
 	InputWeights []float64 `json:"input_weights,omitempty"`
 }

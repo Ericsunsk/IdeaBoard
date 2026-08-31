@@ -79,7 +79,7 @@ Structured data 必须与页面中用户能看见的真实内容一致、遵守�
 
 **由上述规则导出的内容设计推论**：
 
-- 为 IdeaBoard 的真实工作流建独立页面，例如“电商主图从草图到成图”“多图风格融合”“局部重绘”“背景移除”“无缝图案生成”“HD 放大”。每页开头以一两句直接回答核心问题，随后给出步骤、限制、输入/输出示例、可复现 prompt 范例和原创示例图。
+- 为 IdeaBoard 的真实工作流建独立页面，例如“电商主图从草图到成图”“多图风格融合”“局部重绘”“背景移除”“无缝图案生成”“图片放大”。每页开头以一两句直接回答核心问题，随后给出步骤、限制、输入/输出示例、可复现 prompt 范例和原创示例图。
 - 公开模板页要说明适用场景、可编辑参数、版权/素材限制和实际效果；不能把需要登录或不存在的模板 URL 放进 sitemap。答案、图片、表格和事实必须在用户可见 HTML 中，而非只放 JSON-LD、注释或 bot-only DOM。
 - 每项能力都应有一个稳定的 canonical URL，标题采用用户会问的具体任务而非只有品牌口号；链接使用描述性 anchor text。该做法服务于发现与理解，符合 Google 对清晰内容组织和描述性链接的建议。[Google SEO Starter Guide](https://developers.google.com/search/docs/fundamentals/seo-starter-guide)
 - 对价格、生成能力、限制、支持模型和数据处理只陈述可验证的当前事实；变化时更新页面与 `lastmod`。这降低错误引用风险，亦符合 Google 对可靠、透明内容的要求。[Google helpful content](https://developers.google.com/search/docs/fundamentals/creating-helpful-content)

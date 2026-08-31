@@ -302,12 +302,8 @@ func syncManagedEndpointAccount(ctx context.Context, q *dbsqlc.Queries, endpoint
 }
 
 func isManagedImageEndpointProtocol(protocol string) bool {
-	switch strings.TrimSpace(protocol) {
-	case ProtocolImageURLJSONImage, ProtocolFluxFillJSONImage:
-		return true
-	default:
-		return false
-	}
+	canonical, ok := CanonicalProtocol(protocol)
+	return ok && (canonical == ProtocolImagePipeline || canonical == ProtocolImageFill)
 }
 
 func providerEndpointConflictError(err error) error {

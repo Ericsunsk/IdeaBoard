@@ -11,7 +11,7 @@ import (
 	"ideaboard/api/internal/tasking/taskstore"
 )
 
-const taskStatsTestParams = `{"schema_version":4}`
+const taskStatsTestParams = `{"schema_version":5}`
 
 func createTaskStatsTestTask(t testing.TB, db *sql.DB, repo *taskstore.Repository, ctx context.Context, task *tasks.Task) error {
 	t.Helper()

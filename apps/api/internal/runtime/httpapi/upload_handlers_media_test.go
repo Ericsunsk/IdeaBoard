@@ -20,7 +20,7 @@ func TestUploadImageResponseUsesStoredCanonicalMetadata(t *testing.T) {
 func TestUploadImageResponseUsesAvatarFieldForStoredReference(t *testing.T) {
 	stored := &storage.StoredUploadRef{URL: "/uploads/profile/OWNER/avatar/avatar.webp", MIMEType: "image/webp"}
 	payload := newUploadImageResponseFromStored("avatar", stored)
-	if payload.Avatar != stored.URL || payload.URL != "" || payload.Ext != "webp" {
+	if payload.Avatar != profileAvatarDeliveryURL || payload.URL != "" || payload.Ext != "webp" {
 		t.Fatalf("payload = %+v, want avatar response", payload)
 	}
 }

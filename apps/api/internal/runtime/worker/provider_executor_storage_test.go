@@ -110,7 +110,7 @@ func TestCallDrawingAPIStoresParsedOutputEnvelope(t *testing.T) {
 		Prompt: "repeatable textile pattern",
 		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Feature:       workflow.FeatureSlugPromptGeneration,
+			Feature:       workflow.FeatureSlugGeneration,
 		}),
 	}
 

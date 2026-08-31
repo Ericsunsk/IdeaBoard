@@ -8,10 +8,8 @@ export default {
   loadingMore: '더 많은 영감을 불러오는 중',
   allLoaded: '모든 영감을 불러왔습니다',
   queryTooLong: '검색 키워드는 200자를 초과할 수 없습니다',
-  preparingReferences: '참조 이미지를 준비 중입니다. 잠시 기다려 주세요',
   stillProcessing: '검색이 아직 처리 중입니다. 잠시 후 다시 시도해 주세요.',
   invalidVisionResult: '비전 검색 결과가 올바르지 않습니다. 다시 시도해 주세요.',
-  referenceNotUsable: '이 이미지는 검색 참조로 사용할 수 없습니다. 다시 시도해 주세요.',
   priceFree: '무료',
   priceUnavailable: '비전 검색 가격 정보를 현재 사용할 수 없습니다',
   loadFailed: '영감을 검색할 수 없습니다',
@@ -71,7 +69,6 @@ export default {
     default: '인기 영감',
   },
   buttons: {
-    preparingReferences: '참조 준비 중',
     searching: '검색 중',
     search: '검색',
     searchWithPrice: '검색 · {price}',

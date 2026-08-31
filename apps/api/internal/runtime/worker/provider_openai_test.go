@@ -208,7 +208,7 @@ func TestCallOpenAIRetainsGenerationEndpointForStandardRequests(t *testing.T) {
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	params := map[string]interface{}{
-		"feature": "prompt-generation",
+		"feature": "generation",
 	}
 
 	gotResult, err := c.callOpenAIForTest(context.Background(), account, "pattern prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1")
@@ -251,7 +251,7 @@ func TestCallOpenAIRequestsOutputCountAndReturnsMultipleImages(t *testing.T) {
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	params := map[string]interface{}{
-		"feature":      "prompt-generation",
+		"feature":      "generation",
 		"output_count": 2,
 	}
 
@@ -328,7 +328,7 @@ func TestCallOpenAIVariationsUsesEditEndpointAndMultipartImage(t *testing.T) {
 	}
 }
 
-func TestCallOpenAIStyleFusionUsesEditEndpointAndTwoImageParts(t *testing.T) {
+func TestCallOpenAIFusionUsesEditEndpointAndTwoImageParts(t *testing.T) {
 	var gotPath string
 	var gotMultipart multipartRequestCapture
 	imageA := buildTinyPNGBytes(t)
@@ -361,7 +361,7 @@ func TestCallOpenAIStyleFusionUsesEditEndpointAndTwoImageParts(t *testing.T) {
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	params := map[string]interface{}{
-		"feature":    "style-fusion",
+		"feature":    "fusion",
 		"image_urls": []interface{}{server.URL + "/a.png", server.URL + "/b.png"},
 	}
 
@@ -641,7 +641,7 @@ func TestCallOpenAIUsesAssignedModelWhenAccountHasMultipleModels(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected assigned account model to resolve")
 	}
-	if _, err := c.callOpenAIForTest(context.Background(), account, "prompt", 1024, 1024, 2*time.Second, map[string]interface{}{"feature": "prompt-generation"}, resolved.Name); err != nil {
+	if _, err := c.callOpenAIForTest(context.Background(), account, "prompt", 1024, 1024, 2*time.Second, map[string]interface{}{"feature": "generation"}, resolved.Name); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
 	if gotBody["model"] != "gpt-image-2" {
@@ -673,7 +673,7 @@ func TestCallDrawingAPIResultIncludesResolvedModel(t *testing.T) {
 		Prompt: "prompt",
 		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Feature:       workflow.FeatureSlugPromptGeneration,
+			Feature:       workflow.FeatureSlugGeneration,
 		}),
 	}
 	output, err := c.callDrawingAPIForTest(context.Background(), account, task, "gpt-image-1")
@@ -724,7 +724,7 @@ func TestCallDrawingAPIUsesAssignmentResolvedModel(t *testing.T) {
 		Prompt: "prompt",
 		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Feature:       workflow.FeatureSlugPromptGeneration,
+			Feature:       workflow.FeatureSlugGeneration,
 		}),
 	}
 	output, err := c.callDrawingAPIWithAssignment(
@@ -763,11 +763,11 @@ func TestOpenAIEndpointSelectionConsumesRuntimeInvocation(t *testing.T) {
 	if !usesEditEndpoint(workflow.RuntimeOperationInpaint, workflow.RuntimeInvocationEdit) {
 		t.Fatalf("expected inpaint to use edit endpoint")
 	}
-	if usesEditEndpoint(workflow.RuntimeOperationImageUpscale, workflow.RuntimeInvocationTransform) {
+	if usesEditEndpoint(workflow.RuntimeOperationUpscale, workflow.RuntimeInvocationTransform) {
 		t.Fatalf("expected transform invocation to stay out of the edit endpoint")
 	}
 	for _, operation := range []workflow.RuntimeOperation{
-		workflow.RuntimeOperationStyleFusion,
+		workflow.RuntimeOperationFusion,
 		workflow.RuntimeOperationVariations,
 		workflow.RuntimeOperationRender,
 	} {
@@ -840,7 +840,7 @@ func TestCollectOpenAIEditImageRefsIncludesReferenceImageURLs(t *testing.T) {
 			" ",
 			"https://img.example/ref-b.png",
 		},
-	}, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationStyleFusion, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsFusion).ImageRefs
+	}, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationFusion, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsFusion).ImageRefs
 	want := []string{
 		"https://img.example/source.png",
 		"https://img.example/ref-a.png",

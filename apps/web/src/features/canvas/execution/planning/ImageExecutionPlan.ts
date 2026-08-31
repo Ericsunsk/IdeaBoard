@@ -73,8 +73,8 @@ export type ImageInpaintExecutionPlan = {
   resultOptions: ImageExecutionResultOptions
 }
 
-export type PromptGenerationExecutionPlan = {
-  kind: 'prompt-generation'
+export type GenerationExecutionPlan = {
+  kind: 'generation'
   sourceNodeId: string
   source: ImageExecutionInput
   referenceImages: ImageExecutionInput[]
@@ -115,7 +115,7 @@ export type ImageExecutionPlan =
   | ImageActionExecutionPlan
   | OutpaintExecutionPlan
   | ImageInpaintExecutionPlan
-  | PromptGenerationExecutionPlan
+  | GenerationExecutionPlan
   | FusionExecutionPlan
 
 export type ActivatedImageExecutionPlan = ImageExecutionPlan & {
@@ -391,13 +391,13 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     }
   }
 
-  function planPromptGeneration(
+  function planGeneration(
     anchorNodeId: string,
     referenceImages: readonly ImageExecutionInput[],
     prompt: string,
     outputCount: number,
     aspectRatio: PromptAspectRatio,
-  ): PromptGenerationExecutionPlan {
+  ): GenerationExecutionPlan {
     const normalizedPrompt = `${prompt ?? ''}`.trim()
     if (referenceImages.length > 4) failPlanning(i18n.global.t('canvas.execution.tooManyReferenceImages'))
     const normalizedReferences = referenceImages.map((image) => ({
@@ -414,7 +414,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
         : '1k'
     const source = normalizedReferences[0] ?? { url: '', ratio: 1 }
     return {
-      kind: 'prompt-generation',
+      kind: 'generation',
       sourceNodeId: anchorNodeId,
       source,
       referenceImages: normalizedReferences,
@@ -428,7 +428,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     }
   }
 
-  function planFusionPromptGeneration(
+  function planFusionGeneration(
     nodeId: string,
     prompt: string,
     outputCount: number,
@@ -493,9 +493,9 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
 
   return {
     planOutpaintAction,
-    planFusionPromptGeneration,
+    planFusionGeneration,
     planImageDirectAction,
     planImageInpaintAction,
-    planPromptGeneration,
+    planGeneration,
   }
 }

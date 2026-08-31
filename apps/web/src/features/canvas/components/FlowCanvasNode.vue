@@ -392,7 +392,7 @@ function onFusionGenerationRequest(
 function onPromptGenerate() {
   if (!promptSnapshot.value) return
   emit('node-intent', {
-    type: 'prompt-generation-requested',
+    type: 'generation-requested',
     nodeId: props.nodeId,
     prompt: promptSnapshot.value.text,
     outputCount: promptSnapshot.value.outputCount ?? 1,

@@ -110,13 +110,13 @@ describe('HomeCanvasImageActionMenu', () => {
         expect.anything(),
       )
       expect(props.strengthControl.setTriggerRef).toHaveBeenCalledWith(
-        IMAGE_NODE_ACTION.hdUpscale,
+        IMAGE_NODE_ACTION.upscale,
         expect.anything(),
       )
     })
   })
 
-  it('shows the active strength range for style variation and HD actions', () => {
+  it('shows the active strength range for style variation and upscale actions', () => {
     const variationsRender = renderImageActionMenu({
       showStrengthControl: true,
       activeStrengthAction: IMAGE_NODE_ACTION.variations,
@@ -133,7 +133,7 @@ describe('HomeCanvasImageActionMenu', () => {
 
     const hdRender = renderImageActionMenu({
       showStrengthControl: true,
-      activeStrengthAction: IMAGE_NODE_ACTION.hdUpscale,
+      activeStrengthAction: IMAGE_NODE_ACTION.upscale,
     })
     const activeHdRange = hdRender.getByRole('slider', { name: 'Upscale strength' })
 

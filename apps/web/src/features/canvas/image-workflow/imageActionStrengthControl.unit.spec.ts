@@ -164,7 +164,7 @@ describe('useFlowImageActionStrengthControl', () => {
     const onCommit = vi.fn()
     const onCancel = vi.fn()
     const control = useFlowImageActionStrengthControl({ onCommit, onCancel })
-    const action = IMAGE_NODE_ACTION.hdUpscale
+    const action = IMAGE_NODE_ACTION.upscale
     const { input, trigger } = bindRange(control, action, 35)
     stubRangeBounds(input, { left: 100, width: 200 })
 
@@ -203,7 +203,7 @@ describe('useFlowImageActionStrengthControl', () => {
     const onCommit = vi.fn()
     const onCancel = vi.fn()
     const control = useFlowImageActionStrengthControl({ onCommit, onCancel })
-    const action = IMAGE_NODE_ACTION.hdUpscale
+    const action = IMAGE_NODE_ACTION.upscale
     const { input, trigger } = bindRange(control, action, 35)
     stubRangeBounds(input, { left: 100, width: 200 })
 

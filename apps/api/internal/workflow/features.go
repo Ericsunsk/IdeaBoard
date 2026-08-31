@@ -12,15 +12,15 @@ import (
 var workflowFeatureSlugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
 const (
-	FeatureSlugPromptGeneration = "prompt-generation"
-	FeatureSlugInpaint          = "inpaint"
+	FeatureSlugGeneration = "generation"
+	FeatureSlugInpaint    = "inpaint"
 
-	FeatureSlugRender      = "render"
-	FeatureSlugVariations  = "variations"
-	FeatureSlugCutout      = "cutout"
-	FeatureSlugStyleFusion = "style-fusion"
-	FeatureSlugHDUpscale   = "hd-upscale"
-	FeatureSlugOutpaint    = "outpaint"
+	FeatureSlugRender     = "render"
+	FeatureSlugVariations = "variations"
+	FeatureSlugCutout     = "cutout"
+	FeatureSlugFusion     = "fusion"
+	FeatureSlugUpscale    = "upscale"
+	FeatureSlugOutpaint   = "outpaint"
 )
 
 var supportedWorkflowFeatureSlugs = registeredImageFeatureSlugs()
@@ -128,7 +128,7 @@ func ReadWorkflowStringParam(params map[string]interface{}, canonicalKey string)
 	return s, true
 }
 
-func ReadStyleFusionInputWeights(params map[string]interface{}) ([]float64, bool) {
+func ReadFusionInputWeights(params map[string]interface{}) ([]float64, bool) {
 	rawFusion, ok := ReadWorkflowParam(params, paramkeys.Fusion)
 	if !ok {
 		return nil, false

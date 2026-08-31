@@ -3,13 +3,13 @@ import { canonicalizeRuntimeUploadRef } from '../../../../shared/config/runtimeU
 import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 
 export const EXECUTION_FEATURE = {
-  promptGeneration: WORKFLOW_FEATURE.promptGeneration,
+  generation: WORKFLOW_FEATURE.generation,
   inpaint: WORKFLOW_FEATURE.inpaint,
   cutout: WORKFLOW_FEATURE.cutout,
-  styleFusion: WORKFLOW_FEATURE.styleFusion,
+  fusion: WORKFLOW_FEATURE.fusion,
   render: WORKFLOW_FEATURE.render,
   variations: WORKFLOW_FEATURE.variations,
-  hdUpscale: WORKFLOW_FEATURE.hdUpscale,
+  upscale: WORKFLOW_FEATURE.upscale,
   outpaint: WORKFLOW_FEATURE.outpaint,
 } as const
 
@@ -22,15 +22,15 @@ type ExecutionMetaEntry = {
 }
 
 export const EXECUTION_META = {
-  [EXECUTION_FEATURE.promptGeneration]: {
-    feature: EXECUTION_FEATURE.promptGeneration,
+  [EXECUTION_FEATURE.generation]: {
+    feature: EXECUTION_FEATURE.generation,
   },
   [EXECUTION_FEATURE.inpaint]: {
     feature: EXECUTION_FEATURE.inpaint,
   },
-  [EXECUTION_FEATURE.styleFusion]: {
-    feature: EXECUTION_FEATURE.styleFusion,
-    promptPrefix: '[style-fusion]',
+  [EXECUTION_FEATURE.fusion]: {
+    feature: EXECUTION_FEATURE.fusion,
+    promptPrefix: '[fusion]',
   },
   [EXECUTION_FEATURE.render]: {
     feature: EXECUTION_FEATURE.render,
@@ -41,8 +41,8 @@ export const EXECUTION_META = {
   [EXECUTION_FEATURE.cutout]: {
     feature: EXECUTION_FEATURE.cutout,
   },
-  [EXECUTION_FEATURE.hdUpscale]: {
-    feature: EXECUTION_FEATURE.hdUpscale,
+  [EXECUTION_FEATURE.upscale]: {
+    feature: EXECUTION_FEATURE.upscale,
   },
   [EXECUTION_FEATURE.outpaint]: {
     feature: EXECUTION_FEATURE.outpaint,
@@ -52,7 +52,7 @@ export const EXECUTION_META = {
 
 export const EXECUTION_PARTIAL_EDIT_META = EXECUTION_META[EXECUTION_FEATURE.inpaint]
 
-export const EXECUTION_FUSION_META = EXECUTION_META[EXECUTION_FEATURE.styleFusion]
+export const EXECUTION_FUSION_META = EXECUTION_META[EXECUTION_FEATURE.fusion]
 
 interface BuildExecutionTaskRequestOptions {
   prompt: string

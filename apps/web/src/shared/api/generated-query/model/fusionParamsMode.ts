@@ -5,9 +5,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type StyleFusionParamsMode =
-  (typeof StyleFusionParamsMode)[keyof typeof StyleFusionParamsMode]
+export type FusionParamsMode = (typeof FusionParamsMode)[keyof typeof FusionParamsMode]
 
-export const StyleFusionParamsMode = {
+export const FusionParamsMode = {
   weighted_reference: 'weighted_reference',
 } as const

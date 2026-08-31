@@ -24,8 +24,8 @@ const PROMPT_CONFIG_FEATURES_BY_GROUP: Readonly<
   Partial<Record<AdminWorkflowFeatureGroupKey, readonly FeatureSlug[]>>
 > = {
   image: ['render', 'variations', 'inpaint', 'outpaint'],
-  prompt: ['prompt-generation'],
-  fusion: ['style-fusion'],
+  prompt: ['generation'],
+  fusion: ['fusion'],
 }
 
 function toFeatureItem(slug: FeatureSlug): FeatureItem {

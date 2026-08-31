@@ -75,7 +75,7 @@ RETURNING id`).Scan(&endpointID); err != nil {
 	}
 	if _, err := db.ExecContext(ctx, `
 INSERT INTO provider_endpoint_capabilities (provider_endpoint_id, capability)
-VALUES ($1, 'image-upscale')`, endpointID); err != nil {
+VALUES ($1, 'upscale')`, endpointID); err != nil {
 		t.Fatalf("insert provider endpoint capability with runtime role: %v", err)
 	}
 	if _, err := db.ExecContext(ctx, `

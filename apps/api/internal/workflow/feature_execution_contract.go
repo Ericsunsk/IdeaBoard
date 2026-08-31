@@ -42,10 +42,10 @@ const (
 type RoutingCapability string
 
 const (
-	RoutingCapabilityImageGeneration   RoutingCapability = "image-generation"
-	RoutingCapabilityBackgroundRemoval RoutingCapability = "background-removal"
-	RoutingCapabilityImageUpscale      RoutingCapability = "image-upscale"
-	RoutingCapabilityImageFill         RoutingCapability = "image-fill"
+	RoutingCapabilityGeneration RoutingCapability = "generation"
+	RoutingCapabilityCutout     RoutingCapability = "cutout"
+	RoutingCapabilityUpscale    RoutingCapability = "upscale"
+	RoutingCapabilityFill       RoutingCapability = "fill"
 )
 
 // RoutingModelRequirement states whether routing must resolve a Model. It does
@@ -62,14 +62,14 @@ const (
 type RuntimeOperation string
 
 const (
-	RuntimeOperationPromptGeneration  RuntimeOperation = "prompt-generation"
-	RuntimeOperationInpaint           RuntimeOperation = "inpaint"
-	RuntimeOperationRender            RuntimeOperation = "render"
-	RuntimeOperationVariations        RuntimeOperation = "variations"
-	RuntimeOperationStyleFusion       RuntimeOperation = "style-fusion"
-	RuntimeOperationOutpaint          RuntimeOperation = "outpaint"
-	RuntimeOperationBackgroundRemoval RuntimeOperation = "background-removal"
-	RuntimeOperationImageUpscale      RuntimeOperation = "image-upscale"
+	RuntimeOperationGeneration RuntimeOperation = "generation"
+	RuntimeOperationInpaint    RuntimeOperation = "inpaint"
+	RuntimeOperationRender     RuntimeOperation = "render"
+	RuntimeOperationVariations RuntimeOperation = "variations"
+	RuntimeOperationFusion     RuntimeOperation = "fusion"
+	RuntimeOperationOutpaint   RuntimeOperation = "outpaint"
+	RuntimeOperationCutout     RuntimeOperation = "cutout"
+	RuntimeOperationUpscale    RuntimeOperation = "upscale"
 )
 
 // RuntimeInvocation describes the provider-neutral request shape selected by
@@ -268,8 +268,8 @@ type registeredImageFeature struct {
 }
 
 var registeredImageFeatures = []registeredImageFeature{
-	{slug: FeatureSlugPromptGeneration, definition: imageGenerationDefinition(
-		PromptPolicyRequired, RuntimeOperationPromptGeneration, RuntimeInvocationGenerate,
+	{slug: FeatureSlugGeneration, definition: imageGenerationDefinition(
+		PromptPolicyRequired, RuntimeOperationGeneration, RuntimeInvocationGenerate,
 		ImageInputOptional, 4, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsNone,
 	)},
 	{slug: FeatureSlugInpaint, definition: imageFillDefinition(
@@ -288,9 +288,9 @@ var registeredImageFeatures = []registeredImageFeature{
 		promptPolicy:           PromptPolicyIgnored,
 		outputCountPolicy:      OutputCountPolicyFixed,
 		outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
-		routingCapability:      RoutingCapabilityBackgroundRemoval,
+		routingCapability:      RoutingCapabilityCutout,
 		modelRequirement:       RoutingModelNotRequired,
-		runtimeOperation:       RuntimeOperationBackgroundRemoval,
+		runtimeOperation:       RuntimeOperationCutout,
 		runtimeInvocation:      RuntimeInvocationTransform,
 		imageInputPolicy:       ImageInputRequired,
 		maxImageInputCount:     16,
@@ -298,17 +298,17 @@ var registeredImageFeatures = []registeredImageFeature{
 		originalImagePolicy:    OriginalImageIgnored,
 		controlContract:        RuntimeControlsNone,
 	}},
-	{slug: FeatureSlugStyleFusion, definition: imageGenerationDefinition(
-		PromptPolicyOptional, RuntimeOperationStyleFusion, RuntimeInvocationEdit,
+	{slug: FeatureSlugFusion, definition: imageGenerationDefinition(
+		PromptPolicyOptional, RuntimeOperationFusion, RuntimeInvocationEdit,
 		MultipleImageInputsRequired, 4, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsFusion,
 	)},
-	{slug: FeatureSlugHDUpscale, definition: featureExecutionDefinition{
+	{slug: FeatureSlugUpscale, definition: featureExecutionDefinition{
 		promptPolicy:           PromptPolicyIgnored,
 		outputCountPolicy:      OutputCountPolicyFixed,
 		outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
-		routingCapability:      RoutingCapabilityImageUpscale,
+		routingCapability:      RoutingCapabilityUpscale,
 		modelRequirement:       RoutingModelNotRequired,
-		runtimeOperation:       RuntimeOperationImageUpscale,
+		runtimeOperation:       RuntimeOperationUpscale,
 		runtimeInvocation:      RuntimeInvocationTransform,
 		imageInputPolicy:       ImageInputRequired,
 		maxImageInputCount:     16,
@@ -352,7 +352,7 @@ func imageGenerationDefinition(
 		promptPolicy:           promptPolicy,
 		outputCountPolicy:      OutputCountPolicySelectable,
 		outputResolutionPolicy: OutputResolutionPolicyScalable,
-		routingCapability:      RoutingCapabilityImageGeneration,
+		routingCapability:      RoutingCapabilityGeneration,
 		modelRequirement:       RoutingModelRequired,
 		runtimeOperation:       operation,
 		runtimeInvocation:      invocation,
@@ -376,7 +376,7 @@ func imageFillDefinition(
 		promptPolicy:           promptPolicy,
 		outputCountPolicy:      OutputCountPolicyFixed,
 		outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
-		routingCapability:      RoutingCapabilityImageFill,
+		routingCapability:      RoutingCapabilityFill,
 		modelRequirement:       RoutingModelNotRequired,
 		runtimeOperation:       operation,
 		runtimeInvocation:      RuntimeInvocationTransform,
@@ -517,7 +517,7 @@ func CompileFeatureReadinessPlan(input CompileFeatureExecutionInput) (FeatureExe
 	return CompileFeatureExecutionPlan(CompileFeatureExecutionInput{Feature: feature, Params: params})
 }
 
-const CurrentFeatureExecutionPlanSchemaVersion = 4
+const CurrentFeatureExecutionPlanSchemaVersion = 5
 
 type durableFeatureExecutionPlan struct {
 	SchemaVersion int                       `json:"schema_version"`
@@ -572,9 +572,9 @@ type durableFeatureDefinition struct {
 // consult the live compiler registry: semantic changes require a new schema.
 func durableFeatureDefinitionForCurrentSchema(feature string) (durableFeatureDefinition, bool) {
 	switch feature {
-	case FeatureSlugPromptGeneration:
+	case FeatureSlugGeneration:
 		return durableImageGenerationDefinition(
-			PromptPolicyRequired, RuntimeOperationPromptGeneration, RuntimeInvocationGenerate,
+			PromptPolicyRequired, RuntimeOperationGeneration, RuntimeInvocationGenerate,
 			ImageInputOptional, 4, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsNone,
 		), true
 	case FeatureSlugInpaint:
@@ -592,9 +592,9 @@ func durableFeatureDefinitionForCurrentSchema(feature string) (durableFeatureDef
 			PromptPolicyOptional, RuntimeOperationVariations, RuntimeInvocationEdit,
 			ImageInputRequired, 16, MaskInputIgnored, OriginalImageExcluded, RuntimeControlsVariation,
 		), true
-	case FeatureSlugStyleFusion:
+	case FeatureSlugFusion:
 		return durableImageGenerationDefinition(
-			PromptPolicyOptional, RuntimeOperationStyleFusion, RuntimeInvocationEdit,
+			PromptPolicyOptional, RuntimeOperationFusion, RuntimeInvocationEdit,
 			MultipleImageInputsRequired, 4, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsFusion,
 		), true
 	case FeatureSlugOutpaint:
@@ -606,18 +606,18 @@ func durableFeatureDefinitionForCurrentSchema(feature string) (durableFeatureDef
 		return durableFeatureDefinition{
 			promptPolicy: PromptPolicyIgnored, outputCountPolicy: OutputCountPolicyFixed,
 			outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
-			routingCapability:      RoutingCapabilityBackgroundRemoval, modelRequirement: RoutingModelNotRequired,
-			runtimeOperation: RuntimeOperationBackgroundRemoval, runtimeInvocation: RuntimeInvocationTransform,
+			routingCapability:      RoutingCapabilityCutout, modelRequirement: RoutingModelNotRequired,
+			runtimeOperation: RuntimeOperationCutout, runtimeInvocation: RuntimeInvocationTransform,
 			imageInputPolicy: ImageInputRequired, maskInputPolicy: MaskInputIgnored,
 			maxImageInputCount:  16,
 			originalImagePolicy: OriginalImageIgnored, controlContract: RuntimeControlsNone,
 		}, true
-	case FeatureSlugHDUpscale:
+	case FeatureSlugUpscale:
 		return durableFeatureDefinition{
 			promptPolicy: PromptPolicyIgnored, outputCountPolicy: OutputCountPolicyFixed,
 			outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
-			routingCapability:      RoutingCapabilityImageUpscale, modelRequirement: RoutingModelNotRequired,
-			runtimeOperation: RuntimeOperationImageUpscale, runtimeInvocation: RuntimeInvocationTransform,
+			routingCapability:      RoutingCapabilityUpscale, modelRequirement: RoutingModelNotRequired,
+			runtimeOperation: RuntimeOperationUpscale, runtimeInvocation: RuntimeInvocationTransform,
 			imageInputPolicy: ImageInputRequired, maskInputPolicy: MaskInputIgnored,
 			maxImageInputCount:  16,
 			originalImagePolicy: OriginalImageIgnored, controlContract: RuntimeControlsUpscale,
@@ -640,7 +640,7 @@ func durableImageGenerationDefinition(
 	return durableFeatureDefinition{
 		promptPolicy: promptPolicy, outputCountPolicy: OutputCountPolicySelectable,
 		outputResolutionPolicy: OutputResolutionPolicyScalable,
-		routingCapability:      RoutingCapabilityImageGeneration, modelRequirement: RoutingModelRequired,
+		routingCapability:      RoutingCapabilityGeneration, modelRequirement: RoutingModelRequired,
 		runtimeOperation: operation, runtimeInvocation: invocation,
 		imageInputPolicy: imageInputPolicy, maxImageInputCount: maxImageInputCount,
 		maskInputPolicy:     maskInputPolicy,
@@ -657,7 +657,7 @@ func durableImageFillDefinition(
 	return durableFeatureDefinition{
 		promptPolicy: promptPolicy, outputCountPolicy: OutputCountPolicyFixed,
 		outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
-		routingCapability:      RoutingCapabilityImageFill, modelRequirement: RoutingModelNotRequired,
+		routingCapability:      RoutingCapabilityFill, modelRequirement: RoutingModelNotRequired,
 		runtimeOperation: operation, runtimeInvocation: RuntimeInvocationTransform,
 		imageInputPolicy: ImageInputRequired, maxImageInputCount: 1,
 		maskInputPolicy:     maskInputPolicy,

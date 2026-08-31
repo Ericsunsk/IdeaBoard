@@ -54,7 +54,7 @@ export type ImageActionIntentRouterOptions = {
       action: ImageTaskAction,
       options?: { prompt?: string; outputCount?: number; strength?: number },
     ) => Promise<void> | void
-    runFusionPromptGeneration: (
+    runFusionGeneration: (
       nodeId: string,
       prompt: string,
       outputCount: number,
@@ -161,7 +161,7 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
     options.params.updateNodeParam(nodeId, { key: 'prompt', value: prompt })
     options.params.updateNodeParam(nodeId, { key: 'outputCount', value: outputCount })
     options.params.updateNodeParam(nodeId, { key: 'aspectRatio', value: aspectRatio })
-    void options.execution.runFusionPromptGeneration(nodeId, prompt, outputCount, aspectRatio)
+    void options.execution.runFusionGeneration(nodeId, prompt, outputCount, aspectRatio)
   }
 
   return {

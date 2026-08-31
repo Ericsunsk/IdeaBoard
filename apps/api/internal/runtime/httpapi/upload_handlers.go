@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -137,6 +138,34 @@ func uploadProfileAvatarHandler(h UploadDeps) gin.HandlerFunc {
 	}
 }
 
+// profileAvatarContentHandler keeps uploaded avatars behind the authenticated
+// same-origin API even when the backing storage profile is S3-compatible.
+func profileAvatarContentHandler(h UploadDeps) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, ok := requireAuthenticatedUserID(c)
+		if !ok {
+			return
+		}
+		if h.UserRepo == nil || h.StorageService == nil {
+			response.InternalError(c, http.StatusInternalServerError, "读取头像失败", fmt.Errorf("profile avatar dependencies not configured"))
+			return
+		}
+		user, err := h.UserRepo.GetByID(c.Request.Context(), userID)
+		if err != nil || strings.TrimSpace(user.Avatar) == "" {
+			response.Error(c, http.StatusNotFound, "头像不存在")
+			return
+		}
+		object, err := h.StorageService.ReadUploadResourceByURL(c.Request.Context(), user.Avatar, 30*1024*1024)
+		if err != nil {
+			response.Error(c, http.StatusNotFound, "头像不存在")
+			return
+		}
+		c.Header("Cache-Control", "private, max-age=3600")
+		c.Header("Content-Disposition", "inline")
+		c.Data(http.StatusOK, object.ContentType, object.Data)
+	}
+}
+
 func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		release, ok := acquireUploadSlot(c.Request.Context(), h.UploadSettings)
@@ -232,6 +261,10 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 		stored.Height = prepared.Height
 		stored.MIMEType = prepared.MIMEType
 		stored.Animated = prepared.Animated
+		// Browser-visible board media must always use the authenticated
+		// same-origin delivery route, regardless of whether the backing profile
+		// is local or S3-compatible. Keep provider URLs server-side only.
+		stored.URL = mediaAssetOriginalDeliveryURL(handle.AssetID)
 		if err := h.MediaAssets.Complete(c.Request.Context(), handle, stored.IngestionCompletion("")); err != nil {
 			// A concurrent identical upload may have committed first and won the
 			// checksum unique index. Re-read the canonical asset before surfacing
@@ -260,7 +293,7 @@ func newUploadImageResponseFromStored(urlKey string, stored *storage.StoredUploa
 		return payload
 	}
 	if urlKey == "avatar" {
-		payload.Avatar = stored.URL
+		payload.Avatar = profileAvatarDeliveryURL
 	} else {
 		payload.URL = stored.URL
 	}
@@ -275,7 +308,7 @@ func newUploadImageResponseFromStored(urlKey string, stored *storage.StoredUploa
 
 func newUploadImageResponseFromAsset(asset dbsqlc.MediaAsset) uploadImageResponse {
 	payload := uploadImageResponse{
-		URL:          asset.Url,
+		URL:          mediaAssetOriginalDeliveryURL(asset.ID),
 		MediaAssetID: asset.ID,
 		Width:        int(asset.Width),
 		Height:       int(asset.Height),
@@ -285,6 +318,15 @@ func newUploadImageResponseFromAsset(asset dbsqlc.MediaAsset) uploadImageRespons
 		payload.Ext = strings.TrimPrefix(ext, ".")
 	}
 	return payload
+}
+
+const profileAvatarDeliveryURL = "/api/user/profile/avatar/content"
+
+func mediaAssetOriginalDeliveryURL(assetID int64) string {
+	if assetID <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("/api/user/media-assets/%d/original/content", assetID)
 }
 
 func adminUploadHandler(storageService *storage.StorageService, uploadSettings settings.MediaUploadSettingProvider) gin.HandlerFunc {

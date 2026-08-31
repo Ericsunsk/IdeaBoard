@@ -27,7 +27,14 @@ function defaultAuthBaseURL(): string {
   return 'http://localhost:5173'
 }
 
-export const API_BASE_URL = normalizeBaseURL(import.meta.env.VITE_API_BASE_URL, '/api')
+// Production is served behind the same-origin gateway. Ignore legacy absolute
+// API overrides in production so a stale Pages environment variable cannot
+// silently reintroduce browser CORS requests. Local/dev builds may still point
+// at a remote API when explicitly configured for development.
+const isProductionBuild = import.meta.env.PROD === true || import.meta.env.MODE === 'production'
+const configuredAPIBaseURL = normalizeBaseURL(import.meta.env.VITE_API_BASE_URL, '/api')
+export const API_BASE_URL = isProductionBuild ? '/api' : configuredAPIBaseURL
+
 function deriveAPIOriginBaseURL(fallback: string): string {
   if (!HTTP_URL_RE.test(API_BASE_URL)) return ''
 
@@ -48,6 +55,7 @@ function deriveAPIOriginBaseURL(fallback: string): string {
 export const AUTH_BASE_URL = deriveAPIOriginBaseURL(defaultAuthBaseURL())
 
 function deriveAssetBaseURL(): string {
+  if (isProductionBuild) return ''
   const explicit = normalizeBaseURL(import.meta.env.VITE_PUBLIC_ASSET_BASE_URL, '')
   if (explicit) return explicit
   return deriveAPIOriginBaseURL('')

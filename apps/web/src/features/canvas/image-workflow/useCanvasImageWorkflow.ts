@@ -23,15 +23,15 @@ import {
   type UseImageWorkflowExecutionOptions,
 } from './useImageWorkflowExecution'
 import {
-  createPromptGenerationIntent,
-  type PromptGenerationIntentOptions,
-} from './promptGenerationIntent'
+  createGenerationIntent,
+  type GenerationIntentOptions,
+} from './generationIntent'
 
 type CanvasImageWorkflowExecutionPort = Pick<
   ImageWorkflowExecution,
   | 'runImageInpaintAction'
-  | 'runPromptGeneration'
-  | 'runFusionPromptGeneration'
+  | 'runGeneration'
+  | 'runFusionGeneration'
   | 'runImageDirectAction'
   | 'runOutpaintAction'
   | 'isGenerationAvailable'
@@ -57,7 +57,7 @@ type CanvasImageWorkflowGraphPort = Pick<
   | 'stopCanvasInteraction'
   | 'isCanvasInteractionLocked'
 > & {
-  getMediaInputImages: PromptGenerationIntentOptions['getMediaInputImages']
+  getMediaInputImages: GenerationIntentOptions['getMediaInputImages']
   updateSnapshotNodeParam: ImageActionIntentRouterOptions['params']['updateNodeParam']
   markNodeExecutionDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
 }
@@ -250,17 +250,17 @@ export function useCanvasImageWorkflow(
     },
     execution: {
       runImageDirectAction: execution.runImageDirectAction,
-      runFusionPromptGeneration: execution.runFusionPromptGeneration,
+      runFusionGeneration: execution.runFusionGeneration,
     },
     params: {
       updateNodeParam: markImageWorkflowNodeDirty,
     },
   })
-  const promptGeneration = createPromptGenerationIntent({
+  const generation = createGenerationIntent({
     cancelFlowOutpaintMode: outpaint.cancelOutpaintMode,
     cancelFlowInpaintMode: imageTools.commands.lifecycle.cancel,
     getMediaInputImages: graph.getMediaInputImages,
-    runPromptGeneration: execution.runPromptGeneration,
+    runGeneration: execution.runGeneration,
   })
   const outpaintInteractions = useFlowOutpaintInteractionHandlers({
     flowOutpaintNodeId: outpaint.outpaintNodeId,
@@ -285,7 +285,7 @@ export function useCanvasImageWorkflow(
       tools: imageTools.commands,
       interactions: {
         ...imageActions,
-        ...promptGeneration,
+        ...generation,
         ...outpaintInteractions,
         onFlowOutpaintHandlePointerMove: outpaint.onHandlePointerMove,
         onFlowOutpaintHandlePointerUp: outpaint.onHandlePointerUp,

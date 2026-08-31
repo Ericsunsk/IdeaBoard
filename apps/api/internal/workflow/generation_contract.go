@@ -1,11 +1,7 @@
 package workflow
 
-import (
-	"fmt"
-)
+import "fmt"
 
-// GenerationPrimitive describes provider execution mechanics only. Product
-// identity, permissions, and Billing remain owned by the Workflow feature.
 type GenerationPrimitive string
 
 const (
@@ -23,8 +19,6 @@ func ParseGenerationPrimitive(raw string) (GenerationPrimitive, error) {
 	}
 }
 
-// RequestedOutputCount is the number of stable result slots reserved by one
-// user action and one Task. It is intentionally stricter than provider limits.
 type RequestedOutputCount uint8
 
 const (
@@ -39,9 +33,7 @@ func ParseRequestedOutputCount(value int) (RequestedOutputCount, error) {
 	return RequestedOutputCount(value), nil
 }
 
-func (count RequestedOutputCount) Int() int {
-	return int(count)
-}
+func (count RequestedOutputCount) Int() int { return int(count) }
 
 func (count RequestedOutputCount) Validate() error {
 	_, err := ParseRequestedOutputCount(count.Int())

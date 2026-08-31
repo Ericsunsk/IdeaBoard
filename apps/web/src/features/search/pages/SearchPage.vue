@@ -52,12 +52,10 @@
                   <button
                     type="button"
                     class="grid size-8 overflow-hidden rounded-full bg-board-card-bg cursor-pointer transition-[transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-board-primary"
-                    :class="isReferencePending(reference.key) ? 'opacity-60' : ''"
                     :title="
                       t('search.tooltips.removeReferenceWithCount', { count: referenceSlotCount })
                     "
                     :aria-label="t('search.tooltips.removeReference')"
-                    :aria-busy="isReferencePending(reference.key)"
                     @click="removeReference(reference.key)"
                   >
                     <img
@@ -138,7 +136,7 @@
                   type="submit"
                   :label="t('search.actions.search')"
                   :loading="visionState === 'extracting'"
-                  :disabled="hasPendingReferences || visionState === 'extracting'"
+                  :disabled="visionState === 'extracting'"
                   :title="searchButtonTitle"
                   class="!h-8 !min-w-[68px] !rounded-full !border-0 !bg-board-primary !px-4 !text-xs !font-bold !text-ib-text-inverse !shadow-none hover:!bg-board-primary-hover cursor-pointer disabled:!cursor-wait disabled:!opacity-60"
                 />
@@ -333,20 +331,14 @@
                     '!bg-board-primary shadow-xs':
                       references.some(
                         (ref) => ref.key === searchReferenceKey(result.provider, result.id),
-                      ) || isReferencePending(searchReferenceKey(result.provider, result.id)),
+                      ),
                   }"
                   :title="t('search.tooltips.useAsReference')"
                   :aria-label="t('search.tooltips.useAsReference')"
-                  :aria-busy="isReferencePending(searchReferenceKey(result.provider, result.id))"
                   @click.stop="handleSearchResultReference(result)"
                 >
                   <Search
                     class="size-3.5"
-                    :class="
-                      isReferencePending(searchReferenceKey(result.provider, result.id))
-                        ? 'animate-pulse'
-                        : ''
-                    "
                     aria-hidden="true"
                   />
                 </button>
@@ -581,7 +573,6 @@ const {
 const { draftQuery, queryError, heading: searchResultsHeading } = search
 const {
   references,
-  hasPendingReferences,
   referenceSlotCount,
   canAddReference,
   fileInput,
@@ -616,7 +607,6 @@ const {
   removeReference,
   useResultAsReference: handleSearchResultReference,
   useLibraryReference: handleLibraryReference,
-  isReferencePending,
 } = searchCommands
 const {
   reload,

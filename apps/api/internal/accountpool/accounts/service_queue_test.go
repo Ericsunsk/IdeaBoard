@@ -150,7 +150,7 @@ WHERE id = $1`, account.ProviderEndpointID).Scan(&apiType, &protocol, &endpointN
 	leaseToken := "lease-" + taskID
 	task := &tasks.Task{
 		TaskID: taskID, UserID: 1,
-		Params:                     `{"schema_version":4}`,
+		Params:                     `{"schema_version":5}`,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
 		AssignedCredentialID:       tasks.IDPtr(credentialID),
 		AccountID:                  tasks.IDPtr(account.ID),
@@ -189,7 +189,7 @@ RETURNING id`,
 	}
 	if _, err := db.ExecContext(context.Background(), `
 INSERT INTO provider_endpoint_capabilities (provider_endpoint_id, capability)
-VALUES ($1, 'image-generation')`, id); err != nil {
+VALUES ($1, 'generation')`, id); err != nil {
 		t.Fatalf("create test channel capability failed: %v", err)
 	}
 	return id

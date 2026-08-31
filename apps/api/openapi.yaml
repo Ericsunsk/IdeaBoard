@@ -122,13 +122,16 @@ paths:
               properties:
                 images:
                   type: array
-                  minItems: 1
                   maxItems: 4
                   items: { type: string, format: binary }
                 library_asset_ids:
                   type: array
                   maxItems: 4
                   items: { type: integer, format: int64, minimum: 1 }
+                external_references:
+                  type: array
+                  maxItems: 4
+                  items: { type: string }
                 user_text:
                   type: string
                   maxLength: 200
@@ -4294,25 +4297,25 @@ components:
     WorkflowFeatureSlug:
       type: string
       enum:
-        - prompt-generation
+        - generation
         - inpaint
         - cutout
-        - style-fusion
+        - fusion
         - render
         - variations
-        - hd-upscale
+        - upscale
         - outpaint
 
     CanonicalWorkflowFeatureSlug:
       type: string
       enum:
-        - prompt-generation
+        - generation
         - inpaint
         - cutout
-        - style-fusion
+        - fusion
         - render
         - variations
-        - hd-upscale
+        - upscale
         - outpaint
 
     GenerationPrimitive:
@@ -4364,10 +4367,10 @@ components:
           $ref: '#/components/schemas/VariationsParams'
         outpaint:
           $ref: '#/components/schemas/OutpaintParams'
-        hd:
-          $ref: '#/components/schemas/HDUpscaleParams'
+        upscale:
+          $ref: '#/components/schemas/UpscaleParams'
         fusion:
-          $ref: '#/components/schemas/StyleFusionParams'
+          $ref: '#/components/schemas/FusionParams'
 
     WorkflowTaskParams:
       type: object
@@ -4386,10 +4389,10 @@ components:
           $ref: '#/components/schemas/VariationsParams'
         outpaint:
           $ref: '#/components/schemas/OutpaintParams'
-        hd:
-          $ref: '#/components/schemas/HDUpscaleParams'
+        upscale:
+          $ref: '#/components/schemas/UpscaleParams'
         fusion:
-          $ref: '#/components/schemas/StyleFusionParams'
+          $ref: '#/components/schemas/FusionParams'
         extra:
           type: object
           additionalProperties: true
@@ -4479,7 +4482,7 @@ components:
           type: integer
           minimum: 0
 
-    HDUpscaleParams:
+    UpscaleParams:
       type: object
       required: [scale]
       additionalProperties: false
@@ -4490,7 +4493,7 @@ components:
           maximum: 4
           multipleOf: 0.1
 
-    StyleFusionParams:
+    FusionParams:
       type: object
       required: [input_weights]
       additionalProperties: false
@@ -5300,7 +5303,8 @@ components:
         capabilities:
           type: array
           minItems: 1
-          items: { type: string }
+          items:
+            $ref: '#/components/schemas/ProviderCapability'
         name: { type: string }
         base_url: { type: string }
         api_key_configured: { type: boolean }
@@ -5316,8 +5320,7 @@ components:
           $ref: '#/components/schemas/ProviderAPIType'
         protocol: { type: string }
         capability:
-          type: string
-          enum: [background-removal, image-upscale, image-fill]
+          $ref: '#/components/schemas/ProviderProcessingCapability'
         api_key: { type: string, writeOnly: true }
         name: { type: string }
         base_url: { type: string }
@@ -5335,6 +5338,14 @@ components:
       type: string
       enum: [openai-compatible, self-hosted, google-ai, google-cloud]
 
+    ProviderCapability:
+      type: string
+      enum: [generation, cutout, upscale, fill]
+
+    ProviderProcessingCapability:
+      type: string
+      enum: [cutout, upscale, fill]
+
     ProviderEndpointProtocol:
       type: object
       required: [id, capabilities]
@@ -5342,7 +5353,8 @@ components:
         id: { type: string }
         capabilities:
           type: array
-          items: { type: string }
+          items:
+            $ref: '#/components/schemas/ProviderCapability'
 
     ProviderEndpointRegistry:
       type: object

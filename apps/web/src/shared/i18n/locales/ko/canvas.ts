@@ -2,13 +2,13 @@
 export default {
   // Key = camelCased feature slug so copy lookup derives from the slug itself.
   features: {
-    promptGeneration: '텍스트 투 이미지',
+    generation: '텍스트 투 이미지',
     inpaint: '인페인팅',
     render: '렌더',
     variations: '변형',
     cutout: '컷아웃',
-    styleFusion: '이미지 퓨전',
-    hdUpscale: '업스케일',
+    fusion: '이미지 퓨전',
+    upscale: '업스케일',
     outpaint: '아웃페인트',
   },
   imageAction: {

@@ -70,7 +70,7 @@ function createPublicHarness(transport: PendingImageWorkflowTaskTransport) {
     readCanvasGraphStore: () => graphSession.store,
     rendererMetrics,
     boardBaseSnapshot: ref(base),
-    executionWorkspace: { state: { executionCore: core, isNodeRunning: (id) => core.captureActiveLeases([id]).length > 0 }, commands: { runPromptGeneration: vi.fn(), hydratePendingImageLeases: vi.fn(), reattachPendingImageResults: vi.fn() } },
+    executionWorkspace: { state: { executionCore: core, isNodeRunning: (id) => core.captureActiveLeases([id]).length > 0 }, commands: { runGeneration: vi.fn(), hydratePendingImageLeases: vi.fn(), reattachPendingImageResults: vi.fn() } },
     cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(), taskTransport: transport,
   })
   return { core, execution, flushAutosave, markDirty, nodes }
@@ -118,7 +118,7 @@ describe('useFlowImageWorkflowExecution', () => {
       nodes: ref([]), edges: ref([]), readCanvasGraphStore: () => graphSession.store,
       rendererMetrics,
       boardBaseSnapshot: ref(createEmptyCanvasBoardSnapshot()),
-      executionWorkspace: { state: { executionCore: core, isNodeRunning: () => false }, commands: { runPromptGeneration: vi.fn(), hydratePendingImageLeases: vi.fn(), reattachPendingImageResults: vi.fn() } },
+      executionWorkspace: { state: { executionCore: core, isNodeRunning: () => false }, commands: { runGeneration: vi.fn(), hydratePendingImageLeases: vi.fn(), reattachPendingImageResults: vi.fn() } },
       cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(),
       taskTransport: { assertReady, submit: vi.fn(), resolve: vi.fn() },
     })
@@ -215,7 +215,7 @@ describe('useFlowImageWorkflowExecution', () => {
     core.attachBoard(CanvasBoardGraphSession.create('board-a', {
       graphSession,
     }))
-    const workspace = { state: { executionCore: core, isNodeRunning: () => false }, commands: { runPromptGeneration: vi.fn(), hydratePendingImageLeases: vi.fn(), reattachPendingImageResults: vi.fn() } }
+    const workspace = { state: { executionCore: core, isNodeRunning: () => false }, commands: { runGeneration: vi.fn(), hydratePendingImageLeases: vi.fn(), reattachPendingImageResults: vi.fn() } }
     const execution = useFlowImageWorkflowExecution({
       nodes: ref([]), edges: ref([]), readCanvasGraphStore: () => graphSession.store,
       rendererMetrics,
@@ -223,10 +223,10 @@ describe('useFlowImageWorkflowExecution', () => {
       executionWorkspace: workspace, cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(),
       taskTransport: { assertReady: vi.fn(), submit: vi.fn(), resolve: vi.fn() },
     })
-    const plan = { kind: 'prompt-generation', activationId: 'prompt', sourceNodeId: 'prompt-1', source: { url: '', ratio: 1 }, referenceImages: [], prompt: 'draw', outputCount: 1, aspectRatio: 'auto', resultOptions: {} } as never
+    const plan = { kind: 'generation', activationId: 'prompt', sourceNodeId: 'prompt-1', source: { url: '', ratio: 1 }, referenceImages: [], prompt: 'draw', outputCount: 1, aspectRatio: 'auto', resultOptions: {} } as never
     await execution.executeImageWorkflow(plan)
     await execution.reattachPendingImageResults()
-    expect(workspace.commands.runPromptGeneration).toHaveBeenCalledWith(plan)
+    expect(workspace.commands.runGeneration).toHaveBeenCalledWith(plan)
     expect(workspace.commands.reattachPendingImageResults).toHaveBeenCalledOnce()
   })
 })

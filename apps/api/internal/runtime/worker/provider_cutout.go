@@ -18,8 +18,8 @@ import (
 	"ideaboard/api/internal/platform/safehttp"
 )
 
-// callBackgroundRemoval posts the image-url-json-to-image contract.
-func (c *ProviderExecutor) callBackgroundRemoval(
+// callCutout posts the image-url-json-to-image contract.
+func (c *ProviderExecutor) callCutout(
 	ctx context.Context,
 	account *accounts.ApiAccount,
 	request providerRequest,
@@ -32,10 +32,10 @@ func (c *ProviderExecutor) callBackgroundRemoval(
 	return c.callImageURLJSONImage(ctx, account, map[string]interface{}{"image_url": inputURL}, timeout, "抠图")
 }
 
-// callImageUpscale posts the dedicated Modal upscale contract. The prompt,
+// callUpscale posts the dedicated Modal upscale contract. The prompt,
 // output count and output resolution are intentionally absent from this
 // payload: the endpoint transforms one source image into one result.
-func (c *ProviderExecutor) callImageUpscale(
+func (c *ProviderExecutor) callUpscale(
 	ctx context.Context,
 	account *accounts.ApiAccount,
 	request providerRequest,
@@ -44,7 +44,7 @@ func (c *ProviderExecutor) callImageUpscale(
 	if len(request.ImageRefs) == 0 || strings.TrimSpace(request.ImageRefs[0]) == "" {
 		return providerCallResult{}, fmt.Errorf("高清放大请求缺少原图")
 	}
-	// HD is a single-image transform. It must not silently fall back to a
+	// Upscale is a single-image transform. It must not silently fall back to a
 	// canvas/original reference when the ordered input list is absent.
 	request.CanvasRef = ""
 	inputURL, err := c.imageTransformInputURL(request, "高清放大")

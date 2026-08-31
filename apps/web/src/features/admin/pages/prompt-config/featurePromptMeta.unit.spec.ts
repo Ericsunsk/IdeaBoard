@@ -27,13 +27,13 @@ describe('featurePromptMeta', () => {
         key: 'prompt',
         title: 'Prompt',
         order: 20,
-        slugs: [WORKFLOW_FEATURE.promptGeneration],
+        slugs: [WORKFLOW_FEATURE.generation],
       },
       {
         key: 'fusion',
         title: 'Fusion',
         order: 30,
-        slugs: [WORKFLOW_FEATURE.styleFusion],
+        slugs: [WORKFLOW_FEATURE.fusion],
       },
     ])
     expect(featureMap[WORKFLOW_FEATURE.render]).toEqual({

@@ -106,7 +106,7 @@ IDEABOARD_STACK_DIR="$PWD" ./scripts/deploy-stack.sh update \
   --manifest release-manifest.json
 ```
 
-默认生产入口是宿主机反代服务，当前用 `ideaboard nginx-conf /tmp/ideaboard.nginx.conf` 生成 API 域名的 Nginx 配置。默认 upstream 是 `127.0.0.1:6000/6001`，默认 `server_name _` 兼容现有部署；如需明确域名，可在 `docker/.env` 设置 `NGINX_SERVER_NAME=api.example.com` 后重新生成配置。如果宿主机反代服务已能稳定直连 Docker bridge，可在 `docker/.env` 设置 `NGINX_API_UPSTREAM` / `NGINX_AUTH_UPSTREAM` 后重新生成配置。Cloudflare `Proxied` API 域名启用源站 allowlist 后，可用 `ideaboard cloudflare-real-ip-conf /tmp/cloudflare-real-ip.conf` 生成真实客户端 IP include。
+默认生产入口是宿主机反代服务，当前用 `ideaboard nginx-conf /tmp/ideaboard.nginx.conf` 生成 `ideaboard.art` Gateway 的 Nginx 配置。默认 upstream 是 `127.0.0.1:6000/6001`；生产环境设置 `NGINX_SERVER_NAME=ideaboard.art` 后重新生成配置。如果宿主机反代服务已能稳定直连 Docker bridge，可在 `docker/.env` 设置 `NGINX_API_UPSTREAM` / `NGINX_AUTH_UPSTREAM` 后重新生成配置。Cloudflare `Proxied` Gateway 启用源站 allowlist 后，可用 `ideaboard cloudflare-real-ip-conf /tmp/cloudflare-real-ip.conf` 生成真实客户端 IP include。
 
 使用 Nginx Proxy Manager 时，不要直接修改 `compose.yml`。先确保 external network 已存在：
 
@@ -164,4 +164,4 @@ docker compose -f compose.local.yml up -d
 2. `apps/api/.env` 使用 API runtime credential，`apps/auth/.env` 使用 Auth runtime credential；两个 migration command 才使用固定 owner `ideaboard` 与 `POSTGRES_PASSWORD`。
 3. owner、API runtime、Auth runtime 三个 roles 必须不同；本地旧 volume 没有 runtime roles 时，重建开发 volume。
 
-> 说明：`APP_BASE_URL` 和 `API_BASE_URL` 是唯一的公开 Origin 配置。API 使用 `APP_BASE_URL` 生成浏览器跳转与分享链接，使用 `API_BASE_URL` 生成 Stripe Webhook 与本地上传素材地址；Auth 使用由 `API_BASE_URL` 派生的 `BETTER_AUTH_URL`。两者缺失或不是纯 http(s) Origin 时，API 会拒绝启动。`DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` 只提供给一次性的 migration command/container，不进入长期运行的 API/Auth container；本地命令从 `docker/migration.env.example` 创建已被 Git 忽略的 `docker/migration.env`。
+> 说明：`APP_BASE_URL` 是浏览器跳转、分享链接和同域 Gateway 的公开 Origin；`API_BASE_URL` 仅用于 Stripe Webhook 及服务间 API 地址，不能再作为浏览器或本地上传素材的公开地址。浏览器统一访问 `ideaboard.art` 的 `/api/**`、`/api/auth/**` 和 `/uploads/**`。两者缺失或不是纯 http(s) Origin 时，API 会拒绝启动。`DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` 只提供给一次性的 migration command/container，不进入长期运行的 API/Auth container；本地命令从 `docker/migration.env.example` 创建已被 Git 忽略的 `docker/migration.env`。

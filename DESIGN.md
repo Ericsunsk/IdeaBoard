@@ -68,9 +68,8 @@ Canvas 术语以 [apps/web/src/features/canvas/CONTEXT.md](./apps/web/src/featur
 | `variations` | 风格延展 |
 | `inpaint` | 局部重绘 |
 | `cutout` | 抠图 |
-| `style-fusion` | 多图融合 |
-| `pattern-gen` | 图案生成 |
-| `hd-upscale` | HD |
+| `fusion` | 多图融合 |
+| `upscale` | 放大 |
 | `outpaint` | 扩图 |
 
 Contract rules:

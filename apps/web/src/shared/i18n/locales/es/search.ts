@@ -8,10 +8,8 @@ export default {
   loadingMore: 'Cargando más inspiración',
   allLoaded: 'Toda la inspiración disponible cargada',
   queryTooLong: 'La palabra clave de búsqueda no puede superar los 200 caracteres',
-  preparingReferences: 'Preparando imágenes de referencia, espere',
   stillProcessing: 'La búsqueda aún se está procesando. Inténtelo de nuevo en un momento.',
   invalidVisionResult: 'La Búsqueda Visual devolvió un resultado no válido. Inténtelo de nuevo.',
-  referenceNotUsable: 'Esta imagen no se puede utilizar como referencia de búsqueda. Inténtelo de nuevo.',
   priceFree: 'Gratis',
   priceUnavailable: 'El precio de la Búsqueda Visual no está disponible en este momento',
   loadFailed: 'No se pudo buscar inspiración',
@@ -71,7 +69,6 @@ export default {
     default: 'Inspiración del momento',
   },
   buttons: {
-    preparingReferences: 'Preparando referencias',
     searching: 'Buscando',
     search: 'Buscar',
     searchWithPrice: 'Buscar · {price}',

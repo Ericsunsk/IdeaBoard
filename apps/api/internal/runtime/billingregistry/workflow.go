@@ -15,14 +15,14 @@ type workflowPresentation struct {
 }
 
 var workflowPresentations = map[string]workflowPresentation{
-	workflow.FeatureSlugPromptGeneration: {displayName: "Prompt to Image", description: "Generate images from text with optional reference images."},
-	workflow.FeatureSlugInpaint:          {displayName: "Inpaint", description: "Repaint only the selected area of an image."},
-	workflow.FeatureSlugRender:           {displayName: "Render", description: "Turn a sketch into a full image."},
-	workflow.FeatureSlugVariations:       {displayName: "Variations", description: "Create same-style variations of an image."},
-	workflow.FeatureSlugCutout:           {displayName: "Cutout", description: "Detect the subject and remove the background."},
-	workflow.FeatureSlugStyleFusion:      {displayName: "Image Fusion", description: "Blend content and style from multiple reference images."},
-	workflow.FeatureSlugHDUpscale:        {displayName: "Upscale", description: "Increase image resolution and detail."},
-	workflow.FeatureSlugOutpaint:         {displayName: "Outpaint", description: "Extend the image beyond its edges."},
+	workflow.FeatureSlugGeneration: {displayName: "Prompt to Image", description: "Generate images from text with optional reference images."},
+	workflow.FeatureSlugInpaint:    {displayName: "Inpaint", description: "Repaint only the selected area of an image."},
+	workflow.FeatureSlugRender:     {displayName: "Render", description: "Turn a sketch into a full image."},
+	workflow.FeatureSlugVariations: {displayName: "Variations", description: "Create same-style variations of an image."},
+	workflow.FeatureSlugCutout:     {displayName: "Cutout", description: "Detect the subject and remove the background."},
+	workflow.FeatureSlugFusion:     {displayName: "Image Fusion", description: "Blend content and style from multiple reference images."},
+	workflow.FeatureSlugUpscale:    {displayName: "Upscale", description: "Increase image resolution and detail."},
+	workflow.FeatureSlugOutpaint:   {displayName: "Outpaint", description: "Extend the image beyond its edges."},
 }
 
 // WorkflowItems adapts Workflow's canonical executable features to the

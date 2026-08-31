@@ -11,7 +11,7 @@ import {
 } from './imageWorkflowCommandRuntime'
 
 const generationPlan = {
-  kind: 'prompt-generation',
+  kind: 'generation',
   sourceNodeId: 'prompt-1',
   source: { url: '', ratio: 1 },
   referenceImages: [],
@@ -26,8 +26,8 @@ function createCommandHarness(isGenerationAvailable = () => true) {
     planImageDirectAction: vi.fn(() => generationPlan),
     planOutpaintAction: vi.fn(() => generationPlan),
     planImageInpaintAction: vi.fn(() => generationPlan),
-    planPromptGeneration: vi.fn(() => generationPlan),
-    planFusionPromptGeneration: vi.fn(() => generationPlan),
+    planGeneration: vi.fn(() => generationPlan),
+    planFusionGeneration: vi.fn(() => generationPlan),
   }
   const workflow: ImageWorkflowExecutionPort = {
     executeImageWorkflow: vi.fn(async () => undefined),
@@ -54,10 +54,10 @@ describe('imageWorkflowCommandRuntime', () => {
   it('disables generation commands without touching status-only runtime APIs', async () => {
     const { commands, planner, workflow, onWarning } = createCommandHarness(() => false)
 
-    await commands.runPromptGeneration('prompt-1', [], 'keep this local draft', 1, 'auto')
+    await commands.runGeneration('prompt-1', [], 'keep this local draft', 1, 'auto')
 
     expect(commands.isGenerationAvailable()).toBe(false)
-    expect(planner.planPromptGeneration).not.toHaveBeenCalled()
+    expect(planner.planGeneration).not.toHaveBeenCalled()
     expect(workflow.executeImageWorkflow).not.toHaveBeenCalled()
     expect(onWarning).toHaveBeenCalledWith('生成服务暂不可用，请稍后重试')
 
@@ -68,8 +68,8 @@ describe('imageWorkflowCommandRuntime', () => {
   it('assigns a distinct activation identity to each deliberate prompt generation', async () => {
     const { commands, workflow } = createCommandHarness()
 
-    await commands.runPromptGeneration('prompt-1', [], 'draft', 1, 'auto')
-    await commands.runPromptGeneration('prompt-1', [], 'draft', 1, 'auto')
+    await commands.runGeneration('prompt-1', [], 'draft', 1, 'auto')
+    await commands.runGeneration('prompt-1', [], 'draft', 1, 'auto')
 
     const [firstPlan, secondPlan] = (
       workflow.executeImageWorkflow as ReturnType<typeof vi.fn>

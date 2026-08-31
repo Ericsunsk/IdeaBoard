@@ -17,7 +17,7 @@ export type CanvasNodePresentationIntent =
     }
   | { type: 'media-input-remove-requested'; nodeId: string; imageId: string }
   | {
-      type: 'prompt-generation-requested'
+      type: 'generation-requested'
       nodeId: string
       prompt: string
       outputCount: number

@@ -133,7 +133,7 @@ describe('ImageExecutionPlan', () => {
       ],
     }))
 
-    const plan = planner.planFusionPromptGeneration('fusion-1', '', 4, '16:9')
+    const plan = planner.planFusionGeneration('fusion-1', '', 4, '16:9')
 
     expect(plan.kind).toBe('fusion')
     expect(plan.outputCount).toBe(4)
@@ -144,7 +144,7 @@ describe('ImageExecutionPlan', () => {
       'https://example.com/external.png',
       'https://example.com/source.png',
     ])
-    expect(plan.taskPrompt).toBe('[style-fusion] soft light\nlinen texture')
+    expect(plan.taskPrompt).toBe('[fusion] soft light\nlinen texture')
     expect(plan.source).toEqual({ url: 'https://example.com/b.png', ratio: 2 })
     expect(plan.resultOptions.anchor).toEqual({
       x: 100,
@@ -153,7 +153,7 @@ describe('ImageExecutionPlan', () => {
       outputAnchorNodeId: 'fusion-1',
     })
 
-    expect(() => planner.planFusionPromptGeneration('fusion-1', '', 9, '16:9')).toThrow(
+    expect(() => planner.planFusionGeneration('fusion-1', '', 9, '16:9')).toThrow(
       'Invalid number of images.',
     )
   })
@@ -236,7 +236,7 @@ describe('ImageExecutionPlan', () => {
     ).toThrow('Mark the area to inpaint first.')
   })
 
-  it('plans image-fill actions as single-output tasks without inpaint references', () => {
+  it('plans fill actions as single-output tasks without inpaint references', () => {
     const planner = createImageExecutionPlanner(() => ({
       nodes: [
         {
@@ -296,7 +296,7 @@ describe('ImageExecutionPlan', () => {
       edges: [],
     }))
 
-    const textPlan = planner.planPromptGeneration('prompt-1', [], 'generate', 1, 'bad' as never)
+    const textPlan = planner.planGeneration('prompt-1', [], 'generate', 1, 'bad' as never)
 
     expect(textPlan.aspectRatio).toBe('auto')
     expect(textPlan.resultOptions.anchor).toEqual({
@@ -352,7 +352,7 @@ describe('ImageExecutionPlan', () => {
       ],
     }))
 
-    const plan = planner.planFusionPromptGeneration('fusion-1', 'blend', 1, '16:9')
+    const plan = planner.planFusionGeneration('fusion-1', 'blend', 1, '16:9')
     const prepared = prepareFusionExecutionPlan(plan, [
       { width: 1000, height: 1000 },
       { width: 1600, height: 900 },

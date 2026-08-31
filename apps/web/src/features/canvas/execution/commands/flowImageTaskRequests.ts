@@ -4,7 +4,7 @@ import type {
   ImageActionExecutionPlan,
   ImageInpaintExecutionPlan,
   ImageExecutionInput,
-  PromptGenerationExecutionPlan,
+  GenerationExecutionPlan,
   PreparedFusionExecutionPlan,
 } from '../planning/ImageExecutionPlan'
 import { resolveOutpaintPixelGeometry, type OutpaintRect } from '../../utils/outpaintGeometry'
@@ -26,9 +26,9 @@ import type { PromptAspectRatio } from '../../../canvas-board/domain'
 import { i18n } from '../../../../shared/i18n'
 import {
   IMAGE_OUTPAINT_ACTION,
-  IMAGE_HD_UPSCALE_ACTION,
+  IMAGE_UPSCALE_ACTION,
   isImageDirectTaskAction,
-  resolveHdScale,
+  resolveUpscaleScale,
   requireImageActionExecution,
   type ImageDirectTaskAction,
   type ImageExecutionAction,
@@ -132,14 +132,14 @@ export function buildOutpaintReadinessRequest(): SubmitTaskData {
   })
 }
 
-function buildHdUpscaleReadinessRequest(): SubmitTaskData {
-  const execution = requireImageActionExecution(IMAGE_HD_UPSCALE_ACTION)
+function buildUpscaleReadinessRequest(): SubmitTaskData {
+  const execution = requireImageActionExecution(IMAGE_UPSCALE_ACTION)
   return buildExecutionTaskRequest({
     prompt: '',
     feature: execution.feature,
     params: {
-      hd: {
-        scale: resolveHdScale(),
+      upscale: {
+        scale: resolveUpscaleScale(),
       },
     },
   })
@@ -150,12 +150,12 @@ export function buildImageActionReadinessRequest(
   options: ImageActionReadinessOptions = {},
 ): SubmitTaskData {
   if (action === IMAGE_OUTPAINT_ACTION) return buildOutpaintReadinessRequest()
-  if (action === IMAGE_HD_UPSCALE_ACTION) return buildHdUpscaleReadinessRequest()
+  if (action === IMAGE_UPSCALE_ACTION) return buildUpscaleReadinessRequest()
   if (isImageDirectTaskAction(action)) return buildDirectActionReadinessRequest(action, options)
   throw new Error(`Unsupported image execution action ${action}`)
 }
 
-export function buildPromptGenerationTaskRequest(input: {
+export function buildGenerationTaskRequest(input: {
   prompt: string
   aspectRatio: PromptAspectRatio
   imageUrls?: string[]
@@ -167,7 +167,7 @@ export function buildPromptGenerationTaskRequest(input: {
   const outputCount = assertRequestedOutputCount(input.outputCount)
   return buildExecutionTaskRequest({
     prompt: `${input.prompt ?? ''}`.trim(),
-    feature: EXECUTION_META[EXECUTION_FEATURE.promptGeneration].feature,
+    feature: EXECUTION_META[EXECUTION_FEATURE.generation].feature,
     imageUrls: input.imageUrls,
     imageAssetIds: input.imageAssetIds,
     referenceImageAssetIds: input.referenceImageAssetIds,
@@ -274,7 +274,7 @@ export function buildOutpaintTaskRequest(input: {
   })
 }
 
-export function buildHdUpscaleTaskRequest(input: {
+export function buildUpscaleTaskRequest(input: {
   source: ImageExecutionInput
   imageSize: ExecutionImageSize | null
   prompt: string
@@ -283,7 +283,7 @@ export function buildHdUpscaleTaskRequest(input: {
   outputResolution?: OutputResolution
 }): SubmitTaskData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
-  const execution = requireImageActionExecution(IMAGE_HD_UPSCALE_ACTION)
+  const execution = requireImageActionExecution(IMAGE_UPSCALE_ACTION)
   return buildExecutionTaskRequest({
     prompt: '',
     feature: execution.feature,
@@ -291,8 +291,8 @@ export function buildHdUpscaleTaskRequest(input: {
     imageAssetIds: input.source.mediaAssetId ? [input.source.mediaAssetId] : undefined,
     params: {
       ...buildExecutionSizeParams(input.imageSize, input.imageSize),
-      hd: {
-        scale: resolveHdScale(input.strength),
+      upscale: {
+        scale: resolveUpscaleScale(input.strength),
       },
     },
   })
@@ -322,7 +322,7 @@ export function buildFusionTaskRequest(input: FusionTaskRequestInput): SubmitTas
 type ImageExecutionTaskRequestPlan =
   | ImageActionExecutionPlan
   | OutpaintExecutionPlan
-  | PromptGenerationExecutionPlan
+  | GenerationExecutionPlan
   | PreparedFusionExecutionPlan
 
 export function buildImageExecutionTaskRequest(
@@ -331,8 +331,8 @@ export function buildImageExecutionTaskRequest(
 ): SubmitTaskData {
   switch (plan.kind) {
     case 'image-action':
-      if (plan.action === IMAGE_HD_UPSCALE_ACTION) {
-        return buildHdUpscaleTaskRequest({
+      if (plan.action === IMAGE_UPSCALE_ACTION) {
+        return buildUpscaleTaskRequest({
           source: plan.source,
           imageSize,
           prompt: plan.prompt,
@@ -361,8 +361,8 @@ export function buildImageExecutionTaskRequest(
         originalImageRect: plan.originalImageRect,
         prompt: plan.prompt,
       })
-    case 'prompt-generation':
-      return buildPromptGenerationTaskRequest({
+    case 'generation':
+      return buildGenerationTaskRequest({
         prompt: plan.prompt,
         aspectRatio: plan.aspectRatio,
         imageUrls: plan.referenceImages.some((image) => !image.mediaAssetId)

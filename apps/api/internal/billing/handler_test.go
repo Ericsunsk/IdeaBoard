@@ -164,8 +164,8 @@ func TestAdminBillableCatalogReturnsFeatureCardContract(t *testing.T) {
 		},
 		{
 			BillableItemDefinition: BillableItemDefinition{
-				SKU: "ai-image:hd-upscale", Namespace: "ai-image", ProductKind: "workflow-feature",
-				DisplayName: "HD", SortOrder: 30,
+				SKU: "ai-image:upscale", Namespace: "ai-image", ProductKind: "workflow-feature",
+				DisplayName: "Upscale", SortOrder: 30,
 			},
 			Status: BillableItemStatusDisabled, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolution1K: price},
 		},

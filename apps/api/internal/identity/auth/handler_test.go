@@ -97,6 +97,18 @@ func TestGetCurrentUserReturnsPublicIdentity(t *testing.T) {
 	}
 }
 
+func TestCanonicalProfileAvatarURLKeepsExternalIdentityAndHidesUploadOrigin(t *testing.T) {
+	if got := canonicalProfileAvatarURL("https://ideaboard.art/uploads/profile/U1/avatar/a.webp"); got != "/api/user/profile/avatar/content" {
+		t.Fatalf("uploaded avatar URL = %q", got)
+	}
+	if got := canonicalProfileAvatarURL("https://lh3.googleusercontent.com/avatar"); got != "https://lh3.googleusercontent.com/avatar" {
+		t.Fatalf("external avatar URL = %q", got)
+	}
+	if got := canonicalProfileAvatarURL("https://cdn.example.com/uploads/profile/U1/avatar/a.webp"); got != "https://cdn.example.com/uploads/profile/U1/avatar/a.webp" {
+		t.Fatalf("untrusted upload URL = %q", got)
+	}
+}
+
 func serveAuthRequest(t *testing.T, router http.Handler) *httptest.ResponseRecorder {
 	t.Helper()
 

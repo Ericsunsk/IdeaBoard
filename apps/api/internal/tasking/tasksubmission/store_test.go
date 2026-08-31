@@ -46,7 +46,7 @@ func TestStoreRejectsUnpreparedGenerationMediaBeforeTaskInsert(t *testing.T) {
 	ctx := t.Context()
 	db, pool := testdb.OpenWithPool(t)
 	canonical, err := NewCanonicalRequest(CanonicalRequestInput{
-		UserID: 42, Prompt: "draw", UserPrompt: "draw", Params: `{"schema_version":4}`,
+		UserID: 42, Prompt: "draw", UserPrompt: "draw", Params: `{"schema_version":5}`,
 		Feature: "test-non-billable", ClientActionID: "unprepared-media",
 		Generation: &tasks.GenerationRequestSnapshot{
 			SchemaVersion: tasks.CurrentParamsSchemaVersion, Feature: "test-non-billable", Primitive: "image-to-image",

@@ -226,7 +226,7 @@ describe('FlowCanvasNode prompt rendering', () => {
 
     expect(view.emitted('node-intent')).toContainEqual([
       {
-        type: 'prompt-generation-requested',
+        type: 'generation-requested',
         nodeId: 'prompt-1',
         prompt: 'A benchmark prompt',
         outputCount: 1,

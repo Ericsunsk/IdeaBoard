@@ -2,13 +2,13 @@
 export default {
   // Key = camelCased feature slug so copy lookup derives from the slug itself.
   features: {
-    promptGeneration: 'Prompt to Image',
+    generation: 'Prompt to Image',
     inpaint: 'Inpaint',
     render: 'Render',
     variations: 'Variations',
     cutout: 'Cutout',
-    styleFusion: 'Image Fusion',
-    hdUpscale: 'Upscale',
+    fusion: 'Image Fusion',
+    upscale: 'Upscale',
     outpaint: 'Outpaint',
   },
   imageAction: {

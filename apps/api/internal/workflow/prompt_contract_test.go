@@ -52,8 +52,8 @@ func TestNormalizeStructuredPromptContractParamsNormalizesOutpaintContract(t *te
 
 func TestBuildProviderPromptParamsDerivesProviderFieldsFromNestedContract(t *testing.T) {
 	params := map[string]interface{}{
-		"feature": FeatureSlugHDUpscale,
-		ParamKeyHD: map[string]interface{}{
+		"feature": FeatureSlugUpscale,
+		ParamKeyUpscale: map[string]interface{}{
 			"scale": 2.0,
 		},
 	}
@@ -61,7 +61,7 @@ func TestBuildProviderPromptParamsDerivesProviderFieldsFromNestedContract(t *tes
 	providerParams := BuildProviderPromptParams(params)
 
 	if _, exists := providerParams["scale"]; exists {
-		t.Fatalf("did not expect HD scale to be flattened into provider params: %#v", providerParams)
+		t.Fatalf("did not expect Upscale scale to be flattened into provider params: %#v", providerParams)
 	}
 	if _, exists := params["output_quality"]; exists {
 		t.Fatalf("provider param build should not mutate original params: %#v", params)
@@ -71,7 +71,7 @@ func TestBuildProviderPromptParamsDerivesProviderFieldsFromNestedContract(t *tes
 func TestBuildProviderTaskParamsDerivesProviderMapFromCanonicalContract(t *testing.T) {
 	useMask := true
 	params := &tasks.WorkflowTaskParams{
-		Feature: FeatureSlugStyleFusion,
+		Feature: FeatureSlugFusion,
 		Media: &tasks.MediaInputs{
 			Inputs: []tasks.MediaRef{
 				{AssetID: 1, Role: "input", Weight: 0.7},
@@ -87,7 +87,7 @@ func TestBuildProviderTaskParamsDerivesProviderMapFromCanonicalContract(t *testi
 			Ratio:        "4:3",
 			OutputCount:  2,
 		},
-		Fusion: &tasks.StyleFusionParams{
+		Fusion: &tasks.FusionParams{
 			Mode:         "weighted_reference",
 			InputWeights: []float64{0.7, 0.3},
 		},
@@ -105,8 +105,8 @@ func TestBuildProviderTaskParamsDerivesProviderMapFromCanonicalContract(t *testi
 
 	providerParams := BuildProviderTaskParams(params, runtimeMedia)
 
-	if got := providerParams["feature"]; got != FeatureSlugStyleFusion {
-		t.Fatalf("feature = %#v, want style-fusion", got)
+	if got := providerParams["feature"]; got != FeatureSlugFusion {
+		t.Fatalf("feature = %#v, want fusion", got)
 	}
 	if !reflect.DeepEqual(providerParams["image_urls"], []string{"https://img.example/a.png", "https://img.example/b.png"}) {
 		t.Fatalf("image_urls = %#v", providerParams["image_urls"])
@@ -175,28 +175,28 @@ func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 			},
 		},
 		{
-			name: "hd upscale",
+			name: "upscale",
 			params: &tasks.WorkflowTaskParams{
-				Feature: FeatureSlugHDUpscale,
-				HD:      &tasks.HDUpscaleParams{Scale: 2},
+				Feature: FeatureSlugUpscale,
+				Upscale: &tasks.UpscaleParams{Scale: 2},
 			},
 			want: map[string]interface{}{
-				"feature": FeatureSlugHDUpscale,
-				"hd":      map[string]interface{}{"scale": float64(2)},
+				"feature": FeatureSlugUpscale,
+				"upscale": map[string]interface{}{"scale": float64(2)},
 			},
 			wantAbsent: []string{"scale", "output_quality"},
 		},
 		{
 			name: "style fusion",
 			params: &tasks.WorkflowTaskParams{
-				Feature: FeatureSlugStyleFusion,
-				Fusion: &tasks.StyleFusionParams{
+				Feature: FeatureSlugFusion,
+				Fusion: &tasks.FusionParams{
 					Mode:         "weighted_reference",
 					InputWeights: []float64{0.8, 0.2},
 				},
 			},
 			want: map[string]interface{}{
-				"feature":              FeatureSlugStyleFusion,
+				"feature":              FeatureSlugFusion,
 				"fusion":               map[string]interface{}{"mode": "weighted_reference", "input_weights": []float64{0.8, 0.2}},
 				"fusion_input_weights": []float64{0.8, 0.2},
 			},
@@ -204,11 +204,11 @@ func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 		{
 			name: "prompt generation workflow",
 			params: &tasks.WorkflowTaskParams{
-				Feature: FeatureSlugPromptGeneration,
+				Feature: FeatureSlugGeneration,
 				Extra:   map[string]interface{}{"provider_hint": "keep"},
 			},
 			want: map[string]interface{}{
-				"feature":       FeatureSlugPromptGeneration,
+				"feature":       FeatureSlugGeneration,
 				"provider_hint": "keep",
 			},
 		},
@@ -231,7 +231,7 @@ func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 	}
 }
 
-func TestReadStyleFusionPromptContractReadsWeights(t *testing.T) {
+func TestReadFusionPromptContractReadsWeights(t *testing.T) {
 	params := map[string]interface{}{
 		ParamKeyFusion: map[string]interface{}{
 			"mode":          "weighted_reference",
@@ -239,9 +239,9 @@ func TestReadStyleFusionPromptContractReadsWeights(t *testing.T) {
 		},
 	}
 
-	contract, ok := ReadStyleFusionPromptContract(params)
+	contract, ok := ReadFusionPromptContract(params)
 	if !ok {
-		t.Fatal("ReadStyleFusionPromptContract returned false")
+		t.Fatal("ReadFusionPromptContract returned false")
 	}
 	weights := contract.InputWeights
 	if len(weights) != 2 || weights[0] != 0.6 || weights[1] != 0.4 {

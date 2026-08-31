@@ -19,8 +19,8 @@ const mocks = vi.hoisted(() => {
       planImageDirectAction: vi.fn(() => plan),
       planOutpaintAction: vi.fn(() => plan),
       planImageInpaintAction: vi.fn(() => plan),
-      planPromptGeneration: vi.fn(() => plan),
-      planFusionPromptGeneration: vi.fn(() => plan),
+      planGeneration: vi.fn(() => plan),
+      planFusionGeneration: vi.fn(() => plan),
     },
     execution: {
       executeImageWorkflow: vi.fn(async () => undefined),
@@ -211,7 +211,7 @@ describe('useCanvasImageWorkflow', () => {
     handlers.onFlowPromptGenerate('prompt-1', 'Draw this', 2, 'unsupported' as never)
     await vi.waitFor(() => expect(mocks.execution.executeImageWorkflow).toHaveBeenCalledOnce())
 
-    expect(mocks.planner.planPromptGeneration).toHaveBeenCalledWith(
+    expect(mocks.planner.planGeneration).toHaveBeenCalledWith(
       'prompt-1',
       [],
       'Draw this',
@@ -246,7 +246,7 @@ describe('useCanvasImageWorkflow', () => {
     handlers.onFlowPromptGenerate('prompt-1', 'Remix', 3, '16:9')
     await vi.waitFor(() => expect(mocks.execution.executeImageWorkflow).toHaveBeenCalledOnce())
 
-    expect(mocks.planner.planPromptGeneration).toHaveBeenCalledWith(
+    expect(mocks.planner.planGeneration).toHaveBeenCalledWith(
       'prompt-1',
       [
         { url: 'https://example.com/linked.png', ratio: 0.5 },
@@ -265,7 +265,7 @@ describe('useCanvasImageWorkflow', () => {
 
     handlers.onFlowPromptGenerate('prompt-1', '', 1, 'auto')
     await vi.waitFor(() => expect(mocks.execution.executeImageWorkflow).toHaveBeenCalledOnce())
-    expect(mocks.planner.planPromptGeneration).toHaveBeenCalledWith('prompt-1', [], '', 1, 'auto')
+    expect(mocks.planner.planGeneration).toHaveBeenCalledWith('prompt-1', [], '', 1, 'auto')
   })
 
   it('keeps Prompt generation disabled during provider degradation', () => {
@@ -281,7 +281,7 @@ describe('useCanvasImageWorkflow', () => {
       expect(feedback.taskExecution.warning).toHaveBeenCalledWith(
       i18n.global.t('canvas.execution.generationUnavailable'),
     )
-      expect(mocks.planner.planPromptGeneration).not.toHaveBeenCalled()
+      expect(mocks.planner.planGeneration).not.toHaveBeenCalled()
       expect(mocks.execution.executeImageWorkflow).not.toHaveBeenCalled()
     } finally {
       vi.clearAllTimers()
@@ -304,7 +304,7 @@ describe('useCanvasImageWorkflow', () => {
     expect(mocks.execution.executeImageWorkflow).not.toHaveBeenCalled()
   })
 
-  it('wires Image Tool Session without exposing image-fill execution internals', () => {
+  it('wires Image Tool Session without exposing fill execution internals', () => {
     const { options, graph, feedback } = createOptions()
     const workflow = useCanvasImageWorkflow(options as never)
 
@@ -334,7 +334,7 @@ describe('useCanvasImageWorkflow', () => {
 
     expect(graph.updateSnapshotNodeParam).toHaveBeenCalledTimes(3)
     expect(graph.markNodeExecutionDirty).toHaveBeenCalledTimes(3)
-    expect(mocks.planner.planFusionPromptGeneration).toHaveBeenCalledWith(
+    expect(mocks.planner.planFusionGeneration).toHaveBeenCalledWith(
       'fusion-1',
       'Blend',
       3,

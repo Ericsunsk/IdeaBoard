@@ -2,11 +2,11 @@ import { normalizePromptAspectRatio } from '../../canvas-board/domain'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
 import type { MediaInputImage } from '../graph-editing/useFlowMediaInputImages'
 
-export type PromptGenerationIntentOptions = {
+export type GenerationIntentOptions = {
   cancelFlowOutpaintMode: () => void
   cancelFlowInpaintMode: () => void
   getMediaInputImages: (nodeId: string) => MediaInputImage[]
-  runPromptGeneration: (
+  runGeneration: (
     nodeId: string,
     referenceImages: readonly { url: string; ratio: number; mediaAssetId?: number }[],
     prompt: string,
@@ -15,7 +15,7 @@ export type PromptGenerationIntentOptions = {
   ) => Promise<void> | void
 }
 
-export function createPromptGenerationIntent(options: PromptGenerationIntentOptions) {
+export function createGenerationIntent(options: GenerationIntentOptions) {
   function onFlowPromptGenerate(
     promptNodeId: string,
     prompt: string,
@@ -26,7 +26,7 @@ export function createPromptGenerationIntent(options: PromptGenerationIntentOpti
     options.cancelFlowInpaintMode()
     const normalizedAspectRatio = normalizePromptAspectRatio(aspectRatio)
     const inputImages = options.getMediaInputImages(promptNodeId)
-    void options.runPromptGeneration(
+    void options.runGeneration(
       promptNodeId,
       inputImages.map((item) => ({
         url: item.url,

@@ -79,7 +79,6 @@ function createSession() {
     },
     vision: {
       references,
-      hasPendingReferences: ref(false),
       state: ref<'idle' | 'extracting' | 'ready'>('idle'),
       buttonTitle: ref('Search'),
       transferReferences: vi.fn(() => {

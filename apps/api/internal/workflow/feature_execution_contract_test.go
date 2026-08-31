@@ -27,10 +27,10 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 		controlContract        RuntimeControlContract
 	}{
 		{
-			feature: FeatureSlugPromptGeneration, promptPolicy: PromptPolicyRequired,
+			feature: FeatureSlugGeneration, promptPolicy: PromptPolicyRequired,
 			outputCountPolicy: OutputCountPolicySelectable, outputResolutionPolicy: OutputResolutionPolicyScalable,
-			capability: RoutingCapabilityImageGeneration, modelRequirement: RoutingModelRequired,
-			operation: RuntimeOperationPromptGeneration, primitive: GenerationPrimitiveTextToImage,
+			capability: RoutingCapabilityGeneration, modelRequirement: RoutingModelRequired,
+			operation: RuntimeOperationGeneration, primitive: GenerationPrimitiveTextToImage,
 			invocation: RuntimeInvocationGenerate, imageInputPolicy: ImageInputOptional,
 			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageForwardWhenPresent,
 			controlContract: RuntimeControlsNone,
@@ -38,7 +38,7 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 		{
 			feature: FeatureSlugInpaint, promptPolicy: PromptPolicyRequired,
 			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
-			capability: RoutingCapabilityImageFill, modelRequirement: RoutingModelNotRequired,
+			capability: RoutingCapabilityFill, modelRequirement: RoutingModelNotRequired,
 			operation: RuntimeOperationInpaint, imageInputCount: 1, hasMaskInput: true, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationTransform, imageInputPolicy: ImageInputRequired,
 			maskInputPolicy: MaskInputRequired, originalImagePolicy: OriginalImageForwardWhenPresent,
@@ -47,7 +47,7 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 		{
 			feature: FeatureSlugRender, promptPolicy: PromptPolicyOptional,
 			outputCountPolicy: OutputCountPolicySelectable, outputResolutionPolicy: OutputResolutionPolicyScalable,
-			capability: RoutingCapabilityImageGeneration, modelRequirement: RoutingModelRequired,
+			capability: RoutingCapabilityGeneration, modelRequirement: RoutingModelRequired,
 			operation: RuntimeOperationRender, imageInputCount: 1, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationEdit, imageInputPolicy: ImageInputRequired,
 			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageForwardWhenPresent,
@@ -56,7 +56,7 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 		{
 			feature: FeatureSlugVariations, promptPolicy: PromptPolicyOptional,
 			outputCountPolicy: OutputCountPolicySelectable, outputResolutionPolicy: OutputResolutionPolicyScalable,
-			capability: RoutingCapabilityImageGeneration, modelRequirement: RoutingModelRequired,
+			capability: RoutingCapabilityGeneration, modelRequirement: RoutingModelRequired,
 			operation: RuntimeOperationVariations, imageInputCount: 1, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationEdit, imageInputPolicy: ImageInputRequired,
 			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageExcluded,
@@ -65,26 +65,26 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 		{
 			feature: FeatureSlugCutout, promptPolicy: PromptPolicyIgnored,
 			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
-			capability: RoutingCapabilityBackgroundRemoval, modelRequirement: RoutingModelNotRequired,
-			operation: RuntimeOperationBackgroundRemoval, imageInputCount: 1, primitive: GenerationPrimitiveImageToImage,
+			capability: RoutingCapabilityCutout, modelRequirement: RoutingModelNotRequired,
+			operation: RuntimeOperationCutout, imageInputCount: 1, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationTransform, imageInputPolicy: ImageInputRequired,
 			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageIgnored,
 			controlContract: RuntimeControlsNone,
 		},
 		{
-			feature: FeatureSlugStyleFusion, promptPolicy: PromptPolicyOptional,
+			feature: FeatureSlugFusion, promptPolicy: PromptPolicyOptional,
 			outputCountPolicy: OutputCountPolicySelectable, outputResolutionPolicy: OutputResolutionPolicyScalable,
-			capability: RoutingCapabilityImageGeneration, modelRequirement: RoutingModelRequired,
-			operation: RuntimeOperationStyleFusion, imageInputCount: 2, primitive: GenerationPrimitiveImageToImage,
+			capability: RoutingCapabilityGeneration, modelRequirement: RoutingModelRequired,
+			operation: RuntimeOperationFusion, imageInputCount: 2, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationEdit, imageInputPolicy: MultipleImageInputsRequired,
 			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageForwardWhenPresent,
 			controlContract: RuntimeControlsFusion,
 		},
 		{
-			feature: FeatureSlugHDUpscale, promptPolicy: PromptPolicyIgnored,
+			feature: FeatureSlugUpscale, promptPolicy: PromptPolicyIgnored,
 			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
-			capability: RoutingCapabilityImageUpscale, modelRequirement: RoutingModelNotRequired,
-			operation: RuntimeOperationImageUpscale, imageInputCount: 1, primitive: GenerationPrimitiveImageToImage,
+			capability: RoutingCapabilityUpscale, modelRequirement: RoutingModelNotRequired,
+			operation: RuntimeOperationUpscale, imageInputCount: 1, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationTransform, imageInputPolicy: ImageInputRequired,
 			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageIgnored,
 			controlContract: RuntimeControlsUpscale,
@@ -92,7 +92,7 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 		{
 			feature: FeatureSlugOutpaint, promptPolicy: PromptPolicyOptional,
 			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
-			capability: RoutingCapabilityImageFill, modelRequirement: RoutingModelNotRequired,
+			capability: RoutingCapabilityFill, modelRequirement: RoutingModelNotRequired,
 			operation: RuntimeOperationOutpaint, imageInputCount: 1, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationTransform, imageInputPolicy: ImageInputRequired,
 			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageForwardWhenPresent,
@@ -204,13 +204,13 @@ func TestCompileFeatureReadinessPlanSuppliesContractValidMediaFacts(t *testing.T
 		images  int
 		hasMask bool
 	}{
-		{feature: FeatureSlugPromptGeneration},
+		{feature: FeatureSlugGeneration},
 		{feature: FeatureSlugInpaint, images: 1, hasMask: true},
 		{feature: FeatureSlugCutout, images: 1},
-		{feature: FeatureSlugStyleFusion, images: 2},
+		{feature: FeatureSlugFusion, images: 2},
 		{feature: FeatureSlugRender, images: 1},
 		{feature: FeatureSlugVariations, images: 1},
-		{feature: FeatureSlugHDUpscale, images: 1},
+		{feature: FeatureSlugUpscale, images: 1},
 		{feature: FeatureSlugOutpaint, images: 1},
 	}
 
@@ -234,7 +234,7 @@ func TestCompileFeatureExecutionPlanAppliesSelectableOutputParams(t *testing.T) 
 	count := 4
 	resolution := " 2K "
 	plan, err := CompileFeatureExecutionPlan(CompileFeatureExecutionInput{
-		Feature: FeatureSlugStyleFusion,
+		Feature: FeatureSlugFusion,
 		Params: FeatureExecutionParams{
 			RequestedOutputCount: &count,
 			OutputResolution:     &resolution,
@@ -255,9 +255,9 @@ func TestCompileFeatureExecutionPlanAppliesSelectableOutputParams(t *testing.T) 
 	}
 }
 
-func TestCompileFeatureExecutionPlanPromptGenerationWithImageUsesEditPrimitive(t *testing.T) {
+func TestCompileFeatureExecutionPlanGenerationWithImageUsesEditPrimitive(t *testing.T) {
 	plan, err := CompileFeatureExecutionPlan(CompileFeatureExecutionInput{
-		Feature: FeatureSlugPromptGeneration,
+		Feature: FeatureSlugGeneration,
 		Params:  FeatureExecutionParams{ImageInputCount: 1},
 	})
 	if err != nil {
@@ -277,16 +277,16 @@ func TestCompileFeatureExecutionPlanRejectsInvalidRuntimeMediaByFeature(t *testi
 		field   string
 	}{
 		{name: "remove background needs image", feature: FeatureSlugCutout, field: "image_input_count"},
-		{name: "upscale needs image", feature: FeatureSlugHDUpscale, field: "image_input_count"},
+		{name: "upscale needs image", feature: FeatureSlugUpscale, field: "image_input_count"},
 		{name: "inpaint needs image", feature: FeatureSlugInpaint, params: FeatureExecutionParams{HasMaskInput: true}, field: "image_input_count"},
 		{name: "inpaint needs mask", feature: FeatureSlugInpaint, params: FeatureExecutionParams{ImageInputCount: 1}, field: "mask_input"},
 		{name: "sketch needs image", feature: FeatureSlugRender, field: "image_input_count"},
 		{name: "variation needs image", feature: FeatureSlugVariations, field: "image_input_count"},
 		{name: "outpaint needs image", feature: FeatureSlugOutpaint, field: "image_input_count"},
-		{name: "fusion needs multiple images", feature: FeatureSlugStyleFusion, params: FeatureExecutionParams{ImageInputCount: 1}, field: "image_input_count"},
-		{name: "fusion caps images at four", feature: FeatureSlugStyleFusion, params: FeatureExecutionParams{ImageInputCount: 5}, field: "image_input_count"},
+		{name: "fusion needs multiple images", feature: FeatureSlugFusion, params: FeatureExecutionParams{ImageInputCount: 1}, field: "image_input_count"},
+		{name: "fusion caps images at four", feature: FeatureSlugFusion, params: FeatureExecutionParams{ImageInputCount: 5}, field: "image_input_count"},
 		{name: "non mask operation rejects mask", feature: FeatureSlugRender, params: FeatureExecutionParams{ImageInputCount: 1, HasMaskInput: true}, field: "mask_input"},
-		{name: "prompt generation caps images at four", feature: FeatureSlugPromptGeneration, params: FeatureExecutionParams{ImageInputCount: 5}, field: "image_input_count"},
+		{name: "prompt generation caps images at four", feature: FeatureSlugGeneration, params: FeatureExecutionParams{ImageInputCount: 5}, field: "image_input_count"},
 		{name: "general image operation caps at API maximum", feature: FeatureSlugVariations, params: FeatureExecutionParams{ImageInputCount: 17}, field: "image_input_count"},
 	}
 	for _, test := range tests {
@@ -303,8 +303,8 @@ func TestCompileFeatureExecutionPlanUsesFeatureVersionedImageLimits(t *testing.T
 		feature string
 		count   int
 	}{
-		{name: "prompt generation upper bound", feature: FeatureSlugPromptGeneration, count: 4},
-		{name: "fusion upper bound", feature: FeatureSlugStyleFusion, count: 4},
+		{name: "prompt generation upper bound", feature: FeatureSlugGeneration, count: 4},
+		{name: "fusion upper bound", feature: FeatureSlugFusion, count: 4},
 		{name: "general operation accepts five", feature: FeatureSlugVariations, count: 5},
 		{name: "general operation API upper bound", feature: FeatureSlugVariations, count: 16},
 	} {
@@ -343,10 +343,10 @@ func TestCompileFeatureExecutionPlanFixedPriceTransformsUseDefaultResolution(t *
 		operation  RuntimeOperation
 		hasMask    bool
 	}{
-		{feature: FeatureSlugInpaint, capability: RoutingCapabilityImageFill, operation: RuntimeOperationInpaint, hasMask: true},
-		{feature: FeatureSlugCutout, capability: RoutingCapabilityBackgroundRemoval, operation: RuntimeOperationBackgroundRemoval},
-		{feature: FeatureSlugHDUpscale, capability: RoutingCapabilityImageUpscale, operation: RuntimeOperationImageUpscale},
-		{feature: FeatureSlugOutpaint, capability: RoutingCapabilityImageFill, operation: RuntimeOperationOutpaint},
+		{feature: FeatureSlugInpaint, capability: RoutingCapabilityFill, operation: RuntimeOperationInpaint, hasMask: true},
+		{feature: FeatureSlugCutout, capability: RoutingCapabilityCutout, operation: RuntimeOperationCutout},
+		{feature: FeatureSlugUpscale, capability: RoutingCapabilityUpscale, operation: RuntimeOperationUpscale},
+		{feature: FeatureSlugOutpaint, capability: RoutingCapabilityFill, operation: RuntimeOperationOutpaint},
 	} {
 		t.Run(test.feature, func(t *testing.T) {
 			plan, err := CompileFeatureExecutionPlan(CompileFeatureExecutionInput{
@@ -384,10 +384,10 @@ func TestFeatureExecutionPlanDurableRoundTripPreservesCanonicalFacts(t *testing.
 			if feature == FeatureSlugInpaint {
 				params.HasMaskInput = true
 			}
-			if feature == FeatureSlugStyleFusion {
+			if feature == FeatureSlugFusion {
 				params.ImageInputCount = 2
 			}
-			if feature != FeatureSlugCutout && feature != FeatureSlugHDUpscale && feature != FeatureSlugInpaint && feature != FeatureSlugOutpaint {
+			if feature != FeatureSlugCutout && feature != FeatureSlugUpscale && feature != FeatureSlugInpaint && feature != FeatureSlugOutpaint {
 				params.RequestedOutputCount = &count
 				params.OutputResolution = &resolution
 			}
@@ -429,7 +429,7 @@ func TestMigratedV3ExecutionPlanFixturesDecode(t *testing.T) {
 		operation  RuntimeOperation
 		outpaintV3 bool
 	}{
-		{name: "prompt generation", feature: FeatureSlugPromptGeneration, operation: RuntimeOperationPromptGeneration},
+		{name: "prompt generation", feature: FeatureSlugGeneration, operation: RuntimeOperationGeneration},
 		{name: "inpaint", feature: FeatureSlugInpaint, params: FeatureExecutionParams{ImageInputCount: 1, HasMaskInput: true}, operation: RuntimeOperationInpaint},
 		{name: "outpaint", feature: FeatureSlugOutpaint, params: FeatureExecutionParams{ImageInputCount: 1}, operation: RuntimeOperationOutpaint, outpaintV3: true},
 	}
@@ -520,7 +520,7 @@ func TestLegacyOutpaintControlContractRequiresMigration(t *testing.T) {
 }
 
 func TestFeatureExecutionPlanJSONUsesVersionedDurableSeam(t *testing.T) {
-	plan, err := CompileFeatureExecutionPlan(CompileFeatureExecutionInput{Feature: FeatureSlugPromptGeneration})
+	plan, err := CompileFeatureExecutionPlan(CompileFeatureExecutionInput{Feature: FeatureSlugGeneration})
 	if err != nil {
 		t.Fatalf("compile: %v", err)
 	}
@@ -528,7 +528,7 @@ func TestFeatureExecutionPlanJSONUsesVersionedDurableSeam(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if string(payload) == `{}` || !strings.Contains(string(payload), `"schema_version":4`) {
+	if string(payload) == `{}` || !strings.Contains(string(payload), `"schema_version":5`) {
 		t.Fatalf("plan did not use versioned durable encoding: %s", payload)
 	}
 	var decoded FeatureExecutionPlan
@@ -556,7 +556,7 @@ func TestDecodeFeatureExecutionPlanFailsClosed(t *testing.T) {
 	}{
 		{
 			name:    "unknown schema",
-			payload: strings.Replace(string(payload), `"schema_version":4`, `"schema_version":99`, 1),
+			payload: strings.Replace(string(payload), `"schema_version":5`, `"schema_version":99`, 1),
 			code:    FeatureContractUnsupportedSchema,
 		},
 		{
@@ -566,7 +566,7 @@ func TestDecodeFeatureExecutionPlanFailsClosed(t *testing.T) {
 		},
 		{
 			name:    "inconsistent routing capability",
-			payload: strings.Replace(string(payload), `"capability":"image-generation"`, `"capability":"image-upscale"`, 1),
+			payload: strings.Replace(string(payload), `"capability":"generation"`, `"capability":"upscale"`, 1),
 			code:    FeatureContractInvalidDurablePlan,
 		},
 		{
@@ -655,12 +655,12 @@ func TestCompileFeatureExecutionPlanReturnsRecognizableValidationErrors(t *testi
 		},
 		{
 			name:  "invalid output count lower bound",
-			input: CompileFeatureExecutionInput{Feature: FeatureSlugStyleFusion, Params: FeatureExecutionParams{RequestedOutputCount: &zero}},
+			input: CompileFeatureExecutionInput{Feature: FeatureSlugFusion, Params: FeatureExecutionParams{RequestedOutputCount: &zero}},
 			code:  FeatureContractInvalidOutputCount, field: "output_count",
 		},
 		{
 			name:  "invalid output count upper bound",
-			input: CompileFeatureExecutionInput{Feature: FeatureSlugStyleFusion, Params: FeatureExecutionParams{RequestedOutputCount: &five}},
+			input: CompileFeatureExecutionInput{Feature: FeatureSlugFusion, Params: FeatureExecutionParams{RequestedOutputCount: &five}},
 			code:  FeatureContractInvalidOutputCount, field: "output_count",
 		},
 		{
@@ -685,7 +685,7 @@ func TestCompileFeatureExecutionPlanReturnsRecognizableValidationErrors(t *testi
 		},
 		{
 			name:  "dedicated transform rejects scaled resolution",
-			input: CompileFeatureExecutionInput{Feature: FeatureSlugHDUpscale, Params: FeatureExecutionParams{OutputResolution: &resolution4K}},
+			input: CompileFeatureExecutionInput{Feature: FeatureSlugUpscale, Params: FeatureExecutionParams{OutputResolution: &resolution4K}},
 			code:  FeatureContractUnsupportedResolution, field: "output_resolution",
 		},
 	}

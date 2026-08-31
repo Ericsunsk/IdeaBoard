@@ -10,46 +10,98 @@ import (
 )
 
 // buildCORSMiddleware returns a Gin middleware for CORS handling.
-// In production with no explicit allowlist, reject cross-origin browser requests.
-// If origins are configured, enforce the same allowlist in every environment.
+// Production is same-origin only: configured legacy allowlists are ignored so
+// stale environment variables cannot reopen the retired cross-origin API.
+// Development keeps an explicit allowlist for local tooling and integration tests.
 func buildCORSMiddleware(appEnv string, allowedOrigins []string) gin.HandlerFunc {
-	allowed := buildAllowedOriginSet(allowedOrigins)
-	hasAllowedOrigins := len(allowed) > 0
-	rejectUnconfiguredProductionOrigin := !hasAllowedOrigins && isProductionRuntime(appEnv)
-	if rejectUnconfiguredProductionOrigin {
-		slog.Warn("生产环境未配置有效 APP_CORS_ALLOWED_ORIGINS，将拒绝跨域请求。请设置该环境变量或在反向代理中处理 CORS。")
-	}
+	policy := newOriginPolicy(appEnv, allowedOrigins)
 	return func(c *gin.Context) {
-		origin := c.GetHeader("Origin")
-		if origin == "" {
-			c.Next()
-			return
-		}
-
-		if !hasAllowedOrigins {
-			if rejectUnconfiguredProductionOrigin || c.Request.Method == http.MethodOptions {
-				c.AbortWithStatus(http.StatusForbidden)
-				return
-			}
-			c.Next()
-			return
-		}
-
-		if !allowed[normalizeCORSOrigin(origin)] {
+		decision := policy.Decide(c.Request)
+		if !decision.Allowed {
 			c.AbortWithStatus(http.StatusForbidden)
 			return
 		}
-		c.Header("Access-Control-Allow-Origin", origin)
-		c.Header("Access-Control-Allow-Credentials", "true")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie, X-Requested-With")
-		c.Header("Vary", "Origin")
-		if c.Request.Method == http.MethodOptions {
+		for key, value := range decision.Headers {
+			c.Header(key, value)
+		}
+		if decision.Preflight {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
 		c.Next()
 	}
+}
+
+type originDecision struct {
+	Allowed   bool
+	Preflight bool
+	Headers   map[string]string
+}
+
+type originPolicy struct {
+	production bool
+	allowed    map[string]bool
+}
+
+func newOriginPolicy(appEnv string, allowedOrigins []string) originPolicy {
+	allowed := buildAllowedOriginSet(allowedOrigins)
+	if isProductionRuntime(appEnv) && len(allowed) > 0 {
+		slog.Warn("生产环境已配置 APP_CORS_ALLOWED_ORIGINS，但 Gateway 仅支持 same-origin；该 allowlist 将被忽略。")
+	}
+	return originPolicy{production: isProductionRuntime(appEnv), allowed: allowed}
+}
+
+func (p originPolicy) Decide(request *http.Request) originDecision {
+	if request == nil || request.Header.Get("Origin") == "" {
+		return originDecision{Allowed: true}
+	}
+	if isSameOriginRequest(request) {
+		return originDecision{Allowed: true}
+	}
+	if p.production {
+		return originDecision{}
+	}
+	if len(p.allowed) == 0 {
+		if request.Method == http.MethodOptions {
+			return originDecision{}
+		}
+		return originDecision{Allowed: true}
+	}
+	origin := normalizeCORSOrigin(request.Header.Get("Origin"))
+	if !p.allowed[origin] {
+		return originDecision{}
+	}
+	if request.Method == http.MethodOptions {
+		return originDecision{Allowed: true, Preflight: true, Headers: corsResponseHeaders(origin)}
+	}
+	return originDecision{Allowed: true, Headers: corsResponseHeaders(origin)}
+}
+
+func corsResponseHeaders(origin string) map[string]string {
+	return map[string]string{
+		"Access-Control-Allow-Origin":      origin,
+		"Access-Control-Allow-Credentials": "true",
+		"Access-Control-Allow-Methods":     "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+		"Access-Control-Allow-Headers":     "Content-Type, Authorization, Cookie, X-Requested-With, Idempotency-Key",
+		"Vary":                             "Origin",
+	}
+}
+
+func isSameOriginRequest(request *http.Request) bool {
+	if request == nil {
+		return false
+	}
+	origin := normalizeCORSOrigin(request.Header.Get("Origin"))
+	if origin == "" || strings.TrimSpace(request.Host) == "" {
+		return false
+	}
+	scheme := "http"
+	if request.TLS != nil {
+		scheme = "https"
+	} else if forwarded := strings.ToLower(strings.TrimSpace(request.Header.Get("X-Forwarded-Proto"))); forwarded == "http" || forwarded == "https" {
+		scheme = forwarded
+	}
+	return origin == scheme+"://"+strings.ToLower(strings.TrimSpace(request.Host))
 }
 
 func buildAllowedOriginSet(origins []string) map[string]bool {

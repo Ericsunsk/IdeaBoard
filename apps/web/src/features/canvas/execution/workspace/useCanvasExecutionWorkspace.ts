@@ -38,8 +38,8 @@ export type CanvasExecutionWorkspaceState = {
 }
 
 export type CanvasExecutionWorkspaceCommands = {
-  runPromptGeneration: (
-    plan: ActivatedImageExecutionPlan & { kind: 'prompt-generation' },
+  runGeneration: (
+    plan: ActivatedImageExecutionPlan & { kind: 'generation' },
   ) => Promise<void>
   hydratePendingImageLeases: (snapshot?: CanvasBoardSnapshot) => number
   reattachPendingImageResults: () => Promise<void>
@@ -140,8 +140,8 @@ export function useCanvasExecutionWorkspace(
     onError: options.onError,
   })
 
-  async function runPromptGeneration(
-    plan: ActivatedImageExecutionPlan & { kind: 'prompt-generation' },
+  async function runGeneration(
+    plan: ActivatedImageExecutionPlan & { kind: 'generation' },
   ): Promise<void> {
     const attachment = requireAttachment()
     const resolvedReferences = await Promise.all(
@@ -191,7 +191,7 @@ export function useCanvasExecutionWorkspace(
   return {
     state: { executionCore: options.executionCore, isNodeRunning },
     commands: {
-      runPromptGeneration,
+      runGeneration,
       hydratePendingImageLeases: recovery.hydratePendingLeases,
       reattachPendingImageResults: async () => {
         await recovery.recover()

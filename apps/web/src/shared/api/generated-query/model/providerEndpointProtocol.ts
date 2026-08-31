@@ -4,8 +4,9 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { ProviderCapability } from './providerCapability'
 
 export interface ProviderEndpointProtocol {
   id: string
-  capabilities: string[]
+  capabilities: ProviderCapability[]
 }
