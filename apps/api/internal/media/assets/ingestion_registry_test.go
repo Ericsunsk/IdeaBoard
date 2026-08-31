@@ -72,7 +72,7 @@ func TestBoardUploadIngestionTransitionsToReadyWithDerivativeOutbox(t *testing.T
 	}
 }
 
-// This exercises the public Registry seam rather than the concrete type. A
+// This exercises the public ingestion/read seams rather than the concrete type. A
 // workflow can rely on Begin and Complete committing the ready asset and its
 // default derivative outbox together, without knowing the SQL implementation.
 func TestRegistryContractCompletesBoardIngestionWithDerivativeOutbox(t *testing.T) {
@@ -83,7 +83,10 @@ func TestRegistryContractCompletesBoardIngestionWithDerivativeOutbox(t *testing.
 		t.Fatal(err)
 	}
 
-	var registry Registry = NewMediaAssetRegistry(db)
+	var registry interface {
+		IngestionRegistry
+		GetByID(context.Context, int64, int64) (dbsqlc.MediaAsset, error)
+	} = NewMediaAssetRegistry(db)
 	request := ingestion.Request{
 		OwnerUserID:    owner.ID,
 		StorageProfile: "builtin-local",
