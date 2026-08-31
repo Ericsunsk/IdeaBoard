@@ -38,8 +38,14 @@ describe('canvas billing readiness store', () => {
     )
     const store = createCanvasBillingReadinessStore({ fetchReadinessMatrix })
     const entries = [
-      { feature: WORKFLOW_FEATURE.variations, request: { feature: WORKFLOW_FEATURE.variations } },
-      { feature: WORKFLOW_FEATURE.cutout, request: { feature: WORKFLOW_FEATURE.cutout } },
+      {
+        feature: WORKFLOW_FEATURE.variations,
+        request: { prompt: '', feature: WORKFLOW_FEATURE.variations },
+      },
+      {
+        feature: WORKFLOW_FEATURE.cutout,
+        request: { prompt: '', feature: WORKFLOW_FEATURE.cutout },
+      },
     ]
 
     await store.ensureMatrix?.(entries)
