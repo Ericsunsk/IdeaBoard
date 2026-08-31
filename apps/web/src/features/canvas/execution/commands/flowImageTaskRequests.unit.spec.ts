@@ -220,6 +220,18 @@ describe('flowImageTaskRequests', () => {
     expect(request.prompt).toBe('')
   })
 
+  it('prefers the media asset ID over an empty runtime URL for HD upscale', () => {
+    const request = buildHdUpscaleTaskRequest({
+      source: { ...source, mediaAssetId: 42 },
+      imageSize: { width: 1200, height: 800 },
+      prompt: '',
+      outputCount: 1,
+    })
+
+    expect(request.image_asset_ids).toEqual([42])
+    expect(request).not.toHaveProperty('image_urls')
+  })
+
   it('keeps each image workflow in one 1-4 output task with the optional prompt', () => {
     const prompt = '  preserve the subject  '
     const requests = [

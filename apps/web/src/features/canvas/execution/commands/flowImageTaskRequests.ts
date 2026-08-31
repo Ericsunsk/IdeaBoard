@@ -287,7 +287,8 @@ export function buildHdUpscaleTaskRequest(input: {
   return buildExecutionTaskRequest({
     prompt: '',
     feature: execution.feature,
-    imageUrls: [sourceUrl],
+    imageUrls: input.source.mediaAssetId ? undefined : [sourceUrl],
+    imageAssetIds: input.source.mediaAssetId ? [input.source.mediaAssetId] : undefined,
     params: {
       ...buildExecutionSizeParams(input.imageSize, input.imageSize),
       hd: {
