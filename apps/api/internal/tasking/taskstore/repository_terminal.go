@@ -92,7 +92,11 @@ type TaskConvergenceIntent struct {
 // ConvergeTask is the single Task runtime write seam. It commits the Task
 // fact, attempt and exact lease release as one database fact; terminal kinds
 // additionally commit metrics, daily stats and Credit settlement.
-func (r *Repository) ConvergeTask(ctx context.Context, intent TaskConvergenceIntent) (int64, error) {
+func (r *Repository) ConvergeTask(ctx context.Context, intent TaskConvergenceIntent) (rowsAffected int64, err error) {
+	finish := r.metrics.StartTransaction(taskstoreOperationConvergence)
+	defer func() {
+		finish(taskstoreOutcomeSuccess, err)
+	}()
 	switch intent.Kind {
 	case TaskConvergenceCompleted:
 		return r.convergeCompletedTask(ctx, intent)

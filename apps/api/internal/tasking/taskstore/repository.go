@@ -21,8 +21,9 @@ import (
 )
 
 type Repository struct {
-	db *sql.DB
-	q  *dbsqlc.Queries
+	db      *sql.DB
+	q       *dbsqlc.Queries
+	metrics taskstoreMetrics
 }
 
 func (r *Repository) ClaimTaskInputMediaRef(ctx context.Context, tx pgx.Tx, taskID string, ownerUserID, mediaAssetID int64, preparedRefID, role string, inputIndex int) error {
@@ -220,10 +221,12 @@ ON CONFLICT (user_id, client_action_id) WHERE client_action_id <> '' DO NOTHING
 RETURNING id, task_id`
 
 func NewRepository(db *sql.DB) *Repository {
-	return &Repository{db: db, q: dbsqlc.New(db)}
+	return &Repository{db: db, q: dbsqlc.New(db), metrics: newTaskstoreMetrics(time.Now, defaultTaskstoreMetricsRecorder)}
 }
 
-func (r *Repository) Create(ctx context.Context, task *tasks.Task) error {
+func (r *Repository) Create(ctx context.Context, task *tasks.Task) (err error) {
+	finish := r.metrics.StartTransaction(taskstoreOperationCreate)
+	defer func() { finish(taskstoreOutcomeSuccess, err) }()
 	params := createTaskParams(task)
 	id, err := r.q.CreateTask(ctx, params)
 	if err != nil {
@@ -233,13 +236,21 @@ func (r *Repository) Create(ctx context.Context, task *tasks.Task) error {
 	return nil
 }
 
-func (r *Repository) CreateWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks.Task) (bool, error) {
+func (r *Repository) CreateWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks.Task) (created bool, err error) {
+	finish := r.metrics.StartTransaction(taskstoreOperationCreate)
+	defer func() {
+		outcome := taskstoreOutcomeSuccess
+		if err == nil && !created {
+			outcome = taskstoreOutcomeReplayed
+		}
+		finish(outcome, err)
+	}()
 	if tx == nil {
 		return false, fmt.Errorf("taskstore: pgx tx is nil")
 	}
 	params := createTaskParams(task)
 	var taskID string
-	err := tx.QueryRow(ctx, createTaskPGXSQL,
+	err = tx.QueryRow(ctx, createTaskPGXSQL,
 		params.TaskID,
 		params.UserID,
 		params.ClientActionID,
@@ -273,7 +284,15 @@ func (r *Repository) CreateWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks
 	return true, nil
 }
 
-func (r *Repository) LockAndFindSubmissionByClientActionWithPGXTx(ctx context.Context, tx pgx.Tx, userID int64, clientActionID string, request taskbilling.Request) (tasks.TaskSubmissionResult, bool, error) {
+func (r *Repository) LockAndFindSubmissionByClientActionWithPGXTx(ctx context.Context, tx pgx.Tx, userID int64, clientActionID string, request taskbilling.Request) (result tasks.TaskSubmissionResult, found bool, err error) {
+	finish := r.metrics.StartTransaction(taskstoreOperationSubmissionClaim)
+	defer func() {
+		outcome := taskstoreOutcomeSuccess
+		if err == nil && found {
+			outcome = taskstoreOutcomeReplayed
+		}
+		finish(outcome, err)
+	}()
 	if tx == nil || userID <= 0 || strings.TrimSpace(clientActionID) == "" {
 		return tasks.TaskSubmissionResult{}, false, nil
 	}
@@ -282,14 +301,17 @@ func (r *Repository) LockAndFindSubmissionByClientActionWithPGXTx(ctx context.Co
 	if err != nil {
 		return tasks.TaskSubmissionResult{}, false, err
 	}
-	if _, err := tx.Exec(
+	lockStartedAt := time.Now()
+	_, lockErr := tx.Exec(
 		ctx,
 		`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
 		fmt.Sprintf("task-submit:%d:%s", userID, clientActionID),
-	); err != nil {
-		return tasks.TaskSubmissionResult{}, false, fmt.Errorf("taskstore: lock submission claim: %w", err)
+	)
+	r.metrics.RecordLock(taskstoreLockSubmissionClaim, lockStartedAt, lockErr)
+	if lockErr != nil {
+		return tasks.TaskSubmissionResult{}, false, fmt.Errorf("taskstore: lock submission claim: %w", lockErr)
 	}
-	var result tasks.TaskSubmissionResult
+	result = tasks.TaskSubmissionResult{}
 	var actualHash string
 	err = tx.QueryRow(ctx, `
 SELECT task_id, request_hash

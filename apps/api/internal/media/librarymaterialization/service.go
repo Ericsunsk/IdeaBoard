@@ -26,14 +26,6 @@ type mediaStore interface {
 	DeleteObjectByStorageProfile(context.Context, string, string) error
 }
 
-type mediaRegistry interface {
-	FindReadyLibraryMaterializedMedia(context.Context, int64, int64) (dbsqlc.MediaAsset, bool, error)
-	Begin(context.Context, ingestion.Request) (ingestion.Handle, error)
-	Complete(context.Context, ingestion.Handle, ingestion.Completion) error
-	Fail(context.Context, ingestion.Handle, error) error
-	GetByID(context.Context, int64, int64) (dbsqlc.MediaAsset, error)
-}
-
 type libraryAssetLocker interface {
 	Lock(context.Context, int64) (func(), error)
 }
@@ -43,18 +35,18 @@ type libraryAssetLocker interface {
 // processes converge on one managed Media asset rather than duplicate storage.
 type Service struct {
 	storage  mediaStore
-	registry mediaRegistry
+	registry assets.Registry
 	locker   libraryAssetLocker
 	gate     *materializationGate
 }
 
 var processMaterializationGate = newMaterializationGate()
 
-func NewService(db *sql.DB, storageService mediaStore, registry *assets.MediaAssetRegistry) *Service {
+func NewService(db *sql.DB, storageService mediaStore, registry assets.Registry) *Service {
 	return newService(storageService, registry, newPostgresLibraryAssetLocker(db), processMaterializationGate)
 }
 
-func newService(storageService mediaStore, registry mediaRegistry, locker libraryAssetLocker, gate *materializationGate) *Service {
+func newService(storageService mediaStore, registry assets.Registry, locker libraryAssetLocker, gate *materializationGate) *Service {
 	return &Service{storage: storageService, registry: registry, locker: locker, gate: gate}
 }
 

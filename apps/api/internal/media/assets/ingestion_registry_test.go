@@ -72,6 +72,54 @@ func TestBoardUploadIngestionTransitionsToReadyWithDerivativeOutbox(t *testing.T
 	}
 }
 
+// This exercises the public Registry seam rather than the concrete type. A
+// workflow can rely on Begin and Complete committing the ready asset and its
+// default derivative outbox together, without knowing the SQL implementation.
+func TestRegistryContractCompletesBoardIngestionWithDerivativeOutbox(t *testing.T) {
+	db := testdb.Open(t)
+	ctx := context.Background()
+	owner := &users.User{DisplayName: "registry-contract-owner", Status: 1, Role: "user"}
+	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
+		t.Fatal(err)
+	}
+
+	var registry Registry = NewMediaAssetRegistry(db)
+	request := ingestion.Request{
+		OwnerUserID:    owner.ID,
+		StorageProfile: "builtin-local",
+		StorageKey:     "uploads/canvas/registry-contract/image.png",
+		URL:            "/uploads/canvas/registry-contract/image.png",
+		Origin:         ingestion.BoardUploadFacts{BoardID: "registry-contract"},
+	}
+	handle, err := registry.Begin(ctx, request)
+	if err != nil {
+		t.Fatalf("begin ingestion: %v", err)
+	}
+	completion := ingestion.Completion{
+		StorageKey: request.StorageKey,
+		URL:        request.URL,
+		MIMEType:   "image/png",
+		Width:      32,
+		Height:     24,
+		SizeBytes:  128,
+	}
+	if err := registry.Complete(ctx, handle, completion); err != nil {
+		t.Fatalf("complete ingestion: %v", err)
+	}
+
+	asset, err := registry.GetByID(ctx, owner.ID, handle.AssetID)
+	if err != nil || asset.Status != "ready" {
+		t.Fatalf("ready asset = %#v err=%v", asset, err)
+	}
+	var outboxCount int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_derivative_outbox WHERE derivative_id IN (SELECT id FROM media_derivatives WHERE media_asset_id = $1)`, handle.AssetID).Scan(&outboxCount); err != nil {
+		t.Fatal(err)
+	}
+	if outboxCount != 2 {
+		t.Fatalf("derivative outbox count=%d, want 2", outboxCount)
+	}
+}
+
 func TestEnsureDerivativeKeepsOutboxWhenImmediateEnqueueFails(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
