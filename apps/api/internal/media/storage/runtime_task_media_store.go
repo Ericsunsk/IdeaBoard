@@ -283,9 +283,11 @@ func taskOutputFromStoredUploadRef(taskID string, ref *StoredUploadRef, sourceUR
 }
 
 func taskOutputFromMediaAsset(taskID string, asset dbsqlc.MediaAsset, sourceURL string, resultIndex int) tasks.TaskOutput {
+	assetID := asset.ID
 	return tasks.TaskOutput{TaskID: taskID, Role: "image", URL: asset.Url, StorageKey: asset.StorageKey,
 		MIMEType: asset.MimeType, Width: int(asset.Width), Height: int(asset.Height), SizeBytes: asset.SizeBytes,
-		ChecksumSHA256: asset.ChecksumSha256, SourceURL: sourceURL, StorageProfile: asset.StorageProfileID, ResultIndex: resultIndex}
+		ChecksumSHA256: asset.ChecksumSha256, SourceURL: sourceURL, StorageProfile: asset.StorageProfileID, ResultIndex: resultIndex,
+		MediaAssetID: &assetID}
 }
 
 func taskMediaStoredObject(obj *StoredUploadObject) *taskmedia.StoredObject {

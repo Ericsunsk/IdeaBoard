@@ -54,9 +54,10 @@ func TestBoardUploadIngestionTransitionsToReadyWithDerivativeOutbox(t *testing.T
 		t.Fatalf("ready asset = %#v err=%v", asset, err)
 	}
 	derivatives, err := registry.ListDerivatives(ctx, owner.ID, mediaAssetID)
-	if err != nil || len(derivatives) != 2 {
-		t.Fatalf("ready derivatives=%#v err=%v, want 2", derivatives, err)
+	if err != nil {
+		t.Fatal(err)
 	}
+	assertDerivativeTiers(t, derivatives, []string{"thumb", "preview", "processing-input"})
 	for _, derivative := range derivatives {
 		var count int
 		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_derivative_outbox WHERE derivative_id = $1`, derivative.ID).Scan(&count); err != nil || count != 1 {
@@ -67,9 +68,10 @@ func TestBoardUploadIngestionTransitionsToReadyWithDerivativeOutbox(t *testing.T
 		t.Fatalf("ensure large preview derivative: %v", err)
 	}
 	derivatives, err = registry.ListDerivatives(ctx, owner.ID, mediaAssetID)
-	if err != nil || len(derivatives) != 3 {
-		t.Fatalf("ensured derivatives=%#v err=%v, want 3", derivatives, err)
+	if err != nil {
+		t.Fatal(err)
 	}
+	assertDerivativeTiers(t, derivatives, []string{"thumb", "preview", "processing-input", "large-preview"})
 }
 
 // This exercises the public ingestion/read seams rather than the concrete type. A
@@ -118,8 +120,8 @@ func TestRegistryContractCompletesBoardIngestionWithDerivativeOutbox(t *testing.
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_derivative_outbox WHERE derivative_id IN (SELECT id FROM media_derivatives WHERE media_asset_id = $1)`, handle.AssetID).Scan(&outboxCount); err != nil {
 		t.Fatal(err)
 	}
-	if outboxCount != 2 {
-		t.Fatalf("derivative outbox count=%d, want 2", outboxCount)
+	if outboxCount != 3 {
+		t.Fatalf("derivative outbox count=%d, want 3", outboxCount)
 	}
 }
 
@@ -210,9 +212,10 @@ func TestLibraryMaterializationReusesManagedAssetAndQueuesDerivatives(t *testing
 		t.Fatalf("materialization provenance = %s", asset.Metadata)
 	}
 	derivatives, err := registry.ListDerivatives(ctx, owner.ID, mediaAssetID)
-	if err != nil || len(derivatives) != 2 {
-		t.Fatalf("derivatives=%#v err=%v, want default derivatives", derivatives, err)
+	if err != nil {
+		t.Fatal(err)
 	}
+	assertDerivativeTiers(t, derivatives, []string{"thumb", "preview", "processing-input"})
 }
 
 func TestTaskResultIngestionTransitionsToReadyIdempotently(t *testing.T) {
@@ -249,9 +252,10 @@ func TestTaskResultIngestionTransitionsToReadyIdempotently(t *testing.T) {
 		t.Fatalf("ready task result asset=%#v err=%v", asset, err)
 	}
 	derivatives, err := registry.ListDerivatives(ctx, owner.ID, assetID)
-	if err != nil || len(derivatives) != 2 {
-		t.Fatalf("task result derivatives=%#v err=%v, want 2", derivatives, err)
+	if err != nil {
+		t.Fatal(err)
 	}
+	assertDerivativeTiers(t, derivatives, []string{"thumb", "preview", "processing-input"})
 	for _, derivative := range derivatives {
 		var count int
 		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_derivative_outbox WHERE derivative_id = $1`, derivative.ID).Scan(&count); err != nil || count != 1 {
@@ -265,8 +269,26 @@ func TestTaskResultIngestionTransitionsToReadyIdempotently(t *testing.T) {
 	if err := registry.Complete(ctx, retryHandle, stored.IngestionCompletion(request.SourceURL)); err != nil {
 		t.Fatalf("retry complete task result asset: %v", err)
 	}
-	if derivatives, err = registry.ListDerivatives(ctx, owner.ID, assetID); err != nil || len(derivatives) != 2 {
-		t.Fatalf("retry task result derivatives=%#v err=%v, want 2", derivatives, err)
+	if derivatives, err = registry.ListDerivatives(ctx, owner.ID, assetID); err != nil {
+		t.Fatal(err)
+	} else {
+		assertDerivativeTiers(t, derivatives, []string{"thumb", "preview", "processing-input"})
+	}
+}
+
+func assertDerivativeTiers(t *testing.T, derivatives []dbsqlc.MediaDerivative, want []string) {
+	t.Helper()
+	got := make(map[string]struct{}, len(derivatives))
+	for _, derivative := range derivatives {
+		got[derivative.Tier] = struct{}{}
+	}
+	if len(got) != len(want) {
+		t.Fatalf("derivative tiers=%v, want %v", got, want)
+	}
+	for _, tier := range want {
+		if _, ok := got[tier]; !ok {
+			t.Fatalf("derivative tiers=%v, missing %q", got, tier)
+		}
 	}
 }
 
