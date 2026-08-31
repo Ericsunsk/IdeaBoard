@@ -35,18 +35,18 @@ type libraryAssetLocker interface {
 // processes converge on one managed Media asset rather than duplicate storage.
 type Service struct {
 	storage  mediaStore
-	registry assets.Registry
+	registry assets.LibraryMaterializationRegistry
 	locker   libraryAssetLocker
 	gate     *materializationGate
 }
 
 var processMaterializationGate = newMaterializationGate()
 
-func NewService(db *sql.DB, storageService mediaStore, registry assets.Registry) *Service {
+func NewService(db *sql.DB, storageService mediaStore, registry assets.LibraryMaterializationRegistry) *Service {
 	return newService(storageService, registry, newPostgresLibraryAssetLocker(db), processMaterializationGate)
 }
 
-func newService(storageService mediaStore, registry assets.Registry, locker libraryAssetLocker, gate *materializationGate) *Service {
+func newService(storageService mediaStore, registry assets.LibraryMaterializationRegistry, locker libraryAssetLocker, gate *materializationGate) *Service {
 	return &Service{storage: storageService, registry: registry, locker: locker, gate: gate}
 }
 

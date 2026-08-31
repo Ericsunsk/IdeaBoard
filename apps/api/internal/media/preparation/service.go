@@ -16,7 +16,7 @@ import (
 
 type Service struct {
 	storage  mediaStore
-	registry mediaRegistry
+	registry assets.PreparationRegistry
 }
 
 type mediaStore interface {
@@ -25,17 +25,7 @@ type mediaStore interface {
 	DeleteObjectByStorageProfile(context.Context, string, string) error
 }
 
-type mediaRegistry interface {
-	FindPreparedGenerationMedia(context.Context, int64, string, string, int) (assets.PreparedGenerationMedia, bool, error)
-	FindIngestingPreparedGenerationMedia(context.Context, int64, string, string, int) (assets.PreparedGenerationMedia, bool, error)
-	FindReusableGenerationMedia(context.Context, int64, string) (int64, bool, error)
-	FindReadyOwnedMediaAssetIDByChecksum(context.Context, int64, string, string) (int64, bool, error)
-	Begin(context.Context, ingestion.Request) (ingestion.Handle, error)
-	Complete(context.Context, ingestion.Handle, ingestion.Completion) error
-	Fail(context.Context, ingestion.Handle, error) error
-}
-
-func NewService(storageService mediaStore, registry mediaRegistry) *Service {
+func NewService(storageService mediaStore, registry assets.PreparationRegistry) *Service {
 	return &Service{storage: storageService, registry: registry}
 }
 

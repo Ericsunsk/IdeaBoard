@@ -55,7 +55,7 @@ type AuthDeps struct {
 
 type UploadDeps struct {
 	StorageService *storage.StorageService
-	MediaAssets    *assets.MediaAssetRegistry
+	MediaAssets    assets.UploadRegistry
 	UserRepo       *users.UserRepository
 	BoardService   *boards.BoardService
 	UploadSettings settings.MediaUploadSettingProvider
@@ -87,7 +87,7 @@ type UserRouteDeps struct {
 	RewardUserHandler      *rewards.UserHandler
 	PaymentUserHandler     *payments.UserCheckoutHandler
 	UserEventStreamHandler *UserEventStreamHandler
-	MediaAssetRegistry     *assets.MediaAssetRegistry
+	MediaAssetRegistry     assets.ReadRegistry
 	MediaStorageService    *storage.StorageService
 	Uploads                UploadDeps
 	UploadDownloads        UploadDownloadDeps
