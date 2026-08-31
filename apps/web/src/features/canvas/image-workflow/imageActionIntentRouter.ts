@@ -25,49 +25,63 @@ type FusionPromptParamPatch = Extract<
 >
 
 export type ImageActionIntentRouterOptions = {
-  flowRetouchNodeId: Ref<string | null>
-  consumeSuppressedStrengthClick: (action: ImageStrengthAction) => boolean
-  openActiveNodePanel: (panel: ActiveNodePanel) => void
-  clearActiveNodePanel: () => void
-  hideStrengthControl: () => void
-  selectFlowNodeForContextMenu: (nodeId: string) => void
-  cancelFlowOutpaintMode: () => void
-  cancelFlowInpaintMode: () => void
-  enterFlowOutpaintMode: (nodeId: string) => boolean
-  enterFlowRetouchMode: (nodeId: string, mode: RetouchMode) => boolean
-  focusRetouchAndShowChrome: (nodeId: string) => void | Promise<void>
-  runImageDirectAction: (
-    nodeId: string,
-    action: ImageTaskAction,
-    options?: { prompt?: string; outputCount?: number; strength?: number },
-  ) => Promise<void> | void
-  runFusionPromptGeneration: (
-    nodeId: string,
-    prompt: string,
-    outputCount: number,
-    aspectRatio: PromptAspectRatio,
-  ) => Promise<void> | void
-  onFlowNodeParamUpdate: (nodeId: string, patch: FusionPromptParamPatch) => void
-  onWarning: (message: string) => void
-  getActionStrength: (action: ImageStrengthAction) => number
+  state: {
+    flowRetouchNodeId: Ref<string | null>
+  }
+  strength: {
+    consumeSuppressedClick: (action: ImageStrengthAction) => boolean
+    getValue: (action: ImageStrengthAction) => number
+  }
+  ui: {
+    openPanel: (panel: ActiveNodePanel) => void
+    clearPanel: () => void
+    hideStrengthControl: () => void
+    warn: (message: string) => void
+  }
+  selection: {
+    selectNode: (nodeId: string) => void
+  }
+  modes: {
+    cancelOutpaint: () => void
+    cancelInpaint: () => void
+    enterOutpaint: (nodeId: string) => boolean
+    enterRetouch: (nodeId: string, mode: RetouchMode) => boolean
+    focusRetouch: (nodeId: string) => void | Promise<void>
+  }
+  execution: {
+    runImageDirectAction: (
+      nodeId: string,
+      action: ImageTaskAction,
+      options?: { prompt?: string; outputCount?: number; strength?: number },
+    ) => Promise<void> | void
+    runFusionPromptGeneration: (
+      nodeId: string,
+      prompt: string,
+      outputCount: number,
+      aspectRatio: PromptAspectRatio,
+    ) => Promise<void> | void
+  }
+  params: {
+    updateNodeParam: (nodeId: string, patch: FusionPromptParamPatch) => void
+  }
 }
 
 export function createImageActionIntentRouter(options: ImageActionIntentRouterOptions) {
   function onFlowImageContextMenu(nodeId: string, event: MouseEvent) {
     event.preventDefault()
-    if (options.flowRetouchNodeId.value === nodeId) return
-    options.cancelFlowOutpaintMode()
-    options.selectFlowNodeForContextMenu(nodeId)
-    options.openActiveNodePanel({ kind: ACTIVE_NODE_PANEL_KIND.imageTools, nodeId })
-    options.hideStrengthControl()
+    if (options.state.flowRetouchNodeId.value === nodeId) return
+    options.modes.cancelOutpaint()
+    options.selection.selectNode(nodeId)
+    options.ui.openPanel({ kind: ACTIVE_NODE_PANEL_KIND.imageTools, nodeId })
+    options.ui.hideStrengthControl()
   }
 
   function onFlowFusionContextMenu(nodeId: string, event: MouseEvent) {
     event.preventDefault()
-    options.cancelFlowOutpaintMode()
-    options.selectFlowNodeForContextMenu(nodeId)
-    options.openActiveNodePanel({ kind: ACTIVE_NODE_PANEL_KIND.fusionPrompt, nodeId })
-    options.hideStrengthControl()
+    options.modes.cancelOutpaint()
+    options.selection.selectNode(nodeId)
+    options.ui.openPanel({ kind: ACTIVE_NODE_PANEL_KIND.fusionPrompt, nodeId })
+    options.ui.hideStrengthControl()
   }
 
   function onFlowImageDirectAction(
@@ -79,56 +93,56 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
   ) {
     const actionMode = IMAGE_ACTION_REGISTRY[action].mode
     if (actionMode === IMAGE_ACTION_MODE.outpaint) {
-      options.cancelFlowInpaintMode()
-      const entered = options.enterFlowOutpaintMode(nodeId)
-      options.clearActiveNodePanel()
-      options.hideStrengthControl()
-      if (!entered) options.onWarning(i18n.global.t('canvas.tools.cannotOutpaint'))
+      options.modes.cancelInpaint()
+      const entered = options.modes.enterOutpaint(nodeId)
+      options.ui.clearPanel()
+      options.ui.hideStrengthControl()
+      if (!entered) options.ui.warn(i18n.global.t('canvas.tools.cannotOutpaint'))
       return
     }
     if (
       actionMode === IMAGE_ACTION_MODE.inpaint ||
       actionMode === IMAGE_ACTION_MODE.retouch
     ) {
-      options.cancelFlowOutpaintMode()
+      options.modes.cancelOutpaint()
       const editorMode = actionMode === IMAGE_ACTION_MODE.retouch ? 'adjust' : 'inpaint'
-      const entered = options.enterFlowRetouchMode(nodeId, editorMode)
-      options.clearActiveNodePanel()
-      options.hideStrengthControl()
+      const entered = options.modes.enterRetouch(nodeId, editorMode)
+      options.ui.clearPanel()
+      options.ui.hideStrengthControl()
       if (!entered) {
         const warningKey =
           actionMode === IMAGE_ACTION_MODE.retouch
             ? 'canvas.tools.imageNotEditable'
             : 'canvas.tools.cannotInpaint'
-        options.onWarning(i18n.global.t(warningKey))
+        options.ui.warn(i18n.global.t(warningKey))
       } else {
-        void options.focusRetouchAndShowChrome(nodeId)
+        void options.modes.focusRetouch(nodeId)
       }
       return
     }
     if (!isImageTaskAction(action)) {
-      options.onWarning(i18n.global.t('canvas.tools.actionUnavailable'))
+      options.ui.warn(i18n.global.t('canvas.tools.actionUnavailable'))
       return
     }
     if (
       strength === undefined &&
       isImageStrengthAction(action) &&
-      options.consumeSuppressedStrengthClick(action)
+      options.strength.consumeSuppressedClick(action)
     ) {
       return
     }
-    options.cancelFlowOutpaintMode()
-    options.cancelFlowInpaintMode()
-    options.clearActiveNodePanel()
-    options.hideStrengthControl()
-    void options.runImageDirectAction(
+    options.modes.cancelOutpaint()
+    options.modes.cancelInpaint()
+    options.ui.clearPanel()
+    options.ui.hideStrengthControl()
+    void options.execution.runImageDirectAction(
       nodeId,
       action,
       {
         prompt,
         outputCount,
         ...(isImageStrengthAction(action)
-          ? { strength: strength ?? options.getActionStrength(action) }
+          ? { strength: strength ?? options.strength.getValue(action) }
           : {}),
       },
     )
@@ -140,14 +154,14 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
     outputCount: number,
     aspectRatio: PromptAspectRatio,
   ) {
-    options.cancelFlowOutpaintMode()
-    options.cancelFlowInpaintMode()
-    options.clearActiveNodePanel()
-    options.hideStrengthControl()
-    options.onFlowNodeParamUpdate(nodeId, { key: 'prompt', value: prompt })
-    options.onFlowNodeParamUpdate(nodeId, { key: 'outputCount', value: outputCount })
-    options.onFlowNodeParamUpdate(nodeId, { key: 'aspectRatio', value: aspectRatio })
-    void options.runFusionPromptGeneration(nodeId, prompt, outputCount, aspectRatio)
+    options.modes.cancelOutpaint()
+    options.modes.cancelInpaint()
+    options.ui.clearPanel()
+    options.ui.hideStrengthControl()
+    options.params.updateNodeParam(nodeId, { key: 'prompt', value: prompt })
+    options.params.updateNodeParam(nodeId, { key: 'outputCount', value: outputCount })
+    options.params.updateNodeParam(nodeId, { key: 'aspectRatio', value: aspectRatio })
+    void options.execution.runFusionPromptGeneration(nodeId, prompt, outputCount, aspectRatio)
   }
 
   return {

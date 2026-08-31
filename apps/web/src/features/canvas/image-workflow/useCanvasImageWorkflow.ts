@@ -58,7 +58,7 @@ type CanvasImageWorkflowGraphPort = Pick<
   | 'isCanvasInteractionLocked'
 > & {
   getMediaInputImages: PromptGenerationIntentOptions['getMediaInputImages']
-  updateSnapshotNodeParam: ImageActionIntentRouterOptions['onFlowNodeParamUpdate']
+  updateSnapshotNodeParam: ImageActionIntentRouterOptions['params']['updateNodeParam']
   markNodeExecutionDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
 }
 
@@ -225,22 +225,36 @@ export function useCanvasImageWorkflow(
   })
 
   const imageActions = createImageActionIntentRouter({
-    flowRetouchNodeId: imageTools.viewModel.active.nodeId,
-    consumeSuppressedStrengthClick: strengthControl.consumeSuppressedStrengthClick,
-    openActiveNodePanel: ui.panels.open,
-    clearActiveNodePanel: ui.panels.clear,
-    hideStrengthControl: strengthControl.hideStrengthControl,
-    selectFlowNodeForContextMenu: options.flowPaneAdapter.selectOnlyNode,
-    cancelFlowOutpaintMode: outpaint.cancelOutpaintMode,
-    cancelFlowInpaintMode: imageTools.commands.lifecycle.cancel,
-    enterFlowOutpaintMode: outpaint.enterOutpaintMode,
-    enterFlowRetouchMode: imageTools.commands.lifecycle.enter,
-    focusRetouchAndShowChrome: imageTools.commands.editor.focusAndShowChrome,
-    runImageDirectAction: execution.runImageDirectAction,
-    runFusionPromptGeneration: execution.runFusionPromptGeneration,
-    onFlowNodeParamUpdate: markImageWorkflowNodeDirty,
-    onWarning: options.feedback.imageTools.actionUnavailable,
-    getActionStrength: strengthControl.getActionStrength,
+    state: {
+      flowRetouchNodeId: imageTools.viewModel.active.nodeId,
+    },
+    strength: {
+      consumeSuppressedClick: strengthControl.consumeSuppressedStrengthClick,
+      getValue: strengthControl.getActionStrength,
+    },
+    ui: {
+      openPanel: ui.panels.open,
+      clearPanel: ui.panels.clear,
+      hideStrengthControl: strengthControl.hideStrengthControl,
+      warn: options.feedback.imageTools.actionUnavailable,
+    },
+    selection: {
+      selectNode: options.flowPaneAdapter.selectOnlyNode,
+    },
+    modes: {
+      cancelOutpaint: outpaint.cancelOutpaintMode,
+      cancelInpaint: imageTools.commands.lifecycle.cancel,
+      enterOutpaint: outpaint.enterOutpaintMode,
+      enterRetouch: imageTools.commands.lifecycle.enter,
+      focusRetouch: imageTools.commands.editor.focusAndShowChrome,
+    },
+    execution: {
+      runImageDirectAction: execution.runImageDirectAction,
+      runFusionPromptGeneration: execution.runFusionPromptGeneration,
+    },
+    params: {
+      updateNodeParam: markImageWorkflowNodeDirty,
+    },
   })
   const promptGeneration = createPromptGenerationIntent({
     cancelFlowOutpaintMode: outpaint.cancelOutpaintMode,

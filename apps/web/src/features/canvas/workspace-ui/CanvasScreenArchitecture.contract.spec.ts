@@ -48,7 +48,7 @@ describe('Canvas Screen architecture contract', () => {
     expect(uiAdapter).not.toContain('selection:')
     expect(imageWorkflow).toContain('isCanvasInteractionLocked: graph.isCanvasInteractionLocked')
     expect(imageWorkflow).toContain(
-      'selectFlowNodeForContextMenu: options.flowPaneAdapter.selectOnlyNode',
+      'selectNode: options.flowPaneAdapter.selectOnlyNode',
     )
   })
 
