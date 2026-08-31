@@ -345,8 +345,7 @@ validate_env_file() {
   local key
 
   for key in \
-    APP_BASE_URL \
-    API_BASE_URL \
+    PUBLIC_ORIGIN \
     IDEABOARD_API_IMAGE \
     IDEABOARD_API_MIGRATE_IMAGE \
     IDEABOARD_AUTH_IMAGE \
@@ -1149,8 +1148,11 @@ check_public_api_health() {
   local elapsed=0
 
   base_url="$(env_value API_BASE_URL)"
+  if [[ -z "$base_url" ]]; then
+    base_url="$(env_value PUBLIC_ORIGIN)"
+  fi
   base_url="${base_url%/}"
-  [[ -n "$base_url" ]] || die "API_BASE_URL is required for public API health checks"
+  [[ -n "$base_url" ]] || die "PUBLIC_ORIGIN is required for public API health checks"
 
   public_health_url="$(public_api_health_url "$base_url")"
   echo "Waiting for public API health: $public_health_url"
@@ -1453,6 +1455,9 @@ run_doctor() {
     run_backend_smoke_checks
     local base_url
     base_url="$(env_value API_BASE_URL)"
+    if [[ -z "$base_url" ]]; then
+      base_url="$(env_value PUBLIC_ORIGIN)"
+    fi
     base_url="${base_url%/}"
     if [[ -n "$base_url" ]]; then
       echo "Checking public auth session route: ${base_url}/api/auth/get-session"

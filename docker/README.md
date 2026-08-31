@@ -127,7 +127,7 @@ NPM_NETWORK_NAME=npm-nw
 
 API 运行时还必须设置 `APP_SECRETS_ENCRYPTION_KEY`，用于加密 API Key 与对象存储密钥；推荐用 `openssl rand -base64 32` 生成。
 
-生产环境只使用 `ideaboard update --manifest release-manifest.json` 部署同一发布批次的四张镜像。脚本会先执行 preflight，在 API / Auth migrations 前把 PostgreSQL custom dump 写入 `/opt/stacks/ideaboard-backups/postgres-*.dump[.age|.gpg]`，并在启动后检查 PostgreSQL、NATS JetStream、本机 API/Auth health、River schema、默认 JetStream event stream 和公网 `${API_BASE_URL}/api/health`。成功后会写入 `docker/releases/current.json` 与 `previous.json`；已启动的 stack 可用 `ideaboard status` 查看 release 摘要，也可以执行 `ideaboard doctor` / `ideaboard doctor --deep` 排查运行态。如果 health gate 失败，请先查看 `api/auth/postgres/nats` 日志；需要回退运行镜像时用 `ideaboard rollback --to previous`，DB restore 需要基于 backup 人工确认后执行。
+生产环境只使用 `ideaboard update --manifest release-manifest.json` 部署同一发布批次的四张镜像。脚本会先执行 preflight，在 API / Auth migrations 前把 PostgreSQL custom dump 写入 `/opt/stacks/ideaboard-backups/postgres-*.dump[.age|.gpg]`，并在启动后检查 PostgreSQL、NATS JetStream、本机 API/Auth health、River schema、默认 JetStream event stream 和公网 `${PUBLIC_ORIGIN}/api/health`（如设置 `API_BASE_URL` override，则使用 override）。成功后会写入 `docker/releases/current.json` 与 `previous.json`；已启动的 stack 可用 `ideaboard status` 查看 release 摘要，也可以执行 `ideaboard doctor` / `ideaboard doctor --deep` 排查运行态。如果 health gate 失败，请先查看 `api/auth/postgres/nats` 日志；需要回退运行镜像时用 `ideaboard rollback --to previous`，DB restore 需要基于 backup 人工确认后执行。
 
 > [!IMPORTANT]
 > `postgres-*.dump[.age|.gpg]` 会包含 `api_account_secrets`、`storage_profile_secrets` 等表中的上游 API key 与 S3 secret，必须按 secret artifact 处理：建议设置 `BACKUP_ENCRYPTION_RECIPIENT` 加密保存、限制传输与下载，restore 后轮换受影响的上游 API key 和对象存储凭据。
@@ -164,4 +164,4 @@ docker compose -f compose.local.yml up -d
 2. `apps/api/.env` 使用 API runtime credential，`apps/auth/.env` 使用 Auth runtime credential；两个 migration command 才使用固定 owner `ideaboard` 与 `POSTGRES_PASSWORD`。
 3. owner、API runtime、Auth runtime 三个 roles 必须不同；本地旧 volume 没有 runtime roles 时，重建开发 volume。
 
-> 说明：`APP_BASE_URL` 是浏览器跳转、分享链接和同域 Gateway 的公开 Origin；`API_BASE_URL` 仅用于 Stripe Webhook 及服务间 API 地址，不能再作为浏览器或本地上传素材的公开地址。浏览器统一访问 `ideaboard.art` 的 `/api/**`、`/api/auth/**` 和 `/uploads/**`。两者缺失或不是纯 http(s) Origin 时，API 会拒绝启动。`DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` 只提供给一次性的 migration command/container，不进入长期运行的 API/Auth container；本地命令从 `docker/migration.env.example` 创建已被 Git 忽略的 `docker/migration.env`。
+> 说明：`PUBLIC_ORIGIN` 是浏览器跳转、分享链接和同域 Gateway 的 canonical public Origin；`API_BASE_URL` 仅在 API 独立 host 时作为 override，用于 Stripe Webhook 及服务间 API 地址，不能作为浏览器或本地上传素材的默认公开地址。浏览器统一访问 `ideaboard.art` 的 `/api/**`、`/api/auth/**` 和 `/uploads/**`。`PUBLIC_ORIGIN` 缺失或不是纯 http(s) Origin 时，API 会拒绝启动。`DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` 只提供给一次性的 migration command/container，不进入长期运行的 API/Auth container；本地命令从 `docker/migration.env.example` 创建已被 Git 忽略的 `docker/migration.env`。

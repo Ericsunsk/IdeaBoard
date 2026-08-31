@@ -414,14 +414,10 @@ func TestFeatureExecutionPlanDurableRoundTripPreservesCanonicalFacts(t *testing.
 	}
 }
 
-// TestMigratedV3ExecutionPlanFixturesDecode verifies the JSON seam used by
-// the v4 database migration. Legacy plans are represented as schema v3
-// payloads, then transformed exactly as the migration contract requires:
-// bump the schema version, rename only the outpaint control discriminator,
-// and preserve every other feature fact (including the absence of a kind
-// field). Keeping these fixtures here prevents a migration from introducing
-// fields that the fail-closed durable decoder cannot consume.
-func TestMigratedV3ExecutionPlanFixturesDecode(t *testing.T) {
+// TestLegacyExecutionPlanFixturesDecode verifies that legacy execution-plan
+// payloads can be normalized to the current durable shape without introducing
+// fields that the fail-closed decoder cannot consume.
+func TestLegacyExecutionPlanFixturesDecode(t *testing.T) {
 	tests := []struct {
 		name       string
 		feature    string
@@ -460,13 +456,13 @@ func TestMigratedV3ExecutionPlanFixturesDecode(t *testing.T) {
 				}
 				runtime["control_contract"] = "extend"
 				// Some historical records carried this discriminator in the
-				// nested plan. It is intentionally removed by v4 migration;
-				// it is not part of the durable v4 schema.
+				// nested plan. It is intentionally removed during normalization;
+				// it is not part of the durable schema.
 				legacy["kind"] = "canvas-extend"
 			}
 
-			// Simulate the expected *post-migration* durable payload. In
-			// particular, migration must not inject a `kind` discriminator:
+			// Simulate the normalized durable payload. In particular,
+			// normalization must not inject a `kind` discriminator:
 			// durableFeatureExecutionPlan has no such field and decoding is
 			// intentionally fail-closed for unknown keys.
 			migrated := legacy
@@ -515,7 +511,7 @@ func TestLegacyOutpaintControlContractRequiresMigration(t *testing.T) {
 		t.Fatalf("encode legacy fixture: %v", err)
 	}
 	if _, err := DecodeFeatureExecutionPlan(legacyPayload); err == nil {
-		t.Fatal("legacy outpaint control_contract=extend unexpectedly decoded; migration must rename it to outpaint")
+		t.Fatal("legacy outpaint control_contract=extend unexpectedly decoded; normalization must rename it to outpaint")
 	}
 }
 

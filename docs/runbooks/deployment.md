@@ -69,11 +69,11 @@ VPS 侧至少同步：
 
 ```bash
 # /opt/stacks/ideaboard/docker/.env
-APP_BASE_URL=https://ideaboard.art
-API_BASE_URL=https://ideaboard.art
+PUBLIC_ORIGIN=https://ideaboard.art
+# API_BASE_URL=https://api.ideaboard.art
 ```
 
-这两个值必须是没有 path、凭证、query 或 fragment 的 http(s) Origin。它们是唯一事实源：`APP_BASE_URL` 用于浏览器跳转与分享链接，`API_BASE_URL` 用于 Stripe Webhook 和服务间 API 地址；浏览器请求必须通过 `ideaboard.art` 的 same-origin Gateway，API 启动时会 fail closed 校验。
+`PUBLIC_ORIGIN` 以及设置时的 `API_BASE_URL` 必须是没有 path、凭证、query 或 fragment 的 http(s) Origin。`PUBLIC_ORIGIN` 是 canonical source，用于浏览器跳转与分享链接；`API_BASE_URL` 仅在 API 独立 host 时作为 override，用于 Stripe Webhook 和服务间 API 地址。浏览器请求必须通过 `ideaboard.art` 的 same-origin Gateway，API 启动时会 fail closed 校验。
 
 Cloudflare DNS 配置：
 
@@ -202,8 +202,8 @@ GITHUB_TOKEN="${TOKEN}" bash /tmp/bootstrap-vps.sh \
 
 至少修改 `/opt/stacks/ideaboard/docker/.env`：
 
-- `APP_BASE_URL`
-- `API_BASE_URL`
+- `PUBLIC_ORIGIN`
+- `API_BASE_URL`（可选 override）
 - `POSTGRES_PASSWORD`
 - `API_DB_PASSWORD`
 - `AUTH_DB_PASSWORD`
@@ -250,7 +250,7 @@ Migration 前失败会恢复 `.env` snapshot；migration 后失败不会自动 r
 
 `ideaboard` 是固定 schema owner；`ideaboard_api` 与 `ideaboard_auth` 是彼此独立的 limited runtime roles。三个 roles 必须使用不同密码；长期运行的 API/Auth 容器只接收各自 runtime credential，只有一次性的 `api-migrate` / `auth-migrate` 容器接收 owner credential。
 
-空 PostgreSQL 库由 API migration 以 `20260818210000_baseline.sql` 初始化业务 schema；Atlas 在 `atlas_schema_revisions` 中维护版本与校验信息，API runtime 不再自动迁移。Docker 部署会先运行 `api-migrate`，授予 runtime 常规业务表 DML，并将 Credits Ledger 收紧为只读 + typed Credit Commands；再运行 Auth migration，为 Auth runtime role 授予 Better Auth tables DML 与 `get_auth_runtime_settings()` 的 `EXECUTE`，最后启动服务。`DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` 只注入一次性的 migration process，不得进入长期运行的 API/Auth runtime；本地示例见 `docker/migration.env.example`。
+空 PostgreSQL 库由 API migration 以 `20260827000000_baseline.sql` 初始化业务 schema；Atlas 在 `atlas_schema_revisions` 中维护版本与校验信息，API runtime 不再自动迁移。Docker 部署会先运行 `api-migrate`，授予 runtime 常规业务表 DML，并将 Credits Ledger 收紧为只读 + typed Credit Commands；再运行 Auth migration，为 Auth runtime role 授予 Better Auth tables DML 与 `get_auth_runtime_settings()` 的 `EXECUTE`，最后启动服务。`DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` 只注入一次性的 migration process，不得进入长期运行的 API/Auth runtime；本地示例见 `docker/migration.env.example`。
 
 Schema 变更必须经过同一条 Schema Release lifecycle：在 `apps/api` 中修改 domain fragment 或 manifest 后运行 `BASE_SHA=HEAD API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schema-release --write-artifact` 生成 `internal/db/schema/schema.sql`，提交 snapshot 与 append-only migration；发布前和 CI 使用相同 command 但不带 `--write-artifact`，以只读方式检查 manifest assembly、snapshot drift、sqlc generation、migration immutability 和 PostgreSQL catalog semantics。不要调用已移除的旧 schema assembly 或 migration history scripts。
 
@@ -353,11 +353,11 @@ docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stack
 ideaboard smoke
 curl http://127.0.0.1:6000/api/health
 curl http://127.0.0.1:6001/api/health
-curl "${API_BASE_URL}/api/health"
-curl "${API_BASE_URL}/api/auth/get-session"
+curl "${API_BASE_URL:-${PUBLIC_ORIGIN}}/api/health"
+curl "${API_BASE_URL:-${PUBLIC_ORIGIN}}/api/auth/get-session"
 ```
 
-`/api/auth/get-session` 未登录时返回未认证是正常的；关键是宿主机反代服务能转发到 Auth Service。`ideaboard smoke` 会检查 PostgreSQL、NATS JetStream、本机 API/Auth health、River schema、默认 JetStream event stream，以及公网 `${API_BASE_URL}/api/health`。
+`/api/auth/get-session` 未登录时返回未认证是正常的；关键是宿主机反代服务能转发到 Auth Service。`ideaboard smoke` 会检查 PostgreSQL、NATS JetStream、本机 API/Auth health、River schema、默认 JetStream event stream，以及公网 `${API_BASE_URL:-${PUBLIC_ORIGIN}}/api/health`。
 
 对象存储 live smoke 默认不依赖外部凭据；缺少 env 时会自动 skip。需要在隔离的 R2/S3-compatible bucket 上验证 upload/read/public URL/delete/profile reload contract 时，只通过 shell env 或 CI secret 注入凭据，不要把 secret 写入仓库、issue、日志或未加密 artifact：
 

@@ -53,21 +53,23 @@ type AppConfig struct {
 }
 
 // PublicOriginsConfig is immutable deployment configuration. Web owns browser
-// navigation URLs; API owns webhooks and locally served assets.
+// navigation URLs; API owns webhooks and locally served assets. API defaults
+// to the public origin at load time, while the separate fields preserve URL
+// semantics and allow an explicit API host override when needed.
 type PublicOriginsConfig struct {
 	Web string
 	API string
 }
 
 func (c PublicOriginsConfig) Validate() error {
-	if err := validatePublicOrigin("APP_BASE_URL", c.Web); err != nil {
+	if err := validatePublicOrigin("PUBLIC_ORIGIN", c.Web); err != nil {
 		return err
 	}
 	return validatePublicOrigin("API_BASE_URL", c.API)
 }
 
 func (c PublicOriginsConfig) WebURL(path string) string {
-	if validatePublicOrigin("APP_BASE_URL", c.Web) != nil {
+	if validatePublicOrigin("PUBLIC_ORIGIN", c.Web) != nil {
 		return ""
 	}
 	return joinPublicOrigin(c.Web, path)
@@ -143,7 +145,7 @@ type envConfig struct {
 	MetricsAddr           string `env:"METRICS_ADDR"`
 	AppEnv                string `env:"APP_ENV"`
 	AppCORSAllowedOrigins string `env:"APP_CORS_ALLOWED_ORIGINS"`
-	AppBaseURL            string `env:"APP_BASE_URL"`
+	PublicOrigin          string `env:"PUBLIC_ORIGIN"`
 	APIBaseURL            string `env:"API_BASE_URL"`
 
 	AuthServiceBaseURL        string `env:"AUTH_SERVICE_BASE_URL"`
@@ -171,6 +173,12 @@ func Load() *Config {
 	appEnv := normalizeAppEnv(raw.AppEnv)
 	natsURL := strings.TrimSpace(raw.NATSURL)
 
+	publicOrigin := normalizePublicOrigin(raw.PublicOrigin)
+	apiOrigin := normalizePublicOrigin(raw.APIBaseURL)
+	if apiOrigin == "" {
+		apiOrigin = publicOrigin
+	}
+
 	return &Config{
 		Database: DatabaseConfig{
 			Host:              stringEnvDefault(raw.DBHost, "localhost"),
@@ -194,8 +202,8 @@ func Load() *Config {
 			CORSAllowedOrigins: detectCORSAllowedOrigins(raw.AppCORSAllowedOrigins, appEnv),
 		},
 		PublicOrigins: PublicOriginsConfig{
-			Web: normalizePublicOrigin(raw.AppBaseURL),
-			API: normalizePublicOrigin(raw.APIBaseURL),
+			Web: publicOrigin,
+			API: apiOrigin,
 		},
 		Auth: AuthServiceConfig{
 			BaseURL:        stringEnvDefault(raw.AuthServiceBaseURL, "http://127.0.0.1:6001"),

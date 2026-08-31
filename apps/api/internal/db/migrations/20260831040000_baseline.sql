@@ -1721,7 +1721,7 @@ CREATE TABLE api_accounts (
   CONSTRAINT chk_api_accounts_provider_endpoint_id_positive CHECK (provider_endpoint_id > 0),
   CONSTRAINT chk_api_accounts_status CHECK (status IN (0, 1)),
   CONSTRAINT chk_api_accounts_max_concurrent CHECK (max_concurrent BETWEEN 1 AND 64),
-  CONSTRAINT chk_api_accounts_timeout CHECK (timeout BETWEEN 1 AND 600),
+  CONSTRAINT chk_api_accounts_timeout CHECK (timeout BETWEEN 1 AND 900),
   CONSTRAINT chk_api_accounts_fail_count CHECK (fail_count >= 0),
   CONSTRAINT chk_api_accounts_weight CHECK (weight > 0),
   CONSTRAINT chk_api_accounts_deleted_status CHECK (deleted_at IS NULL OR status = 0),
@@ -2365,6 +2365,9 @@ CREATE INDEX idx_media_assets_owner_status ON media_assets (owner_user_id, statu
 CREATE INDEX idx_media_assets_owner_active_updated ON media_assets (owner_user_id, updated_at DESC, id DESC) WHERE deleted_at IS NULL;
 CREATE INDEX idx_media_assets_storage_key ON media_assets (storage_profile_id, storage_key);
 CREATE INDEX idx_media_assets_reclamation_due ON media_assets (reclaim_after, id) WHERE deleted_at IS NULL AND reclaim_after IS NOT NULL;
+CREATE UNIQUE INDEX uq_media_assets_owned_checksum
+  ON media_assets (owner_user_id, storage_profile_id, checksum_sha256)
+  WHERE checksum_sha256 <> '' AND status = 'ready' AND deleted_at IS NULL;
 
 -- Media lineage is intentionally metadata-only for now. It records where an
 -- asset came from without introducing a Media Transformation execution model.
@@ -2414,7 +2417,7 @@ CREATE TABLE media_derivatives (
   last_attempt_at TIMESTAMPTZ(3),
   CONSTRAINT uq_media_derivatives_asset_tier UNIQUE (media_asset_id, tier),
   CONSTRAINT uq_media_derivatives_id_owner UNIQUE (id, owner_user_id),
-  CONSTRAINT ck_media_derivatives_tier CHECK (tier IN ('thumb', 'preview', 'large-preview')),
+  CONSTRAINT ck_media_derivatives_tier CHECK (tier IN ('thumb', 'preview', 'large-preview', 'processing', 'processing-input')),
   CONSTRAINT ck_media_derivatives_format CHECK (format IN ('webp', 'jpeg', 'png')),
   CONSTRAINT ck_media_derivatives_status CHECK (status IN ('pending', 'processing', 'ready', 'failed', 'obsolete')),
   CONSTRAINT ck_media_derivatives_storage_profile_id_not_blank CHECK (btrim(storage_profile_id) <> ''),
@@ -2754,7 +2757,7 @@ CREATE TABLE feature_prompts (
   updated_by BIGINT,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT ck_feature_prompts_feature_slug CHECK (feature_slug IN ('prompt-generation', 'inpaint', 'render', 'variations', 'cutout', 'style-fusion', 'hd-upscale', 'outpaint')),
+  CONSTRAINT ck_feature_prompts_feature_slug CHECK (feature_slug IN ('generation', 'inpaint', 'render', 'variations', 'cutout', 'fusion', 'upscale', 'outpaint')),
   CONSTRAINT fk_feature_prompts_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE TABLE boards (

@@ -20,7 +20,7 @@ var configEnvKeys = []string{
 	"APP_HOST",
 	"METRICS_ADDR",
 	"APP_CORS_ALLOWED_ORIGINS",
-	"APP_BASE_URL",
+	"PUBLIC_ORIGIN",
 	"API_BASE_URL",
 	"AUTH_SERVICE_BASE_URL",
 	"AUTH_INTERNAL_KEY",
@@ -75,11 +75,21 @@ func TestPublicOriginsValidateAndResolveCanonicalURLs(t *testing.T) {
 
 func TestLoadPublicOriginsFromDeploymentEnvironment(t *testing.T) {
 	resetConfigEnv(t)
-	t.Setenv("APP_BASE_URL", " https://app.example.com/ ")
+	t.Setenv("PUBLIC_ORIGIN", " https://app.example.com/ ")
 	t.Setenv("API_BASE_URL", " https://api.example.com/ ")
 
 	got := Load().PublicOrigins
 	if got.Web != "https://app.example.com" || got.API != "https://api.example.com" {
+		t.Fatalf("PublicOrigins = %+v", got)
+	}
+}
+
+func TestLoadPublicOriginsDefaultsAPIToPublicOrigin(t *testing.T) {
+	resetConfigEnv(t)
+	t.Setenv("PUBLIC_ORIGIN", " https://app.example.com/ ")
+
+	got := Load().PublicOrigins
+	if got.Web != "https://app.example.com" || got.API != "https://app.example.com" {
 		t.Fatalf("PublicOrigins = %+v", got)
 	}
 }
