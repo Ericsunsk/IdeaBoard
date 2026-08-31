@@ -92,7 +92,7 @@ func newAppTaskRuntime(
 	riverQueue := taskqueue.NewRiverQueue(nil, dbs.db, postgresRuntimeStore, taskqueue.RiverMaxAttemptsDefault)
 	accountService := accounts.NewAccountService(accounts.AccountServiceDeps{
 		AccountRepo:      repos.accountRepo,
-		TaskRepo:         repos.taskRepo,
+		TaskRepo:         repos.taskRepo.Queries(),
 		QueueStats:       riverQueue,
 		AccountLoadStore: postgresRuntimeStore,
 		ConcurrencyStore: postgresRuntimeStore,
@@ -103,7 +103,7 @@ func newAppTaskRuntime(
 	})
 	riverTaskWorker := worker.NewRiverTaskWorker(worker.RiverTaskWorkerDeps{
 		AccountRepo:        repos.accountRepo,
-		TaskRepo:           repos.taskRepo,
+		TaskRepo:           repos.taskRepo.Runtime(),
 		Enqueuer:           riverQueue,
 		Assigner:           postgresAssigner,
 		CancelStore:        postgresRuntimeStore,
@@ -177,7 +177,7 @@ func newAppTaskRuntime(
 	}
 	riverQueue.SetClient(riverClient)
 
-	submissionStore := tasksubmission.NewStore(dbs.riverPool, repos.taskRepo, riverClient, taskqueue.RiverQueueDefault, taskqueue.RiverMaxAttemptsDefault, taskBillingService)
+	submissionStore := tasksubmission.NewStore(dbs.riverPool, repos.taskRepo.Submission(), riverClient, taskqueue.RiverQueueDefault, taskqueue.RiverMaxAttemptsDefault, taskBillingService)
 	taskService := taskservice.NewService(taskservice.ServiceDeps{
 		TaskIntake: taskservice.NewTaskIntake(taskservice.TaskIntakeDeps{
 			Accounts:       repos.accountRepo,
@@ -186,13 +186,13 @@ func newAppTaskRuntime(
 			MediaReadiness: repos.mediaAssetRegistry,
 			MediaPreparer:  generationMediaPreparer,
 		}),
-		TaskRepo:            repos.taskRepo,
+		TaskRepo:            repos.taskRepo.Queries(),
 		SubmissionStore:     submissionStore,
 		CancelStore:         postgresRuntimeStore,
 		TaskBilling:         taskBillingService,
-		AdminBillingHistory: repos.taskRepo,
-		AdminTaskTrace:      repos.taskRepo,
-		AdminTaskListRead:   repos.taskRepo,
+		AdminBillingHistory: repos.taskRepo.Billing(),
+		AdminTaskTrace:      repos.taskRepo.Trace(),
+		AdminTaskListRead:   repos.taskRepo.Trace(),
 		BillableItems:       services.billableItemRegistry,
 		UserResolver:        taskUserResolver{repo: repos.userRepo},
 	}, taskservice.ServiceOptions{
@@ -203,7 +203,7 @@ func newAppTaskRuntime(
 	return appTaskServices{
 			accountService:   accountService,
 			taskService:      taskService,
-			taskStatsService: taskstats.NewService(repos.taskRepo),
+			taskStatsService: taskstats.NewService(repos.taskRepo.Statistics()),
 			userEvents:       userEventHub,
 		}, appWorkerRuntime{
 			riverClient: riverClient,
