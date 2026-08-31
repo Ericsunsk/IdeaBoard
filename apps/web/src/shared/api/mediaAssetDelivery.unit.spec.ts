@@ -129,4 +129,31 @@ describe('useMediaAssetDelivery', () => {
       expect.objectContaining({ method: 'GET' }),
     )
   })
+
+  it('loads metadata for multiple assets in one request and hydrates cache', async () => {
+    mocks.request.mockResolvedValueOnce({
+      code: 0,
+      msg: '',
+      data: {
+        items: [
+          { ...metadata('ready').data, asset_id: '42' },
+          { ...metadata('ready').data, asset_id: '43' },
+        ],
+      },
+    })
+    const { getMediaAssetMetadataBatch, getMediaAssetMetadata, invalidateMediaAssetMetadata } =
+      await import('./mediaAssetDelivery')
+    invalidateMediaAssetMetadata()
+    const result = await getMediaAssetMetadataBatch([43, 42, 42])
+    expect([...result.keys()]).toEqual([42, 43])
+    expect(mocks.request).toHaveBeenCalledWith(
+      '/user/media-assets/delivery/batch',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ asset_ids: ['43', '42'] }),
+      }),
+    )
+    await getMediaAssetMetadata(42)
+    expect(mocks.request).toHaveBeenCalledTimes(1)
+  })
 })

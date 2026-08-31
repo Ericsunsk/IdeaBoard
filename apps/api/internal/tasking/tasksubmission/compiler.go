@@ -73,7 +73,7 @@ func CompileGenerationSnapshot(input GenerationCompilerInput) (tasks.GenerationR
 		}
 	}
 	appendMedia := func(ref tasks.MediaRef) {
-		if strings.TrimSpace(ref.Source) == "" {
+		if strings.TrimSpace(ref.Source) == "" && ref.AssetID <= 0 {
 			return
 		}
 		snapshot.Media = append(snapshot.Media, tasks.GenerationMediaIntent{

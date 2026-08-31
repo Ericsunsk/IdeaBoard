@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { libraryAssetKey, toLibraryAssetInput } from './libraryResource'
+import { libraryAssetKey, resolveLibraryAssetCardURL, toLibraryAssetInput } from './libraryResource'
 
 describe('libraryResource intent adapter', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -32,5 +32,21 @@ describe('libraryResource intent adapter', () => {
 
   it('uses one saved identity key format for lookup and UI state', () => {
     expect(libraryAssetKey('pexels', '123')).toBe('pexels:123')
+  })
+
+  it('bounds provider preview delivery for Library cards', () => {
+    expect(
+      resolveLibraryAssetCardURL({
+        provider: 'unsplash',
+        preview_url: 'https://images.unsplash.com/photo-1?ixid=abc&w=1080',
+      }),
+    ).toBe('https://images.unsplash.com/photo-1?ixid=abc&w=480&auto=format&fit=crop&q=75')
+
+    expect(
+      resolveLibraryAssetCardURL({
+        provider: 'pexels',
+        preview_url: 'https://images.pexels.com/photos/1.jpeg?w=1200',
+      }),
+    ).toBe('https://images.pexels.com/photos/1.jpeg?w=480&auto=compress&cs=tinysrgb')
   })
 })

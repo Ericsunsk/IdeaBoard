@@ -45,6 +45,30 @@ export function libraryAssetKey(provider: string, sourceID: string): string {
   return `${provider}:${sourceID}`
 }
 
+/** Returns a bandwidth-bounded URL for Library cards without changing the saved original. */
+export function resolveLibraryAssetCardURL(
+  asset: Pick<LibraryAsset, 'provider' | 'preview_url'>,
+): string {
+  const source = asset.preview_url.trim()
+  if (!source) return ''
+  try {
+    const url = new URL(source)
+    if (asset.provider === 'unsplash' && url.hostname.endsWith('images.unsplash.com')) {
+      url.searchParams.set('auto', 'format')
+      url.searchParams.set('fit', 'crop')
+      url.searchParams.set('w', '480')
+      url.searchParams.set('q', '75')
+    } else if (asset.provider === 'pexels' && url.hostname.endsWith('images.pexels.com')) {
+      url.searchParams.set('auto', 'compress')
+      url.searchParams.set('cs', 'tinysrgb')
+      url.searchParams.set('w', '480')
+    }
+    return url.toString()
+  } catch {
+    return source
+  }
+}
+
 export function toLibraryAssetInput(reference: LibrarySearchReference): LibraryAssetInput {
   return {
     provider: reference.provider,

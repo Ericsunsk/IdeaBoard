@@ -57,6 +57,28 @@ describe('Canvas transient overlay motion', () => {
     expect(onCreate).toHaveBeenCalledWith('prompt')
   })
 
+  it('keeps the context menu inside the viewport when opened near an edge', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: false })),
+    )
+    render(CanvasNodeContextMenu, {
+      props: {
+        visible: true,
+        x: 1000,
+        y: 760,
+        items: [{ key: 'prompt', label: '提示词' }],
+        onCreate: vi.fn(),
+      },
+      global: { stubs: { transition: TransitionStub } },
+    })
+
+    await vi.waitFor(() => {
+      const menu = document.querySelector('.canvas-node-context-menu')
+      expect(menu).toHaveStyle({ left: '856px', top: '714px' })
+    })
+  })
+
   it('keeps Node tool Popover layout, attrs, and show/hide behavior', async () => {
     vi.stubGlobal(
       'matchMedia',

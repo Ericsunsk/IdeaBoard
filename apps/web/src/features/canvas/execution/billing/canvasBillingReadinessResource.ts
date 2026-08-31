@@ -15,6 +15,7 @@ import {
   createCanvasTaskClientActionId,
   withTaskClientActionId,
 } from '../task-runner/taskClientActionIds'
+import type { SubmitTaskReadinessMatrixRequest } from '../../../../shared/api/task'
 
 function buildCanvasBillingReadinessRequest(feature: WorkflowFeature): SubmitTaskData {
   switch (feature) {
@@ -47,6 +48,13 @@ export async function fetchCanvasBillingReadiness(
       createCanvasTaskClientActionId(),
     ),
   })
+}
+
+export async function fetchCanvasBillingReadinessMatrix(
+  requests: NonNullable<SubmitTaskReadinessMatrixRequest['requests']>,
+): Promise<SubmitTaskReadinessData[]> {
+  if (requests.length === 0) return []
+  return taskApi.checkSubmitReadinessMatrix({ requests })
 }
 
 export function buildFusionBillingReadinessRequest(input: {

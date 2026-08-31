@@ -50,7 +50,6 @@ export type UseCanvasImageToolsOptions = {
     options?: { zoom?: number; duration?: number; interpolate?: 'smooth' },
   ) => Promise<unknown> | unknown
   createPendingAdjustmentNode: (
-    point: { x: number; y: number },
     sourceNode: ImageNodeItem,
   ) => string | null
   applyImageFileToImageNode: (nodeId: string, file: File) => Promise<boolean>

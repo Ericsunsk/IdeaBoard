@@ -17,6 +17,12 @@ type Validator interface {
 	ValidateSubmitMediaRef(ctx context.Context, userID int64, raw string) error
 }
 
+// AssetAuthorizer validates durable media Asset IDs against the submitting owner.
+// It is optional for backwards-compatible test validators; production wiring provides it.
+type AssetAuthorizer interface {
+	AuthorizeMediaAsset(ctx context.Context, userID, assetID int64) error
+}
+
 type UploadReader interface {
 	ReadUploadObject(ctx context.Context, ref string, maxBytes int64) (*StoredObject, error)
 }
@@ -77,8 +83,9 @@ type StoredObject struct {
 }
 
 type SubmitMediaValidator struct {
-	publicOrigins config.PublicOriginsConfig
-	authorizer    UploadAuthorizer
+	publicOrigins   config.PublicOriginsConfig
+	authorizer      UploadAuthorizer
+	assetAuthorizer AssetAuthorizer
 }
 
 type UploadAuthorizer interface {
@@ -87,11 +94,34 @@ type UploadAuthorizer interface {
 
 const canvasUploadPrefix = "/uploads/canvas/"
 
-func NewSubmitMediaValidator(publicOrigins config.PublicOriginsConfig, authorizer UploadAuthorizer) *SubmitMediaValidator {
-	return &SubmitMediaValidator{
-		publicOrigins: publicOrigins,
-		authorizer:    authorizer,
+func NewSubmitMediaValidator(publicOrigins config.PublicOriginsConfig, authorizer UploadAuthorizer, assetAuthorizers ...AssetAuthorizer) *SubmitMediaValidator {
+	var assetAuthorizer AssetAuthorizer
+	if len(assetAuthorizers) > 0 {
+		assetAuthorizer = assetAuthorizers[0]
 	}
+	return &SubmitMediaValidator{
+		publicOrigins:   publicOrigins,
+		authorizer:      authorizer,
+		assetAuthorizer: assetAuthorizer,
+	}
+}
+
+func (v *SubmitMediaValidator) ValidateSubmitMediaAssetIDs(ctx context.Context, userID int64, assetIDs []int64) error {
+	if len(assetIDs) == 0 {
+		return nil
+	}
+	if v == nil || v.assetAuthorizer == nil {
+		return fmt.Errorf("无法校验媒体资产权限")
+	}
+	for index, assetID := range assetIDs {
+		if assetID <= 0 {
+			return fmt.Errorf("媒体 AssetID 无效: index=%d", index)
+		}
+		if err := v.assetAuthorizer.AuthorizeMediaAsset(ctx, userID, assetID); err != nil {
+			return fmt.Errorf("无权使用媒体 AssetID: index=%d", index)
+		}
+	}
+	return nil
 }
 
 func (v *SubmitMediaValidator) ValidateSubmitMediaRef(ctx context.Context, userID int64, raw string) error {

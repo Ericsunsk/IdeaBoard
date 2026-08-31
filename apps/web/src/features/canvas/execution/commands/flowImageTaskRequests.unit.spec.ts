@@ -34,6 +34,19 @@ const source = {
 }
 
 describe('flowImageTaskRequests', () => {
+  it('prefers AssetID over runtime URL for internal Canvas sources', () => {
+    const request = buildDirectActionTaskRequest({
+      source: { ...source, mediaAssetId: 42 },
+      action: IMAGE_NODE_ACTION.variations,
+      imageSize: null,
+      prompt: 'vary this image',
+      outputCount: 1,
+    })
+
+    expect(request.image_asset_ids).toEqual([42])
+    expect(request).not.toHaveProperty('image_urls')
+  })
+
   it('normalizes HD slider strength to a 1.0-4.0 scale', () => {
     expect(resolveHdScale(undefined)).toBe(2)
     expect(resolveHdScale(0)).toBe(1)

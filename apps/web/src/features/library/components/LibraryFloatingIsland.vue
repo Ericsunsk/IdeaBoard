@@ -213,7 +213,7 @@
                     </div>
                     <img
                       v-else
-                      :src="asset.preview_url"
+                      :src="resolveLibraryAssetCardURL(asset)"
                       :alt="asset.title || t('library.states.savedReference')"
                       loading="lazy"
                       class="h-full w-full object-cover"
@@ -519,7 +519,12 @@ import {
 } from '@iconoir/vue'
 import { useLibraryWorkspace, type LibraryFolderTab } from '../useLibraryWorkspace'
 import type { LibraryFolderFacts, LibraryMutationPublisher } from '../libraryFolderFacts'
-import { libraryAssetKey, saveSearchReference, type LibraryAssetView } from '../libraryResource'
+import {
+  libraryAssetKey,
+  resolveLibraryAssetCardURL,
+  saveSearchReference,
+  type LibraryAssetView,
+} from '../libraryResource'
 import {
   toCanvasLibraryImportDescriptor,
   getLibraryDropEffect,

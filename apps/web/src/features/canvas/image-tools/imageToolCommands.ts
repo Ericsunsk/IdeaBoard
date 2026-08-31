@@ -61,11 +61,6 @@ export function createImageToolCommands(session: ImageToolSession) {
     session.exitRetouchMode({ runBeforeExit: false })
     session.retouchSession.resetRetouchSession()
 
-    const targetPoint = {
-      x: Number(sourceNode.x ?? 0) + Math.max(240, Number(sourceNode.width ?? 300) + 64),
-      y: Number(sourceNode.y ?? 0),
-    }
-
     let pendingNodeId: CanvasGraphNodeId | null = null
     let pendingNodeMaterialized = false
 
@@ -86,7 +81,7 @@ export function createImageToolCommands(session: ImageToolSession) {
     session.registerImageAdjustmentFinalApplyCleanup(cleanupPendingNode)
 
     try {
-      const createdId = board.createPendingAdjustmentNode(targetPoint, sourceNode)
+      const createdId = board.createPendingAdjustmentNode(sourceNode)
       if (!createdId || !isCanvasGraphNodeId(createdId)) {
         reportGenerationFailure()
         return

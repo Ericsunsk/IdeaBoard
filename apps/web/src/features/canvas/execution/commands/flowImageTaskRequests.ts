@@ -35,9 +35,16 @@ import {
 } from '../contracts/imageActionExecution'
 
 function requireImageExecutionInputUrl(source: ImageExecutionInput): string {
+  if (source.mediaAssetId) return ''
   const url = `${source.url ?? ''}`.trim()
   if (!url) throw new Error(i18n.global.t('canvas.execution.imageMissingUrl'))
   return url
+}
+
+function imageAssetIds(sources: ImageExecutionInput[]): number[] {
+  return sources
+    .map((source) => source.mediaAssetId)
+    .filter((id): id is number => id !== undefined && Number.isInteger(id) && id > 0)
 }
 
 export type ImageInpaintTaskRequestInput = {
@@ -45,11 +52,13 @@ export type ImageInpaintTaskRequestInput = {
   originalImageUrl: string
   maskImageUrl: string
   imageSize: ExecutionImageSize | null
+  originalImageAssetId?: number
 }
 
 export type FusionTaskRequestInput = {
   prompt: string
   imageUrls: string[]
+  imageAssetIds?: number[]
   inputWeights: number[]
   outputCount?: number
   sizeSource: ExecutionImageSize | null
@@ -150,6 +159,8 @@ export function buildPromptGenerationTaskRequest(input: {
   prompt: string
   aspectRatio: PromptAspectRatio
   imageUrls?: string[]
+  imageAssetIds?: number[]
+  referenceImageAssetIds?: number[]
   outputCount: number
   outputResolution?: import('../../../../shared/domain/generationContract').OutputResolution
 }): SubmitTaskData {
@@ -158,6 +169,8 @@ export function buildPromptGenerationTaskRequest(input: {
     prompt: `${input.prompt ?? ''}`.trim(),
     feature: EXECUTION_META[EXECUTION_FEATURE.promptGeneration].feature,
     imageUrls: input.imageUrls,
+    imageAssetIds: input.imageAssetIds,
+    referenceImageAssetIds: input.referenceImageAssetIds,
     params: {
       output_count: outputCount,
       output_resolution: input.outputResolution ?? '1k',
@@ -187,7 +200,8 @@ export function buildDirectActionTaskRequest(input: {
     return buildExecutionTaskRequest({
       prompt: input.prompt.trim(),
       feature: execution.feature,
-      imageUrls: [sourceUrl],
+      imageUrls: input.source.mediaAssetId ? undefined : [sourceUrl],
+      imageAssetIds: input.source.mediaAssetId ? [input.source.mediaAssetId] : undefined,
       params: {
         ...outputParams,
         ...sizeParams,
@@ -203,7 +217,8 @@ export function buildDirectActionTaskRequest(input: {
   return buildExecutionTaskRequest({
     prompt: input.prompt.trim(),
     feature: execution.feature,
-    imageUrls: [sourceUrl],
+    imageUrls: input.source.mediaAssetId ? undefined : [sourceUrl],
+    imageAssetIds: input.source.mediaAssetId ? [input.source.mediaAssetId] : undefined,
     params: {
       ...outputParams,
       ...sizeParams,
@@ -219,9 +234,10 @@ export function buildImageInpaintTaskRequest(input: ImageInpaintTaskRequestInput
       output_count: 1,
       output_resolution: 'default',
       ...buildExecutionSizeParams(input.imageSize, input.imageSize),
-      original_image_url: input.originalImageUrl,
+      ...(input.originalImageAssetId ? {} : { original_image_url: input.originalImageUrl }),
       mask_image_url: input.maskImageUrl,
       use_mask: true,
+      ...(input.originalImageAssetId ? { original_image_asset_id: input.originalImageAssetId } : {}),
     },
   })
 }
@@ -241,7 +257,8 @@ export function buildOutpaintTaskRequest(input: {
   return buildExecutionTaskRequest({
     prompt,
     feature: execution.feature,
-    imageUrls: [sourceUrl],
+    imageUrls: input.source.mediaAssetId ? undefined : [sourceUrl],
+    imageAssetIds: input.source.mediaAssetId ? [input.source.mediaAssetId] : undefined,
     params: {
       output_count: 1,
       output_resolution: 'default',
@@ -287,6 +304,7 @@ export function buildFusionTaskRequest(input: FusionTaskRequestInput): SubmitTas
     prompt: input.prompt,
     feature: EXECUTION_FUSION_META.feature,
     imageUrls: input.imageUrls,
+    imageAssetIds: input.imageAssetIds,
     params: {
       ...(outputCount ? { output_count: outputCount } : {}),
       output_resolution: input.outputResolution ?? '1k',
@@ -346,7 +364,10 @@ export function buildImageExecutionTaskRequest(
       return buildPromptGenerationTaskRequest({
         prompt: plan.prompt,
         aspectRatio: plan.aspectRatio,
-        imageUrls: plan.referenceImages.map((image) => image.url),
+        imageUrls: plan.referenceImages.some((image) => !image.mediaAssetId)
+          ? plan.referenceImages.filter((image) => !image.mediaAssetId).map((image) => image.url)
+          : undefined,
+        referenceImageAssetIds: imageAssetIds(plan.referenceImages),
         outputCount: plan.outputCount,
         outputResolution: plan.outputResolution,
       })
@@ -354,6 +375,7 @@ export function buildImageExecutionTaskRequest(
       return buildFusionTaskRequest({
         prompt: plan.taskPrompt,
         imageUrls: plan.imageUrls,
+        imageAssetIds: imageAssetIds(plan.inputImages),
         inputWeights: plan.inputWeights,
         outputCount: plan.outputCount,
         sizeSource: plan.sizeSource,
@@ -374,5 +396,6 @@ export function buildPreparedImageInpaintTaskRequest(input: {
     originalImageUrl: input.plan.source.url,
     maskImageUrl: input.maskImageUrl,
     imageSize: input.imageSize,
+    originalImageAssetId: input.plan.source.mediaAssetId,
   })
 }

@@ -3,6 +3,7 @@ import { ref, shallowRef } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createEmptyCanvasBoardSnapshot,
+  resolveImageNodeStageHeight,
   type CanvasNodeItem,
   type ImageNodeItem,
   type PromptNodeItem,
@@ -295,16 +296,13 @@ describe('useCanvasGraphEditing', () => {
       outputImages: [],
     }
 
-    const createdNodeId = harness.editing.workflowPort.createPendingAdjustmentNode(
-      { x: 580, y: 200 },
-      sourceNode,
-    )
+    const createdNodeId = harness.editing.workflowPort.createPendingAdjustmentNode(sourceNode)
 
     expect(createdNodeId).toMatch(/^image-\d+$/)
     expect(harness.nodes.value).toContainEqual(
       expect.objectContaining({
         id: createdNodeId,
-        position: { x: 580, y: 200 },
+        position: { x: 660, y: 200 },
         data: expect.objectContaining({
           kind: 'image',
           snapshotNode: expect.objectContaining({
@@ -314,6 +312,48 @@ describe('useCanvasGraphEditing', () => {
             outputImages: [],
           }),
         }),
+      }),
+    )
+  })
+
+  it('places a Retouch result below an image occupying the preferred result position', () => {
+    const sourceNode: ImageNodeItem = {
+      id: 10,
+      type: 'image-node',
+      x: 100,
+      y: 200,
+      width: 460,
+      sourceImageUrl: 'https://example.com/source.png',
+      sourceImageRatio: 1.5,
+      outputStatus: 'ready',
+      outputImages: [],
+    }
+    const variationNode: ImageNodeItem = {
+      id: 11,
+      type: 'image-node',
+      x: 660,
+      y: 200,
+      width: 460,
+      sourceImageUrl: 'https://example.com/variation.png',
+      sourceImageRatio: 1.5,
+      outputStatus: 'ready',
+      outputImages: [],
+    }
+    const harness = createHarness([
+      createFlowNode('image-10', 'image', sourceNode),
+      createFlowNode('image-11', 'image', variationNode),
+    ])
+
+    const createdNodeId = harness.editing.workflowPort.createPendingAdjustmentNode(sourceNode)
+    const retouchNode = harness.nodes.value.find((node) => node.id === createdNodeId)
+    const variationHeight = 26 + resolveImageNodeStageHeight(460, 1.5, true)
+
+    expect(retouchNode).toEqual(
+      expect.objectContaining({
+        position: {
+          x: 660,
+          y: 200 + variationHeight + 14,
+        },
       }),
     )
   })

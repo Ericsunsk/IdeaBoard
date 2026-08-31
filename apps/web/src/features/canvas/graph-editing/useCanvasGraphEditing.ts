@@ -10,6 +10,11 @@ import {
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { CanvasVueFlowGraphAdapter } from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import type { CanvasGraphStore } from '../graph-runtime'
+import type { CanvasRendererMetricsPort } from '../vue-flow-adapter'
+import {
+  resolvePendingImageResultPosition,
+  type PendingImageResultLookup,
+} from '../execution'
 import { useFlowCanvasDrop } from './useFlowCanvasDrop'
 import { useFlowImageNodeSnapshots } from './useFlowImageNodeSnapshots'
 import { useFlowImageUploadActions } from './useFlowImageUploadActions'
@@ -199,7 +204,6 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
   }
 
   function createPendingAdjustmentNode(
-    point: { x: number; y: number },
     sourceNode: ImageNodeItem,
   ): string | null {
     const ratio = resolveImageNodeDisplayRatio(sourceNode)
@@ -208,8 +212,33 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
       Number.isFinite(sourceWidth) && sourceWidth > 0
         ? sourceWidth
         : resolveImageNodeFrameSize(ratio, true).width
+    const store = options.readCanvasGraphStore()
+    const lookup: PendingImageResultLookup = {
+      nodeById: new Map(
+        store
+          .getNodeIds()
+          .map((nodeId) => store.getNode(nodeId))
+          .filter((node): node is NonNullable<typeof node> => !!node)
+          .map((node) => [node.id, node]),
+      ),
+      imageChildIdsBySource: new Map(),
+    }
+    const rendererMetrics: CanvasRendererMetricsPort = {
+      readNodeMetrics: () => null,
+    }
+    const position = resolvePendingImageResultPosition(
+      {
+        x: Number(sourceNode.x ?? 0),
+        y: Number(sourceNode.y ?? 0),
+        width,
+        ratio,
+      },
+      lookup,
+      rendererMetrics,
+      { width, ratio },
+    )
 
-    return nodeMutations.createNodeAtPosition('image', point.x, point.y, {
+    return nodeMutations.createNodeAtPosition('image', position.x, position.y, {
       title: sourceNode.title || 'Image',
       width,
       sourceImageRatio: ratio,

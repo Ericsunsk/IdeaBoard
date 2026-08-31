@@ -423,6 +423,46 @@ func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 	}
 }
 
+func TestCheckSubmitTaskReadinessMatrixReturnsAllFeatureEnvelopes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	service := newSubmitServiceForTest(submitTestServiceDeps{
+		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+			ID:     101,
+			Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
+		}}},
+		SubmissionStore: &recordingSubmissionStore{},
+		MediaValidator:  testSubmitMediaValidator{},
+		TaskBilling:     newHandlerTaskBillingService(),
+	}, ServiceOptions{})
+	router := newSubmitHandlerTestRouter(t, service, 42)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit/readiness/matrix", map[string]interface{}{
+		"requests": []map[string]interface{}{
+			{"feature": workflow.FeatureSlugOutpaint, "prompt": "matrix one"},
+			{"feature": workflow.FeatureSlugCutout, "prompt": "matrix two"},
+		},
+	}))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d, body=%s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Code int `json:"code"`
+		Data struct {
+			Items []submitTaskReadinessResponse `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != 0 || len(body.Data.Items) != 2 {
+		t.Fatalf("unexpected matrix response: %+v", body)
+	}
+	if body.Data.Items[0].Feature != workflow.FeatureSlugOutpaint || body.Data.Items[1].Feature != workflow.FeatureSlugCutout {
+		t.Fatalf("unexpected item features: %+v", body.Data.Items)
+	}
+}
+
 func TestCheckSubmitTaskReadinessHandlerHidesMissingProviderConfiguration(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -630,6 +670,10 @@ func newSubmitHandlerTestRouter(t testing.TB, service *Service, userID int64) *g
 	router.POST("/submit/readiness", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, userID, principal.RoleUser)
 		handler.CheckSubmitTaskReadiness(c)
+	})
+	router.POST("/submit/readiness/matrix", func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, userID, principal.RoleUser)
+		handler.CheckSubmitTaskReadinessMatrix(c)
 	})
 	return router
 }

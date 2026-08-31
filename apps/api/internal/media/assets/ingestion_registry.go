@@ -192,6 +192,19 @@ func (r *MediaAssetRegistry) GetByID(ctx context.Context, ownerUserID, assetID i
 	return r.q.GetMediaAssetByIDForOwner(ctx, dbsqlc.GetMediaAssetByIDForOwnerParams{ID: assetID, OwnerUserID: ownerUserID})
 }
 
+// AuthorizeMediaAsset verifies that a ready, non-deleted asset belongs to the owner.
+// The method intentionally exposes no storage details to task intake.
+func (r *MediaAssetRegistry) AuthorizeMediaAsset(ctx context.Context, ownerUserID, assetID int64) error {
+	asset, err := r.GetByID(ctx, ownerUserID, assetID)
+	if err != nil {
+		return err
+	}
+	if strings.ToLower(strings.TrimSpace(asset.Status)) != "ready" {
+		return fmt.Errorf("媒体资产尚未就绪")
+	}
+	return nil
+}
+
 // FindReadyOwnedMediaAssetByChecksum returns an existing ready asset for the
 // same owner, storage profile, and content digest. Restricting the profile
 // keeps the returned URL valid when operators switch storage backends.
@@ -209,6 +222,14 @@ func (r *MediaAssetRegistry) FindReadyOwnedMediaAssetByChecksum(ctx context.Cont
 		return dbsqlc.MediaAsset{}, false, fmt.Errorf("find media asset by checksum: %w", err)
 	}
 	return asset, true, nil
+}
+
+func (r *MediaAssetRegistry) FindReadyOwnedMediaAssetIDByChecksum(ctx context.Context, ownerUserID int64, storageProfileID, checksum string) (int64, bool, error) {
+	asset, found, err := r.FindReadyOwnedMediaAssetByChecksum(ctx, ownerUserID, storageProfileID, checksum)
+	if err != nil || !found {
+		return 0, found, err
+	}
+	return asset.ID, true, nil
 }
 
 func (r *MediaAssetRegistry) ListDerivatives(ctx context.Context, ownerUserID, assetID int64) ([]dbsqlc.MediaDerivative, error) {

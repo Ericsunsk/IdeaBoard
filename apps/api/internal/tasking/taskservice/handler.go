@@ -31,6 +31,14 @@ type submitTaskReadinessResponse struct {
 	Billing   *taskbilling.Readiness `json:"billing,omitempty"`
 }
 
+type submitTaskReadinessMatrixRequest struct {
+	Requests []tasks.SubmitTaskRequest `json:"requests"`
+}
+
+type submitTaskReadinessMatrixResponse struct {
+	Items []submitTaskReadinessResponse `json:"items"`
+}
+
 type adminTaskResponse struct {
 	Task AdminTaskMonitorDetail `json:"task"`
 }
@@ -121,33 +129,54 @@ func (h *Handler) CheckSubmitTaskReadiness(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	readiness, err := h.taskService.CheckSubmitTaskReadiness(c.Request.Context(), userID, &req)
+	result := h.checkSubmitTaskReadiness(c, userID, &req, true)
+	response.SuccessDTO(c, result)
+}
+
+// CheckSubmitTaskReadinessMatrix evaluates several canonical requests in one HTTP round trip.
+// Each item still goes through the same service path as submit/readiness, preserving quote semantics.
+func (h *Handler) CheckSubmitTaskReadinessMatrix(c *gin.Context) {
+	userID, ok := requireUserID(c)
+	if !ok {
+		return
+	}
+	var req submitTaskReadinessMatrixRequest
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.Requests) == 0 || len(req.Requests) > 16 {
+		response.Error(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	items := make([]submitTaskReadinessResponse, 0, len(req.Requests))
+	for index := range req.Requests {
+		item := h.checkSubmitTaskReadiness(c, userID, &req.Requests[index], false)
+		items = append(items, item)
+	}
+	response.SuccessDTO(c, submitTaskReadinessMatrixResponse{Items: items})
+}
+
+func (h *Handler) checkSubmitTaskReadiness(c *gin.Context, userID int64, req *tasks.SubmitTaskRequest, logFailure bool) submitTaskReadinessResponse {
+	readiness, err := h.taskService.CheckSubmitTaskReadiness(c.Request.Context(), userID, req)
 	if err != nil {
-		slog.Warn("task submit readiness failed", "user_id", userID, "feature", req.Feature, "err", err)
+		if logFailure {
+			slog.Warn("task submit readiness failed", "user_id", userID, "feature", req.Feature, "err", err)
+		}
 		if errors.Is(err, taskbilling.ErrPricingUnavailable) {
-			response.SuccessDTO(c, submitTaskReadinessResponse{
-				Ready: false, Message: "暂时无法获取报价，请重试", ErrorCode: "pricing_unavailable", Feature: req.Feature,
-			})
-			return
+			return submitTaskReadinessResponse{Ready: false, Message: "暂时无法获取报价，请重试", ErrorCode: "pricing_unavailable", Feature: req.Feature}
 		}
 		if errors.Is(err, taskbilling.ErrWalletRestricted) {
-			response.SuccessDTO(c, submitTaskReadinessResponse{Ready: false, Message: "账户受限，暂时无法使用 Idea", ErrorCode: "wallet_restricted", Feature: req.Feature})
-			return
+			return submitTaskReadinessResponse{Ready: false, Message: "账户受限，暂时无法使用 Idea", ErrorCode: "wallet_restricted", Feature: req.Feature}
 		}
 		var submissionErr *SubmissionError
 		if errors.As(err, &submissionErr) {
-			response.SuccessDTO(c, submitTaskReadinessResponse{Ready: false, Message: submissionErr.SafeMessage, ErrorCode: submissionErr.Code, Feature: req.Feature})
-			return
+			return submitTaskReadinessResponse{Ready: false, Message: submissionErr.SafeMessage, ErrorCode: submissionErr.Code, Feature: req.Feature}
 		}
-		response.SuccessDTO(c, submitTaskReadinessResponse{Ready: false, Message: userFacingSubmitError(err), ErrorCode: "submission_invalid", Feature: req.Feature})
-		return
+		return submitTaskReadinessResponse{Ready: false, Message: userFacingSubmitError(err), ErrorCode: "submission_invalid", Feature: req.Feature}
 	}
 	ready := readiness.Billing == nil || readiness.Billing.Sufficient
 	message := ""
 	if !ready {
 		message = "Idea不足"
 	}
-	response.SuccessDTO(c, submitTaskReadinessResponse{Ready: ready, Message: message, Feature: readiness.Feature, Billing: readiness.Billing})
+	return submitTaskReadinessResponse{Ready: ready, Message: message, Feature: readiness.Feature, Billing: readiness.Billing}
 }
 
 func (h *Handler) GetTask(c *gin.Context) {

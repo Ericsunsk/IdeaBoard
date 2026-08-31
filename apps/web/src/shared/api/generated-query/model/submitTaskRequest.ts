@@ -23,5 +23,12 @@ export interface SubmitTaskRequest {
   priority?: number
   feature?: WorkflowFeatureSlug
   image_urls?: string[]
+  /**
+   * Durable media Asset IDs owned by the submitting user. Preferred over image_urls for internal Canvas media.
+   * @items.minimum 1
+   */
+  image_asset_ids?: number[]
+  /** @items.minimum 1 */
+  reference_image_asset_ids?: number[]
   params?: SubmitTaskRequestParams
 }

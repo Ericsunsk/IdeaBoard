@@ -32,6 +32,25 @@ function makeReadiness(
 }
 
 describe('canvas billing readiness store', () => {
+  it('loads multiple action quotes through one readiness matrix request', async () => {
+    const fetchReadinessMatrix = vi.fn(async (requests: SubmitTaskReadinessRequestData[]) =>
+      requests.map((request) => makeReadiness(request.feature as WorkflowFeature)),
+    )
+    const store = createCanvasBillingReadinessStore({ fetchReadinessMatrix })
+    const entries = [
+      { feature: WORKFLOW_FEATURE.variations, request: { feature: WORKFLOW_FEATURE.variations } },
+      { feature: WORKFLOW_FEATURE.cutout, request: { feature: WORKFLOW_FEATURE.cutout } },
+    ]
+
+    await store.ensureMatrix?.(entries)
+    await store.ensureMatrix?.(entries)
+
+    expect(fetchReadinessMatrix).toHaveBeenCalledOnce()
+    expect(fetchReadinessMatrix).toHaveBeenCalledWith(entries.map((entry) => entry.request))
+    expect(store.getFeatureState(WORKFLOW_FEATURE.variations, entries[0].request).status).toBe('ready')
+    expect(store.getFeatureState(WORKFLOW_FEATURE.cutout, entries[1].request).status).toBe('ready')
+  })
+
   it('exposes the server quote and refreshes when the quote changes', async () => {
     const fetchReadiness = vi.fn(async (feature: WorkflowFeature) => makeReadiness(feature))
     const store = createCanvasBillingReadinessStore({ fetchReadiness })

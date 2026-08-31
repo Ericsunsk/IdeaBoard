@@ -58,6 +58,15 @@ type mediaAssetDTO struct {
 	Derivatives map[string]mediaAssetDerivativeDTO `json:"derivatives"`
 }
 
+type mediaAssetBatchRequest struct {
+	AssetIDs   []string `json:"asset_ids"`
+	EnsureTier string   `json:"ensure_tier,omitempty"`
+}
+
+type mediaAssetBatchDTO struct {
+	Items []mediaAssetDTO `json:"items"`
+}
+
 func (h *mediaAssetHandler) Metadata(c *gin.Context) {
 	identity, ok := principal.Require(c)
 	if !ok || h == nil || h.assets == nil || h.storage == nil {
@@ -90,10 +99,81 @@ func (h *mediaAssetHandler) Metadata(c *gin.Context) {
 			}
 		}
 	}
-	rows, err := h.assets.ListDerivatives(c.Request.Context(), identity.UserID(), asset.ID)
+	result, err := h.buildMetadata(c, identity.UserID(), asset)
 	if err != nil {
 		response.InternalError(c, http.StatusInternalServerError, "读取媒体派生信息失败", err)
 		return
+	}
+	c.Header("Cache-Control", "no-store")
+	response.SuccessDTO(c, result)
+}
+
+// MetadataBatch returns metadata and signed delivery URLs for several owned assets
+// in one request. Missing or unauthorized assets are omitted to avoid leaking
+// ownership information across the batch boundary.
+func (h *mediaAssetHandler) MetadataBatch(c *gin.Context) {
+	identity, ok := principal.Require(c)
+	if !ok || h == nil || h.assets == nil || h.storage == nil {
+		return
+	}
+	var req mediaAssetBatchRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "请求参数无效")
+		return
+	}
+	if len(req.AssetIDs) == 0 || len(req.AssetIDs) > 100 {
+		response.Error(c, http.StatusBadRequest, "媒体数量必须在1到100之间")
+		return
+	}
+	ensureTier := strings.TrimSpace(req.EnsureTier)
+	if ensureTier != "" && ensureTier != derivatives.TierLargePreview && ensureTier != derivatives.TierProcessing {
+		response.Error(c, http.StatusBadRequest, "请求的媒体派生规格无效")
+		return
+	}
+	items := make([]mediaAssetDTO, 0, len(req.AssetIDs))
+	seen := make(map[string]struct{}, len(req.AssetIDs))
+	for _, rawID := range req.AssetIDs {
+		assetID := strings.TrimSpace(rawID)
+		if assetID == "" || len(assetID) > 128 {
+			response.Error(c, http.StatusBadRequest, "媒体标识无效")
+			return
+		}
+		if _, exists := seen[assetID]; exists {
+			continue
+		}
+		seen[assetID] = struct{}{}
+		asset, err := h.lookupAsset(c, identity.UserID(), assetID)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			response.InternalError(c, http.StatusInternalServerError, "读取媒体信息失败", err)
+			return
+		}
+		if ensureTier != "" && asset.Status == "ready" {
+			if err := h.assets.EnsureDerivative(c.Request.Context(), identity.UserID(), asset.ID, ensureTier); err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					continue
+				}
+				response.InternalError(c, http.StatusInternalServerError, "准备媒体派生信息失败", err)
+				return
+			}
+		}
+		item, err := h.buildMetadata(c, identity.UserID(), asset)
+		if err != nil {
+			response.InternalError(c, http.StatusInternalServerError, "读取媒体派生信息失败", err)
+			return
+		}
+		items = append(items, item)
+	}
+	c.Header("Cache-Control", "no-store")
+	response.SuccessDTO(c, mediaAssetBatchDTO{Items: items})
+}
+
+func (h *mediaAssetHandler) buildMetadata(c *gin.Context, ownerUserID int64, asset dbsqlc.MediaAsset) (mediaAssetDTO, error) {
+	rows, err := h.assets.ListDerivatives(c.Request.Context(), ownerUserID, asset.ID)
+	if err != nil {
+		return mediaAssetDTO{}, err
 	}
 	result := mediaAssetDTO{
 		AssetID: asset.AssetID, Status: asset.Status, MIMEType: asset.MimeType,
@@ -108,8 +188,7 @@ func (h *mediaAssetHandler) Metadata(c *gin.Context) {
 		result.Original.URL = "/api/user/media-assets/" + asset.AssetID + "/original/content"
 		signedURL, supported, err := h.storage.ResolveSignedURLAtProfile(c.Request.Context(), asset.StorageProfileID, asset.StorageKey, time.Hour)
 		if err != nil {
-			response.InternalError(c, http.StatusInternalServerError, "生成原图访问地址失败", err)
-			return
+			return mediaAssetDTO{}, fmt.Errorf("生成原图访问地址失败: %w", err)
 		}
 		if supported {
 			result.Original.URL = signedURL
@@ -124,8 +203,7 @@ func (h *mediaAssetHandler) Metadata(c *gin.Context) {
 			item.URL = fmt.Sprintf("/api/user/media-assets/%s/derivatives/%s/%s/content", asset.AssetID, row.Tier, row.Format)
 			signedURL, supported, err := h.storage.ResolveSignedURLAtProfile(c.Request.Context(), row.StorageProfileID, row.StorageKey, time.Hour)
 			if err != nil {
-				response.InternalError(c, http.StatusInternalServerError, "生成媒体派生访问地址失败", err)
-				return
+				return mediaAssetDTO{}, fmt.Errorf("生成媒体派生访问地址失败: %w", err)
 			}
 			if supported {
 				item.URL = signedURL
@@ -133,8 +211,7 @@ func (h *mediaAssetHandler) Metadata(c *gin.Context) {
 		}
 		result.Derivatives[row.Tier] = item
 	}
-	c.Header("Cache-Control", "no-store")
-	response.SuccessDTO(c, result)
+	return result, nil
 }
 
 func (h *mediaAssetHandler) Content(c *gin.Context) {

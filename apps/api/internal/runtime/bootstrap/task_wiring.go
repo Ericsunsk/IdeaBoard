@@ -81,7 +81,7 @@ func newAppTaskRuntime(
 	)
 	runtimeTaskMediaStore := storage.NewRuntimeTaskMediaStore(services.storageService, repos.mediaAssetRegistry)
 	generationMediaPreparer := preparation.NewService(services.storageService, repos.mediaAssetRegistry)
-	submitMediaValidator := taskmedia.NewSubmitMediaValidator(cfg.PublicOrigins, taskMediaAuthorizer)
+	submitMediaValidator := taskmedia.NewSubmitMediaValidator(cfg.PublicOrigins, taskMediaAuthorizer, repos.mediaAssetRegistry)
 	userEventHub := events.NewUserEventHub()
 	taskEventHub := taskservice.NewEventHub()
 	taskEvents, eventBus, err := newTaskStatusEventPublisherWithResolver(ctx, cfg.Events, taskEventHub, repos.taskRepo, userEventHub)

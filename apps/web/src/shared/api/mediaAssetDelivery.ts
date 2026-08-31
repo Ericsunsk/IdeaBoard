@@ -14,11 +14,13 @@ import { subscribeUserEvent } from './userEventStream'
 import { i18n } from '../i18n'
 import {
   getGetUserMediaAssetMetadataUrl,
+  getGetUserMediaAssetMetadataBatchUrl,
   getGetUserMediaAssetOriginalContentUrl,
   getGetUserMediaAssetDerivativeContentUrl,
 } from './generated-query/user-assets/user-assets'
 import type {
   ApiResponseMediaAssetMetadata,
+  ApiResponseMediaAssetMetadataBatch,
   MediaAssetDeliveryVariant as GeneratedMediaAssetDeliveryVariant,
   MediaAssetMetadata,
 } from './generated-query/model'
@@ -53,6 +55,7 @@ const SIGNED_URL_REFRESH_SKEW_MS = 2 * 60 * 1000
 
 const metadataCache = new Map<number, CachedMetadata>()
 const metadataRequests = new Map<string, Promise<MediaAssetDeliveryMetadata>>()
+const metadataBatchRequests = new Map<string, Promise<ReadonlyMap<number, MediaAssetDeliveryMetadata>>>()
 const ensuredTiers = new Set<string>()
 const invalidationListeners = new Map<number, Set<() => void>>()
 let stopMediaEventSubscription: (() => void) | null = null
@@ -184,6 +187,66 @@ export async function getMediaAssetMetadata(
       if (metadataRequests.get(requestKey) === request) metadataRequests.delete(requestKey)
     })
   metadataRequests.set(requestKey, request)
+  return request
+}
+
+/**
+ * Fetch metadata for multiple assets in one round trip and hydrate the same
+ * cache used by useMediaAssetDelivery. Results are keyed by numeric media ID;
+ * assets the user cannot access are omitted by the API and therefore absent.
+ */
+export async function getMediaAssetMetadataBatch(
+  assetIds: readonly number[],
+  options: {
+    signal?: AbortSignal
+    force?: boolean
+    ensureTier?: Extract<MediaAssetDeliveryTier, 'large-preview' | 'processing'>
+  } = {},
+): Promise<ReadonlyMap<number, MediaAssetDeliveryMetadata>> {
+  const ids = Array.from(
+    new Set(
+      assetIds.filter((value) => Number.isInteger(value) && value > 0),
+    ),
+  )
+  if (ids.length === 0) return new Map()
+  if (ids.length > 100) throw new Error('Too many media assets requested')
+  const sortedIDs = [...ids].sort((a, b) => a - b)
+  const requestKey = `${sortedIDs.join(',')}:${options.ensureTier ?? ''}`
+  if (!options.force) {
+    const cached = new Map<number, MediaAssetDeliveryMetadata>()
+    for (const id of ids) {
+      const metadata = getCachedMetadata(id)
+      if (metadata) cached.set(id, metadata)
+    }
+    if (cached.size === ids.length) return cached
+  }
+  const existing = metadataBatchRequests.get(requestKey)
+  if (existing) return existing
+  const request = api
+    .request<ApiResponseMediaAssetMetadataBatch>(getGetUserMediaAssetMetadataBatchUrl(), {
+      method: 'POST',
+      signal: options.signal,
+      body: JSON.stringify({
+        asset_ids: ids.map(String),
+        ...(options.ensureTier ? { ensure_tier: options.ensureTier } : {}),
+      }),
+    })
+    .then((response) => requireApiData(response, i18n.global.t('common.errors.mediaInfoLoadFailed')))
+    .then((data) => {
+      const result = new Map<number, MediaAssetDeliveryMetadata>()
+      for (const metadata of data.items ?? []) {
+        const id = Number(metadata.asset_id)
+        if (!Number.isInteger(id) || id <= 0) continue
+        metadataCache.set(id, { value: metadata, expiresAt: resolveMetadataExpiry(metadata) })
+        if (options.ensureTier) ensuredTiers.add(`${id}:${options.ensureTier}`)
+        result.set(id, metadata)
+      }
+      return result as ReadonlyMap<number, MediaAssetDeliveryMetadata>
+    })
+    .finally(() => {
+      if (metadataBatchRequests.get(requestKey) === request) metadataBatchRequests.delete(requestKey)
+    })
+  metadataBatchRequests.set(requestKey, request)
   return request
 }
 

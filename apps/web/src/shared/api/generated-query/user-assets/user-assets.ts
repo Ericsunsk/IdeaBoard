@@ -20,9 +20,11 @@ import type { MaybeRefOrGetter } from 'vue'
 import type {
   ApiResponseBase,
   ApiResponseMediaAssetMetadata,
+  ApiResponseMediaAssetMetadataBatch,
   ApiResponseUploadAvatar,
   ApiResponseUploadImage,
   DownloadUserImageParams,
+  MediaAssetMetadataBatchRequest,
   UploadUserBoardAssetBody,
   UploadUserProfileAvatarBody,
 } from '../model'
@@ -172,6 +174,106 @@ export function useGetUserMediaAssetOriginalContent<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getGetUserMediaAssetOriginalContentQueryOptions(assetId, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetUserMediaAssetMetadataBatchUrl = () => {
+  return `/user/media-assets/delivery/batch`
+}
+
+export const getUserMediaAssetMetadataBatch = async (
+  mediaAssetMetadataBatchRequest: MediaAssetMetadataBatchRequest,
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseMediaAssetMetadataBatch> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
+  return orvalMutator<ApiResponseMediaAssetMetadataBatch>(getGetUserMediaAssetMetadataBatchUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(mediaAssetMetadataBatchRequest),
+  })
+}
+
+export const getGetUserMediaAssetMetadataBatchQueryKey = (
+  mediaAssetMetadataBatchRequest?: MaybeRefOrGetter<MediaAssetMetadataBatchRequest>,
+) => {
+  return [
+    'POST',
+    'user',
+    'media-assets',
+    'delivery',
+    'batch',
+    mediaAssetMetadataBatchRequest,
+  ] as const
+}
+
+export const getGetUserMediaAssetMetadataBatchQueryOptions = <
+  TData = Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>,
+  TError = ErrorType<ApiResponseBase>,
+>(
+  mediaAssetMetadataBatchRequest: MaybeRefOrGetter<MediaAssetMetadataBatchRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetUserMediaAssetMetadataBatchQueryKey(mediaAssetMetadataBatchRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>> = ({
+    signal,
+  }) =>
+    getUserMediaAssetMetadataBatch(toValue(mediaAssetMetadataBatchRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>,
+    TError,
+    TData
+  >
+}
+
+export type GetUserMediaAssetMetadataBatchQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>
+>
+export type GetUserMediaAssetMetadataBatchQueryError = ErrorType<ApiResponseBase>
+
+export function useGetUserMediaAssetMetadataBatch<
+  TData = Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>,
+  TError = ErrorType<ApiResponseBase>,
+>(
+  mediaAssetMetadataBatchRequest: MaybeRefOrGetter<MediaAssetMetadataBatchRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetUserMediaAssetMetadataBatchQueryOptions(
+    mediaAssetMetadataBatchRequest,
+    options,
+  )
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

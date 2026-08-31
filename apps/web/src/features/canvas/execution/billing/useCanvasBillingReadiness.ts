@@ -16,7 +16,10 @@ import type { SubmitTaskReadinessData } from '../../../../shared/api/task'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { i18n } from '../../../../shared/i18n'
 import { readinessErrorCopy } from '../../../../shared/errors/errorCatalog'
-import { fetchCanvasBillingReadiness } from './canvasBillingReadinessResource'
+import {
+  fetchCanvasBillingReadiness,
+  fetchCanvasBillingReadinessMatrix,
+} from './canvasBillingReadinessResource'
 import { subscribeCanvasTaskReadiness } from './taskReadinessEvents'
 
 export type CanvasBillingQuoteState = {
@@ -34,6 +37,9 @@ type CanvasBillingReadinessFetcher = (
   feature: WorkflowFeature,
   request?: Parameters<typeof fetchCanvasBillingReadiness>[1],
 ) => Promise<SubmitTaskReadinessData>
+type CanvasBillingReadinessMatrixFetcher = (
+  requests: NonNullable<CanvasBillingReadinessRequest>[],
+) => Promise<SubmitTaskReadinessData[]>
 
 type CanvasBillingReadinessRequest = Parameters<typeof fetchCanvasBillingReadiness>[1]
 
@@ -42,11 +48,12 @@ export type CanvasBillingReadinessStore = {
     feature: WorkflowFeature,
     options?: { force?: boolean; request?: CanvasBillingReadinessRequest },
   ) => Promise<void>
+  ensureMatrix?: (entries: Array<{ feature: WorkflowFeature; request: NonNullable<CanvasBillingReadinessRequest> }>) => Promise<void>
   getFeatureState: (
     feature: WorkflowFeature,
     request?: CanvasBillingReadinessRequest,
   ) => CanvasBillingQuoteState
-  applyReadiness: (readiness: SubmitTaskReadinessData) => void
+  applyReadiness: (readiness: SubmitTaskReadinessData, request?: CanvasBillingReadinessRequest) => void
 }
 
 const EMPTY_STATES = Object.fromEntries(
@@ -71,15 +78,19 @@ function buildReadinessStateKey(
 export function createCanvasBillingReadinessStore(
   options: {
     fetchReadiness?: CanvasBillingReadinessFetcher
+    fetchReadinessMatrix?: CanvasBillingReadinessMatrixFetcher
     now?: () => number
     cacheMs?: number
   } = {},
 ): CanvasBillingReadinessStore {
   const fetchReadiness = options.fetchReadiness ?? fetchCanvasBillingReadiness
+  const customFetcher = options.fetchReadiness !== undefined
+  const fetchReadinessMatrix = options.fetchReadinessMatrix ?? fetchCanvasBillingReadinessMatrix
   const now = options.now ?? Date.now
   const cacheMs = options.cacheMs ?? 60_000
   const states = reactive(new Map<string, CanvasBillingQuoteState>())
   const pending = new Map<string, Promise<void>>()
+  const pendingMatrices = new Map<string, Promise<void>>()
   const loadedAt = new Map<string, number>()
   const failedAt = new Map<string, number>()
 
@@ -137,9 +148,9 @@ export function createCanvasBillingReadinessStore(
     loadedAt.set(key, now())
   }
 
-  function applyReadiness(readiness: SubmitTaskReadinessData): void {
+  function applyReadiness(readiness: SubmitTaskReadinessData, request?: CanvasBillingReadinessRequest): void {
     if (!isWorkflowFeature(readiness.feature)) return
-    applyReadinessForKey(buildReadinessStateKey(readiness.feature), readiness)
+    applyReadinessForKey(buildReadinessStateKey(readiness.feature, request), readiness)
   }
 
   async function ensureFeature(
@@ -179,8 +190,52 @@ export function createCanvasBillingReadinessStore(
     return request
   }
 
+  async function ensureMatrix(
+    entries: Array<{ feature: WorkflowFeature; request: NonNullable<CanvasBillingReadinessRequest> }>,
+  ): Promise<void> {
+    // Custom fetchers are used by isolated consumers/tests that only implement the
+    // single-feature contract; preserve that adapter seam without issuing a real request.
+    if (customFetcher && options.fetchReadinessMatrix === undefined) {
+      await Promise.all(entries.map(({ feature, request }) => ensureFeature(feature, { request })))
+      return
+    }
+    const stale = entries.filter(({ feature, request }) => {
+      const key = buildReadinessStateKey(feature, request)
+      const loaded = loadedAt.get(key) ?? 0
+      const failed = failedAt.get(key) ?? 0
+      return now() - loaded >= cacheMs && now() - failed >= cacheMs
+    })
+    if (stale.length === 0) return
+    const batchKey = stale
+      .map(({ feature, request }) => buildReadinessStateKey(feature, request))
+      .sort()
+      .join('|')
+    const pendingBatch = pendingMatrices.get(batchKey)
+    if (pendingBatch) return pendingBatch
+    const requests = stale.map((entry) => entry.request)
+    const batch = fetchReadinessMatrix(requests)
+      .then((values) => {
+        values.forEach((readiness, index) => {
+          const entry = stale[index]
+          if (entry) applyReadinessForKey(buildReadinessStateKey(entry.feature, entry.request), readiness)
+        })
+      })
+      .catch(() => {
+        const timestamp = now()
+        stale.forEach(({ feature, request }) => {
+          const key = buildReadinessStateKey(feature, request)
+          failedAt.set(key, timestamp)
+          states.set(key, { feature, status: 'error', reason: i18n.global.t('common.errors.billingInfoUnavailable') })
+        })
+      })
+      .finally(() => pendingMatrices.delete(batchKey))
+    pendingMatrices.set(batchKey, batch)
+    return batch
+  }
+
   return {
     ensureFeature,
+    ensureMatrix,
     getFeatureState: (feature, request) =>
       states.get(buildReadinessStateKey(feature, request)) ?? EMPTY_STATES[feature],
     applyReadiness,

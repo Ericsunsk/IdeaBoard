@@ -15,6 +15,7 @@ func registerAuthenticatedUserRoutes(r *gin.Engine, authDeps AuthDeps, h UserRou
 func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	mediaAssetHandler := newMediaAssetHandler(h.MediaAssetRegistry, h.MediaStorageService)
 	userAPI.GET("/info", h.AuthHandler.GetCurrentUser)
+	userAPI.POST("/media-assets/delivery/batch", mediaAssetHandler.MetadataBatch)
 	userAPI.GET("/media-assets/:asset_id", mediaAssetHandler.Metadata)
 	userAPI.GET("/media-assets/:asset_id/original/content", mediaAssetHandler.Original)
 	userAPI.GET("/media-assets/:asset_id/derivatives/:tier/:format/content", mediaAssetHandler.Content)
@@ -58,6 +59,7 @@ func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 
 func registerUserTaskRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	userAPI.POST("/tasks/submit/readiness", h.TaskHandler.CheckSubmitTaskReadiness)
+	userAPI.POST("/tasks/submit/readiness/matrix", h.TaskHandler.CheckSubmitTaskReadinessMatrix)
 	userAPI.POST("/tasks/submit", h.TaskHandler.SubmitTask)
 	userAPI.POST("/tasks/:task_id/cancel", h.TaskHandler.CancelUserTask)
 	userAPI.GET("/tasks/:task_id", h.TaskHandler.GetUserTask)

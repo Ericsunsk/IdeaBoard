@@ -13,7 +13,11 @@ import type { VariationsParams } from './variationsParams'
 
 export interface SubmitTaskRequestParams {
   original_image_url?: string
+  /** @minimum 1 */
+  original_image_asset_id?: number
   mask_image_url?: string
+  /** @minimum 1 */
+  mask_image_asset_id?: number
   reference_image_urls?: string[]
   use_mask?: boolean
   /** @minimum 1 */

@@ -367,7 +367,6 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(harness.runtime.viewModel.locks.isCanvasLocked.value).toBe(true)
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-3').directGenerating).toBe(true)
       expect(harness.createPendingAdjustmentNode).toHaveBeenCalledWith(
-        expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
         expect.objectContaining({ id: 1 }),
       )
       expect(harness.connectionAdapter.connectIntent).toHaveBeenCalledWith({
@@ -431,7 +430,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
 
       expect(renderLayerStackFileMock).toHaveBeenCalledWith(
         {
-          url: '/api/user/media-assets/3/derivatives/processing/webp/content',
+          url: '/api/processing.webp',
           title: 'Library image',
         },
         expect.any(Array),
@@ -459,7 +458,6 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(harness.feedback.warning).toHaveBeenCalledTimes(1)
       expect(harness.feedback.succeeded).not.toHaveBeenCalled()
       expect(harness.createPendingAdjustmentNode).toHaveBeenCalledWith(
-        expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
         expect.objectContaining({ id: 1 }),
       )
       expect(harness.connectionAdapter.connectIntent).toHaveBeenCalledWith({

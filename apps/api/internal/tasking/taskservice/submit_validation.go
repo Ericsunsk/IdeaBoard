@@ -44,6 +44,59 @@ func normalizeSubmitTaskMediaParams(params map[string]interface{}) {
 	}
 }
 
+func collectInt64List(raw interface{}) []int64 {
+	var values []int64
+	switch v := raw.(type) {
+	case []int64:
+		values = append(values, v...)
+	case []int:
+		for _, n := range v {
+			values = append(values, int64(n))
+		}
+	case []interface{}:
+		for _, item := range v {
+			switch n := item.(type) {
+			case int64:
+				values = append(values, n)
+			case int:
+				values = append(values, int64(n))
+			case float64:
+				if n == float64(int64(n)) {
+					values = append(values, int64(n))
+				}
+			}
+		}
+	}
+	return values
+}
+
+func readInt64Param(raw interface{}) (int64, bool) {
+	switch value := raw.(type) {
+	case int64:
+		return value, value > 0
+	case int:
+		return int64(value), value > 0
+	case float64:
+		if value <= 0 || value != float64(int64(value)) {
+			return 0, false
+		}
+		return int64(value), true
+	case json.Number:
+		n, err := value.Int64()
+		return n, err == nil && n > 0
+	default:
+		return 0, false
+	}
+}
+
+func mediaRefsFromAssetIDs(assetIDs []int64, role string) []tasks.MediaRef {
+	refs := make([]tasks.MediaRef, 0, len(assetIDs))
+	for _, id := range assetIDs {
+		refs = append(refs, tasks.MediaRef{AssetID: id, Role: role})
+	}
+	return refs
+}
+
 func normalizeStyleFusionParams(params map[string]interface{}) error {
 	if params == nil {
 		return nil
@@ -285,6 +338,16 @@ func workflowMediaInputsFromMap(params map[string]interface{}, featureSlug strin
 		media.Inputs = mediaRefsFromURLs(imageURLs, tasks.MediaRoleInput, inputWeights)
 		hasMedia = true
 	}
+	assetIDs := collectInt64List(params[paramkeys.ImageAssetIDs])
+	if len(assetIDs) > 0 {
+		media.Inputs = append(media.Inputs, mediaRefsFromAssetIDs(assetIDs, tasks.MediaRoleInput)...)
+		hasMedia = true
+	}
+	referenceAssetIDs := collectInt64List(params[paramkeys.ReferenceImageAssetIDs])
+	if len(referenceAssetIDs) > 0 {
+		media.References = append(media.References, mediaRefsFromAssetIDs(referenceAssetIDs, tasks.MediaRoleReference)...)
+		hasMedia = true
+	}
 	referenceImageURLs := mediarefs.CollectStringList(params[paramkeys.ReferenceImageURLs])
 	if len(referenceImageURLs) > 0 {
 		media.References = mediaRefsFromURLs(referenceImageURLs, tasks.MediaRoleReference, nil)
@@ -296,6 +359,14 @@ func workflowMediaInputsFromMap(params map[string]interface{}, featureSlug strin
 	}
 	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.OriginalImageURL); ok {
 		media.Original = &tasks.MediaRef{Source: v, Role: tasks.MediaRoleOriginal}
+		hasMedia = true
+	}
+	if assetID, ok := readInt64Param(params[paramkeys.OriginalImageAssetID]); ok {
+		media.Original = &tasks.MediaRef{AssetID: assetID, Role: tasks.MediaRoleOriginal}
+		hasMedia = true
+	}
+	if assetID, ok := readInt64Param(params[paramkeys.MaskImageAssetID]); ok {
+		media.Mask = &tasks.MediaRef{AssetID: assetID, Role: tasks.MediaRoleMask}
 		hasMedia = true
 	}
 	if v, ok := readBoolParam(params, paramkeys.UseMask); ok {

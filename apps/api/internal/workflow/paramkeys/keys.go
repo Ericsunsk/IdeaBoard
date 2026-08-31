@@ -13,13 +13,17 @@ const (
 	Generation    = "generation"
 	ExecutionPlan = "execution_plan"
 
-	ImageURL           = "image_url"
-	ImageURLs          = "image_urls"
-	ReferenceImageURLs = "reference_image_urls"
-	MaskImageURL       = "mask_image_url"
-	MaskImageURLs      = "mask_image_urls"
-	OriginalImageURL   = "original_image_url"
-	UseMask            = "use_mask"
+	ImageURL               = "image_url"
+	ImageURLs              = "image_urls"
+	ReferenceImageURLs     = "reference_image_urls"
+	MaskImageURL           = "mask_image_url"
+	MaskImageURLs          = "mask_image_urls"
+	OriginalImageURL       = "original_image_url"
+	ImageAssetIDs          = "image_asset_ids"
+	ReferenceImageAssetIDs = "reference_image_asset_ids"
+	OriginalImageAssetID   = "original_image_asset_id"
+	MaskImageAssetID       = "mask_image_asset_id"
+	UseMask                = "use_mask"
 
 	CustomWidth         = "custom_width"
 	CustomHeight        = "custom_height"
@@ -87,6 +91,10 @@ var providerReservedKeys = keySet(
 	MaskImageURL,
 	MaskImageURLs,
 	OriginalImageURL,
+	ImageAssetIDs,
+	ReferenceImageAssetIDs,
+	OriginalImageAssetID,
+	MaskImageAssetID,
 	UseMask,
 	CustomWidth,
 	CustomHeight,
@@ -111,6 +119,10 @@ var submitTaskParamKeys = keySet(
 	MaskImageURL,
 	MaskImageURLs,
 	OriginalImageURL,
+	ImageAssetIDs,
+	ReferenceImageAssetIDs,
+	OriginalImageAssetID,
+	MaskImageAssetID,
 	UseMask,
 	CustomWidth,
 	CustomHeight,

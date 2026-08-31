@@ -23,10 +23,12 @@ import type {
   ApiResponseTaskId,
   ApiResponseTaskList,
   ApiResponseTaskSubmitReadiness,
+  ApiResponseTaskSubmitReadinessMatrix,
   InsufficientCreditsError,
   ListUserTasksParams,
   PricingUnavailableError,
   SubmissionFailedError,
+  SubmitTaskReadinessMatrixRequest,
   SubmitTaskRequest,
   WalletRestrictedError,
 } from '../model'
@@ -203,6 +205,110 @@ export function useCheckUserTaskSubmitReadiness<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getCheckUserTaskSubmitReadinessQueryOptions(submitTaskRequest, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getCheckUserTaskSubmitReadinessMatrixUrl = () => {
+  return `/user/tasks/submit/readiness/matrix`
+}
+
+export const checkUserTaskSubmitReadinessMatrix = async (
+  submitTaskReadinessMatrixRequest: SubmitTaskReadinessMatrixRequest,
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseTaskSubmitReadinessMatrix> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
+  return orvalMutator<ApiResponseTaskSubmitReadinessMatrix>(
+    getCheckUserTaskSubmitReadinessMatrixUrl(),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(submitTaskReadinessMatrixRequest),
+    },
+  )
+}
+
+export const getCheckUserTaskSubmitReadinessMatrixQueryKey = (
+  submitTaskReadinessMatrixRequest?: MaybeRefOrGetter<SubmitTaskReadinessMatrixRequest>,
+) => {
+  return [
+    'POST',
+    'user',
+    'tasks',
+    'submit',
+    'readiness',
+    'matrix',
+    submitTaskReadinessMatrixRequest,
+  ] as const
+}
+
+export const getCheckUserTaskSubmitReadinessMatrixQueryOptions = <
+  TData = Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>,
+  TError = ErrorType<unknown>,
+>(
+  submitTaskReadinessMatrixRequest: MaybeRefOrGetter<SubmitTaskReadinessMatrixRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getCheckUserTaskSubmitReadinessMatrixQueryKey(submitTaskReadinessMatrixRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>> = ({
+    signal,
+  }) =>
+    checkUserTaskSubmitReadinessMatrix(toValue(submitTaskReadinessMatrixRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>,
+    TError,
+    TData
+  >
+}
+
+export type CheckUserTaskSubmitReadinessMatrixQueryResult = NonNullable<
+  Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>
+>
+export type CheckUserTaskSubmitReadinessMatrixQueryError = ErrorType<unknown>
+
+export function useCheckUserTaskSubmitReadinessMatrix<
+  TData = Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>,
+  TError = ErrorType<unknown>,
+>(
+  submitTaskReadinessMatrixRequest: MaybeRefOrGetter<SubmitTaskReadinessMatrixRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getCheckUserTaskSubmitReadinessMatrixQueryOptions(
+    submitTaskReadinessMatrixRequest,
+    options,
+  )
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

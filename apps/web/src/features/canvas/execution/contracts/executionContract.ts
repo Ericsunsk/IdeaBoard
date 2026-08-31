@@ -58,6 +58,8 @@ interface BuildExecutionTaskRequestOptions {
   prompt: string
   feature?: ExecutionFeature
   imageUrls?: string[]
+  imageAssetIds?: number[]
+  referenceImageAssetIds?: number[]
   params?: SubmitTaskParams
 }
 
@@ -85,6 +87,9 @@ export function buildExecutionTaskRequest(
   if (options.imageUrls && options.imageUrls.length > 0) {
     request.image_urls = options.imageUrls.map(canonicalizeRuntimeUploadRef)
   }
+  if (options.imageAssetIds && options.imageAssetIds.length > 0) {
+    request.image_asset_ids = options.imageAssetIds
+  }
 
   const nextParams = Object.fromEntries(
     Object.entries(options.params ?? {}).map(([key, value]) => [
@@ -94,6 +99,9 @@ export function buildExecutionTaskRequest(
   ) as SubmitTaskParams
   if (Object.keys(nextParams).length > 0) {
     request.params = nextParams
+  }
+  if (options.referenceImageAssetIds && options.referenceImageAssetIds.length > 0) {
+    request.reference_image_asset_ids = options.referenceImageAssetIds
   }
 
   return request

@@ -129,13 +129,18 @@ function buildItemReadinessRequest(item: ImageActionMenuItem) {
 
 function refreshBillingQuotes() {
   if (!billingStore) return
-  for (const item of actionMenuItems.value) {
+  const entries: Array<{ feature: WorkflowFeature; request: NonNullable<ReturnType<typeof buildItemReadinessRequest>> }> = actionMenuItems.value.flatMap((item) => {
     const feature = resolveItemBillingFeature(item)
     const request = buildItemReadinessRequest(item)
-    if (feature && request) {
-      void billingStore.ensureFeature(feature, { request, force: true })
-    }
+    return feature && request ? [{ feature, request }] : []
+  })
+  if (entries.length === 0) return
+  if (billingStore.ensureMatrix) {
+    void billingStore.ensureMatrix(entries)
+    return
   }
+  // Compatibility for lightweight test adapters and older injected stores.
+  for (const entry of entries) void billingStore.ensureFeature(entry.feature, { request: entry.request })
 }
 
 watch([() => props.outputCount, outputResolution], refreshBillingQuotes, { immediate: true })

@@ -148,8 +148,14 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	if err := i.validateImageURLs(ctx, userID, req.ImageURLs); err != nil {
 		return CanonicalTaskRequest{}, err
 	}
+	assetIDs := append([]int64(nil), req.ImageAssetIDs...)
+	assetIDs = append(assetIDs, req.ReferenceImageAssetIDs...)
+	assetIDs = append(assetIDs, mediaAssetIDsFromParams(req.Params)...)
+	if err := i.validateImageAssetIDs(ctx, userID, assetIDs); err != nil {
+		return CanonicalTaskRequest{}, err
+	}
 
-	params := make(map[string]interface{}, len(req.Params)+2)
+	params := make(map[string]interface{}, len(req.Params)+3)
 	for key, value := range req.Params {
 		params[key] = value
 	}
@@ -158,6 +164,12 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	}
 	if len(req.ImageURLs) > 0 {
 		params["image_urls"] = req.ImageURLs
+	}
+	if len(req.ImageAssetIDs) > 0 {
+		params["image_asset_ids"] = req.ImageAssetIDs
+	}
+	if len(req.ReferenceImageAssetIDs) > 0 {
+		params[paramkeys.ReferenceImageAssetIDs] = req.ReferenceImageAssetIDs
 	}
 	normalizeSubmitTaskMediaParams(params)
 	if err := i.validateMediaParams(ctx, userID, params); err != nil {
@@ -273,6 +285,19 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	})
 }
 
+func mediaAssetIDsFromParams(params map[string]interface{}) []int64 {
+	if len(params) == 0 {
+		return nil
+	}
+	assetIDs := collectInt64List(params[paramkeys.ImageAssetIDs])
+	for _, key := range []string{paramkeys.OriginalImageAssetID, paramkeys.MaskImageAssetID} {
+		if assetID, ok := readInt64Param(params[key]); ok {
+			assetIDs = append(assetIDs, assetID)
+		}
+	}
+	return assetIDs
+}
+
 func requiresImageFillSystemPrompt(featureSlug string) bool {
 	return featureSlug == workflow.FeatureSlugInpaint || featureSlug == workflow.FeatureSlugOutpaint
 }
@@ -317,6 +342,19 @@ func (i *taskIntake) validateImageURLs(ctx context.Context, userID int64, imageU
 	return validateSubmitTaskImageURLsWithRefValidator(imageURLs, func(raw string) error {
 		return i.validateMediaRef(ctx, userID, raw)
 	})
+}
+
+func (i *taskIntake) validateImageAssetIDs(ctx context.Context, userID int64, assetIDs []int64) error {
+	if len(assetIDs) == 0 {
+		return nil
+	}
+	validator, ok := i.media.(interface {
+		ValidateSubmitMediaAssetIDs(context.Context, int64, []int64) error
+	})
+	if !ok {
+		return fmt.Errorf("媒体资产校验服务未配置")
+	}
+	return validator.ValidateSubmitMediaAssetIDs(ctx, userID, assetIDs)
 }
 
 func (i *taskIntake) validateMediaParams(ctx context.Context, userID int64, params map[string]interface{}) error {

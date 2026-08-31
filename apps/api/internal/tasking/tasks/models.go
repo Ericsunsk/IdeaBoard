@@ -253,12 +253,14 @@ func SafeTaskResultJSON(raw string) string {
 }
 
 type SubmitTaskRequest struct {
-	Prompt         string                 `json:"prompt"`
-	Feature        string                 `json:"feature"`
-	ClientActionID string                 `json:"client_action_id"`
-	Priority       int                    `json:"priority"`
-	ImageURLs      []string               `json:"image_urls"`
-	Params         map[string]interface{} `json:"params"`
+	Prompt                 string                 `json:"prompt"`
+	Feature                string                 `json:"feature"`
+	ClientActionID         string                 `json:"client_action_id"`
+	Priority               int                    `json:"priority"`
+	ImageURLs              []string               `json:"image_urls"`
+	ImageAssetIDs          []int64                `json:"image_asset_ids"`
+	ReferenceImageAssetIDs []int64                `json:"reference_image_asset_ids"`
+	Params                 map[string]interface{} `json:"params"`
 }
 
 type TaskSubmissionResult struct {
