@@ -18,7 +18,7 @@ concurrency:
 jobs:
   deploy-production:
     name: Deploy ${{ inputs.release_tag }}
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
       contents: read

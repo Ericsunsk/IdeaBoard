@@ -18,7 +18,7 @@ permissions:
 jobs:
   verify:
     name: API then Auth migrations
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
       # Keep workflow inputs out of shell source; GitHub injects them as

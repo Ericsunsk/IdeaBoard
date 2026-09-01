@@ -16,7 +16,7 @@ concurrency:
 jobs:
   changes:
     name: Classify Changes
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     outputs:
       web: ${{ steps.classify.outputs.web }}
       api: ${{ steps.classify.outputs.api }}
@@ -85,7 +85,7 @@ jobs:
     name: Backend Browser Smoke
     if: ${{ needs.changes.outputs.web != 'true' && (needs.changes.outputs.api == 'true' || needs.changes.outputs.auth == 'true' || needs.changes.outputs.docker == 'true') }}
     needs: [changes]
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.62.1-noble
     steps:
       - name: Checkout
@@ -111,7 +111,7 @@ jobs:
     name: CI Gate
     if: always()
     needs: [changes, web, api, auth, migration-integration, backend-browser-smoke, ops]
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10

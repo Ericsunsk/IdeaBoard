@@ -14,7 +14,7 @@ permissions:
 jobs:
   quality:
     name: Web Quality
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
       - uses: ./.github/actions/setup-node
@@ -44,7 +44,7 @@ jobs:
         run: npm run build
   unit:
     name: Web Unit (${{ matrix.shard }})
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -65,7 +65,7 @@ jobs:
         run: npm run test:run -- --shard="${TEST_SHARD}"
   smoke:
     name: Web Browser Smoke
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.62.1-noble
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10

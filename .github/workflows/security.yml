@@ -10,7 +10,7 @@ permissions:
 jobs:
   web-audit:
     if: github.event_name == 'schedule'
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
@@ -33,7 +33,7 @@ jobs:
 
   auth-audit:
     if: github.event_name == 'schedule'
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
@@ -57,7 +57,7 @@ jobs:
 
   api-audit:
     if: github.event_name == 'schedule'
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:

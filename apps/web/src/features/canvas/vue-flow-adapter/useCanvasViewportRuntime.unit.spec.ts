@@ -56,7 +56,7 @@ function createViewportRuntimeHarness(
   const setViewport = vi.fn((nextViewport: CanvasFlowViewport) => {
     viewport.value = nextViewport
   })
-  const loadInitialOrRouteBoard = vi.fn(async () => undefined)
+  const loadInitialOrRouteBoard = vi.fn(async () => ({ status: 'not-found' as const }))
 
   const scope = effectScope()
   const runtime = scope.run(() =>

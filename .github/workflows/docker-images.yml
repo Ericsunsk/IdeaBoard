@@ -25,7 +25,7 @@ concurrency:
 jobs:
   preflight:
     name: Release Eligibility
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       checks: read
@@ -61,7 +61,7 @@ jobs:
     name: Publish ${{ matrix.image.display }} Image
     needs:
       - preflight
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
       contents: read
@@ -110,6 +110,9 @@ jobs:
           repository="${GITHUB_REPOSITORY,,}"
           echo "name=ghcr.io/${repository}/ideaboard-${{ matrix.image.name }}" >> "${GITHUB_OUTPUT}"
           echo "immutable_tag=ghcr.io/${repository}/ideaboard-${{ matrix.image.name }}:sha-${{ needs.preflight.outputs.source_commit }}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
@@ -220,7 +223,7 @@ jobs:
     needs:
       - publish-images
       - preflight
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
@@ -312,7 +315,7 @@ jobs:
     needs:
       - aggregate-release-manifest
       - preflight
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
       contents: read
@@ -472,7 +475,7 @@ jobs:
     if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     needs:
       - aggregate-release-manifest
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: write
