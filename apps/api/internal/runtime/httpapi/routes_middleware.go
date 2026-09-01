@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"net/http"
-	"path"
 	"strings"
 
 	"ideaboard/api/internal/platform/response"
@@ -29,18 +28,33 @@ func globalRequestBodyLimitMiddleware() gin.HandlerFunc {
 }
 
 func isUploadRequest(req *http.Request) bool {
-	if req == nil || strings.ToUpper(strings.TrimSpace(req.Method)) != http.MethodPost {
+	if req == nil || req.URL == nil || strings.ToUpper(strings.TrimSpace(req.Method)) != http.MethodPost {
 		return false
 	}
-	requestPath := path.Clean(req.URL.Path)
+	// URL.Path is used only for route classification here; it is never joined
+	// with a filesystem root. Avoid filesystem-style path normalization so
+	// traversal-like input cannot be reclassified as an upload route.
+	requestPath := req.URL.Path
 	if requestPath == "/api/user/profile/avatar" || requestPath == "/api/admin/upload" {
 		return true
 	}
 	if requestPath == "/api/user/search/vision-extract" {
 		return true
 	}
-	return strings.HasPrefix(requestPath, "/api/user/boards/") &&
-		strings.HasSuffix(requestPath, "/uploads")
+	return isBoardUploadPath(requestPath)
+}
+
+func isBoardUploadPath(requestPath string) bool {
+	// Match the route shape exactly: /api/user/boards/:board_id/uploads.
+	// Splitting URL path segments keeps this classifier independent from
+	// filesystem path semantics and rejects traversal-like or empty segments.
+	segments := strings.Split(requestPath, "/")
+	return len(segments) == 6 &&
+		segments[1] == "api" &&
+		segments[2] == "user" &&
+		segments[3] == "boards" &&
+		segments[4] != "" && segments[4] != "." && segments[4] != ".." &&
+		segments[5] == "uploads"
 }
 
 func requestBodyLimitMiddleware(limitBytes int64) gin.HandlerFunc {

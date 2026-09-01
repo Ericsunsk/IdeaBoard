@@ -19,6 +19,16 @@ describe("secretCipher", () => {
     assert.equal(cipher.decrypt(second), "provider-secret");
   });
 
+  it("uses the fixed ciphertext envelope of a 12-byte nonce and 16-byte tag", () => {
+    const key = randomBytes(32).toString("base64");
+    const encoded = encryptSecret("secret", key);
+    const payload = Buffer.from(encoded, "base64");
+
+    assert.equal(payload.subarray(0, 12).length, 12);
+    assert.equal(payload.subarray(12, 28).length, 16);
+    assert.equal(decryptSecret(encoded, key), "secret");
+  });
+
   it("rejects keys that are not exactly 256 bits", () => {
     assert.throws(() => encryptSecret("secret", "invalid"), /32 bytes/);
   });

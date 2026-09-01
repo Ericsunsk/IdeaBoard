@@ -15,7 +15,9 @@ export function createSecretCipher(encodedKey: string): SecretCipher {
 
 export function encryptSecret(plaintext: string, encodedKey: string): string {
   const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", encryptionKeyBytes(encodedKey), iv);
+  const cipher = createCipheriv("aes-256-gcm", encryptionKeyBytes(encodedKey), iv, {
+    authTagLength: 16,
+  });
   const ciphertext = Buffer.concat([
     cipher.update(plaintext, "utf8"),
     cipher.final(),
@@ -30,6 +32,7 @@ export function decryptSecret(encoded: string, encodedKey: string): string {
     "aes-256-gcm",
     encryptionKeyBytes(encodedKey),
     payload.subarray(0, 12),
+    { authTagLength: 16 },
   );
   decipher.setAuthTag(payload.subarray(12, 28));
   return Buffer.concat([

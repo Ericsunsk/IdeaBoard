@@ -20,6 +20,11 @@ jobs:
     name: API then Auth migrations
     runs-on: ubicloud-standard-2
     timeout-minutes: 25
+    env:
+      # Keep workflow inputs out of shell source; GitHub injects them as
+      # environment values and the migration checker validates the commits.
+      ATLAS_BASE_SHA: ${{ inputs.base_sha }}
+      ATLAS_HEAD_SHA: ${{ inputs.head_sha }}
     services:
       postgres:
         image: postgres:17-alpine
@@ -72,8 +77,6 @@ jobs:
           {
             printf 'ATLAS_DEV_URL=postgres://ideaboard:ideaboard_test@127.0.0.1:5432/%s?sslmode=disable\n' "${validation_db}"
             printf 'ATLAS_BINARY=/tmp/atlas\n'
-            printf 'ATLAS_BASE_SHA=%s\n' '${{ inputs.base_sha }}'
-            printf 'ATLAS_HEAD_SHA=%s\n' '${{ inputs.head_sha }}'
           } >> "${GITHUB_ENV}"
       - name: Validate Atlas migrations on a Fresh database
         run: bash scripts/atlas-migration-check.sh

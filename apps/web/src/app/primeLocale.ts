@@ -1,5 +1,5 @@
 import type { PrimeVueLocaleOptions } from 'primevue/config'
-import type { SupportedLocale } from '../shared/i18n'
+import type { SupportedLocale } from '../shared/i18n/localeCore'
 
 const FILE_SIZE_TYPES = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
 

@@ -119,12 +119,16 @@ func checkReusableWorkflows(root string) {
 	migrationInputs := object(object(migration, "on"), "workflow_call")
 	requireKey(migrationInputs, "inputs", "Migration integration must accept commit range inputs")
 	verify := object(object(migration, "jobs"), "verify")
+	verifyEnv := object(verify, "env")
+	requireEqual(verifyEnv["ATLAS_BASE_SHA"], "${{ inputs.base_sha }}", "Migration base SHA must be passed through job env")
+	requireEqual(verifyEnv["ATLAS_HEAD_SHA"], "${{ inputs.head_sha }}", "Migration head SHA must be passed through job env")
 	requireStepRun(verify, "bash scripts/ci-migration-integration-test.sh")
 	requireStepRun(verify, "bash scripts/atlas-migration-check.sh")
 	requireStepRun(verify, "./scripts/ci-migration-integration.sh")
 	for _, step := range steps(verify) {
 		run, _ := step["run"].(string)
 		reject(strings.Contains(run, "npm run build") || strings.Contains(run, "npm run migrate:dist"), "Migration implementation must stay inside ci-migration-integration.sh")
+		reject(strings.Contains(run, "inputs.base_sha") || strings.Contains(run, "inputs.head_sha"), "Migration inputs must not be interpolated into shell source")
 	}
 
 	ops := loadWorkflow(root, "ops.yml")
