@@ -1,7 +1,6 @@
 import {
   bindCanvasBoardGraphSession,
   type CanvasBoardGraphSession,
-  type PendingImageDomainMutationInput,
   type PendingImageDomainMutationPort,
   type PendingImageDomainMutationResult,
   type PendingImageMutationRejectReason,
@@ -10,6 +9,16 @@ import {
 } from './CanvasBoardGraphSession'
 import type { CanvasBoardAttachment, CanvasBoardSessionIdentity } from '../../board-attachment'
 import { createPendingImageExecutionPublisher } from './pendingImageExecutionPublisher'
+import {
+  assertPendingImageMutationContract,
+  mapPendingImageMaterializationOutcomes,
+  preparePendingImageMaterialization,
+  type PendingImageMaterializationSlot,
+} from './pendingImageMaterialization'
+import {
+  releasePendingImageExecutions,
+  type PendingImageExecutionReleaseContext,
+} from './pendingImageExecutionRelease'
 import {
   attachmentRejection,
   isAttachmentCurrent,
@@ -116,12 +125,7 @@ export class PendingImageMaterializationError extends Error {
   }
 }
 
-export class PendingImageMutationContractError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'PendingImageMutationContractError'
-  }
-}
+export { PendingImageMutationContractError } from './pendingImageMaterialization'
 
 export type PendingImageExecutionCoreOptions = Readonly<{
   onSubscriberError?: (error: unknown) => void
@@ -435,44 +439,21 @@ export function createPendingImageExecutionCore(
     )
   }
 
-  function releaseMany(
-    leases: readonly PendingImageExecutionLease[],
-    mode: 'cancelled' | 'released',
-  ): PendingImageExecutionReleaseResult {
-    const taskIdsBefore = new Set<string>()
-    const outcomes: PendingImageExecutionReleaseOutcome[] = []
-    const seenLeases = new Set<PendingImageExecutionLease>()
-    let didChange = false
-    for (const lease of leases) {
-      if (seenLeases.has(lease)) continue
-      seenLeases.add(lease)
-      const reason = checkLeaseRejection(lease)
-      if (reason) {
-        outcomes.push({ resultNodeId: lease.resultNodeId, kind: 'rejected', reason })
-        continue
-      }
-      const current = factsByNodeId.get(lease.resultNodeId)
-      if (current?.taskId) taskIdsBefore.add(current.taskId)
-      if (mode === 'cancelled') {
-        factsByNodeId = new Map(factsByNodeId).set(
-          lease.resultNodeId,
-          freezeFact(lease.resultNodeId, 'cancelled', current?.taskId, current?.clientActionId),
-        )
-      } else {
-        factsByNodeId = new Map(factsByNodeId)
-        factsByNodeId.delete(lease.resultNodeId)
-        leasesByNodeId.delete(lease.resultNodeId)
-      }
-      outcomes.push({ resultNodeId: lease.resultNodeId, kind: mode })
-      didChange = true
-    }
-    const remainingTaskIds = activeTaskIds()
-    const cancellableTaskIds = [...taskIdsBefore].filter((taskId) => !remainingTaskIds.has(taskId))
-    if (didChange) publisher.publish()
-    return Object.freeze({
-      outcomes: freezeList(outcomes.map((outcome) => Object.freeze(outcome))),
-      cancellableTaskIds: freezeList(cancellableTaskIds),
-    })
+  const releaseContext: PendingImageExecutionReleaseContext = {
+    getLeaseRejection: checkLeaseRejection,
+    getFact: (resultNodeId) => factsByNodeId.get(resultNodeId),
+    setFact: (lease, fact) => {
+      factsByNodeId = new Map(factsByNodeId).set(lease.resultNodeId, fact)
+    },
+    removeLease: (lease) => {
+      factsByNodeId = new Map(factsByNodeId)
+      factsByNodeId.delete(lease.resultNodeId)
+      leasesByNodeId.delete(lease.resultNodeId)
+    },
+    activeTaskIds,
+    createFact: (lease, status, current) =>
+      freezeFact(lease.resultNodeId, status, current?.taskId, current?.clientActionId),
+    publish: publisher.publish,
   }
 
   function materializeBatch(
@@ -481,43 +462,13 @@ export function createPendingImageExecutionCore(
       result: PendingImageResolvedResult
     }>[],
   ): PendingImageMaterializationResult {
-    const outcomes = new Array<PendingImageMaterializationOutcome | undefined>(slots.length)
-    const candidates: Array<{
-      index: number
-      lease: PendingImageExecutionLease
-      input: PendingImageDomainMutationInput
-    }> = []
-    const seenNodeIds = new Set<PendingImageResultNodeId>()
-
-    slots.forEach((slot, index) => {
-      const reason = checkLeaseRejection(slot.lease)
-      if (reason) {
-        outcomes[index] = {
-          resultNodeId: slot.lease.resultNodeId,
-          kind: 'rejected',
-          reason,
-        }
-        return
-      }
-      if (seenNodeIds.has(slot.lease.resultNodeId)) {
-        outcomes[index] = {
-          resultNodeId: slot.lease.resultNodeId,
-          kind: 'rejected',
-          reason: 'duplicate-slot',
-        }
-        return
-      }
-      seenNodeIds.add(slot.lease.resultNodeId)
-      const taskId = factsByNodeId.get(slot.lease.resultNodeId)?.taskId
-      if (!taskId) {
-        throw new Error('Pending image execution must be submitted before materialization')
-      }
-      candidates.push({
-        index,
-        lease: slot.lease,
-        input: { resultNodeId: slot.lease.resultNodeId, taskId, result: slot.result },
-      })
-    })
+    const { candidates, outcomes } = preparePendingImageMaterialization(
+      slots as readonly PendingImageMaterializationSlot[],
+      {
+        getLeaseRejection: checkLeaseRejection,
+        getTaskId: (resultNodeId) => factsByNodeId.get(resultNodeId)?.taskId,
+      },
+    )
 
     if (candidates.length === 0) {
       return Object.freeze({
@@ -554,53 +505,10 @@ export function createPendingImageExecutionCore(
       })
     }
 
-    function assertMutationContract(result: PendingImageDomainMutationResult): void {
-      const candidateIds = new Set(candidates.map(({ lease }) => lease.resultNodeId))
-      const outcomeIds = new Set<PendingImageResultNodeId>()
-      const materializedIds = new Set<PendingImageResultNodeId>()
-      for (const outcome of result.outcomes) {
-        if (!candidateIds.has(outcome.resultNodeId)) {
-          throw new PendingImageMutationContractError(
-            `Mutation returned an unexpected outcome for ${outcome.resultNodeId}`,
-          )
-        }
-        if (outcomeIds.has(outcome.resultNodeId)) {
-          throw new PendingImageMutationContractError(
-            `Mutation returned duplicate outcomes for ${outcome.resultNodeId}`,
-          )
-        }
-        outcomeIds.add(outcome.resultNodeId)
-        if (outcome.kind === 'materialized') materializedIds.add(outcome.resultNodeId)
-      }
-      if (outcomeIds.size !== candidateIds.size) {
-        throw new PendingImageMutationContractError(
-          'Mutation must return exactly one outcome for every candidate',
-        )
-      }
-
-      const changedIds = new Set(result.changedNodeIds)
-      if (changedIds.size !== result.changedNodeIds.length) {
-        throw new PendingImageMutationContractError('Mutation returned duplicate changed node ids')
-      }
-      const changedIdsMatch =
-        changedIds.size === materializedIds.size &&
-        [...changedIds].every((resultNodeId) => materializedIds.has(resultNodeId))
-      if (!changedIdsMatch) {
-        throw new PendingImageMutationContractError(
-          'Mutation changed node ids must match materialized outcomes',
-        )
-      }
-      if (result.didChange !== changedIds.size > 0) {
-        throw new PendingImageMutationContractError(
-          'Mutation didChange must match its changed node ids',
-        )
-      }
-    }
-
     let mutationResult: PendingImageDomainMutationResult
     try {
       mutationResult = mutationPort.materializeBatch(candidates.map(({ input }) => input))
-      assertMutationContract(mutationResult)
+      assertPendingImageMutationContract(candidates, mutationResult)
     } catch (cause) {
       candidates.forEach(({ index, lease }) => {
         const current = factsByNodeId.get(lease.resultNodeId)
@@ -624,30 +532,19 @@ export function createPendingImageExecutionCore(
       )
     }
 
-    const mutationOutcomes = new Map(
-      mutationResult.outcomes.map((outcome) => [outcome.resultNodeId, outcome]),
+    mapPendingImageMaterializationOutcomes(
+      candidates,
+      mutationResult,
+      outcomes as Array<PendingImageMaterializationOutcome | undefined>,
+      {
+        getFact: (resultNodeId) => factsByNodeId.get(resultNodeId),
+        applyFact: (lease, fact) => {
+          applyFact(lease, fact, false)
+        },
+        createFact: (lease, status, current) =>
+          freezeFact(lease.resultNodeId, status, current?.taskId, current?.clientActionId),
+      },
     )
-    candidates.forEach(({ index, lease }) => {
-      const mutationOutcome = mutationOutcomes.get(lease.resultNodeId)
-      const current = factsByNodeId.get(lease.resultNodeId)
-      const taskId = current?.taskId
-      if (mutationOutcome?.kind === 'materialized') {
-        applyFact(
-          lease,
-          freezeFact(lease.resultNodeId, 'succeeded', taskId, current?.clientActionId),
-          false,
-        )
-        outcomes[index] = { resultNodeId: lease.resultNodeId, kind: 'materialized' }
-        return
-      }
-      const reason = mutationOutcome?.reason ?? 'missing-node'
-      applyFact(
-        lease,
-        freezeFact(lease.resultNodeId, 'cancelled', taskId, current?.clientActionId),
-        false,
-      )
-      outcomes[index] = { resultNodeId: lease.resultNodeId, kind: 'rejected', reason }
-    })
     publisher.publish()
 
     return Object.freeze({
@@ -671,8 +568,10 @@ export function createPendingImageExecutionCore(
     claimHydratedLease,
     markSubmitted,
     fail,
-    cancel: (leases) => releaseMany(leases, 'cancelled'),
-    release: (leases) => releaseMany(leases, 'released'),
+    cancel: (leases) =>
+      releasePendingImageExecutions({ leases, mode: 'cancelled', context: releaseContext }),
+    release: (leases) =>
+      releasePendingImageExecutions({ leases, mode: 'released', context: releaseContext }),
     materializeBatch,
     isCurrent,
     factFor,
