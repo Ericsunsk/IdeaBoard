@@ -130,14 +130,6 @@ func (s *Service) Process(ctx context.Context, derivativeID int64) error {
 	original, err := s.storage.ReadObjectAtProfile(renderCtx, asset.StorageProfileID, asset.StorageKey, maxSourceBytes)
 	sourceStorageKey := asset.StorageKey
 	if err != nil {
-		if fallbackKey := storage.LegacyStorageKeyFromURL(asset.StorageKey, asset.Url); fallbackKey != "" {
-			original, err = s.storage.ReadObjectAtProfile(renderCtx, asset.StorageProfileID, fallbackKey, maxSourceBytes)
-			if err == nil {
-				sourceStorageKey = fallbackKey
-			}
-		}
-	}
-	if err != nil {
 		return s.markFailed(ctx, q, processing.ID, "source_read_failed", err)
 	}
 	if _, err := imageformat.InspectBytes(original.Data, filepath.Ext(sourceStorageKey)); err != nil {

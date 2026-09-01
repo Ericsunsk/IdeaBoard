@@ -20,7 +20,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if err := bootstrap.Migrate(ctx, config.Load(), atlasBinary, migrationsDir); err != nil {
+	cfg, err := config.LoadAndValidate()
+	if err != nil {
+		fatal(err)
+	}
+	if err := bootstrap.Migrate(ctx, cfg, atlasBinary, migrationsDir); err != nil {
 		fatal(err)
 	}
 }

@@ -74,6 +74,26 @@ export const userRoutes: RouteRecordRaw[] = [
         meta: { requiresAuth: true },
       },
       {
+        path: 'account',
+        redirect: { path: USER_BOARDS_PATH, query: { accountTab: 'profile' } },
+        meta: { requiresAuth: true },
+      },
+      {
+        path: 'settings',
+        redirect: { path: USER_BOARDS_PATH, query: { accountTab: 'security' } },
+        meta: { requiresAuth: true },
+      },
+      {
+        path: 'billing',
+        redirect: { path: USER_BOARDS_PATH, query: { accountTab: 'billing' } },
+        meta: { requiresAuth: true },
+      },
+      {
+        path: 'recharge',
+        redirect: { path: USER_BOARDS_PATH, query: { accountTab: 'recharge' } },
+        meta: { requiresAuth: true },
+      },
+      {
         path: 'search',
         name: 'UserSearch',
         component: () => import('../../search/pages/SearchPage.vue'),

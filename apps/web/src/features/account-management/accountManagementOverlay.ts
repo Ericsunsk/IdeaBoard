@@ -4,9 +4,14 @@ import {
   ADMIN_ROOT_PATH,
   USER_LOGIN_PATH,
   USER_REGISTER_PATH,
+  USER_BOARDS_PATH,
   isPathUnderRoute,
 } from '../../shared/constants/routePaths'
-import { defaultAccountManagementTab, type AccountManagementTab } from './accountTabRegistry'
+import {
+  defaultAccountManagementTab,
+  resolveAccountManagementTab,
+  type AccountManagementTab,
+} from './accountTabRegistry'
 import {
   parsePaymentReturnQuery,
   stripPaymentReturnQuery,
@@ -131,6 +136,15 @@ export function createAccountManagementOverlay(options: AccountManagementOverlay
             )
           }
         })
+        return
+      }
+
+      const requestedTab =
+        isAllowed && options.route.path === USER_BOARDS_PATH
+          ? options.route.query.accountTab
+          : undefined
+      if (requestedTab && !Array.isArray(requestedTab)) {
+        open(resolveAccountManagementTab(requestedTab))
         return
       }
 

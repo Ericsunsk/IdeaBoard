@@ -2,9 +2,7 @@ export type ProviderApiTypeValue = 'openai-compatible' | 'self-hosted' | 'google
 export type ProviderProtocolValue =
   | 'model-api'
   | 'image-pipeline'
-  | 'image-url-json-to-image'
   | 'image-fill'
-  | 'flux-fill-json-image'
 export type ProviderCapabilityValue =
   | 'generation'
   | 'cutout'

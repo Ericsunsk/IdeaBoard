@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"ideaboard/api/internal/media/reclamation"
-	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
 )
 
@@ -25,7 +24,7 @@ func runMediaReclamation(args []string) {
 		fatal("usage: api media-reclamation scan [--stale-after=30m]")
 	}
 
-	cfg := config.Load()
+	cfg := loadConfigOrFatal()
 	configureRuntimeLogging(cfg)
 	db, err := database.NewPostgres(cfg.Database)
 	if err != nil {

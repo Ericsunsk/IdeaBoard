@@ -87,7 +87,7 @@ func TestResolveProviderExecutionEnforcesSnapshotModelPolicy(t *testing.T) {
 	})
 
 	t.Run("modelless transform", func(t *testing.T) {
-		assignment := resolvedExecutionAssignment("http://127.0.0.1:18080/cutout", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolImageURLJSONImage, "")
+		assignment := resolvedExecutionAssignment("http://127.0.0.1:18080/cutout", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolImagePipeline, "")
 		exec, err := executor.resolveProviderExecution(context.Background(), account, resolvedExecutionTask(t, workflow.FeatureSlugCutout), assignment)
 		if err != nil {
 			t.Fatalf("resolve modelless execution: %v", err)
@@ -109,7 +109,7 @@ func TestResolveProviderExecutionRejectsProtocolURLAndAPITypeBeforeProviderIO(t 
 	task := resolvedExecutionTask(t, workflow.FeatureSlugGeneration)
 
 	t.Run("protocol operation mismatch", func(t *testing.T) {
-		assignment := resolvedExecutionAssignment("http://127.0.0.1:18080/transform", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolImageURLJSONImage, "gpt-image-1")
+		assignment := resolvedExecutionAssignment("http://127.0.0.1:18080/transform", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolImagePipeline, "gpt-image-1")
 		if _, err := executor.resolveProviderExecution(context.Background(), account, task, assignment); err == nil || !strings.Contains(err.Error(), "does not support runtime operation") {
 			t.Fatalf("error = %v, want protocol mismatch", err)
 		}

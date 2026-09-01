@@ -18,7 +18,7 @@ import (
 	"ideaboard/api/internal/platform/safehttp"
 )
 
-// callCutout posts the image-url-json-to-image contract.
+// callCutout posts the image-pipeline cutout contract.
 func (c *ProviderExecutor) callCutout(
 	ctx context.Context,
 	account *accounts.ApiAccount,

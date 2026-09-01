@@ -98,6 +98,17 @@ describe('Board Sync Coordinator', () => {
     expect(harness.saveStatus.value).toBe('idle')
   })
 
+  it('returns not-found for an unknown route board ID', async () => {
+    const harness = createHarness()
+    vi.mocked(harness.boardSession.load).mockResolvedValueOnce(null)
+    vi.mocked(harness.boardSession.exists).mockReturnValueOnce(false)
+
+    const result = await harness.coordinator.loadInitialOrRouteBoard()
+
+    expect(result).toEqual({ status: 'not-found' })
+    expect(harness.saveStatus.value).toBe('idle')
+  })
+
   it('returns a save reconciliation for the graph runtime to apply', async () => {
     const harness = createHarness()
     const result = await harness.coordinator.saveCurrentBoardSnapshot({ silent: false })

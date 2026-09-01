@@ -1,4 +1,4 @@
-import type { RouteSeo } from './routeSeo.ts'
+import { PUBLIC_SITE_ORIGIN, type RouteSeo } from './routeSeo.ts'
 
 function escapeHtml(value: string): string {
   return value
@@ -15,7 +15,7 @@ function replaceOrInsert(html: string, pattern: RegExp, replacement: string): st
 
 export function renderStaticSeoDocument(html: string, seo: RouteSeo): string {
   if (!seo.canonicalPath) throw new Error('Static SEO documents require a canonical path')
-  const canonical = `https://ideaboard.art${seo.canonicalPath}`
+  const canonical = `${PUBLIC_SITE_ORIGIN}${seo.canonicalPath}`
   const title = escapeHtml(seo.title)
   const description = escapeHtml(seo.description)
   const jsonLd = seo.jsonLd

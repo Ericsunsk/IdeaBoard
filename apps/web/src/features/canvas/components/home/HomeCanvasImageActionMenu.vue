@@ -135,12 +135,7 @@ function refreshBillingQuotes() {
     return feature && request ? [{ feature, request }] : []
   })
   if (entries.length === 0) return
-  if (billingStore.ensureMatrix) {
-    void billingStore.ensureMatrix(entries)
-    return
-  }
-  // Compatibility for lightweight test adapters and older injected stores.
-  for (const entry of entries) void billingStore.ensureFeature(entry.feature, { request: entry.request })
+  void billingStore.ensureMatrix(entries)
 }
 
 watch([() => props.outputCount, outputResolution], refreshBillingQuotes, { immediate: true })

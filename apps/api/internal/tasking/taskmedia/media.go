@@ -18,7 +18,6 @@ type Validator interface {
 }
 
 // AssetAuthorizer validates durable media Asset IDs against the submitting owner.
-// It is optional for backwards-compatible test validators; production wiring provides it.
 type AssetAuthorizer interface {
 	AuthorizeMediaAsset(ctx context.Context, userID, assetID int64) error
 }
@@ -103,11 +102,7 @@ type UploadAuthorizer interface {
 
 const canvasUploadPrefix = "/uploads/canvas/"
 
-func NewSubmitMediaValidator(publicOrigins config.PublicOriginsConfig, authorizer UploadAuthorizer, assetAuthorizers ...AssetAuthorizer) *SubmitMediaValidator {
-	var assetAuthorizer AssetAuthorizer
-	if len(assetAuthorizers) > 0 {
-		assetAuthorizer = assetAuthorizers[0]
-	}
+func NewSubmitMediaValidator(publicOrigins config.PublicOriginsConfig, authorizer UploadAuthorizer, assetAuthorizer AssetAuthorizer) *SubmitMediaValidator {
 	return &SubmitMediaValidator{
 		publicOrigins:   publicOrigins,
 		authorizer:      authorizer,

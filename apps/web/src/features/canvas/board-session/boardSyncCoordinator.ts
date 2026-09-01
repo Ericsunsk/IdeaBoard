@@ -44,6 +44,7 @@ export type BoardSyncCoordinator = {
 export type CanvasBoardLoadResult =
   | { status: 'empty'; snapshot: CanvasBoardSnapshot }
   | { status: 'loaded'; snapshot: CanvasBoardSnapshot }
+  | { status: 'not-found' }
   | { status: 'stale' }
   | { status: 'failed' }
 
@@ -142,6 +143,12 @@ export function createBoardSyncCoordinator(
       const snapshot = await options.boardSession.load(boardId)
       if (!isLoadStillCurrent()) return { status: 'stale' }
       if (!snapshot) {
+        // A route board ID must resolve to an entry in the hydrated catalog.
+        // Treating a missing entry as an empty board creates an editable
+        // phantom canvas that can never be persisted safely.
+        if (!options.boardSession.exists(boardId)) {
+          return { status: 'not-found' }
+        }
         return { status: 'empty', snapshot: importEmptyBoardSnapshot() }
       }
       applyLoadedSnapshot()

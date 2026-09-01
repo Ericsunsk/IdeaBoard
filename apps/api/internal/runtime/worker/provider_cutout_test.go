@@ -34,7 +34,7 @@ func TestCallCutoutUsesJSONContractAndKeepsBinaryResult(t *testing.T) {
 	executor := &ProviderExecutor{publicOrigins: config.PublicOriginsConfig{API: "https://media.ideaboard.art"}}
 	result, err := executor.callCutout(context.Background(), &accounts.ApiAccount{
 		ApiKey:       "secret",
-		Protocol:     providerendpoints.ProtocolImageURLJSONImage,
+		Protocol:     providerendpoints.ProtocolImagePipeline,
 		Capabilities: []string{providerendpoints.CapabilityCutout},
 		ProxyURL:     server.URL + "/matting",
 	}, providerRequest{ImageRefs: []string{inputURL}}, time.Second)
@@ -100,7 +100,7 @@ func TestCallUpscaleUsesScaleContractAndSingleImage(t *testing.T) {
 	executor := &ProviderExecutor{}
 	result, err := executor.callUpscale(context.Background(), &accounts.ApiAccount{
 		ApiKey:       "secret",
-		Protocol:     providerendpoints.ProtocolImageURLJSONImage,
+		Protocol:     providerendpoints.ProtocolImagePipeline,
 		Capabilities: []string{providerendpoints.CapabilityUpscale},
 		ProxyURL:     server.URL,
 	}, providerRequest{
@@ -129,7 +129,7 @@ func TestCallUpscaleRejectsInvalidScale(t *testing.T) {
 	for _, scale := range []float64{0.9, 4.1} {
 		_, err := executor.callUpscale(context.Background(), &accounts.ApiAccount{
 			ApiKey:       "secret",
-			Protocol:     providerendpoints.ProtocolImageURLJSONImage,
+			Protocol:     providerendpoints.ProtocolImagePipeline,
 			Capabilities: []string{providerendpoints.CapabilityUpscale},
 			ProxyURL:     "https://upscale.example/modal",
 		}, providerRequest{ImageRefs: []string{"https://media.ideaboard.art/source.jpg"}, Scale: scale}, time.Second)
@@ -152,7 +152,7 @@ func TestCutoutBatchIgnoresRequestedOutputCount(t *testing.T) {
 	_, err := executor.callProviderBatchWithRequest(context.Background(), resolvedProviderExecution{
 		providerEndpointBaseURL: server.URL,
 		apiType:                 workflow.ProviderOpenAICompatible,
-		protocol:                providerendpoints.ProtocolImageURLJSONImage,
+		protocol:                providerendpoints.ProtocolImagePipeline,
 		apiKey:                  "secret",
 		runtimeOperation:        workflow.RuntimeOperationCutout,
 		adapter:                 providerRuntimeAdapterCutout,

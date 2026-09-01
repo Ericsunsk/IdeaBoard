@@ -21,6 +21,9 @@ func Migrate(ctx context.Context, cfg *config.Config, atlasBinary, migrationsDir
 	if cfg == nil {
 		return fmt.Errorf("migration config is nil")
 	}
+	if err := cfg.ValidateDatabase(); err != nil {
+		return fmt.Errorf("invalid database configuration: %w", err)
+	}
 	migrationConfig, err := separatedMigrationDatabaseConfig(cfg.Database)
 	if err != nil {
 		return err

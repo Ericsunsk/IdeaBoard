@@ -10,6 +10,7 @@ import {
   type CanvasViewportPersistence,
   type CanvasViewportPersistenceIdentity,
 } from '../utils/canvasViewportPersistence'
+import type { CanvasBoardLoadResult } from '../board-session'
 
 export type CanvasFlowViewport = {
   x: number
@@ -62,7 +63,7 @@ export type UseCanvasViewportRuntimeOptions = {
   zoomIn: () => Promise<unknown> | unknown
   zoomOut: () => Promise<unknown> | unknown
   panBy: (delta: { x: number; y: number }) => boolean
-  loadInitialOrRouteBoard: () => Promise<void>
+  loadInitialOrRouteBoard: () => Promise<CanvasBoardLoadResult>
   closeBoardHeaderEditing: () => void
   startCanvasInteraction: (key: CanvasViewportRuntimeInteraction) => void
   stopCanvasInteraction: (key: CanvasViewportRuntimeInteraction) => void

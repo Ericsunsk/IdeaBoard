@@ -48,7 +48,7 @@ export type CanvasBillingReadinessStore = {
     feature: WorkflowFeature,
     options?: { force?: boolean; request?: CanvasBillingReadinessRequest },
   ) => Promise<void>
-  ensureMatrix?: (entries: Array<{ feature: WorkflowFeature; request: NonNullable<CanvasBillingReadinessRequest> }>) => Promise<void>
+  ensureMatrix: (entries: Array<{ feature: WorkflowFeature; request: NonNullable<CanvasBillingReadinessRequest> }>) => Promise<void>
   getFeatureState: (
     feature: WorkflowFeature,
     request?: CanvasBillingReadinessRequest,

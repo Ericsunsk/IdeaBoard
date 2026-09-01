@@ -26,7 +26,7 @@ NGINX_SERVER_NAME="ideaboard.art" \
   NGINX_API_UPSTREAM="http://127.0.0.1:6000" \
   NGINX_AUTH_UPSTREAM="http://127.0.0.1:6001" \
   NGINX_AUTH_HEALTH_UPSTREAM="http://127.0.0.1:6001/api/health" \
-  NGINX_WEB_ROOT="/opt/ideaboard/apps/web/dist" \
+  NGINX_WEB_ROOT="/usr/share/nginx/html" \
   NGINX_ROOT_DIRECTIVE="try_files \$uri \$uri/ /index.html" \
   bash "${script_dir}/render-nginx-template.sh" "$output" >/dev/null
 

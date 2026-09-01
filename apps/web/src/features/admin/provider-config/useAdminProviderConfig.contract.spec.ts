@@ -176,7 +176,7 @@ describe('useAdminProviderConfig', () => {
     context.providerEndpointEditor.openCreate()
     context.providerEndpointEditor.form.value = {
       apiType: 'openai-compatible',
-      protocol: 'image-url-json-to-image',
+      protocol: 'image-pipeline',
       capability: '',
       name: 'Modal Image Processing',
       baseUrl: 'https://example.com/image-processing',

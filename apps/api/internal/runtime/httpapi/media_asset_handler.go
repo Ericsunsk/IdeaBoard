@@ -270,14 +270,6 @@ func (h *mediaAssetHandler) Original(c *gin.Context) {
 	}
 	object, err := h.storage.ReadObjectAtProfile(c.Request.Context(), asset.StorageProfileID, asset.StorageKey, 100*1024*1024)
 	if err != nil {
-		// Older ingestions could persist the planned extension while storage
-		// selected a different one from the downloaded content. Keep those
-		// records readable using the canonical URL extension.
-		if fallbackKey := storage.LegacyStorageKeyFromURL(asset.StorageKey, asset.Url); fallbackKey != "" {
-			object, err = h.storage.ReadObjectAtProfile(c.Request.Context(), asset.StorageProfileID, fallbackKey, 100*1024*1024)
-		}
-	}
-	if err != nil {
 		response.InternalError(c, http.StatusInternalServerError, "读取原图失败", err)
 		return
 	}

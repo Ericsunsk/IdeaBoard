@@ -175,7 +175,7 @@ func TestPostgresTaskAssignerRoutesModelessTaskFromExecutionPlan(t *testing.T) {
 	generationAccount := createAssignerAccount(t, db, "generation-only", 2)
 	setAssignerEndpointCapabilities(t, db, generationAccount, string(workflow.RoutingCapabilityGeneration))
 	backgroundAccount := createAssignerAccount(t, db, "background-modeless", 2)
-	setAssignerEndpointProtocol(t, db, backgroundAccount, "image-url-json-to-image")
+	setAssignerEndpointProtocol(t, db, backgroundAccount, "image-pipeline")
 	setAssignerEndpointCapabilities(t, db, backgroundAccount, string(workflow.RoutingCapabilityCutout))
 	setAssignerModelEnabled(t, db, backgroundAccount, "gpt-image-1", false)
 	createAssignerTaskWithOptions(t, db, "pending-background-modeless", 0, tasks.StatusPending, "", "", assignerTaskOptions{
@@ -202,7 +202,7 @@ func TestPostgresTaskAssignerRoutesUpscaleCapabilityFromExecutionPlan(t *testing
 	backgroundAccount := createAssignerAccount(t, db, "background-only", 2)
 	setAssignerEndpointCapabilities(t, db, backgroundAccount, string(workflow.RoutingCapabilityCutout))
 	upscaleAccount := createAssignerAccount(t, db, "upscale-modeless", 2)
-	setAssignerEndpointProtocol(t, db, upscaleAccount, "image-url-json-to-image")
+	setAssignerEndpointProtocol(t, db, upscaleAccount, "image-pipeline")
 	setAssignerEndpointCapabilities(t, db, upscaleAccount, string(workflow.RoutingCapabilityUpscale))
 	setAssignerModelEnabled(t, db, upscaleAccount, "gpt-image-1", false)
 	createAssignerTaskWithOptions(t, db, "pending-upscale-modeless", 0, tasks.StatusPending, "", "", assignerTaskOptions{
@@ -232,7 +232,7 @@ func TestPostgresTaskAssignerRoutesModelessImageFillTasks(t *testing.T) {
 			db := newPostgresAssignerTestDB(t)
 			assigner := NewPostgresTaskAssigner(db)
 			accountID := createAssignerAccount(t, db, "fill-modeless", 2)
-			setAssignerEndpointProtocol(t, db, accountID, "flux-fill-json-image")
+			setAssignerEndpointProtocol(t, db, accountID, "image-fill")
 			setAssignerEndpointCapabilities(t, db, accountID, string(workflow.RoutingCapabilityFill))
 			setAssignerModelEnabled(t, db, accountID, "gpt-image-1", false)
 

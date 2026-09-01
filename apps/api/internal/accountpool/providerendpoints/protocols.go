@@ -7,15 +7,13 @@ import (
 )
 
 const (
-	ProtocolModelAPI          = "model-api"
-	ProtocolImagePipeline     = "image-pipeline"
-	ProtocolImageURLJSONImage = "image-url-json-to-image"
-	ProtocolImageFill         = "image-fill"
-	ProtocolFluxFillJSONImage = "flux-fill-json-image"
-	CapabilityGeneration      = "generation"
-	CapabilityCutout          = "cutout"
-	CapabilityUpscale         = "upscale"
-	CapabilityFill            = "fill"
+	ProtocolModelAPI      = "model-api"
+	ProtocolImagePipeline = "image-pipeline"
+	ProtocolImageFill     = "image-fill"
+	CapabilityGeneration  = "generation"
+	CapabilityCutout      = "cutout"
+	CapabilityUpscale     = "upscale"
+	CapabilityFill        = "fill"
 )
 
 type ProtocolDefinition struct {
@@ -34,7 +32,6 @@ const (
 
 type protocolSpec struct {
 	definition      ProtocolDefinition
-	aliases         []string
 	allowedAPITypes []string
 	adapters        map[string]string
 }
@@ -51,7 +48,6 @@ var protocolSpecs = map[string]protocolSpec{
 	},
 	ProtocolImagePipeline: {
 		definition:      ProtocolDefinition{ID: ProtocolImagePipeline, Capabilities: []string{CapabilityCutout, CapabilityUpscale}},
-		aliases:         []string{ProtocolImageURLJSONImage},
 		allowedAPITypes: []string{"openai-compatible", "self-hosted"},
 		adapters: map[string]string{
 			"cutout":  RuntimeAdapterCutout,
@@ -60,7 +56,6 @@ var protocolSpecs = map[string]protocolSpec{
 	},
 	ProtocolImageFill: {
 		definition:      ProtocolDefinition{ID: ProtocolImageFill, Capabilities: []string{CapabilityFill}},
-		aliases:         []string{ProtocolFluxFillJSONImage},
 		allowedAPITypes: []string{"openai-compatible", "self-hosted"},
 		adapters: map[string]string{
 			"inpaint":  RuntimeAdapterFluxFill,
@@ -86,17 +81,8 @@ func ProtocolRegistry() []ProtocolDefinition {
 
 func CanonicalProtocol(protocol string) (string, bool) {
 	normalized := strings.ToLower(strings.TrimSpace(protocol))
-	if _, ok := protocolSpecs[normalized]; ok {
-		return normalized, true
-	}
-	for canonical, spec := range protocolSpecs {
-		for _, alias := range spec.aliases {
-			if normalized == alias {
-				return canonical, true
-			}
-		}
-	}
-	return "", false
+	_, ok := protocolSpecs[normalized]
+	return normalized, ok
 }
 
 func ProtocolSupportsAPIType(protocol, apiType string) bool {

@@ -33,7 +33,7 @@ services:
       DB_USER: ideaboard_api
       DB_PASSWORD: ${API_DB_PASSWORD:?Set API_DB_PASSWORD}
       DB_NAME: ideaboard
-      DB_SSLMODE: disable
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
       NATS_URL: nats://ideaboard:${NATS_PASSWORD:?Set NATS_PASSWORD}@nats:4222
       NATS_EVENT_BUS_ENABLED: ${NATS_EVENT_BUS_ENABLED:-true}
       RIVER_WORKER_CONCURRENCY: ${RIVER_WORKER_CONCURRENCY:-5}
@@ -70,7 +70,7 @@ services:
       DB_MIGRATION_USER: ideaboard
       DB_MIGRATION_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       DB_NAME: ideaboard
-      DB_SSLMODE: disable
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
     depends_on:
       postgres:
         condition: service_healthy
@@ -103,7 +103,7 @@ services:
       DB_USER: ideaboard_auth
       DB_PASSWORD: ${AUTH_DB_PASSWORD:?Set AUTH_DB_PASSWORD}
       DB_NAME: ideaboard
-      DB_SSLMODE: disable
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
     ports:
       - "127.0.0.1:${AUTH_HOST_PORT:-6001}:6001"
     healthcheck:
@@ -141,7 +141,7 @@ services:
       DB_MIGRATION_USER: ideaboard
       DB_MIGRATION_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       DB_NAME: ideaboard
-      DB_SSLMODE: disable
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
     depends_on:
       postgres:
         condition: service_healthy

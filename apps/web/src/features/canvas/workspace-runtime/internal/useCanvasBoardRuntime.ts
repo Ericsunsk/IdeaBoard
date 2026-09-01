@@ -2,7 +2,7 @@ import { computed, ref, shallowRef, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../../canvas-board/domain'
-import { HOME_PATH } from '../../../../shared/constants/routePaths'
+import { HOME_PATH, USER_BOARDS_PATH } from '../../../../shared/constants/routePaths'
 import { useCanvasBoardSession, type SaveStatus } from '../../board-session'
 import { useFlowBoardHeaderActions } from '../../workspace-chrome/useFlowBoardHeaderActions'
 import { useFlowCanvasRuntime } from './useFlowCanvasRuntime'
@@ -80,6 +80,16 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions) {
     flushAutosave: () => flowRuntime.persistence.flushAutosave(),
   })
 
+  async function loadInitialOrRouteBoard() {
+    const result = await flowRuntime.persistence.loadInitialOrRouteBoard()
+    if (result.status === 'not-found') {
+      // Never leave an unknown route ID attached to an editable canvas.
+      // Return to the board catalog so the user can choose a valid board.
+      await options.router.replace(USER_BOARDS_PATH)
+    }
+    return result
+  }
+
   async function onNavigateRequest(path: string) {
     await flowRuntime.persistence.flushAutosave()
     await options.router.push(path)
@@ -97,7 +107,7 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions) {
       isDirty,
       isSavingBoard,
       saveStatus,
-      loadInitialOrRouteBoard: flowRuntime.persistence.loadInitialOrRouteBoard,
+      loadInitialOrRouteBoard,
       flushAutosave: flowRuntime.persistence.flushAutosave,
       history: flowRuntime.persistence.history,
     },

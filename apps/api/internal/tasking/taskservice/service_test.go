@@ -811,6 +811,7 @@ func TestSubmitTaskCanvasUploadRefsRequireBoardAccess(t *testing.T) {
 		Media: taskmedia.NewSubmitMediaValidator(
 			config.PublicOriginsConfig{API: "https://assets.example.com"},
 			mediaAuthorizer,
+			nil,
 		),
 	})
 	prepare := func(userID int64, ref string) error {

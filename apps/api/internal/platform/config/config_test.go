@@ -140,6 +140,38 @@ func TestLoadDatabaseConfig(t *testing.T) {
 	})
 }
 
+func TestValidateDatabase(t *testing.T) {
+	t.Run("allows local defaults", func(t *testing.T) {
+		cfg := &Config{App: AppConfig{Env: "development"}, Database: DatabaseConfig{SSLMode: "disable"}}
+		if err := cfg.ValidateDatabase(); err != nil {
+			t.Fatalf("ValidateDatabase() error = %v", err)
+		}
+	})
+
+	t.Run("rejects invalid SSL mode in every environment", func(t *testing.T) {
+		cfg := &Config{App: AppConfig{Env: "development"}, Database: DatabaseConfig{SSLMode: "prefer"}}
+		if err := cfg.ValidateDatabase(); err == nil {
+			t.Fatal("ValidateDatabase() succeeded for invalid SSL mode")
+		}
+	})
+
+	t.Run("rejects missing or placeholder production password", func(t *testing.T) {
+		for _, password := range []string{"", "placeholder", "replace-with-real-value", "password"} {
+			cfg := &Config{App: AppConfig{Env: "release"}, Database: DatabaseConfig{Password: password, SSLMode: "require"}}
+			if err := cfg.ValidateDatabase(); err == nil {
+				t.Fatalf("ValidateDatabase() accepted unsafe password %q", password)
+			}
+		}
+	})
+
+	t.Run("accepts configured production password and SSL mode", func(t *testing.T) {
+		cfg := &Config{App: AppConfig{Env: "production"}, Database: DatabaseConfig{Password: "runtime-secret", SSLMode: "verify-full"}}
+		if err := cfg.ValidateDatabase(); err != nil {
+			t.Fatalf("ValidateDatabase() error = %v", err)
+		}
+	})
+}
+
 func TestLoadMetricsAddress(t *testing.T) {
 	resetConfigEnv(t)
 	if got := Load().App.MetricsAddr; got != "127.0.0.1:9091" {

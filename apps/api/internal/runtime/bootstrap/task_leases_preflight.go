@@ -40,7 +40,7 @@ func runPreflight(args []string) {
 		fatal("usage: api preflight task-leases")
 	}
 
-	cfg := config.Load()
+	cfg := loadConfigOrFatal()
 	configureRuntimeLogging(cfg)
 
 	taskRepo, err := newTaskLeasePreflightTaskRepo(cfg)
@@ -64,7 +64,7 @@ func runRepair(args []string) {
 		fatal("refusing to mutate; use api repair task-leases --to=pending --yes")
 	}
 
-	cfg := config.Load()
+	cfg := loadConfigOrFatal()
 	configureRuntimeLogging(cfg)
 
 	taskRepo, err := newTaskLeasePreflightTaskRepo(cfg)

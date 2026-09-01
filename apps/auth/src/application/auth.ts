@@ -83,6 +83,8 @@ export function createAuthComponents(
   const mailConfigService = createRuntimeMailConfigService(
     database,
     environment.secrets.encryptionKey,
+    fetch,
+    environment.auth.baseURL,
   );
   const getAuthGuardSettings = createAuthGuardSettingsReader(database);
   const socialProviderRuntime = createSocialProviderRuntimeCoordinator(betterAuth);
@@ -204,12 +206,14 @@ export function createBetterAuthOptions(input: {
                   expiresInMinutes: EMAIL_OTP_EXPIRES_IN_MINUTES,
                   appName,
                   brandLogoUrl,
+                  publicSiteOrigin: environment.auth.baseURL,
                 })
               : verificationOtp({
                   otp,
                   expiresInMinutes: EMAIL_OTP_EXPIRES_IN_MINUTES,
                   appName,
                   brandLogoUrl,
+                  publicSiteOrigin: environment.auth.baseURL,
                 });
           await mailConfigService.send({ to: email, content });
         },

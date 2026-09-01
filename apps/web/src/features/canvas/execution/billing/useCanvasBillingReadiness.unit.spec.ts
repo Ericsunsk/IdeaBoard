@@ -48,8 +48,8 @@ describe('canvas billing readiness store', () => {
       },
     ]
 
-    await store.ensureMatrix?.(entries)
-    await store.ensureMatrix?.(entries)
+    await store.ensureMatrix(entries)
+    await store.ensureMatrix(entries)
 
     expect(fetchReadinessMatrix).toHaveBeenCalledOnce()
     expect(fetchReadinessMatrix).toHaveBeenCalledWith(entries.map((entry) => entry.request))

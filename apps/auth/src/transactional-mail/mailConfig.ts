@@ -84,6 +84,7 @@ export class MailConfigService {
     private readonly repository: MailConfigRepository,
     private readonly transport: MailTransport,
     private readonly secretCipher: MailSecretCipher,
+    private readonly publicSiteOrigin?: string,
   ) {}
 
   async getSummary(): Promise<MailConfigSummary> {
@@ -176,7 +177,7 @@ export class MailConfigService {
           to: recipient,
           from: `${current.fromName} <${current.fromEmail}>`,
           replyTo: current.replyTo || undefined,
-          content: mailConfigurationTest(),
+          content: mailConfigurationTest({ publicSiteOrigin: this.publicSiteOrigin }),
         },
         apiKey,
       );

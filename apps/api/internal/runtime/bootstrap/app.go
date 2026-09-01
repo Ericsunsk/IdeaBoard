@@ -45,7 +45,7 @@ func Run(args []string) {
 		}
 	}
 
-	cfg := config.Load()
+	cfg := loadConfigOrFatal()
 	configureRuntimeLogging(cfg)
 	slog.Info("server starting", "storage_profiles", true)
 
@@ -71,7 +71,7 @@ func Run(args []string) {
 }
 
 func runMigrate() {
-	cfg := config.Load()
+	cfg := loadConfigOrFatal()
 	configureRuntimeLogging(cfg)
 	atlasBinary := strings.TrimSpace(os.Getenv("ATLAS_BINARY"))
 	if atlasBinary == "" {
@@ -91,7 +91,7 @@ func runInitCreditWallets(args []string) {
 	if len(args) != 1 || strings.TrimSpace(args[0]) == "" {
 		fatal("usage: ideaboard init-credit-wallets <verified-identities.json>")
 	}
-	cfg := config.Load()
+	cfg := loadConfigOrFatal()
 	configureRuntimeLogging(cfg)
 	rawKey, err := base64.StdEncoding.DecodeString(cfg.Credits.WelcomeIdentityKey)
 	if err != nil || len(rawKey) != 32 {
@@ -130,7 +130,7 @@ func runInitCreditWallets(args []string) {
 }
 
 func runFinalizeMigrate() {
-	cfg := config.Load()
+	cfg := loadConfigOrFatal()
 	configureRuntimeLogging(cfg)
 	if err := finalizeAppDatabases(context.Background(), cfg); err != nil {
 		fatal("failed to finalize database migration", "err", err)
@@ -139,7 +139,7 @@ func runFinalizeMigrate() {
 }
 
 func runInitAdmin() {
-	cfg := config.Load()
+	cfg := loadConfigOrFatal()
 	configureRuntimeLogging(cfg)
 	requireAuthInternalKeyForProduction(cfg)
 	rawKey, err := base64.StdEncoding.DecodeString(cfg.Credits.WelcomeIdentityKey)
@@ -190,4 +190,12 @@ func runInitAdmin() {
 func fatal(msg string, attrs ...any) {
 	slog.Error(msg, attrs...)
 	os.Exit(1)
+}
+
+func loadConfigOrFatal() *config.Config {
+	cfg, err := config.LoadAndValidate()
+	if err != nil {
+		fatal("invalid configuration", "err", err)
+	}
+	return cfg
 }

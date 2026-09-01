@@ -6,21 +6,23 @@ export type RenderedEmail = Readonly<{
   text: string;
 }>;
 
+type EmailBrandingVariables = {
+  appName?: string;
+  brandLogoUrl?: string;
+  publicSiteOrigin?: string;
+};
+
 export type VerificationOtpVariables = Readonly<{
   otp: string;
   expiresInMinutes: number;
-  appName?: string;
-  brandLogoUrl?: string;
-}>;
+} & EmailBrandingVariables>;
 
 export type PasswordResetOtpVariables = VerificationOtpVariables;
 
 export type WelcomeOnboardingVariables = Readonly<{
   userName: string;
   canvasUrl: string;
-  appName?: string;
-  brandLogoUrl?: string;
-}>;
+} & EmailBrandingVariables>;
 
 export type PaymentReceiptVariables = Readonly<{
   amount: string;
@@ -31,18 +33,14 @@ export type PaymentReceiptVariables = Readonly<{
   paymentTime: string;
   paymentMethod: string;
   accountBillingUrl: string;
-  appName?: string;
-  brandLogoUrl?: string;
-}>;
+} & EmailBrandingVariables>;
 
 export type TeamInviteVariables = Readonly<{
   inviterName: string;
   boardTitle: string;
   roleName: string;
   acceptInviteUrl: string;
-  appName?: string;
-  brandLogoUrl?: string;
-}>;
+} & EmailBrandingVariables>;
 
 export type SecurityAlertLoginVariables = Readonly<{
   userName: string;
@@ -50,14 +48,9 @@ export type SecurityAlertLoginVariables = Readonly<{
   deviceInfo: string;
   ipLocation: string;
   secureAccountUrl: string;
-  appName?: string;
-  brandLogoUrl?: string;
-}>;
+} & EmailBrandingVariables>;
 
-export type MailConfigurationTestVariables = Readonly<{
-  appName?: string;
-  brandLogoUrl?: string;
-}>;
+export type MailConfigurationTestVariables = Readonly<EmailBrandingVariables>;
 
 type HTMLVariable = Readonly<{
   value: string;
@@ -65,7 +58,7 @@ type HTMLVariable = Readonly<{
 }>;
 
 const APP_NAME = "IdeaBoard";
-const BRAND_LOGO_URL = "https://ideaboard.art/favicon.svg";
+const DEFAULT_PUBLIC_SITE_ORIGIN = "http://localhost:5173";
 const unresolvedVariablePattern = /\{\{[A-Z0-9_]+\}\}/g;
 const templateCache = new Map<string, string>();
 
@@ -80,15 +73,16 @@ export function resolveBrandingLogoUrl(
   logoUrl?: string,
   baseUrl?: string,
 ): string {
+  const fallback = `${resolvePublicSiteOrigin(baseUrl)}/favicon.svg`;
   const trimmed = logoUrl?.trim() ?? "";
   if (!trimmed) {
-    return BRAND_LOGO_URL;
+    return fallback;
   }
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
     try {
       return validURL(trimmed, "brandLogoUrl");
     } catch {
-      return BRAND_LOGO_URL;
+      return fallback;
     }
   }
   if (trimmed.startsWith("/") && baseUrl?.trim()) {
@@ -97,10 +91,10 @@ export function resolveBrandingLogoUrl(
       const resolved = new URL(trimmed, base.origin);
       return validURL(resolved.toString(), "brandLogoUrl");
     } catch {
-      return BRAND_LOGO_URL;
+      return fallback;
     }
   }
-  return BRAND_LOGO_URL;
+  return fallback;
 }
 
 export function verificationOtp(
@@ -109,7 +103,7 @@ export function verificationOtp(
   const otp = validOtp(variables.otp);
   const expiresInMinutes = validExpiry(variables.expiresInMinutes);
   const appName = variables.appName?.trim() || APP_NAME;
-  const brandLogoUrl = variables.brandLogoUrl?.trim() || BRAND_LOGO_URL;
+  const brandLogoUrl = variables.brandLogoUrl?.trim() || `${resolvePublicSiteOrigin(variables.publicSiteOrigin)}/favicon.svg`;
   return {
     subject: `Your ${appName} verification code`,
     html: renderHTML(
@@ -118,7 +112,7 @@ export function verificationOtp(
         OTP_CODE: textVariable(otp),
         EXPIRES_IN_MINUTES: textVariable(String(expiresInMinutes)),
       },
-      { appName, brandLogoUrl },
+      { appName, brandLogoUrl, publicSiteOrigin: variables.publicSiteOrigin },
     ),
     text: `${otp} is your ${appName} verification code. It expires in ${expiresInMinutes} minutes. If you did not request it, you can safely ignore this email.`,
   };
@@ -130,7 +124,7 @@ export function passwordResetOtp(
   const otp = validOtp(variables.otp);
   const expiresInMinutes = validExpiry(variables.expiresInMinutes);
   const appName = variables.appName?.trim() || APP_NAME;
-  const brandLogoUrl = variables.brandLogoUrl?.trim() || BRAND_LOGO_URL;
+  const brandLogoUrl = variables.brandLogoUrl?.trim() || `${resolvePublicSiteOrigin(variables.publicSiteOrigin)}/favicon.svg`;
   return {
     subject: `Reset your ${appName} password`,
     html: renderHTML(
@@ -139,7 +133,7 @@ export function passwordResetOtp(
         OTP_CODE: textVariable(otp),
         EXPIRES_IN_MINUTES: textVariable(String(expiresInMinutes)),
       },
-      { appName, brandLogoUrl },
+      { appName, brandLogoUrl, publicSiteOrigin: variables.publicSiteOrigin },
     ),
     text: `${otp} is your ${appName} password reset code. It expires in ${expiresInMinutes} minutes. If you did not request it, you can safely ignore this email.`,
   };
@@ -151,7 +145,7 @@ export function welcomeOnboarding(
   const userName = requiredText(variables.userName, "userName");
   const canvasUrl = validURL(variables.canvasUrl, "canvasUrl");
   const appName = variables.appName?.trim() || APP_NAME;
-  const brandLogoUrl = variables.brandLogoUrl?.trim() || BRAND_LOGO_URL;
+  const brandLogoUrl = variables.brandLogoUrl?.trim() || `${resolvePublicSiteOrigin(variables.publicSiteOrigin)}/favicon.svg`;
   return {
     subject: `Welcome to ${appName}`,
     html: renderHTML(
@@ -160,7 +154,7 @@ export function welcomeOnboarding(
         USER_NAME: textVariable(userName),
         CANVAS_URL: urlVariable(canvasUrl),
       },
-      { appName, brandLogoUrl },
+      { appName, brandLogoUrl, publicSiteOrigin: variables.publicSiteOrigin },
     ),
     text: `Hi ${userName}, welcome to ${appName}. Open your canvas: ${canvasUrl}`,
   };
@@ -181,7 +175,7 @@ export function paymentReceipt(
     "accountBillingUrl",
   );
   const appName = variables.appName?.trim() || APP_NAME;
-  const brandLogoUrl = variables.brandLogoUrl?.trim() || BRAND_LOGO_URL;
+  const brandLogoUrl = variables.brandLogoUrl?.trim() || `${resolvePublicSiteOrigin(variables.publicSiteOrigin)}/favicon.svg`;
   return {
     subject: `${appName} receipt · ${orderId}`,
     html: renderHTML(
@@ -196,7 +190,7 @@ export function paymentReceipt(
         PAYMENT_METHOD: textVariable(paymentMethod),
         ACCOUNT_BILLING_URL: urlVariable(accountBillingUrl),
       },
-      { appName, brandLogoUrl },
+      { appName, brandLogoUrl, publicSiteOrigin: variables.publicSiteOrigin },
     ),
     text: [
       `Payment received by ${appName}`,
@@ -220,7 +214,7 @@ export function teamInvite(variables: TeamInviteVariables): RenderedEmail {
     "acceptInviteUrl",
   );
   const appName = variables.appName?.trim() || APP_NAME;
-  const brandLogoUrl = variables.brandLogoUrl?.trim() || BRAND_LOGO_URL;
+  const brandLogoUrl = variables.brandLogoUrl?.trim() || `${resolvePublicSiteOrigin(variables.publicSiteOrigin)}/favicon.svg`;
   return {
     subject: `${inviterName} invited you to ${appName}`,
     html: renderHTML(
@@ -231,7 +225,7 @@ export function teamInvite(variables: TeamInviteVariables): RenderedEmail {
         ROLE_NAME: textVariable(roleName),
         ACCEPT_INVITE_URL: urlVariable(acceptInviteUrl),
       },
-      { appName, brandLogoUrl },
+      { appName, brandLogoUrl, publicSiteOrigin: variables.publicSiteOrigin },
     ),
     text: `${inviterName} invited you to join the “${boardTitle}” board as ${roleName}. Accept the invitation: ${acceptInviteUrl}`,
   };
@@ -249,7 +243,7 @@ export function securityAlertLogin(
     "secureAccountUrl",
   );
   const appName = variables.appName?.trim() || APP_NAME;
-  const brandLogoUrl = variables.brandLogoUrl?.trim() || BRAND_LOGO_URL;
+  const brandLogoUrl = variables.brandLogoUrl?.trim() || `${resolvePublicSiteOrigin(variables.publicSiteOrigin)}/favicon.svg`;
   return {
     subject: `New sign-in to your ${appName} account`,
     html: renderHTML(
@@ -261,7 +255,7 @@ export function securityAlertLogin(
         IP_LOCATION: textVariable(ipLocation),
         SECURE_ACCOUNT_URL: urlVariable(secureAccountUrl),
       },
-      { appName, brandLogoUrl },
+      { appName, brandLogoUrl, publicSiteOrigin: variables.publicSiteOrigin },
     ),
     text: [
       `Hi ${userName}, a new device just signed in to your ${appName} account.`,
@@ -277,10 +271,11 @@ export function mailConfigurationTest(
   variables?: MailConfigurationTestVariables,
 ): RenderedEmail {
   const appName = variables?.appName?.trim() || APP_NAME;
-  const brandLogoUrl = variables?.brandLogoUrl?.trim() || BRAND_LOGO_URL;
+  const publicSiteOrigin = resolvePublicSiteOrigin(variables?.publicSiteOrigin);
+  const brandLogoUrl = variables?.brandLogoUrl?.trim() || `${publicSiteOrigin}/favicon.svg`;
   return {
     subject: `${appName} email service test`,
-    html: renderHTML("mail-configuration-test.html", {}, { appName, brandLogoUrl }),
+    html: renderHTML("mail-configuration-test.html", {}, { appName, brandLogoUrl, publicSiteOrigin }),
     text: `${appName} email service configuration test succeeded.`,
   };
 }
@@ -288,16 +283,20 @@ export function mailConfigurationTest(
 function renderHTML(
   templateName: string,
   variables: Readonly<Record<string, HTMLVariable>>,
-  options?: { appName?: string; brandLogoUrl?: string },
+  options?: { appName?: string; brandLogoUrl?: string; publicSiteOrigin?: string },
 ): string {
   const template = loadTemplate(templateName);
   const appName = options?.appName?.trim() || APP_NAME;
+  const publicSiteOrigin = resolvePublicSiteOrigin(options?.publicSiteOrigin);
   const brandLogoUrl = options?.brandLogoUrl?.trim()
     ? validURL(options.brandLogoUrl.trim(), "brandLogoUrl")
-    : BRAND_LOGO_URL;
+    : `${publicSiteOrigin}/favicon.svg`;
   const allVariables: Record<string, HTMLVariable> = {
     APP_NAME: textVariable(appName),
     BRAND_LOGO_URL: urlVariable(brandLogoUrl),
+    // The origin has already been validated and normalized; keep its canonical
+    // serialization without URL.toString() adding a trailing slash.
+    PUBLIC_SITE_ORIGIN: textVariable(publicSiteOrigin),
     BRAND_LOGO_SVG: textVariable(""),
     ...variables,
   };
@@ -316,6 +315,19 @@ function renderHTML(
     );
   }
   return html;
+}
+
+function resolvePublicSiteOrigin(value?: string): string {
+  const candidate = value?.trim() || process.env.PUBLIC_ORIGIN?.trim() || process.env.BETTER_AUTH_URL?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN;
+  try {
+    const url = new URL(candidate);
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) {
+      throw new Error("unsupported URL");
+    }
+    return url.origin;
+  } catch {
+    return DEFAULT_PUBLIC_SITE_ORIGIN;
+  }
 }
 
 function loadTemplate(templateName: string): string {

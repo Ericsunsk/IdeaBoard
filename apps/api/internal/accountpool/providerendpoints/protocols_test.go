@@ -10,9 +10,8 @@ func TestNormalizeProtocolCapabilitiesEnforcesCompatibility(t *testing.T) {
 	if capabilities[0] != CapabilityCutout {
 		t.Fatalf("custom protocol capabilities = %v", capabilities)
 	}
-	protocol, capabilities, err = NormalizeProtocolCapabilities(ProtocolImageURLJSONImage, []string{CapabilityCutout})
-	if err != nil || protocol != ProtocolImagePipeline || len(capabilities) != 1 {
-		t.Fatalf("custom protocol alias normalization = %q, %v, %v", protocol, capabilities, err)
+	if _, _, err = NormalizeProtocolCapabilities("image-url-json-to-image", []string{CapabilityCutout}); err == nil {
+		t.Fatal("legacy image transform protocol must be rejected")
 	}
 	if _, _, err := NormalizeProtocolCapabilities(ProtocolImagePipeline, nil); err == nil {
 		t.Fatal("image processing protocol without a selected capability should fail")
@@ -27,9 +26,8 @@ func TestNormalizeProtocolCapabilitiesEnforcesCompatibility(t *testing.T) {
 	if err != nil || protocol != ProtocolImageFill || len(capabilities) != 1 || capabilities[0] != CapabilityFill {
 		t.Fatalf("image fill protocol normalization = %q, %v, %v", protocol, capabilities, err)
 	}
-	protocol, capabilities, err = NormalizeProtocolCapabilities(ProtocolFluxFillJSONImage, []string{CapabilityFill})
-	if err != nil || protocol != ProtocolImageFill || len(capabilities) != 1 || capabilities[0] != CapabilityFill {
-		t.Fatalf("flux fill alias normalization = %q, %v, %v", protocol, capabilities, err)
+	if _, _, err = NormalizeProtocolCapabilities("flux-fill-json-image", []string{CapabilityFill}); err == nil {
+		t.Fatal("legacy image fill protocol must be rejected")
 	}
 	protocol, capabilities, err = NormalizeProtocolCapabilities(ProtocolModelAPI, nil)
 	if err != nil || protocol != ProtocolModelAPI || len(capabilities) != 1 || capabilities[0] != CapabilityGeneration {
@@ -53,14 +51,14 @@ func TestProtocolSupportsCapabilityChecksExactCapability(t *testing.T) {
 }
 
 func TestValidateProtocolAPITypeSeparatesSelfHostedImageServices(t *testing.T) {
-	if err := ValidateProtocolAPIType(ProtocolFluxFillJSONImage, "self-hosted"); err != nil {
-		t.Fatalf("self-hosted flux fill endpoint should be valid: %v", err)
+	if err := ValidateProtocolAPIType(ProtocolImageFill, "self-hosted"); err != nil {
+		t.Fatalf("self-hosted image fill endpoint should be valid: %v", err)
 	}
-	if err := ValidateProtocolAPIType(ProtocolImageURLJSONImage, "openai-compatible"); err != nil {
-		t.Fatalf("legacy OpenAI-compatible image endpoint should remain valid: %v", err)
+	if err := ValidateProtocolAPIType(ProtocolImagePipeline, "openai-compatible"); err != nil {
+		t.Fatalf("OpenAI-compatible image endpoint should be valid: %v", err)
 	}
-	if err := ValidateProtocolAPIType(ProtocolFluxFillJSONImage, "google-cloud"); err == nil {
-		t.Fatal("Google Cloud must not be accepted for the flux fill request format")
+	if err := ValidateProtocolAPIType(ProtocolImageFill, "google-cloud"); err == nil {
+		t.Fatal("Google Cloud must not be accepted for the image fill request format")
 	}
 	if err := ValidateProtocolAPIType(ProtocolModelAPI, "google-cloud"); err != nil {
 		t.Fatalf("model API should accept Google Cloud: %v", err)
@@ -68,40 +66,46 @@ func TestValidateProtocolAPITypeSeparatesSelfHostedImageServices(t *testing.T) {
 }
 
 func TestCustomProtocolDoesNotSupportModelDetection(t *testing.T) {
-	if ProtocolSupportsModelDetection(ProtocolImageURLJSONImage) {
+	if ProtocolSupportsModelDetection(ProtocolImagePipeline) {
 		t.Fatal("custom protocol must not expose model detection")
 	}
-	if !AllowsModellessAccounts(ProtocolImageURLJSONImage, []string{CapabilityCutout}) {
+	if !AllowsModellessAccounts(ProtocolImagePipeline, []string{CapabilityCutout}) {
 		t.Fatal("cutout endpoint should allow model-less accounts")
 	}
-	if AllowsModellessAccounts(ProtocolImageURLJSONImage, []string{CapabilityCutout, CapabilityUpscale}) {
+	if AllowsModellessAccounts(ProtocolImagePipeline, []string{CapabilityCutout, CapabilityUpscale}) {
 		t.Fatal("combined image transform endpoint should not allow model-less accounts")
 	}
-	if !AllowsModellessAccounts(ProtocolFluxFillJSONImage, []string{CapabilityFill}) {
+	if !AllowsModellessAccounts(ProtocolImageFill, []string{CapabilityFill}) {
 		t.Fatal("fill endpoint should allow model-less accounts")
 	}
 }
 
-func TestProtocolRegistryResolvesAliasesAndRuntimeAdapters(t *testing.T) {
-	canonical, ok := CanonicalProtocol(ProtocolFluxFillJSONImage)
+func TestProtocolRegistryResolvesCanonicalProtocolsAndRuntimeAdapters(t *testing.T) {
+	canonical, ok := CanonicalProtocol(ProtocolImageFill)
 	if !ok || canonical != ProtocolImageFill {
-		t.Fatalf("canonical flux protocol = %q, %v", canonical, ok)
+		t.Fatalf("canonical fill protocol = %q, %v", canonical, ok)
 	}
-	if !ProtocolSupportsAPIType(ProtocolImageURLJSONImage, " self-hosted ") {
-		t.Fatal("image pipeline alias should accept self-hosted API type")
+	if !ProtocolSupportsAPIType(ProtocolImagePipeline, " self-hosted ") {
+		t.Fatal("image pipeline should accept self-hosted API type")
 	}
-	if ProtocolSupportsAPIType(ProtocolFluxFillJSONImage, "google-ai") {
-		t.Fatal("image fill alias should reject Google API types")
+	if ProtocolSupportsAPIType(ProtocolImageFill, "google-ai") {
+		t.Fatal("image fill should reject Google API types")
 	}
-	route, ok := RuntimeAdapterFor(ProtocolImageURLJSONImage, "upscale")
+	route, ok := RuntimeAdapterFor(ProtocolImagePipeline, "upscale")
 	if !ok || route != RuntimeAdapterUpscale {
 		t.Fatalf("upscale route = %q, %v", route, ok)
 	}
-	route, ok = RuntimeAdapterFor(ProtocolFluxFillJSONImage, "outpaint")
+	route, ok = RuntimeAdapterFor(ProtocolImageFill, "outpaint")
 	if !ok || route != RuntimeAdapterFluxFill {
 		t.Fatalf("flux outpaint route = %q, %v", route, ok)
 	}
 	if _, ok := RuntimeAdapterFor(ProtocolModelAPI, "inpaint"); ok {
 		t.Fatal("model protocol must reject inpaint")
+	}
+	if _, ok := CanonicalProtocol("image-url-json-to-image"); ok {
+		t.Fatal("legacy image transform protocol must not resolve")
+	}
+	if _, ok := CanonicalProtocol("flux-fill-json-image"); ok {
+		t.Fatal("legacy image fill protocol must not resolve")
 	}
 }

@@ -70,9 +70,30 @@ describe('userRoutes contract', () => {
       { path: 'register', name: 'UserRegister', meta: { guest: true } },
       { path: 'auth/callback', name: 'UserAuthCallback', meta: { public: true } },
       { path: 'boards', name: 'UserBoards', meta: { requiresAuth: true } },
+      { path: 'account', name: undefined, meta: { requiresAuth: true } },
+      { path: 'settings', name: undefined, meta: { requiresAuth: true } },
+      { path: 'billing', name: undefined, meta: { requiresAuth: true } },
+      { path: 'recharge', name: undefined, meta: { requiresAuth: true } },
       { path: 'search', name: 'UserSearch', meta: { public: true } },
       { path: 'canvas', name: 'UserCanvas', meta: { requiresAuth: true } },
     ])
+
+    expect(requireRoute(userRootRoute.children ?? [], 'account').redirect).toEqual({
+      path: '/user/boards',
+      query: { accountTab: 'profile' },
+    })
+    expect(requireRoute(userRootRoute.children ?? [], 'settings').redirect).toEqual({
+      path: '/user/boards',
+      query: { accountTab: 'security' },
+    })
+    expect(requireRoute(userRootRoute.children ?? [], 'billing').redirect).toEqual({
+      path: '/user/boards',
+      query: { accountTab: 'billing' },
+    })
+    expect(requireRoute(userRootRoute.children ?? [], 'recharge').redirect).toEqual({
+      path: '/user/boards',
+      query: { accountTab: 'recharge' },
+    })
   })
 
   it('lazy-loads the real User layout and route page modules', async () => {

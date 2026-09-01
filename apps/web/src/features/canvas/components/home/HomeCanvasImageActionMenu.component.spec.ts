@@ -147,6 +147,7 @@ describe('HomeCanvasImageActionMenu', () => {
   it('shows AI prices without disabling cached unavailable billing states, and keeps local editor price-free', () => {
     const billingStore: CanvasBillingReadinessStore = {
       ensureFeature: vi.fn(async () => undefined),
+      ensureMatrix: vi.fn(async () => undefined),
       applyReadiness: vi.fn(),
       getFeatureState: (feature) =>
         feature === IMAGE_NODE_ACTION.cutout
@@ -166,6 +167,7 @@ describe('HomeCanvasImageActionMenu', () => {
   it('presents explicit zero pricing as free in tooltip and touch quote', () => {
     const billingStore: CanvasBillingReadinessStore = {
       ensureFeature: vi.fn(async () => undefined),
+      ensureMatrix: vi.fn(async () => undefined),
       applyReadiness: vi.fn(),
       getFeatureState: (feature) => ({
         feature,

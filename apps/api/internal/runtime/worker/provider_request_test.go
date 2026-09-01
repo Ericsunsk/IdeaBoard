@@ -203,12 +203,12 @@ func TestProviderRuntimeAdapterForUsesProtocolAndRuntimeOperation(t *testing.T) 
 	}{
 		{name: "model prompt", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationGeneration, want: providerRuntimeAdapterModelImage},
 		{name: "image fill on model protocol", apiType: workflow.ProviderGoogleAI, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationInpaint, wantErr: true},
-		{name: "cutout", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationCutout, want: providerRuntimeAdapterCutout},
-		{name: "upscale", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationUpscale, want: providerRuntimeAdapterUpscale},
-		{name: "self-hosted flux fill", apiType: workflow.ProviderSelfHosted, protocol: providerendpoints.ProtocolFluxFillJSONImage, operation: workflow.RuntimeOperationOutpaint, want: providerRuntimeAdapterFluxFill},
-		{name: "transform API type mismatch", apiType: workflow.ProviderGoogleAI, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationUpscale, wantErr: true},
+		{name: "cutout", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImagePipeline, operation: workflow.RuntimeOperationCutout, want: providerRuntimeAdapterCutout},
+		{name: "upscale", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImagePipeline, operation: workflow.RuntimeOperationUpscale, want: providerRuntimeAdapterUpscale},
+		{name: "self-hosted image fill", apiType: workflow.ProviderSelfHosted, protocol: providerendpoints.ProtocolImageFill, operation: workflow.RuntimeOperationOutpaint, want: providerRuntimeAdapterFluxFill},
+		{name: "transform API type mismatch", apiType: workflow.ProviderGoogleAI, protocol: providerendpoints.ProtocolImagePipeline, operation: workflow.RuntimeOperationUpscale, wantErr: true},
 		{name: "transform on model protocol", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationCutout, wantErr: true},
-		{name: "generation on transform protocol", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationGeneration, wantErr: true},
+		{name: "generation on transform protocol", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImagePipeline, operation: workflow.RuntimeOperationGeneration, wantErr: true},
 		{name: "unknown operation", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperation("unknown"), wantErr: true},
 		{name: "missing protocol", apiType: workflow.ProviderOpenAICompatible, operation: workflow.RuntimeOperationGeneration, wantErr: true},
 		{name: "missing API type", protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationGeneration, wantErr: true},
@@ -290,7 +290,7 @@ func TestCallDrawingAPIRejectsProtocolOperationMismatchBeforeProviderIO(t *testi
 
 	account := &accounts.ApiAccount{
 		ID: 1, Name: "wrong-protocol", ApiKey: "key", ApiType: workflow.ProviderOpenAICompatible,
-		Protocol: providerendpoints.ProtocolImageURLJSONImage, ProxyURL: server.URL,
+		Protocol: providerendpoints.ProtocolImagePipeline, ProxyURL: server.URL,
 	}
 	_, err := (&ProviderExecutor{}).callDrawingAPIWithAssignment(
 		context.Background(),
@@ -416,7 +416,7 @@ func TestPrepareProviderExecutionCompletesPreflightBeforeLocalMediaIO(t *testing
 
 	unexpectedModelAccount := &accounts.ApiAccount{
 		ID: 1, Name: "unexpected-model", ApiKey: "key", ApiType: workflow.ProviderOpenAICompatible,
-		Protocol: providerendpoints.ProtocolFluxFillJSONImage, ProxyURL: "http://127.0.0.1:18080",
+		Protocol: providerendpoints.ProtocolImageFill, ProxyURL: "http://127.0.0.1:18080",
 	}
 	_, err := (&ProviderExecutor{}).resolveProviderExecution(
 		context.Background(),
@@ -442,7 +442,7 @@ func TestPrepareProviderExecutionCompletesPreflightBeforeLocalMediaIO(t *testing
 	}
 	incompatibleAccount := &accounts.ApiAccount{
 		ID: 1, Name: "incompatible-controls", ApiKey: "key", ApiType: workflow.ProviderOpenAICompatible,
-		Protocol: providerendpoints.ProtocolFluxFillJSONImage, ProxyURL: "http://127.0.0.1:18080",
+		Protocol: providerendpoints.ProtocolImageFill, ProxyURL: "http://127.0.0.1:18080",
 	}
 	_, err = (&ProviderExecutor{}).resolveProviderExecution(
 		context.Background(),

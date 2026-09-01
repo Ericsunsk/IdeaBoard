@@ -51,15 +51,7 @@ const providerProtocolRegistry: Record<
     label: '图像微服务',
     capabilities: ['cutout', 'upscale'],
   },
-  'image-url-json-to-image': {
-    label: '图像微服务',
-    capabilities: ['cutout', 'upscale'],
-  },
   'image-fill': {
-    label: 'Image Fill',
-    capabilities: ['fill'],
-  },
-  'flux-fill-json-image': {
     label: 'Image Fill',
     capabilities: ['fill'],
   },
@@ -116,11 +108,11 @@ export function isModellessProviderProtocol(value: string) {
 }
 
 export function isImagePipelineProtocol(value: string) {
-  return value === 'image-pipeline' || value === 'image-url-json-to-image'
+  return value === 'image-pipeline'
 }
 
 export function isImageFillProtocol(value: string) {
-  return value === 'image-fill' || value === 'flux-fill-json-image'
+  return value === 'image-fill'
 }
 
 export function isModellessProviderCapability(

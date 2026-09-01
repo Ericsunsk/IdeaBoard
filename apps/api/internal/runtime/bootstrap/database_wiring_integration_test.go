@@ -69,7 +69,7 @@ func assertProviderEndpointConfigurationAccess(t *testing.T, db *sql.DB) {
 	var endpointID int64
 	if err := db.QueryRowContext(ctx, `
 INSERT INTO provider_endpoints (api_type, protocol, name, base_url)
-VALUES ('custom', 'image-url-json-to-image', 'runtime privilege test', 'https://runtime-privilege.test')
+VALUES ('custom', 'image-pipeline', 'runtime privilege test', 'https://runtime-privilege.test')
 RETURNING id`).Scan(&endpointID); err != nil {
 		t.Fatalf("insert provider endpoint with runtime role: %v", err)
 	}

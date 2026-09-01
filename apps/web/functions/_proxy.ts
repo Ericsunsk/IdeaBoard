@@ -1,5 +1,5 @@
 interface ProxyEnv {
-  IDEABOARD_API_ORIGIN?: string
+  IDEABOARD_API_ORIGIN: string
 }
 
 interface PagesContext {
@@ -7,10 +7,9 @@ interface PagesContext {
   env: ProxyEnv
 }
 
-const DEFAULT_API_ORIGIN = 'https://api.ideaboard.art'
-
 function apiOrigin(env: ProxyEnv): URL {
-  const configured = (env.IDEABOARD_API_ORIGIN || DEFAULT_API_ORIGIN).trim()
+  const configured = env.IDEABOARD_API_ORIGIN?.trim()
+  if (!configured) throw new Error('IDEABOARD_API_ORIGIN is required')
   const origin = new URL(configured)
   if (origin.protocol !== 'https:') throw new Error('IDEABOARD_API_ORIGIN must use HTTPS')
   origin.pathname = ''
@@ -32,9 +31,14 @@ export async function proxyRequest({ request, env }: PagesContext): Promise<Resp
   const incoming = new URL(request.url)
   const target = new URL(`${origin.origin}${incoming.pathname}${incoming.search}`)
   const headers = new Headers(request.headers)
-  // The upstream sees its own host. Rewrite only our public same-origin
-  // Origin so the API's same-origin CORS policy remains valid behind the proxy.
-  if (headers.get('origin') === incoming.origin) headers.set('origin', origin.origin)
+  // Better Auth validates the browser Origin against AUTH_TRUSTED_ORIGINS,
+  // so auth requests must retain the public origin while ordinary API routes
+  // use the upstream origin for the API CORS policy.
+  const isAuthRequest =
+    incoming.pathname === '/api/auth' || incoming.pathname.startsWith('/api/auth/')
+  if (!isAuthRequest && headers.get('origin') === incoming.origin) {
+    headers.set('origin', origin.origin)
+  }
   headers.set('x-forwarded-host', incoming.host)
   headers.set('x-forwarded-proto', incoming.protocol.slice(0, -1))
 

@@ -234,6 +234,57 @@ func Load() *Config {
 	}
 }
 
+// LoadAndValidate loads deployment configuration and rejects unsafe database
+// settings before any connection attempt. Development keeps the local
+// DB_SSLMODE=disable default; production/release requires an explicit,
+// non-placeholder DB_PASSWORD and an allowlisted SSL mode.
+func LoadAndValidate() (*Config, error) {
+	cfg := Load()
+	if err := cfg.ValidateDatabase(); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+func (c *Config) ValidateDatabase() error {
+	if c == nil {
+		return fmt.Errorf("config is required")
+	}
+	if err := validateDatabaseSSLMode(c.Database.SSLMode); err != nil {
+		return err
+	}
+	if !isProductionAppEnv(c.App.Env) {
+		return nil
+	}
+	if isUnsafeProductionSecret(c.Database.Password) {
+		return fmt.Errorf("DB_PASSWORD must be set to a non-placeholder value when APP_ENV=%s", c.App.Env)
+	}
+	return nil
+}
+
+func validateDatabaseSSLMode(value string) error {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "disable", "require", "verify-full":
+		return nil
+	default:
+		return fmt.Errorf("DB_SSLMODE must be one of disable, require, or verify-full")
+	}
+}
+
+func isUnsafeProductionSecret(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if normalized == "" || strings.HasPrefix(normalized, "replace-with") || strings.HasPrefix(normalized, "replace_with") ||
+		strings.Contains(normalized, "change-before-production") || strings.Contains(normalized, "placeholder") {
+		return true
+	}
+	switch normalized {
+	case "changeme", "change-me", "password", "secret":
+		return true
+	default:
+		return false
+	}
+}
+
 func validatePublicOrigin(name, raw string) error {
 	if strings.TrimSpace(raw) == "" {
 		return fmt.Errorf("%s is required", name)

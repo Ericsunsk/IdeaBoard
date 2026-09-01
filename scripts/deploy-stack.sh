@@ -16,8 +16,7 @@ find_stack_root() {
   for dir in \
     "$SCRIPT_DIR/.." \
     "$PWD" \
-    "/opt/stacks/ideaboard" \
-    "/opt/ideaboard"; do
+    "/opt/stacks/ideaboard"; do
     if [[ -f "$dir/docker/compose.yml" ]]; then
       cd "$dir" && pwd
       return

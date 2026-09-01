@@ -170,7 +170,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     }
   }
 
-  const loadInitialOrRouteBoard = async (): Promise<void> => {
+  const loadInitialOrRouteBoard = async () => {
     nodeDragLifecycle.cancel()
     groupRuntime?.internal.resetTransientSelectionState()
     graphSessionRuntime?.dispose()
@@ -180,6 +180,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       applyBoardSnapshot(result.snapshot, 'hydrate-replace')
     }
     groupRuntime?.internal.handleCommittedGroupsChanged()
+    return result
   }
   const saveCurrentBoardSnapshot = async (
     saveOptions: {

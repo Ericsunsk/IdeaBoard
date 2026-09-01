@@ -97,8 +97,8 @@ func TestCreateImageEndpointStoresManagedAPIKeyInSameTransaction(t *testing.T) {
 		protocol   string
 		capability string
 	}{
-		{name: "single image transform", protocol: ProtocolImageURLJSONImage, capability: CapabilityCutout},
-		{name: "flux fill", protocol: ProtocolFluxFillJSONImage, capability: CapabilityFill},
+		{name: "single image transform", protocol: ProtocolImagePipeline, capability: CapabilityCutout},
+		{name: "image fill", protocol: ProtocolImageFill, capability: CapabilityFill},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			secretstest.EnableEncryption(t)
@@ -153,7 +153,7 @@ func TestUpdateProviderEndpointStatusPreservesEndpointConfigurationAndSecret(t *
 		{name: "model endpoint", protocol: ProtocolModelAPI},
 		{
 			name:       "managed image endpoint",
-			protocol:   ProtocolImageURLJSONImage,
+			protocol:   ProtocolImagePipeline,
 			capability: CapabilityCutout,
 			apiKey:     "modal-secret",
 		},

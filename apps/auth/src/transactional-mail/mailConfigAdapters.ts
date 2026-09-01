@@ -25,11 +25,13 @@ export function createRuntimeMailConfigService(
   pool: Pool,
   encryptionKey: string,
   fetchImpl: typeof fetch = fetch,
+  publicSiteOrigin?: string,
 ): MailConfigService {
   return new MailConfigService(
     createPgMailConfigRepository(pool),
     createResendTransport(fetchImpl),
     createSecretCipher(encryptionKey),
+    publicSiteOrigin,
   );
 }
 

@@ -216,9 +216,7 @@ describe('provider config payload mapping', () => {
   it('identifies capability endpoints that do not require a model', () => {
     expect(isModellessProviderProtocol('model-api')).toBe(false)
     expect(isModellessProviderProtocol('image-pipeline')).toBe(true)
-    expect(isModellessProviderProtocol('image-url-json-to-image')).toBe(true)
     expect(isModellessProviderProtocol('image-fill')).toBe(true)
-    expect(isModellessProviderProtocol('flux-fill-json-image')).toBe(true)
     expect(
       isModellessProviderEndpoint(
         makeProviderEndpoint({
@@ -238,7 +236,7 @@ describe('provider config payload mapping', () => {
     expect(
       isModellessProviderEndpoint(
         makeProviderEndpoint({
-          protocol: 'image-url-json-to-image',
+          protocol: 'image-pipeline',
           capabilities: ['upscale'],
         }),
       ),

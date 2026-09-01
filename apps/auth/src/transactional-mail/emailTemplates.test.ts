@@ -76,7 +76,7 @@ describe("emailTemplates", () => {
 
     assert.equal(
       resolveBrandingLogoUrl("", "https://app.example.com"),
-      "https://ideaboard.art/favicon.svg",
+      "https://app.example.com/favicon.svg",
     );
     assert.equal(
       resolveBrandingLogoUrl(
@@ -101,8 +101,20 @@ describe("emailTemplates", () => {
     );
     assert.equal(
       resolveBrandingLogoUrl("javascript:alert(1)", "http://localhost:5173"),
-      "https://ideaboard.art/favicon.svg",
+      "http://localhost:5173/favicon.svg",
     );
+  });
+
+  it("uses the runtime public origin for default branding and footer links", () => {
+    const email = verificationOtp({
+      otp: "123456",
+      expiresInMinutes: 10,
+      publicSiteOrigin: "https://studio.example.com/",
+    });
+
+    assert.match(email.html, /https:\/\/studio\.example\.com\/favicon\.svg/);
+    assert.match(email.html, /href="https:\/\/studio\.example\.com"/);
+    assert.match(email.html, /🌐 https:\/\/studio\.example\.com/);
   });
 
   it("escapes text variables and validates URL variables", () => {
