@@ -20,7 +20,6 @@ import {
   CANVAS_GROUP_FRAME_PADDING_PX,
   canvasRectToGroupGeometry,
   findTopmostCanvasGroupFrameAtPoint,
-  moveCanvasRect,
   projectCanvasGroupNodeLayers,
   rectContainsRect,
   rectsIntersect,
@@ -34,20 +33,11 @@ import {
 import { resolveFlowNodeCanvasRef } from '../../utils/flowSnapshotAdapter'
 import { releaseCanvasGraphDeleteExecutions } from '../../vue-flow-adapter/flowGraphDeleteProjection'
 import type { CanvasVueFlowGraphAdapter } from '../../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
+import { createGroupDragRuntime } from './groupDragRuntime'
 
 type SelectableFlowItem = {
   id: string
   selected?: boolean
-}
-
-type ActiveGroupDrag = {
-  store: CanvasGraphStore
-  transaction: CanvasGraphTransaction
-  groupId: CanvasGraphGroupId
-  startPoint: CanvasPoint
-  latestPoint: CanvasPoint
-  startPositions: Map<CanvasGraphNodeId, CanvasPoint>
-  startBounds: CanvasRect
 }
 
 type ActiveGroupResize = {
@@ -158,7 +148,6 @@ export type UseCanvasGroupRuntimeOptions = {
 export function useCanvasGroupRuntime(
   options: UseCanvasGroupRuntimeOptions,
 ): CanvasGroupRuntimeControls {
-  let activeGroupDrag: ActiveGroupDrag | null = null
   let activeGroupResize: ActiveGroupResize | null = null
   const selectedGroupId = ref<CanvasGraphGroupId | null>(null)
   const pendingGroupJoin = ref<PendingGroupJoin | null>(null)
@@ -576,98 +565,21 @@ export function useCanvasGroupRuntime(
     return positions
   }
 
-  function beginGroupDrag(point: CanvasPoint): boolean {
-    if (activeGroupDrag || activeGroupResize) return false
-    clearPendingGroupJoin()
-    const frame = findTopmostCanvasGroupFrameAtPoint(groupFrames.value, point)
-    if (!frame) return false
-    const store = options.readCanvasGraphStore()
-    const startPositions = readGroupMemberNodePositions(store, frame.id)
-    if (!startPositions) return false
-    selectGroup(frame.id)
-    activeGroupDrag = {
-      store,
-      transaction: store.beginTransaction('group-move'),
-      groupId: frame.id,
-      startPoint: point,
-      latestPoint: point,
-      startPositions,
-      startBounds: frame.bounds,
-    }
-    return true
-  }
-
-  function moveGroupDrag(point: CanvasPoint): boolean {
-    const drag = activeGroupDrag
-    if (!drag) return false
-    const delta = {
-      x: point.x - drag.startPoint.x,
-      y: point.y - drag.startPoint.y,
-    }
-    drag.latestPoint = point
-    if (delta.x === 0 && delta.y === 0) return true
-    if (drag.startPositions.size > 0) {
-      options.graphAdapter.applyNodeChanges(createPositionChanges(drag.startPositions, delta, true))
-    }
-    setPreviewGroupBounds(drag.groupId, moveCanvasRect(drag.startBounds, delta))
-    return true
-  }
-
-  function commitGroupDrag(): boolean {
-    const drag = activeGroupDrag
-    if (!drag) return false
-    activeGroupDrag = null
-    const delta = {
-      x: drag.latestPoint.x - drag.startPoint.x,
-      y: drag.latestPoint.y - drag.startPoint.y,
-    }
-    if (delta.x === 0 && delta.y === 0) {
-      drag.transaction.cancel()
-      options.graphAdapter.applyNodeChanges(
-        createPositionChanges(drag.startPositions, delta, false),
-      )
-      clearPreviewGroupBounds(drag.groupId)
-      return false
-    }
-    let summary: ReturnType<CanvasGraphTransaction['commit']>
-    try {
-      drag.startPositions.forEach((startPosition, nodeId) => {
-        drag.transaction.updateNode(nodeId, {
-          x: startPosition.x + delta.x,
-          y: startPosition.y + delta.y,
-        })
-      })
-      drag.transaction.updateGroupGeometry(
-        drag.groupId,
-        canvasRectToGroupGeometry(moveCanvasRect(drag.startBounds, delta)),
-      )
-      summary = drag.transaction.commit()
-    } catch (_error) {
-      drag.transaction.cancel()
-      options.graphAdapter.applyNodeChanges(
-        createPositionChanges(drag.startPositions, { x: 0, y: 0 }, false),
-      )
-      clearPreviewGroupBounds(drag.groupId)
-      options.onWarning(i18n.global.t('canvas.groupOps.moveFailed'))
-      return false
-    }
-    options.graphAdapter.applyNodeChanges(createPositionChanges(drag.startPositions, delta, false))
-    clearPreviewGroupBounds(drag.groupId)
-    if (!summary.didChange) return false
-    return true
-  }
-
-  function cancelGroupDrag(): boolean {
-    const drag = activeGroupDrag
-    if (!drag) return false
-    activeGroupDrag = null
-    drag.transaction.cancel()
-    options.graphAdapter.applyNodeChanges(
-      createPositionChanges(drag.startPositions, { x: 0, y: 0 }, false),
-    )
-    clearPreviewGroupBounds(drag.groupId)
-    return true
-  }
+  const groupDrag = createGroupDragRuntime({
+    groupFrames,
+    graphAdapter: options.graphAdapter,
+    readCanvasGraphStore: options.readCanvasGraphStore,
+    clearPendingGroupJoin,
+    selectGroup,
+    readGroupMemberNodePositions,
+    createPositionChanges,
+    setPreviewGroupBounds,
+    clearPreviewGroupBounds,
+    findTopmostGroupFrame: (point) => findTopmostCanvasGroupFrameAtPoint(groupFrames.value, point),
+    onWarning: options.onWarning,
+    moveFailedMessage: i18n.global.t('canvas.groupOps.moveFailed'),
+    isResizeActive: () => activeGroupResize !== null,
+  })
 
   function readGroupFrame(groupId: CanvasGraphGroupId): CanvasGroupFrame | null {
     return groupFrames.value.find((frame) => frame.id === groupId) ?? null
@@ -678,7 +590,7 @@ export function useCanvasGroupRuntime(
     handle: CanvasGroupResizeHandle,
     point: CanvasPoint,
   ): boolean {
-    if (activeGroupDrag || activeGroupResize) return false
+    if (groupDrag.isActive() || activeGroupResize) return false
     clearPendingGroupJoin()
     const frame = readGroupFrame(groupId)
     if (!frame) return false
@@ -926,7 +838,7 @@ export function useCanvasGroupRuntime(
   }
 
   function resetTransientSelectionState() {
-    cancelGroupDrag()
+    groupDrag.cancel()
     cancelGroupResize()
     clearPendingGroupJoin()
     clearSelectedGroup()
@@ -957,12 +869,7 @@ export function useCanvasGroupRuntime(
       groupSelectedNodes,
       ungroupSelectedGroup,
       deleteSelectedGroup,
-      groupDrag: {
-        begin: beginGroupDrag,
-        move: moveGroupDrag,
-        commit: commitGroupDrag,
-        cancel: cancelGroupDrag,
-      },
+      groupDrag,
       groupResize: {
         begin: beginGroupResize,
         move: moveGroupResize,

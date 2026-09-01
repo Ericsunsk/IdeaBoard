@@ -9,6 +9,7 @@ import type {
   BoardsCatalogNavigation,
 } from '../boardCatalogContract'
 import type { BoardFeedback } from '../feedback/useBoardFeedback'
+import { createBoardCatalogCommandHandlers } from './boardCatalogCommandHandlers'
 
 type BoardCatalogControllerDependencies = {
   catalog: CanvasBoardCatalog
@@ -68,6 +69,21 @@ export function createBoardCatalogController(
     resetDeleteState()
   })
 
+  const commandHandlers = createBoardCatalogCommandHandlers({
+    ...dependencies,
+    state: {
+      activeMenuBoardId,
+      renamingBoardId,
+      renameDraft,
+      catalogRecoveryBoardId,
+      isCatalogReloadPending,
+      pendingDeleteBoard,
+      isDeletePending,
+    },
+    clearRename,
+    resetDeleteState,
+  })
+
   function initialize(): Promise<void> {
     if (initializePromise) return initializePromise
     initializePromise = (async () => {
@@ -104,42 +120,6 @@ export function createBoardCatalogController(
     }
   }
 
-  async function createAndOpenBoard() {
-    activeMenuBoardId.value = null
-    try {
-      const result = await dependencies.catalog.commands.create()
-      if (!result.ok) {
-        if (result.reason === 'scope-changed') return
-        dependencies.feedback.createFailed(result)
-        dependencies.warn('[boards] failed to sync new board', result.error)
-        return
-      }
-      dependencies.navigation.openBoard(result.board.id)
-    } catch (error) {
-      dependencies.warn('[boards] failed to create board', error)
-      dependencies.feedback.catalogSyncFailed()
-    }
-  }
-
-  async function duplicateBoard(boardId: string) {
-    activeMenuBoardId.value = null
-    try {
-      const result = await dependencies.catalog.commands.duplicate({ sourceBoardId: boardId })
-      if (!result.ok) {
-        if (result.reason === 'scope-changed') return
-        dependencies.feedback.copyFailed(result)
-        if (result.reason !== 'source-missing') {
-          dependencies.warn('[boards] failed to sync duplicated board', result.error)
-        }
-        return
-      }
-      dependencies.feedback.copied()
-    } catch (error) {
-      dependencies.warn('[boards] failed to duplicate board', error)
-      dependencies.feedback.catalogSyncFailed()
-    }
-  }
-
   function startRename(board: BoardCatalogEntry) {
     activeMenuBoardId.value = null
     renamingBoardId.value = board.id
@@ -158,67 +138,6 @@ export function createBoardCatalogController(
 
   function cancelRename() {
     clearRename(true)
-  }
-
-  async function commitRename() {
-    const boardId = renamingBoardId.value
-    if (!boardId) return
-    const result = await dependencies.catalog.commands.rename({
-      boardId,
-      nextName: renameDraft.value,
-    })
-    if (!result.ok) {
-      switch (result.reason) {
-        case 'scope-changed':
-          return
-        case 'local-name-conflict':
-          dependencies.feedback.renameValidationFailed(result)
-          return
-        case 'invalid-name':
-          clearRename(true)
-          dependencies.feedback.renameValidationFailed(result)
-          return
-        case 'remote-name-conflict':
-        case 'sync-failed':
-          clearRename(true)
-          dependencies.feedback.renameSyncFailed(result)
-          catalogRecoveryBoardId.value =
-            result.reason === 'remote-name-conflict'
-              ? result.hydrate?.ok === true
-                ? null
-                : boardId
-              : result.rollback.ok
-                ? null
-                : boardId
-          dependencies.warn('[boards] failed to sync renamed board', result.error)
-          return
-      }
-    }
-    clearRename(true)
-    dependencies.feedback.renamed()
-  }
-
-  async function reloadCatalog() {
-    const boardId = catalogRecoveryBoardId.value
-    if (!boardId || isCatalogReloadPending.value) return
-    isCatalogReloadPending.value = true
-    try {
-      const result = await dependencies.catalog.commands.hydrate({
-        preserveLocalNewer: false,
-        rollbackBoardIds: [boardId],
-      })
-      if (!result.ok) {
-        dependencies.feedback.catalogSyncFailed()
-        return
-      }
-      catalogRecoveryBoardId.value = null
-      dependencies.feedback.catalogReloaded()
-    } catch (error) {
-      dependencies.warn('[boards] failed to reload catalog', error)
-      dependencies.feedback.catalogSyncFailed()
-    } finally {
-      isCatalogReloadPending.value = false
-    }
   }
 
   function openBoardFromCard(boardId: string) {
@@ -254,39 +173,6 @@ export function createBoardCatalogController(
     pendingDeleteBoard.value = null
   }
 
-  async function confirmDelete() {
-    const board = pendingDeleteBoard.value
-    if (!board || isDeletePending.value) return
-    isDeletePending.value = true
-    try {
-      const result = await dependencies.catalog.commands.delete({ boardId: board.id })
-      if (!result.ok) {
-        if (result.reason === 'scope-changed') {
-          resetDeleteState()
-          return
-        }
-        dependencies.feedback.deleteFailed(result)
-        if (result.reason === 'sync-failed') {
-          dependencies.warn('[boards] failed to sync deleted board', result.error)
-        } else {
-          resetDeleteState()
-        }
-        return
-      }
-      if (renamingBoardId.value === board.id) {
-        clearRename(false)
-      }
-      resetDeleteState()
-      dependencies.feedback.deleted()
-    } catch (error) {
-      const failure = { ok: false as const, reason: 'sync-failed' as const, error }
-      dependencies.feedback.deleteFailed(failure)
-      dependencies.warn('[boards] failed to sync deleted board', error)
-    } finally {
-      isDeletePending.value = false
-    }
-  }
-
   return {
     viewModel: {
       visibleBoards,
@@ -309,18 +195,18 @@ export function createBoardCatalogController(
       setSortMode,
       toggleBoardMenu,
       handleBoardMenuHidden,
-      createAndOpenBoard,
-      duplicateBoard,
+      createAndOpenBoard: commandHandlers.createAndOpenBoard,
+      duplicateBoard: commandHandlers.duplicateBoard,
       startRename,
       updateRenameDraft,
-      commitRename,
+      commitRename: commandHandlers.commitRename,
       cancelRename,
-      reloadCatalog,
+      reloadCatalog: commandHandlers.reloadCatalog,
       openBoardFromCard,
       requestDelete,
       closeDeleteDialog,
       handleDeleteDialogHidden,
-      confirmDelete,
+      confirmDelete: commandHandlers.confirmDelete,
     },
     dispose() {
       stopPreviewWatch()

@@ -9,6 +9,7 @@ import {
   type PendingImageResultNodeId,
 } from './CanvasBoardGraphSession'
 import type { CanvasBoardAttachment, CanvasBoardSessionIdentity } from '../../board-attachment'
+import { createPendingImageExecutionPublisher } from './pendingImageExecutionPublisher'
 
 declare const pendingImageExecutionLeaseBrand: unique symbol
 
@@ -156,9 +157,7 @@ export type PendingImageExecutionCore = {
   ) => PendingImageMaterializationResult
   isCurrent: (lease: PendingImageExecutionLease, taskId?: string) => boolean
   factFor: (resultNodeId: PendingImageResultNodeId) => PendingImageExecutionFact | null
-  captureActiveLeases: (
-    resultNodeIds: readonly string[],
-  ) => PendingImageExecutionLease[]
+  captureActiveLeases: (resultNodeIds: readonly string[]) => PendingImageExecutionLease[]
 }
 
 const ACTIVE_STATUSES: ReadonlySet<PendingImageExecutionStatus> = new Set(['submitting', 'running'])
@@ -210,49 +209,23 @@ export function createPendingImageExecutionCore(
   let sessionIdentity: CanvasBoardSessionIdentity | null = null
   let attachmentEpoch = 0
   let leaseSequence = 0
-  let version = 0
   let factsByNodeId = new Map<PendingImageResultNodeId, PendingImageExecutionFact>()
   const leasesByNodeId = new Map<PendingImageResultNodeId, PendingImageExecutionLease>()
   const claimedHydrationLeases = new WeakSet<PendingImageExecutionLease>()
-  const listeners = new Set<(snapshot: PendingImageExecutionSnapshot) => void>()
   const reportSubscriberError = options.onSubscriberError ?? reportSubscriberErrorByDefault
-  let publishedSnapshot = createSnapshot()
-
-  function createSnapshot(): PendingImageExecutionSnapshot {
-    const attachmentSnapshot = attachment
-      ? Object.freeze({ boardId: attachment.boardId, epoch: attachment.epoch })
-      : null
-    return Object.freeze({
-      version,
-      attachment: attachmentSnapshot,
-      executions: freezeList([...factsByNodeId.values()]),
-    })
-  }
-
-  function publish(): void {
-    version += 1
-    publishedSnapshot = createSnapshot()
-    listeners.forEach((listener) => {
-      try {
-        listener(publishedSnapshot)
-      } catch (error) {
-        try {
-          reportSubscriberError(error)
-        } catch (reporterError) {
-          reportSubscriberErrorByDefault(reporterError)
-        }
-      }
-    })
-  }
-
-  function snapshot(): PendingImageExecutionSnapshot {
-    return publishedSnapshot
-  }
-
-  function subscribe(listener: (snapshot: PendingImageExecutionSnapshot) => void): () => void {
-    listeners.add(listener)
-    return () => listeners.delete(listener)
-  }
+  const publisher = createPendingImageExecutionPublisher({
+    createSnapshot: (version) => {
+      const attachmentSnapshot = attachment
+        ? Object.freeze({ boardId: attachment.boardId, epoch: attachment.epoch })
+        : null
+      return Object.freeze({
+        version,
+        attachment: attachmentSnapshot,
+        executions: freezeList([...factsByNodeId.values()]),
+      })
+    },
+    onSubscriberError: reportSubscriberError,
+  })
 
   function resetExecutions(): void {
     factsByNodeId = new Map()
@@ -278,7 +251,7 @@ export function createPendingImageExecutionCore(
     mutationPort = nextMutationPort
     sessionIdentity = binding.sessionIdentity
     resetExecutions()
-    publish()
+    publisher.publish()
     return nextAttachment
   }
 
@@ -288,7 +261,7 @@ export function createPendingImageExecutionCore(
     mutationPort = null
     sessionIdentity = null
     resetExecutions()
-    publish()
+    publisher.publish()
   }
 
   function currentAttachment(): CanvasBoardAttachment | null {
@@ -370,7 +343,7 @@ export function createPendingImageExecutionCore(
             ...(previousFact.taskId ? { taskId: previousFact.taskId } : {}),
           })
         : undefined
-    publish()
+    publisher.publish()
     return Object.freeze({
       kind: 'started',
       lease,
@@ -430,9 +403,7 @@ export function createPendingImageExecutionCore(
     return factsByNodeId.get(resultNodeId) ?? null
   }
 
-  function captureActiveLeases(
-    resultNodeIds: readonly string[],
-  ): PendingImageExecutionLease[] {
+  function captureActiveLeases(resultNodeIds: readonly string[]): PendingImageExecutionLease[] {
     const uniqueNodeIds = new Set(resultNodeIds as readonly PendingImageResultNodeId[])
     return [...uniqueNodeIds].flatMap((resultNodeId) => {
       const lease = leasesByNodeId.get(resultNodeId)
@@ -453,7 +424,7 @@ export function createPendingImageExecutionCore(
     const reason = leaseRejection(lease)
     if (reason) return { kind: 'rejected', reason }
     factsByNodeId = new Map(factsByNodeId).set(lease.resultNodeId, fact)
-    if (shouldPublish) publish()
+    if (shouldPublish) publisher.publish()
     return { kind: 'applied', fact }
   }
 
@@ -514,7 +485,7 @@ export function createPendingImageExecutionCore(
     }
     const remainingTaskIds = activeTaskIds()
     const cancellableTaskIds = [...taskIdsBefore].filter((taskId) => !remainingTaskIds.has(taskId))
-    if (didChange) publish()
+    if (didChange) publisher.publish()
     return Object.freeze({
       outcomes: freezeList(outcomes.map((outcome) => Object.freeze(outcome))),
       cancellableTaskIds: freezeList(cancellableTaskIds),
@@ -661,7 +632,7 @@ export function createPendingImageExecutionCore(
           reason: 'mutation-error',
         }
       })
-      publish()
+      publisher.publish()
       throw new PendingImageMaterializationError(
         cause,
         freezeList(
@@ -694,7 +665,7 @@ export function createPendingImageExecutionCore(
       )
       outcomes[index] = { resultNodeId: lease.resultNodeId, kind: 'rejected', reason }
     })
-    publish()
+    publisher.publish()
 
     return Object.freeze({
       didChange: mutationResult.didChange,
@@ -706,8 +677,8 @@ export function createPendingImageExecutionCore(
   }
 
   return {
-    snapshot,
-    subscribe,
+    snapshot: publisher.snapshot,
+    subscribe: publisher.subscribe,
     attachBoard,
     detachBoard,
     currentAttachment,

@@ -163,7 +163,7 @@ func TestApplyFeatureSystemPromptDoesNotExposeAssetOrDeprecatedVariables(t *test
 			"original_image_url": "https://img.example/original.png",
 			"mask_image_url":     "https://img.example/mask.png",
 			"use_mask":           true,
-			"upscale":                 map[string]interface{}{"scale": 2.0},
+			"upscale":            map[string]interface{}{"scale": 2.0},
 		},
 		func(string) (string, error) {
 			return "SYS {{category}} {{pattern_mode}} {{original_image_url}} {{mask_image_url}} {{use_mask}} {{unknown}}", nil

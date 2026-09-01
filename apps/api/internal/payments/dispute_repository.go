@@ -14,6 +14,30 @@ import (
 	"github.com/google/uuid"
 )
 
+type paymentDisputeScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanPaymentDispute(row paymentDisputeScanner) (PaymentDispute, error) {
+	var dispute PaymentDispute
+	var restrictionID, debitID, restoreID sql.NullString
+	var closedAt sql.NullTime
+	if err := row.Scan(
+		&dispute.ID, &dispute.PaymentOrderID, &dispute.UserID, &dispute.StripeDisputeID,
+		&dispute.StripeChargeID, &dispute.StripePaymentIntentID, &dispute.ProviderStatus, &dispute.Status,
+		&dispute.AmountMinor, &dispute.Currency, &dispute.TargetIdeaQuantity, &dispute.DebitedIdeaQuantity,
+		&dispute.UnrecoveredCredits, &restrictionID, &debitID, &restoreID, &dispute.OpenedAt, &closedAt,
+		&dispute.NextReconciliationAt, &dispute.CreatedAt, &dispute.UpdatedAt,
+	); err != nil {
+		return PaymentDispute{}, err
+	}
+	dispute.RestrictionID, dispute.DebitTransactionID, dispute.RestoreTransactionID = restrictionID.String, debitID.String, restoreID.String
+	if closedAt.Valid {
+		dispute.ClosedAt = &closedAt.Time
+	}
+	return dispute, nil
+}
+
 const disputeReconciliationInterval = time.Hour
 
 func proportionalDisputeIdeas(amountMinor, paidTotal, totalIdeas int64) int64 {
@@ -240,30 +264,15 @@ WHERE id = $1::uuid`, dispute.ID, dispute.ProviderStatus, dispute.Status, disput
 }
 
 func getPaymentDisputeInTx(ctx context.Context, tx *sql.Tx, stripeDisputeID string) (PaymentDispute, error) {
-	var dispute PaymentDispute
-	var restrictionID, debitID, restoreID sql.NullString
-	var closedAt sql.NullTime
-	err := tx.QueryRowContext(ctx, `
+	dispute, err := scanPaymentDispute(tx.QueryRowContext(ctx, `
 SELECT id::text, payment_order_id::text, user_id, stripe_dispute_id, stripe_charge_id,
        stripe_payment_intent_id, provider_status, status, amount_minor, currency,
        target_idea_quantity, debited_idea_quantity, unrecovered_credits,
        restriction_id::text, debit_transaction_id, restore_transaction_id,
        opened_at, closed_at, next_reconciliation_at, created_at, updated_at
-FROM payment_disputes WHERE stripe_dispute_id = $1 FOR UPDATE`, stripeDisputeID).Scan(
-		&dispute.ID, &dispute.PaymentOrderID, &dispute.UserID, &dispute.StripeDisputeID, &dispute.StripeChargeID,
-		&dispute.StripePaymentIntentID, &dispute.ProviderStatus, &dispute.Status, &dispute.AmountMinor, &dispute.Currency,
-		&dispute.TargetIdeaQuantity, &dispute.DebitedIdeaQuantity, &dispute.UnrecoveredCredits,
-		&restrictionID, &debitID, &restoreID, &dispute.OpenedAt, &closedAt, &dispute.NextReconciliationAt,
-		&dispute.CreatedAt, &dispute.UpdatedAt,
-	)
+FROM payment_disputes WHERE stripe_dispute_id = $1 FOR UPDATE`, stripeDisputeID))
 	if err != nil {
 		return PaymentDispute{}, err
-	}
-	dispute.RestrictionID = restrictionID.String
-	dispute.DebitTransactionID = debitID.String
-	dispute.RestoreTransactionID = restoreID.String
-	if closedAt.Valid {
-		dispute.ClosedAt = &closedAt.Time
 	}
 	return dispute, nil
 }
@@ -307,19 +316,9 @@ LIMIT $2`, now, limit)
 	defer rows.Close()
 	result := make([]PaymentDispute, 0, limit)
 	for rows.Next() {
-		var dispute PaymentDispute
-		var restrictionID, debitID, restoreID sql.NullString
-		var closedAt sql.NullTime
-		if err := rows.Scan(&dispute.ID, &dispute.PaymentOrderID, &dispute.UserID, &dispute.StripeDisputeID,
-			&dispute.StripeChargeID, &dispute.StripePaymentIntentID, &dispute.ProviderStatus, &dispute.Status,
-			&dispute.AmountMinor, &dispute.Currency, &dispute.TargetIdeaQuantity, &dispute.DebitedIdeaQuantity,
-			&dispute.UnrecoveredCredits, &restrictionID, &debitID, &restoreID, &dispute.OpenedAt, &closedAt,
-			&dispute.NextReconciliationAt, &dispute.CreatedAt, &dispute.UpdatedAt); err != nil {
+		dispute, err := scanPaymentDispute(rows)
+		if err != nil {
 			return nil, err
-		}
-		dispute.RestrictionID, dispute.DebitTransactionID, dispute.RestoreTransactionID = restrictionID.String, debitID.String, restoreID.String
-		if closedAt.Valid {
-			dispute.ClosedAt = &closedAt.Time
 		}
 		result = append(result, dispute)
 	}
@@ -346,19 +345,9 @@ ORDER BY d.opened_at, d.id`, strings.TrimSpace(orderNumber))
 	defer rows.Close()
 	result := make([]PaymentDispute, 0)
 	for rows.Next() {
-		var dispute PaymentDispute
-		var restrictionID, debitID, restoreID sql.NullString
-		var closedAt sql.NullTime
-		if err := rows.Scan(&dispute.ID, &dispute.PaymentOrderID, &dispute.UserID, &dispute.StripeDisputeID,
-			&dispute.StripeChargeID, &dispute.StripePaymentIntentID, &dispute.ProviderStatus, &dispute.Status,
-			&dispute.AmountMinor, &dispute.Currency, &dispute.TargetIdeaQuantity, &dispute.DebitedIdeaQuantity,
-			&dispute.UnrecoveredCredits, &restrictionID, &debitID, &restoreID, &dispute.OpenedAt, &closedAt,
-			&dispute.NextReconciliationAt, &dispute.CreatedAt, &dispute.UpdatedAt); err != nil {
+		dispute, err := scanPaymentDispute(rows)
+		if err != nil {
 			return nil, err
-		}
-		dispute.RestrictionID, dispute.DebitTransactionID, dispute.RestoreTransactionID = restrictionID.String, debitID.String, restoreID.String
-		if closedAt.Valid {
-			dispute.ClosedAt = &closedAt.Time
 		}
 		result = append(result, dispute)
 	}
