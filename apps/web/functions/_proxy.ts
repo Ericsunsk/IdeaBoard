@@ -32,9 +32,9 @@ export async function proxyRequest({ request, env }: PagesContext): Promise<Resp
   const incoming = new URL(request.url)
   const target = new URL(`${origin.origin}${incoming.pathname}${incoming.search}`)
   const headers = new Headers(request.headers)
-  // Keep the public host so the API's same-origin CORS policy sees the
-  // browser Origin and forwarded request host as the same site.
-  headers.set('host', incoming.host)
+  // The upstream sees its own host. Rewrite only our public same-origin
+  // Origin so the API's same-origin CORS policy remains valid behind the proxy.
+  if (headers.get('origin') === incoming.origin) headers.set('origin', origin.origin)
   headers.set('x-forwarded-host', incoming.host)
   headers.set('x-forwarded-proto', incoming.protocol.slice(0, -1))
 
