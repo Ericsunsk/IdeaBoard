@@ -10,6 +10,11 @@ import {
 } from './CanvasBoardGraphSession'
 import type { CanvasBoardAttachment, CanvasBoardSessionIdentity } from '../../board-attachment'
 import { createPendingImageExecutionPublisher } from './pendingImageExecutionPublisher'
+import {
+  attachmentRejection,
+  isAttachmentCurrent,
+  leaseRejection,
+} from './pendingImageExecutionValidation'
 
 declare const pendingImageExecutionLeaseBrand: unique symbol
 
@@ -226,6 +231,12 @@ export function createPendingImageExecutionCore(
     },
     onSubscriberError: reportSubscriberError,
   })
+  const checkAttachmentCurrent = (candidate: CanvasBoardAttachment): boolean =>
+    isAttachmentCurrent(candidate, attachment, sessionIdentity)
+  const checkAttachmentRejection = (candidate: CanvasBoardAttachment) =>
+    attachmentRejection(candidate, attachment, sessionIdentity)
+  const checkLeaseRejection = (lease: PendingImageExecutionLease) =>
+    leaseRejection(lease, attachment, sessionIdentity, leasesByNodeId, factsByNodeId, isActive)
 
   function resetExecutions(): void {
     factsByNodeId = new Map()
@@ -268,34 +279,6 @@ export function createPendingImageExecutionCore(
     return attachment
   }
 
-  function isAttachmentCurrent(candidate: CanvasBoardAttachment): boolean {
-    return candidate === attachment && candidate.sessionIdentity === sessionIdentity
-  }
-
-  function attachmentRejection(
-    candidate: CanvasBoardAttachment,
-  ): 'stale-attachment' | 'wrong-board' | null {
-    if (!attachment || candidate.boardId !== attachment.boardId) return 'wrong-board'
-    return candidate === attachment && candidate.sessionIdentity === sessionIdentity
-      ? null
-      : 'stale-attachment'
-  }
-
-  function leaseRejection(
-    lease: PendingImageExecutionLease,
-  ): 'stale-execution' | 'wrong-board' | null {
-    if (!attachment || lease.attachment.boardId !== attachment.boardId) return 'wrong-board'
-    if (
-      lease.attachment !== attachment ||
-      lease.attachment.sessionIdentity !== sessionIdentity ||
-      leasesByNodeId.get(lease.resultNodeId) !== lease ||
-      !isActive(factsByNodeId.get(lease.resultNodeId))
-    ) {
-      return 'stale-execution'
-    }
-    return null
-  }
-
   function activeTaskIds(): Set<string> {
     const taskIds = new Set<string>()
     factsByNodeId.forEach((fact) => {
@@ -311,7 +294,7 @@ export function createPendingImageExecutionCore(
     taskId?: string,
     clientActionId?: string,
   ): PendingImageExecutionStartResult {
-    const attachmentReason = attachmentRejection(targetAttachment)
+    const attachmentReason = checkAttachmentRejection(targetAttachment)
     if (attachmentReason) return { kind: 'rejected', reason: attachmentReason }
     const resultNodeId = requireIdentity(
       rawResultNodeId,
@@ -376,7 +359,7 @@ export function createPendingImageExecutionCore(
     targetAttachment: CanvasBoardAttachment,
     pending: PendingImageHydrationIdentity,
   ): PendingImageExecutionLease | null {
-    if (attachmentRejection(targetAttachment)) return null
+    if (checkAttachmentRejection(targetAttachment)) return null
     const resultNodeId = requireIdentity(
       pending.resultNodeId,
       'resultNodeId',
@@ -387,7 +370,7 @@ export function createPendingImageExecutionCore(
     const fact = factsByNodeId.get(resultNodeId)
     if (
       !lease ||
-      leaseRejection(lease) ||
+      checkLeaseRejection(lease) ||
       fact?.status !== 'running' ||
       fact.taskId !== taskId ||
       fact.clientActionId !== clientActionId
@@ -407,12 +390,12 @@ export function createPendingImageExecutionCore(
     const uniqueNodeIds = new Set(resultNodeIds as readonly PendingImageResultNodeId[])
     return [...uniqueNodeIds].flatMap((resultNodeId) => {
       const lease = leasesByNodeId.get(resultNodeId)
-      return lease && !leaseRejection(lease) ? [lease] : []
+      return lease && !checkLeaseRejection(lease) ? [lease] : []
     })
   }
 
   function isCurrent(lease: PendingImageExecutionLease, taskId?: string): boolean {
-    if (leaseRejection(lease)) return false
+    if (checkLeaseRejection(lease)) return false
     return taskId === undefined || factsByNodeId.get(lease.resultNodeId)?.taskId === taskId.trim()
   }
 
@@ -421,7 +404,7 @@ export function createPendingImageExecutionCore(
     fact: PendingImageExecutionFact,
     shouldPublish = true,
   ): PendingImageExecutionTransition {
-    const reason = leaseRejection(lease)
+    const reason = checkLeaseRejection(lease)
     if (reason) return { kind: 'rejected', reason }
     factsByNodeId = new Map(factsByNodeId).set(lease.resultNodeId, fact)
     if (shouldPublish) publisher.publish()
@@ -435,7 +418,7 @@ export function createPendingImageExecutionCore(
   ): PendingImageExecutionTransition {
     const taskId = requireIdentity(rawTaskId, 'taskId')
     const clientActionId = requireIdentity(rawClientActionId, 'clientActionId')
-    const reason = leaseRejection(lease)
+    const reason = checkLeaseRejection(lease)
     if (reason) return { kind: 'rejected', reason }
     const current = factsByNodeId.get(lease.resultNodeId)
     if (current?.taskId && current.taskId !== taskId) {
@@ -463,7 +446,7 @@ export function createPendingImageExecutionCore(
     for (const lease of leases) {
       if (seenLeases.has(lease)) continue
       seenLeases.add(lease)
-      const reason = leaseRejection(lease)
+      const reason = checkLeaseRejection(lease)
       if (reason) {
         outcomes.push({ resultNodeId: lease.resultNodeId, kind: 'rejected', reason })
         continue
@@ -507,7 +490,7 @@ export function createPendingImageExecutionCore(
     const seenNodeIds = new Set<PendingImageResultNodeId>()
 
     slots.forEach((slot, index) => {
-      const reason = leaseRejection(slot.lease)
+      const reason = checkLeaseRejection(slot.lease)
       if (reason) {
         outcomes[index] = {
           resultNodeId: slot.lease.resultNodeId,
@@ -682,7 +665,7 @@ export function createPendingImageExecutionCore(
     attachBoard,
     detachBoard,
     currentAttachment,
-    isAttachmentCurrent,
+    isAttachmentCurrent: checkAttachmentCurrent,
     begin,
     hydratePendingLease,
     claimHydratedLease,
