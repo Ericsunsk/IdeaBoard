@@ -239,23 +239,61 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 	if params == nil {
 		return p, nil
 	}
+	p.Extra = workflowExtraParamsFromMap(params)
+	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.Feature); ok {
+		p.Feature = v
+	}
+	p.Media = workflowMediaInputsFromMap(params, featureSlug)
+	p.Controls = generationControlsFromMap(params)
+	applyFeatureSpecificTaskParams(p, params, featureSlug)
+	return p, nil
+}
+
+func workflowExtraParamsFromMap(params map[string]interface{}) map[string]interface{} {
+	var extra map[string]interface{}
 	for key, value := range params {
 		if key == "model" || paramkeys.IsKnownSubmitTaskParamKey(key) {
 			continue
 		}
-		if p.Extra == nil {
-			p.Extra = map[string]interface{}{}
+		if extra == nil {
+			extra = map[string]interface{}{}
 		}
-		p.Extra[key] = value
+		extra[key] = value
 	}
-	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.Feature); ok {
-		p.Feature = v
-	}
-	if media := workflowMediaInputsFromMap(params, featureSlug); media != nil {
-		p.Media = media
-	}
+	return extra
+}
 
+func generationControlsFromMap(params map[string]interface{}) *tasks.GenerationControls {
 	controls := &tasks.GenerationControls{}
+	hasControls := false
+	dimensions, hasDimensions := generationDimensionControlsFromMap(params)
+	if hasDimensions {
+		controls.CustomWidth = dimensions.CustomWidth
+		controls.CustomHeight = dimensions.CustomHeight
+		controls.OriginalWidth = dimensions.OriginalWidth
+		controls.OriginalHeight = dimensions.OriginalHeight
+		hasControls = true
+	}
+	strings, hasStrings := generationStringControlsFromMap(params)
+	if hasStrings {
+		controls.Ratio = strings.Ratio
+		controls.Quality = strings.Quality
+		hasControls = true
+	}
+	output, hasOutput := generationOutputControlsFromMap(params)
+	if hasOutput {
+		controls.OutputCount = output.OutputCount
+		controls.PromptUpsampling = output.PromptUpsampling
+		hasControls = true
+	}
+	if !hasControls {
+		return nil
+	}
+	return controls
+}
+
+func generationDimensionControlsFromMap(params map[string]interface{}) (tasks.GenerationControls, bool) {
+	controls := tasks.GenerationControls{}
 	hasControls := false
 	if v, ok := readFloatParam(params, paramkeys.CustomWidth); ok {
 		controls.CustomWidth = v
@@ -273,6 +311,12 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 		controls.OriginalHeight = v
 		hasControls = true
 	}
+	return controls, hasControls
+}
+
+func generationStringControlsFromMap(params map[string]interface{}) (tasks.GenerationControls, bool) {
+	controls := tasks.GenerationControls{}
+	hasControls := false
 	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.Ratio); ok {
 		controls.Ratio = v
 		hasControls = true
@@ -281,6 +325,12 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 		controls.Quality = v
 		hasControls = true
 	}
+	return controls, hasControls
+}
+
+func generationOutputControlsFromMap(params map[string]interface{}) (tasks.GenerationControls, bool) {
+	controls := tasks.GenerationControls{}
+	hasControls := false
 	if v, ok := readIntParam(params, paramkeys.OutputCount); ok {
 		controls.OutputCount = v
 		hasControls = true
@@ -289,37 +339,34 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 		controls.PromptUpsampling = &v
 		hasControls = true
 	}
-	if hasControls {
-		p.Controls = controls
-	}
+	return controls, hasControls
+}
 
-	// Feature-specific nested contracts
+func applyFeatureSpecificTaskParams(params *tasks.WorkflowTaskParams, raw map[string]interface{}, featureSlug string) {
 	switch featureSlug {
 	case workflow.FeatureSlugVariations:
-		if c, ok := workflow.ReadVariationsPromptContract(params); ok {
-			p.Variation = &tasks.VariationsParams{Strength: c.Strength}
+		if c, ok := workflow.ReadVariationsPromptContract(raw); ok {
+			params.Variation = &tasks.VariationsParams{Strength: c.Strength}
 		}
 	case workflow.FeatureSlugOutpaint:
-		if c, ok := workflow.ReadOutpaintContract(params); ok {
-			p.Outpaint = &tasks.OutpaintParams{
+		if c, ok := workflow.ReadOutpaintContract(raw); ok {
+			params.Outpaint = &tasks.OutpaintParams{
 				TargetWidth: c.TargetWidth, TargetHeight: c.TargetHeight,
 				ImageOffsetX: c.ImageOffsetX, ImageOffsetY: c.ImageOffsetY,
 			}
 		}
 	case workflow.FeatureSlugUpscale:
-		if c, ok := workflow.ReadUpscaleContract(params); ok {
-			p.Upscale = &tasks.UpscaleParams{Scale: c.Scale}
+		if c, ok := workflow.ReadUpscaleContract(raw); ok {
+			params.Upscale = &tasks.UpscaleParams{Scale: c.Scale}
 		}
 	case workflow.FeatureSlugFusion:
-		if c, ok := workflow.ReadFusionPromptContract(params); ok {
-			p.Fusion = &tasks.FusionParams{
+		if c, ok := workflow.ReadFusionPromptContract(raw); ok {
+			params.Fusion = &tasks.FusionParams{
 				Mode:         c.Mode,
 				InputWeights: c.InputWeights,
 			}
 		}
 	}
-
-	return p, nil
 }
 
 func workflowMediaInputsFromMap(params map[string]interface{}, featureSlug string) *tasks.MediaInputs {

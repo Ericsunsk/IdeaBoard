@@ -139,6 +139,27 @@ func ApplyGenerationMediaFacts(media *MediaInputs, intents []GenerationMediaInte
 		}
 		return nil, fmt.Errorf("canonical media inputs are required")
 	}
+	copyMedia := cloneMediaInputs(media)
+	intentIndex := 0
+	if err := applyMediaRefSlice(copyMedia.Inputs, intents, &intentIndex); err != nil {
+		return nil, err
+	}
+	if err := applyMediaRefSlice(copyMedia.References, intents, &intentIndex); err != nil {
+		return nil, err
+	}
+	if err := applyOptionalMediaRef(copyMedia.Original, intents, &intentIndex); err != nil {
+		return nil, err
+	}
+	if err := applyOptionalMediaRef(copyMedia.Mask, intents, &intentIndex); err != nil {
+		return nil, err
+	}
+	if intentIndex != len(intents) {
+		return nil, fmt.Errorf("canonical media facts do not match typed inputs")
+	}
+	return &copyMedia, nil
+}
+
+func cloneMediaInputs(media *MediaInputs) MediaInputs {
 	copyMedia := *media
 	copyMedia.Inputs = append([]MediaRef(nil), media.Inputs...)
 	copyMedia.References = append([]MediaRef(nil), media.References...)
@@ -154,45 +175,37 @@ func ApplyGenerationMediaFacts(media *MediaInputs, intents []GenerationMediaInte
 		useMask := *media.UseMask
 		copyMedia.UseMask = &useMask
 	}
+	return copyMedia
+}
 
-	intentIndex := 0
-	apply := func(ref *MediaRef) error {
-		if ref == nil || intentIndex >= len(intents) {
-			return fmt.Errorf("canonical media facts do not match typed inputs")
+func applyMediaRefSlice(refs []MediaRef, intents []GenerationMediaIntent, intentIndex *int) error {
+	for index := range refs {
+		if err := applyMediaRef(&refs[index], intents, intentIndex); err != nil {
+			return err
 		}
-		intent := intents[intentIndex]
-		if intent.InputIndex != intentIndex || intent.AssetID <= 0 || !IsGenerationMediaRole(intent.Role) || intent.Role != ref.Role {
-			return fmt.Errorf("canonical media fact %d is invalid", intentIndex)
-		}
-		ref.AssetID = intent.AssetID
-		ref.Source = ""
-		intentIndex++
+	}
+	return nil
+}
+
+func applyOptionalMediaRef(ref *MediaRef, intents []GenerationMediaIntent, intentIndex *int) error {
+	if ref == nil {
 		return nil
 	}
-	for index := range copyMedia.Inputs {
-		if err := apply(&copyMedia.Inputs[index]); err != nil {
-			return nil, err
-		}
+	return applyMediaRef(ref, intents, intentIndex)
+}
+
+func applyMediaRef(ref *MediaRef, intents []GenerationMediaIntent, intentIndex *int) error {
+	if ref == nil || *intentIndex >= len(intents) {
+		return fmt.Errorf("canonical media facts do not match typed inputs")
 	}
-	for index := range copyMedia.References {
-		if err := apply(&copyMedia.References[index]); err != nil {
-			return nil, err
-		}
+	intent := intents[*intentIndex]
+	if intent.InputIndex != *intentIndex || intent.AssetID <= 0 || !IsGenerationMediaRole(intent.Role) || intent.Role != ref.Role {
+		return fmt.Errorf("canonical media fact %d is invalid", *intentIndex)
 	}
-	if copyMedia.Original != nil {
-		if err := apply(copyMedia.Original); err != nil {
-			return nil, err
-		}
-	}
-	if copyMedia.Mask != nil {
-		if err := apply(copyMedia.Mask); err != nil {
-			return nil, err
-		}
-	}
-	if intentIndex != len(intents) {
-		return nil, fmt.Errorf("canonical media facts do not match typed inputs")
-	}
-	return &copyMedia, nil
+	ref.AssetID = intent.AssetID
+	ref.Source = ""
+	*intentIndex = *intentIndex + 1
+	return nil
 }
 
 type GenerationControls struct {
@@ -282,67 +295,113 @@ func (p *WorkflowTaskParams) UnmarshalJSON(data []byte) error {
 }
 
 func rejectLegacyPersistedMediaFields(raw map[string]json.RawMessage) error {
+	if err := rejectLegacyTopLevelFields(raw); err != nil {
+		return err
+	}
+	if err := rejectLegacyExtraFields(raw["extra"]); err != nil {
+		return err
+	}
+	if err := rejectLegacyMediaFields(raw["media"]); err != nil {
+		return err
+	}
+	return rejectLegacyGenerationFields(raw["generation"])
+}
+
+func rejectLegacyTopLevelFields(raw map[string]json.RawMessage) error {
 	for key := range raw {
 		if paramkeys.IsLegacyPersistedMediaKey(key) {
 			return fmt.Errorf("legacy persisted media field %q is unsupported", key)
 		}
 	}
-	if value, ok := raw["extra"]; ok {
-		var extra map[string]json.RawMessage
-		if err := json.Unmarshal(value, &extra); err != nil {
-			return fmt.Errorf("decode task extra: %w", err)
-		}
-		for key := range extra {
-			if paramkeys.IsLegacyPersistedMediaKey(key) {
-				return fmt.Errorf("legacy task extra media field %q is unsupported", key)
-			}
+	return nil
+}
+
+func rejectLegacyExtraFields(value json.RawMessage) error {
+	if value == nil {
+		return nil
+	}
+	var extra map[string]json.RawMessage
+	if err := json.Unmarshal(value, &extra); err != nil {
+		return fmt.Errorf("decode task extra: %w", err)
+	}
+	for key := range extra {
+		if paramkeys.IsLegacyPersistedMediaKey(key) {
+			return fmt.Errorf("legacy task extra media field %q is unsupported", key)
 		}
 	}
-	if value, ok := raw["media"]; ok {
-		var media map[string]json.RawMessage
-		if err := json.Unmarshal(value, &media); err != nil {
-			return fmt.Errorf("decode task media: %w", err)
+	return nil
+}
+
+func rejectLegacyMediaFields(value json.RawMessage) error {
+	if value == nil {
+		return nil
+	}
+	var media map[string]json.RawMessage
+	if err := json.Unmarshal(value, &media); err != nil {
+		return fmt.Errorf("decode task media: %w", err)
+	}
+	if err := rejectLegacyMediaLists(media); err != nil {
+		return err
+	}
+	return rejectLegacyMediaSingles(media)
+}
+
+func rejectLegacyMediaLists(media map[string]json.RawMessage) error {
+	for _, key := range []string{"inputs", "references"} {
+		value, found := media[key]
+		if !found {
+			continue
 		}
-		for _, key := range []string{"inputs", "references"} {
-			value, found := media[key]
-			if !found {
-				continue
-			}
-			var refs []map[string]json.RawMessage
-			if err := json.Unmarshal(value, &refs); err != nil {
-				return fmt.Errorf("decode task media %s: %w", key, err)
-			}
-			for _, ref := range refs {
-				if _, found := ref["url"]; found {
-					return fmt.Errorf("legacy persisted media URL is unsupported")
-				}
-			}
+		var refs []map[string]json.RawMessage
+		if err := json.Unmarshal(value, &refs); err != nil {
+			return fmt.Errorf("decode task media %s: %w", key, err)
 		}
-		for _, key := range []string{"mask", "original"} {
-			value, found := media[key]
-			if !found || string(value) == "null" {
-				continue
-			}
-			var ref map[string]json.RawMessage
-			if err := json.Unmarshal(value, &ref); err != nil {
-				return fmt.Errorf("decode task media %s: %w", key, err)
-			}
-			if _, found := ref["url"]; found {
-				return fmt.Errorf("legacy persisted media URL is unsupported")
-			}
+		if mediaRefsContainURL(refs) {
+			return fmt.Errorf("legacy persisted media URL is unsupported")
 		}
 	}
-	if value, ok := raw["generation"]; ok {
-		var generation struct {
-			Media []map[string]json.RawMessage `json:"media"`
+	return nil
+}
+
+func mediaRefsContainURL(refs []map[string]json.RawMessage) bool {
+	for _, ref := range refs {
+		if _, found := ref["url"]; found {
+			return true
 		}
-		if err := json.Unmarshal(value, &generation); err != nil {
-			return fmt.Errorf("decode task generation: %w", err)
+	}
+	return false
+}
+
+func rejectLegacyMediaSingles(media map[string]json.RawMessage) error {
+	for _, key := range []string{"mask", "original"} {
+		value, found := media[key]
+		if !found || string(value) == "null" {
+			continue
 		}
-		for _, media := range generation.Media {
-			if _, found := media["ref"]; found {
-				return fmt.Errorf("legacy persisted generation media ref is unsupported")
-			}
+		var ref map[string]json.RawMessage
+		if err := json.Unmarshal(value, &ref); err != nil {
+			return fmt.Errorf("decode task media %s: %w", key, err)
+		}
+		if _, found := ref["url"]; found {
+			return fmt.Errorf("legacy persisted media URL is unsupported")
+		}
+	}
+	return nil
+}
+
+func rejectLegacyGenerationFields(value json.RawMessage) error {
+	if value == nil {
+		return nil
+	}
+	var generation struct {
+		Media []map[string]json.RawMessage `json:"media"`
+	}
+	if err := json.Unmarshal(value, &generation); err != nil {
+		return fmt.Errorf("decode task generation: %w", err)
+	}
+	for _, media := range generation.Media {
+		if _, found := media["ref"]; found {
+			return fmt.Errorf("legacy persisted generation media ref is unsupported")
 		}
 	}
 	return nil

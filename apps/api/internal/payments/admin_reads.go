@@ -176,79 +176,143 @@ func (s *CheckoutWorkflow) ListAdminPaymentOrders(ctx context.Context, input Adm
 }
 
 func (s *CheckoutWorkflow) GetAdminPaymentOrder(ctx context.Context, orderNumber string) (AdminPaymentOrderDetail, error) {
-	if s == nil || s.configuration == nil || s.checkoutStore == nil || s.convergenceStore == nil {
-		return AdminPaymentOrderDetail{}, fmt.Errorf("payments admin read service unavailable")
+	if err := validateAdminPaymentOrderReader(s, orderNumber); err != nil {
+		return AdminPaymentOrderDetail{}, err
 	}
 	orderNumber = strings.TrimSpace(orderNumber)
-	if !adminPaymentOrderNumber.MatchString(orderNumber) {
-		return AdminPaymentOrderDetail{}, ErrAdminPaymentOrderFilter
-	}
 	detail, events, err := s.checkoutStore.getAdminPaymentOrder(ctx, orderNumber)
 	if err != nil {
 		return AdminPaymentOrderDetail{}, err
 	}
-	durableRefunds, err := s.convergenceStore.ListPaymentRefundsForOrder(ctx, orderNumber)
+	durable, err := s.loadAdminPaymentOrderFacts(ctx, orderNumber)
 	if err != nil {
 		return AdminPaymentOrderDetail{}, err
 	}
-	durableStripeRefundIDs := make(map[string]struct{}, len(durableRefunds))
-	for _, refund := range durableRefunds {
+	durable.appendTo(&detail)
+	if err := s.setRefundableIdeaQuantity(ctx, &detail, durable); err != nil {
+		return AdminPaymentOrderDetail{}, err
+	}
+	appendAdminPaymentOrderWebhookFacts(&detail, events, durable.refundIDs, durable.disputeIDs)
+	return detail, nil
+}
+
+func validateAdminPaymentOrderReader(s *CheckoutWorkflow, orderNumber string) error {
+	if s == nil || s.configuration == nil || s.checkoutStore == nil || s.convergenceStore == nil {
+		return fmt.Errorf("payments admin read service unavailable")
+	}
+	if !adminPaymentOrderNumber.MatchString(strings.TrimSpace(orderNumber)) {
+		return ErrAdminPaymentOrderFilter
+	}
+	return nil
+}
+
+type adminPaymentOrderFacts struct {
+	refunds     []PaymentRefund
+	disputes    []PaymentDispute
+	refundIDs   map[string]struct{}
+	disputeIDs  map[string]struct{}
+	disputeMode StripeMode
+}
+
+func (s *CheckoutWorkflow) loadAdminPaymentOrderFacts(ctx context.Context, orderNumber string) (adminPaymentOrderFacts, error) {
+	refunds, err := s.convergenceStore.ListPaymentRefundsForOrder(ctx, orderNumber)
+	if err != nil {
+		return adminPaymentOrderFacts{}, err
+	}
+	disputes, err := s.convergenceStore.ListPaymentDisputesForOrder(ctx, orderNumber)
+	if err != nil {
+		return adminPaymentOrderFacts{}, err
+	}
+	mode, err := s.adminPaymentDisputeMode(ctx, len(disputes))
+	if err != nil {
+		return adminPaymentOrderFacts{}, err
+	}
+	return adminPaymentOrderFacts{
+		refunds: refunds, disputes: disputes, disputeMode: mode,
+		refundIDs: paymentRefundIDs(refunds), disputeIDs: paymentDisputeIDs(disputes),
+	}, nil
+}
+
+func (s *CheckoutWorkflow) adminPaymentDisputeMode(ctx context.Context, disputeCount int) (StripeMode, error) {
+	if disputeCount == 0 {
+		return StripeMode(""), nil
+	}
+	configuration, err := s.configuration.GetStripeConfiguration(ctx)
+	if err == nil {
+		return configuration.Mode, nil
+	}
+	if isConfigurationNotFound(err) {
+		return StripeMode(""), nil
+	}
+	return StripeMode(""), err
+}
+
+func paymentRefundIDs(refunds []PaymentRefund) map[string]struct{} {
+	ids := make(map[string]struct{}, len(refunds))
+	for _, refund := range refunds {
+		if refund.StripeRefundID != "" {
+			ids[refund.StripeRefundID] = struct{}{}
+		}
+	}
+	return ids
+}
+
+func paymentDisputeIDs(disputes []PaymentDispute) map[string]struct{} {
+	ids := make(map[string]struct{}, len(disputes))
+	for _, dispute := range disputes {
+		ids[dispute.StripeDisputeID] = struct{}{}
+	}
+	return ids
+}
+
+func (facts adminPaymentOrderFacts) appendTo(detail *AdminPaymentOrderDetail) {
+	for _, refund := range facts.refunds {
 		updatedAt := refund.UpdatedAt
 		detail.Refunds = append(detail.Refunds, AdminPaymentRefundSummary{ID: maskPaymentIdentity(refund.ID), Status: string(refund.Status), IdeaQuantity: refund.IdeaQuantity, AmountMinor: refund.AmountMinor, Currency: refund.Currency, StripeStatus: refund.StripeStatus, ErrorSummary: refund.ErrorSummary, UpdatedAt: &updatedAt})
-		if refund.StripeRefundID != "" {
-			durableStripeRefundIDs[refund.StripeRefundID] = struct{}{}
-		}
 	}
-	durableDisputes, err := s.convergenceStore.ListPaymentDisputesForOrder(ctx, orderNumber)
-	if err != nil {
-		return AdminPaymentOrderDetail{}, err
-	}
-	disputeMode := StripeMode("")
-	if len(durableDisputes) > 0 {
-		configuration, configurationErr := s.configuration.GetStripeConfiguration(ctx)
-		if configurationErr == nil {
-			disputeMode = configuration.Mode
-		} else if !isConfigurationNotFound(configurationErr) {
-			return AdminPaymentOrderDetail{}, configurationErr
-		}
-	}
-	durableStripeDisputeIDs := make(map[string]struct{}, len(durableDisputes))
-	for _, dispute := range durableDisputes {
+	for _, dispute := range facts.disputes {
 		updatedAt := dispute.UpdatedAt
 		openedAt := dispute.OpenedAt
 		detail.Disputes = append(detail.Disputes, AdminPaymentDisputeSummary{
-			ID: maskPaymentIdentity(dispute.StripeDisputeID), Status: string(dispute.Status),
-			ProviderStatus: dispute.ProviderStatus, AmountMinor: dispute.AmountMinor, Currency: dispute.Currency,
+			ID: maskPaymentIdentity(dispute.StripeDisputeID), Status: string(dispute.Status), ProviderStatus: dispute.ProviderStatus,
+			AmountMinor: dispute.AmountMinor, Currency: dispute.Currency,
 			RatioBasisPoints:   paymentDisputeRatioBasisPoints(dispute.AmountMinor, detail.PaidTotalMinor),
 			TargetIdeaQuantity: dispute.TargetIdeaQuantity, DebitedIdeaQuantity: dispute.DebitedIdeaQuantity,
-			UnrecoveredCredits: dispute.UnrecoveredCredits,
-			StripeDashboardURL: stripeDisputeDashboardURL(disputeMode, dispute.StripeDisputeID),
-			OpenedAt:           &openedAt, ClosedAt: dispute.ClosedAt, UpdatedAt: &updatedAt,
+			UnrecoveredCredits: dispute.UnrecoveredCredits, StripeDashboardURL: stripeDisputeDashboardURL(facts.disputeMode, dispute.StripeDisputeID),
+			OpenedAt: &openedAt, ClosedAt: dispute.ClosedAt, UpdatedAt: &updatedAt,
 		})
-		durableStripeDisputeIDs[dispute.StripeDisputeID] = struct{}{}
 	}
-	if detail.Status == PaymentOrderCredited && detail.PaidAt != nil && s.runtime.now().UTC().Before(detail.PaidAt.Add(refundEligibilityWindow)) && s.wallets != nil {
-		remaining := detail.IdeaQuantity
-		for _, refund := range durableRefunds {
-			if refund.Status == PaymentRefundPending || refund.Status == PaymentRefundSucceeded || refund.Status == PaymentRefundAnomaly {
-				remaining -= refund.IdeaQuantity
-			}
-		}
-		for _, dispute := range durableDisputes {
-			if dispute.Status == PaymentDisputeOpen || dispute.Status == PaymentDisputeLost {
-				remaining -= dispute.TargetIdeaQuantity
-			}
-		}
-		if remaining > 0 {
-			wallet, walletErr := s.wallets.GetWallet(ctx, detail.internalUserID)
-			if walletErr != nil && !errors.Is(walletErr, credits.ErrWalletNotFound) {
-				return AdminPaymentOrderDetail{}, walletErr
-			}
-			if walletErr == nil {
-				detail.RefundableIdeaQuantity = min(remaining, wallet.Available)
-			}
+}
+
+func (s *CheckoutWorkflow) setRefundableIdeaQuantity(ctx context.Context, detail *AdminPaymentOrderDetail, facts adminPaymentOrderFacts) error {
+	if detail.Status != PaymentOrderCredited || detail.PaidAt == nil || !s.runtime.now().UTC().Before(detail.PaidAt.Add(refundEligibilityWindow)) || s.wallets == nil {
+		return nil
+	}
+	remaining := detail.IdeaQuantity
+	for _, refund := range facts.refunds {
+		if refund.Status == PaymentRefundPending || refund.Status == PaymentRefundSucceeded || refund.Status == PaymentRefundAnomaly {
+			remaining -= refund.IdeaQuantity
 		}
 	}
+	for _, dispute := range facts.disputes {
+		if dispute.Status == PaymentDisputeOpen || dispute.Status == PaymentDisputeLost {
+			remaining -= dispute.TargetIdeaQuantity
+		}
+	}
+	if remaining <= 0 {
+		return nil
+	}
+	wallet, err := s.wallets.GetWallet(ctx, detail.internalUserID)
+	if err != nil && !errors.Is(err, credits.ErrWalletNotFound) {
+		return err
+	}
+	if err == nil {
+		detail.RefundableIdeaQuantity = min(remaining, wallet.Available)
+	}
+	return nil
+}
+
+func appendAdminPaymentOrderWebhookFacts(detail *AdminPaymentOrderDetail, events []dbsqlc.ListAdminPaymentOrderWebhookEventsRow, refundIDs, disputeIDs map[string]struct{}) {
 	for _, event := range events {
 		updatedAt := nullTimePointer(event.ProcessedAt)
 		if updatedAt == nil {
@@ -256,22 +320,17 @@ func (s *CheckoutWorkflow) GetAdminPaymentOrder(ctx context.Context, orderNumber
 		}
 		switch event.EventType {
 		case "refund.updated", "refund.failed":
-			if _, durable := durableStripeRefundIDs[event.StripeObjectID]; durable {
+			if _, durable := refundIDs[event.StripeObjectID]; durable {
 				continue
 			}
-			detail.Refunds = append(detail.Refunds, AdminPaymentRefundSummary{
-				ID: maskPaymentIdentity(event.StripeObjectID), Status: event.EventType, UpdatedAt: updatedAt,
-			})
+			detail.Refunds = append(detail.Refunds, AdminPaymentRefundSummary{ID: maskPaymentIdentity(event.StripeObjectID), Status: event.EventType, UpdatedAt: updatedAt})
 		case "charge.dispute.created", "charge.dispute.closed":
-			if _, durable := durableStripeDisputeIDs[event.StripeObjectID]; durable {
+			if _, durable := disputeIDs[event.StripeObjectID]; durable {
 				continue
 			}
-			detail.Disputes = append(detail.Disputes, AdminPaymentDisputeSummary{
-				ID: maskPaymentIdentity(event.StripeObjectID), Status: event.EventType, UpdatedAt: updatedAt,
-			})
+			detail.Disputes = append(detail.Disputes, AdminPaymentDisputeSummary{ID: maskPaymentIdentity(event.StripeObjectID), Status: event.EventType, UpdatedAt: updatedAt})
 		}
 	}
-	return detail, nil
 }
 
 func stripeDisputeDashboardURL(mode StripeMode, disputeID string) string {

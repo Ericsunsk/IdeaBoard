@@ -55,6 +55,18 @@ func (s *RuntimeTaskMediaStore) ResolveRuntimeMedia(ctx context.Context, params 
 	if params.Media == nil {
 		return nil, nil
 	}
+	refs, err := validateRuntimeMediaManifest(params)
+	if err != nil {
+		return nil, err
+	}
+	urls, err := s.presignRuntimeMedia(ctx, refs)
+	if err != nil {
+		return nil, err
+	}
+	return assembleRuntimeMedia(params.Media, urls)
+}
+
+func validateRuntimeMediaManifest(params *tasks.WorkflowTaskParams) ([]tasks.TaskInputManifestRef, error) {
 	manifest := params.InputManifest
 	if manifest == nil {
 		return nil, fmt.Errorf("任务媒体 manifest 缺失")
@@ -73,6 +85,10 @@ func (s *RuntimeTaskMediaStore) ResolveRuntimeMedia(ctx context.Context, params 
 	if len(refs) != expectedRefs {
 		return nil, fmt.Errorf("任务媒体 manifest 与 media params 不匹配")
 	}
+	return refs, nil
+}
+
+func (s *RuntimeTaskMediaStore) presignRuntimeMedia(ctx context.Context, refs []tasks.TaskInputManifestRef) ([]string, error) {
 	urls := make([]string, len(refs))
 	for index, ref := range refs {
 		presigned, err := s.service.Presign(ctx, PresignRequest{StorageProfileID: ref.StorageProfileID, ObjectKey: ref.ObjectKey, TTL: DefaultPresignTTL, ExpectedMIMEType: ref.MIMEType, ExpectedChecksumSHA256: ref.ChecksumSHA256, ExpectedSizeBytes: ref.SizeBytes, ExpectedObjectGeneration: ref.ObjectGeneration, Caller: "task-provider"})
@@ -84,6 +100,10 @@ func (s *RuntimeTaskMediaStore) ResolveRuntimeMedia(ctx context.Context, params 
 		}
 		urls[index] = presigned.URL
 	}
+	return urls, nil
+}
+
+func assembleRuntimeMedia(media *tasks.MediaInputs, urls []string) (*tasks.RuntimeMediaInputs, error) {
 	position := 0
 	next := func() (string, error) {
 		if position >= len(urls) {
@@ -93,29 +113,29 @@ func (s *RuntimeTaskMediaStore) ResolveRuntimeMedia(ctx context.Context, params 
 		position++
 		return url, nil
 	}
-	resolved := &tasks.RuntimeMediaInputs{UseMask: params.Media.UseMask}
-	for index, ref := range params.Media.Inputs {
+	resolved := &tasks.RuntimeMediaInputs{UseMask: media.UseMask}
+	for index, ref := range media.Inputs {
 		url, err := next()
 		if err != nil {
 			return nil, fmt.Errorf("解析 input 媒体失败: index=%d: %w", index, err)
 		}
 		resolved.Inputs = append(resolved.Inputs, tasks.RuntimeMediaRef{URL: url, Role: ref.Role, Weight: ref.Weight})
 	}
-	for index, ref := range params.Media.References {
+	for index, ref := range media.References {
 		url, err := next()
 		if err != nil {
 			return nil, fmt.Errorf("解析 reference 媒体失败: index=%d: %w", index, err)
 		}
 		resolved.References = append(resolved.References, tasks.RuntimeMediaRef{URL: url, Role: ref.Role, Weight: ref.Weight})
 	}
-	if ref := params.Media.Original; ref != nil {
+	if ref := media.Original; ref != nil {
 		url, err := next()
 		if err != nil {
 			return nil, fmt.Errorf("解析 original 媒体失败: %w", err)
 		}
 		resolved.Original = &tasks.RuntimeMediaRef{URL: url, Role: ref.Role, Weight: ref.Weight}
 	}
-	if ref := params.Media.Mask; ref != nil {
+	if ref := media.Mask; ref != nil {
 		url, err := next()
 		if err != nil {
 			return nil, fmt.Errorf("解析 mask 媒体失败: %w", err)

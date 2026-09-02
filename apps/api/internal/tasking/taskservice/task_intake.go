@@ -143,23 +143,44 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	if req == nil {
 		return CanonicalTaskRequest{}, validation.New("请求参数错误")
 	}
-	clientActionID, err := normalizeSubmitTaskClientActionID(req.ClientActionID)
+	normalized, err := i.normalizeCompileRequest(ctx, userID, req)
 	if err != nil {
 		return CanonicalTaskRequest{}, err
 	}
+	execution, err := i.compileTaskExecution(ctx, userID, req, normalized.params)
+	if err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+	prompt, err := i.compileTaskPrompts(ctx, req, execution.featureSlug, execution.plan, normalized.params)
+	if err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+	return assembleCanonicalTaskRequest(userID, req, normalized, execution, prompt)
+}
+
+type normalizedTaskCompile struct {
+	clientActionID string
+	priority       int
+	params         map[string]interface{}
+}
+
+func (i *taskIntake) normalizeCompileRequest(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (normalizedTaskCompile, error) {
+	clientActionID, err := normalizeSubmitTaskClientActionID(req.ClientActionID)
+	if err != nil {
+		return normalizedTaskCompile{}, err
+	}
 	priority := tasks.EffectiveTaskPriority(req.Priority)
 	if !tasks.IsValidTaskPriority(priority) {
-		return CanonicalTaskRequest{}, validation.New("priority 仅支持 1-4")
+		return normalizedTaskCompile{}, validation.New("priority 仅支持 1-4")
 	}
 	if err := validateSubmitTaskPrompt(req.Prompt, maxSubmitTaskPromptBytes, "提示词"); err != nil {
-		return CanonicalTaskRequest{}, err
+		return normalizedTaskCompile{}, err
 	}
 	if err := i.validateImageURLs(ctx, userID, req.ImageURLs); err != nil {
-		return CanonicalTaskRequest{}, err
+		return normalizedTaskCompile{}, err
 	}
-	assetIDs := submitRequestAssetIDs(req)
-	if err := i.validateImageAssetIDs(ctx, userID, assetIDs); err != nil {
-		return CanonicalTaskRequest{}, err
+	if err := i.validateImageAssetIDs(ctx, userID, submitRequestAssetIDs(req)); err != nil {
+		return normalizedTaskCompile{}, err
 	}
 
 	params := make(map[string]interface{}, len(req.Params)+3)
@@ -180,74 +201,93 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	}
 	normalizeSubmitTaskMediaParams(params)
 	if err := i.validateMediaParams(ctx, userID, params); err != nil {
-		return CanonicalTaskRequest{}, err
+		return normalizedTaskCompile{}, err
 	}
+	return normalizedTaskCompile{clientActionID: clientActionID, priority: priority, params: params}, nil
+}
 
+type compiledTaskExecution struct {
+	featureSlug string
+	plan        workflow.FeatureExecutionPlan
+	typedParams *tasks.WorkflowTaskParams
+}
+
+func (i *taskIntake) compileTaskExecution(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest, params map[string]interface{}) (compiledTaskExecution, error) {
 	featureSlug, err := workflow.ResolveWorkflowFeatureSlug(params)
 	if err != nil {
-		return CanonicalTaskRequest{}, err
+		return compiledTaskExecution{}, err
 	}
 	if featureSlug == "" {
-		return CanonicalTaskRequest{}, validation.New("feature 不能为空")
+		return compiledTaskExecution{}, validation.New("feature 不能为空")
 	}
 	params["feature"] = featureSlug
 	delete(params, "model")
 	if err := workflow.NormalizeStructuredPromptContractParams(params, featureSlug); err != nil {
-		return CanonicalTaskRequest{}, err
+		return compiledTaskExecution{}, err
 	}
 	if featureSlug == workflow.FeatureSlugGeneration {
 		if err := workflow.ValidateGenerationSubmitContract(params); err != nil {
-			return CanonicalTaskRequest{}, err
+			return compiledTaskExecution{}, err
 		}
 	}
 	if featureSlug == workflow.FeatureSlugFusion {
 		if err := normalizeFusionParams(params); err != nil {
-			return CanonicalTaskRequest{}, err
+			return compiledTaskExecution{}, err
 		}
 	}
 	executionParams, err := compileFeatureExecutionParams(params, featureSlug)
 	if err != nil {
-		return CanonicalTaskRequest{}, err
+		return compiledTaskExecution{}, err
 	}
 	executionPlan, err := workflow.CompileFeatureExecutionPlan(workflow.CompileFeatureExecutionInput{
 		Feature: featureSlug,
 		Params:  executionParams,
 	})
 	if err != nil {
-		return CanonicalTaskRequest{}, mapFeatureContractValidationError(err)
+		return compiledTaskExecution{}, mapFeatureContractValidationError(err)
 	}
 	params[paramkeys.OutputCount] = executionPlan.RequestedOutputCount().Int()
 	params[paramkeys.OutputResolution] = executionPlan.OutputResolution()
 	typedParams, err := workflowTaskParamsFromMap(params, featureSlug)
 	if err != nil {
-		return CanonicalTaskRequest{}, err
+		return compiledTaskExecution{}, err
 	}
 	if err := validateImageFillDimensions(featureSlug, typedParams); err != nil {
-		return CanonicalTaskRequest{}, err
+		return compiledTaskExecution{}, err
 	}
 	if err := i.validateProcessingInputReadiness(ctx, userID, submitRequestAssetIDs(req)); err != nil {
-		return CanonicalTaskRequest{}, err
+		return compiledTaskExecution{}, err
 	}
 	executionPlanJSON, err := workflow.EncodeFeatureExecutionPlan(executionPlan)
 	if err != nil {
-		return CanonicalTaskRequest{}, err
+		return compiledTaskExecution{}, err
 	}
 	typedParams.ExecutionPlan = executionPlanJSON
 	if err := i.ensureProviderAvailable(ctx, executionPlan.RoutingRequirement()); err != nil {
-		return CanonicalTaskRequest{}, err
+		return compiledTaskExecution{}, err
 	}
+	return compiledTaskExecution{featureSlug: featureSlug, plan: executionPlan, typedParams: typedParams}, nil
+}
 
+type compiledTaskPrompts struct {
+	fullPrompt   string
+	systemPrompt string
+	config       prompts.FeaturePromptRuntimeConfig
+}
+
+func (i *taskIntake) compileTaskPrompts(ctx context.Context, req *tasks.SubmitTaskRequest, featureSlug string, executionPlan workflow.FeatureExecutionPlan, params map[string]interface{}) (compiledTaskPrompts, error) {
 	promptConfig := prompts.FeaturePromptRuntimeConfig{
 		UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(featureSlug),
 	}
 	if i.prompts != nil && executionPlan.PromptPolicy() != workflow.PromptPolicyIgnored {
+		var err error
 		promptConfig, err = i.prompts.GetRuntimeConfig(ctx, featureSlug)
 		if err != nil {
-			return CanonicalTaskRequest{}, newSubmissionError("prompt_unavailable", "系统提示词暂不可用", err)
+			return compiledTaskPrompts{}, newSubmissionError("prompt_unavailable", "系统提示词暂不可用", err)
 		}
 	}
 	if requiresImageFillSystemPrompt(featureSlug) && strings.TrimSpace(promptConfig.Prompt) == "" {
-		return CanonicalTaskRequest{}, validation.New("该功能未配置 System Prompt")
+		return compiledTaskPrompts{}, validation.New("该功能未配置 System Prompt")
 	}
 	var fullPrompt, systemPrompt string
 	// Dedicated image transforms are binary media operations. Their Modal
@@ -257,41 +297,45 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 		fullPrompt = strings.TrimSpace(prompts.ApplyFeatureSystemPromptWithConfig(req.Prompt, req.Prompt, featureSlug, params, promptConfig))
 	}
 	if executionPlan.PromptPolicy() == workflow.PromptPolicyRequired && fullPrompt == "" {
-		return CanonicalTaskRequest{}, validation.New("Prompt Node 需要系统模板或用户描述")
+		return compiledTaskPrompts{}, validation.New("Prompt Node 需要系统模板或用户描述")
 	}
 	if err := validateSubmitTaskPrompt(fullPrompt, maxSubmitTaskFinalPromptBytes, "最终提示词"); err != nil {
-		return CanonicalTaskRequest{}, err
+		return compiledTaskPrompts{}, err
 	}
+	return compiledTaskPrompts{fullPrompt: fullPrompt, systemPrompt: systemPrompt, config: promptConfig}, nil
+}
+
+func assembleCanonicalTaskRequest(userID int64, req *tasks.SubmitTaskRequest, normalized normalizedTaskCompile, execution compiledTaskExecution, prompt compiledTaskPrompts) (CanonicalTaskRequest, error) {
 	generationSnapshot, err := tasksubmission.CompileGenerationSnapshot(tasksubmission.GenerationCompilerInput{
-		Plan:                executionPlan,
+		Plan:                execution.plan,
 		UserPrompt:          req.Prompt,
-		SystemPrompt:        systemPrompt,
-		CompiledPrompt:      fullPrompt,
-		TemplateFingerprint: tasksubmission.TemplateFingerprint("", promptConfig.Prompt),
-		SeedMaterial:        clientActionID,
-		Params:              typedParams,
+		SystemPrompt:        prompt.systemPrompt,
+		CompiledPrompt:      prompt.fullPrompt,
+		TemplateFingerprint: tasksubmission.TemplateFingerprint("", prompt.config.Prompt),
+		SeedMaterial:        normalized.clientActionID,
+		Params:              execution.typedParams,
 	})
 	if err != nil {
 		return CanonicalTaskRequest{}, err
 	}
-	billingRequest, err := resolveTaskBillingRequest(executionPlan)
+	billingRequest, err := resolveTaskBillingRequest(execution.plan)
 	if err != nil {
 		return CanonicalTaskRequest{}, err
 	}
-	if billingRequest != nil && clientActionID == "" {
+	if billingRequest != nil && normalized.clientActionID == "" {
 		return CanonicalTaskRequest{}, validation.New("AI 生图任务必须提供 client_action_id")
 	}
-	typedParams.Generation = &generationSnapshot
-	paramsJSON, err := marshalWorkflowTaskParams(typedParams, params)
+	execution.typedParams.Generation = &generationSnapshot
+	paramsJSON, err := marshalWorkflowTaskParams(execution.typedParams, normalized.params)
 	if err != nil {
 		return CanonicalTaskRequest{}, err
 	}
 	return tasksubmission.NewCanonicalRequest(tasksubmission.CanonicalRequestInput{
-		UserID: userID, Feature: featureSlug, UserPrompt: req.Prompt, Prompt: fullPrompt,
-		Params: paramsJSON, ClientActionID: clientActionID, Priority: priority,
+		UserID: userID, Feature: execution.featureSlug, UserPrompt: req.Prompt, Prompt: prompt.fullPrompt,
+		Params: paramsJSON, ClientActionID: normalized.clientActionID, Priority: normalized.priority,
 		Generation:     &generationSnapshot,
 		BillingRequest: billingRequest,
-		ExecutionPlan:  &executionPlan,
+		ExecutionPlan:  &execution.plan,
 	})
 }
 

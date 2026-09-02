@@ -258,104 +258,158 @@ func SettleTerminal(ctx context.Context, tx *sql.Tx, taskID string) error {
 	if taskID == "" {
 		return fmt.Errorf("task id is required")
 	}
-	var userID int64
-	var unitCredits, quantity, totalCredits int64
-	var holdTransactionID sql.NullString
-	var currentState SettlementState
-	var settledOutputCount int64
+	facts, complete, err := loadSettlementFacts(ctx, tx, taskID)
+	if err != nil {
+		return err
+	}
+	if !complete {
+		return nil
+	}
+	decision, err := decideSettlement(facts)
+	if err != nil {
+		return err
+	}
+	if decision.noop {
+		return nil
+	}
+	settlement, err := applySettlementCommands(ctx, tx, taskID, facts, decision)
+	if err != nil {
+		return err
+	}
+	return persistSettlement(ctx, tx, taskID, decision, settlement)
+}
+
+type settlementFacts struct {
+	userID             int64
+	unitCredits        int64
+	quantity           int64
+	totalCredits       int64
+	holdTransactionID  sql.NullString
+	currentState       SettlementState
+	settledOutputCount int64
+	actualOutputCount  int64
+}
+
+func loadSettlementFacts(ctx context.Context, tx *sql.Tx, taskID string) (settlementFacts, bool, error) {
+	var facts settlementFacts
 	err := tx.QueryRowContext(ctx, `
 SELECT snapshots.user_id, snapshots.unit_credits, snapshots.quantity, snapshots.total_credits,
 	       snapshots.hold_transaction_id, settlements.state, settlements.actual_output_count
 FROM task_billing_snapshots snapshots
 JOIN task_billing_settlements settlements USING (task_id)
 WHERE snapshots.task_id = $1
-	FOR UPDATE OF settlements`, taskID).Scan(&userID, &unitCredits, &quantity, &totalCredits, &holdTransactionID, &currentState, &settledOutputCount)
+	FOR UPDATE OF settlements`, taskID).Scan(&facts.userID, &facts.unitCredits, &facts.quantity, &facts.totalCredits, &facts.holdTransactionID, &facts.currentState, &facts.settledOutputCount)
 	if errors.Is(err, sql.ErrNoRows) {
 		var snapshotExists bool
 		if existsErr := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM task_billing_snapshots WHERE task_id = $1)`, taskID).Scan(&snapshotExists); existsErr != nil {
-			return fmt.Errorf("check task billing snapshot: %w", existsErr)
+			return settlementFacts{}, false, fmt.Errorf("check task billing snapshot: %w", existsErr)
 		}
 		var feature string
 		taskErr := tx.QueryRowContext(ctx, `SELECT feature_slug FROM tasks WHERE task_id = $1`, taskID).Scan(&feature)
 		if taskErr != nil && !errors.Is(taskErr, sql.ErrNoRows) {
-			return fmt.Errorf("check task billing requirement: %w", taskErr)
+			return settlementFacts{}, false, fmt.Errorf("check task billing requirement: %w", taskErr)
 		}
 		if snapshotExists || RequiresBilling(feature) {
-			return fmt.Errorf("%w: task %s has incomplete billing facts", ErrIntegrity, taskID)
+			return settlementFacts{}, false, fmt.Errorf("%w: task %s has incomplete billing facts", ErrIntegrity, taskID)
 		}
-		return nil
+		return settlementFacts{}, false, nil
 	}
 	if err != nil {
-		return fmt.Errorf("load task billing settlement: %w", err)
+		return settlementFacts{}, false, fmt.Errorf("load task billing settlement: %w", err)
 	}
-	var actualOutputCount int64
-	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM task_outputs WHERE task_id = $1`, taskID).Scan(&actualOutputCount); err != nil {
-		return fmt.Errorf("count persisted task outputs: %w", err)
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM task_outputs WHERE task_id = $1`, taskID).Scan(&facts.actualOutputCount); err != nil {
+		return settlementFacts{}, false, fmt.Errorf("count persisted task outputs: %w", err)
 	}
-	if actualOutputCount < 0 || actualOutputCount > quantity {
-		return fmt.Errorf("actual output count %d exceeds requested quantity %d", actualOutputCount, quantity)
+	return facts, true, nil
+}
+
+type settlementDecision struct {
+	target            SettlementState
+	captureAmount     int64
+	releaseAmount     int64
+	actualOutputCount int64
+	noop              bool
+}
+
+func decideSettlement(facts settlementFacts) (settlementDecision, error) {
+	if facts.actualOutputCount < 0 || facts.actualOutputCount > facts.quantity {
+		return settlementDecision{}, fmt.Errorf("actual output count %d exceeds requested quantity %d", facts.actualOutputCount, facts.quantity)
 	}
 	target := SettlementStateReleased
-	if actualOutputCount > 0 {
+	if facts.actualOutputCount > 0 {
 		target = SettlementStateCaptured
 	}
-	if currentState == SettlementStateFree {
-		return nil
+	if facts.currentState == SettlementStateFree {
+		return settlementDecision{noop: true}, nil
 	}
-	if currentState == target {
-		if settledOutputCount == actualOutputCount {
-			return nil
+	if facts.currentState == target {
+		if facts.settledOutputCount == facts.actualOutputCount {
+			return settlementDecision{noop: true}, nil
 		}
-		return ErrSettlementConflict
+		return settlementDecision{}, ErrSettlementConflict
 	}
-	if currentState != SettlementStateHeld || totalCredits <= 0 || !holdTransactionID.Valid || strings.TrimSpace(holdTransactionID.String) == "" {
-		return ErrSettlementConflict
+	if facts.currentState != SettlementStateHeld || facts.totalCredits <= 0 || !facts.holdTransactionID.Valid || strings.TrimSpace(facts.holdTransactionID.String) == "" {
+		return settlementDecision{}, ErrSettlementConflict
 	}
+	return settlementDecision{
+		target: target, captureAmount: facts.actualOutputCount * facts.unitCredits,
+		releaseAmount:     facts.totalCredits - facts.actualOutputCount*facts.unitCredits,
+		actualOutputCount: facts.actualOutputCount,
+	}, nil
+}
 
+type settlementTransactions struct {
+	capture   any
+	release   any
+	settledAt time.Time
+}
+
+func applySettlementCommands(ctx context.Context, tx *sql.Tx, taskID string, facts settlementFacts, decision settlementDecision) (settlementTransactions, error) {
 	commands, err := credits.CommandsInSQLTx(tx)
 	if err != nil {
-		return err
+		return settlementTransactions{}, err
 	}
-	captureAmount := actualOutputCount * unitCredits
-	releaseAmount := totalCredits - captureAmount
-	var captureTransactionID, releaseTransactionID any
-	var settledAt time.Time
-	if releaseAmount > 0 {
-		amount, amountErr := credits.NewCreditAmount(releaseAmount)
+	var transactions settlementTransactions
+	if decision.releaseAmount > 0 {
+		amount, amountErr := credits.NewCreditAmount(decision.releaseAmount)
 		if amountErr != nil {
-			return amountErr
+			return settlementTransactions{}, amountErr
 		}
 		result, releaseErr := commands.Release(ctx, credits.ReleaseCommand{
-			UserID: userID, HoldTransactionID: holdTransactionID.String, Amount: amount,
+			UserID: facts.userID, HoldTransactionID: facts.holdTransactionID.String, Amount: amount,
 			Metadata: taskCommandMetadata("task-release:"+taskID, credits.ActorService, "task-runtime", "task_terminal", "AI 生图任务未产出部分释放", taskID),
 		})
 		if releaseErr != nil {
-			return releaseErr
+			return settlementTransactions{}, releaseErr
 		}
-		releaseTransactionID = result.TransactionID
-		settledAt = result.CreatedAt
+		transactions.release = result.TransactionID
+		transactions.settledAt = result.CreatedAt
 	}
-	if captureAmount > 0 {
-		amount, amountErr := credits.NewCreditAmount(captureAmount)
+	if decision.captureAmount > 0 {
+		amount, amountErr := credits.NewCreditAmount(decision.captureAmount)
 		if amountErr != nil {
-			return amountErr
+			return settlementTransactions{}, amountErr
 		}
 		result, captureErr := commands.Capture(ctx, credits.CaptureCommand{
-			UserID: userID, HoldTransactionID: holdTransactionID.String, Amount: amount,
+			UserID: facts.userID, HoldTransactionID: facts.holdTransactionID.String, Amount: amount,
 			Metadata: taskCommandMetadata("task-capture:"+taskID, credits.ActorService, "task-runtime", "task_terminal", "AI 生图任务实际产出结算", taskID),
 		})
 		if captureErr != nil {
-			return captureErr
+			return settlementTransactions{}, captureErr
 		}
-		captureTransactionID = result.TransactionID
-		settledAt = result.CreatedAt
+		transactions.capture = result.TransactionID
+		transactions.settledAt = result.CreatedAt
 	}
+	return transactions, nil
+}
+
+func persistSettlement(ctx context.Context, tx *sql.Tx, taskID string, decision settlementDecision, transactions settlementTransactions) error {
 	resultUpdate, err := tx.ExecContext(ctx, `
 UPDATE task_billing_settlements
 SET state = $2, actual_output_count = $3, captured_credits = $4, released_credits = $5,
     capture_transaction_id = $6, release_transaction_id = $7, settled_at = $8, updated_at = clock_timestamp()
-WHERE task_id = $1 AND state = 'held'`, taskID, target, actualOutputCount, captureAmount, releaseAmount,
-		captureTransactionID, releaseTransactionID, settledAt)
+WHERE task_id = $1 AND state = 'held'`, taskID, decision.target, decision.actualOutputCount, decision.captureAmount, decision.releaseAmount,
+		transactions.capture, transactions.release, transactions.settledAt)
 	if err != nil {
 		return fmt.Errorf("persist task billing settlement: %w", err)
 	}

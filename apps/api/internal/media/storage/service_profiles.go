@@ -56,71 +56,77 @@ func (s *StorageService) saveProfile(ctx context.Context, profile *StorageProfil
 		return nil, err
 	}
 
-	profile.Provider = canonicalizeStorageProvider(profile.Provider)
-	meta, ok := s.providerMeta[profile.Provider]
-	if !ok {
-		return nil, fmt.Errorf("不支持的存储类型")
-	}
-
-	existingIndex := -1
-	var existing *StorageProfile
-	for i := range profiles {
-		if profiles[i].ID == profile.ID {
-			existingIndex = i
-			existing = &profiles[i]
-			break
-		}
-	}
-
-	if existing == nil {
-		if profile.ID == "" {
-			profile.ID = fmt.Sprintf("%s-%d", profile.Provider, time.Now().UnixNano())
-		}
-		if profile.Provider == StorageProviderLocal && !meta.CreateAllowed {
-			return nil, fmt.Errorf("本地存储不支持新增额外卡片")
-		}
-		existing = &StorageProfile{
-			ID:       profile.ID,
-			Provider: profile.Provider,
-		}
-	} else {
-		if existing.Provider != profile.Provider {
-			return nil, fmt.Errorf("不允许修改存储类型")
-		}
-	}
-
-	rotateSecret := storageProfileHasRealSecret(*profile)
-	next := s.normalizeProfile(*existing, *profile)
-	if apply {
-		next.IsCurrent = true
-	}
-	if err := s.validateProfile(next); err != nil {
+	existingIndex, existing, err := s.resolveProfileSaveTarget(profiles, profile)
+	if err != nil {
 		return nil, err
 	}
-	if next.IsCurrent && !next.Enabled {
-		return nil, fmt.Errorf("当前存储不允许停用")
+	next, rotateSecret, err := s.prepareProfileSave(ctx, *existing, *profile, existingIndex, apply)
+	if err != nil {
+		return nil, err
 	}
-	if apply {
-		if err := s.ensureProfileReadyForRuntime(ctx, next); err != nil {
-			return nil, err
-		}
-	}
-
-	if existingIndex < 0 && next.IsCurrent && !apply {
-		next.IsCurrent = false
-	}
-	if apply {
-		if err := s.profileRepo.saveAndApplyProfile(ctx, next, storageProfileSaveOptions{rotateSecret: rotateSecret}); err != nil {
-			return nil, err
-		}
-	} else {
-		if err := s.profileRepo.saveProfile(ctx, next, storageProfileSaveOptions{rotateSecret: rotateSecret}); err != nil {
-			return nil, err
-		}
+	if err := s.persistProfile(ctx, next, apply, rotateSecret); err != nil {
+		return nil, err
 	}
 
 	masked := s.maskProfile(next)
 	return &masked, nil
+}
+
+func (s *StorageService) resolveProfileSaveTarget(profiles []StorageProfile, profile *StorageProfile) (int, *StorageProfile, error) {
+	profile.Provider = canonicalizeStorageProvider(profile.Provider)
+	meta, ok := s.providerMeta[profile.Provider]
+	if !ok {
+		return -1, nil, fmt.Errorf("不支持的存储类型")
+	}
+
+	for i := range profiles {
+		if profiles[i].ID != profile.ID {
+			continue
+		}
+		if profiles[i].Provider != profile.Provider {
+			return -1, nil, fmt.Errorf("不允许修改存储类型")
+		}
+		return i, &profiles[i], nil
+	}
+
+	if profile.ID == "" {
+		profile.ID = fmt.Sprintf("%s-%d", profile.Provider, time.Now().UnixNano())
+	}
+	if profile.Provider == StorageProviderLocal && !meta.CreateAllowed {
+		return -1, nil, fmt.Errorf("本地存储不支持新增额外卡片")
+	}
+	return -1, &StorageProfile{ID: profile.ID, Provider: profile.Provider}, nil
+}
+
+func (s *StorageService) prepareProfileSave(ctx context.Context, existing, incoming StorageProfile, existingIndex int, apply bool) (StorageProfile, bool, error) {
+	rotateSecret := storageProfileHasRealSecret(incoming)
+	next := s.normalizeProfile(existing, incoming)
+	if apply {
+		next.IsCurrent = true
+	}
+	if err := s.validateProfile(next); err != nil {
+		return StorageProfile{}, false, err
+	}
+	if next.IsCurrent && !next.Enabled {
+		return StorageProfile{}, false, fmt.Errorf("当前存储不允许停用")
+	}
+	if apply {
+		if err := s.ensureProfileReadyForRuntime(ctx, next); err != nil {
+			return StorageProfile{}, false, err
+		}
+	}
+	if existingIndex < 0 && next.IsCurrent && !apply {
+		next.IsCurrent = false
+	}
+	return next, rotateSecret, nil
+}
+
+func (s *StorageService) persistProfile(ctx context.Context, profile StorageProfile, apply, rotateSecret bool) error {
+	options := storageProfileSaveOptions{rotateSecret: rotateSecret}
+	if apply {
+		return s.profileRepo.saveAndApplyProfile(ctx, profile, options)
+	}
+	return s.profileRepo.saveProfile(ctx, profile, options)
 }
 
 func (s *StorageService) DeleteProfile(ctx context.Context, id string) error {

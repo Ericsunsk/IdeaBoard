@@ -22,32 +22,9 @@ const rewardCodeProjectionSQL = `id, display_name, code_hint, credit_amount, max
        redemption_count, expires_at, enabled, created_by, created_at, updated_at`
 
 func (s *Service) CreateRewardCode(ctx context.Context, command CreateRewardCodeCommand) (CreatedRewardCode, error) {
-	if s == nil || s.pool == nil || command.ActorUserID <= 0 {
-		return CreatedRewardCode{}, ErrInvalidCommand
-	}
-	displayName := strings.TrimSpace(command.DisplayName)
-	idempotencyKey := strings.TrimSpace(command.IdempotencyKey)
-	if displayName == "" || utf8.RuneCountInString(displayName) > 120 ||
-		idempotencyKey == "" || utf8.RuneCountInString(idempotencyKey) > 128 ||
-		command.MaxRedemptions < 0 {
-		return CreatedRewardCode{}, ErrInvalidCommand
-	}
-	if _, err := credits.NewCreditAmount(command.CreditAmount); err != nil {
-		return CreatedRewardCode{}, errors.Join(ErrInvalidCommand, err)
-	}
-	normalized, err := normalizeCode(command.Code)
+	input, err := s.prepareRewardCodeCreation(command)
 	if err != nil {
-		return CreatedRewardCode{}, ErrInvalidCommand
-	}
-	expiresAt := cloneOptionalTime(command.ExpiresAt)
-	if expiresAt != nil && !s.currentTime().Before(*expiresAt) {
-		return CreatedRewardCode{}, ErrInvalidCommand
-	}
-	digests := s.keyring.lookupDigests(normalized)
-	current, previous := splitCodeDigestCandidates(digests)
-	fingerprint, err := rewardCodeCreateFingerprint(displayName, command.CreditAmount, command.MaxRedemptions, expiresAt)
-	if err != nil {
-		return CreatedRewardCode{}, fmt.Errorf("fingerprint reward Code creation: %w", err)
+		return CreatedRewardCode{}, err
 	}
 
 	tx, err := s.begin(ctx)
@@ -55,30 +32,122 @@ func (s *Service) CreateRewardCode(ctx context.Context, command CreateRewardCode
 		return CreatedRewardCode{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if err := lockRewardCodeIdentity(ctx, tx, normalized); err != nil {
+	if err := lockRewardCodeIdentity(ctx, tx, input.normalized); err != nil {
 		return CreatedRewardCode{}, err
 	}
+	if replay, ok, err := s.loadRewardCodeReplay(ctx, tx, input, command.ActorUserID); err != nil {
+		return CreatedRewardCode{}, err
+	} else if ok {
+		return finishRewardCodeReplay(ctx, tx, replay)
+	}
+	if err := ensureRewardCodeCodeAvailable(ctx, tx, input.current, input.previous); err != nil {
+		return CreatedRewardCode{}, err
+	}
+	rewardCode, err := s.insertRewardCodeDefinition(ctx, tx, input, command.ActorUserID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		replay, ok, replayErr := s.loadRewardCodeReplay(ctx, tx, input, command.ActorUserID)
+		if replayErr != nil {
+			return CreatedRewardCode{}, replayErr
+		}
+		if !ok {
+			return CreatedRewardCode{}, fmt.Errorf("load idempotent reward Code creation: %w", err)
+		}
+		return finishRewardCodeReplay(ctx, tx, replay)
+	}
+	if err != nil {
+		return CreatedRewardCode{}, err
+	}
+	if err := recordRewardCodeDigestAliases(ctx, tx, rewardCode.ID, input.digests); err != nil {
+		return CreatedRewardCode{}, err
+	}
+	if err := recordRewardCodeCreation(ctx, tx, rewardCode, input.displayName, input.creditAmount, input.maxRedemptions, input.expiresAt, command.ActorUserID); err != nil {
+		return CreatedRewardCode{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return CreatedRewardCode{}, fmt.Errorf("commit reward Code creation: %w", err)
+	}
+	return CreatedRewardCode{RewardCode: rewardCode, Plaintext: input.normalized}, nil
+}
+
+type rewardCodeCreationInput struct {
+	displayName    string
+	idempotencyKey string
+	normalized     string
+	creditAmount   int64
+	maxRedemptions int64
+	expiresAt      *time.Time
+	digests        []codeDigest
+	current        codeDigest
+	previous       codeDigest
+	fingerprint    []byte
+}
+
+func (s *Service) prepareRewardCodeCreation(command CreateRewardCodeCommand) (rewardCodeCreationInput, error) {
+	if s == nil || s.pool == nil || command.ActorUserID <= 0 {
+		return rewardCodeCreationInput{}, ErrInvalidCommand
+	}
+	displayName := strings.TrimSpace(command.DisplayName)
+	idempotencyKey := strings.TrimSpace(command.IdempotencyKey)
+	if displayName == "" || utf8.RuneCountInString(displayName) > 120 ||
+		idempotencyKey == "" || utf8.RuneCountInString(idempotencyKey) > 128 ||
+		command.MaxRedemptions < 0 {
+		return rewardCodeCreationInput{}, ErrInvalidCommand
+	}
+	if _, err := credits.NewCreditAmount(command.CreditAmount); err != nil {
+		return rewardCodeCreationInput{}, errors.Join(ErrInvalidCommand, err)
+	}
+	normalized, err := normalizeCode(command.Code)
+	if err != nil {
+		return rewardCodeCreationInput{}, ErrInvalidCommand
+	}
+	expiresAt := cloneOptionalTime(command.ExpiresAt)
+	if expiresAt != nil && !s.currentTime().Before(*expiresAt) {
+		return rewardCodeCreationInput{}, ErrInvalidCommand
+	}
+	digests := s.keyring.lookupDigests(normalized)
+	current, previous := splitCodeDigestCandidates(digests)
+	fingerprint, err := rewardCodeCreateFingerprint(displayName, command.CreditAmount, command.MaxRedemptions, expiresAt)
+	if err != nil {
+		return rewardCodeCreationInput{}, fmt.Errorf("fingerprint reward Code creation: %w", err)
+	}
+	return rewardCodeCreationInput{
+		displayName: displayName, idempotencyKey: idempotencyKey, normalized: normalized,
+		creditAmount: command.CreditAmount, maxRedemptions: command.MaxRedemptions,
+		expiresAt: expiresAt, digests: digests, current: current, previous: previous,
+		fingerprint: fingerprint,
+	}, nil
+}
+
+func (s *Service) loadRewardCodeReplay(ctx context.Context, tx pgx.Tx, input rewardCodeCreationInput, actorUserID int64) (RewardCode, bool, error) {
 	var rewardCode RewardCode
 	var persistedFingerprint []byte
-	err = scanRewardCodeWithFingerprint(tx.QueryRow(ctx, `SELECT `+rewardCodeProjectionSQL+`, request_fingerprint
+	err := scanRewardCodeWithFingerprint(tx.QueryRow(ctx, `SELECT `+rewardCodeProjectionSQL+`, request_fingerprint
 FROM reward_codes
-WHERE created_by = $1 AND idempotency_key = $2`, command.ActorUserID, idempotencyKey), &rewardCode, &persistedFingerprint, s.currentTime())
-	if err == nil {
-		matches, err := rewardCodeReplayMatches(ctx, tx, rewardCode.ID, persistedFingerprint, fingerprint, digests)
-		if err != nil {
-			return CreatedRewardCode{}, err
-		}
-		if !matches {
-			return CreatedRewardCode{}, ErrRewardCodeConflict
-		}
-		if err := tx.Rollback(ctx); err != nil {
-			return CreatedRewardCode{}, fmt.Errorf("release reward Code creation replay: %w", err)
-		}
-		return CreatedRewardCode{RewardCode: rewardCode, Replayed: true}, nil
+WHERE created_by = $1 AND idempotency_key = $2`, actorUserID, input.idempotencyKey), &rewardCode, &persistedFingerprint, s.currentTime())
+	if errors.Is(err, pgx.ErrNoRows) {
+		return RewardCode{}, false, nil
 	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return CreatedRewardCode{}, fmt.Errorf("load idempotent reward Code creation: %w", err)
+	if err != nil {
+		return RewardCode{}, false, fmt.Errorf("load idempotent reward Code creation: %w", err)
 	}
+	matches, err := rewardCodeReplayMatches(ctx, tx, rewardCode.ID, persistedFingerprint, input.fingerprint, input.digests)
+	if err != nil {
+		return RewardCode{}, false, err
+	}
+	if !matches {
+		return RewardCode{}, false, ErrRewardCodeConflict
+	}
+	return rewardCode, true, nil
+}
+
+func finishRewardCodeReplay(ctx context.Context, tx pgx.Tx, rewardCode RewardCode) (CreatedRewardCode, error) {
+	if err := tx.Rollback(ctx); err != nil {
+		return CreatedRewardCode{}, fmt.Errorf("release reward Code creation replay: %w", err)
+	}
+	return CreatedRewardCode{RewardCode: rewardCode, Replayed: true}, nil
+}
+
+func ensureRewardCodeCodeAvailable(ctx context.Context, tx pgx.Tx, current, previous codeDigest) error {
 	var codeExists bool
 	if err := tx.QueryRow(ctx, `SELECT
   EXISTS (SELECT 1 FROM reward_code_digest_aliases
@@ -86,82 +155,75 @@ WHERE created_by = $1 AND idempotency_key = $2`, command.ActorUserID, idempotenc
              OR ($3 <> '' AND key_version = $3 AND code_digest = $4))`,
 		current.version, current.digest, previous.version, previous.digest,
 	).Scan(&codeExists); err != nil {
-		return CreatedRewardCode{}, fmt.Errorf("check reward Code uniqueness: %w", err)
+		return fmt.Errorf("check reward Code uniqueness: %w", err)
 	}
 	if codeExists {
-		return CreatedRewardCode{}, ErrCodeCollision
+		return ErrCodeCollision
 	}
-	err = scanRewardCode(tx.QueryRow(ctx, `
+	return nil
+}
+
+func (s *Service) insertRewardCodeDefinition(ctx context.Context, tx pgx.Tx, input rewardCodeCreationInput, actorUserID int64) (RewardCode, error) {
+	var rewardCode RewardCode
+	err := scanRewardCode(tx.QueryRow(ctx, `
 INSERT INTO reward_codes (
   display_name, key_version, code_digest, code_hint, credit_amount,
   max_redemptions, expires_at, created_by, idempotency_key, request_fingerprint
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (created_by, idempotency_key) DO NOTHING
 RETURNING `+rewardCodeProjectionSQL,
-		displayName, current.version, current.digest, normalized[len(normalized)-4:], command.CreditAmount,
-		command.MaxRedemptions, expiresAt, command.ActorUserID, idempotencyKey, fingerprint,
+		input.displayName, input.current.version, input.current.digest, input.normalized[len(input.normalized)-4:], input.creditAmount,
+		input.maxRedemptions, input.expiresAt, actorUserID, input.idempotencyKey, input.fingerprint,
 	), &rewardCode, s.currentTime())
 	if errors.Is(err, pgx.ErrNoRows) {
-		persistedFingerprint = nil
-		err = scanRewardCodeWithFingerprint(tx.QueryRow(ctx, `SELECT `+rewardCodeProjectionSQL+`, request_fingerprint
-FROM reward_codes
-WHERE created_by = $1 AND idempotency_key = $2`, command.ActorUserID, idempotencyKey), &rewardCode, &persistedFingerprint, s.currentTime())
-		if err != nil {
-			return CreatedRewardCode{}, fmt.Errorf("load idempotent reward Code creation: %w", err)
-		}
-		matches, err := rewardCodeReplayMatches(ctx, tx, rewardCode.ID, persistedFingerprint, fingerprint, digests)
-		if err != nil {
-			return CreatedRewardCode{}, err
-		}
-		if !matches {
-			return CreatedRewardCode{}, ErrRewardCodeConflict
-		}
-		if err := tx.Rollback(ctx); err != nil {
-			return CreatedRewardCode{}, fmt.Errorf("release reward Code creation replay: %w", err)
-		}
-		return CreatedRewardCode{RewardCode: rewardCode, Replayed: true}, nil
+		return RewardCode{}, err
 	}
 	if err != nil {
 		var postgresError *pgconn.PgError
 		if errors.As(err, &postgresError) && postgresError.Code == "23505" {
-			return CreatedRewardCode{}, ErrCodeCollision
+			return RewardCode{}, ErrCodeCollision
 		}
-		return CreatedRewardCode{}, fmt.Errorf("create reward Code: %w", err)
+		return RewardCode{}, fmt.Errorf("create reward Code: %w", err)
 	}
+	return rewardCode, nil
+}
+
+func recordRewardCodeDigestAliases(ctx context.Context, tx pgx.Tx, rewardCodeID int64, digests []codeDigest) error {
 	for _, candidate := range digests {
 		if _, err := tx.Exec(ctx, `INSERT INTO reward_code_digest_aliases (reward_code_id, key_version, code_digest)
-VALUES ($1, $2, $3)`, rewardCode.ID, candidate.version, candidate.digest); err != nil {
+VALUES ($1, $2, $3)`, rewardCodeID, candidate.version, candidate.digest); err != nil {
 			var postgresError *pgconn.PgError
 			if errors.As(err, &postgresError) && postgresError.Code == "23505" {
-				return CreatedRewardCode{}, ErrCodeCollision
+				return ErrCodeCollision
 			}
-			return CreatedRewardCode{}, fmt.Errorf("record reward Code digest alias: %w", err)
+			return fmt.Errorf("record reward Code digest alias: %w", err)
 		}
 	}
+	return nil
+}
+
+func recordRewardCodeCreation(ctx context.Context, tx pgx.Tx, rewardCode RewardCode, displayName string, creditAmount, maxRedemptions int64, expiresAt *time.Time, actorUserID int64) error {
 	metadata, err := json.Marshal(map[string]any{
-		"display_name": displayName, "credit_amount": command.CreditAmount,
-		"max_redemptions": command.MaxRedemptions, "expires_at": expiresAt,
+		"display_name": displayName, "credit_amount": creditAmount,
+		"max_redemptions": maxRedemptions, "expires_at": expiresAt,
 		"masked_code_hint": rewardCode.MaskedCodeHint,
 	})
 	if err != nil {
-		return CreatedRewardCode{}, fmt.Errorf("encode reward Code journal metadata: %w", err)
+		return fmt.Errorf("encode reward Code journal metadata: %w", err)
 	}
 	targetSnapshot, err := json.Marshal(rewardCodeJournalSnapshot(rewardCode))
 	if err != nil {
-		return CreatedRewardCode{}, fmt.Errorf("encode reward Code journal target: %w", err)
+		return fmt.Errorf("encode reward Code journal target: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `
 INSERT INTO reward_admin_actions (
   reward_code_id, reward_code_id_snapshot, action_type, actor_user_id, metadata, target_snapshot
 )
 VALUES ($1, $1, 'create_reward_code', $2, $3::JSONB, $4::JSONB)`,
-		rewardCode.ID, command.ActorUserID, string(metadata), string(targetSnapshot)); err != nil {
-		return CreatedRewardCode{}, fmt.Errorf("record reward Code creation: %w", err)
+		rewardCode.ID, actorUserID, string(metadata), string(targetSnapshot)); err != nil {
+		return fmt.Errorf("record reward Code creation: %w", err)
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return CreatedRewardCode{}, fmt.Errorf("commit reward Code creation: %w", err)
-	}
-	return CreatedRewardCode{RewardCode: rewardCode, Plaintext: normalized}, nil
+	return nil
 }
 
 func (s *Service) SearchRewardCodes(ctx context.Context, input SearchRewardCodesInput) (RewardCodePage, error) {
@@ -276,21 +338,11 @@ func (s *Service) redeemRewardCode(
 		return RedeemResult{}, false, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	rewardCodeID, found, err := findRewardCodeAliasOwner(ctx, tx, current, previous)
+	rewardCodeID, found, err := lockRewardCodeForRedemption(ctx, tx, current, previous)
 	if err != nil {
 		return RedeemResult{}, true, err
 	}
 	if !found {
-		return RedeemResult{}, false, nil
-	}
-	if err := lockRewardCodeID(ctx, tx, rewardCodeID); err != nil {
-		return RedeemResult{}, true, err
-	}
-	lockedOwnerID, stillExists, err := findRewardCodeAliasOwner(ctx, tx, current, previous)
-	if err != nil {
-		return RedeemResult{}, true, err
-	}
-	if !stillExists || lockedOwnerID != rewardCodeID {
 		return RedeemResult{}, false, nil
 	}
 	rewardCode, err := s.loadRewardCode(ctx, tx, rewardCodeID)
@@ -300,65 +352,118 @@ func (s *Service) redeemRewardCode(
 	if err != nil {
 		return RedeemResult{}, true, err
 	}
+	redemption, replayed, err := s.loadRewardRedemption(ctx, tx, command.UserID, rewardCode.ID)
+	if err != nil {
+		return RedeemResult{}, true, err
+	}
+	if replayed {
+		return s.finishRewardRedemptionReplay(ctx, tx, command.UserID, redemption)
+	}
+	redemptionID, grant, err := s.grantRewardCodeCredits(ctx, tx, command.UserID, rewardCode)
+	if err != nil {
+		return RedeemResult{}, true, err
+	}
+	redemption, err = insertRewardRedemption(ctx, tx, redemptionID, command.UserID, rewardCode, grant)
+	if err != nil {
+		return RedeemResult{}, true, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return RedeemResult{}, true, fmt.Errorf("commit reward Code redemption: %w", err)
+	}
+	return canonicalRedeemResult(redemption, grant.Wallet.Available, false), true, nil
+}
+
+func lockRewardCodeForRedemption(ctx context.Context, tx pgx.Tx, current, previous codeDigest) (int64, bool, error) {
+	rewardCodeID, found, err := findRewardCodeAliasOwner(ctx, tx, current, previous)
+	if err != nil || !found {
+		return rewardCodeID, found, err
+	}
+	if err := lockRewardCodeID(ctx, tx, rewardCodeID); err != nil {
+		return 0, true, err
+	}
+	lockedOwnerID, stillExists, err := findRewardCodeAliasOwner(ctx, tx, current, previous)
+	if err != nil {
+		return 0, true, err
+	}
+	if !stillExists || lockedOwnerID != rewardCodeID {
+		return 0, false, nil
+	}
+	return rewardCodeID, true, nil
+}
+
+func (s *Service) loadRewardRedemption(ctx context.Context, tx pgx.Tx, userID, rewardCodeID int64) (Redemption, bool, error) {
 	var redemption Redemption
-	err = tx.QueryRow(ctx, `SELECT id, reward_code_id, user_id, reward_code_display_name,
+	err := tx.QueryRow(ctx, `SELECT id, reward_code_id, user_id, reward_code_display_name,
        masked_code_hint, credit_amount, credit_transaction_id, available_balance_after, redeemed_at
 FROM reward_redemptions
-WHERE user_id = $1 AND reward_code_id = $2`, command.UserID, rewardCode.ID).Scan(
+WHERE user_id = $1 AND reward_code_id = $2`, userID, rewardCodeID).Scan(
 		&redemption.ID, &redemption.RewardCodeID, &redemption.UserID,
 		&redemption.RewardCodeDisplayName, &redemption.MaskedCodeHint, &redemption.CreditAmount,
 		&redemption.CreditTransactionID, &redemption.AvailableBalanceAfter, &redemption.RedeemedAt,
 	)
-	if err == nil {
-		if err := tx.Rollback(ctx); err != nil {
-			return RedeemResult{}, true, fmt.Errorf("release reward Code replay lock: %w", err)
-		}
-		wallet, err := s.credits.GetWallet(ctx, command.UserID)
-		if err != nil {
-			return RedeemResult{}, true, fmt.Errorf("read reward Code replay Wallet: %w", err)
-		}
-		return canonicalRedeemResult(redemption, wallet.Available, true), true, nil
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Redemption{}, false, nil
 	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return RedeemResult{}, true, fmt.Errorf("find reward Code redemption: %w", err)
+	if err != nil {
+		return Redemption{}, false, fmt.Errorf("find reward Code redemption: %w", err)
 	}
+	return redemption, true, nil
+}
+
+func (s *Service) finishRewardRedemptionReplay(ctx context.Context, tx pgx.Tx, userID int64, redemption Redemption) (RedeemResult, bool, error) {
+	if err := tx.Rollback(ctx); err != nil {
+		return RedeemResult{}, true, fmt.Errorf("release reward Code replay lock: %w", err)
+	}
+	wallet, err := s.credits.GetWallet(ctx, userID)
+	if err != nil {
+		return RedeemResult{}, true, fmt.Errorf("read reward Code replay Wallet: %w", err)
+	}
+	return canonicalRedeemResult(redemption, wallet.Available, true), true, nil
+}
+
+func (s *Service) grantRewardCodeCredits(ctx context.Context, tx pgx.Tx, userID int64, rewardCode RewardCode) (int64, credits.CommandResult, error) {
 	var redemptionID int64
 	if err := tx.QueryRow(ctx, `SELECT nextval(pg_get_serial_sequence('reward_redemptions', 'id'))`).Scan(&redemptionID); err != nil {
-		return RedeemResult{}, true, fmt.Errorf("allocate reward Code redemption id: %w", err)
+		return 0, credits.CommandResult{}, fmt.Errorf("allocate reward Code redemption id: %w", err)
 	}
 	var capacityReserved bool
 	if err := tx.QueryRow(ctx, `SELECT reserve_reward_code_redemption_v1($1)`, rewardCode.ID).Scan(&capacityReserved); err != nil {
-		return RedeemResult{}, true, fmt.Errorf("reserve reward Code capacity: %w", err)
+		return 0, credits.CommandResult{}, fmt.Errorf("reserve reward Code capacity: %w", err)
 	}
 	if !capacityReserved {
-		return RedeemResult{}, true, ErrCodeUnavailable
+		return 0, credits.CommandResult{}, ErrCodeUnavailable
 	}
 	amount, err := credits.NewCreditAmount(rewardCode.CreditAmount)
 	if err != nil {
-		return RedeemResult{}, true, errors.Join(ErrInvalidCommand, err)
+		return 0, credits.CommandResult{}, errors.Join(ErrInvalidCommand, err)
 	}
 	reference := strconv.FormatInt(redemptionID, 10)
 	grant, err := s.credits.InTx(tx).Grant(ctx, credits.GrantCommand{
-		UserID: command.UserID,
+		UserID: userID,
 		Amount: amount,
 		Metadata: credits.CommandMetadata{
 			IdempotencyKey:    "reward-code-redemption:" + reference,
-			Actor:             credits.Actor{Type: credits.ActorUser, ID: strconv.FormatInt(command.UserID, 10)},
+			Actor:             credits.Actor{Type: credits.ActorUser, ID: strconv.FormatInt(userID, 10)},
 			Source:            "reward_redemption",
 			Reason:            "兑换奖励",
 			BusinessReference: credits.BusinessReference{Type: "reward_code_redemption", ID: "rc:" + reference},
 		},
 	})
 	if err != nil {
-		return RedeemResult{}, true, err
+		return 0, credits.CommandResult{}, err
 	}
-	err = tx.QueryRow(ctx, `INSERT INTO reward_redemptions (
+	return redemptionID, grant, nil
+}
+
+func insertRewardRedemption(ctx context.Context, tx pgx.Tx, redemptionID, userID int64, rewardCode RewardCode, grant credits.CommandResult) (Redemption, error) {
+	var redemption Redemption
+	err := tx.QueryRow(ctx, `INSERT INTO reward_redemptions (
   id, reward_code_id, user_id, reward_code_display_name, masked_code_hint,
   credit_amount, credit_transaction_id, available_balance_after
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING id, reward_code_id, user_id, reward_code_display_name, masked_code_hint,
           credit_amount, credit_transaction_id, available_balance_after, redeemed_at`,
-		redemptionID, rewardCode.ID, command.UserID, rewardCode.DisplayName, rewardCode.MaskedCodeHint,
+		redemptionID, rewardCode.ID, userID, rewardCode.DisplayName, rewardCode.MaskedCodeHint,
 		rewardCode.CreditAmount,
 		grant.TransactionID, grant.Wallet.Available,
 	).Scan(
@@ -367,12 +472,9 @@ RETURNING id, reward_code_id, user_id, reward_code_display_name, masked_code_hin
 		&redemption.CreditTransactionID, &redemption.AvailableBalanceAfter, &redemption.RedeemedAt,
 	)
 	if err != nil {
-		return RedeemResult{}, true, fmt.Errorf("record reward Code redemption: %w", err)
+		return Redemption{}, fmt.Errorf("record reward Code redemption: %w", err)
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return RedeemResult{}, true, fmt.Errorf("commit reward Code redemption: %w", err)
-	}
-	return canonicalRedeemResult(redemption, grant.Wallet.Available, false), true, nil
+	return redemption, nil
 }
 
 func canonicalRedeemResult(redemption Redemption, balance int64, replayed bool) RedeemResult {

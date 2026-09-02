@@ -159,40 +159,71 @@ func (s *StripeFactsWorkflow) reconcilePaymentOrderClaim(
 	now time.Time,
 ) (PaymentReconciliationOutcome, error) {
 	order := claim.Order
-	if credentialErr != nil || credential.AccountID != order.StripeAccountID {
-		err := ErrPurchasesUnavailable
-		if credentialErr != nil {
-			err = credentialErr
-		}
+	if err := reconciliationCredentialError(order, credential, credentialErr); err != nil {
 		return paymentReconciliationFailureOutcome(now, order, err, false), err
 	}
 	if order.Status == PaymentOrderCreating && purchasePolicyErr != nil {
 		return paymentReconciliationFailureOutcome(now, order, purchasePolicyErr, false), purchasePolicyErr
 	}
-	if order.Status == PaymentOrderCreating && !purchasesEnabled {
-		expired, err := s.orderLifecycle.expireOrder(ctx, order)
-		if err != nil {
+	switch order.Status {
+	case PaymentOrderCreating:
+		return s.reconcileCreatingPaymentOrder(ctx, credential, apiKey, purchasesEnabled, order, now)
+	case PaymentOrderPaidPendingCredit:
+		return s.reconcilePaidPendingCredit(ctx, order, now)
+	default:
+		return s.reconcileBoundPaymentOrder(ctx, apiKey, order, now)
+	}
+}
+
+func reconciliationCredentialError(order PaymentOrder, credential StoredStripeConfiguration, credentialErr error) error {
+	if credentialErr != nil {
+		return credentialErr
+	}
+	if credential.AccountID != order.StripeAccountID {
+		return ErrPurchasesUnavailable
+	}
+	return nil
+}
+
+func (s *StripeFactsWorkflow) reconcileCreatingPaymentOrder(
+	ctx context.Context,
+	credential StoredStripeConfiguration,
+	apiKey string,
+	purchasesEnabled bool,
+	order PaymentOrder,
+	now time.Time,
+) (PaymentReconciliationOutcome, error) {
+	if !purchasesEnabled {
+		if _, err := s.orderLifecycle.expireOrder(ctx, order); err != nil {
 			return paymentReconciliationFailureOutcome(now, order, err, true), err
 		}
-		_ = expired
 		return paymentReconciliationTerminal(now), nil
 	}
-	if order.Status == PaymentOrderPaidPendingCredit {
-		credited, err := s.orderLifecycle.creditPaidOrder(ctx, order, now)
-		if err != nil {
-			return paymentReconciliationFailureOutcome(now, order, err, true), err
-		}
-		_ = credited
-		return paymentReconciliationTerminal(now), nil
+	// A local creation deadline is not proof that Stripe did not accept the
+	// initial request. Replay the public order idempotency key first.
+	if _, err := s.checkoutRecovery.createCheckoutSessionForOrder(ctx, credential, apiKey, order); err != nil {
+		return paymentReconciliationFailureOutcome(now, order, err, reconciliationFailureIsTransient(err)), err
 	}
-	if order.Status == PaymentOrderCreating {
-		// A local creation deadline is not proof that Stripe did not accept the
-		// initial request. Replay the public order idempotency key first.
-		if _, err := s.checkoutRecovery.createCheckoutSessionForOrder(ctx, credential, apiKey, order); err != nil {
-			return paymentReconciliationFailureOutcome(now, order, err, reconciliationFailureIsTransient(err)), err
-		}
-		return paymentReconciliationCheckpoint(now, order), nil
+	return paymentReconciliationCheckpoint(now, order), nil
+}
+
+func (s *StripeFactsWorkflow) reconcilePaidPendingCredit(
+	ctx context.Context,
+	order PaymentOrder,
+	now time.Time,
+) (PaymentReconciliationOutcome, error) {
+	if _, err := s.orderLifecycle.creditPaidOrder(ctx, order, now); err != nil {
+		return paymentReconciliationFailureOutcome(now, order, err, true), err
 	}
+	return paymentReconciliationTerminal(now), nil
+}
+
+func (s *StripeFactsWorkflow) reconcileBoundPaymentOrder(
+	ctx context.Context,
+	apiKey string,
+	order PaymentOrder,
+	now time.Time,
+) (PaymentReconciliationOutcome, error) {
 	if order.StripeCheckoutSessionID == "" {
 		err := ErrPurchasesUnavailable
 		return paymentReconciliationFailureOutcome(now, order, err, false), err

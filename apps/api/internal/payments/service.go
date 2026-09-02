@@ -63,135 +63,171 @@ func (s *CheckoutWorkflow) configureStripe(ctx context.Context, command Configur
 	if err != nil {
 		return StripeConfigurationSummary{}, err
 	}
-	if hasCurrent && current.PaymentMethodConfigurationID != "" &&
-		current.ProductTaxCode == strings.TrimSpace(command.ProductTaxCode) &&
-		current.PaymentMethodConfigurationID == strings.TrimSpace(command.PaymentMethodConfigurationID) &&
-		current.PurchasesEnabled != command.PurchasesEnabled && strings.TrimSpace(command.APIKey) == "" {
-		metadata := safeAuditMetadata(map[string]any{
-			"account_id": current.AccountID, "mode": current.Mode, "product_tax_code": current.ProductTaxCode,
-			"payment_method_configuration_id": current.PaymentMethodConfigurationID,
-			"purchases_enabled":               command.PurchasesEnabled,
-		})
-		stored, shutdown, err := s.configuration.ReplaceStripeConfiguration(ctx, current.Revision, StoredStripeConfiguration{
-			CredentialID: current.CredentialID,
-			AccountID:    current.AccountID, Mode: current.Mode, ChargesEnabled: current.ChargesEnabled,
-			PaymentMethodConfigurationID: current.PaymentMethodConfigurationID,
-			ProductTaxCode:               current.ProductTaxCode, PurchasesEnabled: command.PurchasesEnabled,
-			StripeProductID: current.StripeProductID, StripeWebhookEndpointID: current.StripeWebhookEndpointID,
-			APIKeyCiphertext: current.APIKeyCiphertext, WebhookSecretCiphertext: current.WebhookSecretCiphertext,
-			SecretMaterialKind: current.SecretMaterialKind, UpdatedBy: command.ActorID,
-		}, ConfigurationAudit{ActorID: command.ActorID, Outcome: "succeeded", Metadata: metadata})
-		if err != nil {
-			return StripeConfigurationSummary{}, fmt.Errorf("update Stripe purchase availability: %w", err)
-		}
-		s.enqueuePaymentCheckoutShutdown(ctx, shutdown)
-		return stripeConfigurationSummary(stored), nil
+	if summary, handled, err := s.updatePurchaseAvailability(ctx, command, current, hasCurrent); handled || err != nil {
+		return summary, err
 	}
-	taxCode, err := normalizeProductTaxCode(command.ProductTaxCode)
+	input, err := s.normalizeStripeConfigurationInput(ctx, command)
 	if err != nil {
-		return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "invalid_tax_code", err.Error(), nil, err)
-	}
-	paymentMethodConfigurationID, err := normalizePaymentMethodConfigurationID(command.PaymentMethodConfigurationID)
-	if err != nil {
-		return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "invalid_payment_method_configuration", err.Error(), nil, err)
-	}
-	webhookURL, err := normalizeWebhookURL(command.WebhookURL)
-	if err != nil {
-		return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "invalid_webhook_url", err.Error(), nil, err)
+		return StripeConfigurationSummary{}, err
 	}
 	if s.configurationGateway == nil {
 		return StripeConfigurationSummary{}, fmt.Errorf("payments configuration service unavailable")
 	}
-	var currentAPIKey, currentWebhookSecret string
+	input, err = s.resolveStripeConfigurationSecrets(ctx, command, current, hasCurrent, input)
+	if err != nil {
+		return StripeConfigurationSummary{}, err
+	}
+	prepared, err := s.configurationGateway.PrepareConfiguration(ctx, input.prepare)
+	if err != nil {
+		return StripeConfigurationSummary{}, s.recordGatewayFailure(ctx, command.ActorID, input.mode, err)
+	}
+	if err := s.validatePreparedStripeConfiguration(ctx, command.ActorID, prepared, input); err != nil {
+		return StripeConfigurationSummary{}, err
+	}
+	return s.persistStripeConfiguration(ctx, command, current, hasCurrent, input, prepared)
+}
+
+type stripeConfigurationInput struct {
+	taxCode, paymentMethodConfigurationID, webhookURL string
+	apiKey, currentAPIKey, currentWebhookSecret       string
+	mode                                              StripeMode
+	prepare                                           PrepareStripeConfiguration
+}
+
+func (s *CheckoutWorkflow) updatePurchaseAvailability(ctx context.Context, command ConfigureStripeCommand, current StoredStripeConfiguration, hasCurrent bool) (StripeConfigurationSummary, bool, error) {
+	if !hasCurrent || current.PaymentMethodConfigurationID == "" ||
+		current.ProductTaxCode != strings.TrimSpace(command.ProductTaxCode) ||
+		current.PaymentMethodConfigurationID != strings.TrimSpace(command.PaymentMethodConfigurationID) ||
+		current.PurchasesEnabled == command.PurchasesEnabled || strings.TrimSpace(command.APIKey) != "" {
+		return StripeConfigurationSummary{}, false, nil
+	}
+	metadata := safeAuditMetadata(map[string]any{
+		"account_id": current.AccountID, "mode": current.Mode, "product_tax_code": current.ProductTaxCode,
+		"payment_method_configuration_id": current.PaymentMethodConfigurationID,
+		"purchases_enabled":               command.PurchasesEnabled,
+	})
+	stored, shutdown, err := s.configuration.ReplaceStripeConfiguration(ctx, current.Revision, StoredStripeConfiguration{
+		CredentialID: current.CredentialID, AccountID: current.AccountID, Mode: current.Mode, ChargesEnabled: current.ChargesEnabled,
+		PaymentMethodConfigurationID: current.PaymentMethodConfigurationID, ProductTaxCode: current.ProductTaxCode,
+		PurchasesEnabled: command.PurchasesEnabled, StripeProductID: current.StripeProductID,
+		StripeWebhookEndpointID: current.StripeWebhookEndpointID, APIKeyCiphertext: current.APIKeyCiphertext,
+		WebhookSecretCiphertext: current.WebhookSecretCiphertext, SecretMaterialKind: current.SecretMaterialKind,
+		UpdatedBy: command.ActorID,
+	}, ConfigurationAudit{ActorID: command.ActorID, Outcome: "succeeded", Metadata: metadata})
+	if err != nil {
+		return StripeConfigurationSummary{}, true, fmt.Errorf("update Stripe purchase availability: %w", err)
+	}
+	s.enqueuePaymentCheckoutShutdown(ctx, shutdown)
+	return stripeConfigurationSummary(stored), true, nil
+}
+
+func (s *CheckoutWorkflow) normalizeStripeConfigurationInput(ctx context.Context, command ConfigureStripeCommand) (stripeConfigurationInput, error) {
+	taxCode, err := normalizeProductTaxCode(command.ProductTaxCode)
+	if err != nil {
+		return stripeConfigurationInput{}, s.recordFailure(ctx, command.ActorID, "invalid_tax_code", err.Error(), nil, err)
+	}
+	paymentMethodConfigurationID, err := normalizePaymentMethodConfigurationID(command.PaymentMethodConfigurationID)
+	if err != nil {
+		return stripeConfigurationInput{}, s.recordFailure(ctx, command.ActorID, "invalid_payment_method_configuration", err.Error(), nil, err)
+	}
+	webhookURL, err := normalizeWebhookURL(command.WebhookURL)
+	if err != nil {
+		return stripeConfigurationInput{}, s.recordFailure(ctx, command.ActorID, "invalid_webhook_url", err.Error(), nil, err)
+	}
+	return stripeConfigurationInput{taxCode: taxCode, paymentMethodConfigurationID: paymentMethodConfigurationID, webhookURL: webhookURL}, nil
+}
+
+func (s *CheckoutWorkflow) resolveStripeConfigurationSecrets(ctx context.Context, command ConfigureStripeCommand, current StoredStripeConfiguration, hasCurrent bool, input stripeConfigurationInput) (stripeConfigurationInput, error) {
 	if hasCurrent {
-		currentAPIKey, err = secrets.DecryptMaterialString(current.APIKeyCiphertext, current.SecretMaterialKind)
+		var err error
+		input.currentAPIKey, err = secrets.DecryptMaterialString(current.APIKeyCiphertext, current.SecretMaterialKind)
 		if err != nil {
-			return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "secret_unavailable", "已保存的 Stripe API Key 无法读取", nil, ErrStripeConfigurationInvalid)
+			return stripeConfigurationInput{}, s.recordFailure(ctx, command.ActorID, "secret_unavailable", "已保存的 Stripe API Key 无法读取", nil, ErrStripeConfigurationInvalid)
 		}
-		currentWebhookSecret, err = secrets.DecryptMaterialString(current.WebhookSecretCiphertext, current.SecretMaterialKind)
+		input.currentWebhookSecret, err = secrets.DecryptMaterialString(current.WebhookSecretCiphertext, current.SecretMaterialKind)
 		if err != nil {
-			return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "secret_unavailable", "已保存的 Stripe Webhook Secret 无法读取", nil, ErrStripeConfigurationInvalid)
+			return stripeConfigurationInput{}, s.recordFailure(ctx, command.ActorID, "secret_unavailable", "已保存的 Stripe Webhook Secret 无法读取", nil, ErrStripeConfigurationInvalid)
 		}
 	}
-	apiKey := strings.TrimSpace(command.APIKey)
-	if apiKey == "" {
+	input.apiKey = strings.TrimSpace(command.APIKey)
+	if input.apiKey == "" {
 		if !hasCurrent {
-			return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "api_key_required", ErrStripeAPIKeyRequired.Error(), nil, ErrStripeAPIKeyRequired)
+			return stripeConfigurationInput{}, s.recordFailure(ctx, command.ActorID, "api_key_required", ErrStripeAPIKeyRequired.Error(), nil, ErrStripeAPIKeyRequired)
 		}
-		apiKey = currentAPIKey
+		input.apiKey = input.currentAPIKey
 	}
-	mode, err := ClassifyStripeAPIKey(apiKey)
+	mode, err := ClassifyStripeAPIKey(input.apiKey)
 	if err != nil {
-		return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "invalid_key", err.Error(), map[string]any{"mode": "unknown"}, err)
+		return stripeConfigurationInput{}, s.recordFailure(ctx, command.ActorID, "invalid_key", err.Error(), map[string]any{"mode": "unknown"}, err)
 	}
-
-	prepare := PrepareStripeConfiguration{
-		APIKey: apiKey, Mode: mode, PurchasesEnabled: command.PurchasesEnabled,
-		ProductTaxCode: taxCode, PaymentMethodConfigurationID: paymentMethodConfigurationID, WebhookURL: webhookURL,
-	}
+	input.mode = mode
+	input.prepare = PrepareStripeConfiguration{APIKey: input.apiKey, Mode: input.mode, PurchasesEnabled: command.PurchasesEnabled,
+		ProductTaxCode: input.taxCode, PaymentMethodConfigurationID: input.paymentMethodConfigurationID, WebhookURL: input.webhookURL}
 	if hasCurrent {
-		prepare.ExistingAccountID = current.AccountID
-		prepare.ExistingProductID = current.StripeProductID
-		prepare.ExistingWebhookEndpointID = current.StripeWebhookEndpointID
-		prepare.ExistingWebhookSecret = currentWebhookSecret
+		input.prepare.ExistingAccountID = current.AccountID
+		input.prepare.ExistingProductID = current.StripeProductID
+		input.prepare.ExistingWebhookEndpointID = current.StripeWebhookEndpointID
+		input.prepare.ExistingWebhookSecret = input.currentWebhookSecret
 	}
+	return input, nil
+}
 
-	prepared, err := s.configurationGateway.PrepareConfiguration(ctx, prepare)
-	if err != nil {
-		code, summary, publicErr := gatewayFailure(err)
-		return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, string(code), summary, map[string]any{"mode": mode}, wrapPublicError(publicErr, summary))
-	}
-	if err := validatePreparedConfiguration(prepared, mode, paymentMethodConfigurationID); err != nil {
+func (s *CheckoutWorkflow) recordGatewayFailure(ctx context.Context, actorID int64, mode StripeMode, err error) error {
+	code, summary, publicErr := gatewayFailure(err)
+	return s.recordFailure(ctx, actorID, string(code), summary, map[string]any{"mode": mode}, wrapPublicError(publicErr, summary))
+}
+
+func (s *CheckoutWorkflow) validatePreparedStripeConfiguration(ctx context.Context, actorID int64, prepared PreparedStripeConfiguration, input stripeConfigurationInput) error {
+	if err := validatePreparedConfiguration(prepared, input.mode, input.paymentMethodConfigurationID); err != nil {
 		code := "invalid_response"
 		if errors.Is(err, ErrStripeCapabilityUnavailable) {
 			code = "capability_missing"
 		}
-		return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, code, err.Error(), map[string]any{"mode": mode}, err)
+		return s.recordFailure(ctx, actorID, code, err.Error(), map[string]any{"mode": input.mode}, err)
 	}
+	return nil
+}
 
-	credentialChanged := !hasCurrent || apiKey != currentAPIKey || prepared.AccountID != current.AccountID ||
-		prepared.Mode != current.Mode || prepared.ChargesEnabled != current.ChargesEnabled ||
-		prepared.PaymentMethodConfigurationID != current.PaymentMethodConfigurationID ||
-		prepared.ProductID != current.StripeProductID || prepared.WebhookEndpointID != current.StripeWebhookEndpointID ||
-		prepared.WebhookSecret != currentWebhookSecret
-	credentialID := ""
-	encryptedAPIKey := current.APIKeyCiphertext
-	encryptedWebhookSecret := current.WebhookSecretCiphertext
-	if !credentialChanged {
-		credentialID = current.CredentialID
-	} else {
-		encryptedAPIKey, err = secrets.EncryptString(apiKey)
-		if err != nil {
-			return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "encryption_failed", "Stripe API Key 加密失败", map[string]any{"mode": mode}, ErrStripeConfigurationInvalid)
-		}
-		encryptedWebhookSecret, err = secrets.EncryptString(prepared.WebhookSecret)
-		if err != nil {
-			return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "encryption_failed", "Stripe Webhook Secret 加密失败", map[string]any{"mode": mode}, ErrStripeConfigurationInvalid)
-		}
+func (s *CheckoutWorkflow) persistStripeConfiguration(ctx context.Context, command ConfigureStripeCommand, current StoredStripeConfiguration, hasCurrent bool, input stripeConfigurationInput, prepared PreparedStripeConfiguration) (StripeConfigurationSummary, error) {
+	credentialChanged := !hasCurrent || input.apiKey != input.currentAPIKey || prepared.AccountID != current.AccountID ||
+		prepared.Mode != current.Mode || prepared.ChargesEnabled != current.ChargesEnabled || prepared.PaymentMethodConfigurationID != current.PaymentMethodConfigurationID ||
+		prepared.ProductID != current.StripeProductID || prepared.WebhookEndpointID != current.StripeWebhookEndpointID || prepared.WebhookSecret != input.currentWebhookSecret
+	credentialID, encryptedAPIKey, encryptedWebhookSecret, err := s.persistCredentialMaterial(ctx, command, current, input, prepared, credentialChanged)
+	if err != nil {
+		return StripeConfigurationSummary{}, err
 	}
-
-	metadata := safeAuditMetadata(map[string]any{
-		"account_id": prepared.AccountID, "mode": mode, "product_tax_code": taxCode,
-		"payment_method_configuration_id": prepared.PaymentMethodConfigurationID,
-		"purchases_enabled":               command.PurchasesEnabled,
-	})
+	metadata := safeAuditMetadata(map[string]any{"account_id": prepared.AccountID, "mode": input.mode, "product_tax_code": input.taxCode,
+		"payment_method_configuration_id": prepared.PaymentMethodConfigurationID, "purchases_enabled": command.PurchasesEnabled})
 	expectedRevision := int64(0)
 	if hasCurrent {
 		expectedRevision = current.Revision
 	}
 	stored, shutdown, err := s.configuration.ReplaceStripeConfiguration(ctx, expectedRevision, StoredStripeConfiguration{
 		CredentialID: credentialID, AccountID: prepared.AccountID, Mode: prepared.Mode, ChargesEnabled: prepared.ChargesEnabled,
-		PaymentMethodConfigurationID: prepared.PaymentMethodConfigurationID,
-		ProductTaxCode:               taxCode, PurchasesEnabled: command.PurchasesEnabled,
-		StripeProductID: prepared.ProductID, StripeWebhookEndpointID: prepared.WebhookEndpointID,
-		APIKeyCiphertext: encryptedAPIKey, WebhookSecretCiphertext: encryptedWebhookSecret,
-		SecretMaterialKind: secrets.MaterialKindEncrypted, UpdatedBy: command.ActorID,
+		PaymentMethodConfigurationID: prepared.PaymentMethodConfigurationID, ProductTaxCode: input.taxCode, PurchasesEnabled: command.PurchasesEnabled,
+		StripeProductID: prepared.ProductID, StripeWebhookEndpointID: prepared.WebhookEndpointID, APIKeyCiphertext: encryptedAPIKey,
+		WebhookSecretCiphertext: encryptedWebhookSecret, SecretMaterialKind: secrets.MaterialKindEncrypted, UpdatedBy: command.ActorID,
 	}, ConfigurationAudit{ActorID: command.ActorID, Outcome: "succeeded", Metadata: metadata})
 	if err != nil {
 		return StripeConfigurationSummary{}, fmt.Errorf("publish Stripe configuration: %w", err)
 	}
 	s.enqueuePaymentCheckoutShutdown(ctx, shutdown)
 	return stripeConfigurationSummary(stored), nil
+}
+
+func (s *CheckoutWorkflow) persistCredentialMaterial(ctx context.Context, command ConfigureStripeCommand, current StoredStripeConfiguration, input stripeConfigurationInput, prepared PreparedStripeConfiguration, credentialChanged bool) (string, string, string, error) {
+	if !credentialChanged {
+		return current.CredentialID, current.APIKeyCiphertext, current.WebhookSecretCiphertext, nil
+	}
+	encryptedAPIKey, err := secrets.EncryptString(input.apiKey)
+	if err != nil {
+		return "", "", "", s.recordFailure(ctx, command.ActorID, "encryption_failed", "Stripe API Key 加密失败", map[string]any{"mode": input.mode}, ErrStripeConfigurationInvalid)
+	}
+	encryptedWebhookSecret, err := secrets.EncryptString(prepared.WebhookSecret)
+	if err != nil {
+		return "", "", "", s.recordFailure(ctx, command.ActorID, "encryption_failed", "Stripe Webhook Secret 加密失败", map[string]any{"mode": input.mode}, ErrStripeConfigurationInvalid)
+	}
+	return "", encryptedAPIKey, encryptedWebhookSecret, nil
 }
 
 func (s *CheckoutWorkflow) enqueuePaymentCheckoutShutdown(ctx context.Context, shutdown *PaymentCheckoutShutdown) {
@@ -214,15 +250,33 @@ func (s *StripeFactsWorkflow) receiveStripeWebhook(ctx context.Context, raw []by
 	if s == nil || s.configuration == nil || s.webhookInbox == nil || s.verifier == nil {
 		return StripeWebhookReceipt{}, fmt.Errorf("payments webhook service unavailable")
 	}
+	stored, event, now, err := s.verifyStripeWebhook(ctx, raw, signature)
+	if err != nil {
+		return StripeWebhookReceipt{}, err
+	}
+	receipt, recognized, err := s.recordStripeWebhookReceipt(ctx, event, now)
+	if err != nil {
+		return StripeWebhookReceipt{}, err
+	}
+	if !recognized {
+		return receipt, nil
+	}
+	if err := s.processStripeWebhookEvent(ctx, event, stored, now); err != nil {
+		return StripeWebhookReceipt{}, err
+	}
+	return receipt, nil
+}
+
+func (s *StripeFactsWorkflow) verifyStripeWebhook(ctx context.Context, raw []byte, signature string) (StoredStripeConfiguration, StripeWebhookEvent, time.Time, error) {
 	if len(raw) == 0 || strings.TrimSpace(signature) == "" {
-		return StripeWebhookReceipt{}, ErrMalformedWebhookPayload
+		return StoredStripeConfiguration{}, StripeWebhookEvent{}, time.Time{}, ErrMalformedWebhookPayload
 	}
 	credentials, err := s.configuration.ListStripeCredentials(ctx)
 	if err != nil {
-		return StripeWebhookReceipt{}, fmt.Errorf("load Stripe webhook credentials: %w", err)
+		return StoredStripeConfiguration{}, StripeWebhookEvent{}, time.Time{}, fmt.Errorf("load Stripe webhook credentials: %w", err)
 	}
 	if len(credentials) == 0 {
-		return StripeWebhookReceipt{}, ErrStripeConfigurationNotFound
+		return StoredStripeConfiguration{}, StripeWebhookEvent{}, time.Time{}, ErrStripeConfigurationNotFound
 	}
 	now := s.runtime.now()
 	var stored StoredStripeConfiguration
@@ -231,7 +285,7 @@ func (s *StripeFactsWorkflow) receiveStripeWebhook(ctx context.Context, raw []by
 	for _, credential := range credentials {
 		secret, decryptErr := secrets.DecryptMaterialString(credential.WebhookSecretCiphertext, credential.SecretMaterialKind)
 		if decryptErr != nil {
-			return StripeWebhookReceipt{}, ErrStripeConfigurationInvalid
+			return StoredStripeConfiguration{}, StripeWebhookEvent{}, time.Time{}, ErrStripeConfigurationInvalid
 		}
 		candidate, candidateErr := s.verifier.Verify(ctx, raw, signature, secret, StripeWebhookTolerance, now)
 		if candidateErr == nil {
@@ -241,14 +295,18 @@ func (s *StripeFactsWorkflow) receiveStripeWebhook(ctx context.Context, raw []by
 		verifyErr = candidateErr
 	}
 	if stored.CredentialID == "" {
-		return StripeWebhookReceipt{}, verifyErr
+		return StoredStripeConfiguration{}, StripeWebhookEvent{}, time.Time{}, verifyErr
 	}
 	if err := validateStripeWebhookEvent(event); err != nil {
-		return StripeWebhookReceipt{}, err
+		return StoredStripeConfiguration{}, StripeWebhookEvent{}, time.Time{}, err
 	}
 	if event.Livemode != (stored.Mode == StripeModeLive) {
-		return StripeWebhookReceipt{}, ErrMalformedWebhookPayload
+		return StoredStripeConfiguration{}, StripeWebhookEvent{}, time.Time{}, ErrMalformedWebhookPayload
 	}
+	return stored, event, now, nil
+}
+
+func (s *StripeFactsWorkflow) recordStripeWebhookReceipt(ctx context.Context, event StripeWebhookEvent, now time.Time) (StripeWebhookReceipt, bool, error) {
 	recognized := isRecognizedStripeWebhookEvent(event.Type)
 	result := "received"
 	var processedAt *time.Time
@@ -258,59 +316,57 @@ func (s *StripeFactsWorkflow) receiveStripeWebhook(ctx context.Context, raw []by
 	}
 	duplicate, err := s.webhookInbox.InsertStripeWebhookEvent(ctx, event, result, processedAt)
 	if err != nil {
-		return StripeWebhookReceipt{}, err
+		return StripeWebhookReceipt{}, false, err
 	}
-	receipt := StripeWebhookReceipt{EventID: event.ID, Duplicate: duplicate, Ignored: !recognized}
-	if !recognized {
-		return receipt, nil
-	}
+	return StripeWebhookReceipt{EventID: event.ID, Duplicate: duplicate, Ignored: !recognized}, recognized, nil
+}
+
+func (s *StripeFactsWorkflow) processStripeWebhookEvent(ctx context.Context, event StripeWebhookEvent, stored StoredStripeConfiguration, now time.Time) error {
 	signal, checkoutLifecycleEvent := checkoutSignalForWebhookEvent(event.Type)
 	if !checkoutLifecycleEvent {
 		if strings.HasPrefix(event.Type, "refund.") {
 			if err := s.processRefundWebhook(ctx, event, stored.CredentialID); err != nil {
 				_ = s.webhookInbox.MarkStripeWebhookEventProcessed(ctx, event.ID, "failed", operationalErrorSummary(err, "Stripe refund webhook processing failed"), now)
-				return StripeWebhookReceipt{}, err
+				return err
 			}
 		}
 		if strings.HasPrefix(event.Type, "charge.dispute.") {
 			if err := s.processDisputeWebhook(ctx, event, stored.CredentialID); err != nil {
 				_ = s.webhookInbox.MarkStripeWebhookEventProcessed(ctx, event.ID, "failed", operationalErrorSummary(err, "Stripe dispute webhook processing failed"), now)
-				return StripeWebhookReceipt{}, err
+				return err
 			}
 		}
-		if err := s.webhookInbox.MarkStripeWebhookEventProcessed(ctx, event.ID, "processed", "", now); err != nil {
-			return StripeWebhookReceipt{}, err
-		}
-		return receipt, nil
+		return s.webhookInbox.MarkStripeWebhookEventProcessed(ctx, event.ID, "processed", "", now)
 	}
+	return s.processCheckoutWebhook(ctx, event, stored, signal, now)
+}
+
+func (s *StripeFactsWorkflow) processCheckoutWebhook(ctx context.Context, event StripeWebhookEvent, stored StoredStripeConfiguration, signal checkoutSignal, now time.Time) error {
 	if s.checkoutGateway == nil {
-		return StripeWebhookReceipt{}, fmt.Errorf("payments Checkout gateway unavailable")
+		return fmt.Errorf("payments Checkout gateway unavailable")
 	}
 	if s.checkoutStore == nil || s.orderLifecycle == nil {
-		return StripeWebhookReceipt{}, fmt.Errorf("payments Checkout persistence unavailable")
+		return fmt.Errorf("payments Checkout persistence unavailable")
 	}
 	apiKey, err := secrets.DecryptMaterialString(stored.APIKeyCiphertext, stored.SecretMaterialKind)
 	if err != nil {
-		return StripeWebhookReceipt{}, ErrStripeConfigurationInvalid
+		return ErrStripeConfigurationInvalid
 	}
 	session, err := s.checkoutGateway.RetrieveCheckoutSession(ctx, RetrieveCheckoutSessionInput{APIKey: apiKey, SessionID: event.ObjectID})
 	if err != nil {
-		return StripeWebhookReceipt{}, checkoutOperationError(err)
+		return checkoutOperationError(err)
 	}
 	if session.ID != event.ObjectID {
-		return StripeWebhookReceipt{}, ErrMalformedWebhookPayload
+		return ErrMalformedWebhookPayload
 	}
 	order, err := s.checkoutStore.GetPaymentOrderByCheckoutSession(ctx, stored.AccountID, session.ID)
 	if err != nil {
-		return StripeWebhookReceipt{}, fmt.Errorf("resolve payment order for Stripe Session: %w", err)
+		return fmt.Errorf("resolve payment order for Stripe Session: %w", err)
 	}
 	if _, err := s.orderLifecycle.convergeCheckoutSession(ctx, order, session, signal); err != nil {
-		return StripeWebhookReceipt{}, err
+		return err
 	}
-	if err := s.webhookInbox.MarkStripeWebhookEventProcessed(ctx, event.ID, "processed", "", now); err != nil {
-		return StripeWebhookReceipt{}, err
-	}
-	return receipt, nil
+	return s.webhookInbox.MarkStripeWebhookEventProcessed(ctx, event.ID, "processed", "", now)
 }
 
 func (s *StripeFactsWorkflow) processDisputeWebhook(ctx context.Context, event StripeWebhookEvent, credentialID string) error {

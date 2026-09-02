@@ -50,129 +50,142 @@ func newTaskExecutionOrchestrator(
 
 func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) error {
 	phaseMachine := newTaskExecutionPhaseMachine(task.TaskID)
-	// ── Phase 1: pre-flight (account + cancellation check) ──
 	correlationID := task.EnsureCorrelationID()
 	accountID := assignment.AccountID
 	slog.Info("worker executing task", "task_id", task.TaskID, "correlation_id", correlationID, "account_id", accountID)
 	startTime := time.Now()
 
-	account, err := o.accountRepo.GetRuntimeAccountForAssignment(ctx, accountID, assignment.ProviderEndpointID, assignment.CredentialID)
+	account, handled, err := o.prepareTaskExecution(ctx, task, assignment, phaseMachine, correlationID)
+	if handled || err != nil {
+		return err
+	}
+	taskCtx, stop := o.taskRuntime.WatchTaskCancellation(ctx, task.TaskID)
+	defer stop()
+
+	attemptCtx, handled, err := o.startTaskAttempt(ctx, task, assignment, account, startTime, correlationID, phaseMachine)
+	if handled || err != nil {
+		return err
+	}
+
+	providerOutput, err := o.providerCall(taskCtx, account, task, assignment)
+	attemptCtx = attemptCtx.withProviderOutput(providerOutput)
+	o.recordProviderTimeline(ctx, task.TaskID, startTime, providerOutput.Timeline)
+	if err != nil {
+		return o.handleProviderFailure(ctx, taskCtx, attemptCtx, err, phaseMachine)
+	}
+	return o.finalizeSuccessfulExecution(ctx, task, assignment, accountID, attemptCtx, providerOutput, phaseMachine, correlationID)
+}
+
+func (o *taskExecutionOrchestrator) prepareTaskExecution(
+	ctx context.Context,
+	task *tasks.TaskPayload,
+	assignment taskqueue.TaskAssignment,
+	phaseMachine *taskExecutionPhaseMachine,
+	correlationID string,
+) (*accounts.RuntimeAccountAccess, bool, error) {
+	account, err := o.accountRepo.GetRuntimeAccountForAssignment(ctx, assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID)
 	if err != nil {
 		if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
-			return phaseErr
+			return nil, true, phaseErr
 		}
-		if requeueErr := o.requeueTask(ctx, task, assignment, "运行时账号、服务端点或凭据不可用，重新调度"); requeueErr != nil {
-			return requeueErr
-		}
-		return nil
+		return nil, true, o.requeueTask(ctx, task, assignment, "运行时账号、服务端点或凭据不可用，重新调度")
 	}
 	cancelled, err := o.taskRuntime.IsTaskCancelled(ctx, task.TaskID)
 	if err != nil {
 		slog.Warn("check task cancellation failed", "task_id", task.TaskID, "correlation_id", correlationID, "err", err)
 		if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
-			return phaseErr
+			return nil, true, phaseErr
 		}
-		if requeueErr := o.requeueTask(ctx, task, assignment, "检查任务取消状态失败"); requeueErr != nil {
-			return requeueErr
-		}
-		return nil
+		return nil, true, o.requeueTask(ctx, task, assignment, "检查任务取消状态失败")
 	}
 	if cancelled {
 		if err := phaseMachine.advance(taskExecutionPhaseCancelled); err != nil {
-			return err
+			return nil, true, err
 		}
 		o.skipCancelledTask(ctx, task, nil)
-		return nil
+		return nil, true, nil
 	}
 	if err := phaseMachine.advance(taskExecutionPhaseAssigned); err != nil {
-		return err
+		return nil, true, err
 	}
+	return account, false, nil
+}
 
-	// ── Phase 2: lease confirmation + snapshot + attempt start ──
-	taskCtx, stop := o.taskRuntime.WatchTaskCancellation(ctx, task.TaskID)
-	defer stop()
-
+func (o *taskExecutionOrchestrator) startTaskAttempt(
+	ctx context.Context,
+	task *tasks.TaskPayload,
+	assignment taskqueue.TaskAssignment,
+	account *accounts.RuntimeAccountAccess,
+	startTime time.Time,
+	correlationID string,
+	phaseMachine *taskExecutionPhaseMachine,
+) (taskExecutionAttemptContext, bool, error) {
 	if err := o.taskRuntime.ConfirmTaskLease(ctx, assignment); err != nil {
-		slog.Warn("confirm task running lease failed", "task_id", task.TaskID, "correlation_id", correlationID, "account_id", accountID, "err", err)
+		slog.Warn("confirm task running lease failed", "task_id", task.TaskID, "correlation_id", correlationID, "account_id", assignment.AccountID, "err", err)
 		if isTaskConvergedError(err) {
 			if phaseErr := phaseMachine.advance(taskExecutionPhaseDropped); phaseErr != nil {
-				return phaseErr
+				return taskExecutionAttemptContext{}, true, phaseErr
 			}
 			o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
-			return nil
+			return taskExecutionAttemptContext{}, true, nil
 		}
 		cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 		defer cleanupCancel()
-		if resetErr := o.taskRuntime.ResetRunningTask(cleanupCtx, taskruntime.ResetRunningTaskInput{
-			Assignment: assignment,
-			Reason:     "确认任务运行租约失败",
-		}); resetErr != nil {
+		if resetErr := o.taskRuntime.ResetRunningTask(cleanupCtx, taskruntime.ResetRunningTaskInput{Assignment: assignment, Reason: "确认任务运行租约失败"}); resetErr != nil {
 			if isTaskConvergedError(resetErr) {
 				o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
-				return nil
+				return taskExecutionAttemptContext{}, true, nil
 			}
-			return resetErr
+			return taskExecutionAttemptContext{}, true, resetErr
 		}
 		if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
-			return phaseErr
+			return taskExecutionAttemptContext{}, true, phaseErr
 		}
-		if requeueErr := o.requeueTask(ctx, task, taskqueue.TaskAssignment{}, "确认任务运行租约失败"); requeueErr != nil {
-			return requeueErr
-		}
-		return nil
+		return taskExecutionAttemptContext{}, true, o.requeueTask(ctx, task, taskqueue.TaskAssignment{}, "确认任务运行租约失败")
 	}
 
-	snapshot := taskExecutionSnapshot(task, account, assignment)
-	o.recordExecutionSnapshot(ctx, task.TaskID, snapshot)
-
+	o.recordExecutionSnapshot(ctx, task.TaskID, taskExecutionSnapshot(task, account, assignment))
 	providerStartAt := time.Now()
 	attemptCtx, err := o.attemptLifecycle.begin(ctx, task, assignment, startTime, providerStartAt)
 	if err != nil {
 		slog.Warn("start task attempt failed", "task_id", task.TaskID, "correlation_id", correlationID, "err", err)
 		cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 		defer cleanupCancel()
-		if resetErr := o.taskRuntime.ResetRunningTask(cleanupCtx, taskruntime.ResetRunningTaskInput{
-			Assignment: assignment,
-			Reason:     "记录任务执行尝试失败",
-		}); resetErr != nil {
+		if resetErr := o.taskRuntime.ResetRunningTask(cleanupCtx, taskruntime.ResetRunningTaskInput{Assignment: assignment, Reason: "记录任务执行尝试失败"}); resetErr != nil {
 			if isTaskConvergedError(resetErr) {
 				o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
-				return nil
+				return taskExecutionAttemptContext{}, true, nil
 			}
-			return resetErr
+			return taskExecutionAttemptContext{}, true, resetErr
 		}
 		if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
-			return phaseErr
+			return taskExecutionAttemptContext{}, true, phaseErr
 		}
-		if requeueErr := o.requeueTask(ctx, task, taskqueue.TaskAssignment{}, "记录任务执行尝试失败"); requeueErr != nil {
-			return requeueErr
-		}
-		return nil
+		return taskExecutionAttemptContext{}, true, o.requeueTask(ctx, task, taskqueue.TaskAssignment{}, "记录任务执行尝试失败")
 	}
-	o.recordExecutionMetrics(ctx, task.TaskID, tasks.TaskExecutionMetricsPatch{
-		TaskID:            task.TaskID,
-		CurrentStage:      tasks.StringPtr(tasks.ExecutionStageProvider),
-		ProviderStartedAt: &providerStartAt,
-		WorkerOverheadMS:  int64Ptr(nonNegativeMilliseconds(providerStartAt.Sub(startTime))),
-	})
+	o.recordExecutionMetrics(ctx, task.TaskID, tasks.TaskExecutionMetricsPatch{TaskID: task.TaskID, CurrentStage: tasks.StringPtr(tasks.ExecutionStageProvider), ProviderStartedAt: &providerStartAt, WorkerOverheadMS: int64Ptr(nonNegativeMilliseconds(providerStartAt.Sub(startTime)))})
 	if err := phaseMachine.advance(taskExecutionPhaseProvider); err != nil {
-		return err
+		return taskExecutionAttemptContext{}, true, err
 	}
-	// ── Phase 3: upstream provider call ──
-	providerOutput, err := o.providerCall(taskCtx, account, task, assignment)
-	attemptCtx = attemptCtx.withProviderOutput(providerOutput)
-	o.recordProviderTimeline(ctx, task.TaskID, startTime, providerOutput.Timeline)
-	// ── Phase 4: provider error handling (interrupt / fail / failover) ──
-	if err != nil {
-		return o.handleProviderFailure(ctx, taskCtx, attemptCtx, err, phaseMachine)
-	}
+	return attemptCtx, false, nil
+}
 
-	// ── Phase 5: post-success cancel check + finalization ──
+func (o *taskExecutionOrchestrator) finalizeSuccessfulExecution(
+	ctx context.Context,
+	task *tasks.TaskPayload,
+	assignment taskqueue.TaskAssignment,
+	accountID int64,
+	attemptCtx taskExecutionAttemptContext,
+	providerOutput providerCallOutput,
+	phaseMachine *taskExecutionPhaseMachine,
+	correlationID string,
+) error {
+
 	if err := phaseMachine.advance(taskExecutionPhaseFinalizing); err != nil {
 		return err
 	}
 	checkCtx, checkCancel := taskCleanupContext(ctx)
-	cancelled, err = o.taskRuntime.IsTaskCancelled(checkCtx, task.TaskID)
+	cancelled, err := o.taskRuntime.IsTaskCancelled(checkCtx, task.TaskID)
 	checkCancel()
 	if err != nil {
 		if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
@@ -746,45 +759,71 @@ func userFacingProviderError(err error) string {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return "上游图像服务响应超时"
 	}
+	if message, ok := userFacingProviderHTTPError(err); ok {
+		return message
+	}
+	if message, ok := userFacingExecutionFailure(err); ok {
+		return message
+	}
+	return "上游图像服务调用失败"
+}
+
+func userFacingProviderHTTPError(err error) (string, bool) {
 	if status, ok := providerHTTPStatus(err); ok {
 		switch status {
 		case http.StatusBadRequest, http.StatusUnprocessableEntity:
-			return "请求参数不合法，请检查输入后重试"
+			return "请求参数不合法，请检查输入后重试", true
 		case http.StatusUnauthorized, http.StatusForbidden:
-			return "上游服务鉴权失败，请联系管理员"
+			return "上游服务鉴权失败，请联系管理员", true
 		case http.StatusPaymentRequired:
-			return "上游服务额度不足或未开通，请联系管理员"
+			return "上游服务额度不足或未开通，请联系管理员", true
 		case http.StatusNotFound:
-			return "上游服务接口或模型不可用，请联系管理员"
+			return "上游服务接口或模型不可用，请联系管理员", true
 		case http.StatusTooManyRequests:
-			return "上游服务请求过于频繁，请稍后重试"
+			return "上游服务请求过于频繁，请稍后重试", true
 		}
 	}
+	return "", false
+}
+
+func userFacingExecutionFailure(err error) (string, bool) {
 	if _, category, ok := executionFailureDetails(err); ok {
-		switch category {
-		case tasks.FailureCategoryProviderError:
-			if reason := strings.TrimSpace(err.Error()); reason != "" && (isProviderOutputParseError(err) || strings.Contains(reason, "workflow contract")) {
-				return reason
-			}
-		case tasks.FailureCategoryStorageError:
-			return "图片结果保存失败，请检查存储配置"
-		case tasks.FailureCategoryFinalizeError:
-			if reason := strings.TrimSpace(err.Error()); reason != "" && (isProviderOutputParseError(err) || strings.Contains(reason, "workflow contract")) {
-				return reason
-			}
-			return "图片结果保存失败，请检查存储配置"
-		case tasks.FailureCategoryAuth:
-			return "上游服务鉴权失败，请联系管理员"
-		case tasks.FailureCategoryInputInvalid:
-			if reason := strings.TrimSpace(err.Error()); reason != "" {
-				return reason
-			}
-			return "请求参数不合法，请检查输入后重试"
-		case tasks.FailureCategoryQuota:
-			return "上游服务额度不足或未开通，请联系管理员"
-		case tasks.FailureCategoryTimeout:
-			return "上游图像服务响应超时"
-		}
+		return userFacingFailureCategory(err, category)
 	}
-	return "上游图像服务调用失败"
+	return "", false
+}
+
+func userFacingFailureCategory(err error, category string) (string, bool) {
+	switch category {
+	case tasks.FailureCategoryProviderError:
+		return providerFailureReason(err)
+	case tasks.FailureCategoryStorageError:
+		return "图片结果保存失败，请检查存储配置", true
+	case tasks.FailureCategoryFinalizeError:
+		if reason, ok := providerFailureReason(err); ok {
+			return reason, true
+		}
+		return "图片结果保存失败，请检查存储配置", true
+	case tasks.FailureCategoryAuth:
+		return "上游服务鉴权失败，请联系管理员", true
+	case tasks.FailureCategoryInputInvalid:
+		if reason := strings.TrimSpace(err.Error()); reason != "" {
+			return reason, true
+		}
+		return "请求参数不合法，请检查输入后重试", true
+	case tasks.FailureCategoryQuota:
+		return "上游服务额度不足或未开通，请联系管理员", true
+	case tasks.FailureCategoryTimeout:
+		return "上游图像服务响应超时", true
+	default:
+		return "", false
+	}
+}
+
+func providerFailureReason(err error) (string, bool) {
+	reason := strings.TrimSpace(err.Error())
+	if reason == "" || (!isProviderOutputParseError(err) && !strings.Contains(reason, "workflow contract")) {
+		return "", false
+	}
+	return reason, true
 }

@@ -103,24 +103,15 @@ func (s *StripeFactsWorkflow) CreatePaymentRefund(ctx context.Context, command C
 	if s == nil || s.convergenceStore == nil || s.refundGateway == nil {
 		return PaymentRefund{}, ErrRefundUnavailable
 	}
-	if command.ActorID <= 0 || strings.TrimSpace(command.OrderNumber) == "" || command.IdeaQuantity <= 0 {
-		return PaymentRefund{}, ErrRefundAmountInvalid
-	}
-	if len(strings.TrimSpace(command.IdempotencyKey)) < 8 || len(strings.TrimSpace(command.IdempotencyKey)) > 160 {
-		return PaymentRefund{}, ErrRefundIdempotency
-	}
-	credential, err := s.configuration.GetStripeCredentialForOrderNumber(ctx, strings.TrimSpace(command.OrderNumber))
+	command, err := normalizePaymentRefundCommand(command)
 	if err != nil {
-		return PaymentRefund{}, ErrRefundOrderNotEligible
+		return PaymentRefund{}, err
 	}
-	apiKey, err := secrets.DecryptMaterialString(credential.APIKeyCiphertext, credential.SecretMaterialKind)
+	apiKey, err := s.refundAPIKey(ctx, command.OrderNumber)
 	if err != nil {
-		return PaymentRefund{}, ErrStripeConfigurationInvalid
+		return PaymentRefund{}, mapRefundCredentialError(err)
 	}
-	refund, _, err := s.convergenceStore.CreatePendingPaymentRefund(ctx, CreatePendingPaymentRefundInput{
-		ActorID: command.ActorID, OrderNumber: strings.TrimSpace(command.OrderNumber), IdeaQuantity: command.IdeaQuantity,
-		IdempotencyKey: strings.TrimSpace(command.IdempotencyKey), Reason: strings.TrimSpace(command.Reason), Now: s.runtime.now().UTC(),
-	})
+	refund, err := s.reservePaymentRefund(ctx, command)
 	if err != nil {
 		return PaymentRefund{}, err
 	}
@@ -128,10 +119,7 @@ func (s *StripeFactsWorkflow) CreatePaymentRefund(ctx context.Context, command C
 	if refund.StripeRefundID != "" {
 		return refund, nil
 	}
-	providerRefund, err := s.refundGateway.CreateRefund(ctx, CreateStripeRefundInput{
-		APIKey: apiKey, ChargeID: refund.StripeChargeID,
-		AmountMinor: refund.AmountMinor, Currency: refund.Currency, IdempotencyKey: "ideaboard-refund-" + refund.ID,
-	})
+	providerRefund, err := s.createProviderRefund(ctx, apiKey, refund)
 	if err != nil {
 		// A timeout remains pending for reconciliation; explicit provider errors
 		// release the local hold so the user can consume the Ideas again.
@@ -153,6 +141,53 @@ func (s *StripeFactsWorkflow) CreatePaymentRefund(ctx context.Context, command C
 	return result, err
 }
 
+func normalizePaymentRefundCommand(command CreatePaymentRefundCommand) (CreatePaymentRefundCommand, error) {
+	command.OrderNumber = strings.TrimSpace(command.OrderNumber)
+	command.IdempotencyKey = strings.TrimSpace(command.IdempotencyKey)
+	command.Reason = strings.TrimSpace(command.Reason)
+	if command.ActorID <= 0 || command.OrderNumber == "" || command.IdeaQuantity <= 0 {
+		return CreatePaymentRefundCommand{}, ErrRefundAmountInvalid
+	}
+	if len(command.IdempotencyKey) < 8 || len(command.IdempotencyKey) > 160 {
+		return CreatePaymentRefundCommand{}, ErrRefundIdempotency
+	}
+	return command, nil
+}
+
+func (s *StripeFactsWorkflow) refundAPIKey(ctx context.Context, orderNumber string) (string, error) {
+	credential, err := s.configuration.GetStripeCredentialForOrderNumber(ctx, orderNumber)
+	if err != nil {
+		return "", ErrRefundOrderNotEligible
+	}
+	apiKey, err := secrets.DecryptMaterialString(credential.APIKeyCiphertext, credential.SecretMaterialKind)
+	if err != nil {
+		return "", ErrStripeConfigurationInvalid
+	}
+	return apiKey, nil
+}
+
+func mapRefundCredentialError(err error) error {
+	if errors.Is(err, ErrStripeConfigurationInvalid) || errors.Is(err, ErrRefundOrderNotEligible) {
+		return err
+	}
+	return ErrRefundOrderNotEligible
+}
+
+func (s *StripeFactsWorkflow) reservePaymentRefund(ctx context.Context, command CreatePaymentRefundCommand) (PaymentRefund, error) {
+	refund, _, err := s.convergenceStore.CreatePendingPaymentRefund(ctx, CreatePendingPaymentRefundInput{
+		ActorID: command.ActorID, OrderNumber: command.OrderNumber, IdeaQuantity: command.IdeaQuantity,
+		IdempotencyKey: command.IdempotencyKey, Reason: command.Reason, Now: s.runtime.now().UTC(),
+	})
+	return refund, err
+}
+
+func (s *StripeFactsWorkflow) createProviderRefund(ctx context.Context, apiKey string, refund PaymentRefund) (StripeRefund, error) {
+	return s.refundGateway.CreateRefund(ctx, CreateStripeRefundInput{
+		APIKey: apiKey, ChargeID: refund.StripeChargeID, AmountMinor: refund.AmountMinor,
+		Currency: refund.Currency, IdempotencyKey: "ideaboard-refund-" + refund.ID,
+	})
+}
+
 func (s *StripeFactsWorkflow) convergePaymentRefund(ctx context.Context, refund PaymentRefund, providerRefund StripeRefund) (PaymentRefund, error) {
 	if s == nil || s.convergenceStore == nil {
 		return PaymentRefund{}, ErrRefundUnavailable
@@ -160,20 +195,32 @@ func (s *StripeFactsWorkflow) convergePaymentRefund(ctx context.Context, refund 
 	if refund.Status == PaymentRefundAnomaly {
 		return refund, nil
 	}
+	if err := validateProviderRefund(refund, providerRefund); err != nil {
+		return PaymentRefund{}, err
+	}
 	providerID := strings.TrimSpace(providerRefund.ID)
-	if providerID == "" || (refund.StripeRefundID != "" && refund.StripeRefundID != providerID) {
-		return PaymentRefund{}, ErrRefundProviderConflict
-	}
-	if (providerRefund.ChargeID != "" && providerRefund.ChargeID != refund.StripeChargeID) ||
-		(providerRefund.AmountMinor > 0 && providerRefund.AmountMinor != refund.AmountMinor) ||
-		(providerRefund.Currency != "" && !strings.EqualFold(providerRefund.Currency, refund.Currency)) {
-		return PaymentRefund{}, ErrRefundProviderConflict
-	}
 	updated, err := s.convergenceStore.MarkPaymentRefundProviderResult(ctx, refund.ID, providerID, providerRefund.Status, s.runtime.now().UTC())
 	if err != nil {
 		return PaymentRefund{}, err
 	}
-	switch strings.ToLower(strings.TrimSpace(providerRefund.Status)) {
+	return s.applyRefundProviderStatus(ctx, updated, providerRefund.Status)
+}
+
+func validateProviderRefund(refund PaymentRefund, providerRefund StripeRefund) error {
+	providerID := strings.TrimSpace(providerRefund.ID)
+	if providerID == "" || (refund.StripeRefundID != "" && refund.StripeRefundID != providerID) {
+		return ErrRefundProviderConflict
+	}
+	if (providerRefund.ChargeID != "" && providerRefund.ChargeID != refund.StripeChargeID) ||
+		(providerRefund.AmountMinor > 0 && providerRefund.AmountMinor != refund.AmountMinor) ||
+		(providerRefund.Currency != "" && !strings.EqualFold(providerRefund.Currency, refund.Currency)) {
+		return ErrRefundProviderConflict
+	}
+	return nil
+}
+
+func (s *StripeFactsWorkflow) applyRefundProviderStatus(ctx context.Context, updated PaymentRefund, status string) (PaymentRefund, error) {
+	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "succeeded":
 		settled, settleErr := s.convergenceStore.MarkPaymentRefundSucceeded(ctx, updated.ID, s.runtime.now().UTC())
 		if settleErr == nil && updated.Status == PaymentRefundPending {

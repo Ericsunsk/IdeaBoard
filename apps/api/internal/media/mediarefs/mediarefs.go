@@ -24,6 +24,21 @@ func CanonicalListKeys() []string {
 }
 
 func ValidateUploadPath(raw string) (string, error) {
+	cleaned, err := normalizeUploadPath(raw)
+	if err != nil {
+		return "", err
+	}
+	parts, err := uploadPathParts(cleaned)
+	if err != nil {
+		return "", err
+	}
+	if isSupportedUploadPath(parts) {
+		return cleaned, nil
+	}
+	return "", fmt.Errorf("不支持的上传资源路径")
+}
+
+func normalizeUploadPath(raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if !strings.HasPrefix(trimmed, "/uploads/") {
 		return "", fmt.Errorf("仅支持 /uploads/ 相对路径")
@@ -32,20 +47,29 @@ func ValidateUploadPath(raw string) (string, error) {
 	if !strings.HasPrefix(cleaned, "/uploads/") {
 		return "", fmt.Errorf("仅支持 /uploads/ 相对路径")
 	}
+	return cleaned, nil
+}
+
+func uploadPathParts(cleaned string) ([]string, error) {
 	parts := strings.Split(strings.TrimPrefix(cleaned, "/uploads/"), "/")
 	if len(parts) < 1 || parts[0] == "" {
-		return "", fmt.Errorf("文件路径不能为空")
+		return nil, fmt.Errorf("文件路径不能为空")
 	}
-	if parts[0] == "canvas" && len(parts) >= 4 && parts[1] != "" && parts[2] != "" && strings.Join(parts[3:], "") != "" {
-		return cleaned, nil
+	return parts, nil
+}
+
+func isSupportedUploadPath(parts []string) bool {
+	if len(parts) < 4 || parts[1] == "" || strings.Join(parts[3:], "") == "" {
+		return false
 	}
-	if parts[0] == "profile" && len(parts) >= 4 && parts[1] != "" && (parts[2] == "avatar" || parts[2] == "vector") && strings.Join(parts[3:], "") != "" {
-		return cleaned, nil
+	switch parts[0] {
+	case "canvas", "tasks":
+		return parts[2] != ""
+	case "profile":
+		return parts[2] == "avatar" || parts[2] == "vector"
+	default:
+		return false
 	}
-	if parts[0] == "tasks" && len(parts) >= 4 && parts[1] != "" && parts[2] != "" && strings.Join(parts[3:], "") != "" {
-		return cleaned, nil
-	}
-	return "", fmt.Errorf("不支持的上传资源路径")
 }
 
 func ParseDataImageURL(raw string, maxDecodedBytes int) (*DataImage, error) {

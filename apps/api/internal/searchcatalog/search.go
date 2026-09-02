@@ -90,6 +90,13 @@ type adapterPage struct {
 	HasMore bool
 }
 
+type providerCall struct {
+	provider Provider
+	page     adapterPage
+	status   ProviderStatus
+	err      error
+}
+
 func NewSearchService(configs *ConfigRepository, metrics ...SearchMetrics) *SearchService {
 	adapters := map[Provider]searchAdapter{
 		ProviderUnsplash: &unsplashAdapter{},
@@ -104,29 +111,70 @@ func NewSearchService(configs *ConfigRepository, metrics ...SearchMetrics) *Sear
 
 func (s *SearchService) Search(ctx context.Context, rawQuery, rawCursor string, limit int) (response SearchResponse, err error) {
 	started := time.Now()
-	page := "append"
+	page := searchPage(rawCursor)
 	metricStatuses := []ProviderStatus(nil)
-	if strings.TrimSpace(rawCursor) == "" {
-		page = "first"
-	}
 	defer func() {
-		outcome := "success"
-		if err != nil {
-			outcome = "failure"
-		} else if response.Partial {
-			outcome = "partial"
-		}
-		if s != nil && s.metrics != nil {
-			statuses := response.ProviderStatus
-			if len(statuses) == 0 {
-				statuses = metricStatuses
-			}
-			s.metrics.RecordSearch(SearchObservation{Duration: time.Since(started), Page: page, Outcome: outcome, ResultCount: len(response.Results), ProviderStatus: statuses})
-		}
+		recordSearchObservation(s, started, page, metricStatuses, response, err)
 	}()
-	query, err := normalizeQuery(rawQuery)
+	query, limit, cursor, err := normalizeSearchInput(rawQuery, rawCursor, limit)
 	if err != nil {
 		return SearchResponse{}, err
+	}
+	if s == nil || s.configs == nil {
+		return SearchResponse{}, ErrNoSearchProviders
+	}
+	active, keys, err := s.resolveProviders(ctx, cursor)
+	if err != nil {
+		return SearchResponse{}, err
+	}
+	if len(active) == 0 {
+		return SearchResponse{Query: query, Results: []Result{}, HasMore: false}, nil
+	}
+	resultsByProvider := s.fetchProviderPages(ctx, query, limit, cursor, active, keys)
+	allResults, statuses, pages, hasMore, failures := aggregateProviderResults(active, resultsByProvider, limit)
+	metricStatuses = statuses
+	if failures == len(active) {
+		return SearchResponse{}, fmt.Errorf("all search providers failed")
+	}
+	allResults = dedupeResults(allResults)
+	if len(allResults) > limit {
+		allResults = allResults[:limit]
+	}
+	next := ""
+	if hasMore {
+		next = encodeCursor(nextCursor(cursor, active, statuses, pages))
+	}
+	return SearchResponse{Query: query, Results: allResults, NextCursor: next, HasMore: hasMore, Partial: failures > 0, ProviderStatus: statuses}, nil
+}
+
+func searchPage(rawCursor string) string {
+	if strings.TrimSpace(rawCursor) == "" {
+		return "first"
+	}
+	return "append"
+}
+
+func recordSearchObservation(s *SearchService, started time.Time, page string, metricStatuses []ProviderStatus, response SearchResponse, err error) {
+	if s == nil || s.metrics == nil {
+		return
+	}
+	outcome := "success"
+	if err != nil {
+		outcome = "failure"
+	} else if response.Partial {
+		outcome = "partial"
+	}
+	statuses := response.ProviderStatus
+	if len(statuses) == 0 {
+		statuses = metricStatuses
+	}
+	s.metrics.RecordSearch(SearchObservation{Duration: time.Since(started), Page: page, Outcome: outcome, ResultCount: len(response.Results), ProviderStatus: statuses})
+}
+
+func normalizeSearchInput(rawQuery, rawCursor string, limit int) (string, int, searchCursor, error) {
+	query, err := normalizeQuery(rawQuery)
+	if err != nil {
+		return "", 0, searchCursor{}, err
 	}
 	if limit <= 0 {
 		limit = DefaultSearchLimit
@@ -136,29 +184,21 @@ func (s *SearchService) Search(ctx context.Context, rawQuery, rawCursor string, 
 	}
 	cursor, err := decodeCursor(rawCursor)
 	if err != nil {
-		return SearchResponse{}, err
+		return "", 0, searchCursor{}, err
 	}
-	if s == nil || s.configs == nil {
-		return SearchResponse{}, ErrNoSearchProviders
-	}
+	return query, limit, cursor, nil
+}
+
+func (s *SearchService) resolveProviders(ctx context.Context, cursor searchCursor) ([]Provider, map[Provider]string, error) {
 	configs, err := s.configs.List(ctx)
 	if err != nil {
-		return SearchResponse{}, err
-	}
-	type providerCall struct {
-		provider Provider
-		page     adapterPage
-		status   ProviderStatus
-		err      error
+		return nil, nil, err
 	}
 	active := make([]Provider, 0, len(configs))
 	keys := make(map[Provider]string, len(configs))
 	availableProviders := 0
 	for _, config := range configs {
-		if !isCatalogProvider(config.Provider) {
-			continue
-		}
-		if !config.Enabled || config.TestState != TestStatePassed {
+		if !isCatalogProvider(config.Provider) || !config.Enabled || config.TestState != TestStatePassed {
 			continue
 		}
 		key, keyErr := s.configs.APIKey(ctx, config.Provider)
@@ -173,11 +213,12 @@ func (s *SearchService) Search(ctx context.Context, rawQuery, rawCursor string, 
 		keys[config.Provider] = key
 	}
 	if availableProviders == 0 {
-		return SearchResponse{}, ErrNoSearchProviders
+		return nil, nil, ErrNoSearchProviders
 	}
-	if len(active) == 0 {
-		return SearchResponse{Query: query, Results: []Result{}, HasMore: false}, nil
-	}
+	return active, keys, nil
+}
+
+func (s *SearchService) fetchProviderPages(ctx context.Context, query string, limit int, cursor searchCursor, active []Provider, keys map[Provider]string) map[Provider]providerCall {
 	calls := make(chan providerCall, len(active))
 	var wait sync.WaitGroup
 	for _, provider := range active {
@@ -185,39 +226,45 @@ func (s *SearchService) Search(ctx context.Context, rawQuery, rawCursor string, 
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
-			started := time.Now()
-			adapter := s.adapters[provider]
-			pageNumber := cursor.page(provider)
-			if adapter == nil {
-				calls <- providerCall{provider: provider, status: ProviderStatus{Provider: provider, Status: "failed", FailureCategory: FailureUnknown, LatencyMS: time.Since(started).Milliseconds()}, err: errors.New("provider adapter unavailable")}
-				return
-			}
-			callCtx, cancel := context.WithTimeout(ctx, searchTimeout)
-			page, callErr := adapter.Search(callCtx, keys[provider], SearchRequest{Query: query, Page: pageNumber, Limit: limit})
-			cancel()
-			status := ProviderStatus{Provider: provider, Status: "ok", LatencyMS: time.Since(started).Milliseconds()}
-			if callErr != nil {
-				status.Status = "failed"
-				status.FailureCategory = classifyProviderError(callErr)
-			}
-			calls <- providerCall{provider: provider, page: page, status: status, err: callErr}
+			calls <- s.fetchProviderPage(ctx, query, limit, cursor, provider, keys[provider])
 		}()
 	}
 	wait.Wait()
 	close(calls)
+	results := make(map[Provider]providerCall, len(active))
+	for call := range calls {
+		results[call.provider] = call
+	}
+	return results
+}
+
+func (s *SearchService) fetchProviderPage(ctx context.Context, query string, limit int, cursor searchCursor, provider Provider, key string) providerCall {
+	started := time.Now()
+	adapter := s.adapters[provider]
+	if adapter == nil {
+		return providerCall{provider: provider, status: ProviderStatus{Provider: provider, Status: "failed", FailureCategory: FailureUnknown, LatencyMS: time.Since(started).Milliseconds()}, err: errors.New("provider adapter unavailable")}
+	}
+	callCtx, cancel := context.WithTimeout(ctx, searchTimeout)
+	page, callErr := adapter.Search(callCtx, key, SearchRequest{Query: query, Page: cursor.page(provider), Limit: limit})
+	cancel()
+	status := ProviderStatus{Provider: provider, Status: "ok", LatencyMS: time.Since(started).Milliseconds()}
+	if callErr != nil {
+		status.Status = "failed"
+		status.FailureCategory = classifyProviderError(callErr)
+	}
+	return providerCall{provider: provider, page: page, status: status, err: callErr}
+}
+
+func aggregateProviderResults(active []Provider, resultsByProvider map[Provider]providerCall, limit int) ([]Result, []ProviderStatus, map[Provider]adapterPage, bool, int) {
 	allResults := make([]Result, 0, limit*len(active))
 	statuses := make([]ProviderStatus, 0, len(active))
 	pages := make(map[Provider]adapterPage, len(active))
-	resultsByProvider := make(map[Provider]providerCall, len(active))
 	hasMore := false
 	failures := 0
-	for call := range calls {
-		resultsByProvider[call.provider] = call
-		pages[call.provider] = call.page
-	}
 	for _, provider := range active {
 		call := resultsByProvider[provider]
 		statuses = append(statuses, call.status)
+		pages[provider] = call.page
 		if call.err != nil {
 			failures++
 			continue
@@ -226,19 +273,7 @@ func (s *SearchService) Search(ctx context.Context, rawQuery, rawCursor string, 
 		allResults = append(allResults, call.page.Results...)
 		hasMore = hasMore || call.page.HasMore
 	}
-	metricStatuses = statuses
-	if failures == len(active) {
-		return SearchResponse{}, fmt.Errorf("all search providers failed")
-	}
-	allResults = dedupeResults(allResults)
-	if len(allResults) > limit {
-		allResults = allResults[:limit]
-	}
-	next := ""
-	if hasMore {
-		next = encodeCursor(nextCursor(cursor, active, statuses, pages))
-	}
-	return SearchResponse{Query: query, Results: allResults, NextCursor: next, HasMore: hasMore, Partial: failures > 0, ProviderStatus: statuses}, nil
+	return allResults, statuses, pages, hasMore, failures
 }
 
 func isCatalogProvider(provider Provider) bool {

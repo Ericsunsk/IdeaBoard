@@ -66,52 +66,68 @@ func (m *TaskInputManifest) Validate() error {
 	if m.SchemaVersion != TaskInputManifestSchemaVersion {
 		return fmt.Errorf("task input manifest schema version mismatch: got %d, want %d", m.SchemaVersion, TaskInputManifestSchemaVersion)
 	}
-	validate := func(kind string, index int, ref TaskInputManifestRef) error {
-		label := kind
-		if index >= 0 {
-			label = fmt.Sprintf("%s %d", kind, index)
-		}
-		if !strings.HasPrefix(strings.TrimSpace(ref.AssetID), "asset_") {
-			return fmt.Errorf("task input manifest %s asset id is invalid", label)
-		}
-		if !strings.HasPrefix(strings.TrimSpace(ref.DerivativeID), "derivative_") {
-			return fmt.Errorf("task input manifest %s derivative id is invalid", label)
-		}
-		if ref.DerivativeTier != TierProcessingInput {
-			return fmt.Errorf("task input manifest %s derivative tier %q is not allowed", label, ref.DerivativeTier)
-		}
-		if strings.TrimSpace(ref.StorageProfileID) == "" || strings.TrimSpace(ref.ObjectKey) == "" {
-			return fmt.Errorf("task input manifest %s object identity is incomplete", label)
-		}
-		if ref.ObjectGeneration <= 0 {
-			return fmt.Errorf("task input manifest %s object generation is invalid", label)
-		}
-		if len(strings.TrimSpace(ref.ChecksumSHA256)) != 64 || !strings.HasPrefix(strings.ToLower(strings.TrimSpace(ref.MIMEType)), "image/") || ref.SizeBytes <= 0 {
-			return fmt.Errorf("task input manifest %s integrity facts are invalid", label)
-		}
-		return nil
+	if err := validateTaskInputManifestRefs("input", m.Inputs); err != nil {
+		return err
 	}
-	for index, ref := range m.Inputs {
-		if err := validate("input", index, ref); err != nil {
-			return err
-		}
+	if err := validateTaskInputManifestRefs("reference", m.References); err != nil {
+		return err
 	}
-	for index, ref := range m.References {
-		if err := validate("reference", index, ref); err != nil {
-			return err
-		}
+	if err := validateOptionalTaskInputManifestRef("original", m.Original); err != nil {
+		return err
 	}
-	if m.Original != nil {
-		if err := validate("original", -1, *m.Original); err != nil {
-			return err
-		}
-	}
-	if m.Mask != nil {
-		if err := validate("mask", -1, *m.Mask); err != nil {
+	return validateOptionalTaskInputManifestRef("mask", m.Mask)
+}
+
+func validateTaskInputManifestRefs(kind string, refs []TaskInputManifestRef) error {
+	for index, ref := range refs {
+		if err := validateTaskInputManifestRef(kind, index, ref); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func validateOptionalTaskInputManifestRef(kind string, ref *TaskInputManifestRef) error {
+	if ref == nil {
+		return nil
+	}
+	return validateTaskInputManifestRef(kind, -1, *ref)
+}
+
+func validateTaskInputManifestRef(kind string, index int, ref TaskInputManifestRef) error {
+	label := manifestRefLabel(kind, index)
+	if !strings.HasPrefix(strings.TrimSpace(ref.AssetID), "asset_") {
+		return fmt.Errorf("task input manifest %s asset id is invalid", label)
+	}
+	if !strings.HasPrefix(strings.TrimSpace(ref.DerivativeID), "derivative_") {
+		return fmt.Errorf("task input manifest %s derivative id is invalid", label)
+	}
+	if ref.DerivativeTier != TierProcessingInput {
+		return fmt.Errorf("task input manifest %s derivative tier %q is not allowed", label, ref.DerivativeTier)
+	}
+	if strings.TrimSpace(ref.StorageProfileID) == "" || strings.TrimSpace(ref.ObjectKey) == "" {
+		return fmt.Errorf("task input manifest %s object identity is incomplete", label)
+	}
+	if ref.ObjectGeneration <= 0 {
+		return fmt.Errorf("task input manifest %s object generation is invalid", label)
+	}
+	if !validTaskInputManifestIntegrity(ref) {
+		return fmt.Errorf("task input manifest %s integrity facts are invalid", label)
+	}
+	return nil
+}
+
+func manifestRefLabel(kind string, index int) string {
+	if index < 0 {
+		return kind
+	}
+	return fmt.Sprintf("%s %d", kind, index)
+}
+
+func validTaskInputManifestIntegrity(ref TaskInputManifestRef) bool {
+	return len(strings.TrimSpace(ref.ChecksumSHA256)) == 64 &&
+		strings.HasPrefix(strings.ToLower(strings.TrimSpace(ref.MIMEType)), "image/") &&
+		ref.SizeBytes > 0
 }
 
 func (m *TaskInputManifest) Marshal() ([]byte, error) {

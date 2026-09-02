@@ -32,53 +32,67 @@ func (l *paymentOrderLifecycle) convergeCheckoutSession(
 	}
 
 	if session.IsPaid() {
-		now := l.now().UTC()
-		result, err := l.repo.ConvergePaidPaymentOrder(
-			ctx,
-			paidCheckoutFactsFromSession(order.StripeAccountID, session, now),
-			now,
-		)
-		if err != nil {
-			return order, err
-		}
-		if !result.Replayed {
-			l.publish(result.Order.UserID, PaymentEvent{PublicToken: result.Order.PublicToken, Status: "credited"})
-		}
-		return result.Order, nil
+		return l.convergePaidCheckoutSession(ctx, order, session)
 	}
 
 	switch session.Status {
 	case CheckoutSessionStatusExpired:
 		return l.expireOrder(ctx, order)
 	case CheckoutSessionStatusComplete:
-		if signal == checkoutSignalAsyncSuccess {
-			return order, ErrStripeProviderUnavailable
-		}
-		if signal == checkoutSignalAsyncFailed {
-			failed, err := l.repo.MarkPaymentOrderFailed(ctx, order.ID)
-			if err != nil {
-				return order, err
-			}
-			if failed.Status == PaymentOrderFailed && failed.Status != order.Status {
-				l.publish(failed.UserID, PaymentEvent{PublicToken: failed.PublicToken, Status: "failed"})
-			}
-			return failed, nil
-		}
-		pending, err := l.repo.MarkPaymentOrderAsyncPending(ctx, order.ID)
+		return l.convergeCompletedCheckoutSession(ctx, order, signal)
+	case CheckoutSessionStatusOpen:
+		return convergeOpenCheckoutSession(order, signal)
+	default:
+		return order, ErrPurchasesUnavailable
+	}
+}
+
+func (l *paymentOrderLifecycle) convergePaidCheckoutSession(ctx context.Context, order PaymentOrder, session CheckoutSession) (PaymentOrder, error) {
+	now := l.now().UTC()
+	result, err := l.repo.ConvergePaidPaymentOrder(
+		ctx,
+		paidCheckoutFactsFromSession(order.StripeAccountID, session, now),
+		now,
+	)
+	if err != nil {
+		return order, err
+	}
+	if !result.Replayed {
+		l.publish(result.Order.UserID, PaymentEvent{PublicToken: result.Order.PublicToken, Status: "credited"})
+	}
+	return result.Order, nil
+}
+
+func (l *paymentOrderLifecycle) convergeCompletedCheckoutSession(ctx context.Context, order PaymentOrder, signal checkoutSignal) (PaymentOrder, error) {
+	if signal == checkoutSignalAsyncSuccess {
+		return order, ErrStripeProviderUnavailable
+	}
+	if signal == checkoutSignalAsyncFailed {
+		failed, err := l.repo.MarkPaymentOrderFailed(ctx, order.ID)
 		if err != nil {
 			return order, err
 		}
-		if order.Status != pending.Status {
-			l.publish(pending.UserID, PaymentEvent{PublicToken: pending.PublicToken, Status: "processing"})
+		if failed.Status == PaymentOrderFailed && failed.Status != order.Status {
+			l.publish(failed.UserID, PaymentEvent{PublicToken: failed.PublicToken, Status: "failed"})
 		}
-		return pending, nil
-	case CheckoutSessionStatusOpen:
-		if signal == checkoutSignalExpired || signal == checkoutSignalCompleted || signal == checkoutSignalAsyncFailed || signal == checkoutSignalAsyncSuccess {
-			return order, ErrStripeProviderUnavailable
-		}
-		return order, nil
+		return failed, nil
+	}
+	pending, err := l.repo.MarkPaymentOrderAsyncPending(ctx, order.ID)
+	if err != nil {
+		return order, err
+	}
+	if order.Status != pending.Status {
+		l.publish(pending.UserID, PaymentEvent{PublicToken: pending.PublicToken, Status: "processing"})
+	}
+	return pending, nil
+}
+
+func convergeOpenCheckoutSession(order PaymentOrder, signal checkoutSignal) (PaymentOrder, error) {
+	switch signal {
+	case checkoutSignalExpired, checkoutSignalCompleted, checkoutSignalAsyncFailed, checkoutSignalAsyncSuccess:
+		return order, ErrStripeProviderUnavailable
 	default:
-		return order, ErrPurchasesUnavailable
+		return order, nil
 	}
 }
 

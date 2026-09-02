@@ -234,6 +234,20 @@ func (s *Service) loadReferences(ctx context.Context, transactions []LedgerTrans
 	if len(transactions) == 0 {
 		return nil
 	}
+	transactionIDs, byID := collectReferenceTransactionIDs(transactions)
+	holdsByTransactionID, err := s.loadHoldReferences(ctx, transactionIDs, byID)
+	if err != nil {
+		return err
+	}
+	chargesByTransactionID, err := s.loadChargeReferences(ctx, transactionIDs, byID)
+	if err != nil {
+		return err
+	}
+	attachReferenceFallbacks(transactions, holdsByTransactionID, chargesByTransactionID)
+	return nil
+}
+
+func collectReferenceTransactionIDs(transactions []LedgerTransaction) ([]string, map[string]*LedgerTransaction) {
 	transactionIDs := make([]string, 0, len(transactions)*2)
 	seenTransactionIDs := make(map[string]struct{}, len(transactions)*2)
 	byID := make(map[string]*LedgerTransaction, len(transactions))
@@ -248,7 +262,14 @@ func (s *Service) loadReferences(ctx context.Context, transactions []LedgerTrans
 		}
 		byID[transactions[index].TransactionID] = &transactions[index]
 	}
+	return transactionIDs, byID
+}
 
+func (s *Service) loadHoldReferences(
+	ctx context.Context,
+	transactionIDs []string,
+	byID map[string]*LedgerTransaction,
+) (map[string]*HoldReference, error) {
 	holds, err := s.pool.Query(ctx, `
 	SELECT hold_transaction_id, amount, captured_amount, released_amount, status,
 	       COALESCE(capture_transaction_id, ''), COALESCE(release_transaction_id, '')
@@ -257,10 +278,10 @@ func (s *Service) loadReferences(ctx context.Context, transactions []LedgerTrans
 	   OR capture_transaction_id = ANY($1::VARCHAR[])
 	   OR release_transaction_id = ANY($1::VARCHAR[])`, transactionIDs)
 	if err != nil {
-		return fmt.Errorf("credits service: list hold references: %w", err)
+		return nil, fmt.Errorf("credits service: list hold references: %w", err)
 	}
 	defer holds.Close()
-	holdsByTransactionID := make(map[string]*HoldReference, len(transactions))
+	holdsByTransactionID := make(map[string]*HoldReference, len(byID))
 	for holds.Next() {
 		var holdTransactionID, captureTransactionID, releaseTransactionID string
 		reference := HoldReference{}
@@ -273,7 +294,7 @@ func (s *Service) loadReferences(ctx context.Context, transactions []LedgerTrans
 			&captureTransactionID,
 			&releaseTransactionID,
 		); err != nil {
-			return fmt.Errorf("credits service: scan hold reference: %w", err)
+			return nil, fmt.Errorf("credits service: scan hold reference: %w", err)
 		}
 		reference.CaptureTransactionID = captureTransactionID
 		reference.ReleaseTransactionID = releaseTransactionID
@@ -291,9 +312,16 @@ func (s *Service) loadReferences(ctx context.Context, transactions []LedgerTrans
 		}
 	}
 	if err := holds.Err(); err != nil {
-		return fmt.Errorf("credits service: read hold references: %w", err)
+		return nil, fmt.Errorf("credits service: read hold references: %w", err)
 	}
+	return holdsByTransactionID, nil
+}
 
+func (s *Service) loadChargeReferences(
+	ctx context.Context,
+	transactionIDs []string,
+	byID map[string]*LedgerTransaction,
+) (map[string]*ChargeReference, error) {
 	charges, err := s.pool.Query(ctx, `
 SELECT charge.capture_transaction_id, charge.amount, charge.refunded_amount, COALESCE(refund.transaction_id, '')
 FROM credit_charges charge
@@ -307,15 +335,15 @@ WHERE charge.capture_transaction_id = ANY($1::VARCHAR[])
        AND related_transaction_id IS NOT NULL
    )`, transactionIDs)
 	if err != nil {
-		return fmt.Errorf("credits service: list charge references: %w", err)
+		return nil, fmt.Errorf("credits service: list charge references: %w", err)
 	}
 	defer charges.Close()
-	chargesByTransactionID := make(map[string]*ChargeReference, len(transactions))
+	chargesByTransactionID := make(map[string]*ChargeReference, len(byID))
 	for charges.Next() {
 		var captureTransactionID, refundTransactionID string
 		reference := ChargeReference{}
 		if err := charges.Scan(&captureTransactionID, &reference.Amount, &reference.RefundedAmount, &refundTransactionID); err != nil {
-			return fmt.Errorf("credits service: scan charge reference: %w", err)
+			return nil, fmt.Errorf("credits service: scan charge reference: %w", err)
 		}
 		reference.RemainingRefundable = reference.Amount - reference.RefundedAmount
 		chargesByTransactionID[captureTransactionID] = &reference
@@ -325,11 +353,18 @@ WHERE charge.capture_transaction_id = ANY($1::VARCHAR[])
 		}
 	}
 	if err := charges.Err(); err != nil {
-		return fmt.Errorf("credits service: read charge references: %w", err)
+		return nil, fmt.Errorf("credits service: read charge references: %w", err)
 	}
+	return chargesByTransactionID, nil
+}
 
-	// A capture/refund can refer to a transaction outside this page. Query keys
-	// include related IDs and this loop attaches those facts without N+1 reads.
+// A capture/refund can refer to a transaction outside this page. Query keys
+// include related IDs and this loop attaches those facts without N+1 reads.
+func attachReferenceFallbacks(
+	transactions []LedgerTransaction,
+	holdsByTransactionID map[string]*HoldReference,
+	chargesByTransactionID map[string]*ChargeReference,
+) {
 	for index := range transactions {
 		transaction := &transactions[index]
 		if transaction.Hold == nil {
@@ -347,7 +382,6 @@ WHERE charge.capture_transaction_id = ANY($1::VARCHAR[])
 			}
 		}
 	}
-	return nil
 }
 
 func (s *Service) loadPostings(ctx context.Context, transactions []LedgerTransaction) error {

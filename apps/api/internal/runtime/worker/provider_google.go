@@ -18,6 +18,7 @@ import (
 	"ideaboard/api/internal/media/mediarefs"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/safehttp"
+	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -363,29 +364,42 @@ func (c *ProviderExecutor) collectGoogleInlineImageParts(ctx context.Context, re
 func (c *ProviderExecutor) resolveGoogleImageBytes(ctx context.Context, ref string, timeout time.Duration) (string, []byte, error) {
 	ref = strings.TrimSpace(ref)
 	if strings.HasPrefix(ref, "data:") {
-		parsed, err := mediarefs.ParseDataImageURL(ref, maxGoogleDataURLBytes)
-		if err != nil {
-			return "", nil, fmt.Errorf("解析 data URL 失败: %w", err)
-		}
-		if _, err := imageformat.InspectBytes(parsed.Data, parsed.Ext); err != nil {
-			return "", nil, err
-		}
-		return parsed.MIMEType, parsed.Data, nil
+		return resolveGoogleDataImage(ref)
 	}
 
 	if obj, ok, err := c.readRelativeUploadObject(ctx, ref, maxGoogleInlineImageBytes); ok {
-		if err != nil {
-			return "", nil, fmt.Errorf("读取上传图像失败: %w", err)
-		}
-		if _, err := imageformat.InspectDetectedBytes(obj.Data); err != nil {
-			return "", nil, err
-		}
-		mimeType := strings.TrimSpace(obj.ContentType)
-		if !strings.HasPrefix(strings.ToLower(mimeType), "image/") {
-			mimeType = inferLocalAssetMimeType(obj.Filename, obj.Data)
-		}
-		return mimeType, obj.Data, nil
+		return resolveGoogleRelativeImage(obj, err)
 	}
+
+	return c.resolveGoogleRemoteImage(ctx, ref, timeout)
+}
+
+func resolveGoogleDataImage(ref string) (string, []byte, error) {
+	parsed, err := mediarefs.ParseDataImageURL(ref, maxGoogleDataURLBytes)
+	if err != nil {
+		return "", nil, fmt.Errorf("解析 data URL 失败: %w", err)
+	}
+	if _, err := imageformat.InspectBytes(parsed.Data, parsed.Ext); err != nil {
+		return "", nil, err
+	}
+	return parsed.MIMEType, parsed.Data, nil
+}
+
+func resolveGoogleRelativeImage(obj *taskmedia.StoredObject, readErr error) (string, []byte, error) {
+	if readErr != nil {
+		return "", nil, fmt.Errorf("读取上传图像失败: %w", readErr)
+	}
+	if _, err := imageformat.InspectDetectedBytes(obj.Data); err != nil {
+		return "", nil, err
+	}
+	mimeType := strings.TrimSpace(obj.ContentType)
+	if !strings.HasPrefix(strings.ToLower(mimeType), "image/") {
+		mimeType = inferLocalAssetMimeType(obj.Filename, obj.Data)
+	}
+	return mimeType, obj.Data, nil
+}
+
+func (c *ProviderExecutor) resolveGoogleRemoteImage(ctx context.Context, ref string, timeout time.Duration) (string, []byte, error) {
 
 	parsedURL, err := url.Parse(ref)
 	if err != nil || parsedURL == nil || parsedURL.Scheme == "" || parsedURL.Host == "" {

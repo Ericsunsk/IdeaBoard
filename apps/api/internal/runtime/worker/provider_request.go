@@ -145,68 +145,86 @@ func validateCanonicalRuntimeControls(params *tasks.WorkflowTaskParams, contract
 	if params == nil {
 		return fmt.Errorf("task params are required")
 	}
-	unexpected := func(expected string) error {
-		return fmt.Errorf("task canonical controls do not match execution plan: expected %s", expected)
-	}
-	rejectOtherControls := func(variation, outpaint, upscale, fusion bool) error {
-		if (params.Variation != nil) != variation ||
-			(params.Outpaint != nil) != outpaint ||
-			(params.Upscale != nil) != upscale ||
-			(params.Fusion != nil) != fusion {
-			return unexpected(string(contract))
-		}
-		return nil
+	if err := validateCanonicalControlPresence(params, contract); err != nil {
+		return err
 	}
 
 	switch contract {
 	case workflow.RuntimeControlsNone:
-		return rejectOtherControls(false, false, false, false)
+		return nil
 	case workflow.RuntimeControlsVariation:
-		if err := rejectOtherControls(true, false, false, false); err != nil {
-			return err
-		}
-		strength := params.Variation.Strength
-		if math.IsNaN(strength) || math.IsInf(strength, 0) || strength < 0 || strength > 100 || strength != math.Round(strength) {
-			return fmt.Errorf("task variation controls are invalid")
-		}
-		return nil
+		return validateVariationControls(params.Variation)
 	case workflow.RuntimeControlsOutpaint:
-		if err := rejectOtherControls(false, true, false, false); err != nil {
-			return err
-		}
-		outpaint := params.Outpaint
-		if outpaint.TargetWidth <= 0 || outpaint.TargetHeight <= 0 || outpaint.ImageOffsetX < 0 || outpaint.ImageOffsetY < 0 {
-			return fmt.Errorf("task image outpaint controls are invalid")
-		}
-		return nil
+		return validateOutpaintControls(params.Outpaint)
 	case workflow.RuntimeControlsUpscale:
-		if err := rejectOtherControls(false, false, true, false); err != nil {
-			return err
-		}
-		scale := params.Upscale.Scale
-		if math.IsNaN(scale) || math.IsInf(scale, 0) || scale < 1 || scale > 4 || math.Abs(scale*10-math.Round(scale*10)) > 1e-9 {
-			return fmt.Errorf("task upscale controls are invalid")
-		}
-		return nil
+		return validateUpscaleControls(params.Upscale)
 	case workflow.RuntimeControlsFusion:
-		if err := rejectOtherControls(false, false, false, true); err != nil {
-			return err
-		}
-		if strings.TrimSpace(params.Fusion.Mode) != "weighted_reference" || len(params.Fusion.InputWeights) == 0 {
-			return fmt.Errorf("task fusion controls are invalid")
-		}
-		if params.Media == nil || len(params.Fusion.InputWeights) != len(params.Media.Inputs) {
-			return fmt.Errorf("task fusion controls do not match input media")
-		}
-		for _, weight := range params.Fusion.InputWeights {
-			if math.IsNaN(weight) || math.IsInf(weight, 0) {
-				return fmt.Errorf("task fusion controls are invalid")
-			}
-		}
-		return nil
+		return validateFusionControls(params)
 	default:
 		return fmt.Errorf("unsupported runtime control contract %q", contract)
 	}
+}
+
+func validateCanonicalControlPresence(params *tasks.WorkflowTaskParams, contract workflow.RuntimeControlContract) error {
+	variation, outpaint, upscale, fusion := false, false, false, false
+	switch contract {
+	case workflow.RuntimeControlsNone:
+	case workflow.RuntimeControlsVariation:
+		variation = true
+	case workflow.RuntimeControlsOutpaint:
+		outpaint = true
+	case workflow.RuntimeControlsUpscale:
+		upscale = true
+	case workflow.RuntimeControlsFusion:
+		fusion = true
+	default:
+		return fmt.Errorf("unsupported runtime control contract %q", contract)
+	}
+	if (params.Variation != nil) != variation ||
+		(params.Outpaint != nil) != outpaint ||
+		(params.Upscale != nil) != upscale ||
+		(params.Fusion != nil) != fusion {
+		return fmt.Errorf("task canonical controls do not match execution plan: expected %s", contract)
+	}
+	return nil
+}
+
+func validateVariationControls(variation *tasks.VariationsParams) error {
+	strength := variation.Strength
+	if math.IsNaN(strength) || math.IsInf(strength, 0) || strength < 0 || strength > 100 || strength != math.Round(strength) {
+		return fmt.Errorf("task variation controls are invalid")
+	}
+	return nil
+}
+
+func validateOutpaintControls(outpaint *tasks.OutpaintParams) error {
+	if outpaint.TargetWidth <= 0 || outpaint.TargetHeight <= 0 || outpaint.ImageOffsetX < 0 || outpaint.ImageOffsetY < 0 {
+		return fmt.Errorf("task image outpaint controls are invalid")
+	}
+	return nil
+}
+
+func validateUpscaleControls(upscale *tasks.UpscaleParams) error {
+	scale := upscale.Scale
+	if math.IsNaN(scale) || math.IsInf(scale, 0) || scale < 1 || scale > 4 || math.Abs(scale*10-math.Round(scale*10)) > 1e-9 {
+		return fmt.Errorf("task upscale controls are invalid")
+	}
+	return nil
+}
+
+func validateFusionControls(params *tasks.WorkflowTaskParams) error {
+	if strings.TrimSpace(params.Fusion.Mode) != "weighted_reference" || len(params.Fusion.InputWeights) == 0 {
+		return fmt.Errorf("task fusion controls are invalid")
+	}
+	if params.Media == nil || len(params.Fusion.InputWeights) != len(params.Media.Inputs) {
+		return fmt.Errorf("task fusion controls do not match input media")
+	}
+	for _, weight := range params.Fusion.InputWeights {
+		if math.IsNaN(weight) || math.IsInf(weight, 0) {
+			return fmt.Errorf("task fusion controls are invalid")
+		}
+	}
+	return nil
 }
 
 func providerMediaFacts(media *tasks.MediaInputs) (int, bool) {

@@ -260,72 +260,114 @@ func finalFailTaskWithLeaseParams(intent TaskConvergenceIntent, completedAt time
 // runTerminalTransition owns the atomic terminal recipe. Repository methods
 // only adapt their caller-specific task fact command into this invariant.
 func (r *Repository) runTerminalTransition(ctx context.Context, command terminalTransitionCommand) (int64, error) {
+	command, policy, err := prepareTerminalTransition(r, command)
+	if err != nil {
+		return 0, err
+	}
+	return r.runTerminalTransitionTx(ctx, command, policy)
+}
+
+func prepareTerminalTransition(r *Repository, command terminalTransitionCommand) (terminalTransitionCommand, terminalTransitionPolicy, error) {
 	if r == nil || r.db == nil {
-		return 0, fmt.Errorf("task terminal repository is unavailable")
+		return terminalTransitionCommand{}, terminalTransitionPolicy{}, fmt.Errorf("task terminal repository is unavailable")
 	}
 	command.taskID = strings.TrimSpace(command.taskID)
 	if command.taskID == "" {
-		return 0, fmt.Errorf("task_id is required")
+		return terminalTransitionCommand{}, terminalTransitionPolicy{}, fmt.Errorf("task_id is required")
 	}
 	if command.writeTaskFact == nil {
-		return 0, fmt.Errorf("task terminal fact writer is required")
+		return terminalTransitionCommand{}, terminalTransitionPolicy{}, fmt.Errorf("task terminal fact writer is required")
 	}
 	if command.finishedAt.IsZero() {
 		command.finishedAt = time.Now()
 	}
 	policy, err := resolveTerminalTransitionPolicy(command.kind)
 	if err != nil {
-		return 0, err
+		return terminalTransitionCommand{}, terminalTransitionPolicy{}, err
 	}
+	return command, policy, nil
+}
 
+func (r *Repository) runTerminalTransitionTx(ctx context.Context, command terminalTransitionCommand, policy terminalTransitionPolicy) (int64, error) {
 	var rowsAffected int64
-	err = dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx *sql.Tx) error {
-		normalizedAttemptFinish, err := normalizeTerminalAttemptFinishTx(ctx, q, command, policy)
+	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx *sql.Tx) error {
+		updated, err := applyTerminalTransitionTx(ctx, q, tx, command, policy)
 		if err != nil {
-			return err
-		}
-		command.attemptFinish = normalizedAttemptFinish
-
-		updated, err := command.writeTaskFact(ctx, q)
-		if err != nil || updated == 0 {
-			return err
-		}
-
-		taskRow, err := q.GetTaskByTaskID(ctx, command.taskID)
-		if err != nil {
-			return err
-		}
-		task := taskFromSQLC(taskRow)
-		isCompatibleCancellation := command.kind == terminalTransitionCancelled && tasks.IsTerminalStatus(task.Status) && (task.Status == tasks.StatusCancelled || task.Status == tasks.StatusCancelledWithResults)
-		if task.Status != policy.taskStatus && !isCompatibleCancellation {
-			return fmt.Errorf("task terminal fact status=%q, want %q", task.Status, policy.taskStatus)
-		}
-
-		if policy.replacesOutputs {
-			if err := replaceTaskOutputsTx(ctx, q, &task, command.outputs); err != nil {
-				return err
-			}
-		}
-		if err := finishTerminalTaskAttemptTx(ctx, q, command, policy); err != nil {
-			return err
-		}
-		if err := releaseTerminalTaskLeaseTx(ctx, q, command, policy); err != nil {
-			return err
-		}
-		if _, err := q.ReleaseTaskInputMediaRefs(ctx, command.taskID); err != nil {
-			return err
-		}
-		metricsByTaskID, err := listExecutionMetricsByTaskIDsTx(ctx, q, []string{command.taskID})
-		if err != nil {
-			return err
-		}
-		if err := applyTerminalOutcomeTx(ctx, q, tx, &task, metricsByTaskID[command.taskID], command, policy); err != nil {
 			return err
 		}
 		rowsAffected = updated
 		return nil
 	})
 	return rowsAffected, err
+}
+
+func applyTerminalTransitionTx(
+	ctx context.Context,
+	q *dbsqlc.Queries,
+	tx *sql.Tx,
+	command terminalTransitionCommand,
+	policy terminalTransitionPolicy,
+) (int64, error) {
+	normalizedAttemptFinish, err := normalizeTerminalAttemptFinishTx(ctx, q, command, policy)
+	if err != nil {
+		return 0, err
+	}
+	command.attemptFinish = normalizedAttemptFinish
+
+	updated, err := command.writeTaskFact(ctx, q)
+	if err != nil || updated == 0 {
+		return updated, err
+	}
+
+	taskRow, err := q.GetTaskByTaskID(ctx, command.taskID)
+	if err != nil {
+		return 0, err
+	}
+	task := taskFromSQLC(taskRow)
+	if err := validateTerminalTaskStatus(command, policy, task.Status); err != nil {
+		return 0, err
+	}
+	if err := finalizeTerminalTaskTx(ctx, q, tx, &task, command, policy); err != nil {
+		return 0, err
+	}
+	return updated, nil
+}
+
+func validateTerminalTaskStatus(command terminalTransitionCommand, policy terminalTransitionPolicy, status string) error {
+	isCompatibleCancellation := command.kind == terminalTransitionCancelled && tasks.IsTerminalStatus(status) && (status == tasks.StatusCancelled || status == tasks.StatusCancelledWithResults)
+	if status != policy.taskStatus && !isCompatibleCancellation {
+		return fmt.Errorf("task terminal fact status=%q, want %q", status, policy.taskStatus)
+	}
+	return nil
+}
+
+func finalizeTerminalTaskTx(
+	ctx context.Context,
+	q *dbsqlc.Queries,
+	tx *sql.Tx,
+	task *tasks.Task,
+	command terminalTransitionCommand,
+	policy terminalTransitionPolicy,
+) error {
+	if policy.replacesOutputs {
+		if err := replaceTaskOutputsTx(ctx, q, task, command.outputs); err != nil {
+			return err
+		}
+	}
+	if err := finishTerminalTaskAttemptTx(ctx, q, command, policy); err != nil {
+		return err
+	}
+	if err := releaseTerminalTaskLeaseTx(ctx, q, command, policy); err != nil {
+		return err
+	}
+	if _, err := q.ReleaseTaskInputMediaRefs(ctx, command.taskID); err != nil {
+		return err
+	}
+	metricsByTaskID, err := listExecutionMetricsByTaskIDsTx(ctx, q, []string{command.taskID})
+	if err != nil {
+		return err
+	}
+	return applyTerminalOutcomeTx(ctx, q, tx, task, metricsByTaskID[command.taskID], command, policy)
 }
 
 func applyTerminalOutcomeTx(

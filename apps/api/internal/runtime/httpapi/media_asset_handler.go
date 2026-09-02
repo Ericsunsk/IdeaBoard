@@ -66,6 +66,12 @@ type mediaAssetBatchDTO struct {
 	Items []mediaAssetDTO `json:"items"`
 }
 
+type metadataBatchFailure struct {
+	status  int
+	message string
+	cause   error
+}
+
 func (h *mediaAssetHandler) Metadata(c *gin.Context) {
 	identity, ok := principal.Require(c)
 	if !ok || h == nil || h.assets == nil {
@@ -115,58 +121,91 @@ func (h *mediaAssetHandler) MetadataBatch(c *gin.Context) {
 	if !ok || h == nil || h.assets == nil {
 		return
 	}
+	req, ensureTier, failure := parseMetadataBatchRequest(c)
+	if failure != nil {
+		respondMetadataBatchFailure(c, failure)
+		return
+	}
+	items, failure := h.collectMetadataBatch(c, identity.UserID(), req.AssetIDs, ensureTier)
+	if failure != nil {
+		respondMetadataBatchFailure(c, failure)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	response.SuccessDTO(c, mediaAssetBatchDTO{Items: items})
+}
+
+func parseMetadataBatchRequest(c *gin.Context) (mediaAssetBatchRequest, string, *metadataBatchFailure) {
 	var req mediaAssetBatchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "请求参数无效")
-		return
+		return req, "", &metadataBatchFailure{status: http.StatusBadRequest, message: "请求参数无效"}
 	}
 	if len(req.AssetIDs) == 0 || len(req.AssetIDs) > 100 {
-		response.Error(c, http.StatusBadRequest, "媒体数量必须在1到100之间")
-		return
+		return req, "", &metadataBatchFailure{status: http.StatusBadRequest, message: "媒体数量必须在1到100之间"}
 	}
 	ensureTier := strings.TrimSpace(req.EnsureTier)
-	if ensureTier != "" && ensureTier != derivatives.TierLargePreview && ensureTier != derivatives.TierProcessing && ensureTier != derivatives.TierProcessingInput {
-		response.Error(c, http.StatusBadRequest, "请求的媒体派生规格无效")
+	if !isMetadataBatchTier(ensureTier) {
+		return req, "", &metadataBatchFailure{status: http.StatusBadRequest, message: "请求的媒体派生规格无效"}
+	}
+	return req, ensureTier, nil
+}
+
+func isMetadataBatchTier(ensureTier string) bool {
+	return ensureTier == "" || ensureTier == derivatives.TierLargePreview || ensureTier == derivatives.TierProcessing || ensureTier == derivatives.TierProcessingInput
+}
+
+func respondMetadataBatchFailure(c *gin.Context, failure *metadataBatchFailure) {
+	if failure.status >= http.StatusInternalServerError {
+		response.InternalError(c, failure.status, failure.message, failure.cause)
 		return
 	}
-	items := make([]mediaAssetDTO, 0, len(req.AssetIDs))
-	seen := make(map[string]struct{}, len(req.AssetIDs))
-	for _, rawID := range req.AssetIDs {
+	response.Error(c, failure.status, failure.message)
+}
+
+func (h *mediaAssetHandler) collectMetadataBatch(c *gin.Context, ownerUserID int64, rawAssetIDs []string, ensureTier string) ([]mediaAssetDTO, *metadataBatchFailure) {
+	items := make([]mediaAssetDTO, 0, len(rawAssetIDs))
+	seen := make(map[string]struct{}, len(rawAssetIDs))
+	for _, rawID := range rawAssetIDs {
 		assetID := strings.TrimSpace(rawID)
 		if assetID == "" || len(assetID) > 128 {
-			response.Error(c, http.StatusBadRequest, "媒体标识无效")
-			return
+			return nil, &metadataBatchFailure{status: http.StatusBadRequest, message: "媒体标识无效"}
 		}
 		if _, exists := seen[assetID]; exists {
 			continue
 		}
 		seen[assetID] = struct{}{}
-		asset, err := h.lookupAsset(c, identity.UserID(), assetID)
-		if errors.Is(err, sql.ErrNoRows) {
-			continue
+		item, include, failure := h.loadMetadataBatchItem(c, ownerUserID, assetID, ensureTier)
+		if failure != nil {
+			return nil, failure
 		}
-		if err != nil {
-			response.InternalError(c, http.StatusInternalServerError, "读取媒体信息失败", err)
-			return
+		if include {
+			items = append(items, item)
 		}
-		if ensureTier != "" && asset.Status == "ready" {
-			if err := h.assets.EnsureDerivative(c.Request.Context(), identity.UserID(), asset.ID, ensureTier); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					continue
-				}
-				response.InternalError(c, http.StatusInternalServerError, "准备媒体派生信息失败", err)
-				return
-			}
-		}
-		item, err := h.buildMetadata(c, identity.UserID(), asset)
-		if err != nil {
-			response.InternalError(c, http.StatusInternalServerError, "读取媒体派生信息失败", err)
-			return
-		}
-		items = append(items, item)
 	}
-	c.Header("Cache-Control", "no-store")
-	response.SuccessDTO(c, mediaAssetBatchDTO{Items: items})
+	return items, nil
+}
+
+func (h *mediaAssetHandler) loadMetadataBatchItem(c *gin.Context, ownerUserID int64, assetID, ensureTier string) (mediaAssetDTO, bool, *metadataBatchFailure) {
+	asset, err := h.lookupAsset(c, ownerUserID, assetID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return mediaAssetDTO{}, false, nil
+	}
+	if err != nil {
+		return mediaAssetDTO{}, false, &metadataBatchFailure{status: http.StatusInternalServerError, message: "读取媒体信息失败", cause: err}
+	}
+	if ensureTier != "" && asset.Status == "ready" {
+		if err := h.assets.EnsureDerivative(c.Request.Context(), ownerUserID, asset.ID, ensureTier); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return mediaAssetDTO{}, false, nil
+			}
+			return mediaAssetDTO{}, false, &metadataBatchFailure{status: http.StatusInternalServerError, message: "准备媒体派生信息失败", cause: err}
+		}
+	}
+	item, err := h.buildMetadata(c, ownerUserID, asset)
+	if err != nil {
+		return mediaAssetDTO{}, false, &metadataBatchFailure{status: http.StatusInternalServerError, message: "读取媒体派生信息失败", cause: err}
+	}
+	return item, true, nil
 }
 
 func (h *mediaAssetHandler) buildMetadata(c *gin.Context, ownerUserID int64, asset dbsqlc.MediaAsset) (mediaAssetDTO, error) {

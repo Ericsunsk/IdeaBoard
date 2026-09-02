@@ -43,78 +43,21 @@ type CanonicalRequest struct {
 }
 
 func NewCanonicalRequest(input CanonicalRequestInput) (CanonicalRequest, error) {
-	if input.UserID <= 0 {
-		return CanonicalRequest{}, fmt.Errorf("canonical submission user id is invalid")
+	feature, priority, err := validateCanonicalMetadata(input)
+	if err != nil {
+		return CanonicalRequest{}, err
 	}
-	feature := strings.TrimSpace(input.Feature)
-	if feature == "" {
-		return CanonicalRequest{}, fmt.Errorf("canonical submission feature is required")
+	executionPlan, err := validateCanonicalExecutionPlan(feature, input.Params, input.ExecutionPlan)
+	if err != nil {
+		return CanonicalRequest{}, err
 	}
-	priority := tasks.EffectiveTaskPriority(input.Priority)
-	if !tasks.IsValidTaskPriority(priority) {
-		return CanonicalRequest{}, fmt.Errorf("canonical submission priority is invalid")
+	billingRequest, err := validateCanonicalBilling(feature, input.ClientActionID, executionPlan, input.BillingRequest)
+	if err != nil {
+		return CanonicalRequest{}, err
 	}
-	var executionPlan *workflow.FeatureExecutionPlan
-	if workflow.IsAIImageFeature(feature) {
-		if input.ExecutionPlan == nil {
-			return CanonicalRequest{}, fmt.Errorf("canonical AI image submission requires execution plan")
-		}
-		encodedPlan, err := workflow.EncodeFeatureExecutionPlan(*input.ExecutionPlan)
-		if err != nil {
-			return CanonicalRequest{}, fmt.Errorf("canonical submission execution plan: %w", err)
-		}
-		if input.ExecutionPlan.Feature() != feature {
-			return CanonicalRequest{}, fmt.Errorf("canonical submission execution plan does not match feature")
-		}
-		typedParams, err := tasks.UnmarshalParams(input.Params)
-		if err != nil {
-			return CanonicalRequest{}, fmt.Errorf("canonical submission params: %w", err)
-		}
-		persistedPlan, err := workflow.DecodeFeatureExecutionPlan(typedParams.ExecutionPlan)
-		if err != nil {
-			return CanonicalRequest{}, fmt.Errorf("canonical submission persisted execution plan: %w", err)
-		}
-		persistedPlanJSON, err := workflow.EncodeFeatureExecutionPlan(persistedPlan)
-		if err != nil || !bytes.Equal(encodedPlan, persistedPlanJSON) {
-			return CanonicalRequest{}, fmt.Errorf("canonical submission persisted execution plan does not match compiled plan")
-		}
-		planCopy := *input.ExecutionPlan
-		executionPlan = &planCopy
-	} else if input.ExecutionPlan != nil {
-		return CanonicalRequest{}, fmt.Errorf("canonical non-image submission must not carry execution plan")
-	}
-	var billingRequest *taskbilling.Request
-	if taskbilling.RequiresBilling(feature) && input.BillingRequest == nil {
-		return CanonicalRequest{}, fmt.Errorf("canonical billed submission requires billing request")
-	}
-	if input.BillingRequest != nil {
-		request := *input.BillingRequest
-		if strings.TrimSpace(request.Feature) != feature {
-			return CanonicalRequest{}, fmt.Errorf("canonical submission billing product does not match feature")
-		}
-		if _, err := taskbilling.RequestFingerprint(request); err != nil {
-			return CanonicalRequest{}, fmt.Errorf("canonical submission billing request: %w", err)
-		}
-		if strings.TrimSpace(input.ClientActionID) == "" {
-			return CanonicalRequest{}, fmt.Errorf("canonical billed submission requires client action id")
-		}
-		if executionPlan != nil && (string(request.OutputResolution) != executionPlan.OutputResolution() || request.Quantity != int64(executionPlan.RequestedOutputCount().Int())) {
-			return CanonicalRequest{}, fmt.Errorf("canonical submission billing request does not match execution plan")
-		}
-		billingRequest = &request
-	}
-	var generation *tasks.GenerationRequestSnapshot
-	if input.Generation != nil {
-		copySnapshot := cloneGenerationSnapshot(*input.Generation)
-		if err := validateGenerationSnapshot(copySnapshot); err != nil {
-			return CanonicalRequest{}, err
-		}
-		generation = &copySnapshot
-		if executionPlan != nil {
-			if err := validateGenerationSnapshotAgainstPlan(copySnapshot, *executionPlan); err != nil {
-				return CanonicalRequest{}, err
-			}
-		}
+	generation, err := validateCanonicalGeneration(input.Generation, executionPlan)
+	if err != nil {
+		return CanonicalRequest{}, err
 	}
 	if billingRequest != nil && generation != nil && billingRequest.Quantity != int64(generation.RequestedOutputCount) {
 		return CanonicalRequest{}, fmt.Errorf("canonical submission billing quantity does not match generation output count")
@@ -125,6 +68,93 @@ func NewCanonicalRequest(input CanonicalRequestInput) (CanonicalRequest, error) 
 		priority: priority, billingRequest: billingRequest,
 		generation: generation, executionPlan: executionPlan,
 	}, nil
+}
+
+func validateCanonicalMetadata(input CanonicalRequestInput) (string, int, error) {
+	if input.UserID <= 0 {
+		return "", 0, fmt.Errorf("canonical submission user id is invalid")
+	}
+	feature := strings.TrimSpace(input.Feature)
+	if feature == "" {
+		return "", 0, fmt.Errorf("canonical submission feature is required")
+	}
+	priority := tasks.EffectiveTaskPriority(input.Priority)
+	if !tasks.IsValidTaskPriority(priority) {
+		return "", 0, fmt.Errorf("canonical submission priority is invalid")
+	}
+	return feature, priority, nil
+}
+
+func validateCanonicalExecutionPlan(feature, params string, planInput *workflow.FeatureExecutionPlan) (*workflow.FeatureExecutionPlan, error) {
+	if !workflow.IsAIImageFeature(feature) {
+		if planInput != nil {
+			return nil, fmt.Errorf("canonical non-image submission must not carry execution plan")
+		}
+		return nil, nil
+	}
+	if planInput == nil {
+		return nil, fmt.Errorf("canonical AI image submission requires execution plan")
+	}
+	encodedPlan, err := workflow.EncodeFeatureExecutionPlan(*planInput)
+	if err != nil {
+		return nil, fmt.Errorf("canonical submission execution plan: %w", err)
+	}
+	if planInput.Feature() != feature {
+		return nil, fmt.Errorf("canonical submission execution plan does not match feature")
+	}
+	typedParams, err := tasks.UnmarshalParams(params)
+	if err != nil {
+		return nil, fmt.Errorf("canonical submission params: %w", err)
+	}
+	persistedPlan, err := workflow.DecodeFeatureExecutionPlan(typedParams.ExecutionPlan)
+	if err != nil {
+		return nil, fmt.Errorf("canonical submission persisted execution plan: %w", err)
+	}
+	persistedPlanJSON, err := workflow.EncodeFeatureExecutionPlan(persistedPlan)
+	if err != nil || !bytes.Equal(encodedPlan, persistedPlanJSON) {
+		return nil, fmt.Errorf("canonical submission persisted execution plan does not match compiled plan")
+	}
+	planCopy := *planInput
+	return &planCopy, nil
+}
+
+func validateCanonicalBilling(feature, clientActionID string, executionPlan *workflow.FeatureExecutionPlan, input *taskbilling.Request) (*taskbilling.Request, error) {
+	if taskbilling.RequiresBilling(feature) && input == nil {
+		return nil, fmt.Errorf("canonical billed submission requires billing request")
+	}
+	if input == nil {
+		return nil, nil
+	}
+	request := *input
+	if strings.TrimSpace(request.Feature) != feature {
+		return nil, fmt.Errorf("canonical submission billing product does not match feature")
+	}
+	if _, err := taskbilling.RequestFingerprint(request); err != nil {
+		return nil, fmt.Errorf("canonical submission billing request: %w", err)
+	}
+	if strings.TrimSpace(clientActionID) == "" {
+		return nil, fmt.Errorf("canonical billed submission requires client action id")
+	}
+	if executionPlan != nil && (string(request.OutputResolution) != executionPlan.OutputResolution() || request.Quantity != int64(executionPlan.RequestedOutputCount().Int())) {
+		return nil, fmt.Errorf("canonical submission billing request does not match execution plan")
+	}
+	return &request, nil
+}
+
+func validateCanonicalGeneration(input *tasks.GenerationRequestSnapshot, executionPlan *workflow.FeatureExecutionPlan) (*tasks.GenerationRequestSnapshot, error) {
+	if input == nil {
+		return nil, nil
+	}
+	copySnapshot := cloneGenerationSnapshot(*input)
+	if err := validateGenerationSnapshot(copySnapshot); err != nil {
+		return nil, err
+	}
+	if executionPlan != nil {
+		if err := validateGenerationSnapshotAgainstPlan(copySnapshot, *executionPlan); err != nil {
+			return nil, err
+		}
+	}
+	return &copySnapshot, nil
 }
 
 func (r CanonicalRequest) UserID() int64 {

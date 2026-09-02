@@ -301,39 +301,57 @@ type cloudflareAIResponse struct {
 }
 
 func extractCloudflareWorkersAIVision(ctx context.Context, config VisionProviderConfig, input VisionInput) (VisionExtraction, error) {
+	body, err := cloudflareVisionRequestBody(input)
+	if err != nil {
+		return VisionExtraction{}, err
+	}
+	request, err := newCloudflareVisionRequest(ctx, config, body)
+	if err != nil {
+		return VisionExtraction{}, err
+	}
+	return executeCloudflareVisionRequest(ctx, request)
+}
+
+func cloudflareVisionRequestBody(input VisionInput) ([]byte, error) {
 	if len(input.Images) == 0 {
-		return VisionExtraction{}, ErrVisionInput
+		return nil, ErrVisionInput
 	}
 	imageBytes, err := buildVisionContactSheet(input.Images)
 	if err != nil {
-		return VisionExtraction{}, fmt.Errorf("%w: build reference contact sheet: %v", ErrVisionImageInvalid, err)
+		return nil, fmt.Errorf("%w: build reference contact sheet: %v", ErrVisionImageInvalid, err)
 	}
 	imageInts := make([]int, len(imageBytes))
 	for i, b := range imageBytes {
 		imageInts[i] = int(b)
 	}
-	prompt := cloudflareVisionPrompt(input.UserText)
-	body, err := json.Marshal(cloudflareAIRequest{Prompt: prompt, Image: imageInts})
-	if err != nil {
-		return VisionExtraction{}, err
-	}
+	return json.Marshal(cloudflareAIRequest{
+		Prompt: cloudflareVisionPrompt(input.UserText),
+		Image:  imageInts,
+	})
+}
+
+func newCloudflareVisionRequest(ctx context.Context, config VisionProviderConfig, body []byte) (*http.Request, error) {
 	endpoint, err := cloudflareEndpointURL(config.EndpointURL, config.Model)
 	if err != nil {
-		return VisionExtraction{}, &visionProviderError{kind: visionProviderFailureResponse, cause: err}
+		return nil, &visionProviderError{kind: visionProviderFailureResponse, cause: err}
 	}
 	parsed, err := url.Parse(endpoint)
 	if err != nil || parsed.Hostname() == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return VisionExtraction{}, &visionProviderError{kind: visionProviderFailureResponse, cause: fmt.Errorf("invalid endpoint URL: %q", endpoint)}
+		return nil, &visionProviderError{kind: visionProviderFailureResponse, cause: fmt.Errorf("invalid endpoint URL: %q", endpoint)}
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
-		return VisionExtraction{}, &visionProviderError{kind: visionProviderFailureResponse, cause: err}
+		return nil, &visionProviderError{kind: visionProviderFailureResponse, cause: err}
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
 	if strings.TrimSpace(config.APIKey) != "" {
 		request.Header.Set("Authorization", "Bearer "+config.APIKey)
 	}
+	return request, nil
+}
+
+func executeCloudflareVisionRequest(ctx context.Context, request *http.Request) (VisionExtraction, error) {
 	response, err := safehttp.DoRequestWithAllowHosts(ctx, request, visionSearchTimeout, outbound.AllowHosts(ctx)...)
 	if err != nil {
 		kind := visionProviderFailureNetwork
@@ -347,16 +365,27 @@ func extractCloudflareWorkersAIVision(ctx context.Context, config VisionProvider
 	if err != nil {
 		return VisionExtraction{}, &visionProviderError{kind: visionProviderFailureResponse, cause: err}
 	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		kind := visionProviderFailureResponse
-		switch response.StatusCode {
-		case http.StatusUnauthorized, http.StatusForbidden:
-			kind = visionProviderFailureCredentials
-		case http.StatusTooManyRequests:
-			kind = visionProviderFailureQuota
-		}
-		return VisionExtraction{}, &visionProviderError{kind: kind, cause: fmt.Errorf("status %d: %s", response.StatusCode, safeProviderErrorMessage(data))}
+	if err := cloudflareVisionHTTPError(response.StatusCode, data); err != nil {
+		return VisionExtraction{}, err
 	}
+	return decodeCloudflareVisionBody(data)
+}
+
+func cloudflareVisionHTTPError(statusCode int, data []byte) error {
+	if statusCode >= 200 && statusCode < 300 {
+		return nil
+	}
+	kind := visionProviderFailureResponse
+	switch statusCode {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		kind = visionProviderFailureCredentials
+	case http.StatusTooManyRequests:
+		kind = visionProviderFailureQuota
+	}
+	return &visionProviderError{kind: kind, cause: fmt.Errorf("status %d: %s", statusCode, safeProviderErrorMessage(data))}
+}
+
+func decodeCloudflareVisionBody(data []byte) (VisionExtraction, error) {
 	var envelope cloudflareAIResponse
 	if err := json.Unmarshal(data, &envelope); err != nil || (!envelope.Success && len(envelope.Errors) > 0) {
 		if len(envelope.Errors) > 0 {

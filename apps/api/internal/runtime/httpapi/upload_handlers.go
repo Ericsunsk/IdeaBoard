@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"sync"
@@ -175,12 +176,7 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 		}
 		defer release()
 
-		file, err := c.FormFile("file")
-		if err != nil {
-			response.Error(c, 400, "请选择文件")
-			return
-		}
-		_, ok = validateUploadFileHeader(c, file, 30*1024*1024, imageformat.UploadAllowedImageExtensions())
+		file, ok := parseBoardUploadFile(c)
 		if !ok {
 			return
 		}
@@ -188,110 +184,154 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		boardID := strings.TrimSpace(c.Param("board_id"))
-		if h.BoardService == nil || h.UserRepo == nil || h.StorageService == nil || h.MediaAssets == nil {
-			response.InternalError(c, 500, "上传失败", fmt.Errorf("board upload dependencies not configured"))
+		board, storeOpts, ok := resolveBoardUploadTarget(c, h, userID)
+		if !ok {
 			return
 		}
-		board, _, err := h.BoardService.ResolveBoardWriteAccess(c.Request.Context(), userID, boardID)
-		if err != nil {
-			switch {
-			case errors.Is(err, boards.ErrInvalidBoardInput):
-				response.Error(c, 400, "缺少画布ID")
-			case errors.Is(err, boards.ErrBoardNotFound):
-				response.Error(c, 404, "画布不存在")
-			case errors.Is(err, boards.ErrBoardPermissionDenied):
-				response.Error(c, 403, "无权编辑该画布")
-			default:
-				response.InternalError(c, 500, "上传失败", err)
-			}
+		prepared, ok := prepareBoardUpload(c, h, file, storeOpts)
+		if !ok {
 			return
 		}
-		owner, err := h.UserRepo.GetByID(c.Request.Context(), board.OwnerUserID)
-		if err != nil {
-			response.InternalError(c, 500, "上传失败", err)
+		boardAsset, found, ok := findExistingBoardAsset(c, h, board.OwnerUserID, prepared)
+		if !ok {
 			return
 		}
-		dirPrefix, err := storage.CanvasContentUploadDirPrefix(owner.StorageUID, board.BoardID)
-		if err != nil {
-			response.InternalError(c, 500, "上传失败", err)
+		if found {
+			response.SuccessDTO(c, newUploadImageResponseFromAsset(boardAsset))
 			return
 		}
-		storeOpts := storage.StorageStoreOptions{
-			DirPrefix: dirPrefix,
+		payload, ok := persistBoardAsset(c, h, board, file, storeOpts, prepared)
+		if ok {
+			response.SuccessDTO(c, payload)
 		}
-		// Inspect bytes before planning the Media Asset so the object key and
-		// metadata use the canonical format rather than the client filename.
-		prepared, err := h.StorageService.PrepareUploadRefFromFile(c.Request.Context(), file, storeOpts)
-		if err != nil {
-			response.InternalError(c, 500, "上传失败", err)
-			return
-		}
-		// Reuse an existing ready asset for identical bytes owned by this user.
-		// This keeps duplicate uploads from creating another physical object while
-		// preserving the existing board snapshot contract (asset ID + stable URL).
-		if prepared.ChecksumSHA256 != "" {
-			existing, found, lookupErr := h.MediaAssets.FindReadyOwnedMediaAssetByChecksum(c.Request.Context(), board.OwnerUserID, prepared.StorageProfile, prepared.ChecksumSHA256)
-			if lookupErr != nil {
-				response.InternalError(c, 500, "上传失败", lookupErr)
-				return
-			}
-			if found {
-				response.SuccessDTO(c, newUploadImageResponseFromAsset(existing))
-				return
-			}
-		}
-		handle, err := h.MediaAssets.Begin(c.Request.Context(), ingestion.Request{
-			OwnerUserID: board.OwnerUserID, StorageProfile: prepared.StorageProfile,
-			StorageKey: prepared.StorageKey, URL: prepared.URL,
-			Origin: ingestion.BoardUploadFacts{BoardID: board.BoardID},
-		})
-		if err != nil {
-			response.InternalError(c, 500, "上传失败", err)
-			return
-		}
-		storeOpts.ObjectKey = prepared.StorageKey
-		stored, err := h.StorageService.UploadRefAtProfile(c.Request.Context(), prepared.StorageProfile, file, storeOpts)
-		if err != nil {
-			_ = h.MediaAssets.Fail(context.WithoutCancel(c.Request.Context()), handle, err)
-			response.InternalError(c, 500, "上传失败", err)
-			return
-		}
-		stored.Width = prepared.Width
-		stored.Height = prepared.Height
-		stored.MIMEType = prepared.MIMEType
-		stored.Animated = prepared.Animated
-		asset, err := h.MediaAssets.GetByID(c.Request.Context(), board.OwnerUserID, handle.AssetID)
-		if err != nil {
-			_ = h.MediaAssets.Fail(context.WithoutCancel(c.Request.Context()), handle, err)
-			_ = h.StorageService.DeleteObjectByStorageProfile(context.WithoutCancel(c.Request.Context()), stored.StorageProfile, stored.StorageKey)
-			response.InternalError(c, 500, "上传失败", err)
-			return
-		}
-		// Browser-visible board media must always use the authenticated
-		// same-origin delivery route, regardless of whether the backing profile
-		// is local or S3-compatible. Keep provider URLs server-side only.
-		stored.URL = mediaAssetOriginalDeliveryURL(asset.AssetID)
-		if err := h.MediaAssets.Complete(c.Request.Context(), handle, stored.IngestionCompletion("")); err != nil {
-			// A concurrent identical upload may have committed first and won the
-			// checksum unique index. Re-read the canonical asset before surfacing
-			// an error so the loser still succeeds without retaining its object.
-			if existing, found, lookupErr := h.MediaAssets.FindReadyOwnedMediaAssetByChecksum(c.Request.Context(), board.OwnerUserID, stored.StorageProfile, stored.ChecksumSHA256); lookupErr == nil && found {
-				cleanupCtx := context.WithoutCancel(c.Request.Context())
-				_ = h.StorageService.DeleteObjectByStorageProfile(cleanupCtx, stored.StorageProfile, stored.StorageKey)
-				_ = h.MediaAssets.Fail(cleanupCtx, handle, err)
-				response.SuccessDTO(c, newUploadImageResponseFromAsset(existing))
-				return
-			}
-			_ = h.MediaAssets.Fail(context.WithoutCancel(c.Request.Context()), handle, err)
-			_ = h.StorageService.DeleteObjectByStorageProfile(context.WithoutCancel(c.Request.Context()), stored.StorageProfile, stored.StorageKey)
-			response.InternalError(c, 500, "上传失败", err)
-			return
-		}
-		payload := newUploadImageResponseFromStored("url", stored)
-		payload.AssetID = asset.AssetID
-		response.SuccessDTO(c, payload)
 	}
+}
+
+func parseBoardUploadFile(c *gin.Context) (*multipart.FileHeader, bool) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		response.Error(c, 400, "请选择文件")
+		return nil, false
+	}
+	if _, ok := validateUploadFileHeader(c, file, 30*1024*1024, imageformat.UploadAllowedImageExtensions()); !ok {
+		return nil, false
+	}
+	return file, true
+}
+
+func resolveBoardUploadTarget(c *gin.Context, h UploadDeps, userID int64) (*boards.UserBoard, storage.StorageStoreOptions, bool) {
+	if h.BoardService == nil || h.UserRepo == nil || h.StorageService == nil || h.MediaAssets == nil {
+		response.InternalError(c, 500, "上传失败", fmt.Errorf("board upload dependencies not configured"))
+		return nil, storage.StorageStoreOptions{}, false
+	}
+	boardID := strings.TrimSpace(c.Param("board_id"))
+	board, _, err := h.BoardService.ResolveBoardWriteAccess(c.Request.Context(), userID, boardID)
+	if err != nil {
+		switch {
+		case errors.Is(err, boards.ErrInvalidBoardInput):
+			response.Error(c, 400, "缺少画布ID")
+		case errors.Is(err, boards.ErrBoardNotFound):
+			response.Error(c, 404, "画布不存在")
+		case errors.Is(err, boards.ErrBoardPermissionDenied):
+			response.Error(c, 403, "无权编辑该画布")
+		default:
+			response.InternalError(c, 500, "上传失败", err)
+		}
+		return nil, storage.StorageStoreOptions{}, false
+	}
+	owner, err := h.UserRepo.GetByID(c.Request.Context(), board.OwnerUserID)
+	if err != nil {
+		response.InternalError(c, 500, "上传失败", err)
+		return nil, storage.StorageStoreOptions{}, false
+	}
+	dirPrefix, err := storage.CanvasContentUploadDirPrefix(owner.StorageUID, board.BoardID)
+	if err != nil {
+		response.InternalError(c, 500, "上传失败", err)
+		return nil, storage.StorageStoreOptions{}, false
+	}
+	return board, storage.StorageStoreOptions{DirPrefix: dirPrefix}, true
+}
+
+func prepareBoardUpload(c *gin.Context, h UploadDeps, file *multipart.FileHeader, storeOpts storage.StorageStoreOptions) (*storage.StoredUploadRef, bool) {
+	// Inspect bytes before planning the Media Asset so the object key and
+	// metadata use the canonical format rather than the client filename.
+	prepared, err := h.StorageService.PrepareUploadRefFromFile(c.Request.Context(), file, storeOpts)
+	if err != nil {
+		response.InternalError(c, 500, "上传失败", err)
+		return nil, false
+	}
+	return prepared, true
+}
+
+func findExistingBoardAsset(c *gin.Context, h UploadDeps, ownerUserID int64, prepared *storage.StoredUploadRef) (dbsqlc.MediaAsset, bool, bool) {
+	if prepared.ChecksumSHA256 == "" {
+		return dbsqlc.MediaAsset{}, false, true
+	}
+	// Reuse an existing ready asset for identical bytes owned by this user.
+	// This keeps duplicate uploads from creating another physical object while
+	// preserving the existing board snapshot contract (asset ID + stable URL).
+	existing, found, err := h.MediaAssets.FindReadyOwnedMediaAssetByChecksum(c.Request.Context(), ownerUserID, prepared.StorageProfile, prepared.ChecksumSHA256)
+	if err != nil {
+		response.InternalError(c, 500, "上传失败", err)
+		return dbsqlc.MediaAsset{}, false, false
+	}
+	return existing, found, true
+}
+
+func persistBoardAsset(c *gin.Context, h UploadDeps, board *boards.UserBoard, file *multipart.FileHeader, storeOpts storage.StorageStoreOptions, prepared *storage.StoredUploadRef) (uploadImageResponse, bool) {
+	handle, err := h.MediaAssets.Begin(c.Request.Context(), ingestion.Request{
+		OwnerUserID: board.OwnerUserID, StorageProfile: prepared.StorageProfile,
+		StorageKey: prepared.StorageKey, URL: prepared.URL,
+		Origin: ingestion.BoardUploadFacts{BoardID: board.BoardID},
+	})
+	if err != nil {
+		response.InternalError(c, 500, "上传失败", err)
+		return uploadImageResponse{}, false
+	}
+	storeOpts.ObjectKey = prepared.StorageKey
+	stored, err := h.StorageService.UploadRefAtProfile(c.Request.Context(), prepared.StorageProfile, file, storeOpts)
+	if err != nil {
+		_ = h.MediaAssets.Fail(context.WithoutCancel(c.Request.Context()), handle, err)
+		response.InternalError(c, 500, "上传失败", err)
+		return uploadImageResponse{}, false
+	}
+	stored.Width = prepared.Width
+	stored.Height = prepared.Height
+	stored.MIMEType = prepared.MIMEType
+	stored.Animated = prepared.Animated
+	asset, err := h.MediaAssets.GetByID(c.Request.Context(), board.OwnerUserID, handle.AssetID)
+	if err != nil {
+		_ = h.MediaAssets.Fail(context.WithoutCancel(c.Request.Context()), handle, err)
+		_ = h.StorageService.DeleteObjectByStorageProfile(context.WithoutCancel(c.Request.Context()), stored.StorageProfile, stored.StorageKey)
+		response.InternalError(c, 500, "上传失败", err)
+		return uploadImageResponse{}, false
+	}
+	// Browser-visible board media must always use the authenticated
+	// same-origin delivery route, regardless of whether the backing profile
+	// is local or S3-compatible. Keep provider URLs server-side only.
+	stored.URL = mediaAssetOriginalDeliveryURL(asset.AssetID)
+	if err := h.MediaAssets.Complete(c.Request.Context(), handle, stored.IngestionCompletion("")); err != nil {
+		return convergeBoardAssetCompletionFailure(c, h, board.OwnerUserID, handle, stored, err)
+	}
+	payload := newUploadImageResponseFromStored("url", stored)
+	payload.AssetID = asset.AssetID
+	return payload, true
+}
+
+func convergeBoardAssetCompletionFailure(c *gin.Context, h UploadDeps, ownerUserID int64, handle ingestion.Handle, stored *storage.StoredUploadRef, completionErr error) (uploadImageResponse, bool) {
+	// A concurrent identical upload may have committed first and won the
+	// checksum unique index. Re-read the canonical asset before surfacing an
+	// error so the loser still succeeds without retaining its object.
+	if existing, found, lookupErr := h.MediaAssets.FindReadyOwnedMediaAssetByChecksum(c.Request.Context(), ownerUserID, stored.StorageProfile, stored.ChecksumSHA256); lookupErr == nil && found {
+		cleanupCtx := context.WithoutCancel(c.Request.Context())
+		_ = h.StorageService.DeleteObjectByStorageProfile(cleanupCtx, stored.StorageProfile, stored.StorageKey)
+		_ = h.MediaAssets.Fail(cleanupCtx, handle, completionErr)
+		return newUploadImageResponseFromAsset(existing), true
+	}
+	_ = h.MediaAssets.Fail(context.WithoutCancel(c.Request.Context()), handle, completionErr)
+	_ = h.StorageService.DeleteObjectByStorageProfile(context.WithoutCancel(c.Request.Context()), stored.StorageProfile, stored.StorageKey)
+	response.InternalError(c, 500, "上传失败", completionErr)
+	return uploadImageResponse{}, false
 }
 
 func newUploadImageResponseFromStored(urlKey string, stored *storage.StoredUploadRef) uploadImageResponse {

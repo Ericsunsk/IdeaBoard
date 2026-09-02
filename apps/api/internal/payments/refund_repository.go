@@ -81,49 +81,78 @@ func (r *Repository) CreateExternalPaymentRefund(ctx context.Context, provider S
 	if err != nil {
 		return PaymentRefund{}, err
 	}
-	// A webhook can race the Admin request between Stripe's response and the
-	// local provider-fact update. Resolve an already-linked provider ID first,
-	// then attach the uniquely matching local intent before creating an external
-	// refund fact. This keeps the provider refund and local hold one durable row.
-	var linked PaymentRefund
-	if err := scanPaymentRefund(tx.QueryRowContext(ctx, `SELECT id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at FROM payment_refunds WHERE stripe_refund_id = $1 FOR UPDATE`, provider.ID), &linked); err == nil {
+	if linked, err := r.findRefundByStripeID(ctx, tx, provider.ID); err == nil {
 		return linked, tx.Commit()
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return PaymentRefund{}, err
 	}
 	key := "stripe-dashboard-" + provider.ID
-	var existing PaymentRefund
-	if err := scanPaymentRefund(tx.QueryRowContext(ctx, `SELECT id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at FROM payment_refunds WHERE payment_order_id = $1::uuid AND idempotency_key = $2`, order.ID, key), &existing); err == nil {
+	if existing, err := r.findRefundByIdempotency(ctx, tx, order.ID, key); err == nil {
 		return existing, tx.Commit()
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return PaymentRefund{}, err
 	}
-	if order.Status != PaymentOrderCredited || order.PaidSubtotal <= 0 || order.PaidTotal <= 0 || order.IdeaQuantity <= 0 {
-		return PaymentRefund{}, ErrRefundOrderNotEligible
+	if err := validateExternalRefund(order, provider); err != nil {
+		return PaymentRefund{}, err
 	}
-	if !strings.EqualFold(provider.Currency, order.PaidCurrency) {
-		return PaymentRefund{}, ErrRefundProviderConflict
-	}
-	var pending PaymentRefund
-	if err := scanPaymentRefund(tx.QueryRowContext(ctx, `SELECT id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at FROM payment_refunds WHERE payment_order_id = $1::uuid AND status = 'pending' AND stripe_refund_id = '' AND stripe_charge_id = $2 AND amount_minor = $3 AND LOWER(currency) = LOWER($4) AND actor_id IS NOT NULL ORDER BY created_at ASC, id ASC LIMIT 1 FOR UPDATE`, order.ID, provider.ChargeID, provider.AmountMinor, provider.Currency), &pending); err == nil {
-		if _, err := tx.ExecContext(ctx, `UPDATE payment_refunds SET stripe_refund_id = $2, stripe_status = $3, updated_at = $4 WHERE id = $1::uuid`, pending.ID, provider.ID, provider.Status, now); err != nil {
+	if pending, err := r.findPendingRefund(ctx, tx, order, provider); err == nil {
+		if err := r.attachExternalProviderRefund(ctx, tx, pending, provider, now); err != nil {
 			return PaymentRefund{}, err
 		}
-		pending.StripeRefundID = provider.ID
-		pending.StripeStatus = provider.Status
-		pending.UpdatedAt = now
 		if err := tx.Commit(); err != nil {
 			return PaymentRefund{}, err
 		}
-		pending.PublicOrderNumber = order.PublicNumber
+		pending.StripeRefundID, pending.StripeStatus, pending.UpdatedAt, pending.PublicOrderNumber = provider.ID, provider.Status, now, order.PublicNumber
 		return pending, nil
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return PaymentRefund{}, err
 	}
-	qty := proportionalRefundIdeas(provider.AmountMinor, order.PaidTotal, order.IdeaQuantity)
-	if qty > order.IdeaQuantity {
-		qty = order.IdeaQuantity
+	refund, err := r.createExternalRefundFact(ctx, tx, order, provider, key, now)
+	if err != nil {
+		return PaymentRefund{}, err
 	}
+	if err := tx.Commit(); err != nil {
+		return PaymentRefund{}, err
+	}
+	return refund, nil
+}
+
+const paymentRefundSelect = `SELECT id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at FROM payment_refunds`
+
+func (r *Repository) findRefundByStripeID(ctx context.Context, tx refundQueryer, stripeID string) (PaymentRefund, error) {
+	var refund PaymentRefund
+	err := scanPaymentRefund(tx.QueryRowContext(ctx, paymentRefundSelect+` WHERE stripe_refund_id = $1 FOR UPDATE`, stripeID), &refund)
+	return refund, err
+}
+
+func (r *Repository) findRefundByIdempotency(ctx context.Context, tx refundQueryer, orderID, key string) (PaymentRefund, error) {
+	var refund PaymentRefund
+	err := scanPaymentRefund(tx.QueryRowContext(ctx, paymentRefundSelect+` WHERE payment_order_id = $1::uuid AND idempotency_key = $2`, orderID, key), &refund)
+	return refund, err
+}
+
+func validateExternalRefund(order paymentRefundOrderFacts, provider StripeRefund) error {
+	if order.Status != PaymentOrderCredited || order.PaidSubtotal <= 0 || order.PaidTotal <= 0 || order.IdeaQuantity <= 0 {
+		return ErrRefundOrderNotEligible
+	}
+	if !strings.EqualFold(provider.Currency, order.PaidCurrency) {
+		return ErrRefundProviderConflict
+	}
+	return nil
+}
+
+func (r *Repository) findPendingRefund(ctx context.Context, tx refundQueryer, order paymentRefundOrderFacts, provider StripeRefund) (PaymentRefund, error) {
+	var pending PaymentRefund
+	err := scanPaymentRefund(tx.QueryRowContext(ctx, paymentRefundSelect+` WHERE payment_order_id = $1::uuid AND status = 'pending' AND stripe_refund_id = '' AND stripe_charge_id = $2 AND amount_minor = $3 AND LOWER(currency) = LOWER($4) AND actor_id IS NOT NULL ORDER BY created_at ASC, id ASC LIMIT 1 FOR UPDATE`, order.ID, provider.ChargeID, provider.AmountMinor, provider.Currency), &pending)
+	return pending, err
+}
+
+func (r *Repository) attachExternalProviderRefund(ctx context.Context, tx *sql.Tx, pending PaymentRefund, provider StripeRefund, now time.Time) error {
+	_, err := tx.ExecContext(ctx, `UPDATE payment_refunds SET stripe_refund_id = $2, stripe_status = $3, updated_at = $4 WHERE id = $1::uuid`, pending.ID, provider.ID, provider.Status, now)
+	return err
+}
+
+func (r *Repository) createExternalRefundFact(ctx context.Context, tx *sql.Tx, order paymentRefundOrderFacts, provider StripeRefund, key string, now time.Time) (PaymentRefund, error) {
 	var already, alreadyAmount, disputedIdeas, disputedAmount int64
 	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(idea_quantity), 0), COALESCE(SUM(amount_minor), 0) FROM payment_refunds WHERE payment_order_id = $1::uuid AND status IN ('pending', 'succeeded', 'anomaly')`, order.ID).Scan(&already, &alreadyAmount); err != nil {
 		return PaymentRefund{}, err
@@ -132,6 +161,10 @@ func (r *Repository) CreateExternalPaymentRefund(ctx context.Context, provider S
 		return PaymentRefund{}, err
 	}
 	already += disputedIdeas
+	qty := proportionalRefundIdeas(provider.AmountMinor, order.PaidTotal, order.IdeaQuantity)
+	if qty > order.IdeaQuantity {
+		qty = order.IdeaQuantity
+	}
 	if qty <= 0 || order.IdeaQuantity-already <= 0 || provider.AmountMinor > order.PaidTotal-alreadyAmount-disputedAmount {
 		return PaymentRefund{}, ErrRefundAmountExceeds
 	}
@@ -156,11 +189,7 @@ func (r *Repository) CreateExternalPaymentRefund(ctx context.Context, provider S
 	if _, err := tx.ExecContext(ctx, `INSERT INTO payment_refunds (id, payment_order_id, user_id, idempotency_key, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, actor_id, reason, created_at, updated_at) VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, NULL, $12, $13, $13)`, refundID, order.ID, order.UserID, key, qty, provider.AmountMinor, strings.ToLower(provider.Currency), provider.Status, provider.ID, provider.ChargeID, holdResult.TransactionID, "Stripe Dashboard refund", now); err != nil {
 		return PaymentRefund{}, err
 	}
-	refund := PaymentRefund{ID: refundID, PaymentOrderID: order.ID, PublicOrderNumber: order.PublicNumber, UserID: order.UserID, IdeaQuantity: qty, AmountMinor: provider.AmountMinor, Currency: strings.ToLower(provider.Currency), Status: PaymentRefundPending, StripeStatus: provider.Status, StripeRefundID: provider.ID, StripeChargeID: provider.ChargeID, CreditHoldTransactionID: holdResult.TransactionID, CreatedAt: now, UpdatedAt: now}
-	if err := tx.Commit(); err != nil {
-		return PaymentRefund{}, err
-	}
-	return refund, nil
+	return PaymentRefund{ID: refundID, PaymentOrderID: order.ID, PublicOrderNumber: order.PublicNumber, UserID: order.UserID, IdeaQuantity: qty, AmountMinor: provider.AmountMinor, Currency: strings.ToLower(provider.Currency), Status: PaymentRefundPending, StripeStatus: provider.Status, StripeRefundID: provider.ID, StripeChargeID: provider.ChargeID, CreditHoldTransactionID: holdResult.TransactionID, CreatedAt: now, UpdatedAt: now}, nil
 }
 
 func (r *Repository) RecordPaymentRefundAnomaly(ctx context.Context, provider StripeRefund, reason string, now time.Time) (int64, error) {
@@ -204,48 +233,26 @@ func (r *Repository) CreatePendingPaymentRefund(ctx context.Context, input Creat
 		return PaymentRefund{}, false, fmt.Errorf("begin refund transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	var order PaymentOrder
-	var paidSubtotal, paidTotal sql.NullInt64
-	var paidCurrency sql.NullString
-	var paidAt sql.NullTime
-	if err := tx.QueryRowContext(ctx, `
-SELECT id::text, public_order_number, user_id, status, stripe_charge_id, idea_quantity,
-       paid_subtotal_minor, paid_total_minor, paid_currency, paid_at
-FROM payment_orders WHERE public_order_number = $1 FOR UPDATE`, input.OrderNumber).Scan(
-		&order.ID, &order.PublicOrderNumber, &order.UserID, &order.Status, &order.StripeChargeID,
-		&order.IdeaQuantity, &paidSubtotal, &paidTotal, &paidCurrency, &paidAt,
-	); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return PaymentRefund{}, false, ErrAdminPaymentOrderNotFound
-		}
-		return PaymentRefund{}, false, fmt.Errorf("read payment order for refund: %w", err)
+	order, paidSubtotal, paidTotal, paidCurrency, paidAt, err := r.loadPendingRefundOrder(ctx, tx, input.OrderNumber)
+	if err != nil {
+		return PaymentRefund{}, false, err
 	}
-	var existing PaymentRefund
-	if err := scanPaymentRefund(tx.QueryRowContext(ctx, `SELECT id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at FROM payment_refunds WHERE payment_order_id = $1::uuid AND idempotency_key = $2`, order.ID, input.IdempotencyKey), &existing); err == nil {
-		if existing.IdeaQuantity != input.IdeaQuantity {
-			return PaymentRefund{}, false, ErrRefundIdempotency
-		}
+	if existing, replayed, err := findPendingRefundReplay(ctx, tx, order, input); err != nil {
+		return PaymentRefund{}, false, err
+	} else if replayed {
 		if err := tx.Commit(); err != nil {
 			return PaymentRefund{}, false, fmt.Errorf("commit refund replay: %w", err)
 		}
 		existing.PublicOrderNumber = order.PublicOrderNumber
 		existing.StripeChargeID = order.StripeChargeID
 		return existing, true, nil
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return PaymentRefund{}, false, fmt.Errorf("read refund idempotency: %w", err)
 	}
-	if order.Status != PaymentOrderCredited || order.StripeChargeID == "" || order.IdeaQuantity <= 0 || !paidSubtotal.Valid || paidSubtotal.Int64 <= 0 || !paidTotal.Valid || paidTotal.Int64 <= 0 || !paidAt.Valid {
-		return PaymentRefund{}, false, ErrRefundOrderNotEligible
+	if err := validatePendingRefundEligibility(order, paidSubtotal, paidTotal, paidAt, input.Now); err != nil {
+		return PaymentRefund{}, false, err
 	}
-	if !input.Now.Before(paidAt.Time.Add(refundEligibilityWindow)) {
-		return PaymentRefund{}, false, ErrRefundExpired
-	}
-	var alreadyRefunded, disputedIdeas int64
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(idea_quantity), 0) FROM payment_refunds WHERE payment_order_id = $1::uuid AND status IN ('pending', 'succeeded', 'anomaly')`, order.ID).Scan(&alreadyRefunded); err != nil {
-		return PaymentRefund{}, false, fmt.Errorf("sum existing refunds: %w", err)
-	}
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(target_idea_quantity), 0) FROM payment_disputes WHERE payment_order_id = $1::uuid AND status IN ('open', 'lost')`, order.ID).Scan(&disputedIdeas); err != nil {
-		return PaymentRefund{}, false, fmt.Errorf("sum active Disputes: %w", err)
+	alreadyRefunded, disputedIdeas, err := loadPendingRefundBalances(ctx, tx, order.ID)
+	if err != nil {
+		return PaymentRefund{}, false, err
 	}
 	remaining := order.IdeaQuantity - alreadyRefunded - disputedIdeas
 	if remaining <= 0 || input.IdeaQuantity > remaining {
@@ -255,33 +262,97 @@ FROM payment_orders WHERE public_order_number = $1 FOR UPDATE`, input.OrderNumbe
 	if amountMinor <= 0 {
 		amountMinor = 1
 	}
-	refundID := uuid.NewString()
-	commands, err := credits.CommandsInSQLTx(tx)
+	refund, err := r.persistPendingRefund(ctx, tx, order, paidCurrency.String, input, amountMinor)
 	if err != nil {
 		return PaymentRefund{}, false, err
 	}
+	if err := tx.Commit(); err != nil {
+		return PaymentRefund{}, false, fmt.Errorf("commit payment refund: %w", err)
+	}
+	return refund, false, nil
+}
+
+func (r *Repository) loadPendingRefundOrder(ctx context.Context, tx *sql.Tx, orderNumber string) (PaymentOrder, sql.NullInt64, sql.NullInt64, sql.NullString, sql.NullTime, error) {
+	var order PaymentOrder
+	var paidSubtotal, paidTotal sql.NullInt64
+	var paidCurrency sql.NullString
+	var paidAt sql.NullTime
+	if err := tx.QueryRowContext(ctx, `
+SELECT id::text, public_order_number, user_id, status, stripe_charge_id, idea_quantity,
+       paid_subtotal_minor, paid_total_minor, paid_currency, paid_at
+FROM payment_orders WHERE public_order_number = $1 FOR UPDATE`, orderNumber).Scan(
+		&order.ID, &order.PublicOrderNumber, &order.UserID, &order.Status, &order.StripeChargeID,
+		&order.IdeaQuantity, &paidSubtotal, &paidTotal, &paidCurrency, &paidAt,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return PaymentOrder{}, sql.NullInt64{}, sql.NullInt64{}, sql.NullString{}, sql.NullTime{}, ErrAdminPaymentOrderNotFound
+		}
+		return PaymentOrder{}, sql.NullInt64{}, sql.NullInt64{}, sql.NullString{}, sql.NullTime{}, fmt.Errorf("read payment order for refund: %w", err)
+	}
+	return order, paidSubtotal, paidTotal, paidCurrency, paidAt, nil
+}
+
+func findPendingRefundReplay(ctx context.Context, tx refundQueryer, order PaymentOrder, input CreatePendingPaymentRefundInput) (PaymentRefund, bool, error) {
+	var existing PaymentRefund
+	err := scanPaymentRefund(tx.QueryRowContext(ctx, `SELECT id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at FROM payment_refunds WHERE payment_order_id = $1::uuid AND idempotency_key = $2`, order.ID, input.IdempotencyKey), &existing)
+	if err == nil {
+		if existing.IdeaQuantity != input.IdeaQuantity {
+			return PaymentRefund{}, false, ErrRefundIdempotency
+		}
+		return existing, true, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return PaymentRefund{}, false, fmt.Errorf("read refund idempotency: %w", err)
+	}
+	return PaymentRefund{}, false, nil
+}
+
+func validatePendingRefundEligibility(order PaymentOrder, paidSubtotal, paidTotal sql.NullInt64, paidAt sql.NullTime, now time.Time) error {
+	if order.Status != PaymentOrderCredited || order.StripeChargeID == "" || order.IdeaQuantity <= 0 || !paidSubtotal.Valid || paidSubtotal.Int64 <= 0 || !paidTotal.Valid || paidTotal.Int64 <= 0 || !paidAt.Valid {
+		return ErrRefundOrderNotEligible
+	}
+	if !now.Before(paidAt.Time.Add(refundEligibilityWindow)) {
+		return ErrRefundExpired
+	}
+	return nil
+}
+
+func loadPendingRefundBalances(ctx context.Context, tx refundQueryer, orderID string) (int64, int64, error) {
+	var alreadyRefunded, disputedIdeas int64
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(idea_quantity), 0) FROM payment_refunds WHERE payment_order_id = $1::uuid AND status IN ('pending', 'succeeded', 'anomaly')`, orderID).Scan(&alreadyRefunded); err != nil {
+		return 0, 0, fmt.Errorf("sum existing refunds: %w", err)
+	}
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(target_idea_quantity), 0) FROM payment_disputes WHERE payment_order_id = $1::uuid AND status IN ('open', 'lost')`, orderID).Scan(&disputedIdeas); err != nil {
+		return 0, 0, fmt.Errorf("sum active Disputes: %w", err)
+	}
+	return alreadyRefunded, disputedIdeas, nil
+}
+
+func (r *Repository) persistPendingRefund(ctx context.Context, tx *sql.Tx, order PaymentOrder, currency string, input CreatePendingPaymentRefundInput, amountMinor int64) (PaymentRefund, error) {
+	refundID := uuid.NewString()
+	commands, err := credits.CommandsInSQLTx(tx)
+	if err != nil {
+		return PaymentRefund{}, err
+	}
 	creditAmount, err := credits.NewCreditAmount(input.IdeaQuantity)
 	if err != nil {
-		return PaymentRefund{}, false, ErrRefundAmountInvalid
+		return PaymentRefund{}, ErrRefundAmountInvalid
 	}
 	hold, err := commands.PurchaseRefundHold(ctx, credits.PurchaseRefundHoldCommand{UserID: order.UserID, Amount: creditAmount, Metadata: credits.CommandMetadata{
 		IdempotencyKey: "refund-hold-" + refundID, Actor: credits.Actor{Type: credits.ActorService, ID: "payments"}, Source: "stripe_refund_hold", Reason: input.Reason,
 		BusinessReference: credits.BusinessReference{Type: "payment_refund", ID: refundID},
 	}})
 	if err != nil {
-		return PaymentRefund{}, false, err
+		return PaymentRefund{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO payment_refunds (id, payment_order_id, user_id, idempotency_key, idea_quantity, amount_minor, currency, status, stripe_charge_id, credit_hold_transaction_id, actor_id, reason, created_at, updated_at) VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, $12, $12)`, refundID, order.ID, order.UserID, input.IdempotencyKey, input.IdeaQuantity, amountMinor, strings.ToLower(paidCurrency.String), order.StripeChargeID, hold.TransactionID, input.ActorID, input.Reason, input.Now); err != nil {
-		return PaymentRefund{}, false, fmt.Errorf("insert payment refund: %w", err)
+	currency = strings.ToLower(currency)
+	if _, err := tx.ExecContext(ctx, `INSERT INTO payment_refunds (id, payment_order_id, user_id, idempotency_key, idea_quantity, amount_minor, currency, status, stripe_charge_id, credit_hold_transaction_id, actor_id, reason, created_at, updated_at) VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, $12, $12)`, refundID, order.ID, order.UserID, input.IdempotencyKey, input.IdeaQuantity, amountMinor, currency, order.StripeChargeID, hold.TransactionID, input.ActorID, input.Reason, input.Now); err != nil {
+		return PaymentRefund{}, fmt.Errorf("insert payment refund: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO payment_admin_actions (action_type, actor_id, target_type, target_id, outcome, metadata) VALUES ('refund_payment', $1, 'payment_refund', $2, 'succeeded', jsonb_build_object('phase', 'reserved', 'payment_order_id', $3::uuid, 'idea_quantity', $4::bigint, 'amount_minor', $5::bigint, 'currency', $6::text))`, input.ActorID, refundID, order.ID, input.IdeaQuantity, amountMinor, strings.ToLower(paidCurrency.String)); err != nil {
-		return PaymentRefund{}, false, fmt.Errorf("record payment refund audit: %w", err)
+	if _, err := tx.ExecContext(ctx, `INSERT INTO payment_admin_actions (action_type, actor_id, target_type, target_id, outcome, metadata) VALUES ('refund_payment', $1, 'payment_refund', $2, 'succeeded', jsonb_build_object('phase', 'reserved', 'payment_order_id', $3::uuid, 'idea_quantity', $4::bigint, 'amount_minor', $5::bigint, 'currency', $6::text))`, input.ActorID, refundID, order.ID, input.IdeaQuantity, amountMinor, currency); err != nil {
+		return PaymentRefund{}, fmt.Errorf("record payment refund audit: %w", err)
 	}
-	refund := PaymentRefund{ID: refundID, PaymentOrderID: order.ID, PublicOrderNumber: order.PublicOrderNumber, UserID: order.UserID, IdeaQuantity: input.IdeaQuantity, AmountMinor: amountMinor, Currency: strings.ToLower(paidCurrency.String), Status: PaymentRefundPending, StripeChargeID: order.StripeChargeID, CreditHoldTransactionID: hold.TransactionID, CreatedAt: input.Now, UpdatedAt: input.Now}
-	if err := tx.Commit(); err != nil {
-		return PaymentRefund{}, false, fmt.Errorf("commit payment refund: %w", err)
-	}
-	return refund, false, nil
+	return PaymentRefund{ID: refundID, PaymentOrderID: order.ID, PublicOrderNumber: order.PublicOrderNumber, UserID: order.UserID, IdeaQuantity: input.IdeaQuantity, AmountMinor: amountMinor, Currency: currency, Status: PaymentRefundPending, StripeChargeID: order.StripeChargeID, CreditHoldTransactionID: hold.TransactionID, CreatedAt: input.Now, UpdatedAt: input.Now}, nil
 }
 
 func proportionalRefundAmount(subtotal, totalIdeas, alreadyRefunded, newIdeas int64) int64 {

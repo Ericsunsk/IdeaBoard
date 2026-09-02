@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"ideaboard/api/internal/credits"
@@ -14,24 +15,9 @@ import (
 )
 
 func (s *Service) UpdateRewardCode(ctx context.Context, command UpdateRewardCodeCommand) (UpdatedRewardCode, error) {
-	displayName := strings.TrimSpace(command.DisplayName)
-	if !s.validAdminMutation(command.RewardCodeID, command.ActorUserID) ||
-		displayName == "" || utf8.RuneCountInString(displayName) > 120 || command.MaxRedemptions < 0 {
-		return UpdatedRewardCode{}, ErrInvalidCommand
-	}
-	if _, err := credits.NewCreditAmount(command.CreditAmount); err != nil {
-		return UpdatedRewardCode{}, errors.Join(ErrInvalidCommand, err)
-	}
-
-	var normalized string
-	var currentDigest, previousDigest codeDigest
-	if command.Code != nil {
-		var err error
-		normalized, err = normalizeCode(*command.Code)
-		if err != nil {
-			return UpdatedRewardCode{}, ErrInvalidCommand
-		}
-		currentDigest, previousDigest = splitCodeDigestCandidates(s.keyring.lookupDigests(normalized))
+	input, err := s.prepareRewardCodeUpdate(command)
+	if err != nil {
+		return UpdatedRewardCode{}, err
 	}
 
 	tx, err := s.begin(ctx)
@@ -39,55 +25,16 @@ func (s *Service) UpdateRewardCode(ctx context.Context, command UpdateRewardCode
 		return UpdatedRewardCode{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if command.Code != nil {
-		if err := lockRewardCodeIdentity(ctx, tx, normalized); err != nil {
-			return UpdatedRewardCode{}, err
-		}
-	}
-	if err := lockRewardCodeID(ctx, tx, command.RewardCodeID); err != nil {
+	rotationReplayed, err := s.lockRewardCodeUpdate(ctx, tx, input)
+	if err != nil {
 		return UpdatedRewardCode{}, err
 	}
-	rotationReplayed := false
-	if command.Code != nil {
-		aliasOwnerID, aliasExists, err := findRewardCodeAliasOwner(ctx, tx, currentDigest, previousDigest)
-		if err != nil {
-			return UpdatedRewardCode{}, err
-		}
-		if aliasExists && aliasOwnerID != command.RewardCodeID {
-			return UpdatedRewardCode{}, ErrCodeCollision
-		}
-		rotationReplayed = aliasExists
+	if err := s.updateRewardCodeDefinition(ctx, tx, input); err != nil {
+		return UpdatedRewardCode{}, err
 	}
-
-	var found bool
-	if err := tx.QueryRow(ctx, `SELECT update_reward_code_definition_v1($1, $2, $3, $4, $5, $6)`,
-		command.RewardCodeID, displayName, command.CreditAmount, command.MaxRedemptions,
-		cloneOptionalTime(command.ExpiresAt), command.ActorUserID,
-	).Scan(&found); err != nil {
-		return UpdatedRewardCode{}, mapRewardManagementError("update reward Code", err)
+	if err := s.rotateRewardCode(ctx, tx, input, rotationReplayed); err != nil {
+		return UpdatedRewardCode{}, err
 	}
-	if !found {
-		return UpdatedRewardCode{}, ErrRewardCodeNotFound
-	}
-
-	if command.Code != nil && !rotationReplayed {
-		var previousVersion any
-		var previousCodeDigest any
-		if previousDigest.version != "" {
-			previousVersion = previousDigest.version
-			previousCodeDigest = previousDigest.digest
-		}
-		if err := tx.QueryRow(ctx, `SELECT rotate_reward_code_v1($1, $2, $3, $4, $5, $6, $7)`,
-			command.RewardCodeID, currentDigest.version, currentDigest.digest,
-			normalized[len(normalized)-4:], previousVersion, previousCodeDigest, command.ActorUserID,
-		).Scan(&found); err != nil {
-			return UpdatedRewardCode{}, mapRewardManagementError("rotate reward Code", err)
-		}
-		if !found {
-			return UpdatedRewardCode{}, ErrRewardCodeNotFound
-		}
-	}
-
 	updated, err := s.loadRewardCode(ctx, tx, command.RewardCodeID)
 	if err != nil {
 		return UpdatedRewardCode{}, err
@@ -96,13 +43,105 @@ func (s *Service) UpdateRewardCode(ctx context.Context, command UpdateRewardCode
 		return UpdatedRewardCode{}, fmt.Errorf("commit reward Code update: %w", err)
 	}
 	result := UpdatedRewardCode{RewardCode: updated}
-	if command.Code != nil {
+	if input.hasCode {
 		result.Replayed = &rotationReplayed
 		if !rotationReplayed {
-			result.Plaintext = normalized
+			result.Plaintext = input.normalized
 		}
 	}
 	return result, nil
+}
+
+type rewardCodeUpdateInput struct {
+	command        UpdateRewardCodeCommand
+	displayName    string
+	expiresAt      *time.Time
+	normalized     string
+	currentDigest  codeDigest
+	previousDigest codeDigest
+	hasCode        bool
+}
+
+func (s *Service) prepareRewardCodeUpdate(command UpdateRewardCodeCommand) (rewardCodeUpdateInput, error) {
+	displayName := strings.TrimSpace(command.DisplayName)
+	if !s.validAdminMutation(command.RewardCodeID, command.ActorUserID) ||
+		displayName == "" || utf8.RuneCountInString(displayName) > 120 || command.MaxRedemptions < 0 {
+		return rewardCodeUpdateInput{}, ErrInvalidCommand
+	}
+	if _, err := credits.NewCreditAmount(command.CreditAmount); err != nil {
+		return rewardCodeUpdateInput{}, errors.Join(ErrInvalidCommand, err)
+	}
+	input := rewardCodeUpdateInput{command: command, displayName: displayName, expiresAt: cloneOptionalTime(command.ExpiresAt)}
+	if command.Code == nil {
+		return input, nil
+	}
+	normalized, err := normalizeCode(*command.Code)
+	if err != nil {
+		return rewardCodeUpdateInput{}, ErrInvalidCommand
+	}
+	input.normalized = normalized
+	input.currentDigest, input.previousDigest = splitCodeDigestCandidates(s.keyring.lookupDigests(normalized))
+	input.hasCode = true
+	return input, nil
+}
+
+func (s *Service) lockRewardCodeUpdate(ctx context.Context, tx pgx.Tx, input rewardCodeUpdateInput) (bool, error) {
+	if input.hasCode {
+		if err := lockRewardCodeIdentity(ctx, tx, input.normalized); err != nil {
+			return false, err
+		}
+	}
+	if err := lockRewardCodeID(ctx, tx, input.command.RewardCodeID); err != nil {
+		return false, err
+	}
+	if !input.hasCode {
+		return false, nil
+	}
+	aliasOwnerID, aliasExists, err := findRewardCodeAliasOwner(ctx, tx, input.currentDigest, input.previousDigest)
+	if err != nil {
+		return false, err
+	}
+	if aliasExists && aliasOwnerID != input.command.RewardCodeID {
+		return false, ErrCodeCollision
+	}
+	return aliasExists, nil
+}
+
+func (s *Service) updateRewardCodeDefinition(ctx context.Context, tx pgx.Tx, input rewardCodeUpdateInput) error {
+	var found bool
+	if err := tx.QueryRow(ctx, `SELECT update_reward_code_definition_v1($1, $2, $3, $4, $5, $6)`,
+		input.command.RewardCodeID, input.displayName, input.command.CreditAmount, input.command.MaxRedemptions,
+		input.expiresAt, input.command.ActorUserID,
+	).Scan(&found); err != nil {
+		return mapRewardManagementError("update reward Code", err)
+	}
+	if !found {
+		return ErrRewardCodeNotFound
+	}
+	return nil
+}
+
+func (s *Service) rotateRewardCode(ctx context.Context, tx pgx.Tx, input rewardCodeUpdateInput, replayed bool) error {
+	if !input.hasCode || replayed {
+		return nil
+	}
+	var previousVersion any
+	var previousCodeDigest any
+	if input.previousDigest.version != "" {
+		previousVersion = input.previousDigest.version
+		previousCodeDigest = input.previousDigest.digest
+	}
+	var found bool
+	if err := tx.QueryRow(ctx, `SELECT rotate_reward_code_v1($1, $2, $3, $4, $5, $6, $7)`,
+		input.command.RewardCodeID, input.currentDigest.version, input.currentDigest.digest,
+		input.normalized[len(input.normalized)-4:], previousVersion, previousCodeDigest, input.command.ActorUserID,
+	).Scan(&found); err != nil {
+		return mapRewardManagementError("rotate reward Code", err)
+	}
+	if !found {
+		return ErrRewardCodeNotFound
+	}
+	return nil
 }
 
 func (s *Service) SetRewardCodeEnabled(ctx context.Context, command SetRewardCodeEnabledCommand) (RewardCode, error) {

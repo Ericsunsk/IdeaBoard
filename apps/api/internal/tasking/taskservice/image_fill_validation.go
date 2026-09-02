@@ -16,7 +16,7 @@ const (
 )
 
 func validateImageFillDimensions(featureSlug string, params *tasks.WorkflowTaskParams) error {
-	if featureSlug != workflow.FeatureSlugOutpaint && featureSlug != workflow.FeatureSlugInpaint {
+	if !isImageFillFeature(featureSlug) {
 		return nil
 	}
 	if params == nil || params.Controls == nil {
@@ -33,42 +33,60 @@ func validateImageFillDimensions(featureSlug string, params *tasks.WorkflowTaskP
 	}
 	switch featureSlug {
 	case workflow.FeatureSlugOutpaint:
-		if params.Outpaint == nil {
-			return validation.New("扩图需要提供目标尺寸和原图偏移")
-		}
-		targetWidth, targetHeight, err := validateImageFillSize(
-			"目标图片",
-			float64(params.Outpaint.TargetWidth),
-			float64(params.Outpaint.TargetHeight),
-		)
-		if err != nil {
-			return err
-		}
-		if targetWidth < originalWidth || targetHeight < originalHeight {
-			return validation.New("扩图目标尺寸不能小于原图尺寸")
-		}
-		offsetX := int64(params.Outpaint.ImageOffsetX)
-		offsetY := int64(params.Outpaint.ImageOffsetY)
-		if offsetX < 0 || offsetY < 0 ||
-			offsetX > targetWidth-originalWidth ||
-			offsetY > targetHeight-originalHeight {
-			return validation.New("扩图偏移不能让原图超出目标画布")
-		}
-		if targetWidth == originalWidth && targetHeight == originalHeight {
-			return validation.New("扩图目标尺寸必须至少扩展一个方向")
-		}
+		return validateOutpaintDimensions(params.Outpaint, originalWidth, originalHeight)
 	case workflow.FeatureSlugInpaint:
-		targetWidth, targetHeight, err := validateImageFillSize(
-			"目标图片",
-			params.Controls.CustomWidth,
-			params.Controls.CustomHeight,
-		)
-		if err != nil {
-			return err
-		}
-		if targetWidth != originalWidth || targetHeight != originalHeight {
-			return validation.New("局部重绘的目标尺寸必须与原图尺寸一致")
-		}
+		return validateInpaintDimensions(params.Controls, originalWidth, originalHeight)
+	}
+	return nil
+}
+
+func isImageFillFeature(featureSlug string) bool {
+	return featureSlug == workflow.FeatureSlugOutpaint || featureSlug == workflow.FeatureSlugInpaint
+}
+
+func validateOutpaintDimensions(outpaint *tasks.OutpaintParams, originalWidth, originalHeight int64) error {
+	if outpaint == nil {
+		return validation.New("扩图需要提供目标尺寸和原图偏移")
+	}
+	targetWidth, targetHeight, err := validateImageFillSize(
+		"目标图片",
+		float64(outpaint.TargetWidth),
+		float64(outpaint.TargetHeight),
+	)
+	if err != nil {
+		return err
+	}
+	if targetWidth < originalWidth || targetHeight < originalHeight {
+		return validation.New("扩图目标尺寸不能小于原图尺寸")
+	}
+	if !isValidOutpaintOffset(outpaint, targetWidth, targetHeight, originalWidth, originalHeight) {
+		return validation.New("扩图偏移不能让原图超出目标画布")
+	}
+	if targetWidth == originalWidth && targetHeight == originalHeight {
+		return validation.New("扩图目标尺寸必须至少扩展一个方向")
+	}
+	return nil
+}
+
+func isValidOutpaintOffset(outpaint *tasks.OutpaintParams, targetWidth, targetHeight, originalWidth, originalHeight int64) bool {
+	offsetX := int64(outpaint.ImageOffsetX)
+	offsetY := int64(outpaint.ImageOffsetY)
+	return offsetX >= 0 && offsetY >= 0 &&
+		offsetX <= targetWidth-originalWidth &&
+		offsetY <= targetHeight-originalHeight
+}
+
+func validateInpaintDimensions(controls *tasks.GenerationControls, originalWidth, originalHeight int64) error {
+	targetWidth, targetHeight, err := validateImageFillSize(
+		"目标图片",
+		controls.CustomWidth,
+		controls.CustomHeight,
+	)
+	if err != nil {
+		return err
+	}
+	if targetWidth != originalWidth || targetHeight != originalHeight {
+		return validation.New("局部重绘的目标尺寸必须与原图尺寸一致")
 	}
 	return nil
 }

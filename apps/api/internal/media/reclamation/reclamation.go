@@ -60,31 +60,51 @@ func (*ReclaimWorker) Timeout(*river.Job[ReclaimJobArgs]) time.Duration {
 }
 
 func (w *ReclaimWorker) Work(ctx context.Context, job *river.Job[ReclaimJobArgs]) error {
-	if w == nil || w.q == nil || w.storage == nil || job == nil || job.Args.MediaAssetID <= 0 || job.Args.ReclaimGeneration <= 0 {
+	if !validReclaimJob(w, job) {
 		return fmt.Errorf("invalid media reclamation job")
 	}
+	args := job.Args
 	now := w.now()
 	claimToken := uuid.NullUUID{UUID: uuid.New(), Valid: true}
+	asset, claimed, err := w.claimAsset(ctx, args, now, claimToken)
+	if !claimed {
+		return w.resolveSkippedClaim(ctx, args, now)
+	}
+	if err != nil {
+		return err
+	}
+	if err := w.deleteClaimedObjects(ctx, asset, args, claimToken); err != nil {
+		return err
+	}
+	return w.finalizeReclamation(ctx, asset, args, claimToken)
+}
+
+func validReclaimJob(w *ReclaimWorker, job *river.Job[ReclaimJobArgs]) bool {
+	return w != nil && w.q != nil && w.storage != nil && job != nil &&
+		job.Args.MediaAssetID > 0 && job.Args.ReclaimGeneration > 0
+}
+
+func (w *ReclaimWorker) claimAsset(ctx context.Context, args ReclaimJobArgs, now time.Time, claimToken uuid.NullUUID) (dbsqlc.MediaAsset, bool, error) {
 	asset, err := w.q.ClaimDueMediaAssetReclamation(ctx, dbsqlc.ClaimDueMediaAssetReclamationParams{
-		ID:                job.Args.MediaAssetID,
-		ReclaimGeneration: job.Args.ReclaimGeneration,
+		ID:                args.MediaAssetID,
+		ReclaimGeneration: args.ReclaimGeneration,
 		ClaimedAt:         sql.NullTime{Time: now, Valid: true},
 		ClaimToken:        claimToken,
 		NowAt:             sql.NullTime{Time: now, Valid: true},
 		StaleClaimBefore:  sql.NullTime{Time: now.Add(-ClaimLeaseDuration), Valid: true},
 	})
 	if database.IsNotFound(err) || errors.Is(err, sql.ErrNoRows) {
-		return w.resolveSkippedClaim(ctx, job.Args, now)
+		return dbsqlc.MediaAsset{}, false, nil
 	}
 	if err != nil {
-		return fmt.Errorf("claim media asset %d: %w", job.Args.MediaAssetID, err)
+		return dbsqlc.MediaAsset{}, true, fmt.Errorf("claim media asset %d: %w", args.MediaAssetID, err)
 	}
+	return asset, true, nil
+}
+
+func (w *ReclaimWorker) deleteClaimedObjects(ctx context.Context, asset dbsqlc.MediaAsset, args ReclaimJobArgs, claimToken uuid.NullUUID) error {
 	if err := w.storage.DeleteObjectByStorageProfile(ctx, asset.StorageProfileID, asset.StorageKey); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		releaseCtx := context.WithoutCancel(ctx)
-		if releaseErr := w.q.ReleaseMediaAssetReclamationClaim(releaseCtx, dbsqlc.ReleaseMediaAssetReclamationClaimParams{ID: asset.ID, ReclaimGeneration: job.Args.ReclaimGeneration, ClaimToken: claimToken}); releaseErr != nil {
-			return errors.Join(fmt.Errorf("delete media asset %d: %w", asset.ID, err), fmt.Errorf("release media reclamation claim: %w", releaseErr))
-		}
-		return fmt.Errorf("delete media asset %d: %w", asset.ID, err)
+		return w.releaseClaimOnError(ctx, asset.ID, args.ReclaimGeneration, claimToken, fmt.Errorf("delete media asset %d: %w", asset.ID, err))
 	}
 	derivatives, err := w.q.ListMediaDerivativesByAsset(ctx, dbsqlc.ListMediaDerivativesByAssetParams{
 		MediaAssetID: asset.ID, OwnerUserID: asset.OwnerUserID,
@@ -97,19 +117,27 @@ func (w *ReclaimWorker) Work(ctx context.Context, job *river.Job[ReclaimJobArgs]
 			continue
 		}
 		if err := w.storage.DeleteObjectByStorageProfile(ctx, derivative.StorageProfileID, derivative.StorageKey); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			releaseCtx := context.WithoutCancel(ctx)
-			if releaseErr := w.q.ReleaseMediaAssetReclamationClaim(releaseCtx, dbsqlc.ReleaseMediaAssetReclamationClaimParams{ID: asset.ID, ReclaimGeneration: job.Args.ReclaimGeneration, ClaimToken: claimToken}); releaseErr != nil {
-				return errors.Join(fmt.Errorf("delete media asset %d derivative %s: %w", asset.ID, derivative.Tier, err), fmt.Errorf("release media reclamation claim: %w", releaseErr))
-			}
-			return fmt.Errorf("delete media asset %d derivative %s: %w", asset.ID, derivative.Tier, err)
+			return w.releaseClaimOnError(ctx, asset.ID, args.ReclaimGeneration, claimToken, fmt.Errorf("delete media asset %d derivative %s: %w", asset.ID, derivative.Tier, err))
 		}
 	}
+	return nil
+}
+
+func (w *ReclaimWorker) releaseClaimOnError(ctx context.Context, assetID, generation int64, claimToken uuid.NullUUID, operationErr error) error {
+	releaseCtx := context.WithoutCancel(ctx)
+	if releaseErr := w.q.ReleaseMediaAssetReclamationClaim(releaseCtx, dbsqlc.ReleaseMediaAssetReclamationClaimParams{ID: assetID, ReclaimGeneration: generation, ClaimToken: claimToken}); releaseErr != nil {
+		return errors.Join(operationErr, fmt.Errorf("release media reclamation claim: %w", releaseErr))
+	}
+	return operationErr
+}
+
+func (w *ReclaimWorker) finalizeReclamation(ctx context.Context, asset dbsqlc.MediaAsset, args ReclaimJobArgs, claimToken uuid.NullUUID) error {
 	if err := w.q.DeleteMediaDerivativesByAsset(ctx, dbsqlc.DeleteMediaDerivativesByAssetParams{MediaAssetID: asset.ID, OwnerUserID: asset.OwnerUserID}); err != nil {
 		return fmt.Errorf("delete media asset %d derivative records: %w", asset.ID, err)
 	}
 	rows, err := w.q.MarkMediaAssetReclaimed(ctx, dbsqlc.MarkMediaAssetReclaimedParams{
 		ID:                asset.ID,
-		ReclaimGeneration: job.Args.ReclaimGeneration,
+		ReclaimGeneration: args.ReclaimGeneration,
 		ClaimToken:        claimToken,
 		DeletedAt:         sql.NullTime{Time: w.now(), Valid: true},
 	})
@@ -117,7 +145,7 @@ func (w *ReclaimWorker) Work(ctx context.Context, job *river.Job[ReclaimJobArgs]
 		return fmt.Errorf("mark media asset %d reclaimed: %w", asset.ID, err)
 	}
 	if rows == 0 {
-		return w.resolveSkippedClaim(ctx, job.Args, w.now())
+		return w.resolveSkippedClaim(ctx, args, w.now())
 	}
 	return nil
 }

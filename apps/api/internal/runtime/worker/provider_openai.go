@@ -23,6 +23,7 @@ import (
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/safehttp"
+	"ideaboard/api/internal/tasking/taskmedia"
 )
 
 const maxOpenAIDataURLBytes = 10 * 1024 * 1024
@@ -374,37 +375,43 @@ func (c *ProviderExecutor) writeOpenAIMultipartImagePart(ctx context.Context, wr
 
 func (c *ProviderExecutor) resolveOpenAIImageBytes(ctx context.Context, ref string, index int, timeout time.Duration) (filename string, mimeType string, data []byte, err error) {
 	if strings.HasPrefix(ref, "data:") {
-		parsed, decodeErr := mediarefs.ParseDataImageURL(ref, maxOpenAIDataURLBytes)
-		if decodeErr != nil {
-			return "", "", nil, fmt.Errorf("解析 data URL 失败: %w", decodeErr)
-		}
-		ext := strings.TrimPrefix(parsed.Ext, ".")
-		return fmt.Sprintf("image-%d.%s", index+1, ext), parsed.MIMEType, parsed.Data, nil
+		return resolveOpenAIDataURL(ref, index)
 	}
 
 	if obj, ok, readErr := c.readRelativeUploadObject(ctx, ref, maxOpenAIDataURLBytes); ok {
-		if readErr != nil {
-			return "", "", nil, fmt.Errorf("读取上传图像失败: %w", readErr)
-		}
-		if _, err := imageformat.InspectDetectedBytes(obj.Data); err != nil {
-			return "", "", nil, err
-		}
-		mimeType = strings.TrimSpace(obj.ContentType)
-		if parsedMimeType, _, parseMimeErr := mime.ParseMediaType(mimeType); parseMimeErr == nil && strings.HasPrefix(parsedMimeType, "image/") {
-			mimeType = parsedMimeType
-		} else {
-			mimeType = inferLocalAssetMimeType(obj.Filename, obj.Data)
-		}
-		filename = strings.TrimSpace(obj.Filename)
-		if filename == "" || filename == "." || filename == "/" {
-			filename = fmt.Sprintf("image-%d.%s", index+1, inferOpenAIImageFileExtension(mimeType))
-		}
-		if ext := strings.TrimSpace(path.Ext(filename)); ext == "" {
-			filename += "." + inferOpenAIImageFileExtension(mimeType)
-		}
-		return filename, mimeType, obj.Data, nil
+		return resolveOpenAIRelativeObject(obj, readErr, index)
 	}
 
+	return c.resolveOpenAIRemoteImage(ctx, ref, index, timeout)
+}
+
+func resolveOpenAIDataURL(ref string, index int) (string, string, []byte, error) {
+	parsed, decodeErr := mediarefs.ParseDataImageURL(ref, maxOpenAIDataURLBytes)
+	if decodeErr != nil {
+		return "", "", nil, fmt.Errorf("解析 data URL 失败: %w", decodeErr)
+	}
+	ext := strings.TrimPrefix(parsed.Ext, ".")
+	return fmt.Sprintf("image-%d.%s", index+1, ext), parsed.MIMEType, parsed.Data, nil
+}
+
+func resolveOpenAIRelativeObject(obj *taskmedia.StoredObject, readErr error, index int) (string, string, []byte, error) {
+	if readErr != nil {
+		return "", "", nil, fmt.Errorf("读取上传图像失败: %w", readErr)
+	}
+	if _, err := imageformat.InspectDetectedBytes(obj.Data); err != nil {
+		return "", "", nil, err
+	}
+	mimeType := strings.TrimSpace(obj.ContentType)
+	if parsedMimeType, _, parseMimeErr := mime.ParseMediaType(mimeType); parseMimeErr == nil && strings.HasPrefix(parsedMimeType, "image/") {
+		mimeType = parsedMimeType
+	} else {
+		mimeType = inferLocalAssetMimeType(obj.Filename, obj.Data)
+	}
+	filename := strings.TrimSpace(obj.Filename)
+	return ensureOpenAIImageFilename(filename, mimeType, index), mimeType, obj.Data, nil
+}
+
+func (c *ProviderExecutor) resolveOpenAIRemoteImage(ctx context.Context, ref string, index int, timeout time.Duration) (string, string, []byte, error) {
 	parsed, parseErr := url.Parse(ref)
 	if parseErr != nil || parsed == nil || parsed.Scheme == "" || parsed.Host == "" {
 		return "", "", nil, fmt.Errorf("不支持的图像引用: %q", ref)
@@ -432,22 +439,27 @@ func (c *ProviderExecutor) resolveOpenAIImageBytes(ctx context.Context, ref stri
 		return "", "", nil, fmt.Errorf("拉取图像为空: %q", ref)
 	}
 
-	detectedMimeType := strings.TrimSpace(resp.Header.Get("Content-Type"))
-	if parsedMimeType, _, parseMimeErr := mime.ParseMediaType(detectedMimeType); parseMimeErr == nil && strings.HasPrefix(parsedMimeType, "image/") {
-		detectedMimeType = parsedMimeType
-	} else {
-		detectedMimeType = inferLocalAssetMimeType(path.Base(parsed.Path), body)
-	}
+	detectedMimeType := resolveOpenAIResponseMIME(resp.Header.Get("Content-Type"), path.Base(parsed.Path), body)
+	return ensureOpenAIImageFilename(path.Base(parsed.Path), detectedMimeType, index), detectedMimeType, body, nil
+}
 
-	filename = path.Base(parsed.Path)
+func resolveOpenAIResponseMIME(contentType, filename string, data []byte) string {
+	detectedMimeType := strings.TrimSpace(contentType)
+	if parsedMimeType, _, parseMimeErr := mime.ParseMediaType(detectedMimeType); parseMimeErr == nil && strings.HasPrefix(parsedMimeType, "image/") {
+		return parsedMimeType
+	}
+	return inferLocalAssetMimeType(filename, data)
+}
+
+func ensureOpenAIImageFilename(filename, mimeType string, index int) string {
+	filename = strings.TrimSpace(filename)
 	if filename == "" || filename == "." || filename == "/" {
-		filename = fmt.Sprintf("image-%d.%s", index+1, inferOpenAIImageFileExtension(detectedMimeType))
+		filename = fmt.Sprintf("image-%d.%s", index+1, inferOpenAIImageFileExtension(mimeType))
 	}
 	if ext := strings.TrimSpace(path.Ext(filename)); ext == "" {
-		filename += "." + inferOpenAIImageFileExtension(detectedMimeType)
+		filename += "." + inferOpenAIImageFileExtension(mimeType)
 	}
-
-	return filename, detectedMimeType, body, nil
+	return filename
 }
 
 func inferOpenAIImageFileExtension(mimeType string) string {

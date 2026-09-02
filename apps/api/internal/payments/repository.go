@@ -773,25 +773,59 @@ func (r *Repository) replayedPaymentConvergence(ctx context.Context, order Payme
 }
 
 func validatePaidCheckoutFacts(order PaymentOrder, facts PaidCheckoutFacts) error {
-	currency := strings.ToLower(strings.TrimSpace(facts.PaidCurrency))
-	if facts.StripeAccountID != order.StripeAccountID ||
-		facts.PublicOrderNumber != order.PublicOrderNumber || facts.PaymentOrderID != order.ID ||
-		facts.RequestHash != order.RequestHash ||
-		facts.IdeaQuantity != order.IdeaQuantity {
+	if paidCheckoutIdentityConflict(order, facts) {
 		return ErrCheckoutIdempotencyConflict
 	}
-	if order.StripeCheckoutSessionID != "" && facts.StripeSessionID != order.StripeCheckoutSessionID ||
-		order.StripeCustomerID != "" && facts.StripeCustomerID != order.StripeCustomerID ||
-		order.StripeCheckoutSessionID != "" && !facts.ExpiresAt.Equal(order.ExpiresAt) {
+	if paidCheckoutBindingConflict(order, facts) {
 		return ErrCheckoutIdempotencyConflict
 	}
-	if strings.TrimSpace(facts.StripePaymentIntentID) == "" || facts.PaidSubtotalMinor < 0 || facts.PaidTaxMinor < 0 ||
-		facts.PaidTotalMinor <= 0 || facts.PaidSubtotalMinor+facts.PaidTaxMinor != facts.PaidTotalMinor ||
-		len(currency) != 3 || facts.PaidAt.IsZero() || facts.ExpiresAt.IsZero() || strings.TrimSpace(facts.StripeCustomerID) == "" ||
-		strings.TrimSpace(facts.StripeSessionID) == "" {
+	if invalidPaidCheckoutPayload(facts) {
 		return fmt.Errorf("invalid paid Checkout facts")
 	}
 	return nil
+}
+
+func paidCheckoutIdentityConflict(order PaymentOrder, facts PaidCheckoutFacts) bool {
+	if facts.StripeAccountID != order.StripeAccountID {
+		return true
+	}
+	if facts.PublicOrderNumber != order.PublicOrderNumber {
+		return true
+	}
+	if facts.PaymentOrderID != order.ID {
+		return true
+	}
+	if facts.RequestHash != order.RequestHash {
+		return true
+	}
+	return facts.IdeaQuantity != order.IdeaQuantity
+}
+
+func paidCheckoutBindingConflict(order PaymentOrder, facts PaidCheckoutFacts) bool {
+	if order.StripeCheckoutSessionID != "" && facts.StripeSessionID != order.StripeCheckoutSessionID {
+		return true
+	}
+	if order.StripeCustomerID != "" && facts.StripeCustomerID != order.StripeCustomerID {
+		return true
+	}
+	return order.StripeCheckoutSessionID != "" && !facts.ExpiresAt.Equal(order.ExpiresAt)
+}
+
+func invalidPaidCheckoutPayload(facts PaidCheckoutFacts) bool {
+	currency := strings.ToLower(strings.TrimSpace(facts.PaidCurrency))
+	if strings.TrimSpace(facts.StripePaymentIntentID) == "" {
+		return true
+	}
+	if facts.PaidSubtotalMinor < 0 || facts.PaidTaxMinor < 0 {
+		return true
+	}
+	if facts.PaidTotalMinor <= 0 || facts.PaidSubtotalMinor+facts.PaidTaxMinor != facts.PaidTotalMinor {
+		return true
+	}
+	if len(currency) != 3 || facts.PaidAt.IsZero() || facts.ExpiresAt.IsZero() {
+		return true
+	}
+	return strings.TrimSpace(facts.StripeCustomerID) == "" || strings.TrimSpace(facts.StripeSessionID) == ""
 }
 
 func validateRecordedPaidCheckoutFacts(order PaymentOrder, facts PaidCheckoutFacts) error {

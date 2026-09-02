@@ -129,6 +129,14 @@ type startReconciliationInput struct {
 	onlyIfOverdue bool
 }
 
+type normalizedReconciliationInput struct {
+	trigger       ReconciliationTrigger
+	requestedBy   any
+	reason        any
+	scheduledFor  any
+	onlyIfOverdue bool
+}
+
 func (s *Service) StartReconciliation(
 	ctx context.Context,
 	input StartManualReconciliationInput,
@@ -165,28 +173,54 @@ func (s *Service) startReconciliation(
 	if s == nil || s.pool == nil || s.reconciliationDispatcher == nil {
 		return nil, ErrReconciliationUnavailable
 	}
-	var requestedBy any
-	var reason any
-	var scheduledFor any
+	normalized, err := normalizeReconciliationInput(input)
+	if err != nil {
+		return nil, err
+	}
+	runID, enqueueRequired, err := s.createReconciliationRun(ctx, normalized)
+	if err != nil {
+		return nil, err
+	}
+	if runID == nil || (input.trigger == ReconciliationTriggerScheduled && !enqueueRequired) {
+		return nil, nil
+	}
+	run, err := s.GetReconciliationRun(ctx, *runID)
+	if err != nil {
+		return nil, err
+	}
+	return &run, nil
+}
+
+func normalizeReconciliationInput(input startReconciliationInput) (normalizedReconciliationInput, error) {
+	normalized := normalizedReconciliationInput{
+		trigger:       input.trigger,
+		onlyIfOverdue: input.onlyIfOverdue,
+	}
 	switch input.trigger {
 	case ReconciliationTriggerManual:
 		if !input.action.IsValid() {
-			return nil, ErrInvalidCommand
+			return normalizedReconciliationInput{}, ErrInvalidCommand
 		}
-		requestedBy = input.action.ActorID()
-		reason = input.action.Reason()
+		normalized.requestedBy = input.action.ActorID()
+		normalized.reason = input.action.Reason()
 	case ReconciliationTriggerScheduled:
 		if input.scheduledFor == nil || input.scheduledFor.IsZero() {
-			return nil, ErrInvalidCommand
+			return normalizedReconciliationInput{}, ErrInvalidCommand
 		}
-		normalized := input.scheduledFor.UTC().Truncate(time.Second)
-		scheduledFor = normalized
+		normalized.scheduledFor = input.scheduledFor.UTC().Truncate(time.Second)
 	default:
-		return nil, ErrInvalidCommand
+		return normalizedReconciliationInput{}, ErrInvalidCommand
 	}
+	return normalized, nil
+}
+
+func (s *Service) createReconciliationRun(
+	ctx context.Context,
+	input normalizedReconciliationInput,
+) (*int64, bool, error) {
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("credits reconciliation: begin: %w", err)
+		return nil, false, fmt.Errorf("credits reconciliation: begin: %w", err)
 	}
 	defer func() {
 		rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rollbackTimeout)
@@ -198,32 +232,22 @@ func (s *Service) startReconciliation(
 	var runID *int64
 	var enqueueRequired bool
 	if err := tx.QueryRow(ctx, `SELECT run_id, enqueue_required FROM start_credit_reconciliation($1, $2, $3, $4, $5)`,
-		string(input.trigger), requestedBy, reason, scheduledFor, input.onlyIfOverdue,
+		string(input.trigger), input.requestedBy, input.reason, input.scheduledFor, input.onlyIfOverdue,
 	).Scan(&runID, &enqueueRequired); err != nil {
-		return nil, fmt.Errorf("credits reconciliation: create run: %w", err)
+		return nil, false, fmt.Errorf("credits reconciliation: create run: %w", err)
 	}
 	if enqueueRequired {
 		if runID == nil || *runID <= 0 {
-			return nil, fmt.Errorf("credits reconciliation: enqueue-required run has invalid ID")
+			return nil, false, fmt.Errorf("credits reconciliation: enqueue-required run has invalid ID")
 		}
 		if err := s.reconciliationDispatcher.DispatchReconciliationRun(ctx, tx, *runID); err != nil {
-			return nil, fmt.Errorf("credits reconciliation: enqueue run: %w", err)
+			return nil, false, fmt.Errorf("credits reconciliation: enqueue run: %w", err)
 		}
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("credits reconciliation: commit: %w", err)
+		return nil, false, fmt.Errorf("credits reconciliation: commit: %w", err)
 	}
-	// A scheduled tick is a pure trigger. When the database already owns the
-	// slot (active, completed, or otherwise deduplicated), no new work was
-	// created and the runtime scheduler should treat the tick as a no-op.
-	if runID == nil || (input.trigger == ReconciliationTriggerScheduled && !enqueueRequired) {
-		return nil, nil
-	}
-	run, err := s.GetReconciliationRun(ctx, *runID)
-	if err != nil {
-		return nil, err
-	}
-	return &run, nil
+	return runID, enqueueRequired, nil
 }
 
 func (s *Service) ExecuteReconciliation(ctx context.Context, runID int64) error {

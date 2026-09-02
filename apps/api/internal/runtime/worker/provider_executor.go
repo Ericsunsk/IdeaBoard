@@ -367,97 +367,99 @@ func resolvedProviderParsedOutputCount(callResult providerCallResult, imageURLs 
 	return len(imageURLs)
 }
 
-func (c *ProviderExecutor) resolveProviderExecution(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (resolvedProviderExecution, error) {
+type providerExecutionInputs struct {
+	apiKey               string
+	baseURL              string
+	apiType              string
+	protocol             string
+	providerEndpointID   int64
+	providerEndpointName string
+}
+
+func validateProviderExecutionInputs(ctx context.Context, account *accounts.RuntimeAccountAccess, assignment taskqueue.TaskAssignment) (providerExecutionInputs, error) {
 	if account == nil || account.ID <= 0 || assignment.AccountID != account.ID {
-		return resolvedProviderExecution{}, newExecutionFailureError(
-			tasks.ExecutionStageAssigned,
-			tasks.FailureCategoryInputInvalid,
-			fmt.Errorf("assignment account identity is invalid"),
-		)
+		return providerExecutionInputs{}, fmt.Errorf("assignment account identity is invalid")
 	}
 	apiKey := strings.TrimSpace(account.APIKey)
-	if apiKey == "" {
-		return resolvedProviderExecution{}, newExecutionFailureError(
-			tasks.ExecutionStageAssigned,
-			tasks.FailureCategoryAuth,
-			fmt.Errorf("账号 %s 的 API Key 为空", account.Name),
-		)
-	}
 	if assignment.ProviderEndpointID <= 0 ||
 		strings.TrimSpace(assignment.ProviderEndpointName) == "" ||
 		strings.TrimSpace(assignment.ProviderEndpointBaseURL) == "" ||
 		strings.TrimSpace(assignment.ProviderEndpointProtocol) == "" ||
 		strings.TrimSpace(assignment.APIType) == "" {
-		return resolvedProviderExecution{}, newExecutionFailureError(
-			tasks.ExecutionStageAssigned,
-			tasks.FailureCategoryInputInvalid,
-			fmt.Errorf("assignment provider endpoint snapshot is incomplete"),
-		)
+		return providerExecutionInputs{}, fmt.Errorf("assignment provider endpoint snapshot is incomplete")
 	}
-	baseURL, validateErr := outbound.ValidateConfiguredEndpoint(
+	baseURL, err := outbound.ValidateConfiguredEndpoint(
 		strings.TrimSpace(assignment.ProviderEndpointBaseURL),
 		outbound.AllowHosts(ctx)...,
 	)
-	if validateErr != nil {
-		return resolvedProviderExecution{}, newExecutionFailureError(
-			tasks.ExecutionStageAssigned,
-			tasks.FailureCategoryInputInvalid,
-			fmt.Errorf("ProviderEndpoint snapshot URL 不可用"),
-		)
+	if err != nil {
+		return providerExecutionInputs{}, fmt.Errorf("ProviderEndpoint snapshot URL 不可用")
 	}
 	apiType := strings.ToLower(strings.TrimSpace(assignment.APIType))
 	if !workflow.IsSupportedProviderAPIType(apiType) {
-		return resolvedProviderExecution{}, newExecutionFailureError(
-			tasks.ExecutionStageAssigned,
-			tasks.FailureCategoryInputInvalid,
-			fmt.Errorf("assignment API type is unsupported: %s", assignment.APIType),
-		)
+		return providerExecutionInputs{}, fmt.Errorf("assignment API type is unsupported: %s", assignment.APIType)
 	}
+	return providerExecutionInputs{
+		apiKey:               apiKey,
+		baseURL:              baseURL,
+		apiType:              apiType,
+		protocol:             strings.TrimSpace(assignment.ProviderEndpointProtocol),
+		providerEndpointID:   assignment.ProviderEndpointID,
+		providerEndpointName: strings.TrimSpace(assignment.ProviderEndpointName),
+	}, nil
+}
 
-	taskParams, err := c.parseAndNormalizeTaskParams(ctx, task)
+type providerExecutionPlan struct {
+	params        providerTaskParams
+	operation     workflow.RuntimeOperation
+	adapter       providerRuntimeAdapter
+	timeout       time.Duration
+	resolvedModel string
+}
+
+func (c *ProviderExecutor) resolveProviderExecutionPlan(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, inputs providerExecutionInputs, assignment taskqueue.TaskAssignment) (providerExecutionPlan, error) {
+	params, err := c.parseAndNormalizeTaskParams(ctx, task)
 	if err != nil {
-		return resolvedProviderExecution{}, newExecutionFailureError(
-			tasks.ExecutionStageAssigned,
-			tasks.FailureCategoryInputInvalid,
-			err,
-		)
+		return providerExecutionPlan{}, err
 	}
-	if taskParams.ExecutionPlan == nil {
-		return resolvedProviderExecution{}, newExecutionFailureError(
-			tasks.ExecutionStageAssigned,
-			tasks.FailureCategoryInputInvalid,
-			fmt.Errorf("drawing task requires a durable execution plan"),
-		)
+	if params.ExecutionPlan == nil {
+		return providerExecutionPlan{}, fmt.Errorf("drawing task requires a durable execution plan")
 	}
-	plan := *taskParams.ExecutionPlan
+	plan := *params.ExecutionPlan
 	operation := plan.RuntimeOperation()
-	protocol := strings.TrimSpace(assignment.ProviderEndpointProtocol)
-	adapter, routeErr := providerRuntimeAdapterFor(apiType, protocol, operation)
-	if routeErr != nil {
-		return resolvedProviderExecution{}, newExecutionFailureError(
-			tasks.ExecutionStageAssigned,
-			tasks.FailureCategoryInputInvalid,
-			routeErr,
-		)
+	adapter, err := providerRuntimeAdapterFor(inputs.apiType, inputs.protocol, operation)
+	if err != nil {
+		return providerExecutionPlan{}, err
 	}
-	timeout := resolveProviderTimeout(account, adapter)
 	resolvedModel := strings.TrimSpace(assignment.ResolvedModel)
 	modelRequired := plan.RoutingRequirement().ModelRequirement() == workflow.RoutingModelRequired
 	if modelRequired && resolvedModel == "" {
-		return resolvedProviderExecution{}, newExecutionFailureError(
-			tasks.ExecutionStageAssigned,
-			tasks.FailureCategoryInputInvalid,
-			fmt.Errorf("账号 %s 未分配模型，请先在后台检测并选择模型", account.Name),
-		)
+		return providerExecutionPlan{}, fmt.Errorf("账号 %s 未分配模型，请先在后台检测并选择模型", account.Name)
 	}
 	if !modelRequired && resolvedModel != "" {
-		return resolvedProviderExecution{}, newExecutionFailureError(
-			tasks.ExecutionStageAssigned,
-			tasks.FailureCategoryInputInvalid,
-			fmt.Errorf("modelless operation must not carry a resolved model"),
-		)
+		return providerExecutionPlan{}, fmt.Errorf("modelless operation must not carry a resolved model")
 	}
-	taskParams, err = c.resolveRuntimeProviderTaskParams(ctx, taskParams)
+	params, err = c.resolveRuntimeProviderTaskParams(ctx, params)
+	if err != nil {
+		return providerExecutionPlan{}, err
+	}
+	return providerExecutionPlan{
+		params:        params,
+		operation:     operation,
+		adapter:       adapter,
+		timeout:       resolveProviderTimeout(account, adapter),
+		resolvedModel: resolvedModel,
+	}, nil
+}
+
+func (c *ProviderExecutor) resolveProviderExecution(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (resolvedProviderExecution, error) {
+	if account == nil || account.ID <= 0 || assignment.AccountID != account.ID {
+		return resolvedProviderExecution{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, fmt.Errorf("assignment account identity is invalid"))
+	}
+	if strings.TrimSpace(account.APIKey) == "" {
+		return resolvedProviderExecution{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryAuth, fmt.Errorf("账号 %s 的 API Key 为空", account.Name))
+	}
+	inputs, err := validateProviderExecutionInputs(ctx, account, assignment)
 	if err != nil {
 		return resolvedProviderExecution{}, newExecutionFailureError(
 			tasks.ExecutionStageAssigned,
@@ -465,28 +467,27 @@ func (c *ProviderExecutor) resolveProviderExecution(ctx context.Context, account
 			err,
 		)
 	}
-
-	request, requestErr := taskParams.providerRequest(task.Prompt, resolvedModel)
-	if requestErr != nil {
-		return resolvedProviderExecution{}, newExecutionFailureError(
-			tasks.ExecutionStageAssigned,
-			tasks.FailureCategoryInputInvalid,
-			requestErr,
-		)
+	plan, err := c.resolveProviderExecutionPlan(ctx, account, task, inputs, assignment)
+	if err != nil {
+		return resolvedProviderExecution{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
+	}
+	request, err := plan.params.providerRequest(task.Prompt, plan.resolvedModel)
+	if err != nil {
+		return resolvedProviderExecution{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
 	}
 	resolved := resolvedProviderExecution{
 		accountID:               account.ID,
 		accountName:             strings.TrimSpace(account.Name),
-		providerEndpointID:      assignment.ProviderEndpointID,
-		providerEndpointName:    strings.TrimSpace(assignment.ProviderEndpointName),
-		providerEndpointBaseURL: baseURL,
-		apiType:                 apiType,
-		protocol:                protocol,
-		apiKey:                  apiKey,
-		resolvedModel:           resolvedModel,
-		runtimeOperation:        operation,
-		adapter:                 adapter,
-		timeout:                 timeout,
+		providerEndpointID:      inputs.providerEndpointID,
+		providerEndpointName:    inputs.providerEndpointName,
+		providerEndpointBaseURL: inputs.baseURL,
+		apiType:                 inputs.apiType,
+		protocol:                inputs.protocol,
+		apiKey:                  inputs.apiKey,
+		resolvedModel:           plan.resolvedModel,
+		runtimeOperation:        plan.operation,
+		adapter:                 plan.adapter,
+		timeout:                 plan.timeout,
 		request:                 request,
 	}
 	adapterAccount := resolved.adapterAccount()

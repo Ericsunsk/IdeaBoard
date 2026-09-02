@@ -273,103 +273,134 @@ func (s *CheckoutWorkflow) createCheckoutLocked(ctx context.Context, command Cre
 	if s == nil || s.checkoutStore == nil || s.checkoutGateway == nil || s.wallets == nil {
 		return CheckoutResult{}, ErrPurchasesUnavailable
 	}
-	requestHash, err := CheckoutRequestFingerprint(command)
+	request, err := s.prepareCheckoutRequest(ctx, command)
 	if err != nil {
 		return CheckoutResult{}, err
+	}
+	resolution, err := s.resolveCheckoutOrder(ctx, command, request)
+	if err != nil {
+		return CheckoutResult{}, err
+	}
+	order, reused := resolution.order, resolution.reused
+	if order.Status != PaymentOrderCreating {
+		return finalizeExistingCheckoutResult(order)
+	}
+	order, err = s.createCheckoutSessionForOrder(ctx, request.configuration, request.apiKey, order)
+	if err != nil {
+		return CheckoutResult{}, err
+	}
+	return finalizeCreatedCheckoutResult(order, reused)
+}
+
+type checkoutRequest struct {
+	quote         PurchaseQuote
+	requestHash   string
+	configuration StoredStripeConfiguration
+	apiKey        string
+	returnBaseURL string
+	now           time.Time
+}
+
+type checkoutOrderResolution struct {
+	order  PaymentOrder
+	reused bool
+}
+
+func (s *CheckoutWorkflow) prepareCheckoutRequest(ctx context.Context, command CreateCheckoutCommand) (checkoutRequest, error) {
+	requestHash, err := CheckoutRequestFingerprint(command)
+	if err != nil {
+		return checkoutRequest{}, err
 	}
 	quote, err := NewPurchaseQuote(command.IdeaQuantity)
 	if err != nil {
-		return CheckoutResult{}, err
+		return checkoutRequest{}, err
 	}
 	configuration, apiKey, err := s.checkoutConfiguration(ctx)
 	if err != nil {
-		return CheckoutResult{}, err
+		return checkoutRequest{}, err
 	}
 	if err := s.requireRechargeableWallet(ctx, command.UserID); err != nil {
-		return CheckoutResult{}, err
+		return checkoutRequest{}, err
 	}
 	returnBaseURL, err := normalizeCheckoutReturnBaseURL(command.ReturnBaseURL)
 	if err != nil {
-		return CheckoutResult{}, err
+		return checkoutRequest{}, err
 	}
+	return checkoutRequest{
+		quote: quote, requestHash: requestHash, configuration: configuration,
+		apiKey: apiKey, returnBaseURL: returnBaseURL, now: s.runtime.now().UTC(),
+	}, nil
+}
 
-	now := s.runtime.now().UTC()
-	activeOrders, err := s.refreshActivePaymentOrders(ctx, command.UserID, now)
+func (s *CheckoutWorkflow) resolveCheckoutOrder(ctx context.Context, command CreateCheckoutCommand, request checkoutRequest) (checkoutOrderResolution, error) {
+	activeOrders, err := s.refreshActivePaymentOrders(ctx, command.UserID, request.now)
 	if err != nil {
-		return CheckoutResult{}, err
+		return checkoutOrderResolution{}, err
 	}
-	var order PaymentOrder
-	reused := false
 	activeOrderCount := len(activeOrders)
 	for _, activeOrder := range activeOrders {
-		if activeOrder.IdeaQuantity != quote.IdeaQuantity {
+		if activeOrder.IdeaQuantity != request.quote.IdeaQuantity {
 			continue
 		}
 		switch activeOrder.Status {
 		case PaymentOrderCheckoutOpen:
-			resolved, err := s.retrieveAndConvergeCheckout(ctx, apiKey, activeOrder)
+			resolved, err := s.retrieveAndConvergeCheckout(ctx, request.apiKey, activeOrder)
 			if err != nil {
-				return CheckoutResult{}, err
+				return checkoutOrderResolution{}, err
 			}
 			switch resolved.Status {
 			case PaymentOrderCheckoutOpen:
-				return checkoutResult(resolved, true), nil
+				return checkoutOrderResolution{order: resolved, reused: true}, nil
 			case PaymentOrderAsyncPaymentPending:
-				return CheckoutResult{}, ErrPaymentAlreadyInProgress
+				return checkoutOrderResolution{}, ErrPaymentAlreadyInProgress
 			default:
 				activeOrderCount--
 			}
 		case PaymentOrderAsyncPaymentPending:
-			return CheckoutResult{}, ErrPaymentAlreadyInProgress
+			return checkoutOrderResolution{}, ErrPaymentAlreadyInProgress
 		case PaymentOrderCreating:
-			order, reused = activeOrder, true
+			return checkoutOrderResolution{order: activeOrder, reused: true}, nil
 		}
 		break
 	}
-	if order.ID == "" {
-		if activeOrderCount >= 3 {
-			return CheckoutResult{}, ErrPendingCheckoutLimit
-		}
-		orderID, err := uuid.NewV7()
-		if err != nil {
-			return CheckoutResult{}, fmt.Errorf("generate payment order ID: %w", err)
-		}
-		publicOrderNumber, err := newPublicOrderNumber(now)
-		if err != nil {
-			return CheckoutResult{}, err
-		}
-		order, reused, err = s.checkoutStore.CreatePaymentOrderIntent(ctx, CreatePaymentOrderIntentInput{
-			ID: orderID.String(), PublicOrderNumber: publicOrderNumber, PublicToken: uuid.NewString(),
-			UserID: command.UserID, ClientIdempotencyKey: strings.TrimSpace(command.ClientIdempotencyKey), RequestHash: requestHash,
-			StripeCredentialID: configuration.CredentialID, StripeAccountID: configuration.AccountID, StripeProductID: configuration.StripeProductID,
-			IdeaQuantity: quote.IdeaQuantity,
-			TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
-			ReturnBaseURL: returnBaseURL,
-			// Stripe accepts expiry with second precision. Persist the exact normalized
-			// request value before the first call so every idempotent replay matches.
-			ExpiresAt: now.UTC().Truncate(time.Second).Add(checkoutSessionLifetime + checkoutSessionTransportMargin),
-		})
-		if err != nil {
-			return CheckoutResult{}, err
-		}
+	if activeOrderCount >= 3 {
+		return checkoutOrderResolution{}, ErrPendingCheckoutLimit
 	}
-	if order.Status != PaymentOrderCreating {
-		if order.Status != PaymentOrderCheckoutOpen && order.Status != PaymentOrderAsyncPaymentPending {
-			return CheckoutResult{}, ErrPurchasesUnavailable
-		}
-		if order.Status == PaymentOrderAsyncPaymentPending {
-			return CheckoutResult{}, ErrPaymentAlreadyInProgress
-		}
-		if order.CheckoutURL == "" {
-			return CheckoutResult{}, ErrPurchasesUnavailable
-		}
-		return checkoutResult(order, true), nil
-	}
-
-	order, err = s.createCheckoutSessionForOrder(ctx, configuration, apiKey, order)
+	orderID, err := uuid.NewV7()
 	if err != nil {
-		return CheckoutResult{}, err
+		return checkoutOrderResolution{}, fmt.Errorf("generate payment order ID: %w", err)
 	}
+	publicOrderNumber, err := newPublicOrderNumber(request.now)
+	if err != nil {
+		return checkoutOrderResolution{}, err
+	}
+	order, reused, err := s.checkoutStore.CreatePaymentOrderIntent(ctx, CreatePaymentOrderIntentInput{
+		ID: orderID.String(), PublicOrderNumber: publicOrderNumber, PublicToken: uuid.NewString(),
+		UserID: command.UserID, ClientIdempotencyKey: strings.TrimSpace(command.ClientIdempotencyKey), RequestHash: request.requestHash,
+		StripeCredentialID: request.configuration.CredentialID, StripeAccountID: request.configuration.AccountID, StripeProductID: request.configuration.StripeProductID,
+		IdeaQuantity: request.quote.IdeaQuantity, TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
+		ReturnBaseURL: request.returnBaseURL,
+		// Stripe accepts expiry with second precision. Persist the exact normalized
+		// request value before the first call so every idempotent replay matches.
+		ExpiresAt: request.now.Truncate(time.Second).Add(checkoutSessionLifetime + checkoutSessionTransportMargin),
+	})
+	if err != nil {
+		return checkoutOrderResolution{}, err
+	}
+	return checkoutOrderResolution{order: order, reused: reused}, nil
+}
+
+func finalizeExistingCheckoutResult(order PaymentOrder) (CheckoutResult, error) {
+	if order.Status == PaymentOrderAsyncPaymentPending {
+		return CheckoutResult{}, ErrPaymentAlreadyInProgress
+	}
+	if order.Status != PaymentOrderCheckoutOpen || order.CheckoutURL == "" {
+		return CheckoutResult{}, ErrPurchasesUnavailable
+	}
+	return checkoutResult(order, true), nil
+}
+
+func finalizeCreatedCheckoutResult(order PaymentOrder, reused bool) (CheckoutResult, error) {
 	switch order.Status {
 	case PaymentOrderCheckoutOpen:
 		return checkoutResult(order, reused), nil

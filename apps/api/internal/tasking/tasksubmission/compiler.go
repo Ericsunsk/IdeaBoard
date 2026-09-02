@@ -32,20 +32,43 @@ func CompileGenerationSnapshot(input GenerationCompilerInput) (tasks.GenerationR
 	if _, err := workflow.EncodeFeatureExecutionPlan(input.Plan); err != nil {
 		return tasks.GenerationRequestSnapshot{}, fmt.Errorf("generation compiler execution plan: %w", err)
 	}
-	feature := input.Plan.Feature()
+	if err := validateGenerationPrompts(&input); err != nil {
+		return tasks.GenerationRequestSnapshot{}, err
+	}
+	snapshot := newGenerationSnapshot(input)
+	if input.Params == nil {
+		if hasPlannedMedia(input.Plan) {
+			return tasks.GenerationRequestSnapshot{}, fmt.Errorf("generation compiler media facts do not match execution plan")
+		}
+		return snapshot, nil
+	}
+	if err := compileGenerationControls(&snapshot, input.Params.Controls); err != nil {
+		return tasks.GenerationRequestSnapshot{}, err
+	}
+	compileGenerationMedia(&snapshot, input.Params.Media)
+	if err := validateGenerationMedia(snapshot, input.Plan); err != nil {
+		return tasks.GenerationRequestSnapshot{}, err
+	}
+	return snapshot, nil
+}
+
+func validateGenerationPrompts(input *GenerationCompilerInput) error {
 	if strings.TrimSpace(input.TemplateFingerprint) == "" {
 		input.TemplateFingerprint = TemplateFingerprint(input.TemplateVersion, input.CompiledPrompt)
 	}
 	if input.TemplateFingerprint == "" {
-		return tasks.GenerationRequestSnapshot{}, fmt.Errorf("generation compiler template fingerprint is required")
+		return fmt.Errorf("generation compiler template fingerprint is required")
 	}
 	if strings.TrimSpace(input.UserPrompt) != input.UserPrompt || strings.TrimSpace(input.CompiledPrompt) != input.CompiledPrompt {
-		return tasks.GenerationRequestSnapshot{}, fmt.Errorf("generation compiler prompts must be normalized")
+		return fmt.Errorf("generation compiler prompts must be normalized")
 	}
+	return nil
+}
 
-	snapshot := tasks.GenerationRequestSnapshot{
+func newGenerationSnapshot(input GenerationCompilerInput) tasks.GenerationRequestSnapshot {
+	return tasks.GenerationRequestSnapshot{
 		SchemaVersion:        tasks.CurrentParamsSchemaVersion,
-		Feature:              feature,
+		Feature:              input.Plan.Feature(),
 		Primitive:            string(input.Plan.RuntimeInputs().GenerationPrimitive()),
 		UserPrompt:           input.UserPrompt,
 		SystemPrompt:         input.SystemPrompt,
@@ -55,22 +78,32 @@ func CompileGenerationSnapshot(input GenerationCompilerInput) (tasks.GenerationR
 		Seed:                 generationSeed(input.SeedMaterial, input.TemplateFingerprint, input.CompiledPrompt),
 		RequestedOutputCount: input.Plan.RequestedOutputCount().Int(),
 	}
-	if input.Params == nil {
-		if input.Plan.RuntimeInputs().ImageInputCount() != 0 || input.Plan.RuntimeInputs().HasMaskInput() {
-			return tasks.GenerationRequestSnapshot{}, fmt.Errorf("generation compiler media facts do not match execution plan")
-		}
-		return snapshot, nil
+}
+
+func hasPlannedMedia(plan workflow.FeatureExecutionPlan) bool {
+	runtimeInputs := plan.RuntimeInputs()
+	return runtimeInputs.ImageInputCount() != 0 || runtimeInputs.HasMaskInput()
+}
+
+func compileGenerationControls(snapshot *tasks.GenerationRequestSnapshot, controls *tasks.GenerationControls) error {
+	if controls == nil {
+		return nil
 	}
-	if input.Params.Controls != nil {
-		controls := *input.Params.Controls
-		if controls.PromptUpsampling != nil {
-			value := *controls.PromptUpsampling
-			controls.PromptUpsampling = &value
-		}
-		snapshot.Controls = &controls
-		if controls.OutputCount > 0 && controls.OutputCount != snapshot.RequestedOutputCount {
-			return tasks.GenerationRequestSnapshot{}, fmt.Errorf("generation compiler output count does not match execution plan")
-		}
+	copyControls := *controls
+	if controls.PromptUpsampling != nil {
+		value := *controls.PromptUpsampling
+		copyControls.PromptUpsampling = &value
+	}
+	snapshot.Controls = &copyControls
+	if copyControls.OutputCount > 0 && copyControls.OutputCount != snapshot.RequestedOutputCount {
+		return fmt.Errorf("generation compiler output count does not match execution plan")
+	}
+	return nil
+}
+
+func compileGenerationMedia(snapshot *tasks.GenerationRequestSnapshot, media *tasks.MediaInputs) {
+	if media == nil {
+		return
 	}
 	appendMedia := func(ref tasks.MediaRef) {
 		if strings.TrimSpace(ref.Source) == "" && ref.AssetID <= 0 {
@@ -80,25 +113,26 @@ func CompileGenerationSnapshot(input GenerationCompilerInput) (tasks.GenerationR
 			InputIndex: len(snapshot.Media), Role: ref.Role, AssetID: ref.AssetID, Weight: ref.Weight, Source: strings.TrimSpace(ref.Source),
 		})
 	}
-	if media := input.Params.Media; media != nil {
-		for _, ref := range media.Inputs {
-			appendMedia(ref)
-		}
-		for _, ref := range media.References {
-			appendMedia(ref)
-		}
-		if media.Original != nil {
-			appendMedia(*media.Original)
-		}
-		if media.Mask != nil {
-			appendMedia(*media.Mask)
-		}
+	for _, ref := range media.Inputs {
+		appendMedia(ref)
 	}
+	for _, ref := range media.References {
+		appendMedia(ref)
+	}
+	if media.Original != nil {
+		appendMedia(*media.Original)
+	}
+	if media.Mask != nil {
+		appendMedia(*media.Mask)
+	}
+}
+
+func validateGenerationMedia(snapshot tasks.GenerationRequestSnapshot, plan workflow.FeatureExecutionPlan) error {
 	imageInputCount := 0
 	hasMaskInput := false
 	for _, media := range snapshot.Media {
 		if !tasks.IsGenerationMediaRole(media.Role) {
-			return tasks.GenerationRequestSnapshot{}, fmt.Errorf("generation compiler media role is invalid")
+			return fmt.Errorf("generation compiler media role is invalid")
 		}
 		if media.Role == tasks.MediaRoleMask {
 			hasMaskInput = true
@@ -106,11 +140,11 @@ func CompileGenerationSnapshot(input GenerationCompilerInput) (tasks.GenerationR
 		}
 		imageInputCount++
 	}
-	runtimeInputs := input.Plan.RuntimeInputs()
+	runtimeInputs := plan.RuntimeInputs()
 	if imageInputCount != runtimeInputs.ImageInputCount() || hasMaskInput != runtimeInputs.HasMaskInput() {
-		return tasks.GenerationRequestSnapshot{}, fmt.Errorf("generation compiler media facts do not match execution plan")
+		return fmt.Errorf("generation compiler media facts do not match execution plan")
 	}
-	return snapshot, nil
+	return nil
 }
 
 func generationSeed(parts ...string) uint64 {

@@ -110,11 +110,8 @@ func (s *Service) Process(ctx context.Context, derivativeID int64) error {
 	if err != nil {
 		return fmt.Errorf("load media derivative: %w", err)
 	}
-	if derivative.Status == "ready" || derivative.Status == "obsolete" {
-		if err := q.DeleteMediaDerivativeOutbox(ctx, derivative.ID); err != nil {
-			return fmt.Errorf("clear completed media derivative outbox: %w", err)
-		}
-		return nil
+	if isCompletedStatus(derivative.Status) {
+		return s.clearCompletedOutbox(ctx, q, derivative.ID)
 	}
 	processing, err := q.MarkMediaDerivativeProcessing(ctx, dbsqlc.MarkMediaDerivativeProcessingParams{ID: derivative.ID, MaxAttemptCount: MaxAttempts})
 	if err != nil {
@@ -123,62 +120,115 @@ func (s *Service) Process(ctx context.Context, derivativeID int64) error {
 		}
 		return fmt.Errorf("claim media derivative: %w", err)
 	}
+	asset, spec, failureCode, err := s.loadProcessingInputs(ctx, q, derivative, processing)
+	if err != nil {
+		return s.markFailed(ctx, q, processing.ID, failureCode, err)
+	}
+	rendered, failureCode, err := s.renderDerivative(ctx, asset, spec)
+	if err != nil {
+		return s.markFailed(ctx, q, processing.ID, failureCode, err)
+	}
+	persisted, failureCode, err := s.persistRenderedDerivative(ctx, asset, processing, rendered)
+	if err != nil {
+		return s.markFailed(ctx, q, processing.ID, failureCode, err)
+	}
+	return s.completeDerivative(ctx, q, processing, asset, rendered, persisted)
+}
+
+func isCompletedStatus(status string) bool {
+	return status == "ready" || status == "obsolete"
+}
+
+func (s *Service) clearCompletedOutbox(ctx context.Context, q *dbsqlc.Queries, derivativeID int64) error {
+	if err := q.DeleteMediaDerivativeOutbox(ctx, derivativeID); err != nil {
+		return fmt.Errorf("clear completed media derivative outbox: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) loadProcessingInputs(ctx context.Context, q *dbsqlc.Queries, derivative, processing dbsqlc.MediaDerivative) (dbsqlc.MediaAsset, TierSpec, string, error) {
 	asset, err := q.GetMediaAssetByID(ctx, derivative.MediaAssetID)
 	if err != nil {
-		return s.markFailed(ctx, q, processing.ID, "asset_not_found", err)
+		return dbsqlc.MediaAsset{}, TierSpec{}, "asset_not_found", err
 	}
 	spec, ok := TierSpecs[processing.Tier]
 	if !ok {
-		return s.markFailed(ctx, q, processing.ID, "invalid_tier", fmt.Errorf("unknown tier %q", processing.Tier))
+		return dbsqlc.MediaAsset{}, TierSpec{}, "invalid_tier", fmt.Errorf("unknown tier %q", processing.Tier)
 	}
+	return asset, spec, "", nil
+}
+
+type renderedDerivative struct {
+	encoded       []byte
+	width, height int
+	format        string
+}
+
+func (s *Service) renderDerivative(ctx context.Context, asset dbsqlc.MediaAsset, spec TierSpec) (renderedDerivative, string, error) {
 	renderCtx, cancel := context.WithTimeout(ctx, renderDeadline)
 	defer cancel()
 	original, err := s.storage.ReadObjectAtProfile(renderCtx, asset.StorageProfileID, asset.StorageKey, maxSourceBytes)
-	sourceStorageKey := asset.StorageKey
 	if err != nil {
-		return s.markFailed(ctx, q, processing.ID, "source_read_failed", err)
+		return renderedDerivative{}, "source_read_failed", err
 	}
-	if _, err := imageformat.InspectBytes(original.Data, filepath.Ext(sourceStorageKey)); err != nil {
-		return s.markFailed(ctx, q, processing.ID, "source_limits_exceeded", err)
+	if _, err := imageformat.InspectBytes(original.Data, filepath.Ext(asset.StorageKey)); err != nil {
+		return renderedDerivative{}, "source_limits_exceeded", err
 	}
 	if s.renderer == nil {
-		return s.markFailed(ctx, q, processing.ID, "renderer_unavailable", fmt.Errorf("media renderer is unavailable"))
+		return renderedDerivative{}, "renderer_unavailable", fmt.Errorf("media renderer is unavailable")
 	}
 	encoded, width, height, format, err := s.renderer.Render(renderCtx, original.Data, asset.StorageKey, spec.MaxSide)
 	if err != nil {
-		return s.markFailed(ctx, q, processing.ID, "render_failed", err)
+		return renderedDerivative{}, "render_failed", err
 	}
 	if len(encoded) == 0 || len(encoded) > maxOutputBytes {
-		return s.markFailed(ctx, q, processing.ID, "output_limits_exceeded", fmt.Errorf("rendered output size is invalid: %d", len(encoded)))
+		return renderedDerivative{}, "output_limits_exceeded", fmt.Errorf("rendered output size is invalid: %d", len(encoded))
 	}
-	key, err := storage.ImageDerivativeObjectKey(asset.StorageKey, asset.AssetID, processing.Tier, format)
+	return renderedDerivative{encoded: encoded, width: width, height: height, format: format}, "", nil
+}
+
+type persistedDerivative struct {
+	key, mimeType, checksum string
+}
+
+func (s *Service) persistRenderedDerivative(ctx context.Context, asset dbsqlc.MediaAsset, processing dbsqlc.MediaDerivative, rendered renderedDerivative) (persistedDerivative, string, error) {
+	key, err := storage.ImageDerivativeObjectKey(asset.StorageKey, asset.AssetID, processing.Tier, rendered.format)
 	if err != nil {
-		return s.markFailed(ctx, q, processing.ID, "key_failed", err)
+		return persistedDerivative{}, "key_failed", err
 	}
-	mimeType := "image/jpeg"
-	switch format {
-	case FormatPNG:
-		mimeType = "image/png"
-	case FormatWebP:
-		mimeType = "image/webp"
+	mimeType := derivativeMimeType(rendered.format)
+	if err := s.storage.PutObjectAtProfile(ctx, asset.StorageProfileID, key, rendered.encoded, mimeType); err != nil {
+		return persistedDerivative{}, "destination_write_failed", err
 	}
-	if err := s.storage.PutObjectAtProfile(ctx, asset.StorageProfileID, key, encoded, mimeType); err != nil {
-		return s.markFailed(ctx, q, processing.ID, "destination_write_failed", err)
-	}
-	digest := sha256.Sum256(encoded)
+	digest := sha256.Sum256(rendered.encoded)
 	checksum := hex.EncodeToString(digest[:])
-	if err := s.verifier.Verify(ctx, asset.StorageProfileID, key, checksum, mimeType, int64(len(encoded))); err != nil {
+	if err := s.verifier.Verify(ctx, asset.StorageProfileID, key, checksum, mimeType, int64(len(rendered.encoded))); err != nil {
 		code := "integrity_invalid"
 		if mediaerrors.IsRetryable(err) {
 			code = "integrity_transient"
 		} else {
 			_ = s.storage.DeleteObjectByStorageProfile(context.WithoutCancel(ctx), asset.StorageProfileID, key)
 		}
-		return s.markFailed(ctx, q, processing.ID, code, err)
+		return persistedDerivative{}, code, err
 	}
+	return persistedDerivative{key: key, mimeType: mimeType, checksum: checksum}, "", nil
+}
+
+func derivativeMimeType(format string) string {
+	switch format {
+	case FormatPNG:
+		return "image/png"
+	case FormatWebP:
+		return "image/webp"
+	default:
+		return "image/jpeg"
+	}
+}
+
+func (s *Service) completeDerivative(ctx context.Context, q *dbsqlc.Queries, processing dbsqlc.MediaDerivative, asset dbsqlc.MediaAsset, rendered renderedDerivative, persisted persistedDerivative) error {
 	ready, err := q.MarkMediaDerivativeReady(ctx, dbsqlc.MarkMediaDerivativeReadyParams{
-		ID: processing.ID, Format: format, StorageKey: key, MimeType: mimeType, Width: int32(width), Height: int32(height),
-		SizeBytes: int64(len(encoded)), ChecksumSha256: checksum, SourceObjectGeneration: asset.ObjectGeneration,
+		ID: processing.ID, Format: rendered.format, StorageKey: persisted.key, MimeType: persisted.mimeType, Width: int32(rendered.width), Height: int32(rendered.height),
+		SizeBytes: int64(len(rendered.encoded)), ChecksumSha256: persisted.checksum, SourceObjectGeneration: asset.ObjectGeneration,
 	})
 	if err != nil {
 		return fmt.Errorf("mark media derivative ready: %w", err)

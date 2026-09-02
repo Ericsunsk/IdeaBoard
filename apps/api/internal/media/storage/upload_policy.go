@@ -167,60 +167,120 @@ func ParseUploadResource(rawPath string) (UploadResource, error) {
 		return UploadResource{}, err
 	}
 
-	resource := UploadResource{
-		ObjectKey: objectKey,
-	}
-
 	trimmed := strings.TrimPrefix(objectKey, uploadObjectRoot+"/")
-	parts := strings.Split(trimmed, "/")
+	resource, err := parseUploadResourceParts(strings.Split(trimmed, "/"))
+	if err != nil {
+		return UploadResource{}, err
+	}
+	resource.ObjectKey = objectKey
+	return resource, nil
+}
+
+func parseUploadResourceParts(parts []string) (UploadResource, error) {
 	if len(parts) < 1 || parts[0] == "" {
 		return UploadResource{}, fmt.Errorf("文件路径不能为空")
 	}
 
-	if parts[0] == "canvas" && len(parts) >= 4 && parts[1] != "" && parts[2] != "" && strings.Join(parts[3:], "") != "" {
-		resource.Kind = UploadResourceKindCanvas
-		resource.Canvas = &UploadCanvasResource{
+	var resource UploadResource
+	var ok bool
+	switch parts[0] {
+	case "canvas":
+		resource, ok = parseCanvasUploadResource(parts)
+	case "profile":
+		resource, ok = parseProfileAvatarUploadResource(parts)
+	case "tasks":
+		resource, ok = parseTaskOutputUploadResource(parts)
+	case "library":
+		resource, ok = parseLibraryUploadResource(parts)
+	case "site":
+		resource, ok = parseSiteAssetUploadResource(parts)
+	}
+	if !ok {
+		return UploadResource{}, fmt.Errorf("不支持的上传资源路径")
+	}
+	return resource, nil
+}
+
+func parseCanvasUploadResource(parts []string) (UploadResource, bool) {
+	relativePath, ok := uploadRelativePath(parts, 3)
+	if len(parts) < 4 || parts[1] == "" || parts[2] == "" || !ok {
+		return UploadResource{}, false
+	}
+	return UploadResource{
+		Kind: UploadResourceKindCanvas,
+		Canvas: &UploadCanvasResource{
 			OwnerSegment: parts[1],
 			BoardSegment: parts[2],
-			RelativePath: strings.Join(parts[3:], "/"),
-		}
-		return resource, nil
-	}
+			RelativePath: relativePath,
+		},
+	}, true
+}
 
-	if parts[0] == "profile" && len(parts) >= 4 && parts[1] != "" && parts[2] == "avatar" && strings.Join(parts[3:], "") != "" {
-		resource.Kind = UploadResourceKindProfileAvatar
-		resource.ProfileAvatar = &UploadProfileAvatarResource{
+func parseProfileAvatarUploadResource(parts []string) (UploadResource, bool) {
+	relativePath, ok := uploadRelativePath(parts, 3)
+	if len(parts) < 4 || parts[1] == "" || parts[2] != "avatar" || !ok {
+		return UploadResource{}, false
+	}
+	return UploadResource{
+		Kind: UploadResourceKindProfileAvatar,
+		ProfileAvatar: &UploadProfileAvatarResource{
 			OwnerSegment: parts[1],
-			RelativePath: strings.Join(parts[3:], "/"),
-		}
-		return resource, nil
-	}
+			RelativePath: relativePath,
+		},
+	}, true
+}
 
-	if parts[0] == "tasks" && len(parts) >= 4 && parts[1] != "" && parts[2] != "" && strings.Join(parts[3:], "") != "" {
-		resource.Kind = UploadResourceKindTaskOutput
-		resource.TaskOutput = &UploadTaskOutputResource{
+func parseTaskOutputUploadResource(parts []string) (UploadResource, bool) {
+	relativePath, ok := uploadRelativePath(parts, 3)
+	if len(parts) < 4 || parts[1] == "" || parts[2] == "" || !ok {
+		return UploadResource{}, false
+	}
+	return UploadResource{
+		Kind: UploadResourceKindTaskOutput,
+		TaskOutput: &UploadTaskOutputResource{
 			UserSegment:  parts[1],
 			TaskSegment:  parts[2],
-			RelativePath: strings.Join(parts[3:], "/"),
-		}
-		return resource, nil
-	}
+			RelativePath: relativePath,
+		},
+	}, true
+}
 
-	if parts[0] == "library" && len(parts) >= 4 && parts[1] != "" && parts[2] != "" && strings.Join(parts[3:], "") != "" {
-		resource.Kind = UploadResourceKindLibrary
-		resource.Library = &UploadLibraryResource{UserSegment: parts[1], AssetSegment: parts[2], RelativePath: strings.Join(parts[3:], "/")}
-		return resource, nil
+func parseLibraryUploadResource(parts []string) (UploadResource, bool) {
+	relativePath, ok := uploadRelativePath(parts, 3)
+	if len(parts) < 4 || parts[1] == "" || parts[2] == "" || !ok {
+		return UploadResource{}, false
 	}
+	return UploadResource{
+		Kind: UploadResourceKindLibrary,
+		Library: &UploadLibraryResource{
+			UserSegment:  parts[1],
+			AssetSegment: parts[2],
+			RelativePath: relativePath,
+		},
+	}, true
+}
 
-	if parts[0] == "site" && len(parts) >= 3 && parts[1] == "assets" && strings.Join(parts[2:], "") != "" {
-		resource.Kind = UploadResourceKindSiteAsset
-		resource.SiteAsset = &UploadSiteAssetResource{
-			RelativePath: strings.Join(parts[2:], "/"),
-		}
-		return resource, nil
+func parseSiteAssetUploadResource(parts []string) (UploadResource, bool) {
+	relativePath, ok := uploadRelativePath(parts, 2)
+	if len(parts) < 3 || parts[1] != "assets" || !ok {
+		return UploadResource{}, false
 	}
+	return UploadResource{
+		Kind: UploadResourceKindSiteAsset,
+		SiteAsset: &UploadSiteAssetResource{
+			RelativePath: relativePath,
+		},
+	}, true
+}
 
-	return UploadResource{}, fmt.Errorf("不支持的上传资源路径")
+func uploadRelativePath(parts []string, start int) (string, bool) {
+	if len(parts) <= start {
+		return "", false
+	}
+	if strings.Join(parts[start:], "") == "" {
+		return "", false
+	}
+	return strings.Join(parts[start:], "/"), true
 }
 
 func normalizeUploadObjectKey(raw string) (string, error) {

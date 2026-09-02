@@ -67,49 +67,70 @@ func (r providerResultFinalization) validatedOrTerminal() providerResultFinaliza
 func (r providerResultFinalization) validate() error {
 	switch r.state {
 	case providerResultRemoteRefs:
-		if len(r.remoteRefs) == 0 {
-			return fmt.Errorf("provider result remote references are empty")
-		}
-		if len(r.imageURLs) != 0 || len(r.outputs) != 0 || r.terminalErr != nil {
-			return fmt.Errorf("provider result remote references contain incompatible payload")
-		}
-		for _, ref := range r.remoteRefs {
-			if strings.TrimSpace(ref) == "" {
-				return fmt.Errorf("provider result contains an empty remote reference")
-			}
-		}
+		return r.validateRemoteRefs()
 	case providerResultDurableOutputs:
-		if len(r.remoteRefs) != 0 || r.terminalErr != nil {
-			return fmt.Errorf("provider result durable outputs contain incompatible payload")
-		}
-		if len(r.imageURLs) == 0 || len(r.imageURLs) != len(r.outputs) {
-			return fmt.Errorf("provider result durable outputs are incomplete")
-		}
-		seenResultIndexes := make(map[int]struct{}, len(r.outputs))
-		for index, output := range r.outputs {
-			if strings.TrimSpace(r.imageURLs[index]) == "" || strings.TrimSpace(output.URL) == "" {
-				return fmt.Errorf("provider result durable output is missing an image URL")
-			}
-			if r.imageURLs[index] != output.URL {
-				return fmt.Errorf("provider result durable output URL does not match image URL")
-			}
-			if output.ResultIndex < 0 {
-				return fmt.Errorf("provider result durable output has a negative result index")
-			}
-			if _, exists := seenResultIndexes[output.ResultIndex]; exists {
-				return fmt.Errorf("provider result writes result index %d more than once", output.ResultIndex)
-			}
-			seenResultIndexes[output.ResultIndex] = struct{}{}
-		}
+		return r.validateDurableOutputs()
 	case providerResultTerminalFailure:
-		if r.terminalErr == nil {
-			return fmt.Errorf("provider result terminal failure is missing an error")
-		}
-		if len(r.remoteRefs) != 0 || len(r.imageURLs) != 0 || len(r.outputs) != 0 {
-			return fmt.Errorf("provider result terminal failure contains success payload")
-		}
+		return r.validateTerminalFailure()
 	default:
 		return fmt.Errorf("provider result state %d is unsupported", r.state)
+	}
+}
+
+func (r providerResultFinalization) validateRemoteRefs() error {
+	if len(r.remoteRefs) == 0 {
+		return fmt.Errorf("provider result remote references are empty")
+	}
+	if len(r.imageURLs) != 0 || len(r.outputs) != 0 || r.terminalErr != nil {
+		return fmt.Errorf("provider result remote references contain incompatible payload")
+	}
+	for _, ref := range r.remoteRefs {
+		if strings.TrimSpace(ref) == "" {
+			return fmt.Errorf("provider result contains an empty remote reference")
+		}
+	}
+	return nil
+}
+
+func (r providerResultFinalization) validateDurableOutputs() error {
+	if len(r.remoteRefs) != 0 || r.terminalErr != nil {
+		return fmt.Errorf("provider result durable outputs contain incompatible payload")
+	}
+	if len(r.imageURLs) == 0 || len(r.imageURLs) != len(r.outputs) {
+		return fmt.Errorf("provider result durable outputs are incomplete")
+	}
+	seenResultIndexes := make(map[int]struct{}, len(r.outputs))
+	for index, output := range r.outputs {
+		if err := validateDurableOutput(r.imageURLs[index], output); err != nil {
+			return err
+		}
+		if _, exists := seenResultIndexes[output.ResultIndex]; exists {
+			return fmt.Errorf("provider result writes result index %d more than once", output.ResultIndex)
+		}
+		seenResultIndexes[output.ResultIndex] = struct{}{}
+	}
+	return nil
+}
+
+func validateDurableOutput(imageURL string, output tasks.TaskOutput) error {
+	if strings.TrimSpace(imageURL) == "" || strings.TrimSpace(output.URL) == "" {
+		return fmt.Errorf("provider result durable output is missing an image URL")
+	}
+	if imageURL != output.URL {
+		return fmt.Errorf("provider result durable output URL does not match image URL")
+	}
+	if output.ResultIndex < 0 {
+		return fmt.Errorf("provider result durable output has a negative result index")
+	}
+	return nil
+}
+
+func (r providerResultFinalization) validateTerminalFailure() error {
+	if r.terminalErr == nil {
+		return fmt.Errorf("provider result terminal failure is missing an error")
+	}
+	if len(r.remoteRefs) != 0 || len(r.imageURLs) != 0 || len(r.outputs) != 0 {
+		return fmt.Errorf("provider result terminal failure contains success payload")
 	}
 	return nil
 }

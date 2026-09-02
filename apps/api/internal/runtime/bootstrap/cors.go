@@ -170,40 +170,79 @@ func buildAllowedOriginSet(origins []string) (map[string]bool, bool, bool) {
 }
 
 func normalizeCORSOrigin(raw string) string {
+	parsed, ok := parseCORSOrigin(raw)
+	if !ok {
+		return ""
+	}
+	scheme := normalizeCORSScheme(parsed.Scheme)
+	if scheme == "" {
+		return ""
+	}
+	host := normalizeCORSHost(parsed, scheme)
+	if host == "" {
+		return ""
+	}
+	return scheme + "://" + host
+}
+
+func parseCORSOrigin(raw string) (*url.URL, bool) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
-		return ""
+		return nil, false
 	}
 	parsed, err := url.Parse(trimmed)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.User != nil ||
-		(parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return ""
+	if err != nil || !isCORSOriginURL(parsed) {
+		return nil, false
 	}
-	scheme := strings.ToLower(parsed.Scheme)
+	return parsed, true
+}
+
+func isCORSOriginURL(parsed *url.URL) bool {
+	if parsed == nil || parsed.Scheme == "" || parsed.Host == "" || parsed.User != nil {
+		return false
+	}
+	if parsed.Path != "" && parsed.Path != "/" {
+		return false
+	}
+	return parsed.RawQuery == "" && parsed.Fragment == ""
+}
+
+func normalizeCORSScheme(raw string) string {
+	scheme := strings.ToLower(raw)
 	if scheme != "http" && scheme != "https" {
 		return ""
 	}
+	return scheme
+}
+
+func normalizeCORSHost(parsed *url.URL, scheme string) string {
 	hostname := strings.ToLower(parsed.Hostname())
 	if hostname == "" {
 		return ""
 	}
-	port := parsed.Port()
-	if port != "" {
-		portNumber, err := strconv.Atoi(port)
-		if err != nil || portNumber < 1 || portNumber > 65535 {
-			return ""
-		}
-		if (scheme == "http" && port == "80") || (scheme == "https" && port == "443") {
-			port = ""
-		}
+	port, ok := normalizeCORSPort(parsed.Port(), scheme)
+	if !ok {
+		return ""
 	}
 	if strings.Contains(hostname, ":") {
 		hostname = "[" + hostname + "]"
 	}
-	return scheme + "://" + hostname + func() string {
-		if port == "" {
-			return ""
-		}
-		return ":" + port
-	}()
+	if port == "" {
+		return hostname
+	}
+	return hostname + ":" + port
+}
+
+func normalizeCORSPort(raw, scheme string) (string, bool) {
+	if raw == "" {
+		return "", true
+	}
+	portNumber, err := strconv.Atoi(raw)
+	if err != nil || portNumber < 1 || portNumber > 65535 {
+		return "", false
+	}
+	if (scheme == "http" && raw == "80") || (scheme == "https" && raw == "443") {
+		return "", true
+	}
+	return raw, true
 }
