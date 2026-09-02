@@ -44,12 +44,12 @@ type RunningTaskFinalizer interface {
 	FailRunningByAccountIDWithTx(ctx context.Context, tx *sql.Tx, accountID int64, errMsg string, completedAt time.Time) ([]string, error)
 }
 
-func NewAccountRepository(db *sql.DB) *AccountRepository {
-	return &AccountRepository{db: db, q: dbsqlc.New(db)}
-}
-
-func NewAccountRepositoryWithRunningTaskFinalizer(db *sql.DB, finalizer RunningTaskFinalizer) *AccountRepository {
-	return &AccountRepository{db: db, q: dbsqlc.New(db), runningTaskFinalizer: finalizer}
+func NewAccountRepository(db *sql.DB, finalizer ...RunningTaskFinalizer) *AccountRepository {
+	var taskFinalizer RunningTaskFinalizer
+	if len(finalizer) > 0 {
+		taskFinalizer = finalizer[0]
+	}
+	return &AccountRepository{db: db, q: dbsqlc.New(db), runningTaskFinalizer: taskFinalizer}
 }
 
 func (r *AccountRepository) Create(ctx context.Context, account *ApiAccount) error {

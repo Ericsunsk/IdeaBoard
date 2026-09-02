@@ -6,35 +6,8 @@ import (
 	"testing"
 	"time"
 
-	mediaerrors "ideaboard/api/internal/media/errors"
 	"ideaboard/api/internal/media/storage"
 )
-
-// TestStructuredErrorCodeMappingContract locks the inline-to-typed
-// mapping. The mapping is the single source of truth that the
-// runbook, the Admin UI, and the front-end align on. New inline
-// strings must round-trip through this test before the build is
-// considered green.
-func TestStructuredErrorCodeMappingContract(t *testing.T) {
-	cases := map[string]mediaerrors.Code{
-		"asset_not_found":            mediaerrors.CodeMediaNotFound,
-		"source_read_failed":         mediaerrors.CodeObjectMissing,
-		"destination_write_failed":   mediaerrors.CodeObjectMissing,
-		"key_failed":                 mediaerrors.CodeObjectMissing,
-		"source_limits_exceeded":     mediaerrors.CodeObjectInvalid,
-		"output_limits_exceeded":     mediaerrors.CodeObjectInvalid,
-		"render_failed":              mediaerrors.CodeStorageTransient,
-		"renderer_unavailable":       mediaerrors.CodeStorageTransient,
-		"invalid_tier":               mediaerrors.CodeMediaNotFound,
-		"stale_processing_recovered": mediaerrors.CodeStorageTransient,
-		"unknown":                    mediaerrors.CodeMediaNotFound,
-	}
-	for inline, want := range cases {
-		if got := structuredErrorCode(inline); got != want {
-			t.Errorf("structuredErrorCode(%q) = %q, want %q", inline, got, want)
-		}
-	}
-}
 
 func TestReconcilerResultCounters(t *testing.T) {
 	got := Result{Inspected: 10, Missing: 2, Invalid: 1, Errors: 1}

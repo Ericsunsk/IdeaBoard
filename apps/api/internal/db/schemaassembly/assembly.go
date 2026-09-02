@@ -177,15 +177,3 @@ func declaredObjects(sql string) []string {
 	}
 	return objects
 }
-
-// ValidateManifest is exported for CI and focused contract tests.
-func ValidateManifest(manifest Manifest) error { return validateManifest(manifest) }
-
-// FragmentNames returns the explicit order, useful for diagnostics and tests.
-func FragmentNames(manifest Manifest) []string {
-	result := make([]string, len(manifest.Fragments))
-	for index, fragment := range manifest.Fragments {
-		result[index] = fragment.Name
-	}
-	return result
-}

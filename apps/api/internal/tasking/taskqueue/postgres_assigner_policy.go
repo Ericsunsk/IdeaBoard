@@ -98,13 +98,6 @@ func (p taskAssignmentPolicy) decideLockedTask(taskID string, riverJobID int64, 
 	return taskAssignmentDecision{}
 }
 
-func (p taskAssignmentPolicy) decideCandidatePool(taskID string, candidates []int64) taskAssignmentDecision {
-	if len(candidates) == 0 {
-		return taskAssignmentDecision{done: true, assignment: p.noCapacity(taskID)}
-	}
-	return taskAssignmentDecision{}
-}
-
 func (p taskAssignmentPolicy) decideAssignedTask(taskID string, selectedAccount taskAssignmentSelectedAccount, leaseToken string, updatedRows int64) taskAssignmentDecision {
 	if updatedRows == 0 {
 		return taskAssignmentDecision{done: true, assignment: p.discard(taskID)}

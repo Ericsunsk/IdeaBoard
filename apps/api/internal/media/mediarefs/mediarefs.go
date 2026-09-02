@@ -19,10 +19,6 @@ type DataImage struct {
 	Data     []byte
 }
 
-func CanonicalStringKeys() []string {
-	return append([]string(nil), stringKeys...)
-}
-
 func CanonicalListKeys() []string {
 	return append([]string(nil), listKeys...)
 }
@@ -196,37 +192,6 @@ func forEachStringList(raw interface{}, key string, strict bool, onValue func(st
 		}
 	}
 	return nil
-}
-
-func CollectUniqueParamRefs(params map[string]interface{}, keys []string) []string {
-	if params == nil || len(keys) == 0 {
-		return nil
-	}
-	seen := make(map[string]struct{})
-	refs := make([]string, 0, len(keys))
-	appendRef := func(raw string) {
-		ref := strings.TrimSpace(raw)
-		if ref == "" {
-			return
-		}
-		if _, ok := seen[ref]; ok {
-			return
-		}
-		seen[ref] = struct{}{}
-		refs = append(refs, ref)
-	}
-
-	for _, key := range keys {
-		switch value := params[key].(type) {
-		case string:
-			appendRef(value)
-		case []string, []interface{}:
-			for _, ref := range CollectStringList(value) {
-				appendRef(ref)
-			}
-		}
-	}
-	return refs
 }
 
 func imageExtensionFromMIME(mimeType string) string {

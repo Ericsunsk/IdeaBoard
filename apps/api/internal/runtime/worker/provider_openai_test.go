@@ -636,11 +636,8 @@ func TestCallOpenAIUsesAssignedModelWhenAccountHasMultipleModels(t *testing.T) {
 		ApiKey:   "test-key",
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}, {Name: "gpt-image-2", Enabled: true}},
 	}
-	resolved, ok := accounts.ResolveAccountModel(account, "gpt-image-2")
-	if !ok {
-		t.Fatalf("expected assigned account model to resolve")
-	}
-	if _, err := c.callOpenAIForTest(context.Background(), account, "prompt", 1024, 1024, 2*time.Second, map[string]interface{}{"feature": "generation"}, resolved.Name); err != nil {
+	resolvedModel := account.Models[1].Name
+	if _, err := c.callOpenAIForTest(context.Background(), account, "prompt", 1024, 1024, 2*time.Second, map[string]interface{}{"feature": "generation"}, resolvedModel); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
 	if gotBody["model"] != "gpt-image-2" {

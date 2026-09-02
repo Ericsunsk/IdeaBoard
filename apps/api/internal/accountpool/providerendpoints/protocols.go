@@ -173,15 +173,6 @@ func ProtocolSupportsModelDetection(protocol string) bool {
 	return ok && canonical == ProtocolModelAPI
 }
 
-func ProtocolSupportsCapability(protocol, capability string) bool {
-	canonical, ok := CanonicalProtocol(protocol)
-	if !ok {
-		return false
-	}
-	allowed := protocolSpecs[canonical].definition.Capabilities
-	return containsCapability(allowed, strings.ToLower(strings.TrimSpace(capability)))
-}
-
 func AllowsModellessAccounts(protocol string, capabilities []string) bool {
 	if len(capabilities) != 1 {
 		return false

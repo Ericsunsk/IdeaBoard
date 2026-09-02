@@ -25,14 +25,14 @@ func createTaskStatsTestTask(t testing.TB, db *sql.DB, repo *taskstore.Repositor
 			if err := db.QueryRowContext(ctx, `SELECT provider_endpoint_id FROM api_accounts WHERE id=$1`, accountID).Scan(&id); err != nil {
 				return fmt.Errorf("load task stats fixture provider endpoint: %w", err)
 			}
-			task.AssignedProviderEndpointID = tasks.IDPtr(id)
+			task.AssignedProviderEndpointID = testPtr(id)
 		}
 		if task.AssignedCredentialID == nil {
 			var id int64
 			if err := db.QueryRowContext(ctx, `SELECT id FROM api_account_secrets WHERE account_id=$1 AND status='active' ORDER BY id DESC LIMIT 1`, accountID).Scan(&id); err != nil {
 				return fmt.Errorf("load task stats fixture credential: %w", err)
 			}
-			task.AssignedCredentialID = tasks.IDPtr(id)
+			task.AssignedCredentialID = testPtr(id)
 		}
 	}
 	now := time.Now()

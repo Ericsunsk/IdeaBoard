@@ -13,16 +13,12 @@ func subscriberCountForTest(h *EventHub, taskID string) int {
 
 func TestEventHubSubscribeAndPublish(t *testing.T) {
 	hub := NewEventHub()
-
 	ch, unsub, ok := hub.Subscribe("task-1", 1)
 	if !ok {
 		t.Fatal("subscribe rejected unexpectedly")
 	}
 	defer unsub()
-
-	event := TaskEvent{TaskID: "task-1", Status: "running"}
-	hub.Publish("task-1", event)
-
+	hub.Publish("task-1", TaskEvent{TaskID: "task-1", Status: "running"})
 	select {
 	case received := <-ch:
 		if received.Status != "running" {
@@ -35,34 +31,28 @@ func TestEventHubSubscribeAndPublish(t *testing.T) {
 
 func TestEventHubUnsubscribe(t *testing.T) {
 	hub := NewEventHub()
-
 	ch, unsub, ok := hub.Subscribe("task-1", 1)
 	if !ok {
 		t.Fatal("subscribe rejected unexpectedly")
 	}
 	unsub()
-
 	hub.Publish("task-1", TaskEvent{TaskID: "task-1", Status: "completed"})
 	select {
 	case event := <-ch:
 		t.Fatalf("unexpected event after unsubscribe: %+v", event)
 	case <-time.After(100 * time.Millisecond):
 	}
-
 	if subscriberCountForTest(hub, "task-1") != 0 {
 		t.Errorf("expected 0 subscribers, got %d", subscriberCountForTest(hub, "task-1"))
 	}
 }
 
 func TestEventHubPublishNoSubscribers(t *testing.T) {
-	hub := NewEventHub()
-
-	hub.Publish("nonexistent", TaskEvent{TaskID: "x", Status: "running"})
+	NewEventHub().Publish("nonexistent", TaskEvent{TaskID: "x", Status: "running"})
 }
 
 func TestEventHubMultipleSubscribers(t *testing.T) {
 	hub := NewEventHub()
-
 	ch1, unsub1, ok := hub.Subscribe("task-1", 1)
 	if !ok {
 		t.Fatal("first subscribe rejected unexpectedly")
@@ -73,21 +63,15 @@ func TestEventHubMultipleSubscribers(t *testing.T) {
 		t.Fatal("second subscribe rejected unexpectedly")
 	}
 	defer unsub2()
-
-	event := TaskEvent{TaskID: "task-1", Status: "completed"}
-	hub.Publish("task-1", event)
-
+	hub.Publish("task-1", TaskEvent{TaskID: "task-1", Status: "completed"})
 	received := 0
 	timeout := time.After(time.Second)
-
 	for received < 2 {
 		select {
 		case <-ch1:
 			received++
-			continue
 		case <-ch2:
 			received++
-			continue
 		case <-timeout:
 			t.Fatalf("timeout: only received %d/2 events", received)
 		}
@@ -96,18 +80,14 @@ func TestEventHubMultipleSubscribers(t *testing.T) {
 
 func TestEventHubNonBlockingPublish(t *testing.T) {
 	hub := NewEventHub()
-
 	ch, unsub, ok := hub.Subscribe("task-1", 1)
 	if !ok {
 		t.Fatal("subscribe rejected unexpectedly")
 	}
 	defer unsub()
-
 	for i := 0; i < 10; i++ {
-		event := TaskEvent{TaskID: "task-1", Status: "running"}
-		hub.Publish("task-1", event)
+		hub.Publish("task-1", TaskEvent{TaskID: "task-1", Status: "running"})
 	}
-
 	drained := 0
 	timeout := time.After(100 * time.Millisecond)
 	for {
@@ -130,12 +110,10 @@ func TestEventHubSlowConsumerKeepsNewestEvent(t *testing.T) {
 		t.Fatal("subscribe rejected unexpectedly")
 	}
 	defer unsub()
-
 	for i := 0; i < 20; i++ {
 		hub.Publish("task-1", TaskEvent{TaskID: "task-1", Status: "running"})
 	}
 	hub.Publish("task-1", TaskEvent{TaskID: "task-1", Status: "completed"})
-
 	deadline := time.After(time.Second)
 	for {
 		select {
@@ -156,7 +134,6 @@ func TestEventHubRejectsWhenPerUserLimitReached(t *testing.T) {
 		t.Fatal("first subscribe rejected unexpectedly")
 	}
 	defer unsub()
-
 	if _, _, ok := hub.Subscribe("task-2", 9); ok {
 		t.Fatal("expected second subscribe to be rejected by per-user limit")
 	}
@@ -169,7 +146,6 @@ func TestEventHubRejectsWhenGlobalLimitReached(t *testing.T) {
 		t.Fatal("first subscribe rejected unexpectedly")
 	}
 	defer unsub()
-
 	if _, _, ok := hub.Subscribe("task-2", 2); ok {
 		t.Fatal("expected subscribe to be rejected by global limit")
 	}

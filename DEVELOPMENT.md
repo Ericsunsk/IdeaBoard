@@ -130,7 +130,10 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 | Web lint | `cd apps/web && npm run lint` |
 | Web style lint | `cd apps/web && npm run lint:style` |
 | API tests | `cd apps/api && go test ./...` |
+| Test infrastructure modules | `cd apps/api/internal/testdb && go test ./...` and `cd apps/api/internal/testsupport && go test ./...` |
 | API build | `cd apps/api && go build ./...` |
+| Production dead-code scan | `cd apps/api && deadcode ./...` |
+| Test reachability dead-code scan | `cd apps/api && deadcode -test ./...` |
 | Schema snapshot generation | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' BASE_SHA=HEAD go run ./cmd/schema-release --write-artifact` |
 | Schema Release check | `cd apps/api && BASE_SHA="$(git merge-base HEAD origin/main)" API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schema-release` |
 | sqlc regeneration | `cd apps/api && go tool sqlc generate` |

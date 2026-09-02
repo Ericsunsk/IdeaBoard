@@ -54,7 +54,7 @@ func TestValidateManifestRejectsUnknownAndOutOfOrderDependencies(t *testing.T) {
 				{Name: "first", Path: "first.sql", DependsOn: tt.deps},
 				{Name: "later", Path: "later.sql"},
 			}}
-			err := ValidateManifest(manifest)
+			err := validateManifest(manifest)
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("ValidateManifest error=%v, want substring %q", err, tt.want)
 			}
@@ -68,8 +68,8 @@ func TestValidateManifestRejectsMissingCanonicalDomain(t *testing.T) {
 		t.Fatal(err)
 	}
 	manifest.Fragments = manifest.Fragments[:len(manifest.Fragments)-1]
-	if err := ValidateManifest(manifest); err == nil || !strings.Contains(err.Error(), "missing required fragment") {
-		t.Fatalf("ValidateManifest error=%v, want missing required fragment", err)
+	if err := validateManifest(manifest); err == nil || !strings.Contains(err.Error(), "missing required fragment") {
+		t.Fatalf("validateManifest error=%v, want missing required fragment", err)
 	}
 }
 

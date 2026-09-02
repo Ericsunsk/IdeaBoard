@@ -79,8 +79,8 @@ func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
 	if err := createTaskStatsTestTask(t, db, taskRepo, ctx, &tasks.Task{
 		TaskID:                     "r1",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(runningAccount.ProviderEndpointID),
-		AccountID:                  tasks.IDPtr(runningAccount.ID),
+		AssignedProviderEndpointID: testPtr(runningAccount.ProviderEndpointID),
+		AccountID:                  testPtr(runningAccount.ID),
 		Status:                     tasks.StatusRunning,
 	}); err != nil {
 		t.Fatalf("seed running task failed: %v", err)
@@ -535,8 +535,8 @@ func TestBackfillStatisticsDoesNotUseSingleEnabledAccountModelFallback(t *testin
 	if err := createTaskStatsTestTask(t, db, taskRepo, ctx, &tasks.Task{
 		TaskID:                     "single-model-fallback",
 		UserID:                     93,
-		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
-		AccountID:                  tasks.IDPtr(account.ID),
+		AssignedProviderEndpointID: testPtr(account.ProviderEndpointID),
+		AccountID:                  testPtr(account.ID),
 		FeatureSlug:                "fusion",
 		APIType:                    "openai-compatible",
 		Status:                     tasks.StatusCompleted,
@@ -713,8 +713,8 @@ RETURNING id`).Scan(&channelID); err != nil {
 	task := &tasks.Task{
 		TaskID:                     "repair-multi-1",
 		UserID:                     12,
-		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
-		AccountID:                  tasks.IDPtr(account.ID),
+		AssignedProviderEndpointID: testPtr(account.ProviderEndpointID),
+		AccountID:                  testPtr(account.ID),
 		Status:                     tasks.StatusCompleted,
 		Result:                     `{}`,
 		CreatedAt:                  created,

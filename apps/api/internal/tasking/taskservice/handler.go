@@ -314,36 +314,6 @@ func (h *Handler) GetUserTask(c *gin.Context) {
 	response.SuccessDTO(c, userTaskResponse{Task: task.ToUserView()})
 }
 
-func (h *Handler) StreamUserTask(c *gin.Context) {
-	userID, ok := requireUserID(c)
-	if !ok {
-		return
-	}
-	taskID := c.Param("task_id")
-	ctx := c.Request.Context()
-	task, err := h.taskService.GetUserTask(ctx, taskID, userID)
-	if err != nil {
-		response.Error(c, http.StatusNotFound, "任务不存在")
-		return
-	}
-	hub := h.taskService.EventHub()
-	if hub == nil {
-		response.Error(c, http.StatusServiceUnavailable, "任务事件服务未配置")
-		return
-	}
-
-	session := taskStreamSession{
-		taskID:      taskID,
-		userID:      userID,
-		initialTask: task,
-		taskLoader:  h.taskService,
-		events:      hub,
-	}
-	if err := session.Run(c); errors.Is(err, errTaskStreamConnectionLimit) {
-		response.Error(c, http.StatusTooManyRequests, "SSE 连接数已达上限，请稍后重试")
-	}
-}
-
 func (h *Handler) CancelUserTask(c *gin.Context) {
 	userID, ok := requireUserID(c)
 	if !ok {

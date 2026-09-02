@@ -101,7 +101,7 @@ func TestStoreRemoteRefLocalSavesImageAndCleansTempFile(t *testing.T) {
 func TestLocalStoredUploadURLUsesConfiguredWebOrigin(t *testing.T) {
 	withTempWorkingDir(t)
 
-	service := NewStorageServiceWithPublicAPI(nil, nil, "https://ideaboard.art")
+	service := NewStorageService(nil, nil, "https://ideaboard.art")
 	profile := benchmarkLocalProfile()
 	adapter, err := service.adapterRegistry.get(StorageProviderLocal)
 	if err != nil {

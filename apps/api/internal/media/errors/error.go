@@ -86,18 +86,6 @@ func (e *Error) Unwrap() error {
 	return e.Cause
 }
 
-// IsCode reports whether err is a *Error with the given code. It is a
-// convenience for the hot path: instead of
-// `var m *mediaerrors.Error; errors.As(err, &m) && m.Code == code`,
-// callers can use `mediaerrors.IsCode(err, mediaerrors.CodeX)`.
-func IsCode(err error, code Code) bool {
-	var m *Error
-	if !errors.As(err, &m) {
-		return false
-	}
-	return m.Code == code
-}
-
 // CodeOf returns the code of err if it is a *Error, or empty string
 // otherwise. It is intended for logging, never for control flow.
 func CodeOf(err error) Code {

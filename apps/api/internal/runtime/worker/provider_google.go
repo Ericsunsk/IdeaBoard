@@ -193,10 +193,6 @@ func providerGoogleImageRefs(providerReq providerRequest) []string {
 	return refs
 }
 
-func (c *ProviderExecutor) callGoogleAIWithRequest(ctx context.Context, account *accounts.ApiAccount, providerReq providerRequest, timeout time.Duration) (providerCallResult, error) {
-	return c.callGoogleProviderWithRequest(ctx, account, workflow.ProviderGoogleAI, providerReq, timeout)
-}
-
 func (c *ProviderExecutor) callGoogleProviderWithRequest(ctx context.Context, account *accounts.ApiAccount, apiType string, providerReq providerRequest, timeout time.Duration) (providerCallResult, error) {
 	contract := googleContract(apiType)
 	baseURL := contract.DefaultBaseURL
@@ -256,10 +252,6 @@ func buildGoogleModelCollectionURL(baseURL, apiType string) string {
 		return trimmedBaseURL + strings.TrimPrefix(contract.ModelCollection, contract.VersionPath)
 	}
 	return trimmedBaseURL + contract.ModelCollection
-}
-
-func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, account *accounts.ApiAccount, baseURL string, providerReq providerRequest, timeout time.Duration, googleParams googleProviderParams) (providerCallResult, error) {
-	return c.callGoogleGeminiGenerateContentForAPIType(ctx, account, workflow.ProviderGoogleAI, baseURL, providerReq, timeout, googleParams)
 }
 
 func (c *ProviderExecutor) callGoogleGeminiGenerateContentForAPIType(ctx context.Context, account *accounts.ApiAccount, apiType, baseURL string, providerReq providerRequest, timeout time.Duration, googleParams googleProviderParams) (providerCallResult, error) {

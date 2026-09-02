@@ -24,7 +24,6 @@ type Service struct {
 	taskRepo            TaskStore
 	submissionStore     TaskSubmissionStore
 	cancelStore         taskqueue.TaskCancellationStore
-	eventHub            *EventHub
 	taskEvents          events.TaskStatusPublisher
 	taskBilling         *taskbilling.Service
 	adminBillingHistory AdminBillingHistoryStore
@@ -125,7 +124,6 @@ type ServiceDeps struct {
 }
 
 type ServiceOptions struct {
-	EventHub   *EventHub
 	TaskEvents events.TaskStatusPublisher
 }
 
@@ -146,7 +144,6 @@ func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 		taskRepo:            deps.TaskRepo,
 		submissionStore:     deps.SubmissionStore,
 		cancelStore:         deps.CancelStore,
-		eventHub:            opts.EventHub,
 		taskEvents:          opts.TaskEvents,
 		taskBilling:         deps.TaskBilling,
 		adminBillingHistory: deps.AdminBillingHistory,
@@ -155,10 +152,6 @@ func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 		billableItems:       deps.BillableItems,
 		userResolver:        deps.UserResolver,
 	}
-}
-
-func (s *Service) EventHub() *EventHub {
-	return s.eventHub
 }
 
 func (s *Service) ResolveAdminTaskUserID(ctx context.Context, rawPublicID string) (int64, error) {

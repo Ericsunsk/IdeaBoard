@@ -9,7 +9,7 @@ import (
 
 func TestIntegrityVerifierRejectsEmptyExpected(t *testing.T) {
 	v := NewIntegrityVerifier(nil, IntegrityConfig{})
-	if err := v.Verify(context.Background(), "p", "k", "", "", 0); !mediaerrors.IsCode(err, mediaerrors.CodeObjectInvalid) {
+	if err := v.Verify(context.Background(), "p", "k", "", "", 0); mediaerrors.CodeOf(err) != mediaerrors.CodeObjectInvalid {
 		t.Fatalf("expected object_invalid, got %v", err)
 	}
 }

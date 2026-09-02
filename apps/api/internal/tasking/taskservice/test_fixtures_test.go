@@ -32,9 +32,9 @@ func createTaskServiceTestTask(t testing.TB, db *sql.DB, repo *taskstore.Reposit
 		if err := db.QueryRowContext(ctx, `INSERT INTO api_account_secrets(account_id,secret_material_kind,secret_payload,key_version,fingerprint,status) VALUES($1,'encrypted','fixture-secret','test-key',$2,'active') RETURNING id`, accountID, fmt.Sprintf("taskservice-fixture-%d", accountID)).Scan(&credentialID); err != nil {
 			return fmt.Errorf("seed task service fixture credential: %w", err)
 		}
-		task.AccountID = tasks.IDPtr(accountID)
-		task.AssignedProviderEndpointID = tasks.IDPtr(providerEndpointID)
-		task.AssignedCredentialID = tasks.IDPtr(credentialID)
+		task.AccountID = testPtr(accountID)
+		task.AssignedProviderEndpointID = testPtr(providerEndpointID)
+		task.AssignedCredentialID = testPtr(credentialID)
 		if task.LeaseToken == "" {
 			task.LeaseToken = "lease-" + task.TaskID
 		}
@@ -45,14 +45,14 @@ func createTaskServiceTestTask(t testing.TB, db *sql.DB, repo *taskstore.Reposit
 			if err := db.QueryRowContext(ctx, `SELECT provider_endpoint_id FROM api_accounts WHERE id=$1`, accountID).Scan(&id); err != nil {
 				return fmt.Errorf("load task service fixture provider endpoint: %w", err)
 			}
-			task.AssignedProviderEndpointID = tasks.IDPtr(id)
+			task.AssignedProviderEndpointID = testPtr(id)
 		}
 		if task.AssignedCredentialID == nil {
 			var id int64
 			if err := db.QueryRowContext(ctx, `SELECT id FROM api_account_secrets WHERE account_id=$1 AND status='active' ORDER BY id DESC LIMIT 1`, accountID).Scan(&id); err != nil {
 				return fmt.Errorf("load task service fixture credential: %w", err)
 			}
-			task.AssignedCredentialID = tasks.IDPtr(id)
+			task.AssignedCredentialID = testPtr(id)
 		}
 	}
 	now := time.Now()

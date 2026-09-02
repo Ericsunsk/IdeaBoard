@@ -58,11 +58,11 @@ func TestErrorImplementsErrorInterface(t *testing.T) {
 	if !errors.Is(err, cause) {
 		t.Fatal("errors.Is should follow Unwrap to the cause")
 	}
-	if !IsCode(err, CodeStorageTransient) {
-		t.Fatal("IsCode must match the constructed code")
+	if CodeOf(err) != CodeStorageTransient {
+		t.Fatal("CodeOf must match the constructed code")
 	}
-	if IsCode(err, CodeObjectMissing) {
-		t.Fatal("IsCode must not match a different code")
+	if CodeOf(err) == CodeObjectMissing {
+		t.Fatal("CodeOf must not match a different code")
 	}
 	if CodeOf(err) != CodeStorageTransient {
 		t.Fatalf("CodeOf = %q, want %q", CodeOf(err), CodeStorageTransient)

@@ -20,8 +20,11 @@ func TestTaskInputManifestRoundTripPreservesImmutableObjectFacts(t *testing.T) {
 	if strings.Contains(string(raw), "url") {
 		t.Fatalf("manifest must not persist any URL: %s", raw)
 	}
-	decoded, err := UnmarshalTaskInputManifest(raw)
-	if err != nil {
+	var decoded TaskInputManifest
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if err := decoded.Validate(); err != nil {
 		t.Fatal(err)
 	}
 	if decoded.Inputs[0].ObjectGeneration != input.ObjectGeneration || decoded.Inputs[0].ChecksumSHA256 != input.ChecksumSHA256 {
@@ -76,7 +79,11 @@ func TestTaskInputManifestRejectsUnknownSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := UnmarshalTaskInputManifest(raw); err == nil {
+	var decoded TaskInputManifest
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if err := decoded.Validate(); err == nil {
 		t.Fatal("expected schema mismatch rejection")
 	}
 }

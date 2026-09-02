@@ -137,20 +137,8 @@ func LibraryAssetUploadObjectPrefix(userID int64) (string, error) {
 	return path.Join(uploadObjectRoot, "library", fmt.Sprintf("%d", userID)) + "/", nil
 }
 
-func TaskOutputUploadObjectPrefix(userID int64, taskID string) (string, error) {
-	dirPrefix, err := TaskOutputUploadDirPrefix(userID, taskID)
-	if err != nil {
-		return "", err
-	}
-	return path.Join(uploadObjectRoot, dirPrefix) + "/", nil
-}
-
 func SiteAssetUploadDirPrefix() string {
 	return path.Join("site", "assets")
-}
-
-func SiteAssetUploadObjectPrefix() string {
-	return path.Join(uploadObjectRoot, SiteAssetUploadDirPrefix()) + "/"
 }
 
 func userUploadObjectPrefixes(userID int64, storageUID string) ([]string, error) {

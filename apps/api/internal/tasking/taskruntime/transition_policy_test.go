@@ -443,9 +443,9 @@ func taskTransitionTestTaskWithRetry(status string, retryCount int) *tasks.Task 
 	return &tasks.Task{
 		TaskID:                     "transition-policy-task",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(22),
-		AssignedCredentialID:       tasks.IDPtr(33),
-		AccountID:                  tasks.IDPtr(11),
+		AssignedProviderEndpointID: testPtr(22),
+		AssignedCredentialID:       testPtr(33),
+		AccountID:                  testPtr(11),
 		Status:                     status,
 		LeaseToken:                 "lease-current",
 		RetryCount:                 retryCount,

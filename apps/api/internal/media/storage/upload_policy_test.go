@@ -1,6 +1,9 @@
 package storage
 
-import "testing"
+import (
+	"path"
+	"testing"
+)
 
 func TestCanvasContentUploadDirPrefix(t *testing.T) {
 	got, err := CanvasContentUploadDirPrefix("OWNR1A", "board-1")
@@ -120,10 +123,11 @@ func TestTaskOutputUploadPrefixes(t *testing.T) {
 		t.Fatalf("user object prefix = %q, want %q", userPrefix, "uploads/tasks/42/")
 	}
 
-	taskPrefix, err := TaskOutputUploadObjectPrefix(42, "task-abc")
+	taskDir, err := TaskOutputUploadDirPrefix(42, "task-abc")
 	if err != nil {
-		t.Fatalf("TaskOutputUploadObjectPrefix returned error: %v", err)
+		t.Fatalf("TaskOutputUploadDirPrefix returned error: %v", err)
 	}
+	taskPrefix := path.Join(uploadObjectRoot, taskDir) + "/"
 	if taskPrefix != "uploads/tasks/42/task-abc/" {
 		t.Fatalf("task object prefix = %q, want %q", taskPrefix, "uploads/tasks/42/task-abc/")
 	}
@@ -133,7 +137,7 @@ func TestSiteAssetUploadPrefixes(t *testing.T) {
 	if got := SiteAssetUploadDirPrefix(); got != "site/assets" {
 		t.Fatalf("dir prefix = %q, want %q", got, "site/assets")
 	}
-	if got := SiteAssetUploadObjectPrefix(); got != "uploads/site/assets/" {
+	if got := path.Join(uploadObjectRoot, SiteAssetUploadDirPrefix()) + "/"; got != "uploads/site/assets/" {
 		t.Fatalf("object prefix = %q, want %q", got, "uploads/site/assets/")
 	}
 }

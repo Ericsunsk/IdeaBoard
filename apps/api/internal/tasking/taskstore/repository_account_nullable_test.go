@@ -50,8 +50,8 @@ func TestCreateTaskRejectsUnknownAccountID(t *testing.T) {
 	err := repo.Create(ctx, &tasks.Task{
 		TaskID:                     "task-unknown-account",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(199999),
-		AccountID:                  tasks.IDPtr(99999),
+		AssignedProviderEndpointID: testPtr(199999),
+		AccountID:                  testPtr(99999),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-unknown-account",
 	})
@@ -70,8 +70,8 @@ func TestCreateTaskAcceptsKnownAccountID(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-known-account",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(channelID),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(channelID),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-known-account",
 	}
@@ -101,9 +101,9 @@ func TestTaskAttemptRequiresKnownAccountAndChannel(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-attempt-fk",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(channelID),
-		AssignedCredentialID:       tasks.IDPtr(credentialID),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(channelID),
+		AssignedCredentialID:       testPtr(credentialID),
+		AccountID:                  testPtr(accountID),
 		ResolvedModel:              "gpt-image-1",
 		APIType:                    "openai-compatible",
 		ProviderEndpointBaseURL:    "https://example.com/repository-test-channel-10089",
@@ -170,9 +170,9 @@ func TestListMonitorExecutionPressureByRangeUsesQueueAndAttemptFacts(t *testing.
 	runningTask := &tasks.Task{
 		TaskID:                     "attempt-pressure-running",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(channelID),
-		AssignedCredentialID:       tasks.IDPtr(credentialID),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(channelID),
+		AssignedCredentialID:       testPtr(credentialID),
+		AccountID:                  testPtr(accountID),
 		ResolvedModel:              "gpt-image-1",
 		APIType:                    "openai-compatible",
 		ProviderEndpointBaseURL:    "https://example.com/repository-test-channel-10090",
@@ -201,9 +201,9 @@ func TestListMonitorExecutionPressureByRangeUsesQueueAndAttemptFacts(t *testing.
 	failedTask := &tasks.Task{
 		TaskID:                     "attempt-pressure-failed",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(channelID),
-		AssignedCredentialID:       tasks.IDPtr(credentialID),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(channelID),
+		AssignedCredentialID:       testPtr(credentialID),
+		AccountID:                  testPtr(accountID),
 		ResolvedModel:              "gpt-image-1",
 		APIType:                    "openai-compatible",
 		ProviderEndpointBaseURL:    "https://example.com/repository-test-channel-10090",
@@ -238,9 +238,9 @@ func TestListMonitorExecutionPressureByRangeUsesQueueAndAttemptFacts(t *testing.
 	retryTask := &tasks.Task{
 		TaskID:                     "attempt-pressure-requeued",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(channelID),
-		AssignedCredentialID:       tasks.IDPtr(credentialID),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(channelID),
+		AssignedCredentialID:       testPtr(credentialID),
+		AccountID:                  testPtr(accountID),
 		ResolvedModel:              "gpt-image-1",
 		APIType:                    "openai-compatible",
 		ProviderEndpointBaseURL:    "https://example.com/repository-test-channel-10090",
@@ -308,9 +308,9 @@ func TestCreateTaskAttemptRequiresCurrentLeaseIdentity(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-attempt-lease-identity",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(channelID),
-		AssignedCredentialID:       tasks.IDPtr(credentialID),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(channelID),
+		AssignedCredentialID:       testPtr(credentialID),
+		AccountID:                  testPtr(accountID),
 		ResolvedModel:              "gpt-image-1",
 		APIType:                    "openai-compatible",
 		ProviderEndpointBaseURL:    "https://example.com/repository-test-channel-10093",
@@ -368,9 +368,9 @@ func TestFinishTaskAttemptOnlyUpdatesRunningAttempt(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-attempt-terminal-guard",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(channelID),
-		AssignedCredentialID:       tasks.IDPtr(credentialID),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(channelID),
+		AssignedCredentialID:       testPtr(credentialID),
+		AccountID:                  testPtr(accountID),
 		ResolvedModel:              "gpt-image-1",
 		APIType:                    "openai-compatible",
 		ProviderEndpointBaseURL:    "https://example.com/repository-test-channel-10095",
@@ -443,9 +443,9 @@ func TestRetryAttemptHistoryUsesReleasedLeaseThenNewLease(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-attempt-retry-history",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(channelID),
-		AssignedCredentialID:       tasks.IDPtr(credentialID),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(channelID),
+		AssignedCredentialID:       testPtr(credentialID),
+		AccountID:                  testPtr(accountID),
 		ResolvedModel:              "gpt-image-1",
 		APIType:                    "openai-compatible",
 		ProviderEndpointBaseURL:    "https://example.com/repository-test-channel-10096",
@@ -554,8 +554,8 @@ func TestCompleteWithAttemptRollsBackWhenAttemptFinishFails(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-complete-attempt-rollback",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(channelID),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(channelID),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-complete-attempt-rollback",
 	}
@@ -734,8 +734,8 @@ func TestRequeueWithAttemptRollsBackWhenAttemptFinishFails(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-requeue-attempt-rollback",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(channelID),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(channelID),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-requeue-attempt-rollback",
 	}
@@ -787,8 +787,8 @@ func TestResetRunningTaskClearsAssignedAccountAndChannel(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-reset-assigned-channel",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(channelID),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(channelID),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-reset-assigned-channel",
 	}
@@ -855,8 +855,8 @@ func TestMarkTaskCancelledRetainsAssignmentSnapshot(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-cancel-retains-assignment",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(channelID),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(channelID),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-cancel-retains-assignment",
 	}

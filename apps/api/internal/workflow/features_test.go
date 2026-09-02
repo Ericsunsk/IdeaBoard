@@ -58,7 +58,7 @@ func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 }
 
 func TestCanonicalFeatureRegistryMatchesProductionRouting(t *testing.T) {
-	canonical := CanonicalFeatureSlugs()
+	canonical := SupportedFeatureSlugs()
 	for _, slug := range canonical {
 		t.Run(slug, func(t *testing.T) {
 			if _, ok := ParseWorkflowFeatureSlug(slug); !ok {
@@ -122,7 +122,7 @@ func TestSupportedFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T
 	assertSameFeatureSlugs(
 		t,
 		"OpenAPI canonical contract",
-		CanonicalFeatureSlugs(),
+		SupportedFeatureSlugs(),
 		extractOpenAPIStringEnum(t, string(openAPIRaw), "CanonicalWorkflowFeatureSlug"),
 	)
 

@@ -36,16 +36,18 @@ func TestNormalizeProtocolCapabilitiesEnforcesCompatibility(t *testing.T) {
 }
 
 func TestProtocolSupportsCapabilityChecksExactCapability(t *testing.T) {
-	if !ProtocolSupportsCapability(ProtocolModelAPI, CapabilityGeneration) {
+	model, ok := CanonicalProtocol(ProtocolModelAPI)
+	if !ok || !containsCapability(protocolSpecs[model].definition.Capabilities, CapabilityGeneration) {
 		t.Fatal("model protocol should support image generation")
 	}
-	if ProtocolSupportsCapability(ProtocolModelAPI, CapabilityUpscale) {
+	if !ok || containsCapability(protocolSpecs[model].definition.Capabilities, CapabilityUpscale) {
 		t.Fatal("model protocol should not support upscale")
 	}
-	if !ProtocolSupportsCapability(ProtocolImageFill, CapabilityFill) {
+	fill, ok := CanonicalProtocol(ProtocolImageFill)
+	if !ok || !containsCapability(protocolSpecs[fill].definition.Capabilities, CapabilityFill) {
 		t.Fatal("image fill protocol should support image fill")
 	}
-	if ProtocolSupportsCapability(ProtocolImageFill, CapabilityGeneration) {
+	if !ok || containsCapability(protocolSpecs[fill].definition.Capabilities, CapabilityGeneration) {
 		t.Fatal("image fill protocol should not support image generation")
 	}
 }

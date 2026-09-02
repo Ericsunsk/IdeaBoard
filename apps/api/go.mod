@@ -20,7 +20,13 @@ require (
 	golang.org/x/image v0.45.0
 	golang.org/x/text v0.41.0
 	golang.org/x/time v0.15.0
+	ideaboard/api/internal/testdb v0.0.0
+	ideaboard/api/internal/testsupport v0.0.0
 )
+
+replace ideaboard/api/internal/testdb => ./internal/testdb
+
+replace ideaboard/api/internal/testsupport => ./internal/testsupport
 
 require (
 	cel.dev/expr v0.25.1 // indirect

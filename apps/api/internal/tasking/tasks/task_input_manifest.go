@@ -121,20 +121,6 @@ func (m *TaskInputManifest) Marshal() ([]byte, error) {
 	return json.Marshal(m)
 }
 
-func UnmarshalTaskInputManifest(data []byte) (*TaskInputManifest, error) {
-	if len(data) == 0 {
-		return nil, fmt.Errorf("cannot unmarshal empty task input manifest")
-	}
-	var manifest TaskInputManifest
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		return nil, fmt.Errorf("unmarshal task input manifest: %w", err)
-	}
-	if err := manifest.Validate(); err != nil {
-		return nil, err
-	}
-	return &manifest, nil
-}
-
 func (m *TaskInputManifest) ResolveInputs() []TaskInputManifestRef {
 	if m == nil {
 		return nil

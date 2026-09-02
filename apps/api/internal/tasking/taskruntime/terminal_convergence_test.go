@@ -578,8 +578,8 @@ func newBilledCompletionConvergenceFixture(
 		TaskID:                     taskID,
 		UserID:                     userID,
 		FeatureSlug:                workflow.FeatureSlugGeneration,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "current-lease-token",
 	}

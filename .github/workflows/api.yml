@@ -36,6 +36,12 @@ jobs:
           cache-dependency-path: apps/api/go.sum
       - name: Test CI parity entrypoint
         run: bash scripts/ci-parity-test.sh
+      - name: Test nested test infrastructure modules
+        working-directory: apps/api
+        run: |
+          go test ./...
+          (cd internal/testdb && go test ./...)
+          (cd internal/testsupport && go test ./...)
       - name: Lint API
         uses: golangci/golangci-lint-action@63c23d5020da8f97005b6de340504130bdbe42c7
         with:

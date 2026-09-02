@@ -146,20 +146,41 @@ func roundTripDrawingTaskForTest(t *testing.T, task *tasks.TaskPayload) *tasks.T
 
 func (c *ProviderExecutor) callOpenAIForTest(ctx context.Context, account *accounts.ApiAccount, prompt string, width, height int, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
 	operation, invocation, controls := providerRuntimeIntentForTest(params)
-	compiledParams := workflow.BuildProviderPromptParams(params)
+	compiledParams := providerPromptParamsForTest(params)
 	return c.callOpenAIWithRequest(ctx, account, newProviderRequest(prompt, width, height, compiledParams, resolvedModel, providerRequestFactsForTest(compiledParams, operation), operation, invocation, controls), timeout)
 }
 
 func (c *ProviderExecutor) callGoogleAIForTest(ctx context.Context, account *accounts.ApiAccount, prompt string, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
 	operation, invocation, controls := providerRuntimeIntentForTest(params)
-	compiledParams := workflow.BuildProviderPromptParams(params)
+	compiledParams := providerPromptParamsForTest(params)
 	return c.callGoogleAIWithRequest(ctx, account, newProviderRequest(prompt, 0, 0, compiledParams, resolvedModel, providerRequestFactsForTest(compiledParams, operation), operation, invocation, controls), timeout)
 }
 
 func (c *ProviderExecutor) callGoogleCloudForTest(ctx context.Context, account *accounts.ApiAccount, prompt string, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
 	operation, invocation, controls := providerRuntimeIntentForTest(params)
-	compiledParams := workflow.BuildProviderPromptParams(params)
+	compiledParams := providerPromptParamsForTest(params)
 	return c.callGoogleProviderWithRequest(ctx, account, "google-cloud", newProviderRequest(prompt, 0, 0, compiledParams, resolvedModel, providerRequestFactsForTest(compiledParams, operation), operation, invocation, controls), timeout)
+}
+
+func providerPromptParamsForTest(params map[string]interface{}) map[string]interface{} {
+	if params == nil {
+		return nil
+	}
+	out := make(map[string]interface{}, len(params)+2)
+	for key, value := range params {
+		out[key] = value
+	}
+	if contract, ok := params[workflow.ParamKeyVariation].(map[string]interface{}); ok {
+		if strength, exists := contract["strength"]; exists {
+			out["variation_strength"] = strength
+		}
+	}
+	if contract, ok := params[workflow.ParamKeyFusion].(map[string]interface{}); ok {
+		if weights, exists := contract["input_weights"]; exists {
+			out["fusion_input_weights"] = weights
+		}
+	}
+	return out
 }
 
 func providerRequestFactsForTest(params map[string]interface{}, operation workflow.RuntimeOperation) resolvedProviderRequestFacts {

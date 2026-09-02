@@ -478,7 +478,7 @@ func TestAccountStopAndArchiveReleaseBilledHoldsAtomically(t *testing.T) {
 			credentialID := loadRepositoryTestCredentialID(t, db, accountID)
 			task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-account-"+operation, accountID, channelID, credentialID, "lease-account", "lease-account")
 			holdTaskForSettlementTest(t, pool, taskBilling, task, request)
-			accountRepo := accountspool.NewAccountRepositoryWithRunningTaskFinalizer(db, repo)
+			accountRepo := accountspool.NewAccountRepository(db, repo)
 
 			var (
 				ids []string

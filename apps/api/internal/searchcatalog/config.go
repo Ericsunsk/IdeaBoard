@@ -289,8 +289,6 @@ func publicConfig(provider Provider, stored storedProviderConfig) ProviderConfig
 	return ProviderConfig{Provider: provider, APIKeyConfigured: strings.TrimSpace(stored.APIKeyCiphertext) != "", EndpointURL: stored.EndpointURL, Model: stored.Model, Enabled: stored.Enabled, TestState: stored.TestState, FailureCategory: stored.FailureCategory, StatusMessage: stored.StatusMessage, TestedAt: stored.TestedAt}
 }
 
-func Providers() []Provider { return append([]Provider(nil), providers...) }
-
 func isProvider(provider Provider) bool {
 	return provider == ProviderUnsplash || provider == ProviderPexels || provider == ProviderVision
 }

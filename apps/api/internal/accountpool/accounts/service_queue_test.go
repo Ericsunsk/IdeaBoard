@@ -151,9 +151,9 @@ WHERE id = $1`, account.ProviderEndpointID).Scan(&apiType, &protocol, &endpointN
 	task := &tasks.Task{
 		TaskID: taskID, UserID: 1,
 		Params:                     `{"schema_version":5}`,
-		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
-		AssignedCredentialID:       tasks.IDPtr(credentialID),
-		AccountID:                  tasks.IDPtr(account.ID),
+		AssignedProviderEndpointID: testPtr(account.ProviderEndpointID),
+		AssignedCredentialID:       testPtr(credentialID),
+		AccountID:                  testPtr(account.ID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 leaseToken,
 	}
@@ -302,7 +302,7 @@ func TestUpdateAccountNormalizesZeroWeight(t *testing.T) {
 func TestDeleteAccountDeletesStoppedAccount(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	accountRepo := NewAccountRepositoryWithRunningTaskFinalizer(db, taskRepo)
+	accountRepo := NewAccountRepository(db, taskRepo)
 	acc := createTestAccount(t, accountRepo, "a1", 0)
 	svc := NewAccountService(AccountServiceDeps{
 		AccountRepo:      accountRepo,
@@ -392,7 +392,7 @@ func TestDeleteAccountDeletesStoppedAccount(t *testing.T) {
 func TestDeleteAccountArchivesRunningAccount(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	accountRepo := NewAccountRepositoryWithRunningTaskFinalizer(db, taskRepo)
+	accountRepo := NewAccountRepository(db, taskRepo)
 	acc := createTestAccount(t, accountRepo, "running", 1)
 	svc := NewAccountService(AccountServiceDeps{
 		AccountRepo:      accountRepo,
@@ -415,7 +415,7 @@ func TestDeleteAccountArchivesRunningAccount(t *testing.T) {
 func TestDeleteAccountReturnsErrorAndSkipsSideEffectsWhenTaskFinalizerFails(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	sentinel := errors.New("finalizer failed")
-	accountRepo := NewAccountRepositoryWithRunningTaskFinalizer(db, failingRunningTaskFinalizer{err: sentinel})
+	accountRepo := NewAccountRepository(db, failingRunningTaskFinalizer{err: sentinel})
 	acc := createTestAccount(t, accountRepo, "delete-finalizer-fail", 1)
 	taskRepo := &failingAccountTaskStore{listed: []string{"should-not-mark"}}
 	cancelStore := &fakeCancelStore{}
@@ -458,7 +458,7 @@ func TestDeleteAccountReturnsErrorAndSkipsSideEffectsWhenTaskFinalizerFails(t *t
 func TestDeleteAccountFailsResidualInFlightTasks(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	accountRepo := NewAccountRepositoryWithRunningTaskFinalizer(db, taskRepo)
+	accountRepo := NewAccountRepository(db, taskRepo)
 	acc := createTestAccount(t, accountRepo, "delete-residual", 0)
 
 	first := createRunningTaskFixture(t, db, taskRepo, acc, "delete-residual-running-1")
@@ -506,7 +506,7 @@ func TestDeleteAccountFailsResidualInFlightTasks(t *testing.T) {
 func TestStopAccountMarksCancelAndFailsInFlightTasks(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	accountRepo := NewAccountRepositoryWithRunningTaskFinalizer(db, taskRepo)
+	accountRepo := NewAccountRepository(db, taskRepo)
 	acc := createTestAccount(t, accountRepo, "a1", 1)
 
 	first := createRunningTaskFixture(t, db, taskRepo, acc, "t-running-1")
@@ -556,7 +556,7 @@ func TestStopAccountMarksCancelAndFailsInFlightTasks(t *testing.T) {
 func TestStopAccountReturnsErrorAndSkipsSideEffectsWhenTaskFinalizerFails(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	sentinel := errors.New("finalizer failed")
-	accountRepo := NewAccountRepositoryWithRunningTaskFinalizer(db, failingRunningTaskFinalizer{err: sentinel})
+	accountRepo := NewAccountRepository(db, failingRunningTaskFinalizer{err: sentinel})
 	acc := createTestAccount(t, accountRepo, "stop-finalizer-fail", 1)
 	taskRepo := &failingAccountTaskStore{listed: []string{"should-not-mark"}}
 	cancelStore := &fakeCancelStore{}

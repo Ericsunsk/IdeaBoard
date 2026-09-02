@@ -59,14 +59,6 @@ func SupportedFeatureSlugs() []string {
 	return slugs
 }
 
-// CanonicalFeatureSlugs is the executable workflow registry used by routing
-// and Billing. There is no legacy feature alias layer.
-func CanonicalFeatureSlugs() []string {
-	slugs := make([]string, len(supportedWorkflowFeatureSlugs))
-	copy(slugs, supportedWorkflowFeatureSlugs)
-	return slugs
-}
-
 func supportedFeatureSlugSet(slugs []string) map[string]struct{} {
 	result := make(map[string]struct{}, len(slugs))
 	for _, slug := range slugs {
@@ -77,12 +69,6 @@ func supportedFeatureSlugSet(slugs []string) map[string]struct{} {
 
 func normalizeWorkflowFeatureSlug(raw string) string {
 	return strings.TrimSpace(raw)
-}
-
-// NormalizeModelKey is the canonical model identity shared by account routing
-// and billing. Provider-specific path aliases are not collapsed here.
-func NormalizeModelKey(model string) string {
-	return strings.ToLower(strings.TrimSpace(model))
 }
 
 func ParseWorkflowFeatureSlug(raw string) (string, bool) {

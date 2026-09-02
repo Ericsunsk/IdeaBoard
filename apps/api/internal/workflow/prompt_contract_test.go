@@ -50,24 +50,6 @@ func TestNormalizeStructuredPromptContractParamsNormalizesOutpaintContract(t *te
 	}
 }
 
-func TestBuildProviderPromptParamsDerivesProviderFieldsFromNestedContract(t *testing.T) {
-	params := map[string]interface{}{
-		"feature": FeatureSlugUpscale,
-		ParamKeyUpscale: map[string]interface{}{
-			"scale": 2.0,
-		},
-	}
-
-	providerParams := BuildProviderPromptParams(params)
-
-	if _, exists := providerParams["scale"]; exists {
-		t.Fatalf("did not expect Upscale scale to be flattened into provider params: %#v", providerParams)
-	}
-	if _, exists := params["output_quality"]; exists {
-		t.Fatalf("provider param build should not mutate original params: %#v", params)
-	}
-}
-
 func TestBuildProviderTaskParamsDerivesProviderMapFromCanonicalContract(t *testing.T) {
 	useMask := true
 	params := &tasks.WorkflowTaskParams{

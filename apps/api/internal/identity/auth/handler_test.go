@@ -46,7 +46,7 @@ func TestGetCurrentUserReturnsNotFoundWhenUserMissing(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	db := testdb.Open(t)
-	handler := NewAuthHandler(users.NewUserService(users.NewUserRepository(db), nil, nil))
+	handler := NewAuthHandler(users.NewUserServiceWithEmailReader(users.NewUserRepository(db), nil, nil, nil, nil))
 	router := gin.New()
 	router.GET("/api/user/info", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleUser)
@@ -70,7 +70,7 @@ func TestGetCurrentUserReturnsPublicIdentity(t *testing.T) {
 	if err := repo.Create(t.Context(), user); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	handler := NewAuthHandler(users.NewUserService(repo, nil, nil))
+	handler := NewAuthHandler(users.NewUserServiceWithEmailReader(repo, nil, nil, nil, nil))
 	router := gin.New()
 	router.GET("/api/user/info", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, user.ID, principal.RoleUser)

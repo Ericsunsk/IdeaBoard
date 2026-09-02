@@ -16,8 +16,8 @@ func TestListAttachesExecutionMetrics(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "metrics-list-task",
 		UserID:                     10,
-		AssignedProviderEndpointID: tasks.IDPtr(accountID + 10000),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(accountID + 10000),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		CreatedAt:                  createdAt,
 	}
@@ -199,8 +199,8 @@ func TestMarkTaskFailedWithLeaseWritesTerminalExecutionMetrics(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "metrics-failed-with-lease",
 		UserID:                     10,
-		AssignedProviderEndpointID: tasks.IDPtr(channelID),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(channelID),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-metrics-failed",
 		CreatedAt:                  completedAt.Add(-2 * time.Second),
@@ -250,8 +250,8 @@ func TestCompleteWithOutputsWritesTerminalExecutionMetrics(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "metrics-completed-with-outputs",
 		UserID:                     10,
-		AssignedProviderEndpointID: tasks.IDPtr(channelID),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(channelID),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-metrics-completed",
 		CreatedAt:                  completedAt.Add(-3 * time.Second),
@@ -321,7 +321,7 @@ func TestListExecutionBottleneckStatsByCreatedRangeOnlyUsesTerminalTasks(t *test
 	accountID := seedRepositoryTestAccount(t, db, 93)
 	now := time.Now()
 	seedTasks(t, taskRepo, ctx,
-		&tasks.Task{TaskID: "metrics-running", UserID: 10, AccountID: tasks.IDPtr(accountID), Status: tasks.StatusRunning, CreatedAt: now.Add(-5 * time.Minute)},
+		&tasks.Task{TaskID: "metrics-running", UserID: 10, AccountID: testPtr(accountID), Status: tasks.StatusRunning, CreatedAt: now.Add(-5 * time.Minute)},
 		&tasks.Task{TaskID: "metrics-completed", UserID: 10, Status: tasks.StatusCompleted, CreatedAt: now.Add(-4 * time.Minute)},
 		&tasks.Task{TaskID: "metrics-failed", UserID: 10, Status: tasks.StatusFailed, CreatedAt: now.Add(-3 * time.Minute)},
 		&tasks.Task{TaskID: "metrics-completed-missing", UserID: 10, Status: tasks.StatusCompleted, CreatedAt: now.Add(-2 * time.Minute)},
@@ -510,9 +510,9 @@ func TestListMonitorGoldenSignalSamplesByRangeCountsFailedAttemptBeforeSuccessfu
 	task := &tasks.Task{
 		TaskID:                     "golden-failover-success",
 		UserID:                     10,
-		AssignedProviderEndpointID: tasks.IDPtr(channelID),
-		AssignedCredentialID:       tasks.IDPtr(credentialID),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(channelID),
+		AssignedCredentialID:       testPtr(credentialID),
+		AccountID:                  testPtr(accountID),
 		ResolvedModel:              "gpt-image-1",
 		APIType:                    "openai-compatible",
 		ProviderEndpointBaseURL:    baseURL,

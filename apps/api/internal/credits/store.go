@@ -34,10 +34,6 @@ func normalizeMetadata(metadata CommandMetadata) (CommandMetadata, error) {
 	return metadata, nil
 }
 
-func walletSystemShard(userID int64) string {
-	return fmt.Sprintf("wallet:%d", userID)
-}
-
 func executeCreditCommand(
 	ctx context.Context,
 	tx pgx.Tx,

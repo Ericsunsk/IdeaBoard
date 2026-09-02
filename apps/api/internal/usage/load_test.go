@@ -13,7 +13,6 @@ import (
 
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits"
-	creditsloadtest "ideaboard/api/internal/credits/loadtestsupport"
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/testdb"
 
@@ -43,7 +42,7 @@ func TestUsageMillionTransactionDataset(t *testing.T) {
 
 	anchor := usageLoadAnchor(t)
 	captureSeedStarted := time.Now()
-	if err := creditsloadtest.SeedCaptureFacts(ctx, db, creditsloadtest.CaptureFactsConfig{
+	if err := SeedCaptureFacts(ctx, db, CaptureFactsConfig{
 		BaseUserID:       usageLoadTargetUserID,
 		UserCount:        usageLoadUserCount,
 		TransactionCount: transactionCount,

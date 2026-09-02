@@ -66,7 +66,7 @@ func TestRepairErrRepairNotPossibleCode(t *testing.T) {
 	// must agree on the same Code so a dashboard can pivot
 	// on either. The mapping is the single source of truth.
 	mediaErr := mediaerrors.New(mediaerrors.CodeRepairNotPossible, "media.derivative.repair", "cap reached", ErrRepairNotPossible)
-	if !mediaerrors.IsCode(mediaErr, mediaerrors.CodeRepairNotPossible) {
+	if mediaerrors.CodeOf(mediaErr) != mediaerrors.CodeRepairNotPossible {
 		t.Fatal("structured error must carry repair_not_possible code")
 	}
 }

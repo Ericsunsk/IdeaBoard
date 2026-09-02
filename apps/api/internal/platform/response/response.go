@@ -53,10 +53,6 @@ func SuccessDTO[T any](c *gin.Context, data T) {
 	})
 }
 
-func ErrorDTO[T any](c *gin.Context, httpStatus int, data T) {
-	c.JSON(httpStatus, Response{Code: httpStatus, Msg: "request failed", MessageSafe: true, Data: data})
-}
-
 func InternalError(c *gin.Context, httpStatus int, publicMsg string, err error) {
 	if err != nil {
 		slog.Warn("HTTP error response", "message", publicMsg, "err", err)

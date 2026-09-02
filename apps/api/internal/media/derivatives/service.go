@@ -89,35 +89,6 @@ func (e *failureRecordedError) Error() string { return e.err.Error() }
 
 func (e *failureRecordedError) Unwrap() error { return e.err }
 
-// structuredErrorCode maps the inline derivative error string used by
-// the existing error_code column to the structured Code defined in
-// internal/media/errors. The mapping is the single source of truth
-// for the runbook; do not introduce new strings without adding them
-// here. The column itself remains VARCHAR(64) for backward
-// compatibility, but every new code must round-trip through this
-// mapping.
-func structuredErrorCode(inline string) mediaerrors.Code {
-	switch inline {
-	case "asset_not_found":
-		return mediaerrors.CodeMediaNotFound
-	case "source_read_failed", "destination_write_failed", "key_failed":
-		return mediaerrors.CodeObjectMissing
-	case "source_limits_exceeded", "output_limits_exceeded", "integrity_invalid":
-		return mediaerrors.CodeObjectInvalid
-	case "render_failed", "renderer_unavailable", "integrity_transient":
-		return mediaerrors.CodeStorageTransient
-	case "invalid_tier":
-		return mediaerrors.CodeMediaNotFound
-	case "stale_processing_recovered":
-		return mediaerrors.CodeStorageTransient
-	default:
-		// Unknown inline codes map to a non-retryable media
-		// error; the runbook treats this as a media bug and
-		// pages the on-call.
-		return mediaerrors.CodeMediaNotFound
-	}
-}
-
 func NewService(db *sql.DB, storageService *storage.StorageService, publishers ...EventPublisher) *Service {
 	var publisher EventPublisher
 	if len(publishers) > 0 {
@@ -278,10 +249,6 @@ func derivativeRetryDelay(attemptCount int32) time.Duration {
 		}
 	}
 	return delay
-}
-
-func render(data []byte, maxSide int) ([]byte, int, int, string, error) {
-	return goRenderer{}.Render(context.Background(), data, "", maxSide)
 }
 
 type goRenderer struct{}

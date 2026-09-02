@@ -47,8 +47,8 @@ func TestResetRunningTaskResetsState(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-reset-pending",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-reset",
 	}
@@ -88,8 +88,8 @@ func TestResetRunningTaskRejectsTerminalTask(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-reset-terminal",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusCompleted,
 		CompletedAt:                ptrTime(time.Now()),
 	}
@@ -149,8 +149,8 @@ func TestRequeueTaskForFailoverPersistsProvidedResultEnvelope(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-requeue-custom-result",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-requeue-custom-result",
 		RetryCount:                 0,
@@ -250,10 +250,10 @@ func seedTaskRuntimeTask(t testing.TB, db *sql.DB, repo *taskstore.Repository, c
 			t.Fatalf("running/assigned task %q requires account_id", task.TaskID)
 		}
 		if task.AssignedProviderEndpointID == nil {
-			task.AssignedProviderEndpointID = tasks.IDPtr(taskRuntimeProviderEndpointID(accountID))
+			task.AssignedProviderEndpointID = testPtr(taskRuntimeProviderEndpointID(accountID))
 		}
 		if task.AssignedCredentialID == nil {
-			task.AssignedCredentialID = tasks.IDPtr(seedTaskRuntimeCredential(t, db, accountID))
+			task.AssignedCredentialID = testPtr(seedTaskRuntimeCredential(t, db, accountID))
 		}
 	}
 	now := time.Now()
@@ -360,8 +360,8 @@ func TestRequeueTaskForFailoverRequeuesWhenBelowRetryLimit(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-requeue",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-requeue",
 		RetryCount:                 defaultTaskRetryLimit - 2,
@@ -410,9 +410,9 @@ func TestConfirmTaskLeasePublishesRunningStatus(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-publish",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AssignedCredentialID:       tasks.IDPtr(credentialID),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AssignedCredentialID:       testPtr(credentialID),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-publish",
 	}
@@ -445,8 +445,8 @@ func TestRecordTaskCancelledPublishesCancelledStatus(t *testing.T) {
 	accountID := seedTaskRuntimeAccount(t, db, 53)
 
 	task := &tasks.Task{
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
 		TaskID:                     "task-cancelled-event",
 		UserID:                     1,
 		Status:                     tasks.StatusRunning,
@@ -543,8 +543,8 @@ func TestConvergeTaskAfterRiverFinalFailureFailsRunningTaskWithSameRiverLease(t 
 	task := &tasks.Task{
 		TaskID:                     "task-river-final-running",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "river:202:lease",
 	}
@@ -588,8 +588,8 @@ func TestConvergeTaskAfterRiverFinalFailureRecoversRunningTaskWithoutLease(t *te
 	task := &tasks.Task{
 		TaskID:                     "task-startup-recovery-unleased",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "",
 	}
@@ -628,8 +628,8 @@ func TestConvergeTaskAfterRiverFinalFailureRejectsRunningTaskWithDifferentRiverL
 	task := &tasks.Task{
 		TaskID:                     "task-river-final-stale",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "river:303:lease",
 	}
@@ -700,9 +700,9 @@ func TestConfirmTaskLeaseRejectsStaleLeaseWithoutPublishing(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-stale-lease",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AssignedCredentialID:       tasks.IDPtr(credentialID),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AssignedCredentialID:       testPtr(credentialID),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-current",
 	}
@@ -733,8 +733,8 @@ func TestCompleteTaskRejectsLeaseTokenMismatch(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-complete-token-mismatch",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "current-lease-token",
 	}
@@ -766,8 +766,8 @@ func TestRequeueTaskForFailoverFailsWhenRetryLimitReached(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-retry-limit",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-retry-limit",
 		RetryCount:                 defaultTaskRetryLimit - 1,
@@ -833,8 +833,8 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 	requeueTask := &tasks.Task{
 		TaskID:                     "task-requeue-publish-pending",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(account13)),
-		AccountID:                  tasks.IDPtr(account13),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(account13)),
+		AccountID:                  testPtr(account13),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-publish-pending",
 		RetryCount:                 0,
@@ -861,8 +861,8 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 	finalTask := &tasks.Task{
 		TaskID:                     "task-requeue-publish-failed",
 		UserID:                     1,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(account14)),
-		AccountID:                  tasks.IDPtr(account14),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(account14)),
+		AccountID:                  testPtr(account14),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-publish-failed",
 		RetryCount:                 defaultTaskRetryLimit - 1,
@@ -897,8 +897,8 @@ func TestCompleteTaskUpsertsDailyStat(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-completed-daily",
 		UserID:                     7,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-completed-daily",
 		CreatedAt:                  time.Now().Add(-90 * time.Second),
@@ -948,8 +948,8 @@ func TestCompleteTaskPersistsTaskOutputs(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-completed-outputs",
 		UserID:                     7,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-completed-outputs",
 	}
@@ -1056,8 +1056,8 @@ func TestCompleteTaskReusesDuplicateMediaAsset(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-duplicate-output-asset",
 		UserID:                     7,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-duplicate-output-asset",
 	}
@@ -1109,8 +1109,8 @@ func TestCompleteTaskPersistsRemoteOnlyOutput(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-remote-only-output",
 		UserID:                     7,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-remote-only-output",
 	}
@@ -1164,8 +1164,8 @@ func TestCompleteTaskDoesNotInferOutputsFromResultURL(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-foreign-origin",
 		UserID:                     7,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-foreign-origin",
 	}
@@ -1195,8 +1195,8 @@ func TestCompleteTaskRejectsOutputWithoutStorageKey(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:                     "task-inline-result",
 		UserID:                     7,
-		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
-		AccountID:                  tasks.IDPtr(accountID),
+		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-inline-result",
 	}

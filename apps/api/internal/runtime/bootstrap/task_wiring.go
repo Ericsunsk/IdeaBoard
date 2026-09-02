@@ -199,7 +199,6 @@ func newAppTaskRuntime(
 		BillableItems:       services.billableItemRegistry,
 		UserResolver:        taskUserResolver{repo: repos.userRepo},
 	}, taskservice.ServiceOptions{
-		EventHub:   taskEventHub,
 		TaskEvents: taskEvents,
 	})
 
@@ -290,14 +289,6 @@ func (p compositeTaskStatusPublisher) PublishTaskStatus(ctx context.Context, eve
 		}
 	}
 	return firstErr
-}
-
-func newTaskStatusEventPublisher(
-	ctx context.Context,
-	cfg config.EventBusConfig,
-	hub *taskservice.EventHub,
-) (events.TaskStatusPublisher, *events.NATSJetStreamEventBus, error) {
-	return newTaskStatusEventPublisherWithResolver(ctx, cfg, hub, nil)
 }
 
 func newTaskStatusEventPublisherWithResolver(

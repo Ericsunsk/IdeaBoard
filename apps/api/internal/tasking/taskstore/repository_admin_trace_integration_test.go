@@ -83,8 +83,8 @@ func createAdminTraceTask(t *testing.T, repo *Repository, ctx context.Context, t
 	t.Helper()
 	task := &tasks.Task{TaskID: taskID, UserID: 1, FeatureSlug: "image-generate", Status: status, CreatedAt: time.Now().Add(-time.Minute)}
 	if status != tasks.StatusPending {
-		task.AccountID = tasks.IDPtr(accountID)
-		task.AssignedCredentialID = tasks.IDPtr(credentialID)
+		task.AccountID = testPtr(accountID)
+		task.AssignedCredentialID = testPtr(credentialID)
 	}
 	if err := createRepositoryTestTask(t, repo, ctx, task); err != nil {
 		t.Fatalf("create %s: %v", taskID, err)

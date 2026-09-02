@@ -449,7 +449,7 @@ func TestStopAccountAndFinalizeRunningTasksRollsBackAccountStatusWhenFinalizerFa
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
 	sentinel := errors.New("finalizer failed")
-	repo := NewAccountRepositoryWithRunningTaskFinalizer(db, stubRunningTaskFinalizer{err: sentinel})
+	repo := NewAccountRepository(db, stubRunningTaskFinalizer{err: sentinel})
 	channelID := createAccountTestChannel(t, db, "stop-rollback")
 	account := &ApiAccount{
 		Name:               "stop-rollback",
@@ -485,7 +485,7 @@ func TestArchiveAccountAndFinalizeRunningTasksRollsBackArchiveAndSecretWhenFinal
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
 	sentinel := errors.New("finalizer failed")
-	repo := NewAccountRepositoryWithRunningTaskFinalizer(db, stubRunningTaskFinalizer{err: sentinel})
+	repo := NewAccountRepository(db, stubRunningTaskFinalizer{err: sentinel})
 	channelID := createAccountTestChannel(t, db, "archive-rollback")
 	account := &ApiAccount{
 		Name:               "archive-rollback",

@@ -1,6 +1,5 @@
-// Package loadtestsupport owns bulk Credit fact fixtures used by explicit
-// PostgreSQL load harnesses. It is not part of the runtime Credits API.
-package loadtestsupport
+// Capture fact fixtures for the explicit PostgreSQL load harness.
+package usage
 
 import (
 	"context"

@@ -176,7 +176,7 @@ func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error
 	repos := appRepositories{
 		db:                   db,
 		userRepo:             users.NewUserRepository(db),
-		accountRepo:          accounts.NewAccountRepositoryWithRunningTaskFinalizer(db, taskRepo),
+		accountRepo:          accounts.NewAccountRepository(db, taskRepo),
 		taskRepo:             taskRepo,
 		taskBillingUsage:     taskbilling.NewUsageStore(db),
 		providerEndpointRepo: providerendpoints.NewProviderEndpointRepository(db),

@@ -57,13 +57,6 @@ func newTaskExecutionPhaseMachine(taskID string) *taskExecutionPhaseMachine {
 	return &taskExecutionPhaseMachine{taskID: taskID, phase: taskExecutionPhasePreflight}
 }
 
-func (m *taskExecutionPhaseMachine) current() taskExecutionPhase {
-	if m == nil {
-		return ""
-	}
-	return m.phase
-}
-
 func (m *taskExecutionPhaseMachine) advance(next taskExecutionPhase) error {
 	if m == nil {
 		return fmt.Errorf("task execution phase machine is unavailable")

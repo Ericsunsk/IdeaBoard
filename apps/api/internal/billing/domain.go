@@ -44,10 +44,6 @@ func NormalizeOutputResolution(raw string) (OutputResolution, error) {
 	return "", ErrInvalidOutputResolution
 }
 
-func SupportedOutputResolutions() []OutputResolution {
-	return append([]OutputResolution(nil), outputResolutions[:]...)
-}
-
 var (
 	ErrInvalidSKU              = errors.New("invalid billing SKU")
 	ErrInvalidQuantity         = errors.New("quantity must be a positive integer")

@@ -131,27 +131,6 @@ func NormalizeStructuredPromptContractParams(params map[string]interface{}, feat
 	}
 }
 
-func BuildProviderPromptParams(params map[string]interface{}) map[string]interface{} {
-	return defaultProviderParamsEncoder.EncodePromptParams(params)
-}
-
-func buildProviderPromptParams(params map[string]interface{}) map[string]interface{} {
-	if params == nil {
-		return nil
-	}
-	out := make(map[string]interface{}, len(params)+8)
-	for key, value := range params {
-		out[key] = value
-	}
-	if contract, ok := ReadVariationsPromptContract(params); ok {
-		out[paramkeys.VariationStrength] = contract.Strength
-	}
-	if contract, ok := ReadFusionPromptContract(params); ok {
-		out[paramkeys.FusionInputWeights] = contract.InputWeights
-	}
-	return out
-}
-
 func normalizeVariationsContract(params map[string]interface{}) error {
 	obj, err := requiredWorkflowObjectParam(params, ParamKeyVariation)
 	if err != nil {

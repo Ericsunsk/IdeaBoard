@@ -46,7 +46,7 @@ type appDomainServices struct {
 func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepositories, appPool *pgxpool.Pool) (appDomainServices, error) {
 	runtimeSettings := settings.NewRuntimeSettingsService(repos.systemConfigRepo)
 	outbound.ConfigurePolicyProvider(runtimeSettings)
-	storageService := storage.NewStorageServiceWithPublicAPI(
+	storageService := storage.NewStorageService(
 		repos.storageProfileRepo,
 		repos.mediaAssetRegistry,
 		// Browser-visible upload references must resolve through the same-origin

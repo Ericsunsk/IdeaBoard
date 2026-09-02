@@ -90,14 +90,14 @@ type StorageService struct {
 	providerMeta        map[StorageProvider]StorageProviderMeta
 }
 
-func NewStorageService(profileRepo *StorageProfileRepository, assetLocator StoredUploadLocator) *StorageService {
-	return newStorageService(profileRepo, assetLocator, "")
-}
-
-// NewStorageServiceWithPublicAPI binds local upload URLs to the public web
-// origin so browser-visible references stay on the same-origin Gateway.
-func NewStorageServiceWithPublicAPI(profileRepo *StorageProfileRepository, assetLocator StoredUploadLocator, publicAPIOrigin string) *StorageService {
-	return newStorageService(profileRepo, assetLocator, publicAPIOrigin)
+// NewStorageService binds local upload URLs to the public web origin when one
+// is provided, so browser-visible references stay on the same-origin Gateway.
+func NewStorageService(profileRepo *StorageProfileRepository, assetLocator StoredUploadLocator, publicAPIOrigin ...string) *StorageService {
+	origin := ""
+	if len(publicAPIOrigin) > 0 {
+		origin = publicAPIOrigin[0]
+	}
+	return newStorageService(profileRepo, assetLocator, origin)
 }
 
 func newStorageService(profileRepo *StorageProfileRepository, assetLocator StoredUploadLocator, publicAPIOrigin string) *StorageService {

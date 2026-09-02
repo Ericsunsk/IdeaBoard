@@ -9,7 +9,6 @@ import (
 
 type ProviderParamsEncoder interface {
 	EncodeTaskParams(params *tasks.WorkflowTaskParams, runtimeMedia *tasks.RuntimeMediaInputs) map[string]interface{}
-	EncodePromptParams(params map[string]interface{}) map[string]interface{}
 }
 
 type providerParamsEncoder struct{}
@@ -18,10 +17,6 @@ var defaultProviderParamsEncoder ProviderParamsEncoder = providerParamsEncoder{}
 
 func (providerParamsEncoder) EncodeTaskParams(params *tasks.WorkflowTaskParams, runtimeMedia *tasks.RuntimeMediaInputs) map[string]interface{} {
 	return buildProviderTaskParams(params, runtimeMedia)
-}
-
-func (providerParamsEncoder) EncodePromptParams(params map[string]interface{}) map[string]interface{} {
-	return buildProviderPromptParams(params)
 }
 
 // BuildProviderTaskParams adapts the canonical task params contract to the
