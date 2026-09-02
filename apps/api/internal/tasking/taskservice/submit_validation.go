@@ -357,10 +357,6 @@ func workflowMediaInputsFromMap(params map[string]interface{}, featureSlug strin
 		media.Mask = &tasks.MediaRef{Source: v, Role: tasks.MediaRoleMask}
 		hasMedia = true
 	}
-	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.OriginalImageURL); ok {
-		media.Original = &tasks.MediaRef{Source: v, Role: tasks.MediaRoleOriginal}
-		hasMedia = true
-	}
 	if assetID, ok := readInt64Param(params[paramkeys.OriginalImageAssetID]); ok {
 		media.Original = &tasks.MediaRef{AssetID: assetID, Role: tasks.MediaRoleOriginal}
 		hasMedia = true

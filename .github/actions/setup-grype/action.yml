@@ -25,7 +25,7 @@ runs:
       env:
         VERSION_FILE: ${{ inputs.version-file }}
         CHECKSUM_FILE: ${{ inputs.checksum-file }}
-      run: |
+      run: | # zizmor: ignore[github-env] install_dir is derived from the validated version and points to runner.temp
         set -euo pipefail
         : "${RUNNER_TEMP:?RUNNER_TEMP is required}"
         : "${GITHUB_PATH:?GITHUB_PATH is required}"

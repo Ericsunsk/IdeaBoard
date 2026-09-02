@@ -371,6 +371,7 @@ type MediaAsset struct {
 	Height            int32           `json:"height"`
 	SizeBytes         int64           `json:"size_bytes"`
 	ChecksumSha256    string          `json:"checksum_sha256"`
+	ObjectGeneration  int64           `json:"object_generation"`
 	Status            string          `json:"status"`
 	Metadata          json.RawMessage `json:"metadata"`
 	CreatedAt         time.Time       `json:"created_at"`
@@ -394,26 +395,30 @@ type MediaAssetSource struct {
 }
 
 type MediaDerivative struct {
-	ID               int64        `json:"id"`
-	MediaAssetID     int64        `json:"media_asset_id"`
-	OwnerUserID      int64        `json:"owner_user_id"`
-	Tier             string       `json:"tier"`
-	Format           string       `json:"format"`
-	Status           string       `json:"status"`
-	StorageProfileID string       `json:"storage_profile_id"`
-	StorageKey       string       `json:"storage_key"`
-	MimeType         string       `json:"mime_type"`
-	Width            int32        `json:"width"`
-	Height           int32        `json:"height"`
-	SizeBytes        int64        `json:"size_bytes"`
-	ChecksumSha256   string       `json:"checksum_sha256"`
-	AttemptCount     int32        `json:"attempt_count"`
-	ErrorCode        string       `json:"error_code"`
-	ErrorMessage     string       `json:"error_message"`
-	CreatedAt        time.Time    `json:"created_at"`
-	UpdatedAt        time.Time    `json:"updated_at"`
-	ReadyAt          sql.NullTime `json:"ready_at"`
-	LastAttemptAt    sql.NullTime `json:"last_attempt_at"`
+	ID                     int64        `json:"id"`
+	DerivativeID           string       `json:"derivative_id"`
+	MediaAssetID           int64        `json:"media_asset_id"`
+	OwnerUserID            int64        `json:"owner_user_id"`
+	Tier                   string       `json:"tier"`
+	Format                 string       `json:"format"`
+	Status                 string       `json:"status"`
+	StorageProfileID       string       `json:"storage_profile_id"`
+	StorageKey             string       `json:"storage_key"`
+	MimeType               string       `json:"mime_type"`
+	Width                  int32        `json:"width"`
+	Height                 int32        `json:"height"`
+	SizeBytes              int64        `json:"size_bytes"`
+	ChecksumSha256         string       `json:"checksum_sha256"`
+	SourceObjectGeneration int64        `json:"source_object_generation"`
+	ObjectGeneration       int64        `json:"object_generation"`
+	AttemptCount           int32        `json:"attempt_count"`
+	ErrorCode              string       `json:"error_code"`
+	ErrorMessage           string       `json:"error_message"`
+	CreatedAt              time.Time    `json:"created_at"`
+	UpdatedAt              time.Time    `json:"updated_at"`
+	ReadyAt                sql.NullTime `json:"ready_at"`
+	VerifiedAt             sql.NullTime `json:"verified_at"`
+	LastAttemptAt          sql.NullTime `json:"last_attempt_at"`
 }
 
 type MediaDerivativeOutbox struct {

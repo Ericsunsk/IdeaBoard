@@ -11,10 +11,7 @@ import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { CanvasVueFlowGraphAdapter } from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import type { CanvasGraphStore } from '../graph-runtime'
 import type { CanvasRendererMetricsPort } from '../vue-flow-adapter'
-import {
-  resolvePendingImageResultPosition,
-  type PendingImageResultLookup,
-} from '../execution'
+import { resolvePendingImageResultPosition, type PendingImageResultLookup } from '../execution'
 import { useFlowCanvasDrop } from './useFlowCanvasDrop'
 import { useFlowImageNodeSnapshots } from './useFlowImageNodeSnapshots'
 import { useFlowImageUploadActions } from './useFlowImageUploadActions'
@@ -39,7 +36,7 @@ export type CanvasGraphEditingUploadAdapter = {
     boardId: string,
   ) => Promise<{
     url: string
-    media_asset_id?: number
+    asset_id: string
     width?: number
     height?: number
     mime?: string
@@ -203,9 +200,7 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     })
   }
 
-  function createPendingAdjustmentNode(
-    sourceNode: ImageNodeItem,
-  ): string | null {
+  function createPendingAdjustmentNode(sourceNode: ImageNodeItem): string | null {
     const ratio = resolveImageNodeDisplayRatio(sourceNode)
     const sourceWidth = Number(sourceNode.width)
     const width =

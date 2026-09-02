@@ -7,11 +7,47 @@ package dbsqlc
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"time"
 
 	"github.com/lib/pq"
 )
+
+const countMediaDerivativesByStatus = `-- name: CountMediaDerivativesByStatus :many
+SELECT status, COUNT(*)::bigint AS count
+FROM media_derivatives
+GROUP BY status
+ORDER BY status
+`
+
+type CountMediaDerivativesByStatusRow struct {
+	Status string `json:"status"`
+	Count  int64  `json:"count"`
+}
+
+func (q *Queries) CountMediaDerivativesByStatus(ctx context.Context) ([]CountMediaDerivativesByStatusRow, error) {
+	rows, err := q.db.QueryContext(ctx, countMediaDerivativesByStatus)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountMediaDerivativesByStatusRow
+	for rows.Next() {
+		var i CountMediaDerivativesByStatusRow
+		if err := rows.Scan(&i.Status, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
 const deleteMediaDerivativeOutbox = `-- name: DeleteMediaDerivativeOutbox :exec
 DELETE FROM media_derivative_outbox
@@ -65,9 +101,9 @@ func (q *Queries) EnqueueMediaDerivativeOutbox(ctx context.Context, derivativeID
 }
 
 const getMediaDerivativeByAssetTier = `-- name: GetMediaDerivativeByAssetTier :one
-SELECT id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
-  storage_key, mime_type, width, height, size_bytes, checksum_sha256, attempt_count,
-  error_code, error_message, created_at, updated_at, ready_at, last_attempt_at
+SELECT id, derivative_id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
+  storage_key, mime_type, width, height, size_bytes, checksum_sha256, source_object_generation, object_generation, attempt_count,
+  error_code, error_message, created_at, updated_at, ready_at, verified_at, last_attempt_at
 FROM media_derivatives
 WHERE media_asset_id = $1
   AND owner_user_id = $2
@@ -85,6 +121,7 @@ func (q *Queries) GetMediaDerivativeByAssetTier(ctx context.Context, arg GetMedi
 	var i MediaDerivative
 	err := row.Scan(
 		&i.ID,
+		&i.DerivativeID,
 		&i.MediaAssetID,
 		&i.OwnerUserID,
 		&i.Tier,
@@ -97,21 +134,24 @@ func (q *Queries) GetMediaDerivativeByAssetTier(ctx context.Context, arg GetMedi
 		&i.Height,
 		&i.SizeBytes,
 		&i.ChecksumSha256,
+		&i.SourceObjectGeneration,
+		&i.ObjectGeneration,
 		&i.AttemptCount,
 		&i.ErrorCode,
 		&i.ErrorMessage,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReadyAt,
+		&i.VerifiedAt,
 		&i.LastAttemptAt,
 	)
 	return i, err
 }
 
 const getMediaDerivativeByID = `-- name: GetMediaDerivativeByID :one
-SELECT id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
-  storage_key, mime_type, width, height, size_bytes, checksum_sha256, attempt_count,
-  error_code, error_message, created_at, updated_at, ready_at, last_attempt_at
+SELECT id, derivative_id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
+  storage_key, mime_type, width, height, size_bytes, checksum_sha256, source_object_generation, object_generation, attempt_count,
+  error_code, error_message, created_at, updated_at, ready_at, verified_at, last_attempt_at
 FROM media_derivatives
 WHERE id = $1
 `
@@ -121,6 +161,7 @@ func (q *Queries) GetMediaDerivativeByID(ctx context.Context, id int64) (MediaDe
 	var i MediaDerivative
 	err := row.Scan(
 		&i.ID,
+		&i.DerivativeID,
 		&i.MediaAssetID,
 		&i.OwnerUserID,
 		&i.Tier,
@@ -133,28 +174,32 @@ func (q *Queries) GetMediaDerivativeByID(ctx context.Context, id int64) (MediaDe
 		&i.Height,
 		&i.SizeBytes,
 		&i.ChecksumSha256,
+		&i.SourceObjectGeneration,
+		&i.ObjectGeneration,
 		&i.AttemptCount,
 		&i.ErrorCode,
 		&i.ErrorMessage,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReadyAt,
+		&i.VerifiedAt,
 		&i.LastAttemptAt,
 	)
 	return i, err
 }
 
 const getMediaDerivativeForDelivery = `-- name: GetMediaDerivativeForDelivery :one
-SELECT d.id, d.media_asset_id, d.owner_user_id, d.tier, d.format, d.status,
+SELECT d.id, d.derivative_id, d.media_asset_id, d.owner_user_id, d.tier, d.format, d.status,
   d.storage_profile_id, d.storage_key, d.mime_type, d.width, d.height, d.size_bytes,
-  d.checksum_sha256, d.attempt_count, d.error_code, d.error_message,
-  d.created_at, d.updated_at, d.ready_at, d.last_attempt_at
+  d.checksum_sha256, d.source_object_generation, d.object_generation, d.attempt_count, d.error_code, d.error_message,
+  d.created_at, d.updated_at, d.ready_at, d.verified_at, d.last_attempt_at
 FROM media_derivatives AS d
 JOIN media_assets AS a ON a.id = d.media_asset_id AND a.owner_user_id = d.owner_user_id
 WHERE d.media_asset_id = $1
   AND d.owner_user_id = $2
   AND d.tier = $3
   AND d.status = 'ready'
+  AND d.source_object_generation = a.object_generation
   AND a.status = 'ready'
   AND a.deleted_at IS NULL
 `
@@ -170,6 +215,7 @@ func (q *Queries) GetMediaDerivativeForDelivery(ctx context.Context, arg GetMedi
 	var i MediaDerivative
 	err := row.Scan(
 		&i.ID,
+		&i.DerivativeID,
 		&i.MediaAssetID,
 		&i.OwnerUserID,
 		&i.Tier,
@@ -182,13 +228,67 @@ func (q *Queries) GetMediaDerivativeForDelivery(ctx context.Context, arg GetMedi
 		&i.Height,
 		&i.SizeBytes,
 		&i.ChecksumSha256,
+		&i.SourceObjectGeneration,
+		&i.ObjectGeneration,
 		&i.AttemptCount,
 		&i.ErrorCode,
 		&i.ErrorMessage,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReadyAt,
+		&i.VerifiedAt,
 		&i.LastAttemptAt,
+	)
+	return i, err
+}
+
+const getProcessingInputManifestObject = `-- name: GetProcessingInputManifestObject :one
+SELECT a.asset_id, d.id AS media_derivative_id, d.derivative_id, d.tier,
+  d.storage_profile_id, d.storage_key, d.object_generation,
+  d.checksum_sha256, d.mime_type, d.size_bytes
+FROM media_derivatives AS d
+JOIN media_assets AS a ON a.id = d.media_asset_id AND a.owner_user_id = d.owner_user_id
+WHERE d.media_asset_id = $1
+  AND d.owner_user_id = $2
+  AND d.tier = 'processing-input'
+  AND d.status = 'ready'
+  AND d.source_object_generation = a.object_generation
+  AND a.status = 'ready'
+  AND a.deleted_at IS NULL
+`
+
+type GetProcessingInputManifestObjectParams struct {
+	MediaAssetID int64 `json:"media_asset_id"`
+	OwnerUserID  int64 `json:"owner_user_id"`
+}
+
+type GetProcessingInputManifestObjectRow struct {
+	AssetID           string `json:"asset_id"`
+	MediaDerivativeID int64  `json:"media_derivative_id"`
+	DerivativeID      string `json:"derivative_id"`
+	Tier              string `json:"tier"`
+	StorageProfileID  string `json:"storage_profile_id"`
+	StorageKey        string `json:"storage_key"`
+	ObjectGeneration  int64  `json:"object_generation"`
+	ChecksumSha256    string `json:"checksum_sha256"`
+	MimeType          string `json:"mime_type"`
+	SizeBytes         int64  `json:"size_bytes"`
+}
+
+func (q *Queries) GetProcessingInputManifestObject(ctx context.Context, arg GetProcessingInputManifestObjectParams) (GetProcessingInputManifestObjectRow, error) {
+	row := q.db.QueryRowContext(ctx, getProcessingInputManifestObject, arg.MediaAssetID, arg.OwnerUserID)
+	var i GetProcessingInputManifestObjectRow
+	err := row.Scan(
+		&i.AssetID,
+		&i.MediaDerivativeID,
+		&i.DerivativeID,
+		&i.Tier,
+		&i.StorageProfileID,
+		&i.StorageKey,
+		&i.ObjectGeneration,
+		&i.ChecksumSha256,
+		&i.MimeType,
+		&i.SizeBytes,
 	)
 	return i, err
 }
@@ -200,6 +300,7 @@ JOIN media_assets AS a ON a.id = d.media_asset_id AND a.owner_user_id = d.owner_
 WHERE d.media_asset_id = $1
   AND d.tier = $2
   AND d.status = 'ready'
+  AND d.source_object_generation = a.object_generation
   AND a.status = 'ready'
   AND a.deleted_at IS NULL
 `
@@ -307,6 +408,42 @@ func (q *Queries) ListMediaDerivativeIDsMissingOutbox(ctx context.Context, arg L
 	return items, nil
 }
 
+const listMediaDerivativeRepairCandidates = `-- name: ListMediaDerivativeRepairCandidates :many
+SELECT id, attempt_count
+FROM media_derivatives
+WHERE status IN ('missing', 'invalid')
+ORDER BY updated_at ASC, id ASC
+LIMIT $1
+`
+
+type ListMediaDerivativeRepairCandidatesRow struct {
+	ID           int64 `json:"id"`
+	AttemptCount int32 `json:"attempt_count"`
+}
+
+func (q *Queries) ListMediaDerivativeRepairCandidates(ctx context.Context, rowLimit int32) ([]ListMediaDerivativeRepairCandidatesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMediaDerivativeRepairCandidates, rowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMediaDerivativeRepairCandidatesRow
+	for rows.Next() {
+		var i ListMediaDerivativeRepairCandidatesRow
+		if err := rows.Scan(&i.ID, &i.AttemptCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMediaDerivativeStorageKeys = `-- name: ListMediaDerivativeStorageKeys :many
 SELECT storage_profile_id, storage_key
 FROM media_derivatives
@@ -342,12 +479,18 @@ func (q *Queries) ListMediaDerivativeStorageKeys(ctx context.Context) ([]ListMed
 }
 
 const listMediaDerivativesByAsset = `-- name: ListMediaDerivativesByAsset :many
-SELECT id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
-  storage_key, mime_type, width, height, size_bytes, checksum_sha256, attempt_count,
-  error_code, error_message, created_at, updated_at, ready_at, last_attempt_at
+SELECT media_derivatives.id, media_derivatives.derivative_id, media_derivatives.media_asset_id, media_derivatives.owner_user_id,
+  media_derivatives.tier, media_derivatives.format, media_derivatives.status, media_derivatives.storage_profile_id,
+  media_derivatives.storage_key, media_derivatives.mime_type, media_derivatives.width, media_derivatives.height,
+  media_derivatives.size_bytes, media_derivatives.checksum_sha256, media_derivatives.source_object_generation,
+  media_derivatives.object_generation, media_derivatives.attempt_count, media_derivatives.error_code, media_derivatives.error_message,
+  media_derivatives.created_at, media_derivatives.updated_at, media_derivatives.ready_at, media_derivatives.verified_at,
+  media_derivatives.last_attempt_at
 FROM media_derivatives
-WHERE media_asset_id = $1
-  AND owner_user_id = $2
+JOIN media_assets AS a ON a.id = media_derivatives.media_asset_id AND a.owner_user_id = media_derivatives.owner_user_id
+WHERE media_derivatives.media_asset_id = $1
+  AND media_derivatives.owner_user_id = $2
+  AND (media_derivatives.status <> 'ready' OR media_derivatives.source_object_generation = a.object_generation)
 ORDER BY CASE tier WHEN 'thumb' THEN 1 WHEN 'preview' THEN 2 WHEN 'large-preview' THEN 3 WHEN 'processing' THEN 4 ELSE 5 END,
   format ASC
 `
@@ -368,6 +511,7 @@ func (q *Queries) ListMediaDerivativesByAsset(ctx context.Context, arg ListMedia
 		var i MediaDerivative
 		if err := rows.Scan(
 			&i.ID,
+			&i.DerivativeID,
 			&i.MediaAssetID,
 			&i.OwnerUserID,
 			&i.Tier,
@@ -380,12 +524,15 @@ func (q *Queries) ListMediaDerivativesByAsset(ctx context.Context, arg ListMedia
 			&i.Height,
 			&i.SizeBytes,
 			&i.ChecksumSha256,
+			&i.SourceObjectGeneration,
+			&i.ObjectGeneration,
 			&i.AttemptCount,
 			&i.ErrorCode,
 			&i.ErrorMessage,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ReadyAt,
+			&i.VerifiedAt,
 			&i.LastAttemptAt,
 		); err != nil {
 			return nil, err
@@ -433,6 +580,71 @@ func (q *Queries) ListPendingMediaDerivativeIDs(ctx context.Context, arg ListPen
 			return nil, err
 		}
 		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listReadyDerivativesForReconcile = `-- name: ListReadyDerivativesForReconcile :many
+SELECT id, derivative_id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
+  storage_key, mime_type, width, height, size_bytes, checksum_sha256, source_object_generation, object_generation, attempt_count,
+  error_code, error_message, created_at, updated_at, ready_at, verified_at, last_attempt_at
+FROM media_derivatives
+WHERE status = 'ready'
+  AND btrim(storage_key) <> ''
+  AND COALESCE(verified_at, ready_at, updated_at) < $1
+ORDER BY COALESCE(verified_at, ready_at, updated_at) ASC, id ASC
+LIMIT $2
+`
+
+type ListReadyDerivativesForReconcileParams struct {
+	ReconcileBefore sql.NullTime `json:"reconcile_before"`
+	RowLimit        int32        `json:"row_limit"`
+}
+
+func (q *Queries) ListReadyDerivativesForReconcile(ctx context.Context, arg ListReadyDerivativesForReconcileParams) ([]MediaDerivative, error) {
+	rows, err := q.db.QueryContext(ctx, listReadyDerivativesForReconcile, arg.ReconcileBefore, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MediaDerivative
+	for rows.Next() {
+		var i MediaDerivative
+		if err := rows.Scan(
+			&i.ID,
+			&i.DerivativeID,
+			&i.MediaAssetID,
+			&i.OwnerUserID,
+			&i.Tier,
+			&i.Format,
+			&i.Status,
+			&i.StorageProfileID,
+			&i.StorageKey,
+			&i.MimeType,
+			&i.Width,
+			&i.Height,
+			&i.SizeBytes,
+			&i.ChecksumSha256,
+			&i.SourceObjectGeneration,
+			&i.ObjectGeneration,
+			&i.AttemptCount,
+			&i.ErrorCode,
+			&i.ErrorMessage,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ReadyAt,
+			&i.VerifiedAt,
+			&i.LastAttemptAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
@@ -530,9 +742,9 @@ SET status = 'failed',
     error_message = $2,
     attempt_count = GREATEST(attempt_count, $3)
 WHERE id = $4
-RETURNING id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
-  storage_key, mime_type, width, height, size_bytes, checksum_sha256, attempt_count,
-  error_code, error_message, created_at, updated_at, ready_at, last_attempt_at
+RETURNING id, derivative_id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
+  storage_key, mime_type, width, height, size_bytes, checksum_sha256, source_object_generation, object_generation, attempt_count,
+  error_code, error_message, created_at, updated_at, ready_at, verified_at, last_attempt_at
 `
 
 type MarkMediaDerivativeFailedParams struct {
@@ -552,6 +764,7 @@ func (q *Queries) MarkMediaDerivativeFailed(ctx context.Context, arg MarkMediaDe
 	var i MediaDerivative
 	err := row.Scan(
 		&i.ID,
+		&i.DerivativeID,
 		&i.MediaAssetID,
 		&i.OwnerUserID,
 		&i.Tier,
@@ -564,15 +777,62 @@ func (q *Queries) MarkMediaDerivativeFailed(ctx context.Context, arg MarkMediaDe
 		&i.Height,
 		&i.SizeBytes,
 		&i.ChecksumSha256,
+		&i.SourceObjectGeneration,
+		&i.ObjectGeneration,
 		&i.AttemptCount,
 		&i.ErrorCode,
 		&i.ErrorMessage,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReadyAt,
+		&i.VerifiedAt,
 		&i.LastAttemptAt,
 	)
 	return i, err
+}
+
+const markMediaDerivativeInvalid = `-- name: MarkMediaDerivativeInvalid :execrows
+UPDATE media_derivatives
+SET status = 'invalid', error_code = 'object_invalid', error_message = $1, verified_at = now()
+WHERE id = $2
+  AND status = 'ready'
+  AND object_generation = $3
+`
+
+type MarkMediaDerivativeInvalidParams struct {
+	ErrorMessage     string `json:"error_message"`
+	ID               int64  `json:"id"`
+	ObjectGeneration int64  `json:"object_generation"`
+}
+
+func (q *Queries) MarkMediaDerivativeInvalid(ctx context.Context, arg MarkMediaDerivativeInvalidParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markMediaDerivativeInvalid, arg.ErrorMessage, arg.ID, arg.ObjectGeneration)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const markMediaDerivativeMissing = `-- name: MarkMediaDerivativeMissing :execrows
+UPDATE media_derivatives
+SET status = 'missing', error_code = 'object_missing', error_message = $1, verified_at = now()
+WHERE id = $2
+  AND status = 'ready'
+  AND object_generation = $3
+`
+
+type MarkMediaDerivativeMissingParams struct {
+	ErrorMessage     string `json:"error_message"`
+	ID               int64  `json:"id"`
+	ObjectGeneration int64  `json:"object_generation"`
+}
+
+func (q *Queries) MarkMediaDerivativeMissing(ctx context.Context, arg MarkMediaDerivativeMissingParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markMediaDerivativeMissing, arg.ErrorMessage, arg.ID, arg.ObjectGeneration)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const markMediaDerivativeProcessing = `-- name: MarkMediaDerivativeProcessing :one
@@ -582,14 +842,14 @@ SET status = 'processing',
     last_attempt_at = now(),
     error_code = '',
     error_message = ''
-WHERE id = $1
+WHERE media_derivatives.id = $1
   AND (
     status = 'pending'
     OR (status = 'failed' AND attempt_count < $2)
   )
-RETURNING id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
-  storage_key, mime_type, width, height, size_bytes, checksum_sha256, attempt_count,
-  error_code, error_message, created_at, updated_at, ready_at, last_attempt_at
+RETURNING id, derivative_id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
+  storage_key, mime_type, width, height, size_bytes, checksum_sha256, source_object_generation, object_generation, attempt_count,
+  error_code, error_message, created_at, updated_at, ready_at, verified_at, last_attempt_at
 `
 
 type MarkMediaDerivativeProcessingParams struct {
@@ -602,6 +862,7 @@ func (q *Queries) MarkMediaDerivativeProcessing(ctx context.Context, arg MarkMed
 	var i MediaDerivative
 	err := row.Scan(
 		&i.ID,
+		&i.DerivativeID,
 		&i.MediaAssetID,
 		&i.OwnerUserID,
 		&i.Tier,
@@ -614,12 +875,15 @@ func (q *Queries) MarkMediaDerivativeProcessing(ctx context.Context, arg MarkMed
 		&i.Height,
 		&i.SizeBytes,
 		&i.ChecksumSha256,
+		&i.SourceObjectGeneration,
+		&i.ObjectGeneration,
 		&i.AttemptCount,
 		&i.ErrorCode,
 		&i.ErrorMessage,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReadyAt,
+		&i.VerifiedAt,
 		&i.LastAttemptAt,
 	)
 	return i, err
@@ -629,22 +893,32 @@ const markMediaDerivativeReady = `-- name: MarkMediaDerivativeReady :one
 UPDATE media_derivatives
 SET status = 'ready', format = $1, storage_key = $2, mime_type = $3,
     width = $4, height = $5, size_bytes = $6,
-    checksum_sha256 = $7, ready_at = now(), error_code = '', error_message = ''
-WHERE id = $8
-RETURNING id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
-  storage_key, mime_type, width, height, size_bytes, checksum_sha256, attempt_count,
-  error_code, error_message, created_at, updated_at, ready_at, last_attempt_at
+    checksum_sha256 = $7, source_object_generation = $8, object_generation = object_generation + 1,
+    ready_at = now(), verified_at = now(), error_code = '', error_message = ''
+WHERE media_derivatives.id = $9
+  AND EXISTS (
+    SELECT 1 FROM media_assets AS a
+    WHERE a.id = media_derivatives.media_asset_id
+      AND a.owner_user_id = media_derivatives.owner_user_id
+      AND a.status = 'ready'
+      AND a.deleted_at IS NULL
+      AND a.object_generation = $8
+  )
+RETURNING id, derivative_id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
+  storage_key, mime_type, width, height, size_bytes, checksum_sha256, source_object_generation, object_generation, attempt_count,
+  error_code, error_message, created_at, updated_at, ready_at, verified_at, last_attempt_at
 `
 
 type MarkMediaDerivativeReadyParams struct {
-	Format         string `json:"format"`
-	StorageKey     string `json:"storage_key"`
-	MimeType       string `json:"mime_type"`
-	Width          int32  `json:"width"`
-	Height         int32  `json:"height"`
-	SizeBytes      int64  `json:"size_bytes"`
-	ChecksumSha256 string `json:"checksum_sha256"`
-	ID             int64  `json:"id"`
+	Format                 string `json:"format"`
+	StorageKey             string `json:"storage_key"`
+	MimeType               string `json:"mime_type"`
+	Width                  int32  `json:"width"`
+	Height                 int32  `json:"height"`
+	SizeBytes              int64  `json:"size_bytes"`
+	ChecksumSha256         string `json:"checksum_sha256"`
+	SourceObjectGeneration int64  `json:"source_object_generation"`
+	ID                     int64  `json:"id"`
 }
 
 func (q *Queries) MarkMediaDerivativeReady(ctx context.Context, arg MarkMediaDerivativeReadyParams) (MediaDerivative, error) {
@@ -656,11 +930,13 @@ func (q *Queries) MarkMediaDerivativeReady(ctx context.Context, arg MarkMediaDer
 		arg.Height,
 		arg.SizeBytes,
 		arg.ChecksumSha256,
+		arg.SourceObjectGeneration,
 		arg.ID,
 	)
 	var i MediaDerivative
 	err := row.Scan(
 		&i.ID,
+		&i.DerivativeID,
 		&i.MediaAssetID,
 		&i.OwnerUserID,
 		&i.Tier,
@@ -673,15 +949,82 @@ func (q *Queries) MarkMediaDerivativeReady(ctx context.Context, arg MarkMediaDer
 		&i.Height,
 		&i.SizeBytes,
 		&i.ChecksumSha256,
+		&i.SourceObjectGeneration,
+		&i.ObjectGeneration,
 		&i.AttemptCount,
 		&i.ErrorCode,
 		&i.ErrorMessage,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReadyAt,
+		&i.VerifiedAt,
 		&i.LastAttemptAt,
 	)
 	return i, err
+}
+
+const markMediaDerivativeRepairTerminal = `-- name: MarkMediaDerivativeRepairTerminal :execrows
+UPDATE media_derivatives
+SET status = 'failed', error_code = 'repair_not_possible', error_message = $1
+WHERE id = $2
+  AND status IN ('missing', 'invalid')
+  AND attempt_count >= $3
+`
+
+type MarkMediaDerivativeRepairTerminalParams struct {
+	ErrorMessage    string `json:"error_message"`
+	ID              int64  `json:"id"`
+	MaxAttemptCount int32  `json:"max_attempt_count"`
+}
+
+func (q *Queries) MarkMediaDerivativeRepairTerminal(ctx context.Context, arg MarkMediaDerivativeRepairTerminalParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markMediaDerivativeRepairTerminal, arg.ErrorMessage, arg.ID, arg.MaxAttemptCount)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const markMediaDerivativeVerified = `-- name: MarkMediaDerivativeVerified :execrows
+UPDATE media_derivatives
+SET verified_at = now()
+WHERE id = $1
+  AND status = 'ready'
+  AND object_generation = $2
+`
+
+type MarkMediaDerivativeVerifiedParams struct {
+	ID               int64 `json:"id"`
+	ObjectGeneration int64 `json:"object_generation"`
+}
+
+func (q *Queries) MarkMediaDerivativeVerified(ctx context.Context, arg MarkMediaDerivativeVerifiedParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markMediaDerivativeVerified, arg.ID, arg.ObjectGeneration)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const requeueMediaDerivativeRepair = `-- name: RequeueMediaDerivativeRepair :execrows
+UPDATE media_derivatives
+SET status = 'pending', error_code = '', error_message = ''
+WHERE id = $1
+  AND status IN ('missing', 'invalid')
+  AND attempt_count < $2
+`
+
+type RequeueMediaDerivativeRepairParams struct {
+	ID              int64 `json:"id"`
+	MaxAttemptCount int32 `json:"max_attempt_count"`
+}
+
+func (q *Queries) RequeueMediaDerivativeRepair(ctx context.Context, arg RequeueMediaDerivativeRepairParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, requeueMediaDerivativeRepair, arg.ID, arg.MaxAttemptCount)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const rescheduleMediaDerivativeOutbox = `-- name: RescheduleMediaDerivativeOutbox :exec
@@ -769,31 +1112,37 @@ func (q *Queries) UpsertMediaAssetSource(ctx context.Context, arg UpsertMediaAss
 
 const upsertMediaDerivative = `-- name: UpsertMediaDerivative :one
 INSERT INTO media_derivatives (
-  media_asset_id, owner_user_id, tier, format, status, storage_profile_id
+  derivative_id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id, source_object_generation
 )
 SELECT
-  $1, $2, $3, $4,
-  'pending', a.storage_profile_id
+  $1, $2, $3, $4, $5,
+  'pending', a.storage_profile_id, a.object_generation
 FROM media_assets AS a
-WHERE a.id = $1
-  AND a.owner_user_id = $2
+WHERE a.id = $2
+  AND a.owner_user_id = $3
   AND a.deleted_at IS NULL
 ON CONFLICT (media_asset_id, tier) DO UPDATE
 SET status = CASE
-      WHEN media_derivatives.status IN ('obsolete', 'failed') THEN 'pending'
+      WHEN media_derivatives.status IN ('obsolete', 'failed')
+        OR media_derivatives.source_object_generation <> EXCLUDED.source_object_generation THEN 'pending'
       ELSE media_derivatives.status
     END,
     storage_profile_id = EXCLUDED.storage_profile_id,
-    attempt_count = CASE WHEN media_derivatives.status IN ('obsolete', 'failed') THEN 0 ELSE media_derivatives.attempt_count END,
-    error_code = CASE WHEN media_derivatives.status IN ('obsolete', 'failed') THEN '' ELSE media_derivatives.error_code END,
-    error_message = CASE WHEN media_derivatives.status IN ('obsolete', 'failed') THEN '' ELSE media_derivatives.error_message END
+    source_object_generation = EXCLUDED.source_object_generation,
+    attempt_count = CASE WHEN media_derivatives.status IN ('obsolete', 'failed')
+      OR media_derivatives.source_object_generation <> EXCLUDED.source_object_generation THEN 0 ELSE media_derivatives.attempt_count END,
+    error_code = CASE WHEN media_derivatives.status IN ('obsolete', 'failed')
+      OR media_derivatives.source_object_generation <> EXCLUDED.source_object_generation THEN '' ELSE media_derivatives.error_code END,
+    error_message = CASE WHEN media_derivatives.status IN ('obsolete', 'failed')
+      OR media_derivatives.source_object_generation <> EXCLUDED.source_object_generation THEN '' ELSE media_derivatives.error_message END
 WHERE media_derivatives.owner_user_id = EXCLUDED.owner_user_id
-RETURNING id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
-  storage_key, mime_type, width, height, size_bytes, checksum_sha256, attempt_count,
-  error_code, error_message, created_at, updated_at, ready_at, last_attempt_at
+RETURNING id, derivative_id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
+  storage_key, mime_type, width, height, size_bytes, checksum_sha256, source_object_generation, object_generation, attempt_count,
+  error_code, error_message, created_at, updated_at, ready_at, verified_at, last_attempt_at
 `
 
 type UpsertMediaDerivativeParams struct {
+	DerivativeID string `json:"derivative_id"`
 	MediaAssetID int64  `json:"media_asset_id"`
 	OwnerUserID  int64  `json:"owner_user_id"`
 	Tier         string `json:"tier"`
@@ -802,6 +1151,7 @@ type UpsertMediaDerivativeParams struct {
 
 func (q *Queries) UpsertMediaDerivative(ctx context.Context, arg UpsertMediaDerivativeParams) (MediaDerivative, error) {
 	row := q.db.QueryRowContext(ctx, upsertMediaDerivative,
+		arg.DerivativeID,
 		arg.MediaAssetID,
 		arg.OwnerUserID,
 		arg.Tier,
@@ -810,6 +1160,7 @@ func (q *Queries) UpsertMediaDerivative(ctx context.Context, arg UpsertMediaDeri
 	var i MediaDerivative
 	err := row.Scan(
 		&i.ID,
+		&i.DerivativeID,
 		&i.MediaAssetID,
 		&i.OwnerUserID,
 		&i.Tier,
@@ -822,12 +1173,15 @@ func (q *Queries) UpsertMediaDerivative(ctx context.Context, arg UpsertMediaDeri
 		&i.Height,
 		&i.SizeBytes,
 		&i.ChecksumSha256,
+		&i.SourceObjectGeneration,
+		&i.ObjectGeneration,
 		&i.AttemptCount,
 		&i.ErrorCode,
 		&i.ErrorMessage,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReadyAt,
+		&i.VerifiedAt,
 		&i.LastAttemptAt,
 	)
 	return i, err

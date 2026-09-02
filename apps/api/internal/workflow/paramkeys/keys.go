@@ -18,11 +18,11 @@ const (
 	ReferenceImageURLs     = "reference_image_urls"
 	MaskImageURL           = "mask_image_url"
 	MaskImageURLs          = "mask_image_urls"
-	OriginalImageURL       = "original_image_url"
 	ImageAssetIDs          = "image_asset_ids"
 	ReferenceImageAssetIDs = "reference_image_asset_ids"
 	OriginalImageAssetID   = "original_image_asset_id"
 	MaskImageAssetID       = "mask_image_asset_id"
+	CanvasImageRef         = "canvas_image_ref"
 	UseMask                = "use_mask"
 
 	CustomWidth         = "custom_width"
@@ -90,11 +90,11 @@ var providerReservedKeys = keySet(
 	ReferenceImageURLs,
 	MaskImageURL,
 	MaskImageURLs,
-	OriginalImageURL,
 	ImageAssetIDs,
 	ReferenceImageAssetIDs,
 	OriginalImageAssetID,
 	MaskImageAssetID,
+	CanvasImageRef,
 	UseMask,
 	CustomWidth,
 	CustomHeight,
@@ -118,7 +118,6 @@ var submitTaskParamKeys = keySet(
 	ReferenceImageURLs,
 	MaskImageURL,
 	MaskImageURLs,
-	OriginalImageURL,
 	ImageAssetIDs,
 	ReferenceImageAssetIDs,
 	OriginalImageAssetID,
@@ -152,7 +151,9 @@ func IsProviderReservedKey(key string) bool {
 // appear in durable Task Params after the AssetID media contract cutover.
 func IsLegacyPersistedMediaKey(key string) bool {
 	switch key {
-	case ImageURL, ImageURLs, ReferenceImageURLs, MaskImageURL, MaskImageURLs, OriginalImageURL:
+	case ImageURL, ImageURLs, ReferenceImageURLs, MaskImageURL, MaskImageURLs:
+		return true
+	case "original" + "_image_url":
 		return true
 	default:
 		return false

@@ -49,8 +49,15 @@ function defaultAuthBaseURL(): string {
 // API overrides in production so a stale Pages environment variable cannot
 // silently reintroduce browser CORS requests. Local/dev builds may still point
 // at a remote API when explicitly configured for development.
-const isProductionBuild = import.meta.env.PROD === true || import.meta.env.MODE === 'production'
-const configuredAPIBaseURL = normalizeBaseURL(import.meta.env.VITE_API_BASE_URL, '/api')
+type RuntimeImportMetaEnv = {
+  readonly PROD?: boolean
+  readonly MODE?: string
+  readonly VITE_API_BASE_URL?: string
+}
+
+const runtimeEnv = (import.meta as ImportMeta & { readonly env: RuntimeImportMetaEnv }).env
+const isProductionBuild = runtimeEnv.PROD === true || runtimeEnv.MODE === 'production'
+const configuredAPIBaseURL = normalizeBaseURL(runtimeEnv.VITE_API_BASE_URL, '/api')
 export const API_BASE_URL = isProductionBuild ? '/api' : configuredAPIBaseURL
 
 function deriveAPIOriginBaseURL(fallback: string): string {
@@ -72,15 +79,6 @@ function deriveAPIOriginBaseURL(fallback: string): string {
 
 export const AUTH_BASE_URL = deriveAPIOriginBaseURL(defaultAuthBaseURL())
 
-function deriveAssetBaseURL(): string {
-  if (isProductionBuild) return ''
-  const explicit = normalizeBaseURL(import.meta.env.VITE_PUBLIC_ASSET_BASE_URL, '')
-  if (explicit) return explicit
-  return deriveAPIOriginBaseURL('')
-}
-
-export const PUBLIC_ASSET_BASE_URL = deriveAssetBaseURL()
-
 export function joinRuntimeURL(base: string, path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
   if (!base) return normalizedPath
@@ -101,9 +99,6 @@ export function resolveAuthUrl(path: string): string {
 export function resolveAssetUrl(raw: string): string {
   const trimmed = raw.trim()
   if (!trimmed || HTTP_URL_RE.test(trimmed) || PASSTHROUGH_URL_RE.test(trimmed)) return raw
-  if (trimmed.startsWith('/uploads/') && PUBLIC_ASSET_BASE_URL) {
-    return joinRuntimeURL(PUBLIC_ASSET_BASE_URL, trimmed)
-  }
   return raw
 }
 
@@ -116,10 +111,7 @@ export function canonicalizeRuntimeUploadRef(raw: string): string {
   try {
     const url = new URL(trimmed)
     if (!url.pathname.startsWith('/uploads/')) return raw
-    const assetBase = PUBLIC_ASSET_BASE_URL ? new URL(PUBLIC_ASSET_BASE_URL) : null
-    const isPublicAssetOrigin = assetBase
-      ? url.origin === assetBase.origin
-      : typeof window !== 'undefined' && url.origin === window.location.origin
+    const isPublicAssetOrigin = typeof window !== 'undefined' && url.origin === window.location.origin
     if (!isPublicAssetOrigin && !isLoopbackHostname(url.hostname)) return raw
     return `${url.pathname}${url.search}`
   } catch {

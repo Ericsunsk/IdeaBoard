@@ -614,6 +614,7 @@ func taskOutputFromSQLC(row dbsqlc.ListOutputsByTaskIDsRow) tasks.TaskOutput {
 		ID:             row.ID,
 		TaskID:         row.TaskID,
 		MediaAssetID:   dbutil.Int64Ptr(row.MediaAssetID),
+		AssetID:        row.AssetID,
 		OutputKind:     row.OutputKind,
 		Role:           row.Role,
 		URL:            row.Url,

@@ -3986,6 +3986,7 @@ components:
       properties:
         id: { type: integer }
         task_id: { type: string }
+        asset_id: { type: string, minLength: 1 }
         output_kind: { type: string, enum: [asset, remote] }
         role: { type: string }
         url: { type: string }
@@ -4224,9 +4225,7 @@ components:
       properties:
         id: { type: integer }
         task_id: { type: string }
-        media_asset_id:
-          type: integer
-          nullable: true
+        asset_id: { type: string, minLength: 1 }
         output_kind:
           type: string
           enum: [asset, remote]
@@ -4336,7 +4335,6 @@ components:
       type: object
       additionalProperties: false
       properties:
-        original_image_url: { type: string }
         original_image_asset_id: { type: integer, format: int64, minimum: 1 }
         mask_image_url: { type: string }
         mask_image_asset_id: { type: integer, format: int64, minimum: 1 }
@@ -4417,10 +4415,10 @@ components:
 
     WorkflowMediaRef:
       type: object
-      required: [url]
+      required: [asset_id]
       additionalProperties: false
       properties:
-        url: { type: string }
+        asset_id: { type: integer, format: int64, minimum: 1 }
         role: { type: string }
         weight:
           type: number
@@ -5592,10 +5590,10 @@ components:
 
     UploadImageMetadata:
       type: object
-      required: [url]
+      required: [url, asset_id]
       properties:
         url: { type: string }
-        media_asset_id: { type: integer, format: int64 }
+        asset_id: { type: string, minLength: 1 }
         width: { type: integer }
         height: { type: integer }
         mime: { type: string }

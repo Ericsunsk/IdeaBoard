@@ -93,7 +93,8 @@ describe('flowImageDirectActionExecutor', () => {
         outputs: [
           {
             role: 'image',
-            url: ' https://cdn.example.com/done.png ',
+            url: '',
+            asset_id: 'asset_done',
             width: 1000,
             height: 750,
             mime_type: ' image/png ',
@@ -104,7 +105,8 @@ describe('flowImageDirectActionExecutor', () => {
 
     await expect(waitExistingOrLiveTaskImageResults('task-done')).resolves.toEqual([
       {
-        url: 'https://cdn.example.com/done.png',
+        url: '/api/user/media-assets/asset_done/derivatives/preview/webp/content',
+        assetId: 'asset_done',
         width: 1000,
         height: 750,
         mimeType: 'image/png',

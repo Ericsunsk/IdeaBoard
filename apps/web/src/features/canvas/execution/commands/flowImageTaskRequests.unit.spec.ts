@@ -530,7 +530,7 @@ describe('flowImageTaskRequests', () => {
     const plan: ImageInpaintExecutionPlan = {
       kind: 'inpaint',
       sourceNodeId: 'image-1',
-      source,
+      source: { ...source, mediaAssetId: 42 },
       prompt: 'replace object',
       rawMaskDataUrl: 'data:image/png;base64,mask',
       outputCount: 1,
@@ -547,7 +547,7 @@ describe('flowImageTaskRequests', () => {
       feature: EXECUTION_FEATURE.inpaint,
       params: {
         output_count: 1,
-        original_image_url: source.url,
+        original_image_asset_id: 42,
         mask_image_url: 'https://assets.example.com/mask.png',
         custom_width: 900,
         custom_height: 600,

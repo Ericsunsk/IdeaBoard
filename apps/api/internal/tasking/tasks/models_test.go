@@ -107,6 +107,39 @@ func TestTaskUserViewOmitsInternalIdentity(t *testing.T) {
 	}
 }
 
+func TestTaskOutputPublicJSONUsesAssetID(t *testing.T) {
+	internalID := int64(42)
+	output := TaskOutput{
+		ID:           7,
+		TaskID:       "task-output-contract",
+		MediaAssetID: &internalID,
+		AssetID:      "asset_public",
+		OutputKind:   "asset",
+		Role:         "image",
+		URL:          "/api/user/media-assets/asset_public/original/content",
+	}
+
+	payload, err := json.Marshal(output)
+	if err != nil {
+		t.Fatalf("marshal task output: %v", err)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &fields); err != nil {
+		t.Fatalf("decode task output: %v", err)
+	}
+	if _, exists := fields["media_asset_id"]; exists {
+		t.Fatalf("task output leaked internal media_asset_id: %s", payload)
+	}
+	if got, ok := fields["asset_id"]; !ok || string(got) != `"asset_public"` {
+		t.Fatalf("task output asset_id = %s, want public asset id", got)
+	}
+
+	view := (&Task{TaskID: output.TaskID, Outputs: []TaskOutput{output}}).ToUserView()
+	if len(view.Outputs) != 1 || view.Outputs[0].AssetID != "asset_public" {
+		t.Fatalf("user output asset_id = %#v, want asset_public", view.Outputs)
+	}
+}
+
 func TestTaskCorrelationIDFallsBackToTaskID(t *testing.T) {
 	task := &Task{TaskID: "task-trace"}
 

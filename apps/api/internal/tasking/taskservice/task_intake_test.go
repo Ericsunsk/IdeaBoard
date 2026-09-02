@@ -331,6 +331,7 @@ func TestTaskIntakePrepareMediaPreservesCompiledExecutionPlan(t *testing.T) {
 		}}},
 		Media:         testSubmitMediaValidator{},
 		MediaPreparer: preparer,
+		MediaManifest: recordingTaskInputManifestBuilder{},
 	})
 	canonical, err := intake.Compile(t.Context(), 42, &tasks.SubmitTaskRequest{
 		Prompt: "draw from reference", Feature: workflow.FeatureSlugRender,

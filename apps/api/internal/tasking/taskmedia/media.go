@@ -41,6 +41,13 @@ type ProcessingInputReadiness interface {
 	ValidateProcessingInputReadiness(context.Context, int64, []int64) error
 }
 
+// TaskInputManifestBuilder resolves mutable Media Asset references into the
+// immutable object facts persisted with a Task. Implementations must verify
+// every referenced object before returning.
+type TaskInputManifestBuilder interface {
+	BuildTaskInputManifest(context.Context, int64, *tasks.MediaInputs) (*tasks.TaskInputManifest, error)
+}
+
 type ResultMaterializer interface {
 	MaterializeRemoteResults(ctx context.Context, userID int64, taskID string, sourceURLs []string, opts ResultMaterializeOptions) (MaterializedResults, error)
 	MaterializeBytesResult(ctx context.Context, userID int64, taskID string, filename string, sourceURL string, data []byte, opts ResultMaterializeOptions) (MaterializedResults, error)

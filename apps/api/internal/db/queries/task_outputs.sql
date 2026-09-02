@@ -3,6 +3,7 @@ SELECT
   o.id,
   o.task_id,
   o.media_asset_id,
+  COALESCE(a.asset_id, '') AS asset_id,
   o.output_kind,
   o.role,
   (CASE WHEN o.output_kind = 'remote' THEN o.url ELSE COALESCE(a.url, '') END)::text AS url,

@@ -60,6 +60,7 @@ type Request struct {
 
 type Handle struct {
 	AssetID        int64
+	PublicAssetID  string
 	ExistingReady  bool
 	OwnerUserID    int64
 	StorageProfile string

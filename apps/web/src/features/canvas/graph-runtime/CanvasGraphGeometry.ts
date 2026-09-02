@@ -23,8 +23,11 @@ export type CanvasGraphBounds = {
 }
 
 function hasDisplayableImageSource(node: ImageNodeItem): boolean {
-  if (node.sourceImageUrl.trim()) return true
-  return node.outputImages.some((output) => output.url.trim().length > 0)
+  if (node.sourceMediaRef) return true
+  if (node.sourceImageUrl && node.sourceImageUrl.trim()) return true
+  return node.outputImages.some(
+    (output) => output.mediaRef !== undefined || (output.url && output.url.trim().length > 0),
+  )
 }
 
 export function resolveCanvasGraphNodeDimensions(

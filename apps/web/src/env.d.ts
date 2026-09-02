@@ -10,7 +10,6 @@ declare module '*.vue' {
 declare global {
   interface ImportMetaEnv {
     readonly VITE_API_BASE_URL?: string
-    readonly VITE_PUBLIC_ASSET_BASE_URL?: string
     readonly VITE_CANVAS_PERF_PROBE?: string
   }
 }

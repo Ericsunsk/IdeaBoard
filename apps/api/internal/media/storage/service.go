@@ -10,7 +10,18 @@ import (
 
 var errProviderHTTPSUnavailable = errors.New("storage profile does not expose a provider HTTPS URL")
 
-var errStoredObjectNotFound = errors.New("stored object not found")
+// ErrStoredObjectNotFound is the sentinel returned by ReadObjectAtProfile
+// and any other storage probe when the underlying object is absent. The
+// reconciler, the readiness validator, and the integrity verifier all
+// branch on errors.Is(err, ErrStoredObjectNotFound). It is exported
+// because the storage package's public surface intentionally hides the
+// concrete adapter from the media subsystem; the sentinel is the only
+// signal a non-storage caller may rely on.
+var ErrStoredObjectNotFound = errors.New("stored object not found")
+
+// ErrObjectGenerationUnavailable is returned when an object store cannot
+// prove the immutable generation recorded in the task manifest.
+var ErrObjectGenerationUnavailable = errors.New("stored object generation unavailable")
 
 type StorageStoreOptions struct {
 	DirPrefix  string

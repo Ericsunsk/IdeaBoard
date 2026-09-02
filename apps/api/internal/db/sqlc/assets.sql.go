@@ -173,7 +173,7 @@ WHERE asset.id = $3
   )
 RETURNING asset.id, asset.asset_id, asset.owner_user_id, asset.storage_profile_id, asset.storage_key,
   asset.url, asset.source_url, asset.media_kind, asset.mime_type,
-  asset.width, asset.height, asset.size_bytes, asset.checksum_sha256,
+  asset.width, asset.height, asset.size_bytes, asset.checksum_sha256, asset.object_generation,
   asset.status, asset.metadata, asset.created_at, asset.updated_at, asset.deleted_at,
   asset.reclaim_after, asset.reclaim_started_at, asset.reclaim_claim_token, asset.reclaim_generation
 `
@@ -211,6 +211,7 @@ func (q *Queries) ClaimDueMediaAssetReclamation(ctx context.Context, arg ClaimDu
 		&i.Height,
 		&i.SizeBytes,
 		&i.ChecksumSha256,
+		&i.ObjectGeneration,
 		&i.Status,
 		&i.Metadata,
 		&i.CreatedAt,
@@ -549,7 +550,7 @@ func (q *Queries) FindPreparedGenerationMedia(ctx context.Context, arg FindPrepa
 
 const findReadyOwnedMediaAssetByChecksum = `-- name: FindReadyOwnedMediaAssetByChecksum :one
 SELECT id, asset_id, owner_user_id, storage_profile_id, storage_key,
-  url, source_url, media_kind, mime_type, width, height, size_bytes, checksum_sha256,
+  url, source_url, media_kind, mime_type, width, height, size_bytes, checksum_sha256, object_generation,
   status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
   reclaim_claim_token, reclaim_generation
 FROM media_assets
@@ -586,6 +587,7 @@ func (q *Queries) FindReadyOwnedMediaAssetByChecksum(ctx context.Context, arg Fi
 		&i.Height,
 		&i.SizeBytes,
 		&i.ChecksumSha256,
+		&i.ObjectGeneration,
 		&i.Status,
 		&i.Metadata,
 		&i.CreatedAt,
@@ -626,7 +628,7 @@ const getMediaAssetByAssetIDForOwner = `-- name: GetMediaAssetByAssetIDForOwner 
 SELECT
   id, asset_id, owner_user_id, storage_profile_id, storage_key,
   url, source_url, media_kind, mime_type,
-  width, height, size_bytes, checksum_sha256,
+  width, height, size_bytes, checksum_sha256, object_generation,
   status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
   reclaim_claim_token, reclaim_generation
 FROM media_assets
@@ -657,6 +659,7 @@ func (q *Queries) GetMediaAssetByAssetIDForOwner(ctx context.Context, arg GetMed
 		&i.Height,
 		&i.SizeBytes,
 		&i.ChecksumSha256,
+		&i.ObjectGeneration,
 		&i.Status,
 		&i.Metadata,
 		&i.CreatedAt,
@@ -674,7 +677,7 @@ const getMediaAssetByID = `-- name: GetMediaAssetByID :one
 SELECT
   id, asset_id, owner_user_id, storage_profile_id, storage_key,
   url, source_url, media_kind, mime_type,
-  width, height, size_bytes, checksum_sha256,
+  width, height, size_bytes, checksum_sha256, object_generation,
   status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
   reclaim_claim_token, reclaim_generation
 FROM media_assets
@@ -698,6 +701,7 @@ func (q *Queries) GetMediaAssetByID(ctx context.Context, id int64) (MediaAsset, 
 		&i.Height,
 		&i.SizeBytes,
 		&i.ChecksumSha256,
+		&i.ObjectGeneration,
 		&i.Status,
 		&i.Metadata,
 		&i.CreatedAt,
@@ -715,7 +719,7 @@ const getMediaAssetByIDForOwner = `-- name: GetMediaAssetByIDForOwner :one
 SELECT
   id, asset_id, owner_user_id, storage_profile_id, storage_key,
   url, source_url, media_kind, mime_type,
-  width, height, size_bytes, checksum_sha256,
+  width, height, size_bytes, checksum_sha256, object_generation,
   status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
   reclaim_claim_token, reclaim_generation
 FROM media_assets
@@ -746,6 +750,7 @@ func (q *Queries) GetMediaAssetByIDForOwner(ctx context.Context, arg GetMediaAss
 		&i.Height,
 		&i.SizeBytes,
 		&i.ChecksumSha256,
+		&i.ObjectGeneration,
 		&i.Status,
 		&i.Metadata,
 		&i.CreatedAt,
@@ -763,7 +768,7 @@ const getMediaAssetByStorageLocator = `-- name: GetMediaAssetByStorageLocator :o
 SELECT
   id, asset_id, owner_user_id, storage_profile_id, storage_key,
   url, source_url, media_kind, mime_type,
-  width, height, size_bytes, checksum_sha256,
+  width, height, size_bytes, checksum_sha256, object_generation,
   status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
   reclaim_claim_token, reclaim_generation
 FROM media_assets
@@ -793,6 +798,7 @@ func (q *Queries) GetMediaAssetByStorageLocator(ctx context.Context, arg GetMedi
 		&i.Height,
 		&i.SizeBytes,
 		&i.ChecksumSha256,
+		&i.ObjectGeneration,
 		&i.Status,
 		&i.Metadata,
 		&i.CreatedAt,
@@ -809,7 +815,7 @@ func (q *Queries) GetMediaAssetByStorageLocator(ctx context.Context, arg GetMedi
 const getReadyLibraryMaterializedMediaAsset = `-- name: GetReadyLibraryMaterializedMediaAsset :one
 SELECT asset.id, asset.asset_id, asset.owner_user_id, asset.storage_profile_id, asset.storage_key,
   asset.url, asset.source_url, asset.media_kind, asset.mime_type,
-  asset.width, asset.height, asset.size_bytes, asset.checksum_sha256,
+  asset.width, asset.height, asset.size_bytes, asset.checksum_sha256, asset.object_generation,
   asset.status, asset.metadata, asset.created_at, asset.updated_at, asset.deleted_at, asset.reclaim_after, asset.reclaim_started_at,
   asset.reclaim_claim_token, asset.reclaim_generation
 FROM library_asset_media_assets AS link
@@ -842,6 +848,7 @@ func (q *Queries) GetReadyLibraryMaterializedMediaAsset(ctx context.Context, arg
 		&i.Height,
 		&i.SizeBytes,
 		&i.ChecksumSha256,
+		&i.ObjectGeneration,
 		&i.Status,
 		&i.Metadata,
 		&i.CreatedAt,
@@ -1153,6 +1160,7 @@ func (q *Queries) MarkMediaAssetFailed(ctx context.Context, arg MarkMediaAssetFa
 const markMediaAssetReady = `-- name: MarkMediaAssetReady :one
 UPDATE media_assets
 SET status = 'ready', updated_at = now(),
+    object_generation = CASE WHEN status = 'ready' THEN object_generation + 1 ELSE object_generation END,
     storage_key = COALESCE(NULLIF($1::text, ''), storage_key),
     url = $2, source_url = $3,
     mime_type = $4, width = $5, height = $6,

@@ -20,6 +20,7 @@ import {
   type CanvasGraphStore,
 } from '../graph-runtime'
 import { canvasBoardSnapshotToFlow } from '../utils/flowSnapshotAdapter'
+import type { MediaRef } from '../../../shared/media/MediaRef'
 
 export type MediaInputImage = {
   id: string
@@ -28,7 +29,7 @@ export type MediaInputImage = {
   sourceNodeId?: string
   url: string
   ratio: number
-  mediaAssetId?: number
+  mediaRef?: MediaRef
 }
 
 type UseFlowMediaInputImagesOptions = {
@@ -38,7 +39,9 @@ type UseFlowMediaInputImagesOptions = {
   }
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  uploadImageToBoard: (file: File) => Promise<{ url: string; ratio: number; mediaAssetId: number }>
+  uploadImageToBoard: (
+    file: File,
+  ) => Promise<{ url: string; ratio: number; assetId: string; mediaRef: MediaRef }>
   updateSnapshotNodeBase: (
     nodeId: string,
     mutate: (snapshotNode: CanvasNodeItem) => CanvasNodeItem,
@@ -49,7 +52,7 @@ type UseFlowMediaInputImagesOptions = {
   graphAdapter: CanvasVueFlowGraphAdapter
   markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
   getImageNodeDisplayPayload: (nodeId: string) => ImageNodeDisplayPayload | null
-  openImageUrlPreview: (src: string, ratio?: number, mediaAssetId?: number) => Promise<void>
+  openImageUrlPreview: (src: string, ratio?: number, assetId?: string) => Promise<void>
   onWarning: (message: string) => void
 }
 
@@ -60,7 +63,7 @@ type LinkedNodePreviewImage = {
   sourceNodeId: string
   url: string
   ratio: number
-  mediaAssetId?: number
+  mediaRef?: MediaRef
 }
 
 type MediaInputSnapshotNode = PromptNodeItem | FusionNodeItem
@@ -107,7 +110,7 @@ function areMediaInputImagesEqual(current: MediaInputImage[], next: MediaInputIm
         item.sourceId === next[idx]?.sourceId &&
         item.url === next[idx]?.url &&
         item.ratio === next[idx]?.ratio &&
-        item.mediaAssetId === next[idx]?.mediaAssetId,
+        item.mediaRef?.assetId === next[idx]?.mediaRef?.assetId,
     )
   )
 }
@@ -208,13 +211,13 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
         sourceNodeId: nodeId,
         url: display.url,
         ratio: Number.isFinite(display.ratio) && display.ratio > 0 ? display.ratio : 1,
-        mediaAssetId: display.mediaAssetId,
+        ...(display.mediaRef ? { mediaRef: display.mediaRef } : {}),
       }
     }
 
     const outputs = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
     const latest = outputs[outputs.length - 1] as
-      { url?: string; ratio?: number; mediaAssetId?: number } | undefined
+      { url?: string; ratio?: number; mediaRef?: MediaRef } | undefined
     const url = typeof latest?.url === 'string' ? latest.url.trim() : ''
     if (!url) return null
     const ratio = Number(latest?.ratio)
@@ -225,7 +228,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
       sourceNodeId: nodeId,
       url,
       ratio: Number.isFinite(ratio) && ratio > 0 ? ratio : 1,
-      mediaAssetId: latest?.mediaAssetId,
+      ...(latest?.mediaRef ? { mediaRef: latest.mediaRef } : {}),
     }
   }
 
@@ -259,10 +262,10 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
         const externalImage: PromptNodeInputImage = {
           id: `external:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`,
           sourceType: 'external',
-          sourceId: uploaded.url,
+          sourceId: uploaded.assetId,
           url: uploaded.url,
           ratio: uploaded.ratio,
-          mediaAssetId: uploaded.mediaAssetId,
+          mediaRef: uploaded.mediaRef,
         }
         return {
           ...snapshotNode,
@@ -297,8 +300,12 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
     if (file) await addMediaInputImageFile(nodeId, file)
   }
 
-  function onFlowMediaInputImagePreview(image: { url: string; ratio: number; mediaAssetId?: number }) {
-    void options.openImageUrlPreview(image.url, image.ratio, image.mediaAssetId)
+  function onFlowMediaInputImagePreview(image: {
+    url: string
+    ratio: number
+    mediaRef?: MediaRef
+  }) {
+    void options.openImageUrlPreview(image.url, image.ratio, image.mediaRef?.assetId)
   }
 
   function onFlowMediaInputImageRemove(nodeId: string, imageId: string) {
@@ -349,7 +356,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
             sourceNodeId?: unknown
             url?: unknown
             ratio?: unknown
-            mediaAssetId?: unknown
+            mediaRef?: unknown
           }>
         }
       | undefined
@@ -363,7 +370,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
       const sourceNodeId = typeof item.sourceNodeId === 'string' ? item.sourceNodeId : undefined
       const url = typeof item.url === 'string' ? item.url.trim() : ''
       const ratio = Number(item.ratio)
-      const mediaAssetId = Number(item.mediaAssetId)
+      const mediaRef = item.mediaRef as MediaRef | undefined
       if (!id || !sourceType || !sourceId || !url || !Number.isFinite(ratio) || ratio <= 0) return
       normalized.push({
         id,
@@ -372,7 +379,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
         sourceNodeId,
         url,
         ratio,
-        ...(Number.isInteger(mediaAssetId) && mediaAssetId > 0 ? { mediaAssetId } : {}),
+        ...(mediaRef?.assetId ? { mediaRef } : {}),
       })
     })
     return normalized

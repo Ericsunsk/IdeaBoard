@@ -6,25 +6,20 @@ describe('buildExecutionTaskRequest', () => {
     vi.resetModules()
   })
 
-  it('canonicalizes first-party upload URLs before task submission', async () => {
-    vi.stubEnv('VITE_PUBLIC_ASSET_BASE_URL', 'https://assets.example.com')
-    vi.resetModules()
-
+  it('keeps only the typed media fields at the task boundary', async () => {
     const { buildExecutionTaskRequest } = await import('./executionContract')
 
     const request = buildExecutionTaskRequest({
       prompt: 'demo',
-      imageUrls: ['https://assets.example.com/uploads/canvas/U123/board/content/a.png'],
+      imageUrls: ['https://assets.example.com/reference.png'],
       params: {
-        original_image_url: 'https://assets.example.com/uploads/canvas/U123/board/content/a.png',
-        mask_image_url: 'https://assets.example.com/uploads/canvas/U123/board/content/b.png',
+        mask_image_url: 'https://assets.example.com/mask.png',
       },
     })
 
-    expect(request.image_urls).toEqual(['/uploads/canvas/U123/board/content/a.png'])
+    expect(request.image_urls).toEqual(['https://assets.example.com/reference.png'])
     expect(request.params).toEqual({
-      original_image_url: '/uploads/canvas/U123/board/content/a.png',
-      mask_image_url: '/uploads/canvas/U123/board/content/b.png',
+      mask_image_url: 'https://assets.example.com/mask.png',
     })
   })
 })

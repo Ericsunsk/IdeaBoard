@@ -8,6 +8,7 @@ import {
   type OutputResolution,
   normalizeOutputResolution,
 } from '../../../shared/domain/generationContract'
+import type { MediaRef } from '../../../shared/media/MediaRef'
 
 export interface CanvasPoint {
   x: number
@@ -78,8 +79,10 @@ export interface PromptNodeInputImage extends ImageNodeOutputItem {
 export type FusionNodeInputImage = PromptNodeInputImage
 
 export interface ImageNodeOutputItem {
+  /** Runtime display URL. Durable board state is `mediaRef`. */
   url: string
   ratio: number
+  mediaRef?: MediaRef
   mediaAssetId?: number
 }
 
@@ -125,7 +128,9 @@ export interface ImageNodeItem {
   y: number
   width: number
   title?: string
+  /** Runtime display URL. Durable board state is `sourceMediaRef`. */
   sourceImageUrl: string
+  sourceMediaRef?: MediaRef
   sourceMediaAssetId?: number
   adjustmentRecipe?: ImageAdjustmentRecipe
   sourceImageRatio: number

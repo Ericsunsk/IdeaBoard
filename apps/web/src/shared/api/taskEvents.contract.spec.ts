@@ -78,13 +78,14 @@ function makeTask(status: string, task: Partial<Task> = {}): Task {
   }
 }
 
-function makeImageOutput(url: string): NonNullable<Task['outputs']>[number] {
+function makeImageOutput(assetId: string): NonNullable<Task['outputs']>[number] {
   return {
     id: 1,
     task_id: 'task-1',
     output_kind: 'asset',
     role: 'image',
-    url,
+    url: '',
+    asset_id: assetId,
     mime_type: 'image/png',
     width: 1024,
     height: 1024,
@@ -149,13 +150,14 @@ describe('waitTaskImageResultsWithSse', () => {
     vi.stubGlobal('EventSource', undefined)
     mocks.getTask.mockResolvedValueOnce(
       makeTaskResponse('completed', {
-        outputs: [makeImageOutput(' https://cdn.example.com/image.png ')],
+        outputs: [makeImageOutput('asset_image')],
       }),
     )
 
     await expect(waitTaskImageResultsWithSse('task-1')).resolves.toEqual([
       {
-        url: 'https://cdn.example.com/image.png',
+        url: '/api/user/media-assets/asset_image/derivatives/preview/webp/content',
+        assetId: 'asset_image',
         width: 1024,
         height: 1024,
         mimeType: 'image/png',
@@ -169,7 +171,7 @@ describe('waitTaskImageResultsWithSse', () => {
     vi.stubGlobal('EventSource', MockEventSource)
     mocks.getTask.mockResolvedValueOnce(
       makeTaskResponse('completed', {
-        outputs: [makeImageOutput(' https://cdn.example.com/sse-output.png ')],
+        outputs: [makeImageOutput('asset_sse_output')],
       }),
     )
 
@@ -179,7 +181,8 @@ describe('waitTaskImageResultsWithSse', () => {
 
     await expect(result).resolves.toEqual([
       {
-        url: 'https://cdn.example.com/sse-output.png',
+        url: '/api/user/media-assets/asset_sse_output/derivatives/preview/webp/content',
+        assetId: 'asset_sse_output',
         width: 1024,
         height: 1024,
         mimeType: 'image/png',
@@ -194,7 +197,7 @@ describe('waitTaskImageResultsWithSse', () => {
     vi.stubGlobal('EventSource', MockEventSource)
     mocks.getTask.mockResolvedValueOnce(
       makeTaskResponse('completed', {
-        outputs: [makeImageOutput('https://cdn.example.com/settled.png')],
+        outputs: [makeImageOutput('asset_settled')],
       }),
     )
     const listener = vi.fn()
@@ -259,7 +262,7 @@ describe('waitTaskImageResultsWithSse', () => {
     vi.stubGlobal('EventSource', MockEventSource)
     mocks.getTask.mockResolvedValueOnce(makeTaskResponse('running')).mockResolvedValueOnce(
       makeTaskResponse('completed', {
-        result: JSON.stringify({ image_url: 'https://cdn.example.com/done.png' }),
+        outputs: [makeImageOutput('asset_done')],
       }),
     )
 
@@ -272,7 +275,16 @@ describe('waitTaskImageResultsWithSse', () => {
 
     await vi.advanceTimersByTimeAsync(50)
 
-    await expect(result).resolves.toEqual([{ url: 'https://cdn.example.com/done.png' }])
+    await expect(result).resolves.toEqual([
+      {
+        url: '/api/user/media-assets/asset_done/derivatives/preview/webp/content',
+        assetId: 'asset_done',
+        width: 1024,
+        height: 1024,
+        mimeType: 'image/png',
+        resultIndex: 0,
+      },
+    ])
     expect(mocks.getTask).toHaveBeenCalledTimes(2)
     expect(MockEventSource.instances[0]?.closed).toBe(true)
   })
@@ -281,7 +293,7 @@ describe('waitTaskImageResultsWithSse', () => {
     vi.stubGlobal('EventSource', MockEventSource)
     mocks.getTask.mockResolvedValue(
       makeTaskResponse('completed', {
-        outputs: [makeImageOutput('https://cdn.example.com/done.png')],
+        outputs: [makeImageOutput('asset_done')],
       }),
     )
     const first = waitTaskImageResultsWithSse('task-1')

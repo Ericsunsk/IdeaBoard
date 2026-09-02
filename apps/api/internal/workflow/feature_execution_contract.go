@@ -100,9 +100,8 @@ const (
 type OriginalImagePolicy string
 
 const (
-	OriginalImageIgnored            OriginalImagePolicy = "ignored"
-	OriginalImageForwardWhenPresent OriginalImagePolicy = "forward-when-present"
-	OriginalImageExcluded           OriginalImagePolicy = "excluded"
+	OriginalImageIgnored  OriginalImagePolicy = "ignored"
+	OriginalImageExcluded OriginalImagePolicy = "excluded"
 )
 
 // RuntimeControlContract names typed Workflow controls required by the
@@ -270,15 +269,15 @@ type registeredImageFeature struct {
 var registeredImageFeatures = []registeredImageFeature{
 	{slug: FeatureSlugGeneration, definition: imageGenerationDefinition(
 		PromptPolicyRequired, RuntimeOperationGeneration, RuntimeInvocationGenerate,
-		ImageInputOptional, 4, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsNone,
+		ImageInputOptional, 4, MaskInputIgnored, OriginalImageExcluded, RuntimeControlsNone,
 	)},
 	{slug: FeatureSlugInpaint, definition: imageFillDefinition(
 		PromptPolicyRequired, RuntimeOperationInpaint,
-		ImageInputRequired, MaskInputRequired, OriginalImageForwardWhenPresent, RuntimeControlsNone,
+		ImageInputRequired, MaskInputRequired, OriginalImageExcluded, RuntimeControlsNone,
 	)},
 	{slug: FeatureSlugRender, definition: imageGenerationDefinition(
 		PromptPolicyOptional, RuntimeOperationRender, RuntimeInvocationEdit,
-		ImageInputRequired, 16, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsNone,
+		ImageInputRequired, 16, MaskInputIgnored, OriginalImageExcluded, RuntimeControlsNone,
 	)},
 	{slug: FeatureSlugVariations, definition: imageGenerationDefinition(
 		PromptPolicyOptional, RuntimeOperationVariations, RuntimeInvocationEdit,
@@ -300,7 +299,7 @@ var registeredImageFeatures = []registeredImageFeature{
 	}},
 	{slug: FeatureSlugFusion, definition: imageGenerationDefinition(
 		PromptPolicyOptional, RuntimeOperationFusion, RuntimeInvocationEdit,
-		MultipleImageInputsRequired, 4, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsFusion,
+		MultipleImageInputsRequired, 4, MaskInputIgnored, OriginalImageExcluded, RuntimeControlsFusion,
 	)},
 	{slug: FeatureSlugUpscale, definition: featureExecutionDefinition{
 		promptPolicy:           PromptPolicyIgnored,
@@ -318,7 +317,7 @@ var registeredImageFeatures = []registeredImageFeature{
 	}},
 	{slug: FeatureSlugOutpaint, definition: imageFillDefinition(
 		PromptPolicyOptional, RuntimeOperationOutpaint,
-		ImageInputRequired, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsOutpaint,
+		ImageInputRequired, MaskInputIgnored, OriginalImageExcluded, RuntimeControlsOutpaint,
 	)},
 }
 
@@ -575,7 +574,7 @@ func durableFeatureDefinitionForCurrentSchema(feature string) (durableFeatureDef
 	case FeatureSlugGeneration:
 		return durableImageGenerationDefinition(
 			PromptPolicyRequired, RuntimeOperationGeneration, RuntimeInvocationGenerate,
-			ImageInputOptional, 4, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsNone,
+			ImageInputOptional, 4, MaskInputIgnored, OriginalImageExcluded, RuntimeControlsNone,
 		), true
 	case FeatureSlugInpaint:
 		return durableImageFillDefinition(
@@ -585,7 +584,7 @@ func durableFeatureDefinitionForCurrentSchema(feature string) (durableFeatureDef
 	case FeatureSlugRender:
 		return durableImageGenerationDefinition(
 			PromptPolicyOptional, RuntimeOperationRender, RuntimeInvocationEdit,
-			ImageInputRequired, 16, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsNone,
+			ImageInputRequired, 16, MaskInputIgnored, OriginalImageExcluded, RuntimeControlsNone,
 		), true
 	case FeatureSlugVariations:
 		return durableImageGenerationDefinition(
@@ -595,7 +594,7 @@ func durableFeatureDefinitionForCurrentSchema(feature string) (durableFeatureDef
 	case FeatureSlugFusion:
 		return durableImageGenerationDefinition(
 			PromptPolicyOptional, RuntimeOperationFusion, RuntimeInvocationEdit,
-			MultipleImageInputsRequired, 4, MaskInputIgnored, OriginalImageForwardWhenPresent, RuntimeControlsFusion,
+			MultipleImageInputsRequired, 4, MaskInputIgnored, OriginalImageExcluded, RuntimeControlsFusion,
 		), true
 	case FeatureSlugOutpaint:
 		return durableImageFillDefinition(
@@ -661,7 +660,7 @@ func durableImageFillDefinition(
 		runtimeOperation: operation, runtimeInvocation: RuntimeInvocationTransform,
 		imageInputPolicy: ImageInputRequired, maxImageInputCount: 1,
 		maskInputPolicy:     maskInputPolicy,
-		originalImagePolicy: OriginalImageForwardWhenPresent, controlContract: controlContract,
+		originalImagePolicy: OriginalImageExcluded, controlContract: controlContract,
 	}
 }
 

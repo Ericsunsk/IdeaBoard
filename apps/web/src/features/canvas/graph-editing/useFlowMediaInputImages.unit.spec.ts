@@ -14,6 +14,7 @@ import { CanvasGraphSession } from '../graph-runtime'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
 import { useFlowMediaInputImages } from './useFlowMediaInputImages'
 import { useCanvasVueFlowGraphAdapter } from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
+import type { MediaRef } from '../../../shared/media/MediaRef'
 
 function makeImageSnapshot(overrides: Partial<ImageNodeItem> = {}): ImageNodeItem {
   return {
@@ -24,7 +25,11 @@ function makeImageSnapshot(overrides: Partial<ImageNodeItem> = {}): ImageNodeIte
     width: 280,
     title: 'Image',
     sourceImageUrl: 'https://example.com/source.png',
-    sourceMediaAssetId: 101,
+    sourceMediaRef: {
+      assetId: 'asset_101',
+      derivativeTier: 'preview',
+      derivativeFormat: 'webp',
+    },
     sourceImageRatio: 1,
     outputStatus: 'ready',
     outputImages: [],
@@ -127,7 +132,12 @@ function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
   const uploadImageToBoard = vi.fn(async () => ({
     url: 'https://example.com/external.png',
     ratio: 0.75,
-    mediaAssetId: 501,
+    assetId: 'asset_501',
+    mediaRef: {
+      assetId: 'asset_501',
+      derivativeTier: 'preview',
+      derivativeFormat: 'webp',
+    } satisfies MediaRef,
   }))
   const api = useFlowMediaInputImages({
     browser: {
@@ -148,7 +158,7 @@ function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
       return {
         url: snapshot.sourceImageUrl,
         ratio: snapshot.sourceImageRatio,
-        mediaAssetId: snapshot.sourceMediaAssetId,
+        mediaRef: snapshot.sourceMediaRef,
       }
     },
     openImageUrlPreview: vi.fn(),
@@ -226,8 +236,17 @@ describe('useFlowMediaInputImages', () => {
     const edges: Ref<Edge[]> = shallowRef([])
     const harness = createHarness(nodes, edges)
 
-    harness.graphSession.store.beginTransaction('connect', { recordHistory: false, markDirty: false })
-      .addEdge({ id: 1, fromNodeType: 'image', fromNodeId: 1, fromPort: 'image', toNodeType: 'prompt', toNodeId: 2, toPort: 'image' })
+    harness.graphSession.store
+      .beginTransaction('connect', { recordHistory: false, markDirty: false })
+      .addEdge({
+        id: 1,
+        fromNodeType: 'image',
+        fromNodeId: 1,
+        fromPort: 'image',
+        toNodeType: 'prompt',
+        toNodeId: 2,
+        toPort: 'image',
+      })
       .commit()
     harness.project()
     await nextTick()
@@ -240,12 +259,16 @@ describe('useFlowMediaInputImages', () => {
         sourceNodeId: 'image-1',
         url: 'https://example.com/source.png',
         ratio: 1,
-        mediaAssetId: 101,
+        mediaRef: {
+          assetId: 'asset_101',
+          derivativeTier: 'preview',
+          derivativeFormat: 'webp',
+        },
       },
     ])
   })
 
-  it('preserves the media asset id for an external input upload', async () => {
+  it('preserves the public asset reference for an external input upload', async () => {
     const nodes: Ref<Node[]> = shallowRef([
       makeFlowNode('prompt-1', 'prompt', makePromptSnapshot()),
     ] as Node[])
@@ -262,7 +285,11 @@ describe('useFlowMediaInputImages', () => {
         sourceType: 'external',
         url: 'https://example.com/external.png',
         ratio: 0.75,
-        mediaAssetId: 501,
+        mediaRef: {
+          assetId: 'asset_501',
+          derivativeTier: 'preview',
+          derivativeFormat: 'webp',
+        },
       }),
     ])
   })
@@ -297,11 +324,10 @@ describe('useFlowMediaInputImages', () => {
         targetHandle: 'in:image',
       },
     ] as Edge[])
-    const {
-      onFlowMediaInputImageRemove,
-      graphActions,
-      markFlowExecutionNodeDirty,
-    } = createHarness(nodes, edges)
+    const { onFlowMediaInputImageRemove, graphActions, markFlowExecutionNodeDirty } = createHarness(
+      nodes,
+      edges,
+    )
 
     onFlowMediaInputImageRemove('prompt-1', 'node:image-1')
     await nextTick()

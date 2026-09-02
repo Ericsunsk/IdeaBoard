@@ -274,7 +274,7 @@ func newProviderRequest(
 	providerParams := params
 	imageRefs := collectOrderedProviderRefs(providerParams, openAIImageInputRefKeys)
 	maskRefs := collectOrderedProviderRefs(providerParams, []string{"mask_image_urls", "mask_image_url"})
-	canvasRef := firstProviderRef(providerParams, "original_image_url")
+	canvasRef := firstProviderRef(providerParams, "canvas_image_ref")
 	controls := compileProviderControls(providerParams, operation, invocation, controlContract)
 	return providerRequest{
 		Primitive:        facts.primitive,

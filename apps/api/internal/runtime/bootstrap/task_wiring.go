@@ -134,6 +134,8 @@ func newAppTaskRuntime(
 	periodicJobs = append(periodicJobs, checkoutShutdownPeriodicJobs...)
 	periodicJobs = append(periodicJobs, mediaDerivativePeriodicJobs...)
 	periodicJobs = append(periodicJobs, visionBillingPeriodicJobs...)
+	derivativeOutboxDispatcher := derivatives.NewOutboxDispatcher(dbs.db, services.storageService)
+	derivativeOutboxDispatcher.SetReconciler(mediaDerivativeEvents)
 	riverClient, err := worker.NewRiverClient(dbs.riverPool, riverTaskWorker, worker.RiverServerOptions{
 		QueueName:   taskqueue.RiverQueueDefault,
 		Concurrency: workerConcurrency,
@@ -154,7 +156,7 @@ func newAppTaskRuntime(
 			river.AddWorker(workers, worker.NewPaymentCheckoutShutdownWorker(services.paymentService))
 			river.AddWorker(workers, worker.NewPaymentCheckoutShutdownScheduleWorker(services.paymentService))
 			river.AddWorker(workers, derivatives.NewWorker(mediaDerivativeService))
-			river.AddWorker(workers, derivatives.NewOutboxDispatcher(dbs.db, services.storageService))
+			river.AddWorker(workers, derivativeOutboxDispatcher)
 			river.AddWorker(workers, searchcatalog.NewVisionBillingReconciliationWorker(visionBillingService))
 		},
 		PeriodicJobs: periodicJobs,
@@ -185,6 +187,7 @@ func newAppTaskRuntime(
 			Media:          submitMediaValidator,
 			MediaReadiness: repos.mediaAssetRegistry,
 			MediaPreparer:  generationMediaPreparer,
+			MediaManifest:  repos.mediaAssetRegistry,
 		}),
 		TaskRepo:            repos.taskRepo.Queries(),
 		SubmissionStore:     submissionStore,

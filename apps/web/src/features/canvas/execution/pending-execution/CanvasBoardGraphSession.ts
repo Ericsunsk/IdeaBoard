@@ -1,17 +1,18 @@
 import { resolveImageNodeFrameSize, type ImageNodeItem } from '../../../canvas-board/domain'
 import { CanvasGraphSession, type CanvasGraphStore } from '../../graph-runtime'
 import type { CanvasBoardAttachment, CanvasBoardSessionIdentity } from '../../board-attachment'
+import type { MediaRef } from '../../../../shared/media/MediaRef'
 
 
 export type PendingImageResultNodeId = `image-${number}`
 
 export type PendingImageResolvedResult = Readonly<{
   url: string
+  mediaRef?: MediaRef
   ratio: number
   width?: number
   height?: number
   mimeType?: string
-  mediaAssetId?: number
   resultIndex?: number
 }>
 
@@ -168,7 +169,7 @@ export class CanvasBoardGraphSession {
       transaction.updateNode(input.resultNodeId, {
         width: resolved.width,
         sourceImageUrl: input.result.url,
-        sourceMediaAssetId: input.result.mediaAssetId,
+        sourceMediaRef: input.result.mediaRef,
         sourceImageRatio: resolved.ratio,
         pendingTaskId: undefined,
         pendingResultIndex: undefined,

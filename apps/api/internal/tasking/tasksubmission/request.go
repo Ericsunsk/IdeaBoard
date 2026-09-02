@@ -205,6 +205,26 @@ func (r CanonicalRequest) WithGenerationSnapshot(snapshot tasks.GenerationReques
 	return r, nil
 }
 
+func (r CanonicalRequest) WithInputManifest(manifest *tasks.TaskInputManifest) (CanonicalRequest, error) {
+	if manifest == nil {
+		return r, nil
+	}
+	if err := manifest.Validate(); err != nil {
+		return CanonicalRequest{}, err
+	}
+	typedParams, err := tasks.UnmarshalParams(r.params)
+	if err != nil {
+		return CanonicalRequest{}, fmt.Errorf("decode canonical params: %w", err)
+	}
+	typedParams.InputManifest = manifest
+	paramsJSON, err := json.Marshal(typedParams)
+	if err != nil {
+		return CanonicalRequest{}, fmt.Errorf("encode canonical input manifest: %w", err)
+	}
+	r.params = string(paramsJSON)
+	return r, nil
+}
+
 func (r CanonicalRequest) Priority() int {
 	return r.priority
 }

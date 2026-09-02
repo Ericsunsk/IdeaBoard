@@ -40,6 +40,24 @@ var (
 		Name: "ideaboard_media_derivative_orphan_scan_failures_total",
 		Help: "Total storage profile failures encountered while scanning for orphan media derivatives.",
 	})
+	// ready-object existence reconciler (issue #661/#663).
+	mediaDerivativeReconcileMissing = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ideaboard_media_derivative_reconcile_missing_total",
+		Help: "Total media derivatives the reconciler flipped ready → missing.",
+	})
+	mediaDerivativeReconcileInvalid = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ideaboard_media_derivative_reconcile_invalid_total",
+		Help: "Total media derivatives the reconciler flipped ready → invalid.",
+	})
+	mediaDerivativeReconcileErrors = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ideaboard_media_derivative_reconcile_errors_total",
+		Help: "Total per-row reconcile probe errors. Persistent growth means storage is degraded.",
+	})
+	// bounded repair (issue #663).
+	mediaDerivativeRepairTerminals = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ideaboard_media_derivative_repair_terminals_total",
+		Help: "Total media derivatives that hit the bounded repair attempt cap and were marked repair_not_possible.",
+	})
 )
 
 func init() {
@@ -47,6 +65,10 @@ func init() {
 		mediaDerivativeReconcileRuns,
 		mediaDerivativeOrphanObjects,
 		mediaDerivativeOrphanScanFailures,
+		mediaDerivativeReconcileMissing,
+		mediaDerivativeReconcileInvalid,
+		mediaDerivativeReconcileErrors,
+		mediaDerivativeRepairTerminals,
 	)
 }
 
@@ -63,14 +85,36 @@ type Worker struct {
 
 type OutboxDispatcher struct {
 	river.WorkerDefaults[DispatchScheduleArgs]
+	db             *sql.DB
 	q              *dbsqlc.Queries
 	storage        *storage.StorageService
 	orphanScanMu   sync.Mutex
 	lastOrphanScan time.Time
+	// reconciler is the canonical media derivative ready-object
+	// reconciler (issue #661/#663). nil until NewOutboxDispatcher
+	// is called; tests can override it via SetReconciler.
+	reconciler *Reconciler
+	// repair is the bounded retry target for missing/invalid
+	// derivatives (issue #663). nil until SetRepair is called.
+	repair *Repair
 }
 
 func NewOutboxDispatcher(db *sql.DB, storageService *storage.StorageService) *OutboxDispatcher {
-	return &OutboxDispatcher{q: dbsqlc.New(db), storage: storageService}
+	d := &OutboxDispatcher{db: db, q: dbsqlc.New(db), storage: storageService}
+	d.reconciler = NewReconciler(d.q, storageService, nil, ReconcilerConfig{})
+	d.repair = NewRepair(db, nil, RepairConfig{})
+	return d
+}
+
+// SetReconciler overrides the default reconciler. The publisher is
+// passed through here so the dispatcher can fan the canonical event
+// types to the same UserEventHub that publishes updated/ready.
+func (d *OutboxDispatcher) SetReconciler(events EventPublisher) {
+	if d == nil {
+		return
+	}
+	d.reconciler = NewReconciler(d.q, d.storage, events, ReconcilerConfig{})
+	d.repair = NewRepair(d.db, events, RepairConfig{})
 }
 
 type DispatchScheduleArgs struct{}
@@ -146,6 +190,38 @@ func (d *OutboxDispatcher) reconcile(ctx context.Context) error {
 	}
 	if err := d.reconcileReadyAssets(ctx); err != nil {
 		return err
+	}
+	// Reconcile ready-but-object-missing or invalid derivatives
+	// (issue #661/#663). Errors are logged but do not abort the
+	// rest of the reconcile cycle; the runbook triages a slow
+	// reconciler via the metrics counters below.
+	if d.reconciler != nil {
+		result, recErr := d.reconciler.Reconcile(ctx)
+		if recErr != nil {
+			slog.Warn("media derivative ready-object reconcile failed", "err", recErr)
+		} else {
+			if result.Missing > 0 {
+				mediaDerivativeReconcileMissing.Add(float64(result.Missing))
+			}
+			if result.Invalid > 0 {
+				mediaDerivativeReconcileInvalid.Add(float64(result.Invalid))
+			}
+			if result.Errors > 0 {
+				mediaDerivativeReconcileErrors.Add(float64(result.Errors))
+			}
+		}
+	}
+	// Bounded repair for missing/invalid derivatives (issue
+	// #663). Errors are logged but do not abort the cycle; the
+	// runbook triages a stalled repair via the metrics
+	// counters below.
+	if d.repair != nil {
+		_, terminals, repErr := d.repair.RunOnce(ctx, reconcileBatchSize)
+		if repErr != nil {
+			slog.Warn("media derivative repair run failed", "err", repErr)
+		} else if len(terminals) > 0 {
+			mediaDerivativeRepairTerminals.Add(float64(len(terminals)))
+		}
 	}
 	staleBefore := time.Now().Add(-processingLease)
 	staleIDs, err := d.q.ListStaleProcessingMediaDerivativeIDs(ctx, dbsqlc.ListStaleProcessingMediaDerivativeIDsParams{

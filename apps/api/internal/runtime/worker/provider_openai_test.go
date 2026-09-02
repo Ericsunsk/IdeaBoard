@@ -489,10 +489,9 @@ func TestCallOpenAIInpaintUsesEditEndpointAndMultipartFiles(t *testing.T) {
 	maskDataURL := buildTinyPNGDataURL(t)
 	sourceDataURL := buildTinyPNGDataURL(t)
 	params := map[string]interface{}{
-		"feature":            "inpaint",
-		"image_urls":         []interface{}{maskDataURL},
-		"original_image_url": sourceDataURL,
-		"mask_image_url":     maskDataURL,
+		"feature":        "inpaint",
+		"image_urls":     []interface{}{sourceDataURL},
+		"mask_image_url": maskDataURL,
 	}
 
 	if _, err := c.callOpenAIForTest(context.Background(), account, "edit prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
@@ -509,8 +508,8 @@ func TestCallOpenAIInpaintUsesEditEndpointAndMultipartFiles(t *testing.T) {
 	if len(masks) != 1 {
 		t.Fatalf("expected one mask file, got %#v", masks)
 	}
-	if gotMultipart.Fields["original_image_url"][0] != sourceDataURL {
-		t.Fatalf("expected original_image_url field to stay, got %#v", gotMultipart.Fields["original_image_url"])
+	if _, exists := gotMultipart.Fields["original_image_url"]; exists {
+		t.Fatalf("did not expect retired original_image_url field: %#v", gotMultipart.Fields)
 	}
 }
 
@@ -803,7 +802,7 @@ func TestOpenAIRequestFinalizerDropsRedundantFields(t *testing.T) {
 		Image:     "data:image/png;base64,abc",
 		ImageURLs: []string{"data:image/png;base64,abc"},
 		Extra: map[string]interface{}{
-			"original_image_url": "data:image/png;base64,abc",
+			"canvas_image_ref": "data:image/png;base64,abc",
 		},
 	}
 	openAIRequestFinalizer{DropOriginalImageRef: true}.apply(&reqBody)
@@ -814,8 +813,8 @@ func TestOpenAIRequestFinalizerDropsRedundantFields(t *testing.T) {
 	if reqBody.ImageURLs != nil {
 		t.Fatalf("image_urls should be dropped, got %#v", reqBody.ImageURLs)
 	}
-	if _, exists := reqBody.Extra["original_image_url"]; exists {
-		t.Fatalf("original_image_url should be dropped, got %#v", reqBody.Extra)
+	if _, exists := reqBody.Extra["canvas_image_ref"]; exists {
+		t.Fatalf("canvas_image_ref should be dropped, got %#v", reqBody.Extra)
 	}
 
 	reqBody = openAIImageRequestBody{

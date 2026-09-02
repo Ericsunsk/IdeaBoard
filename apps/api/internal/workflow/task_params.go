@@ -54,16 +54,17 @@ func flattenRuntimeMediaInputs(out map[string]interface{}, media *tasks.RuntimeM
 	if media == nil {
 		return
 	}
-	if urls := runtimeMediaRefURLs(media.Inputs); len(urls) > 0 {
-		out[paramkeys.ImageURLs] = urls
+	imageURLs := runtimeMediaRefURLs(media.Inputs)
+	if media.Original != nil {
+		if url := strings.TrimSpace(media.Original.URL); url != "" {
+			imageURLs = append(imageURLs, url)
+		}
+	}
+	if len(imageURLs) > 0 {
+		out[paramkeys.ImageURLs] = imageURLs
 	}
 	if urls := runtimeMediaRefURLs(media.References); len(urls) > 0 {
 		out[paramkeys.ReferenceImageURLs] = urls
-	}
-	if media.Original != nil {
-		if url := strings.TrimSpace(media.Original.URL); url != "" {
-			out[paramkeys.OriginalImageURL] = url
-		}
 	}
 	if media.Mask != nil {
 		if url := strings.TrimSpace(media.Mask.URL); url != "" {

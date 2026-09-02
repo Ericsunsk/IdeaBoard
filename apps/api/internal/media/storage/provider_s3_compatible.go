@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +32,7 @@ type S3CompatibleService struct {
 	clientCache             sync.Map
 	capabilityProbe         func(context.Context, *S3CompatibleConfig) error
 	deliveryRead            func(context.Context, string, *S3CompatibleConfig, int64) (*StoredUploadObject, error)
+	generationRead          func(context.Context, string, *S3CompatibleConfig) (int64, error)
 	r2PermissionRetryDelays []time.Duration
 }
 
@@ -444,6 +446,10 @@ func (s *S3CompatibleService) putBytesAtKeyWithConfig(ctx context.Context, objec
 	if strings.TrimSpace(contentType) == "" {
 		contentType = "application/octet-stream"
 	}
+	generation, err := s.nextObjectGeneration(ctx, client, cfg, key)
+	if err != nil {
+		return fmt.Errorf("读取对象 generation 失败: %w", err)
+	}
 	body := bytes.NewReader(data)
 	if err := s.putObjectWithRetry(ctx, cfg, body, func(attemptCtx context.Context) error {
 		_, putErr := client.PutObject(
@@ -452,7 +458,7 @@ func (s *S3CompatibleService) putBytesAtKeyWithConfig(ctx context.Context, objec
 			key,
 			body,
 			int64(len(data)),
-			minio.PutObjectOptions{ContentType: contentType},
+			minio.PutObjectOptions{ContentType: contentType, UserMetadata: map[string]string{"object-generation": strconv.FormatInt(generation, 10)}},
 		)
 		return putErr
 	}); err != nil {
@@ -506,6 +512,10 @@ func (s *S3CompatibleService) putReaderWithConfigRef(ctx context.Context, client
 	if err != nil {
 		return nil, fmt.Errorf("计算上传文件 checksum 失败: %w", err)
 	}
+	generation, err := s.nextObjectGeneration(ctx, client, cfg, key)
+	if err != nil {
+		return nil, fmt.Errorf("读取对象 generation 失败: %w", err)
+	}
 
 	err = s.putObjectWithRetry(ctx, cfg, body, func(attemptCtx context.Context) error {
 		_, putErr := client.PutObject(
@@ -514,7 +524,7 @@ func (s *S3CompatibleService) putReaderWithConfigRef(ctx context.Context, client
 			key,
 			body,
 			size,
-			minio.PutObjectOptions{ContentType: contentType},
+			minio.PutObjectOptions{ContentType: contentType, UserMetadata: map[string]string{"object-generation": strconv.FormatInt(generation, 10)}},
 		)
 		return putErr
 	})
@@ -695,7 +705,7 @@ func (s *S3CompatibleService) readDeliveryObject(ctx context.Context, key string
 	}
 	defer response.Body.Close()
 	if response.StatusCode == http.StatusNotFound {
-		return nil, errStoredObjectNotFound
+		return nil, ErrStoredObjectNotFound
 	}
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("读取文件失败: 存储服务返回 HTTP %d", response.StatusCode)
@@ -810,6 +820,81 @@ func (s *S3CompatibleService) SignedURLWithConfig(ctx context.Context, objectKey
 		return "", fmt.Errorf("生成 S3 signed URL 失败: %w", err)
 	}
 	return signed.String(), nil
+}
+
+// VerifyObjectGeneration proves the logical generation recorded in the task
+// manifest against storage metadata before a signed URL is issued. Providers
+// that do not expose the metadata fail closed instead of treating the
+// manifest's expected value as authoritative.
+func (s *S3CompatibleService) VerifyObjectGeneration(ctx context.Context, objectKey string, expected int64, cfg *S3CompatibleConfig) error {
+	if expected <= 0 {
+		return fmt.Errorf("%w: expected generation must be positive", ErrObjectGenerationUnavailable)
+	}
+	key := strings.TrimSpace(objectKey)
+	if key == "" {
+		return fmt.Errorf("%w: object key is empty", ErrObjectGenerationUnavailable)
+	}
+	if !s.IsConfigEnabled(cfg) {
+		return fmt.Errorf("%w: S3 兼容存储配置未启用或不完整", ErrObjectGenerationUnavailable)
+	}
+	var actual int64
+	var err error
+	if s.generationRead != nil {
+		actual, err = s.generationRead(ctx, key, cfg)
+	} else {
+		client, clientErr := s.clientWithConfig(ctx, cfg)
+		if clientErr != nil {
+			return fmt.Errorf("%w: %v", ErrObjectGenerationUnavailable, clientErr)
+		}
+		info, statErr := client.StatObject(ctx, strings.TrimSpace(cfg.BucketName), key, minio.StatObjectOptions{})
+		if statErr != nil {
+			return fmt.Errorf("%w: stat object: %v", ErrObjectGenerationUnavailable, statErr)
+		}
+		raw := strings.TrimSpace(info.Metadata.Get("X-Amz-Meta-Object-Generation"))
+		if raw == "" {
+			raw = strings.TrimSpace(info.Metadata.Get("object-generation"))
+		}
+		if raw == "" {
+			return fmt.Errorf("%w: object metadata is missing x-amz-meta-object-generation", ErrObjectGenerationUnavailable)
+		}
+		actual, err = strconv.ParseInt(raw, 10, 64)
+		if err != nil || actual <= 0 {
+			return fmt.Errorf("%w: invalid object generation metadata %q", ErrObjectGenerationUnavailable, raw)
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("%w: read object generation: %v", ErrObjectGenerationUnavailable, err)
+	}
+	if actual <= 0 || actual != expected {
+		return fmt.Errorf("%w: got %d, want %d", ErrObjectGenerationUnavailable, actual, expected)
+	}
+	return nil
+}
+
+func (s *S3CompatibleService) nextObjectGeneration(ctx context.Context, client *minio.Client, cfg *S3CompatibleConfig, key string) (int64, error) {
+	info, err := client.StatObject(ctx, strings.TrimSpace(cfg.BucketName), key, minio.StatObjectOptions{})
+	if err != nil {
+		code := strings.ToLower(s3ErrorCode(err))
+		if code == "nosuchkey" || code == "notfound" || code == "nosuchobject" {
+			return 1, nil
+		}
+		return 0, err
+	}
+	raw := strings.TrimSpace(info.Metadata.Get("X-Amz-Meta-Object-Generation"))
+	if raw == "" {
+		raw = strings.TrimSpace(info.Metadata.Get("object-generation"))
+	}
+	if raw == "" {
+		return 0, ErrObjectGenerationUnavailable
+	}
+	current, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || current <= 0 {
+		return 0, fmt.Errorf("invalid object generation metadata %q", raw)
+	}
+	if current == int64(^uint64(0)>>1) {
+		return 0, fmt.Errorf("object generation overflow")
+	}
+	return current + 1, nil
 }
 
 func (s *S3CompatibleService) validateBaseConfig(ctx context.Context, cfg *S3CompatibleConfig) error {

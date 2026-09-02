@@ -12,7 +12,6 @@ import type { UpscaleParams } from './upscaleParams'
 import type { VariationsParams } from './variationsParams'
 
 export interface SubmitTaskRequestParams {
-  original_image_url?: string
   /** @minimum 1 */
   original_image_asset_id?: number
   mask_image_url?: string

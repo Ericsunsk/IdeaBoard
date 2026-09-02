@@ -85,7 +85,7 @@ func (f openAIRequestFinalizer) dropRedundantVariationsOriginalRef(reqBody *open
 	if !f.DropOriginalImageRef {
 		return
 	}
-	delete(reqBody.Extra, "original_image_url")
+	delete(reqBody.Extra, "canvas_image_ref")
 }
 
 func readOpenAIProviderParams(providerReq providerRequest) openAIProviderParams {
@@ -111,7 +111,7 @@ func (p openAIProviderParams) applySharedExtras(reqBody *openAIImageRequestBody)
 		reqBody.setExtra("variation_strength", *p.VariationStrength)
 	}
 	if p.OriginalImageRef != "" {
-		reqBody.setExtra("original_image_url", p.OriginalImageRef)
+		reqBody.setExtra("canvas_image_ref", p.OriginalImageRef)
 	}
 }
 

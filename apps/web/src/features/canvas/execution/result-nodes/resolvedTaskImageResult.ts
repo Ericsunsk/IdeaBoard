@@ -1,9 +1,9 @@
 export type ResolvedTaskImageResult = {
   url: string
+  mediaRef?: import('../../../../shared/media/MediaRef').MediaRef
   ratio: number
   width?: number
   height?: number
   mimeType?: string
-  mediaAssetId?: number
   resultIndex?: number
 }

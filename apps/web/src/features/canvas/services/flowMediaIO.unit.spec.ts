@@ -13,13 +13,15 @@ describe('flow media URL resolution', () => {
     ).toBe('http://localhost:3000/uploads/canvas/U123/board/content/image.png')
   })
 
-  it('fetches API media asset URLs directly instead of proxying them as external URLs', async () => {
+  it('routes API media asset URLs through the authenticated download boundary', async () => {
     vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.com/api')
     vi.resetModules()
     const { resolveFetchUrl: resolveConfiguredFetchUrl } = await import('./flowMediaIO')
     const mediaAssetURL = 'https://api.example.com/api/user/media-assets/3/original/content'
 
-    expect(resolveConfiguredFetchUrl(mediaAssetURL)).toBe(mediaAssetURL)
+    expect(resolveConfiguredFetchUrl(mediaAssetURL)).toBe(
+      '/api/user/download?url=' + encodeURIComponent(mediaAssetURL),
+    )
   })
 
   it.each([

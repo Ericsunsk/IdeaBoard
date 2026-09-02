@@ -28,7 +28,7 @@ function createDeferred<T>() {
 function createReattachWorkspace(
   graphSession: CanvasGraphSession,
   core: ReturnType<typeof createPendingImageExecutionCore>,
-  waitTaskImageResults: (taskId: string) => Promise<Array<{ url: string; resultIndex: number }>>,
+  waitTaskImageResults: (taskId: string) => Promise<Array<{ url: string; resultIndex: number; assetId?: string }>>,
   hydrate = true,
 ) {
   const store = graphSession.store
@@ -65,7 +65,7 @@ describe('useCanvasExecutionWorkspace', () => {
       pendingResults: { reservePendingResults: () => ({ resultNodeIds: ['image-1'] }), attachPendingTaskIds, removePendingResults: vi.fn() },
       executionCore: core, cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(), flushAutosave,
       taskAdapter: { assertTaskRequestReady: vi.fn(async () => undefined), submitTaskRequest: vi.fn(async () => ({ taskId: 'task-1' })) },
-      waitTaskImageResults: async () => [{ url: 'https://example.com/result.png', width: 400, height: 200, resultIndex: 0 }], loadImageSize: async () => ({ width: 400, height: 200 }),
+      waitTaskImageResults: async () => [{ assetId: 'asset_result', url: '/api/user/media-assets/asset_result/derivatives/preview/webp/content', width: 400, height: 200, resultIndex: 0 }], loadImageSize: async () => ({ width: 400, height: 200 }),
     })
     await workspace.commands.runGeneration({ kind: 'generation', sourceNodeId: 'prompt-1', source: { url: '', ratio: 1 }, referenceImages: [], prompt: 'draw', outputCount: 1, aspectRatio: 'auto', resultOptions: {} } as never)
     expect(attachPendingTaskIds).toHaveBeenCalledWith([expect.objectContaining({
@@ -85,7 +85,7 @@ describe('useCanvasExecutionWorkspace', () => {
     const workspace = createReattachWorkspace(
       store,
       core,
-      async () => [{ url: 'https://example.com/recovered.png', resultIndex: 0 }],
+      async () => [{ assetId: 'asset_recovered', url: '/api/user/media-assets/asset_recovered/derivatives/preview/webp/content', resultIndex: 0 }],
     )
     await workspace.commands.reattachPendingImageResults()
     expect(core.factFor('image-1')).toMatchObject({
@@ -98,7 +98,7 @@ describe('useCanvasExecutionWorkspace', () => {
     const core = createPendingImageExecutionCore()
     core.attachBoard(CanvasBoardGraphSession.create('board-a', { graphSession: store }))
     const waitTaskImageResults = vi.fn(async () => [
-      { url: 'https://example.com/recovered.png', resultIndex: 0 },
+      { assetId: 'asset_recovered', url: '/api/user/media-assets/asset_recovered/derivatives/preview/webp/content', resultIndex: 0 },
     ])
     const workspace = createReattachWorkspace(store, core, waitTaskImageResults, false)
 
@@ -112,14 +112,14 @@ describe('useCanvasExecutionWorkspace', () => {
     const store = createStore()
     const core = createPendingImageExecutionCore()
     core.attachBoard(CanvasBoardGraphSession.create('board-a', { graphSession: store }))
-    const deferred = createDeferred<Array<{ url: string; resultIndex: number }>>()
+    const deferred = createDeferred<Array<{ url: string; resultIndex: number; assetId?: string }>>()
     const waitTaskImageResults = vi.fn(() => deferred.promise)
     const workspace = createReattachWorkspace(store, core, waitTaskImageResults)
 
     const first = workspace.commands.reattachPendingImageResults()
     const duplicate = workspace.commands.reattachPendingImageResults()
     await vi.waitFor(() => expect(waitTaskImageResults).toHaveBeenCalledOnce())
-    deferred.resolve([{ url: 'https://example.com/recovered.png', resultIndex: 0 }])
+    deferred.resolve([{ assetId: 'asset_recovered', url: '/api/user/media-assets/asset_recovered/derivatives/preview/webp/content', resultIndex: 0 }])
     await Promise.all([first, duplicate])
 
     expect(waitTaskImageResults).toHaveBeenCalledOnce()
@@ -130,7 +130,7 @@ describe('useCanvasExecutionWorkspace', () => {
     const store = createStore('task-old')
     const core = createPendingImageExecutionCore()
     const attachment = core.attachBoard(CanvasBoardGraphSession.create('board-a', { graphSession: store }))
-    const deferred = createDeferred<Array<{ url: string; resultIndex: number }>>()
+    const deferred = createDeferred<Array<{ url: string; resultIndex: number; assetId?: string }>>()
     const workspace = createReattachWorkspace(store, core, () => deferred.promise)
 
     const reattach = workspace.commands.reattachPendingImageResults()
@@ -149,14 +149,14 @@ describe('useCanvasExecutionWorkspace', () => {
     const store = createStore()
     const core = createPendingImageExecutionCore()
     core.attachBoard(CanvasBoardGraphSession.create('board-a', { graphSession: store }))
-    const deferred = createDeferred<Array<{ url: string; resultIndex: number }>>()
+    const deferred = createDeferred<Array<{ url: string; resultIndex: number; assetId?: string }>>()
     const workspace = createReattachWorkspace(store, core, () => deferred.promise)
 
     const reattach = workspace.commands.reattachPendingImageResults()
     await vi.waitFor(() => expect(core.factFor('image-1')).toMatchObject({ status: 'running' }))
     const boardBStore = CanvasGraphSession.hydrate('board-b', createEmptyCanvasBoardSnapshot())
     core.attachBoard(CanvasBoardGraphSession.create('board-b', { graphSession: boardBStore }))
-    deferred.resolve([{ url: 'https://example.com/old-board.png', resultIndex: 0 }])
+    deferred.resolve([{ assetId: 'asset_old_board', url: '/api/user/media-assets/asset_old_board/derivatives/preview/webp/content', resultIndex: 0 }])
     await reattach
 
     expect(core.snapshot().attachment).toMatchObject({ boardId: 'board-b' })
@@ -168,13 +168,13 @@ describe('useCanvasExecutionWorkspace', () => {
     const store = createStore()
     const core = createPendingImageExecutionCore()
     core.attachBoard(CanvasBoardGraphSession.create('board-a', { graphSession: store }))
-    const deferred = createDeferred<Array<{ url: string; resultIndex: number }>>()
+    const deferred = createDeferred<Array<{ url: string; resultIndex: number; assetId?: string }>>()
     const workspace = createReattachWorkspace(store, core, () => deferred.promise)
 
     const reattach = workspace.commands.reattachPendingImageResults()
     await vi.waitFor(() => expect(core.factFor('image-1')).toMatchObject({ status: 'running' }))
     store.store.beginTransaction('delete').removeNode('image-1').commit()
-    deferred.resolve([{ url: 'https://example.com/deleted.png', resultIndex: 0 }])
+    deferred.resolve([{ assetId: 'asset_deleted', url: '/api/user/media-assets/asset_deleted/derivatives/preview/webp/content', resultIndex: 0 }])
     await reattach
 
     expect(core.factFor('image-1')).toMatchObject({ status: 'cancelled', taskId: 'task-1' })

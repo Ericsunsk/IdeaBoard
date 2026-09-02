@@ -46,9 +46,16 @@ const canvasGroupNodeIdSchema = v.pipe(
   v.transform((value) => value as CanvasGroupNodeId),
 )
 
+const mediaRefSchema = v.strictObject({
+  assetId: nonEmptyStringSchema,
+  derivativeTier: v.picklist(['thumb', 'preview', 'large-preview', 'processing', 'processing-input']),
+  derivativeFormat: v.picklist(['webp', 'jpeg', 'png']),
+})
+
 const imageNodeOutputItemSchema = v.strictObject({
   url: nonEmptyStringSchema,
   ratio: positiveFiniteNumberSchema,
+  mediaRef: v.optional(mediaRefSchema),
   mediaAssetId: v.optional(positiveIntegerSchema),
 })
 
@@ -143,6 +150,7 @@ const imageNodeItemSchema = v.strictObject({
   width: finiteNumberSchema,
   title: v.optional(v.string()),
   sourceImageUrl: v.string(),
+  sourceMediaRef: v.optional(mediaRefSchema),
   sourceMediaAssetId: v.optional(positiveIntegerSchema),
   adjustmentRecipe: v.optional(imageAdjustmentRecipeSchema),
   sourceImageRatio: positiveFiniteNumberSchema,

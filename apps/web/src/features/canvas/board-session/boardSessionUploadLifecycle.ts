@@ -1,21 +1,18 @@
 import { uploadApi } from '../../../shared/api/upload'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
-import {
-  rebuildCanvasBoardMediaRefs,
-  type CanvasBoardSnapshot,
-} from '../../canvas-board/domain'
+import { rebuildCanvasBoardMediaRefs, type CanvasBoardSnapshot } from '../../canvas-board/domain'
 import { filenameFromImageUrl, isDataUrl, resolveFetchUrl } from '../services/flowMediaIO'
 import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
-import { resolveMediaAssetOriginalURL } from '../../../shared/api/mediaAssetDelivery'
+import { buildMediaBrowserURL, type MediaRef } from '../../../shared/media/MediaRef'
 import { measureCanvasPerfAsync } from '../utils/canvasPerfProbe'
 
 interface StableRef {
   path: string
   get: () => string
-  getMediaAssetId?: () => number | undefined
+  getMediaRef?: () => MediaRef | undefined
   set: (url: string) => void
-  setMediaAssetId?: (mediaAssetId: number) => void
+  setMediaRef?: (mediaRef: MediaRef) => void
 }
 
 interface BoardSessionUploadLifecycleOptions {
@@ -68,7 +65,7 @@ function isBoardCanvasUploadPath(path: string, userUid: string, boardId: string)
   return false
 }
 
-type StableImageItem = { url: string; mediaAssetId?: number }
+type StableImageItem = { url: string; mediaRef?: MediaRef }
 
 function appendImageItemRefs(
   refs: StableRef[],
@@ -81,12 +78,12 @@ function appendImageItemRefs(
       refs.push({
         path: `${prefix}[${nodeIndex}].${collection}[${itemIndex}].url`,
         get: () => item.url,
-        getMediaAssetId: () => item.mediaAssetId,
+        getMediaRef: () => item.mediaRef,
         set: (url) => {
           item.url = url
         },
-        setMediaAssetId: (mediaAssetId) => {
-          item.mediaAssetId = mediaAssetId
+        setMediaRef: (mediaRef) => {
+          item.mediaRef = mediaRef
         },
       })
     })
@@ -99,12 +96,12 @@ function collectStableRefs(snapshot: CanvasBoardSnapshot): StableRef[] {
     refs.push({
       path: `imageNodes[${index}].sourceImageUrl`,
       get: () => node.sourceImageUrl,
-      getMediaAssetId: () => node.sourceMediaAssetId,
+      getMediaRef: () => node.sourceMediaRef,
       set: (url) => {
         node.sourceImageUrl = url
       },
-      setMediaAssetId: (mediaAssetId) => {
-        node.sourceMediaAssetId = mediaAssetId
+      setMediaRef: (mediaRef) => {
+        node.sourceMediaRef = mediaRef
       },
     })
   })
@@ -128,7 +125,7 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
     return isBoardCanvasUploadPath(path, normalizedUserUid, normalizedBoardId)
   }
 
-  async function fetchAndUploadStable(raw: string): Promise<{ url: string; mediaAssetId: number }> {
+  async function fetchAndUploadStable(raw: string): Promise<{ url: string; mediaRef: MediaRef }> {
     const blob = await fetchImageBlob(raw)
     if (!blob.size) {
       throw new Error(t('canvas.session.downloadEmptyResponse'))
@@ -139,11 +136,16 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
     const prepared = await prepareImageAssetForUpload(file)
     prepared.warnings.forEach((message) => warning(message))
     const uploaded = await uploadApi.upload(prepared.uploadFile, normalizedBoardId)
-    const mediaAssetId = Number(uploaded.media_asset_id)
-    if (!Number.isInteger(mediaAssetId) || mediaAssetId <= 0) {
+    const assetId = uploaded.asset_id?.trim()
+    if (!assetId) {
       throw new Error(t('canvas.session.uploadMissingMediaAsset'))
     }
-    return { url: resolveMediaAssetOriginalURL(mediaAssetId), mediaAssetId }
+    const mediaRef: MediaRef = {
+      assetId,
+      derivativeTier: 'preview',
+      derivativeFormat: 'webp',
+    }
+    return { url: buildMediaBrowserURL(mediaRef), mediaRef }
   }
 
   async function fetchImageBlob(raw: string): Promise<Blob> {
@@ -198,15 +200,15 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
       }),
       async () => {
         const refs = collectStableRefs(snapshot)
-        const tasks = new Map<string, Promise<{ url: string; mediaAssetId: number }>>()
+        const tasks = new Map<string, Promise<{ url: string; mediaRef: MediaRef }>>()
         for (const ref of refs) {
           const current = ref.get()
           const normalized = current.trim()
           if (!normalized) continue
           if (normalized !== current) ref.set(normalized)
-          const mediaAssetId = Number(ref.getMediaAssetId?.())
-          if (Number.isInteger(mediaAssetId) && mediaAssetId > 0) {
-            const stableUrl = resolveMediaAssetOriginalURL(mediaAssetId)
+          const mediaRef = ref.getMediaRef?.()
+          if (mediaRef) {
+            const stableUrl = buildMediaBrowserURL(mediaRef)
             if (normalized !== stableUrl) ref.set(stableUrl)
             continue
           }
@@ -221,7 +223,7 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
           try {
             const uploaded = await task
             ref.set(uploaded.url)
-            ref.setMediaAssetId?.(uploaded.mediaAssetId)
+            ref.setMediaRef?.(uploaded.mediaRef)
           } catch (error) {
             const reason = userFacingErrorCopy(error, t('canvas.session.unknownError'))
             throw new Error(t('canvas.session.unstableImageLink', { path: ref.path, reason }), {

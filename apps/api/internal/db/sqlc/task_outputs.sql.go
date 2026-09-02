@@ -67,6 +67,7 @@ SELECT
   o.id,
   o.task_id,
   o.media_asset_id,
+  COALESCE(a.asset_id, '') AS asset_id,
   o.output_kind,
   o.role,
   (CASE WHEN o.output_kind = 'remote' THEN o.url ELSE COALESCE(a.url, '') END)::text AS url,
@@ -92,6 +93,7 @@ type ListOutputsByTaskIDsRow struct {
 	ID             int64           `json:"id"`
 	TaskID         string          `json:"task_id"`
 	MediaAssetID   sql.NullInt64   `json:"media_asset_id"`
+	AssetID        string          `json:"asset_id"`
 	OutputKind     string          `json:"output_kind"`
 	Role           string          `json:"role"`
 	Url            string          `json:"url"`
@@ -122,6 +124,7 @@ func (q *Queries) ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([
 			&i.ID,
 			&i.TaskID,
 			&i.MediaAssetID,
+			&i.AssetID,
 			&i.OutputKind,
 			&i.Role,
 			&i.Url,

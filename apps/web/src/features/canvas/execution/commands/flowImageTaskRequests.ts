@@ -234,7 +234,6 @@ export function buildImageInpaintTaskRequest(input: ImageInpaintTaskRequestInput
       output_count: 1,
       output_resolution: 'default',
       ...buildExecutionSizeParams(input.imageSize, input.imageSize),
-      ...(input.originalImageAssetId ? {} : { original_image_url: input.originalImageUrl }),
       mask_image_url: input.maskImageUrl,
       use_mask: true,
       ...(input.originalImageAssetId ? { original_image_asset_id: input.originalImageAssetId } : {}),

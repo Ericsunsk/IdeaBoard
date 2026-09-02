@@ -10,6 +10,7 @@ lanes=(
   'Auth|AUTH_REQUIRED|AUTH_RESULT'
   'Migration integration|MIGRATION_REQUIRED|MIGRATION_RESULT'
   'Ops|OPS_REQUIRED|OPS_RESULT'
+  'Media contract|MEDIA_CONTRACT_REQUIRED|MEDIA_CONTRACT_RESULT'
 )
 
 {
@@ -35,4 +36,3 @@ done
 if [[ "${API_REQUIRED:-}" == true || "${AUTH_REQUIRED:-}" == true || "${DOCKER_REQUIRED:-}" == true ]]; then
   [[ "${WEB_REQUIRED:-}" == true || "${BROWSER_SMOKE_RESULT:-}" == success ]] || exit 1
 fi
-

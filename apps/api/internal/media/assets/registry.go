@@ -45,6 +45,7 @@ type ReadRegistry interface {
 
 type UploadRegistry interface {
 	IngestionRegistry
+	GetByID(context.Context, int64, int64) (dbsqlc.MediaAsset, error)
 	FindReadyOwnedMediaAssetByChecksum(context.Context, int64, string, string) (dbsqlc.MediaAsset, bool, error)
 }
 

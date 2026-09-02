@@ -255,7 +255,7 @@ export function resolveMediaAssetOriginalURL(assetId: number): string {
 }
 
 export function resolveMediaAssetDerivativeURL(
-  assetId: number,
+  assetId: string | number,
   tier: 'thumb' | 'preview' | 'large-preview' | 'processing' | 'processing-input' = 'large-preview',
   format: 'webp' | 'jpeg' | 'png' = 'webp',
 ): string {

@@ -54,6 +54,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		// integrations; using it here would leak a separate API host into the SPA.
 		cfg.PublicOrigins.Web,
 	)
+	repos.mediaAssetRegistry.SetIntegrityVerifier(storage.NewIntegrityVerifier(storageService, storage.IntegrityConfig{}))
 	if err := storageService.EnsureDefaultProfiles(ctx); err != nil {
 		return appDomainServices{}, fmt.Errorf("failed to ensure default storage profiles: %w", err)
 	}

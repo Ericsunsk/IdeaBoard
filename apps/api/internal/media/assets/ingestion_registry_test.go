@@ -16,6 +16,18 @@ import (
 	"ideaboard/api/internal/testdb"
 )
 
+type acceptingIntegrityVerifier struct{}
+
+func (acceptingIntegrityVerifier) Verify(context.Context, string, string, string, string, int64) error {
+	return nil
+}
+
+func newMediaAssetRegistryForTest(db *sql.DB) *MediaAssetRegistry {
+	registry := NewMediaAssetRegistry(db)
+	registry.SetIntegrityVerifier(acceptingIntegrityVerifier{})
+	return registry
+}
+
 func TestBoardUploadIngestionTransitionsToReadyWithDerivativeOutbox(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
@@ -23,7 +35,7 @@ func TestBoardUploadIngestionTransitionsToReadyWithDerivativeOutbox(t *testing.T
 	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
-	registry := NewMediaAssetRegistry(db)
+	registry := newMediaAssetRegistryForTest(db)
 	upload := ingestion.Request{OwnerUserID: owner.ID, Origin: ingestion.BoardUploadFacts{BoardID: "board-ingestion"},
 		StorageProfile: "builtin-local", URL: "/uploads/canvas/owner/board-ingestion/content/image.png", StorageKey: "uploads/canvas/owner/board-ingestion/content/image.png"}
 	stored := storage.StoredUploadRef{
@@ -74,6 +86,61 @@ func TestBoardUploadIngestionTransitionsToReadyWithDerivativeOutbox(t *testing.T
 	assertDerivativeTiers(t, derivatives, []string{"thumb", "preview", "processing-input", "large-preview"})
 }
 
+func TestDerivativeIsRequeuedWhenSourceGenerationChanges(t *testing.T) {
+	db := testdb.Open(t)
+	ctx := context.Background()
+	owner := &users.User{DisplayName: "derivative-generation-owner", Status: 1, Role: "user"}
+	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
+		t.Fatal(err)
+	}
+	registry := newMediaAssetRegistryForTest(db)
+	request := ingestion.Request{
+		OwnerUserID: owner.ID, StorageProfile: "builtin-local",
+		StorageKey: "uploads/generation/source.png", URL: "/uploads/generation/source.png",
+		Origin: ingestion.BoardUploadFacts{BoardID: "generation"},
+	}
+	handle, err := registry.Begin(ctx, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := registry.Complete(ctx, handle, ingestion.Completion{
+		StorageKey: request.StorageKey, URL: request.URL, MIMEType: "image/png", Width: 32, Height: 32,
+		SizeBytes: 128, ChecksumSHA256: "generation-v1",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var derivativeID int64
+	if err := db.QueryRowContext(ctx, `SELECT id FROM media_derivatives WHERE media_asset_id = $1 AND tier = 'preview'`, handle.AssetID).Scan(&derivativeID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE media_derivatives SET status = 'ready', storage_key = 'derivatives/generation/preview.webp', mime_type = 'image/webp', ready_at = now(), source_object_generation = (SELECT object_generation FROM media_assets WHERE id = $1) WHERE id = $2`, handle.AssetID, derivativeID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE media_assets SET object_generation = object_generation + 1 WHERE id = $1`, handle.AssetID); err != nil {
+		t.Fatal(err)
+	}
+	if err := registry.EnsureDerivative(ctx, owner.ID, handle.AssetID, "preview"); err != nil {
+		t.Fatal(err)
+	}
+	row, err := dbsqlc.New(db).GetMediaDerivativeByAssetTier(ctx, dbsqlc.GetMediaDerivativeByAssetTierParams{MediaAssetID: handle.AssetID, OwnerUserID: owner.ID, Tier: "preview"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.Status != "pending" {
+		t.Fatalf("stale derivative status = %q, want pending", row.Status)
+	}
+	asset, err := dbsqlc.New(db).GetMediaAssetByID(ctx, handle.AssetID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.SourceObjectGeneration != asset.ObjectGeneration {
+		t.Fatalf("source generation = %d, asset generation = %d", row.SourceObjectGeneration, asset.ObjectGeneration)
+	}
+	if _, err := dbsqlc.New(db).GetMediaDerivativeForDelivery(ctx, dbsqlc.GetMediaDerivativeForDeliveryParams{MediaAssetID: handle.AssetID, OwnerUserID: owner.ID, Tier: "preview"}); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("stale derivative delivery err = %v, want sql.ErrNoRows", err)
+	}
+}
+
 // This exercises the public ingestion/read seams rather than the concrete type. A
 // workflow can rely on Begin and Complete committing the ready asset and its
 // default derivative outbox together, without knowing the SQL implementation.
@@ -88,7 +155,7 @@ func TestRegistryContractCompletesBoardIngestionWithDerivativeOutbox(t *testing.
 	var registry interface {
 		IngestionRegistry
 		GetByID(context.Context, int64, int64) (dbsqlc.MediaAsset, error)
-	} = NewMediaAssetRegistry(db)
+	} = newMediaAssetRegistryForTest(db)
 	request := ingestion.Request{
 		OwnerUserID:    owner.ID,
 		StorageProfile: "builtin-local",
@@ -107,6 +174,11 @@ func TestRegistryContractCompletesBoardIngestionWithDerivativeOutbox(t *testing.
 		Width:      32,
 		Height:     24,
 		SizeBytes:  128,
+	}
+	mismatched := completion
+	mismatched.StorageKey = "uploads/canvas/registry-contract/other.png"
+	if err := registry.Complete(ctx, handle, mismatched); err == nil || !strings.Contains(err.Error(), "storage key does not match") {
+		t.Fatalf("expected completion storage key mismatch, got %v", err)
 	}
 	if err := registry.Complete(ctx, handle, completion); err != nil {
 		t.Fatalf("complete ingestion: %v", err)
@@ -132,7 +204,7 @@ func TestEnsureDerivativeKeepsOutboxWhenImmediateEnqueueFails(t *testing.T) {
 	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
-	registry := NewMediaAssetRegistry(db)
+	registry := newMediaAssetRegistryForTest(db)
 	request := ingestion.Request{
 		OwnerUserID:    owner.ID,
 		StorageProfile: "builtin-local", StorageKey: "uploads/canvas/fallback/image.png",
@@ -179,7 +251,7 @@ func TestLibraryMaterializationReusesManagedAssetAndQueuesDerivatives(t *testing
 	if err := db.QueryRowContext(ctx, `INSERT INTO library_assets (owner_user_id, folder_id, provider, source_id, source_url, preview_url, original_url) VALUES ($1, $2, 'unsplash', 'materialized', 'https://unsplash.com/photos/materialized', 'https://images.unsplash.com/materialized-preview', 'https://images.unsplash.com/materialized-original') RETURNING id`, owner.ID, folderID).Scan(&libraryAssetID); err != nil {
 		t.Fatal(err)
 	}
-	registry := NewMediaAssetRegistry(db)
+	registry := newMediaAssetRegistryForTest(db)
 	media := ingestion.Request{OwnerUserID: owner.ID, StorageProfile: "builtin-local", StorageKey: "uploads/library/1/materialized/original", URL: "/uploads/library/1/materialized/original", Origin: ingestion.LibraryMaterializationFacts{LibraryAssetID: libraryAssetID, CanonicalSourceURL: "https://unsplash.com/photos/materialized", Provider: "unsplash", SourceID: "materialized"}}
 	handle, err := registry.Begin(ctx, media)
 	if err != nil {
@@ -225,7 +297,7 @@ func TestTaskResultIngestionTransitionsToReadyIdempotently(t *testing.T) {
 	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
-	registry := NewMediaAssetRegistry(db)
+	registry := newMediaAssetRegistryForTest(db)
 	request := ingestion.Request{
 		OwnerUserID:    owner.ID,
 		StorageProfile: "builtin-local", StorageKey: "uploads/tasks/1/task-result-ingestion/result-0.png", URL: "/uploads/tasks/1/task-result-ingestion/result-0.png", SourceURL: "https://provider.example/result.png",
@@ -299,7 +371,7 @@ func TestGenerationPreparationIngestionCompletesWithTypedMediaRef(t *testing.T) 
 	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
-	registry := NewMediaAssetRegistry(db)
+	registry := newMediaAssetRegistryForTest(db)
 	request := ingestion.Request{
 		OwnerUserID: owner.ID, StorageProfile: "builtin-local", StorageKey: "uploads/tasks/1/prepare-action/input-0.png",
 		URL: "/uploads/tasks/1/prepare-action/input-0.png", SourceURL: "https://source.example/input.png",
@@ -339,7 +411,7 @@ func TestMediaAssetRegistryPersistsFailureForEveryOrigin(t *testing.T) {
 	if err := db.QueryRowContext(ctx, `INSERT INTO library_assets (owner_user_id, folder_id, provider, source_id, source_url, preview_url, original_url) VALUES ($1, $2, 'unsplash', 'failed-origin', 'https://unsplash.com/photos/failed-origin', 'https://images.unsplash.com/failed-preview', 'https://images.unsplash.com/failed-original') RETURNING id`, owner.ID, folderID).Scan(&libraryAssetID); err != nil {
 		t.Fatal(err)
 	}
-	registry := NewMediaAssetRegistry(db)
+	registry := newMediaAssetRegistryForTest(db)
 	requests := []ingestion.Request{
 		{OwnerUserID: owner.ID, StorageProfile: "builtin-local", StorageKey: "uploads/canvas/1/failure/image.png", URL: "/uploads/canvas/1/failure/image.png", Origin: ingestion.BoardUploadFacts{BoardID: "failure-board"}},
 		{OwnerUserID: owner.ID, StorageProfile: "builtin-local", StorageKey: "uploads/tasks/1/failure/input.png", URL: "/uploads/tasks/1/failure/input.png", Origin: ingestion.GenerationPreparationFacts{RefID: "failure-action", Role: "input", InputIndex: 0}},
@@ -371,7 +443,7 @@ func TestMediaAssetRegistryRegistersBoardUploadForInitialReclamation(t *testing.
 		t.Fatalf("create upload owner: %v", err)
 	}
 	now := time.Date(2026, time.July, 29, 12, 0, 0, 0, time.UTC)
-	registry := NewMediaAssetRegistry(db)
+	registry := newMediaAssetRegistryForTest(db)
 	registry.now = func() time.Time { return now }
 
 	upload := ingestion.Request{OwnerUserID: owner.ID, StorageProfile: "builtin-local", StorageKey: "uploads/canvas/OWNER/shared-board/content/image.png", URL: "https://media.example.com/uploads/canvas/OWNER/shared-board/content/image.png", Origin: ingestion.BoardUploadFacts{BoardID: "shared-board"}}

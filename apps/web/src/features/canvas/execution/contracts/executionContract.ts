@@ -64,7 +64,7 @@ interface BuildExecutionTaskRequestOptions {
 }
 
 const CANVAS_INTERACTIVE_TASK_PRIORITY = 1
-const MEDIA_STRING_PARAM_KEYS = new Set(['original_image_url', 'mask_image_url'])
+const MEDIA_STRING_PARAM_KEYS = new Set(['mask_image_url'])
 
 function canonicalizeTaskMediaParam(key: string, value: unknown): unknown {
   if (MEDIA_STRING_PARAM_KEYS.has(key) && typeof value === 'string') {

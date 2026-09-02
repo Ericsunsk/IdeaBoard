@@ -20,6 +20,11 @@ vi.mock('../media/imageSize', () => ({
 vi.mock('../media/flowInpaintMask', () => ({
   prepareFlowInpaintMask: vi.fn(async () => 'https://example.com/mask.png'),
 }))
+vi.mock('../../../../shared/api/mediaAssetDelivery', () => ({
+  resolveMediaAssetProcessingURL: vi.fn(async (assetId: number) =>
+    `/api/user/media-assets/${assetId}/derivatives/processing/jpeg/content`,
+  ),
+}))
 
 const rendererMetrics = { readNodeMetrics: () => null }
 
@@ -185,7 +190,7 @@ describe('useFlowImageWorkflowExecution', () => {
       kind: 'inpaint',
       activationId: 'inpaint',
       sourceNodeId: 'image-1',
-      source: { url: 'https://example.com/a.png', ratio: 1 },
+      source: { url: 'https://example.com/a.png', ratio: 1, mediaAssetId: 42 },
       prompt: 'remove the object',
       rawMaskDataUrl: 'data:image/png;base64,mask',
       outputCount: 1,
@@ -197,7 +202,7 @@ describe('useFlowImageWorkflowExecution', () => {
       feature: 'inpaint',
       params: {
         output_count: 1,
-        original_image_url: 'https://example.com/a.png',
+        original_image_asset_id: 42,
         mask_image_url: 'https://example.com/mask.png',
         original_image_width: 1200,
         original_image_height: 800,

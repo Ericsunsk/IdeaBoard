@@ -1,6 +1,7 @@
 import { normalizePromptAspectRatio } from '../../canvas-board/domain'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
 import type { MediaInputImage } from '../graph-editing/useFlowMediaInputImages'
+import type { MediaRef } from '../../../shared/media/MediaRef'
 
 export type GenerationIntentOptions = {
   cancelFlowOutpaintMode: () => void
@@ -8,7 +9,7 @@ export type GenerationIntentOptions = {
   getMediaInputImages: (nodeId: string) => MediaInputImage[]
   runGeneration: (
     nodeId: string,
-    referenceImages: readonly { url: string; ratio: number; mediaAssetId?: number }[],
+    referenceImages: readonly { url: string; ratio: number; mediaRef?: MediaRef }[],
     prompt: string,
     outputCount: number,
     aspectRatio: PromptAspectRatio,
@@ -31,7 +32,7 @@ export function createGenerationIntent(options: GenerationIntentOptions) {
       inputImages.map((item) => ({
         url: item.url,
         ratio: item.ratio,
-        ...(item.mediaAssetId ? { mediaAssetId: item.mediaAssetId } : {}),
+        ...(item.mediaRef ? { mediaRef: item.mediaRef } : {}),
       })),
       prompt,
       outputCount,

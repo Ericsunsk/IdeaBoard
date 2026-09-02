@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json
@@ -52,6 +54,8 @@ jobs:
         shard: ["1/2", "2/2"]
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json
@@ -69,6 +73,8 @@ jobs:
     container: mcr.microsoft.com/playwright:v1.62.1-noble
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json

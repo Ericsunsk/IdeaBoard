@@ -55,7 +55,7 @@ function createHarness(initialNodes: Node[] = []) {
   const droppedFile = ref<File | null>(null)
   const upload = vi.fn(async () => ({
     url: 'https://example.com/uploaded.png',
-    media_asset_id: 42,
+    asset_id: 'asset_42',
     width: 200,
     height: 100,
   }))
@@ -184,8 +184,12 @@ describe('useCanvasGraphEditing', () => {
     expect(harness.upload).toHaveBeenCalledWith(expect.any(File), 'board-a')
     expect(snapshot).toMatchObject({
       title: 'picked.png',
-      sourceImageUrl: '/api/user/media-assets/42/original/content',
-      sourceMediaAssetId: 42,
+      sourceImageUrl: '/api/user/media-assets/asset_42/derivatives/preview/webp/content',
+      sourceMediaRef: {
+        assetId: 'asset_42',
+        derivativeTier: 'preview',
+        derivativeFormat: 'webp',
+      },
       sourceImageRatio: 0.5,
       outputStatus: 'ready',
     })
@@ -217,8 +221,12 @@ describe('useCanvasGraphEditing', () => {
     expect(promptSnapshot.inputImages).toEqual([
       expect.objectContaining({
         sourceType: 'external',
-        url: '/api/user/media-assets/42/original/content',
-        mediaAssetId: 42,
+        url: '/api/user/media-assets/asset_42/derivatives/preview/webp/content',
+        mediaRef: {
+          assetId: 'asset_42',
+          derivativeTier: 'preview',
+          derivativeFormat: 'webp',
+        },
       }),
     ])
     expect(harness.nodes.value).toContainEqual(

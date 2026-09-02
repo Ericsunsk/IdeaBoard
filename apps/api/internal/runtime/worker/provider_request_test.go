@@ -161,8 +161,12 @@ func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T
 	if got.ExecutionPlan == nil || got.ExecutionPlan.RuntimeOperation() != workflow.RuntimeOperationOutpaint {
 		t.Fatalf("runtime operation = %#v, want outpaint", got.ExecutionPlan)
 	}
-	if got.Provider["original_image_url"] != "https://img.example/source.png" {
-		t.Fatalf("original_image_url = %#v", got.Provider["original_image_url"])
+	// Issue #664: the durable boundary no longer carries
+	// `original_image_url`. The original is always resolved
+	// through the processing-input derivative. The runtime
+	// provider call receives the masked input only.
+	if got.Provider["original_image_url"] != nil {
+		t.Fatalf("original_image_url must be dropped from the durable boundary: %#v", got.Provider["original_image_url"])
 	}
 	if got.Provider["original_image_width"] != float64(640) || got.Provider["original_image_height"] != float64(480) {
 		t.Fatalf("original size = %#v x %#v", got.Provider["original_image_width"], got.Provider["original_image_height"])

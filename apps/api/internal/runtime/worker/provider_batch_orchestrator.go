@@ -2,9 +2,10 @@ package worker
 
 import (
 	"context"
+	cryptorand "crypto/rand"
+	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/rand/v2"
 	"time"
 )
 
@@ -131,7 +132,11 @@ func providerRetryDelay(err error) time.Duration {
 		return retryAfter
 	}
 	const base = 250 * time.Millisecond
-	return base/2 + time.Duration(rand.Int64N(int64(base/2)+1))
+	var sample [8]byte
+	if _, readErr := cryptorand.Read(sample[:]); readErr != nil {
+		return base / 2
+	}
+	return base/2 + time.Duration(binary.BigEndian.Uint64(sample[:])%uint64(base/2+1))
 }
 
 func providerRetryAfter(err error) (time.Duration, bool) {

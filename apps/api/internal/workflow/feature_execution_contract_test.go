@@ -32,7 +32,7 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 			capability: RoutingCapabilityGeneration, modelRequirement: RoutingModelRequired,
 			operation: RuntimeOperationGeneration, primitive: GenerationPrimitiveTextToImage,
 			invocation: RuntimeInvocationGenerate, imageInputPolicy: ImageInputOptional,
-			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageForwardWhenPresent,
+			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageExcluded,
 			controlContract: RuntimeControlsNone,
 		},
 		{
@@ -41,7 +41,7 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 			capability: RoutingCapabilityFill, modelRequirement: RoutingModelNotRequired,
 			operation: RuntimeOperationInpaint, imageInputCount: 1, hasMaskInput: true, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationTransform, imageInputPolicy: ImageInputRequired,
-			maskInputPolicy: MaskInputRequired, originalImagePolicy: OriginalImageForwardWhenPresent,
+			maskInputPolicy: MaskInputRequired, originalImagePolicy: OriginalImageExcluded,
 			controlContract: RuntimeControlsNone,
 		},
 		{
@@ -50,7 +50,7 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 			capability: RoutingCapabilityGeneration, modelRequirement: RoutingModelRequired,
 			operation: RuntimeOperationRender, imageInputCount: 1, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationEdit, imageInputPolicy: ImageInputRequired,
-			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageForwardWhenPresent,
+			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageExcluded,
 			controlContract: RuntimeControlsNone,
 		},
 		{
@@ -77,7 +77,7 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 			capability: RoutingCapabilityGeneration, modelRequirement: RoutingModelRequired,
 			operation: RuntimeOperationFusion, imageInputCount: 2, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationEdit, imageInputPolicy: MultipleImageInputsRequired,
-			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageForwardWhenPresent,
+			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageExcluded,
 			controlContract: RuntimeControlsFusion,
 		},
 		{
@@ -95,7 +95,7 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 			capability: RoutingCapabilityFill, modelRequirement: RoutingModelNotRequired,
 			operation: RuntimeOperationOutpaint, imageInputCount: 1, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationTransform, imageInputPolicy: ImageInputRequired,
-			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageForwardWhenPresent,
+			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageExcluded,
 			controlContract: RuntimeControlsOutpaint,
 		},
 	}

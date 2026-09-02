@@ -77,13 +77,13 @@ describe('useFlowImageUploadActions', () => {
       url: string
       width: number
       height: number
-      media_asset_id?: number
+      asset_id: string
     }>()
     const uploadB = createDeferred<{
       url: string
       width: number
       height: number
-      media_asset_id?: number
+      asset_id: string
     }>()
     const uploadApi = {
       upload: vi.fn().mockReturnValueOnce(uploadA.promise).mockReturnValueOnce(uploadB.promise),
@@ -109,16 +109,20 @@ describe('useFlowImageUploadActions', () => {
     const secondUpload = actions.applyImageFileToImageNode('node-1', makeFile('b.png'))
     await flushPromises()
 
-    uploadB.resolve({ url: '/uploads/b.png', width: 100, height: 100, media_asset_id: 22 })
+    uploadB.resolve({ url: '/uploads/b.png', width: 100, height: 100, asset_id: 'asset_22' })
     await expect(secondUpload).resolves.toBe(true)
-    uploadA.resolve({ url: '/uploads/a.png', width: 100, height: 100, media_asset_id: 11 })
+    uploadA.resolve({ url: '/uploads/a.png', width: 100, height: 100, asset_id: 'asset_11' })
     await expect(firstUpload).resolves.toBe(false)
 
     expect(snapshots.get('node-1')?.sourceImageUrl).toBe(
-      '/api/user/media-assets/22/original/content',
+      '/api/user/media-assets/asset_22/derivatives/preview/webp/content',
     )
-    expect(snapshots.get('node-1')?.sourceMediaAssetId).toBe(22)
-    expect(updates).toEqual(['/api/user/media-assets/22/original/content'])
+    expect(snapshots.get('node-1')?.sourceMediaRef).toEqual({
+      assetId: 'asset_22',
+      derivativeTier: 'preview',
+      derivativeFormat: 'webp',
+    })
+    expect(updates).toEqual(['/api/user/media-assets/asset_22/derivatives/preview/webp/content'])
     expect(warnings).toEqual([])
   })
 
@@ -129,7 +133,7 @@ describe('useFlowImageUploadActions', () => {
       url: string
       width: number
       height: number
-      media_asset_id: number
+      asset_id: string
     }>()
     const runtimeStates: Array<{ previewUrl: string; failureMessage?: string } | null> = []
     const actions = useFlowImageUploadActions({
@@ -152,10 +156,15 @@ describe('useFlowImageUploadActions', () => {
 
     expect(runtimeStates).toEqual([{ previewUrl: 'blob:replacement-image' }])
 
-    upload.resolve({ url: '/uploads/replacement.png', width: 100, height: 100, media_asset_id: 71 })
+    upload.resolve({
+      url: '/uploads/replacement.png',
+      width: 100,
+      height: 100,
+      asset_id: 'asset_71',
+    })
     await expect(task).resolves.toBe(true)
     expect(runtimeStates).toEqual([{ previewUrl: 'blob:replacement-image' }, null])
-    expect(snapshots.get('node-1')?.sourceMediaAssetId).toBe(71)
+    expect(snapshots.get('node-1')?.sourceMediaRef?.assetId).toBe('asset_71')
   })
 
   it('warns when an existing image node receives an unsupported file or has no board', async () => {
@@ -168,7 +177,7 @@ describe('useFlowImageUploadActions', () => {
       uploadApi: {
         upload: vi.fn().mockResolvedValue({
           url: '/uploads/decoded.png',
-          media_asset_id: 64,
+          asset_id: 'asset_64',
           width: 100,
           height: 100,
         }),
@@ -209,7 +218,7 @@ describe('useFlowImageUploadActions', () => {
       url: string
       width: number
       height: number
-      media_asset_id?: number
+      asset_id: string
     }>()
     const updateSnapshotNode = vi.fn()
     const actions = useFlowImageUploadActions({
@@ -225,7 +234,7 @@ describe('useFlowImageUploadActions', () => {
     const task = actions.applyImageFileToImageNode('node-1', makeFile('a.png'))
     await flushPromises()
     currentBoardId.value = 'board-b'
-    upload.resolve({ url: '/uploads/a.png', width: 100, height: 100, media_asset_id: 31 })
+    upload.resolve({ url: '/uploads/a.png', width: 100, height: 100, asset_id: 'asset_31' })
 
     await expect(task).resolves.toBe(false)
     expect(updateSnapshotNode).not.toHaveBeenCalled()
@@ -237,7 +246,7 @@ describe('useFlowImageUploadActions', () => {
       url: string
       width: number
       height: number
-      media_asset_id?: number
+      asset_id: string
     }>()
     const createNodeAtPosition = vi.fn().mockReturnValue('node-new')
     const actions = useFlowImageUploadActions({
@@ -253,7 +262,7 @@ describe('useFlowImageUploadActions', () => {
     const task = actions.createImageNodeFromFile({ x: 10, y: 20 }, makeFile('a.png'))
     await flushPromises()
     currentBoardId.value = 'board-b'
-    upload.resolve({ url: '/uploads/a.png', width: 100, height: 100, media_asset_id: 32 })
+    upload.resolve({ url: '/uploads/a.png', width: 100, height: 100, asset_id: 'asset_32' })
 
     await expect(task).resolves.toBeNull()
     expect(createNodeAtPosition).toHaveBeenCalledOnce()
@@ -268,13 +277,13 @@ describe('useFlowImageUploadActions', () => {
         .fn()
         .mockResolvedValueOnce({
           url: '/uploads/canvas/user/board-a/content/first.png',
-          media_asset_id: 41,
+          asset_id: 'asset_41',
           width: 100,
           height: 100,
         })
         .mockResolvedValueOnce({
           url: '/uploads/canvas/user/board-a/content/second.png',
-          media_asset_id: 42,
+          asset_id: 'asset_42',
           width: 100,
           height: 100,
         }),
@@ -318,7 +327,7 @@ describe('useFlowImageUploadActions', () => {
       url: string
       width: number
       height: number
-      media_asset_id: number
+      asset_id: string
     }>()
     const runtimeStates: Array<{ previewUrl: string; failureMessage?: string } | null> = []
     const revokeObjectUrl = vi.fn()
@@ -350,13 +359,17 @@ describe('useFlowImageUploadActions', () => {
       url: '/uploads/local.png',
       width: 200,
       height: 100,
-      media_asset_id: 61,
+      asset_id: 'asset_61',
     })
 
     await expect(task).resolves.toEqual({ kind: 'ready', nodeId: 'image-1' })
     expect(snapshots.get('image-1')).toMatchObject({
-      sourceImageUrl: '/api/user/media-assets/61/original/content',
-      sourceMediaAssetId: 61,
+      sourceImageUrl: '/api/user/media-assets/asset_61/derivatives/preview/webp/content',
+      sourceMediaRef: {
+        assetId: 'asset_61',
+        derivativeTier: 'preview',
+        derivativeFormat: 'webp',
+      },
       sourceImageRatio: 1,
     })
     expect(runtimeStates).toEqual([{ previewUrl: 'blob:local-image' }, null])
@@ -369,7 +382,7 @@ describe('useFlowImageUploadActions', () => {
     const decode = createDeferred<boolean>()
     const upload = createDeferred<{
       url: string
-      media_asset_id: number
+      asset_id: string
       width: number
       height: number
     }>()
@@ -400,7 +413,7 @@ describe('useFlowImageUploadActions', () => {
 
     upload.resolve({
       url: '/uploads/decoded.png',
-      media_asset_id: 64,
+      asset_id: 'asset_64',
       width: 100,
       height: 100,
     })
@@ -432,7 +445,7 @@ describe('useFlowImageUploadActions', () => {
             url: '/uploads/retried.png',
             width: 100,
             height: 100,
-            media_asset_id: 62,
+            asset_id: 'asset_62',
           }),
       },
       onWarning,
@@ -457,7 +470,7 @@ describe('useFlowImageUploadActions', () => {
 
     await expect(actions.retryLocalUpload('image-1')).resolves.toBe(true)
     expect(snapshots.get('image-1')?.sourceImageUrl).toBe(
-      '/api/user/media-assets/62/original/content',
+      '/api/user/media-assets/asset_62/derivatives/preview/webp/content',
     )
     expect(runtimeStates).toEqual([
       { previewUrl: 'blob:retry-image' },
@@ -475,7 +488,7 @@ describe('useFlowImageUploadActions', () => {
       url: string
       width: number
       height: number
-      media_asset_id: number
+      asset_id: string
     }>()
     const revokeObjectUrl = vi.fn()
     const updateSnapshotNode = vi.fn()
@@ -501,7 +514,7 @@ describe('useFlowImageUploadActions', () => {
       url: '/uploads/detached.png',
       width: 100,
       height: 100,
-      media_asset_id: 63,
+      asset_id: 'asset_63',
     })
 
     await expect(task).resolves.toBeNull()
@@ -543,7 +556,7 @@ describe('useFlowImageUploadActions', () => {
       url: string
       width: number
       height: number
-      media_asset_id?: number
+      asset_id: string
     }>()
     const actions = useFlowImageUploadActions({
       currentBoardId,
@@ -558,7 +571,7 @@ describe('useFlowImageUploadActions', () => {
     const task = actions.uploadImageToBoard(makeFile('a.png'))
     await flushPromises()
     currentBoardId.value = 'board-b'
-    upload.resolve({ url: '/uploads/a.png', width: 100, height: 100, media_asset_id: 51 })
+    upload.resolve({ url: '/uploads/a.png', width: 100, height: 100, asset_id: 'asset_51' })
 
     await expect(task).rejects.toThrow('Upload result expired. Please pick the image again.')
   })

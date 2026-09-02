@@ -10,7 +10,7 @@ import (
 	"ideaboard/api/internal/platform/outbound"
 )
 
-var stringKeys = []string{"image_url", "original_image_url", "mask_image_url"}
+var stringKeys = []string{"image_url", "mask_image_url", "canvas_image_ref"}
 var listKeys = []string{"image_urls", "mask_image_urls", "reference_image_urls"}
 
 type DataImage struct {

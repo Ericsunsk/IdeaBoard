@@ -3,10 +3,13 @@ import {
   resolveImageNodeLatestOutput,
   type ImageNodeItem,
 } from '../../canvas-board/domain'
+import { buildMediaBrowserURL, type MediaRef } from '../../../shared/media/MediaRef'
 
 export type ImageNodeDisplayPayload = {
   url: string
   ratio: number
+  mediaRef?: MediaRef
+  /** Internal snapshot migration field; public API uses MediaRef.assetId. */
   mediaAssetId?: number
 }
 
@@ -31,28 +34,32 @@ type ResolveImageNodeLayoutAnchorOptions = {
 export const DEFAULT_IMAGE_NODE_LAYOUT_WIDTH = 280
 
 export function resolveImageNodeDisplayUrl(
-  imageNode: Pick<ImageNodeItem, 'sourceImageUrl' | 'outputImages'>,
+  imageNode: Pick<ImageNodeItem, 'sourceImageUrl' | 'sourceMediaRef' | 'outputImages'>,
 ): string {
   const latestOutput = resolveImageNodeLatestOutput(imageNode)
+  if (latestOutput?.mediaRef) return buildMediaBrowserURL(latestOutput.mediaRef)
+  if (imageNode.sourceMediaRef) return buildMediaBrowserURL(imageNode.sourceMediaRef)
   return `${latestOutput?.url || imageNode.sourceImageUrl || ''}`.trim()
 }
 
 export function resolveImageNodeDisplayPayload(
   imageNode: Pick<
     ImageNodeItem,
-    'sourceImageUrl' | 'sourceMediaAssetId' | 'sourceImageRatio' | 'outputImages'
+    'sourceImageUrl' | 'sourceMediaRef' | 'sourceMediaAssetId' | 'sourceImageRatio' | 'outputImages'
   >,
 ): ImageNodeDisplayPayload | null {
   const url = resolveImageNodeDisplayUrl(imageNode)
   if (!url) return null
   const latestOutput = resolveImageNodeLatestOutput(imageNode)
-  const mediaAssetId = Number(
-    latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId,
-  )
+  const mediaRef = latestOutput ? latestOutput.mediaRef : imageNode.sourceMediaRef
   return {
     url,
     ratio: resolveImageNodeDisplayRatio(imageNode),
-    ...(Number.isInteger(mediaAssetId) && mediaAssetId > 0 ? { mediaAssetId } : {}),
+    ...(mediaRef ? { mediaRef } : {}),
+    ...(mediaRef ? {} : (() => {
+      const legacyID = Number(latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId)
+      return Number.isInteger(legacyID) && legacyID > 0 ? { mediaAssetId: legacyID } : {}
+    })()),
   }
 }
 
@@ -67,11 +74,15 @@ export function resolveImageNodeLayoutAnchor(
   const width = Number(imageNode.width)
   const fallbackWidth = Number(options.fallbackWidth)
   const latestOutput = resolveImageNodeLatestOutput(imageNode)
-  const mediaAssetId = Number(latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId)
+  const mediaRef = latestOutput ? latestOutput.mediaRef : imageNode.sourceMediaRef
   return {
     url,
     ratio: resolveImageNodeDisplayRatio(imageNode),
-    ...(Number.isInteger(mediaAssetId) && mediaAssetId > 0 ? { mediaAssetId } : {}),
+    ...(mediaRef ? { mediaRef } : {}),
+    ...(mediaRef ? {} : (() => {
+      const legacyID = Number(latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId)
+      return Number.isInteger(legacyID) && legacyID > 0 ? { mediaAssetId: legacyID } : {}
+    })()),
     x: Number(node.position?.x ?? imageNode.x ?? 0),
     y: Number(node.position?.y ?? imageNode.y ?? 0),
     width:

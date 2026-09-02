@@ -5,6 +5,7 @@ import {
 } from '../../../../shared/query/taskResult'
 import { i18n } from '../../../../shared/i18n'
 import type { ResolvedTaskImageResult } from './resolvedTaskImageResult'
+import { buildMediaBrowserURL, type MediaRef } from '../../../../shared/media/MediaRef'
 
 export type ImageSize = {
   width: number
@@ -99,11 +100,14 @@ export async function resolveTaskImageResultDisplay(
   }
 
   const ratio = size ? size.height / size.width : fallbackRatio > 0 ? fallbackRatio : 1
+  const mediaRef: MediaRef | undefined = normalized.assetId
+    ? { assetId: normalized.assetId, derivativeTier: 'preview', derivativeFormat: 'webp' }
+    : undefined
   return {
-    url: normalized.url,
+    url: mediaRef ? buildMediaBrowserURL(mediaRef) : normalized.url,
     ratio,
+    ...(mediaRef ? { mediaRef } : {}),
     ...(size ? { width: size.width, height: size.height } : {}),
     ...(normalized.mimeType ? { mimeType: normalized.mimeType } : {}),
-    ...(normalized.mediaAssetId ? { mediaAssetId: normalized.mediaAssetId } : {}),
   }
 }

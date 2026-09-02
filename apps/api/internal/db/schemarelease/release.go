@@ -455,16 +455,19 @@ func openIsolatedSchema(ctx context.Context, db *sql.DB, prefix string) (*sql.Co
 	}
 	schemaName := fmt.Sprintf("%s_%x", prefix, random)
 	quoted := quoteIdentifier(schemaName)
+	// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- quoted is pg identifier sanitized above
 	if _, err := db.ExecContext(ctx, "CREATE SCHEMA "+quoted); err != nil {
 		return nil, nil, fmt.Errorf("create isolated schema: %w", err)
 	}
 	conn, err := db.Conn(ctx)
 	if err != nil {
+		// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- quoted is pg identifier sanitized above
 		_, _ = db.ExecContext(context.Background(), "DROP SCHEMA IF EXISTS "+quoted+" CASCADE")
 		return nil, nil, fmt.Errorf("open isolated schema connection: %w", err)
 	}
 	if _, err := conn.ExecContext(ctx, "SET search_path TO "+quoted+", public"); err != nil {
 		_ = conn.Close()
+		// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- quoted is pg identifier sanitized above
 		_, _ = db.ExecContext(context.Background(), "DROP SCHEMA IF EXISTS "+quoted+" CASCADE")
 		return nil, nil, fmt.Errorf("set isolated schema search_path: %w", err)
 	}
@@ -472,6 +475,7 @@ func openIsolatedSchema(ctx context.Context, db *sql.DB, prefix string) (*sql.Co
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		closeErr := conn.Close()
+		// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- quoted is pg identifier sanitized above
 		_, dropErr := db.ExecContext(cleanupCtx, "DROP SCHEMA IF EXISTS "+quoted+" CASCADE")
 		return errors.Join(closeErr, dropErr)
 	}

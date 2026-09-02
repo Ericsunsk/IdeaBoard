@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -43,7 +44,7 @@ func (r *recordingTaskResultRegistry) Begin(_ context.Context, request ingestion
 	id := r.nextID
 	r.nextID++
 	return ingestion.Handle{
-		AssetID: id, OwnerUserID: request.OwnerUserID, StorageProfile: request.StorageProfile,
+		AssetID: id, PublicAssetID: fmt.Sprintf("asset_test_%d", id), OwnerUserID: request.OwnerUserID, StorageProfile: request.StorageProfile,
 		StorageKey: request.StorageKey, Origin: request.Origin,
 	}, nil
 }
@@ -161,6 +162,25 @@ func TestRuntimeTaskMediaStoreNeverFallsBackToOriginalAsset(t *testing.T) {
 	}
 }
 
+func TestRuntimeTaskMediaStoreRejectsExtraManifestRefs(t *testing.T) {
+	service, _ := newStorageServiceTest(t)
+	store := NewRuntimeTaskMediaStore(service, &recordingTaskResultRegistry{})
+	manifest, err := tasks.NewTaskInputManifest([]tasks.TaskInputManifestRef{
+		{
+			AssetID: "asset_extra", DerivativeID: "derivative_extra", DerivativeTier: tasks.TierProcessingInput,
+			StorageProfileID: "profile_primary", ObjectKey: "uploads/processing/extra.webp", ObjectGeneration: 1,
+			ChecksumSHA256: strings.Repeat("a", 64), MIMEType: "image/webp", SizeBytes: 1,
+		},
+	}, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	params := &tasks.WorkflowTaskParams{Media: &tasks.MediaInputs{}, InputManifest: manifest}
+	if _, err := store.ResolveRuntimeMedia(t.Context(), params); err == nil || !strings.Contains(err.Error(), "manifest 与 media params 不匹配") {
+		t.Fatalf("expected extra manifest refs to be rejected, got %v", err)
+	}
+}
+
 func TestRuntimeTaskMediaStoreMaterializeRemoteResultsStoresOutputs(t *testing.T) {
 	withTempWorkingDir(t)
 	tmpDir := t.TempDir()
@@ -204,6 +224,9 @@ func TestRuntimeTaskMediaStoreMaterializeRemoteResultsStoresOutputs(t *testing.T
 		}
 		if output.MediaAssetID == nil || *output.MediaAssetID != int64(100+i) {
 			t.Fatalf("output[%d] asset = %#v", i, output.MediaAssetID)
+		}
+		if output.AssetID != fmt.Sprintf("asset_test_%d", 100+i) {
+			t.Fatalf("output[%d] public asset id = %q", i, output.AssetID)
 		}
 		assertLocalUploadBytes(t, output.StorageKey, imageBytes)
 	}
@@ -280,6 +303,9 @@ func TestRuntimeTaskMediaStoreMaterializeBytesResultStoresOutput(t *testing.T) {
 	}
 	if !strings.HasPrefix(output.StorageKey, "uploads/tasks/42/task-bytes/") || output.MIMEType != "image/png" || output.Width != 1 || output.Height != 1 || output.SizeBytes != int64(len(imageBytes)) {
 		t.Fatalf("output storage fields = %#v", output)
+	}
+	if output.AssetID != "asset_test_100" {
+		t.Fatalf("output public asset id = %q", output.AssetID)
 	}
 	assertLocalUploadBytes(t, output.StorageKey, imageBytes)
 }

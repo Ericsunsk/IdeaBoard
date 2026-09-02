@@ -624,3 +624,19 @@ func TestS3CompatibleClientRechecksEndpointPolicyBeforeUsingCachedClient(t *test
 		t.Fatal("cached client remained usable when policy lookup failed")
 	}
 }
+
+func TestS3CompatibleServiceVerifyObjectGenerationUsesAdapterMetadata(t *testing.T) {
+	service := NewS3CompatibleService()
+	cfg := &S3CompatibleConfig{Enabled: true, ProfileID: "profile", AccessKeyID: "ak", SecretAccessKey: "sk", BucketName: "bucket", Endpoint: "s3.example.com", AccessDomain: "https://bucket.example.com"}
+	service.generationRead = func(context.Context, string, *S3CompatibleConfig) (int64, error) { return 7, nil }
+	if err := service.VerifyObjectGeneration(context.Background(), "uploads/image.png", 7, cfg); err != nil {
+		t.Fatalf("matching generation rejected: %v", err)
+	}
+	if err := service.VerifyObjectGeneration(context.Background(), "uploads/image.png", 8, cfg); !errors.Is(err, ErrObjectGenerationUnavailable) {
+		t.Fatalf("mismatched generation error = %v, want ErrObjectGenerationUnavailable", err)
+	}
+	service.generationRead = func(context.Context, string, *S3CompatibleConfig) (int64, error) { return 0, nil }
+	if err := service.VerifyObjectGeneration(context.Background(), "uploads/image.png", 7, cfg); !errors.Is(err, ErrObjectGenerationUnavailable) {
+		t.Fatalf("missing generation error = %v, want ErrObjectGenerationUnavailable", err)
+	}
+}

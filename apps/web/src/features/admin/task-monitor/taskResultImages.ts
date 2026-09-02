@@ -1,4 +1,4 @@
-import { PUBLIC_ASSET_BASE_URL, resolveAssetUrl } from '../../../shared/config/runtimeUrls'
+import { resolveAssetUrl } from '../../../shared/config/runtimeUrls'
 
 const HTTP_URL_RE = /^https?:\/\//i
 const UPLOAD_ASSET_PATH_PREFIX = '/uploads/'
@@ -17,27 +17,14 @@ function parseResultImageUrl(rawUrl: string): URL | null {
   }
 }
 
-function getTrustedAssetBaseUrl(): URL | null {
-  if (!PUBLIC_ASSET_BASE_URL) return null
-  return parseResultImageUrl(PUBLIC_ASSET_BASE_URL)
+function hasUploadAssetPath(pathname: string): boolean {
+  return pathname.startsWith(UPLOAD_ASSET_PATH_PREFIX)
 }
 
-function hasUploadAssetPath(pathname: string, basePathname = ''): boolean {
-  const normalizedBase = basePathname.replace(/\/+$/, '')
-  const uploadPath = `${normalizedBase}${UPLOAD_ASSET_PATH_PREFIX}`
-  return pathname.startsWith(uploadPath)
-}
-
+// Browser-visible task images must stay on the same-origin upload path.
 function isTrustedUploadUrl(url: URL): boolean {
   const currentOrigin = getCurrentOrigin()
-  if (url.origin === currentOrigin && hasUploadAssetPath(url.pathname)) return true
-
-  const trustedAssetBase = getTrustedAssetBaseUrl()
-  return (
-    !!trustedAssetBase &&
-    url.origin === trustedAssetBase.origin &&
-    hasUploadAssetPath(url.pathname, trustedAssetBase.pathname)
-  )
+  return url.origin === currentOrigin && hasUploadAssetPath(url.pathname)
 }
 
 export function getSafeResultImageUrl(rawUrl: string): string {

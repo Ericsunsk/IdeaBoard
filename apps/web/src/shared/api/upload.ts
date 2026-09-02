@@ -1,4 +1,7 @@
-import { uploadUserBoardAsset, uploadUserProfileAvatar } from './generated-query/user-assets/user-assets'
+import {
+  uploadUserBoardAsset,
+  uploadUserProfileAvatar,
+} from './generated-query/user-assets/user-assets'
 import type { UploadAvatarMetadata, UploadImageMetadata } from './generated-query/model'
 import { resolveApiData } from './apiResponse'
 import { i18n } from '../i18n'
@@ -17,8 +20,7 @@ export const uploadApi = {
       i18n.global.t('common.errors.uploadFailed'),
     )
     if (!data.url?.trim()) throw new Error(i18n.global.t('common.errors.uploadFailed'))
-    const mediaAssetId = Number(data.media_asset_id)
-    if (!Number.isInteger(mediaAssetId) || mediaAssetId <= 0) {
+    if (!data.asset_id?.trim()) {
       throw new Error(i18n.global.t('common.errors.uploadProcessingFailed'))
     }
     return data

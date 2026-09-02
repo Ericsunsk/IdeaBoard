@@ -59,6 +59,7 @@ type TaskIntakeDeps struct {
 	Media          taskmedia.Validator
 	MediaReadiness taskmedia.ProcessingInputReadiness
 	MediaPreparer  taskmedia.GenerationMediaPreparer
+	MediaManifest  taskmedia.TaskInputManifestBuilder
 }
 
 type taskIntake struct {
@@ -67,6 +68,7 @@ type taskIntake struct {
 	media          taskmedia.Validator
 	mediaReadiness taskmedia.ProcessingInputReadiness
 	mediaPreparer  taskmedia.GenerationMediaPreparer
+	mediaManifest  taskmedia.TaskInputManifestBuilder
 }
 
 func NewTaskIntake(deps TaskIntakeDeps) TaskIntake {
@@ -76,6 +78,7 @@ func NewTaskIntake(deps TaskIntakeDeps) TaskIntake {
 		media:          deps.Media,
 		mediaReadiness: deps.MediaReadiness,
 		mediaPreparer:  deps.MediaPreparer,
+		mediaManifest:  deps.MediaManifest,
 	}
 }
 
@@ -222,6 +225,9 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	if err := validateImageFillDimensions(featureSlug, typedParams); err != nil {
 		return CanonicalTaskRequest{}, err
 	}
+	if err := i.validateProcessingInputReadiness(ctx, userID, submitRequestAssetIDs(req)); err != nil {
+		return CanonicalTaskRequest{}, err
+	}
 	executionPlanJSON, err := workflow.EncodeFeatureExecutionPlan(executionPlan)
 	if err != nil {
 		return CanonicalTaskRequest{}, err
@@ -334,29 +340,40 @@ func (i *taskIntake) PrepareMedia(ctx context.Context, userID int64, canonical C
 	if userID <= 0 || canonical.UserID() != userID {
 		return CanonicalTaskRequest{}, validation.New("请求用户与任务不匹配")
 	}
+	typedParams, err := tasks.UnmarshalParams(canonical.Params())
+	if err != nil {
+		return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", err)
+	}
+	updated := canonical
 	snapshot := canonical.GenerationSnapshot()
-	if snapshot == nil || len(snapshot.Media) == 0 {
-		return canonical, nil
+	if snapshot != nil && len(snapshot.Media) > 0 {
+		if i.mediaPreparer == nil {
+			return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", fmt.Errorf("generation media preparer is unavailable"))
+		}
+		prepared, prepareErr := i.mediaPreparer.PrepareGenerationMedia(ctx, userID, canonical.ClientActionID(), snapshot)
+		if prepareErr != nil {
+			return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", prepareErr)
+		}
+		updated, err = canonical.WithGenerationSnapshot(prepared)
+		if err != nil {
+			return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", err)
+		}
+		typedParams, err = tasks.UnmarshalParams(updated.Params())
+		if err != nil {
+			return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", err)
+		}
 	}
-	if i.mediaPreparer == nil {
-		return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", fmt.Errorf("generation media preparer is unavailable"))
+	if typedParams.Media == nil || i.mediaManifest == nil {
+		if typedParams.Media == nil {
+			return updated, nil
+		}
+		return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", fmt.Errorf("task input manifest builder is unavailable"))
 	}
-	prepared, err := i.mediaPreparer.PrepareGenerationMedia(ctx, userID, canonical.ClientActionID(), snapshot)
+	manifest, err := i.mediaManifest.BuildTaskInputManifest(ctx, userID, typedParams.Media)
 	if err != nil {
-		return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", err)
+		return CanonicalTaskRequest{}, newSubmissionError("media_processing_input_not_ready", "参考图片仍在处理中，请稍后重试", err)
 	}
-	assetIDs := make([]int64, 0, len(prepared.Media))
-	for _, media := range prepared.Media {
-		assetIDs = append(assetIDs, media.AssetID)
-	}
-	if err := i.validateProcessingInputReadiness(ctx, userID, assetIDs); err != nil {
-		return CanonicalTaskRequest{}, err
-	}
-	updated, err := canonical.WithGenerationSnapshot(prepared)
-	if err != nil {
-		return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", err)
-	}
-	return updated, nil
+	return updated.WithInputManifest(manifest)
 }
 
 func (i *taskIntake) validateProcessingInputReadiness(ctx context.Context, userID int64, assetIDs []int64) error {

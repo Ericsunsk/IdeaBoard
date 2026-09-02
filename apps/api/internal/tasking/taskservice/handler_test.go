@@ -616,6 +616,7 @@ func newSubmitServiceForTest(deps submitTestServiceDeps, opts ServiceOptions) *S
 			Prompts:       promptStore,
 			Media:         deps.MediaValidator,
 			MediaPreparer: mediaPreparer,
+			MediaManifest: recordingTaskInputManifestBuilder{},
 		}),
 		SubmissionStore: deps.SubmissionStore,
 		TaskBilling:     deps.TaskBilling,

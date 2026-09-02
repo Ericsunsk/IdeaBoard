@@ -9,7 +9,7 @@ import {
 } from '../../../shared/utils/imageUploadSupport'
 import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
 import { preloadImage } from '../../../shared/media/preloadImage'
-import { resolveMediaAssetOriginalURL } from '../../../shared/api/mediaAssetDelivery'
+import { buildMediaBrowserURL, type MediaRef } from '../../../shared/media/MediaRef'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
 import { resolveImageNodeFrameSize } from '../../canvas-board/domain'
@@ -17,7 +17,12 @@ import { readCurrentBoardIdRef } from '../utils/currentBoardId'
 import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 import type { FlowLocalUploadState } from '../types/flowTypes'
 
-type FlowImageUploadResult = { url: string; ratio: number; mediaAssetId: number }
+export type FlowImageUploadResult = {
+  url: string
+  ratio: number
+  assetId: string
+  mediaRef: MediaRef
+}
 
 export type CanvasImageNodeCreationResult =
   | Readonly<{ kind: 'ready'; nodeId: CanvasGraphNodeIdForKind<'image'> }>
@@ -35,7 +40,7 @@ type LocalUploadMaterializationResult =
 
 type UploadedImageData = {
   url: string
-  media_asset_id?: number
+  asset_id: string
   width?: number
   height?: number
   mime?: string
@@ -180,10 +185,8 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
         const prepared = await prepareImageAssetForUpload(file)
         prepared.warnings.forEach((message) => options.onWarning(message))
         const uploaded = await options.uploadApi.upload(prepared.uploadFile, boardId)
-        const mediaAssetId = Number(uploaded.media_asset_id)
-        if (!Number.isInteger(mediaAssetId) || mediaAssetId <= 0) {
-          throw new Error(i18n.global.t('canvas.session.uploadMissingMediaAsset'))
-        }
+        const assetId = `${uploaded.asset_id ?? ''}`.trim()
+        if (!assetId) throw new Error(i18n.global.t('canvas.session.uploadMissingMediaAsset'))
         const width = Number(uploaded.width)
         const height = Number(uploaded.height)
         const serverRatio =
@@ -193,10 +196,16 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
         const preparedRatio = prepared.dimensionsKnown && prepared.ratio > 0 ? prepared.ratio : null
         const resolvedRatio =
           preparedRatio ?? (serverRatio && serverRatio > 0 ? serverRatio : null) ?? 1
+        const mediaRef: MediaRef = {
+          assetId,
+          derivativeTier: 'preview',
+          derivativeFormat: 'webp',
+        }
         return {
-          url: resolveMediaAssetOriginalURL(mediaAssetId),
+          url: buildMediaBrowserURL(mediaRef),
           ratio: resolvedRatio,
-          mediaAssetId,
+          assetId,
+          mediaRef,
         }
       } finally {
         inFlightUploads.delete(cacheKey)
@@ -319,7 +328,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
           title: resolveImageFileTitle(localUpload.file) || prev.title,
           width,
           sourceImageUrl: uploaded.url,
-          sourceMediaAssetId: uploaded.mediaAssetId,
+          sourceMediaRef: uploaded.mediaRef,
           sourceImageRatio: uploaded.ratio,
           outputStatus: 'ready',
           outputImages: [],

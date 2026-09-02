@@ -12,9 +12,7 @@ import { CanvasGraphSession, type CanvasGraphTransaction } from '../../graph-run
 import { canvasBoardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
 import { useCanvasGraphEditing } from '../../graph-editing'
 import { useFlowCanvasRuntime, type UseFlowCanvasRuntimeOptions } from './useFlowCanvasRuntime'
-import {
-  createFlowGraphCommandOptions,
-} from '../../vue-flow-adapter/flowGraphAdapterCommandSideEffects'
+import { createFlowGraphCommandOptions } from '../../vue-flow-adapter/flowGraphAdapterCommandSideEffects'
 import {
   CanvasBoardGraphSession,
   collectPendingImageTasks,
@@ -279,7 +277,11 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
         }),
       )
     },
-    hydratePending(attachment: ReturnType<typeof executionCore.currentAttachment>, nodeId: string, taskId: string) {
+    hydratePending(
+      attachment: ReturnType<typeof executionCore.currentAttachment>,
+      nodeId: string,
+      taskId: string,
+    ) {
       if (!attachment) return null
       const hydrated = executionCore.hydratePendingLease(attachment, {
         resultNodeId: nodeId as `image-${number}`,
@@ -288,7 +290,10 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
       })
       return hydrated.kind === 'started' ? hydrated.lease : null
     },
-    beginSubmission(attachment: ReturnType<typeof executionCore.currentAttachment>, nodeId: string) {
+    beginSubmission(
+      attachment: ReturnType<typeof executionCore.currentAttachment>,
+      nodeId: string,
+    ) {
       if (!attachment) return null
       const started = executionCore.begin(attachment, nodeId as `image-${number}`)
       return started.kind === 'started' ? started.lease : null
@@ -302,10 +307,18 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     getNodeLease(nodeId: string) {
       return executionCore.captureActiveLeases([nodeId])[0] ?? null
     },
-    transitionNode(lease: { resultNodeId: `image-${number}` }, state: { status: string; taskId?: string }) {
+    transitionNode(
+      lease: { resultNodeId: `image-${number}` },
+      state: { status: string; taskId?: string },
+    ) {
       if (state.status === 'failed') return executionCore.fail(lease as never).kind === 'applied'
-      if (state.status === 'cancelled') return executionCore.cancel([lease as never]).outcomes.length > 0
-      if (state.status === 'running' && state.taskId) return executionCore.markSubmitted(lease as never, state.taskId, `action-${state.taskId}`).kind === 'applied'
+      if (state.status === 'cancelled')
+        return executionCore.cancel([lease as never]).outcomes.length > 0
+      if (state.status === 'running' && state.taskId)
+        return (
+          executionCore.markSubmitted(lease as never, state.taskId, `action-${state.taskId}`)
+            .kind === 'applied'
+        )
       if (state.status === 'succeeded') {
         terminalStates.set(lease.resultNodeId, { status: state.status, taskId: state.taskId })
         executionCore.release([lease as never])
@@ -429,7 +442,7 @@ function createCanvasGraphRuntimeHarness(harness: ReturnType<typeof createRuntim
     upload: {
       upload: vi.fn(async () => ({
         url: 'https://example.com/upload.png',
-        media_asset_id: 42,
+        asset_id: 'asset_42',
       })),
     },
     materializeLibraryAsset: vi.fn(async () => ({
@@ -484,7 +497,9 @@ function projectCanonicalGraph(
 
 function commitCanonicalGraphMutation(
   harness: ReturnType<typeof createRuntimeHarness>,
-  reason: Parameters<ReturnType<typeof harness.runtime.graphEditing.readCanvasGraphStore>['beginTransaction']>[0],
+  reason: Parameters<
+    ReturnType<typeof harness.runtime.graphEditing.readCanvasGraphStore>['beginTransaction']
+  >[0],
   mutate: (transaction: CanvasGraphTransaction) => void,
 ) {
   const transaction = harness.runtime.graphEditing.readCanvasGraphStore().beginTransaction(reason, {
@@ -731,7 +746,9 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.renderEdges.value[0]?.animated).toBe(false)
     expect(harness.graphActions.setEdges).toHaveBeenCalled()
     const lastPresentedEdges = vi.mocked(harness.graphActions.setEdges).mock.lastCall?.[0] ?? []
-    expect(lastPresentedEdges.find((edge: Edge) => edge.id === 'connection-4')?.animated).toBe(false)
+    expect(lastPresentedEdges.find((edge: Edge) => edge.id === 'connection-4')?.animated).toBe(
+      false,
+    )
     resolveSave()
     await save
 
@@ -785,7 +802,9 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.nodes.value.map((node) => node.id)).toContain('image-10')
     expect(harness.edges.value.map((edge) => edge.id)).toContain('connection-4')
     expect(harness.edges.value.map((edge) => edge.id)).toContain('connection-5')
-    expect(harness.renderEdges.value.find((edge) => edge.id === 'connection-4')?.animated).toBe(true)
+    expect(harness.renderEdges.value.find((edge) => edge.id === 'connection-4')?.animated).toBe(
+      true,
+    )
   })
 
   it('reconciles a persisted pending edge by endpoints instead of retaining both edge ids', async () => {
@@ -834,10 +853,9 @@ describe('useFlowCanvasRuntime', () => {
     await nextTick()
     harness.graphActions.setNodes.mockClear()
 
-    const transaction = harness.runtime.graphEditing.readCanvasGraphStore().beginTransaction(
-      'node-update',
-      { recordHistory: true, markDirty: true },
-    )
+    const transaction = harness.runtime.graphEditing
+      .readCanvasGraphStore()
+      .beginTransaction('node-update', { recordHistory: true, markDirty: true })
     transaction.addNode({
       id: 99,
       type: 'prompt',
@@ -1114,7 +1132,9 @@ describe('useFlowCanvasRuntime', () => {
       targetHandle: 'in:image',
     })
 
-    expect(harness.onWarning).toHaveBeenCalledWith('Failed to write the connection to the canvas. Refresh and try again.')
+    expect(harness.onWarning).toHaveBeenCalledWith(
+      'Failed to write the connection to the canvas. Refresh and try again.',
+    )
     expect(readEdgeProjection(harness.fullEdges.value)).toEqual(projectionBefore)
     expect(exportCurrentBoardSnapshot(harness)).toEqual(snapshotBefore)
     expect(harness.graphActions.addEdges).not.toHaveBeenCalled()
@@ -1129,10 +1149,12 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
 
-    const transaction = harness.runtime.graphEditing.readCanvasGraphStore().beginTransaction('group', {
-      recordHistory: true,
-      markDirty: true,
-    })
+    const transaction = harness.runtime.graphEditing
+      .readCanvasGraphStore()
+      .beginTransaction('group', {
+        recordHistory: true,
+        markDirty: true,
+      })
     transaction.createGroup(['image-1', 'prompt-1'], SAMPLE_GROUP_GEOMETRY, 'group-1')
     transaction.commit()
 
@@ -2683,7 +2705,9 @@ describe('useFlowCanvasRuntime', () => {
 
     graphRuntime.onFlowDeleteNode('node-image-1')
 
-    expect(harness.onWarning).toHaveBeenCalledWith('Failed to write the deletion to the canvas. Refresh and try again.')
+    expect(harness.onWarning).toHaveBeenCalledWith(
+      'Failed to write the deletion to the canvas. Refresh and try again.',
+    )
     expect(exportCurrentBoardSnapshot(harness)).toEqual(graphBefore)
     expect(harness.isDirty.value).toBe(false)
   })
@@ -2883,7 +2907,9 @@ describe('useFlowCanvasRuntime', () => {
       },
     ])
 
-    expect(harness.onWarning).not.toHaveBeenCalledWith('Failed to apply the deletion. Refresh the canvas and try again.')
+    expect(harness.onWarning).not.toHaveBeenCalledWith(
+      'Failed to apply the deletion. Refresh the canvas and try again.',
+    )
     expect(harness.fullEdges.value).toHaveLength(0)
   })
 
@@ -2916,7 +2942,9 @@ describe('useFlowCanvasRuntime', () => {
       },
     ])
 
-    expect(harness.onWarning).toHaveBeenCalledWith('Failed to apply the deletion. Refresh the canvas and try again.')
+    expect(harness.onWarning).toHaveBeenCalledWith(
+      'Failed to apply the deletion. Refresh the canvas and try again.',
+    )
     expect(readEdgeProjection(harness.fullEdges.value)).toEqual(edgeProjectionBefore)
     expect(harness.graphActions.applyEdgeChanges).not.toHaveBeenCalled()
     expect(harness.isDirty.value).toBe(false)
@@ -2951,7 +2979,9 @@ describe('useFlowCanvasRuntime', () => {
     ])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.onWarning).not.toHaveBeenCalledWith('Failed to apply the deletion. Refresh the canvas and try again.')
+    expect(harness.onWarning).not.toHaveBeenCalledWith(
+      'Failed to apply the deletion. Refresh the canvas and try again.',
+    )
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toHaveLength(0)
   })
@@ -2983,7 +3013,9 @@ describe('useFlowCanvasRuntime', () => {
     harness.runtime.flowPane.onNodesChange([{ id: 'image-1', type: 'remove' }])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.onWarning).not.toHaveBeenCalledWith('Failed to apply the deletion. Refresh the canvas and try again.')
+    expect(harness.onWarning).not.toHaveBeenCalledWith(
+      'Failed to apply the deletion. Refresh the canvas and try again.',
+    )
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toHaveLength(0)
   })
@@ -3016,7 +3048,9 @@ describe('useFlowCanvasRuntime', () => {
     harness.runtime.flowPane.onNodesChange([{ id: driftedImageNode.id, type: 'remove' }])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.onWarning).not.toHaveBeenCalledWith('Failed to apply the deletion. Refresh the canvas and try again.')
+    expect(harness.onWarning).not.toHaveBeenCalledWith(
+      'Failed to apply the deletion. Refresh the canvas and try again.',
+    )
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toHaveLength(0)
   })

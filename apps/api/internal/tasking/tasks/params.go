@@ -21,6 +21,10 @@ type WorkflowTaskParams struct {
 	// Runtime media refs. Provider adapters flatten this object at the edge.
 	Media *MediaInputs `json:"media,omitempty"`
 
+	// InputManifest is resolved before Billing/Task/River submission. Runtime
+	// code must not rediscover media through the mutable Asset catalog.
+	InputManifest *TaskInputManifest `json:"input_manifest,omitempty"`
+
 	// Generation controls shared by multiple providers.
 	Controls *GenerationControls `json:"controls,omitempty"`
 

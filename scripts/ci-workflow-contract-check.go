@@ -86,11 +86,22 @@ func checkCI(ci workflow) {
 	requireEqual(gate["name"], "CI Gate", "Required check must remain CI Gate")
 	requireStringIn(gate, "needs", "changes", "CI Gate must depend on change classification")
 	requireStringIn(gate, "needs", "migration-integration", "CI Gate must depend on migration integration")
+	requireStringIn(gate, "needs", "media-contract", "CI Gate must depend on Media contract")
+	mediaContract := object(jobs, "media-contract")
+	requireEqual(mediaContract["name"], "Media Contract", "Media contract job must remain separately visible")
+	requireStringIn(mediaContract, "needs", "changes", "Media contract must wait for change classification")
+	mediaBoundary := requireStep(mediaContract, "Run media package boundary gate")
+	requireEqual(mediaBoundary["run"], "./scripts/ci-media-package-boundary.sh", "Media contract must enforce the package boundary")
+	legacyScan := requireStep(mediaContract, "Run legacy media cutover zero-result scan")
+	requireEqual(legacyScan["run"], "./scripts/ci-legacy-media-zero-scan.sh", "Media contract must enforce the clean-break scan")
 	gateCheckout := requireStep(gate, "Checkout")
 	requireEqual(gateCheckout["uses"], "actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10", "CI Gate must checkout the lane policy module")
 	gateStep := requireStep(gate, "Summarize and verify required lanes")
 	requireEqual(gateStep["run"], "./scripts/ci-gate.sh", "CI Gate must use the lane policy module")
 	requireEqual(gateStep["if"], "always()", "CI Gate policy must run after failed or skipped lanes")
+	gateEnv := object(gateStep, "env")
+	requireEqual(gateEnv["MEDIA_CONTRACT_REQUIRED"], "true", "Media contract must always be a required CI lane")
+	requireEqual(gateEnv["MEDIA_CONTRACT_RESULT"], "${{ needs.media-contract.result }}", "CI Gate must receive the Media contract result")
 }
 
 func checkReusableWorkflows(root string) {
@@ -137,6 +148,8 @@ func checkReusableWorkflows(root string) {
 	for _, command := range []string{
 		"bash scripts/ci-change-classifier-test.sh",
 		"bash scripts/ci-gate-test.sh",
+		"bash scripts/ci-media-package-boundary-test.sh",
+		"bash scripts/ci-legacy-media-zero-scan-test.sh",
 		"bash scripts/ci-workflow-contract-test.sh",
 	} {
 		requireContains(ciContractRun, command, "Ops must run "+command)
@@ -157,7 +170,11 @@ func checkRelease(root string, release workflow) {
 	requireEqual(buildInputs["sbom"], true, "Images must include SBOM attestations")
 	requireEqual(buildInputs["tags"], "${{ steps.image.outputs.immutable_tag }}", "Image build must consume the prepared immutable tag")
 	prepareImage := requireStep(object(jobs, "publish-images"), "Prepare image name")
-	requireContains(stringValue(prepareImage["run"]), "immutable_tag=ghcr.io/${repository}/ideaboard-${{ matrix.image.name }}:sha-${{ needs.preflight.outputs.source_commit }}", "Images must use immutable commit tags")
+	prepareImageEnv := object(prepareImage, "env")
+	requireEqual(prepareImageEnv["IMAGE_NAME"], "${{ matrix.image.name }}", "Image name must be passed through step env")
+	requireEqual(prepareImageEnv["SOURCE_COMMIT"], "${{ needs.preflight.outputs.source_commit }}", "Image commit must be passed through step env")
+	prepareImageRun := stringValue(prepareImage["run"])
+	requireContains(prepareImageRun, "immutable_tag=ghcr.io/${repository}/ideaboard-${IMAGE_NAME}:sha-${SOURCE_COMMIT}", "Images must use immutable commit tags")
 
 	deploy := object(jobs, "deploy-production")
 	requireEqual(object(deploy, "concurrency")["cancel-in-progress"], false, "Production deployments must not cancel in progress")

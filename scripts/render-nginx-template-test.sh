@@ -88,11 +88,14 @@ fi
 
 # Forwarded protocol is derived from the actual connection, never a client
 # supplied X-Forwarded-Proto value.
-if grep -qF '$http_x_forwarded_proto' "$output" || grep -qF '$proxy_x_forwarded_proto' "$output"; then
+client_forwarded_proto="\$http_x_forwarded_proto"
+proxy_forwarded_proto="\$proxy_x_forwarded_proto"
+if grep -qF "$client_forwarded_proto" "$output" || grep -qF "$proxy_forwarded_proto" "$output"; then
   printf 'render-nginx-template-test: rendered config trusts client X-Forwarded-Proto\n' >&2
   exit 2
 fi
-forwarded_proto_count="$(grep -cE 'proxy_set_header X-Forwarded-Proto \$scheme;' "$output" || true)"
+forwarded_proto_pattern="proxy_set_header X-Forwarded-Proto \$scheme;"
+forwarded_proto_count="$(grep -cF "$forwarded_proto_pattern" "$output" || true)"
 if (( forwarded_proto_count != 7 )); then
   printf 'render-nginx-template-test: X-Forwarded-Proto count = %d, want 7\n' "$forwarded_proto_count" >&2
   exit 2

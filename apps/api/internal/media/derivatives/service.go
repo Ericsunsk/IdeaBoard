@@ -20,6 +20,7 @@ import (
 	"time"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	mediaerrors "ideaboard/api/internal/media/errors"
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/storage"
 
@@ -56,6 +57,7 @@ var TierSpecs = map[string]TierSpec{
 type Service struct {
 	db       *sql.DB
 	storage  *storage.StorageService
+	verifier *storage.IntegrityVerifier
 	renderer renderer
 	events   EventPublisher
 }
@@ -87,12 +89,45 @@ func (e *failureRecordedError) Error() string { return e.err.Error() }
 
 func (e *failureRecordedError) Unwrap() error { return e.err }
 
+// structuredErrorCode maps the inline derivative error string used by
+// the existing error_code column to the structured Code defined in
+// internal/media/errors. The mapping is the single source of truth
+// for the runbook; do not introduce new strings without adding them
+// here. The column itself remains VARCHAR(64) for backward
+// compatibility, but every new code must round-trip through this
+// mapping.
+func structuredErrorCode(inline string) mediaerrors.Code {
+	switch inline {
+	case "asset_not_found":
+		return mediaerrors.CodeMediaNotFound
+	case "source_read_failed", "destination_write_failed", "key_failed":
+		return mediaerrors.CodeObjectMissing
+	case "source_limits_exceeded", "output_limits_exceeded", "integrity_invalid":
+		return mediaerrors.CodeObjectInvalid
+	case "render_failed", "renderer_unavailable", "integrity_transient":
+		return mediaerrors.CodeStorageTransient
+	case "invalid_tier":
+		return mediaerrors.CodeMediaNotFound
+	case "stale_processing_recovered":
+		return mediaerrors.CodeStorageTransient
+	default:
+		// Unknown inline codes map to a non-retryable media
+		// error; the runbook treats this as a media bug and
+		// pages the on-call.
+		return mediaerrors.CodeMediaNotFound
+	}
+}
+
 func NewService(db *sql.DB, storageService *storage.StorageService, publishers ...EventPublisher) *Service {
 	var publisher EventPublisher
 	if len(publishers) > 0 {
 		publisher = publishers[0]
 	}
-	return &Service{db: db, storage: storageService, renderer: newRenderer(), events: publisher}
+	return &Service{
+		db: db, storage: storageService,
+		verifier: storage.NewIntegrityVerifier(storageService, storage.IntegrityConfig{MaxBytes: maxOutputBytes + 1}),
+		renderer: newRenderer(), events: publisher,
+	}
 }
 
 func (s *Service) Process(ctx context.Context, derivativeID int64) error {
@@ -160,14 +195,24 @@ func (s *Service) Process(ctx context.Context, derivativeID int64) error {
 		return s.markFailed(ctx, q, processing.ID, "destination_write_failed", err)
 	}
 	digest := sha256.Sum256(encoded)
+	checksum := hex.EncodeToString(digest[:])
+	if err := s.verifier.Verify(ctx, asset.StorageProfileID, key, checksum, mimeType, int64(len(encoded))); err != nil {
+		code := "integrity_invalid"
+		if mediaerrors.IsRetryable(err) {
+			code = "integrity_transient"
+		} else {
+			_ = s.storage.DeleteObjectByStorageProfile(context.WithoutCancel(ctx), asset.StorageProfileID, key)
+		}
+		return s.markFailed(ctx, q, processing.ID, code, err)
+	}
 	ready, err := q.MarkMediaDerivativeReady(ctx, dbsqlc.MarkMediaDerivativeReadyParams{
 		ID: processing.ID, Format: format, StorageKey: key, MimeType: mimeType, Width: int32(width), Height: int32(height),
-		SizeBytes: int64(len(encoded)), ChecksumSha256: hex.EncodeToString(digest[:]),
+		SizeBytes: int64(len(encoded)), ChecksumSha256: checksum, SourceObjectGeneration: asset.ObjectGeneration,
 	})
 	if err != nil {
 		return fmt.Errorf("mark media derivative ready: %w", err)
 	}
-	s.publishEvent(ready.OwnerUserID, Event{Type: EventTypeUpdated, MediaAssetID: ready.MediaAssetID, Tier: ready.Tier, Format: ready.Format, Status: ready.Status})
+	s.publishEvent(ready.OwnerUserID, Event{Type: EventTypeReady, MediaAssetID: ready.MediaAssetID, DerivativeID: ready.DerivativeID, Tier: ready.Tier, Format: ready.Format, Status: ready.Status, SchemaVersion: EventSchemaVersion})
 	if err := q.DeleteMediaDerivativeOutbox(ctx, processing.ID); err != nil {
 		return fmt.Errorf("delete media derivative outbox: %w", err)
 	}
@@ -190,7 +235,7 @@ func (s *Service) markFailed(ctx context.Context, q *dbsqlc.Queries, id int64, c
 	if err != nil {
 		return fmt.Errorf("%s: %v; mark failed: %w", code, cause, err)
 	}
-	s.publishEvent(failed.OwnerUserID, Event{Type: EventTypeUpdated, MediaAssetID: failed.MediaAssetID, Tier: failed.Tier, Format: failed.Format, Status: failed.Status})
+	s.publishEvent(failed.OwnerUserID, Event{Type: EventTypeUpdated, MediaAssetID: failed.MediaAssetID, DerivativeID: failed.DerivativeID, Tier: failed.Tier, Format: failed.Format, Status: failed.Status, SchemaVersion: EventSchemaVersion})
 	if retryable && failed.AttemptCount < MaxAttempts {
 		if err := q.RescheduleMediaDerivativeOutbox(ctx, dbsqlc.RescheduleMediaDerivativeOutboxParams{
 			DerivativeID: id,
@@ -214,7 +259,7 @@ func (s *Service) publishEvent(userID int64, event Event) {
 
 func isRetryableDerivativeError(code string) bool {
 	switch code {
-	case "source_read_failed", "render_failed", "destination_write_failed":
+	case "source_read_failed", "render_failed", "destination_write_failed", "integrity_transient":
 		return true
 	default:
 		return false

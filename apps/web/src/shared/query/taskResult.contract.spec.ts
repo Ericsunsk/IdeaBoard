@@ -2,57 +2,37 @@ import { describe, expect, it } from 'vitest'
 import { extractImageResultsFromTaskPayload, normalizeTaskImageResults } from './taskResult'
 
 describe('taskResult image result helpers', () => {
-  it('extracts normalized image output metadata before falling back to result json', () => {
+  it('extracts normalized image output metadata from materialized outputs', () => {
     expect(
       extractImageResultsFromTaskPayload({
         outputs: [
           {
             role: 'image',
-            url: ' https://cdn.example.com/output.png ',
             width: '1024',
             height: 768,
             mime_type: ' image/png ',
-            media_asset_id: '42',
+            asset_id: 'asset_42',
           },
         ],
-        result: JSON.stringify({ image_url: 'https://cdn.example.com/fallback.png' }),
       }),
     ).toEqual([
       {
-        url: '/api/user/media-assets/42/original/content',
+        url: '/api/user/media-assets/asset_42/derivatives/preview/webp/content',
+        assetId: 'asset_42',
         width: 1024,
         height: 768,
         mimeType: 'image/png',
-        mediaAssetId: 42,
       },
     ])
   })
 
-  it('normalizes result objects and drops invalid entries', () => {
+  it('drops result objects that do not carry a public asset identity', () => {
     expect(
       normalizeTaskImageResults([
-        { url: ' https://cdn.example.com/a.png ', width: 0, height: 100 },
-        { url: '   ' },
+        { width: 0, height: 100 },
+        {},
       ]),
-    ).toEqual([
-      {
-        url: 'https://cdn.example.com/a.png',
-        height: 100,
-      },
-    ])
-  })
-
-  it('does not surface failed provider parsed-output envelopes as Canvas image results', () => {
-    expect(
-      extractImageResultsFromTaskPayload({
-        result: JSON.stringify({
-          status: 'failed',
-          parsed_output_status: 'invalid',
-          image_url: '/uploads/tasks/1/task/should-not-render.png',
-          image_urls: ['/uploads/tasks/1/task/should-not-render.png'],
-          error: '图案生成输出不符合 workflow contract',
-        }),
-      }),
     ).toEqual([])
   })
+
 })

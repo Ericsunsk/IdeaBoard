@@ -37,13 +37,13 @@ type uploadConcurrencyLimiter struct {
 }
 
 type uploadImageResponse struct {
-	URL          string `json:"url,omitempty"`
-	Avatar       string `json:"avatar,omitempty"`
-	MediaAssetID int64  `json:"media_asset_id,omitempty"`
-	Width        int    `json:"width,omitempty"`
-	Height       int    `json:"height,omitempty"`
-	Mime         string `json:"mime,omitempty"`
-	Ext          string `json:"ext,omitempty"`
+	URL     string `json:"url,omitempty"`
+	Avatar  string `json:"avatar,omitempty"`
+	AssetID string `json:"asset_id,omitempty"`
+	Width   int    `json:"width,omitempty"`
+	Height  int    `json:"height,omitempty"`
+	Mime    string `json:"mime,omitempty"`
+	Ext     string `json:"ext,omitempty"`
 }
 
 func acquireUploadSlot(ctx context.Context, provider settings.MediaUploadSettingProvider) (func(), bool) {
@@ -261,10 +261,17 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 		stored.Height = prepared.Height
 		stored.MIMEType = prepared.MIMEType
 		stored.Animated = prepared.Animated
+		asset, err := h.MediaAssets.GetByID(c.Request.Context(), board.OwnerUserID, handle.AssetID)
+		if err != nil {
+			_ = h.MediaAssets.Fail(context.WithoutCancel(c.Request.Context()), handle, err)
+			_ = h.StorageService.DeleteObjectByStorageProfile(context.WithoutCancel(c.Request.Context()), stored.StorageProfile, stored.StorageKey)
+			response.InternalError(c, 500, "上传失败", err)
+			return
+		}
 		// Browser-visible board media must always use the authenticated
 		// same-origin delivery route, regardless of whether the backing profile
 		// is local or S3-compatible. Keep provider URLs server-side only.
-		stored.URL = mediaAssetOriginalDeliveryURL(handle.AssetID)
+		stored.URL = mediaAssetOriginalDeliveryURL(asset.AssetID)
 		if err := h.MediaAssets.Complete(c.Request.Context(), handle, stored.IngestionCompletion("")); err != nil {
 			// A concurrent identical upload may have committed first and won the
 			// checksum unique index. Re-read the canonical asset before surfacing
@@ -282,7 +289,7 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 			return
 		}
 		payload := newUploadImageResponseFromStored("url", stored)
-		payload.MediaAssetID = handle.AssetID
+		payload.AssetID = asset.AssetID
 		response.SuccessDTO(c, payload)
 	}
 }
@@ -308,11 +315,11 @@ func newUploadImageResponseFromStored(urlKey string, stored *storage.StoredUploa
 
 func newUploadImageResponseFromAsset(asset dbsqlc.MediaAsset) uploadImageResponse {
 	payload := uploadImageResponse{
-		URL:          mediaAssetOriginalDeliveryURL(asset.ID),
-		MediaAssetID: asset.ID,
-		Width:        int(asset.Width),
-		Height:       int(asset.Height),
-		Mime:         asset.MimeType,
+		URL:     mediaAssetOriginalDeliveryURL(asset.AssetID),
+		AssetID: asset.AssetID,
+		Width:   int(asset.Width),
+		Height:  int(asset.Height),
+		Mime:    asset.MimeType,
 	}
 	if ext := imageformat.ImageExtensionFromMIME(asset.MimeType); ext != "" {
 		payload.Ext = strings.TrimPrefix(ext, ".")
@@ -322,11 +329,11 @@ func newUploadImageResponseFromAsset(asset dbsqlc.MediaAsset) uploadImageRespons
 
 const profileAvatarDeliveryURL = "/api/user/profile/avatar/content"
 
-func mediaAssetOriginalDeliveryURL(assetID int64) string {
-	if assetID <= 0 {
+func mediaAssetOriginalDeliveryURL(assetID string) string {
+	if strings.TrimSpace(assetID) == "" {
 		return ""
 	}
-	return fmt.Sprintf("/api/user/media-assets/%d/original/content", assetID)
+	return fmt.Sprintf("/api/user/media-assets/%s/original/content", assetID)
 }
 
 func adminUploadHandler(storageService *storage.StorageService, uploadSettings settings.MediaUploadSettingProvider) gin.HandlerFunc {

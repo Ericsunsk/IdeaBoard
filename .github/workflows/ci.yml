@@ -34,6 +34,7 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Classify changed contexts
         id: classify
         env:
@@ -90,6 +91,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - name: Set up Node.js
         uses: ./.github/actions/setup-node
         with:
@@ -107,14 +110,33 @@ jobs:
     if: needs.changes.outputs.ops == 'true'
     needs: [changes]
     uses: ./.github/workflows/ops.yml
-  ci-gate:
-    name: CI Gate
-    if: always()
-    needs: [changes, web, api, auth, migration-integration, backend-browser-smoke, ops]
+  media-contract:
+    # Issue #661 / #667 contract gate. This always runs so the
+    # required CI Gate cannot silently accept a skipped media
+    # contract check on docs-only or workflow-only changes.
+    name: Media Contract
+    needs: [changes]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run media package boundary gate
+        run: ./scripts/ci-media-package-boundary.sh
+      - name: Run legacy media cutover zero-result scan
+        run: ./scripts/ci-legacy-media-zero-scan.sh
+  ci-gate:
+    name: CI Gate
+    if: always()
+    needs: [changes, web, api, auth, migration-integration, backend-browser-smoke, ops, media-contract]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - name: Summarize and verify required lanes
         if: always()
         env:
@@ -131,4 +153,6 @@ jobs:
           BROWSER_SMOKE_RESULT: ${{ needs.backend-browser-smoke.result }}
           OPS_REQUIRED: ${{ needs.changes.outputs.ops }}
           OPS_RESULT: ${{ needs.ops.result }}
+          MEDIA_CONTRACT_REQUIRED: 'true'
+          MEDIA_CONTRACT_RESULT: ${{ needs.media-contract.result }}
         run: ./scripts/ci-gate.sh

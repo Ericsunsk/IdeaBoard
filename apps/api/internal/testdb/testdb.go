@@ -77,6 +77,7 @@ func createIsolatedEnv(t testing.TB) isolatedEnv {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		if schemaCreated {
+			// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- quotedSchema is pg identifier sanitized above
 			_, _ = adminDB.ExecContext(ctx, `DROP SCHEMA IF EXISTS `+quotedSchema+` CASCADE`)
 		}
 		_ = adminDB.Close()
@@ -85,6 +86,7 @@ func createIsolatedEnv(t testing.TB) isolatedEnv {
 	if err := adminDB.Ping(); err != nil {
 		t.Fatalf("ping PostgreSQL test db failed: %v", err)
 	}
+	// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- quotedSchema is pg identifier sanitized above
 	if _, err := adminDB.ExecContext(t.Context(), `CREATE SCHEMA `+quotedSchema); err != nil {
 		t.Fatalf("create PostgreSQL test schema failed: %v", err)
 	}

@@ -37,6 +37,7 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
           fetch-depth: 0
+          persist-credentials: false
       - name: Verify source commit and CI Gate
         id: validate
         env:
@@ -102,14 +103,18 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           ref: ${{ needs.preflight.outputs.source_commit }}
+          persist-credentials: false
 
       - name: Prepare image name
         id: image
         shell: bash
+        env:
+          IMAGE_NAME: ${{ matrix.image.name }}
+          SOURCE_COMMIT: ${{ needs.preflight.outputs.source_commit }}
         run: |
           repository="${GITHUB_REPOSITORY,,}"
-          echo "name=ghcr.io/${repository}/ideaboard-${{ matrix.image.name }}" >> "${GITHUB_OUTPUT}"
-          echo "immutable_tag=ghcr.io/${repository}/ideaboard-${{ matrix.image.name }}:sha-${{ needs.preflight.outputs.source_commit }}" >> "${GITHUB_OUTPUT}"
+          echo "name=ghcr.io/${repository}/ideaboard-${IMAGE_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "immutable_tag=ghcr.io/${repository}/ideaboard-${IMAGE_NAME}:sha-${SOURCE_COMMIT}" >> "${GITHUB_OUTPUT}"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130
@@ -156,6 +161,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ${{ runner.temp }}/grype-db
+          lookup-only: true
           key: grype-db-v6-${{ runner.os }}-${{ hashFiles('.grype-version') }}-${{ steps.grype-cache.outputs.date }}
           restore-keys: grype-db-v6-${{ runner.os }}-${{ hashFiles('.grype-version') }}-
 
@@ -240,6 +246,8 @@ jobs:
 
       - name: Generate release manifest
         shell: bash
+        env:
+          SOURCE_COMMIT: ${{ needs.preflight.outputs.source_commit }}
         run: |
           for image in api api-migrate auth auth-migrate; do
             test -s "release-assets/${image}.json" || {
@@ -252,7 +260,7 @@ jobs:
             --arg repository "${GITHUB_REPOSITORY}" \
             --arg tag "${GITHUB_REF_NAME}" \
             --arg ref "${GITHUB_REF}" \
-            --arg commit "${{ needs.preflight.outputs.source_commit }}" \
+            --arg commit "${SOURCE_COMMIT}" \
             --arg run_id "${GITHUB_RUN_ID}" \
             --arg workflow "docker-images.yml" \
             --arg cosign_identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/docker-images.yml@${GITHUB_REF}" \
@@ -327,6 +335,8 @@ jobs:
     steps:
       - name: Checkout deployment client
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
 
       - name: Download release metadata bundle
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -336,6 +346,8 @@ jobs:
 
       - name: Validate Production release manifest
         shell: bash
+        env:
+          SOURCE_COMMIT: ${{ needs.preflight.outputs.source_commit }}
         run: |
           set -euo pipefail
 
@@ -343,7 +355,7 @@ jobs:
           test -s "${manifest}"
           jq -e \
             --arg expected_tag "${GITHUB_REF_NAME}" \
-            --arg expected_commit "${{ needs.preflight.outputs.source_commit }}" \
+            --arg expected_commit "${SOURCE_COMMIT}" \
             --arg expected_ref "${GITHUB_REF}" \
             --arg expected_repository "${GITHUB_REPOSITORY}" \
             --arg expected_image_repository "ghcr.io/${GITHUB_REPOSITORY,,}" \

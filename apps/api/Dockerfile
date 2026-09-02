@@ -6,6 +6,8 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG ATLAS_VERSION=1.3.2
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 WORKDIR /src
 
 COPY go.mod go.sum ./
@@ -20,12 +22,15 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     mkdir -p /out/uploads /out/migrations && \
     cp internal/db/migrations/*.sql internal/db/migrations/atlas.sum /out/migrations
 
-RUN apt-get update && apt-get install --no-install-recommends -y ca-certificates curl && \
+RUN apt-get update && \
+    apt-get install --no-install-recommends -y \
+      ca-certificates="$(apt-cache policy ca-certificates | awk '/Candidate:/ { print $2 }')" \
+      curl="$(apt-cache policy curl | awk '/Candidate:/ { print $2 }')" && \
     curl -fsSL "https://release.ariga.io/atlas/atlas-linux-${TARGETARCH}-v${ATLAS_VERSION}" -o /out/atlas && \
     chmod 0555 /out/atlas && \
     rm -rf /var/lib/apt/lists/*
 
-FROM cgr.dev/chainguard/static:latest AS runtime
+FROM cgr.dev/chainguard/static:latest@sha256:f51c2493951313c3ad4069080b2814ffb6ed6fe3909dabeb84a9482f42d5600b AS runtime
 
 WORKDIR /app
 
@@ -44,7 +49,7 @@ USER 65532:65532
 
 ENTRYPOINT ["/app/ideaboard-server"]
 
-FROM cgr.dev/chainguard/static:latest-glibc AS migrator
+FROM cgr.dev/chainguard/static:latest-glibc@sha256:f51c2493951313c3ad4069080b2814ffb6ed6fe3909dabeb84a9482f42d5600b AS migrator
 
 WORKDIR /app
 

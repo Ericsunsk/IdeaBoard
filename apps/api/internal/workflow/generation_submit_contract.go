@@ -20,7 +20,7 @@ func ValidateGenerationSubmitContract(params map[string]interface{}) error {
 			return fmt.Errorf("generation 不接受显式 %s，生成模式由参考图推导", key)
 		}
 	}
-	for _, key := range []string{paramkeys.ReferenceImageURLs, paramkeys.OriginalImageURL, paramkeys.MaskImageURL, paramkeys.UseMask} {
+	for _, key := range []string{paramkeys.ReferenceImageURLs, paramkeys.MaskImageURL, paramkeys.UseMask} {
 		if _, exists := params[key]; exists {
 			return fmt.Errorf("generation 参考图必须只使用 image_urls")
 		}

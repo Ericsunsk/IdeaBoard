@@ -1006,6 +1006,9 @@ func TestCompleteTaskPersistsTaskOutputs(t *testing.T) {
 		if output.MediaAssetID == nil || *output.MediaAssetID == 0 {
 			t.Fatalf("output missing media asset id: %+v", output)
 		}
+		if output.AssetID == "" {
+			t.Fatalf("output missing public asset id: %+v", output)
+		}
 	}
 	var persistedOutputURL string
 	if err := db.QueryRowContext(ctx, `SELECT url FROM task_outputs WHERE task_id = $1 ORDER BY result_index ASC LIMIT 1`, task.TaskID).Scan(&persistedOutputURL); err != nil {

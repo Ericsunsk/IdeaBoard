@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
 
       - name: Set up Go
         uses: ./.github/actions/setup-go
@@ -29,6 +31,8 @@ jobs:
         run: |
           bash scripts/ci-change-classifier-test.sh
           bash scripts/ci-gate-test.sh
+          bash scripts/ci-media-package-boundary-test.sh
+          bash scripts/ci-legacy-media-zero-scan-test.sh
           bash scripts/ci-workflow-contract-test.sh
 
       - name: Check shell syntax
@@ -46,6 +50,10 @@ jobs:
           bash -n scripts/ci-change-classifier-test.sh
           bash -n scripts/ci-gate.sh
           bash -n scripts/ci-gate-test.sh
+          bash -n scripts/ci-media-package-boundary.sh
+          bash -n scripts/ci-media-package-boundary-test.sh
+          bash -n scripts/ci-legacy-media-zero-scan.sh
+          bash -n scripts/ci-legacy-media-zero-scan-test.sh
           bash -n scripts/ci-workflow-contract-test.sh
 
       - name: Install ShellCheck
@@ -73,6 +81,10 @@ jobs:
             scripts/ci-change-classifier-test.sh \
             scripts/ci-gate.sh \
             scripts/ci-gate-test.sh \
+            scripts/ci-media-package-boundary.sh \
+            scripts/ci-media-package-boundary-test.sh \
+            scripts/ci-legacy-media-zero-scan.sh \
+            scripts/ci-legacy-media-zero-scan-test.sh \
             scripts/ci-workflow-contract-test.sh
 
       - name: Verify manifest-only deployment contract

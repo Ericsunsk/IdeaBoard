@@ -9,8 +9,8 @@ import type { TaskOutputOutputKind } from './taskOutputOutputKind'
 export interface TaskOutput {
   id: number
   task_id: string
-  /** @nullable */
-  media_asset_id?: number | null
+  /** @minLength 1 */
+  asset_id?: string
   output_kind: TaskOutputOutputKind
   role: string
   url: string

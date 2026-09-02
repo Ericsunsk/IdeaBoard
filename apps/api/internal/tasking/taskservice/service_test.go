@@ -69,6 +69,35 @@ func (p *recordingGenerationMediaPreparer) PrepareGenerationMedia(_ context.Cont
 	return prepared, nil
 }
 
+type recordingTaskInputManifestBuilder struct{}
+
+func (recordingTaskInputManifestBuilder) BuildTaskInputManifest(_ context.Context, _ int64, media *tasks.MediaInputs) (*tasks.TaskInputManifest, error) {
+	if media == nil {
+		return tasks.NewTaskInputManifest(nil, nil, nil, nil, nil)
+	}
+	ref := func(value tasks.MediaRef, suffix string) tasks.TaskInputManifestRef {
+		return tasks.TaskInputManifestRef{AssetID: "asset_" + suffix, DerivativeID: "derivative_" + suffix, DerivativeTier: tasks.TierProcessingInput, StorageProfileID: "test", ObjectKey: "uploads/" + suffix + ".webp", ObjectGeneration: 1, ChecksumSHA256: strings.Repeat("a", 64), MIMEType: "image/webp", SizeBytes: 1, Role: value.Role, Weight: value.Weight}
+	}
+	inputs := make([]tasks.TaskInputManifestRef, 0, len(media.Inputs))
+	for index, value := range media.Inputs {
+		inputs = append(inputs, ref(value, strconv.Itoa(index+1)))
+	}
+	references := make([]tasks.TaskInputManifestRef, 0, len(media.References))
+	for index, value := range media.References {
+		references = append(references, ref(value, strconv.Itoa(100+index)))
+	}
+	var original, mask *tasks.TaskInputManifestRef
+	if media.Original != nil {
+		value := ref(*media.Original, "original")
+		original = &value
+	}
+	if media.Mask != nil {
+		value := ref(*media.Mask, "mask")
+		mask = &value
+	}
+	return tasks.NewTaskInputManifest(inputs, references, original, mask, media.UseMask)
+}
+
 func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -727,7 +756,6 @@ func TestWorkflowTaskParamsFromMapDoesNotPreserveKnownContractKeysInExtra(t *tes
 			"https://example.com/ref.png",
 		},
 		"mask_image_url":          "https://example.com/mask.png",
-		"original_image_url":      "https://example.com/source.png",
 		"use_mask":                true,
 		"custom_width":            640,
 		"custom_height":           480,
@@ -773,8 +801,14 @@ func TestWorkflowTaskParamsFromMapDoesNotPreserveKnownContractKeysInExtra(t *tes
 			t.Fatalf("known submit param %s leaked into Extra: %#v", key, typedParams.Extra)
 		}
 	}
-	if typedParams.Media == nil || typedParams.Media.Mask == nil || typedParams.Media.Original == nil || typedParams.Media.UseMask == nil {
-		t.Fatalf("media = %#v, want input/reference/mask/original/use_mask", typedParams.Media)
+	if typedParams.Media == nil || typedParams.Media.Mask == nil || typedParams.Media.UseMask == nil {
+		t.Fatalf("media = %#v, want input/reference/mask/use_mask", typedParams.Media)
+	}
+	// Issue #664: the durable boundary no longer carries an
+	// `Original` ref. The runtime resolves the original through
+	// the processing-input derivative.
+	if typedParams.Media.Original != nil {
+		t.Fatalf("media.Original must be nil on the durable boundary: %#v", typedParams.Media.Original)
 	}
 	if typedParams.Controls == nil || typedParams.Controls.CustomWidth != 640 || typedParams.Controls.OutputCount != 2 {
 		t.Fatalf("controls = %#v, want canonical controls", typedParams.Controls)

@@ -10,12 +10,13 @@ describe('flowImageDirectActionTaskResult', () => {
 
     await expect(
       resolveTaskImageResultDisplay(
-        { url: ' https://example.com/output.png ', width: 400, height: 200 },
+        { url: ' https://example.com/output.png ', assetId: 'asset_1', width: 400, height: 200 },
         1,
         loadImageSize,
       ),
     ).resolves.toEqual({
-      url: 'https://example.com/output.png',
+      url: '/api/user/media-assets/asset_1/derivatives/preview/webp/content',
+      mediaRef: { assetId: 'asset_1', derivativeTier: 'preview', derivativeFormat: 'webp' },
       ratio: 0.5,
       width: 400,
       height: 200,
@@ -23,18 +24,18 @@ describe('flowImageDirectActionTaskResult', () => {
     expect(loadImageSize).not.toHaveBeenCalled()
   })
 
-  it('preserves media asset id from task output metadata', async () => {
+  it('derives a MediaRef delivery URL from the public task output identity', async () => {
     const loadImageSize = vi.fn()
 
     await expect(
       resolveTaskImageResultDisplay(
-        { url: 'https://example.com/output.png', width: 400, height: 200, mediaAssetId: 42 },
+        { url: 'https://example.com/output.png', width: 400, height: 200, assetId: 'asset_42' },
         1,
         loadImageSize,
       ),
     ).resolves.toMatchObject({
-      url: '/api/user/media-assets/42/original/content',
-      mediaAssetId: 42,
+      url: '/api/user/media-assets/asset_42/derivatives/preview/webp/content',
+      mediaRef: { assetId: 'asset_42', derivativeTier: 'preview', derivativeFormat: 'webp' },
     })
   })
 
@@ -42,26 +43,27 @@ describe('flowImageDirectActionTaskResult', () => {
     const loadImageSize = vi.fn(async () => null)
 
     await expect(
-      resolveTaskImageResultDisplay({ url: 'https://example.com/output.png' }, 1.25, loadImageSize),
+      resolveTaskImageResultDisplay({ url: 'https://example.com/output.png', assetId: 'asset_1' }, 1.25, loadImageSize),
     ).resolves.toEqual({
-      url: 'https://example.com/output.png',
+      url: '/api/user/media-assets/asset_1/derivatives/preview/webp/content',
+      mediaRef: { assetId: 'asset_1', derivativeTier: 'preview', derivativeFormat: 'webp' },
       ratio: 1.25,
     })
-    expect(loadImageSize).toHaveBeenCalledWith('https://example.com/output.png')
+    expect(loadImageSize).toHaveBeenCalledWith('/api/user/media-assets/asset_1/derivatives/preview/webp/content')
   })
 
   it('resolves a stable batch slot by result index', async () => {
     await expect(
       resolveTaskImageResultAtIndexDisplay(
         [
-          { url: 'https://example.com/second.png', resultIndex: 1 },
-          { url: 'https://example.com/first.png', resultIndex: 0 },
+          { url: 'https://example.com/second.png', assetId: 'asset_2', resultIndex: 1 },
+          { url: 'https://example.com/first.png', assetId: 'asset_1', resultIndex: 0 },
         ],
         0,
         1,
         vi.fn(async () => ({ width: 100, height: 100 })),
       ),
-    ).resolves.toMatchObject({ url: 'https://example.com/first.png', resultIndex: 0 })
+    ).resolves.toMatchObject({ url: '/api/user/media-assets/asset_1/derivatives/preview/webp/content', resultIndex: 0 })
   })
 
   it('fails a missing batch slot instead of falling through to another result', async () => {

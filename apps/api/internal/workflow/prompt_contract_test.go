@@ -131,6 +131,21 @@ func TestBuildProviderTaskParamsDerivesProviderMapFromCanonicalContract(t *testi
 	}
 }
 
+func TestBuildProviderTaskParamsIncludesRuntimeOriginalInImageURLs(t *testing.T) {
+	params := &tasks.WorkflowTaskParams{Feature: FeatureSlugInpaint}
+	runtimeMedia := &tasks.RuntimeMediaInputs{
+		Original: &tasks.RuntimeMediaRef{URL: " https://img.example/original.png "},
+	}
+
+	providerParams := BuildProviderTaskParams(params, runtimeMedia)
+	if !reflect.DeepEqual(providerParams["image_urls"], []string{"https://img.example/original.png"}) {
+		t.Fatalf("image_urls = %#v", providerParams["image_urls"])
+	}
+	if _, exists := providerParams["original_image_url"]; exists {
+		t.Fatalf("original image leaked into durable provider key: %#v", providerParams)
+	}
+}
+
 func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 	tests := []struct {
 		name       string

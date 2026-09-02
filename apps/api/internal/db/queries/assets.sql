@@ -95,6 +95,7 @@ RETURNING id;
 -- name: MarkMediaAssetReady :one
 UPDATE media_assets
 SET status = 'ready', updated_at = now(),
+    object_generation = CASE WHEN status = 'ready' THEN object_generation + 1 ELSE object_generation END,
     storage_key = COALESCE(NULLIF(sqlc.arg(storage_key)::text, ''), storage_key),
     url = sqlc.arg(url), source_url = sqlc.arg(source_url),
     mime_type = sqlc.arg(mime_type), width = sqlc.arg(width), height = sqlc.arg(height),
@@ -113,7 +114,7 @@ RETURNING id;
 -- name: GetReadyLibraryMaterializedMediaAsset :one
 SELECT asset.id, asset.asset_id, asset.owner_user_id, asset.storage_profile_id, asset.storage_key,
   asset.url, asset.source_url, asset.media_kind, asset.mime_type,
-  asset.width, asset.height, asset.size_bytes, asset.checksum_sha256,
+  asset.width, asset.height, asset.size_bytes, asset.checksum_sha256, asset.object_generation,
   asset.status, asset.metadata, asset.created_at, asset.updated_at, asset.deleted_at, asset.reclaim_after, asset.reclaim_started_at,
   asset.reclaim_claim_token, asset.reclaim_generation
 FROM library_asset_media_assets AS link
@@ -166,7 +167,7 @@ WHERE id = ANY(sqlc.arg(ids)::bigint[]) AND status = 'uploading';
 SELECT
   id, asset_id, owner_user_id, storage_profile_id, storage_key,
   url, source_url, media_kind, mime_type,
-  width, height, size_bytes, checksum_sha256,
+  width, height, size_bytes, checksum_sha256, object_generation,
   status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
   reclaim_claim_token, reclaim_generation
 FROM media_assets
@@ -176,7 +177,7 @@ WHERE id = sqlc.arg(id);
 SELECT
   id, asset_id, owner_user_id, storage_profile_id, storage_key,
   url, source_url, media_kind, mime_type,
-  width, height, size_bytes, checksum_sha256,
+  width, height, size_bytes, checksum_sha256, object_generation,
   status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
   reclaim_claim_token, reclaim_generation
 FROM media_assets
@@ -187,7 +188,7 @@ WHERE storage_profile_id = sqlc.arg(storage_profile_id)
 SELECT
   id, asset_id, owner_user_id, storage_profile_id, storage_key,
   url, source_url, media_kind, mime_type,
-  width, height, size_bytes, checksum_sha256,
+  width, height, size_bytes, checksum_sha256, object_generation,
   status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
   reclaim_claim_token, reclaim_generation
 FROM media_assets
@@ -199,7 +200,7 @@ WHERE id = sqlc.arg(id)
 SELECT
   id, asset_id, owner_user_id, storage_profile_id, storage_key,
   url, source_url, media_kind, mime_type,
-  width, height, size_bytes, checksum_sha256,
+  width, height, size_bytes, checksum_sha256, object_generation,
   status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
   reclaim_claim_token, reclaim_generation
 FROM media_assets
@@ -427,7 +428,7 @@ WHERE asset.id = sqlc.arg(id)
   )
 RETURNING asset.id, asset.asset_id, asset.owner_user_id, asset.storage_profile_id, asset.storage_key,
   asset.url, asset.source_url, asset.media_kind, asset.mime_type,
-  asset.width, asset.height, asset.size_bytes, asset.checksum_sha256,
+  asset.width, asset.height, asset.size_bytes, asset.checksum_sha256, asset.object_generation,
   asset.status, asset.metadata, asset.created_at, asset.updated_at, asset.deleted_at,
   asset.reclaim_after, asset.reclaim_started_at, asset.reclaim_claim_token, asset.reclaim_generation;
 
@@ -462,7 +463,7 @@ WHERE media_assets.id = sqlc.arg(id)
 
 -- name: FindReadyOwnedMediaAssetByChecksum :one
 SELECT id, asset_id, owner_user_id, storage_profile_id, storage_key,
-  url, source_url, media_kind, mime_type, width, height, size_bytes, checksum_sha256,
+  url, source_url, media_kind, mime_type, width, height, size_bytes, checksum_sha256, object_generation,
   status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
   reclaim_claim_token, reclaim_generation
 FROM media_assets

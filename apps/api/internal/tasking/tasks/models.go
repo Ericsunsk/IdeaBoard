@@ -99,9 +99,12 @@ type AdminTaskAttempt struct {
 }
 
 type TaskOutput struct {
-	ID             int64     `json:"id"`
-	TaskID         string    `json:"task_id"`
-	MediaAssetID   *int64    `json:"media_asset_id,omitempty"`
+	ID     int64  `json:"id"`
+	TaskID string `json:"task_id"`
+	// MediaAssetID is the internal relational FK used only while persisting
+	// output lineage. API consumers receive AssetID, the stable public identity.
+	MediaAssetID   *int64    `json:"-"`
+	AssetID        string    `json:"asset_id,omitempty"`
 	OutputKind     string    `json:"output_kind"`
 	Role           string    `json:"role"`
 	URL            string    `json:"url"`
@@ -138,6 +141,7 @@ type TaskUserView struct {
 type TaskOutputUserView struct {
 	ID          int64     `json:"id"`
 	TaskID      string    `json:"task_id"`
+	AssetID     string    `json:"asset_id,omitempty"`
 	OutputKind  string    `json:"output_kind"`
 	Role        string    `json:"role"`
 	URL         string    `json:"url"`
@@ -202,6 +206,7 @@ func taskOutputsUserView(outputs []TaskOutput) []TaskOutputUserView {
 		result = append(result, TaskOutputUserView{
 			ID:          output.ID,
 			TaskID:      output.TaskID,
+			AssetID:     output.AssetID,
 			OutputKind:  output.OutputKind,
 			Role:        output.Role,
 			URL:         output.URL,

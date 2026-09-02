@@ -36,7 +36,7 @@ describe('uploadApi', () => {
           msg: 'ok',
           data: {
             url: '/uploads/boards/board-1/image.png',
-            media_asset_id: 42,
+            asset_id: 'asset_upload_42',
             width: 640,
             height: 480,
             mime: uploadedFile.type,
@@ -48,7 +48,7 @@ describe('uploadApi', () => {
 
     await expect(uploadApi.upload(file, ' board 1 ')).resolves.toEqual({
       url: '/uploads/boards/board-1/image.png',
-      media_asset_id: 42,
+      asset_id: 'asset_upload_42',
       width: 640,
       height: 480,
       mime: 'image/png',

@@ -76,11 +76,11 @@ describe('createBoardSessionUploadLifecycle', () => {
     vi.spyOn(uploadApi, 'upload')
       .mockResolvedValueOnce({
         url: '/uploads/canvas/user-uid/board-a/content/image-output.png',
-        media_asset_id: 201,
+        asset_id: 'asset_201',
       })
       .mockResolvedValueOnce({
         url: '/uploads/canvas/user-uid/board-a/content/fusion-output.png',
-        media_asset_id: 202,
+        asset_id: 'asset_202',
       })
     const snapshot = makeCanvasBoardSnapshot({
       imageNodes: [
@@ -121,27 +121,14 @@ describe('createBoardSessionUploadLifecycle', () => {
     }).stabilizeSnapshotForSave(snapshot)
 
     expect(snapshot.imageNodes[0]?.outputImages[0]).toMatchObject({
-      url: '/api/user/media-assets/201/original/content',
-      mediaAssetId: 201,
+      url: '/api/user/media-assets/asset_201/derivatives/preview/webp/content',
+      mediaRef: { assetId: 'asset_201', derivativeTier: 'preview', derivativeFormat: 'webp' },
     })
     expect(snapshot.fusionNodes[0]?.outputImages[0]).toMatchObject({
-      url: '/api/user/media-assets/202/original/content',
-      mediaAssetId: 202,
+      url: '/api/user/media-assets/asset_202/derivatives/preview/webp/content',
+      mediaRef: { assetId: 'asset_202', derivativeTier: 'preview', derivativeFormat: 'webp' },
     })
-    expect(snapshot.mediaRefs).toEqual([
-      {
-        mediaAssetId: 201,
-        refType: 'board_node',
-        refId: 'image-1',
-        role: 'output:0',
-      },
-      {
-        mediaAssetId: 202,
-        refType: 'board_node',
-        refId: 'fusion-2',
-        role: 'output:0',
-      },
-    ])
+    expect(snapshot.mediaRefs).toBeUndefined()
   })
 
   it('stabilizes prompt and fusion inputs and rebuilds their media refs', async () => {
@@ -152,11 +139,11 @@ describe('createBoardSessionUploadLifecycle', () => {
     vi.spyOn(uploadApi, 'upload')
       .mockResolvedValueOnce({
         url: '/uploads/canvas/user-uid/board-a/content/prompt-input.png',
-        media_asset_id: 301,
+        asset_id: 'asset_301',
       })
       .mockResolvedValueOnce({
         url: '/uploads/canvas/user-uid/board-a/content/fusion-input.png',
-        media_asset_id: 302,
+        asset_id: 'asset_302',
       })
     const snapshot = makeCanvasBoardSnapshot({
       promptNodes: [
@@ -213,17 +200,14 @@ describe('createBoardSessionUploadLifecycle', () => {
     }).stabilizeSnapshotForSave(snapshot)
 
     expect(snapshot.promptNodes[0]?.inputImages[0]).toMatchObject({
-      url: '/api/user/media-assets/301/original/content',
-      mediaAssetId: 301,
+      url: '/api/user/media-assets/asset_301/derivatives/preview/webp/content',
+      mediaRef: { assetId: 'asset_301', derivativeTier: 'preview', derivativeFormat: 'webp' },
     })
     expect(snapshot.fusionNodes[0]?.inputImages[0]).toMatchObject({
-      url: '/api/user/media-assets/302/original/content',
-      mediaAssetId: 302,
+      url: '/api/user/media-assets/asset_302/derivatives/preview/webp/content',
+      mediaRef: { assetId: 'asset_302', derivativeTier: 'preview', derivativeFormat: 'webp' },
     })
-    expect(snapshot.mediaRefs).toEqual([
-      { mediaAssetId: 301, refType: 'board_node', refId: 'prompt-1', role: 'input:0' },
-      { mediaAssetId: 302, refType: 'board_node', refId: 'fusion-2', role: 'input:0' },
-    ])
+    expect(snapshot.mediaRefs).toBeUndefined()
   })
 
   it('rewrites an existing provider URL to the stable media asset content URL', async () => {
@@ -236,13 +220,21 @@ describe('createBoardSessionUploadLifecycle', () => {
           y: 0,
           width: 280,
           sourceImageUrl: 'https://cdn.example.com/signed/source.png?expires=1',
-          sourceMediaAssetId: 401,
+          sourceMediaRef: {
+            assetId: 'asset_401',
+            derivativeTier: 'preview',
+            derivativeFormat: 'webp',
+          },
           sourceImageRatio: 1,
           outputStatus: 'ready',
           outputImages: [
             {
               url: 'https://cdn.example.com/signed/output.png?expires=1',
-              mediaAssetId: 402,
+              mediaRef: {
+                assetId: 'asset_402',
+                derivativeTier: 'preview',
+                derivativeFormat: 'webp',
+              },
               ratio: 1,
             },
           ],
@@ -257,12 +249,20 @@ describe('createBoardSessionUploadLifecycle', () => {
     }).stabilizeSnapshotForSave(snapshot)
 
     expect(snapshot.imageNodes[0]).toMatchObject({
-      sourceImageUrl: '/api/user/media-assets/401/original/content',
-      sourceMediaAssetId: 401,
+      sourceImageUrl: '/api/user/media-assets/asset_401/derivatives/preview/webp/content',
+      sourceMediaRef: {
+        assetId: 'asset_401',
+        derivativeTier: 'preview',
+        derivativeFormat: 'webp',
+      },
     })
     expect(snapshot.imageNodes[0]?.outputImages[0]).toMatchObject({
-      url: '/api/user/media-assets/402/original/content',
-      mediaAssetId: 402,
+      url: '/api/user/media-assets/asset_402/derivatives/preview/webp/content',
+      mediaRef: {
+        assetId: 'asset_402',
+        derivativeTier: 'preview',
+        derivativeFormat: 'webp',
+      },
     })
   })
 })

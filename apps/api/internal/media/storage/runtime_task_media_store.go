@@ -52,53 +52,78 @@ func (s *RuntimeTaskMediaStore) ResolveRuntimeMedia(ctx context.Context, params 
 	if s == nil || s.service == nil {
 		return nil, fmt.Errorf("存储服务未初始化")
 	}
-	urls := make(map[int64]string)
-	resolve := func(assetID int64) (string, error) {
-		if assetID <= 0 {
-			return "", fmt.Errorf("媒体 AssetID 缺失")
-		}
-		if existing := urls[assetID]; existing != "" {
-			return existing, nil
-		}
-		providerURL, err := s.service.ResolveProviderDerivativeURL(ctx, assetID, "processing-input")
-		if err != nil {
-			return "", err
-		}
-		urls[assetID] = providerURL
-		return providerURL, nil
-	}
-
 	if params.Media == nil {
 		return nil, nil
 	}
+	manifest := params.InputManifest
+	if manifest == nil {
+		return nil, fmt.Errorf("任务媒体 manifest 缺失")
+	}
+	if err := manifest.Validate(); err != nil {
+		return nil, fmt.Errorf("任务媒体 manifest 无效: %w", err)
+	}
+	refs := manifest.ResolveInputs()
+	expectedRefs := len(params.Media.Inputs) + len(params.Media.References)
+	if params.Media.Original != nil {
+		expectedRefs++
+	}
+	if params.Media.Mask != nil {
+		expectedRefs++
+	}
+	if len(refs) != expectedRefs {
+		return nil, fmt.Errorf("任务媒体 manifest 与 media params 不匹配")
+	}
+	urls := make([]string, len(refs))
+	for index, ref := range refs {
+		presigned, err := s.service.Presign(ctx, PresignRequest{StorageProfileID: ref.StorageProfileID, ObjectKey: ref.ObjectKey, TTL: DefaultPresignTTL, ExpectedMIMEType: ref.MIMEType, ExpectedChecksumSHA256: ref.ChecksumSHA256, ExpectedSizeBytes: ref.SizeBytes, ExpectedObjectGeneration: ref.ObjectGeneration, Caller: "task-provider"})
+		if err != nil {
+			return nil, fmt.Errorf("presign task media %d: %w", index, err)
+		}
+		if presigned.ObjectGeneration != ref.ObjectGeneration || presigned.StorageProfileID != ref.StorageProfileID {
+			return nil, fmt.Errorf("任务媒体 object generation/profile mismatch")
+		}
+		urls[index] = presigned.URL
+	}
+	position := 0
+	next := func() (string, error) {
+		if position >= len(urls) {
+			return "", fmt.Errorf("任务媒体 manifest 与 media params 不匹配")
+		}
+		url := urls[position]
+		position++
+		return url, nil
+	}
 	resolved := &tasks.RuntimeMediaInputs{UseMask: params.Media.UseMask}
 	for index, ref := range params.Media.Inputs {
-		url, err := resolve(ref.AssetID)
+		url, err := next()
 		if err != nil {
 			return nil, fmt.Errorf("解析 input 媒体失败: index=%d: %w", index, err)
 		}
 		resolved.Inputs = append(resolved.Inputs, tasks.RuntimeMediaRef{URL: url, Role: ref.Role, Weight: ref.Weight})
 	}
 	for index, ref := range params.Media.References {
-		url, err := resolve(ref.AssetID)
+		url, err := next()
 		if err != nil {
 			return nil, fmt.Errorf("解析 reference 媒体失败: index=%d: %w", index, err)
 		}
 		resolved.References = append(resolved.References, tasks.RuntimeMediaRef{URL: url, Role: ref.Role, Weight: ref.Weight})
 	}
 	if ref := params.Media.Original; ref != nil {
-		url, err := resolve(ref.AssetID)
+		url, err := next()
 		if err != nil {
 			return nil, fmt.Errorf("解析 original 媒体失败: %w", err)
 		}
 		resolved.Original = &tasks.RuntimeMediaRef{URL: url, Role: ref.Role, Weight: ref.Weight}
 	}
 	if ref := params.Media.Mask; ref != nil {
-		url, err := resolve(ref.AssetID)
+		url, err := next()
 		if err != nil {
 			return nil, fmt.Errorf("解析 mask 媒体失败: %w", err)
 		}
 		resolved.Mask = &tasks.RuntimeMediaRef{URL: url, Role: ref.Role, Weight: ref.Weight}
+	}
+	if position != len(urls) {
+		return nil, fmt.Errorf("任务媒体 manifest 与 media params 不匹配")
 	}
 	return resolved, nil
 }
@@ -147,6 +172,7 @@ func (s *RuntimeTaskMediaStore) MaterializeRemoteResults(ctx context.Context, us
 		}
 		output := taskOutputFromStoredUploadRef(taskID, ref, sourceURL, index)
 		output.MediaAssetID = &handle.AssetID
+		output.AssetID = strings.TrimSpace(handle.PublicAssetID)
 		items = append(items, taskmedia.MaterializedResult{
 			ImageURL: ref.URL,
 			Output:   output,
@@ -192,6 +218,7 @@ func (s *RuntimeTaskMediaStore) MaterializeBytesResult(ctx context.Context, user
 	}
 	output := taskOutputFromStoredUploadRef(taskID, ref, sourceURL, 0)
 	output.MediaAssetID = &handle.AssetID
+	output.AssetID = strings.TrimSpace(handle.PublicAssetID)
 	return taskmedia.MaterializedResults{
 		Items: []taskmedia.MaterializedResult{{
 			ImageURL: ref.URL,
@@ -287,7 +314,7 @@ func taskOutputFromMediaAsset(taskID string, asset dbsqlc.MediaAsset, sourceURL 
 	return tasks.TaskOutput{TaskID: taskID, Role: "image", URL: asset.Url, StorageKey: asset.StorageKey,
 		MIMEType: asset.MimeType, Width: int(asset.Width), Height: int(asset.Height), SizeBytes: asset.SizeBytes,
 		ChecksumSHA256: asset.ChecksumSha256, SourceURL: sourceURL, StorageProfile: asset.StorageProfileID, ResultIndex: resultIndex,
-		MediaAssetID: &assetID}
+		MediaAssetID: &assetID, AssetID: asset.AssetID}
 }
 
 func taskMediaStoredObject(obj *StoredUploadObject) *taskmedia.StoredObject {

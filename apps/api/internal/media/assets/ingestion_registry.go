@@ -15,9 +15,12 @@ import (
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/media/derivatives"
+	mediaerrors "ideaboard/api/internal/media/errors"
 	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/media/reclamation"
 	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/tasking/taskmedia"
+	"ideaboard/api/internal/tasking/tasks"
 )
 
 func (r *MediaAssetRegistry) Begin(ctx context.Context, request ingestion.Request) (ingestion.Handle, error) {
@@ -41,6 +44,15 @@ func (r *MediaAssetRegistry) Begin(ctx context.Context, request ingestion.Reques
 func (r *MediaAssetRegistry) Complete(ctx context.Context, handle ingestion.Handle, completion ingestion.Completion) error {
 	if r == nil || r.db == nil || handle.AssetID <= 0 || handle.OwnerUserID <= 0 || handle.Origin == nil {
 		return fmt.Errorf("invalid media asset completion")
+	}
+	if strings.TrimSpace(completion.StorageKey) == "" || strings.TrimSpace(completion.StorageKey) != strings.TrimSpace(handle.StorageKey) {
+		return fmt.Errorf("media asset completion storage key does not match ingestion handle")
+	}
+	if r.integrityVerifier == nil {
+		return fmt.Errorf("media asset integrity verifier is not configured")
+	}
+	if err := r.integrityVerifier.Verify(ctx, handle.StorageProfile, completion.StorageKey, completion.ChecksumSHA256, completion.MIMEType, completion.SizeBytes); err != nil {
+		return fmt.Errorf("verify completed media asset: %w", err)
 	}
 	metadata, err := ingestionMetadata(handle.Origin, completion)
 	if err != nil {
@@ -97,6 +109,11 @@ type MediaAssetRegistry struct {
 	q                  *dbsqlc.Queries
 	now                func() time.Time
 	derivativeEnqueuer func(context.Context, int64) error
+	integrityVerifier  processingInputIntegrityVerifier
+}
+
+type processingInputIntegrityVerifier interface {
+	Verify(context.Context, string, string, string, string, int64) error
 }
 
 type DerivativeEnqueuer func(context.Context, int64) error
@@ -163,7 +180,7 @@ func (r *MediaAssetRegistry) beginLibraryMaterialization(ctx context.Context, re
 		return ingestion.Handle{}, fmt.Errorf("commit library materialized media transaction: %w", err)
 	}
 	committed = true
-	return ingestionHandle(assetIDValue, false, request), nil
+	return ingestionHandle(assetIDValue, assetID, false, request), nil
 }
 
 func NewMediaAssetRegistry(db *sql.DB) *MediaAssetRegistry {
@@ -174,6 +191,83 @@ func (r *MediaAssetRegistry) SetDerivativeEnqueuer(enqueuer DerivativeEnqueuer) 
 	if r != nil {
 		r.derivativeEnqueuer = enqueuer
 	}
+}
+
+func (r *MediaAssetRegistry) SetIntegrityVerifier(verifier processingInputIntegrityVerifier) {
+	if r != nil {
+		r.integrityVerifier = verifier
+	}
+}
+
+var _ taskmedia.TaskInputManifestBuilder = (*MediaAssetRegistry)(nil)
+
+// BuildTaskInputManifest resolves each mutable Asset reference to the exact
+// ready derivative object that will be used by the provider. The returned
+// value is safe to persist with the Task and is never rebuilt from catalog
+// state during retry.
+func (r *MediaAssetRegistry) BuildTaskInputManifest(ctx context.Context, userID int64, media *tasks.MediaInputs) (*tasks.TaskInputManifest, error) {
+	if r == nil || r.q == nil || userID <= 0 {
+		return nil, fmt.Errorf("media derivative registry is unavailable")
+	}
+	if media == nil {
+		return tasks.NewTaskInputManifest(nil, nil, nil, nil, nil)
+	}
+	resolve := func(ref tasks.MediaRef) (tasks.TaskInputManifestRef, error) {
+		if ref.AssetID <= 0 {
+			return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeMediaNotFound, "media.manifest.resolve", "invalid asset id", nil)
+		}
+		row, err := r.q.GetProcessingInputManifestObject(ctx, dbsqlc.GetProcessingInputManifestObjectParams{MediaAssetID: ref.AssetID, OwnerUserID: userID})
+		if errors.Is(err, sql.ErrNoRows) {
+			return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeMediaProcessing, "media.manifest.resolve", "processing-input derivative is not ready", err)
+		}
+		if err != nil {
+			return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeStorageTransient, "media.manifest.resolve", "load processing-input derivative failed", err)
+		}
+		if r.integrityVerifier == nil {
+			return tasks.TaskInputManifestRef{}, fmt.Errorf("media integrity verifier is unavailable")
+		}
+		if err := r.integrityVerifier.Verify(ctx, row.StorageProfileID, row.StorageKey, row.ChecksumSha256, row.MimeType, row.SizeBytes); err != nil {
+			return tasks.TaskInputManifestRef{}, err
+		}
+		return tasks.TaskInputManifestRef{
+			AssetID: row.AssetID, DerivativeID: row.DerivativeID, DerivativeTier: row.Tier,
+			StorageProfileID: row.StorageProfileID, ObjectKey: row.StorageKey,
+			ObjectGeneration: row.ObjectGeneration, ChecksumSHA256: row.ChecksumSha256,
+			MIMEType: row.MimeType, SizeBytes: row.SizeBytes, Role: ref.Role, Weight: ref.Weight,
+		}, nil
+	}
+	inputs := make([]tasks.TaskInputManifestRef, 0, len(media.Inputs))
+	for index, ref := range media.Inputs {
+		resolved, err := resolve(ref)
+		if err != nil {
+			return nil, fmt.Errorf("resolve input media %d: %w", index, err)
+		}
+		inputs = append(inputs, resolved)
+	}
+	references := make([]tasks.TaskInputManifestRef, 0, len(media.References))
+	for index, ref := range media.References {
+		resolved, err := resolve(ref)
+		if err != nil {
+			return nil, fmt.Errorf("resolve reference media %d: %w", index, err)
+		}
+		references = append(references, resolved)
+	}
+	var original, mask *tasks.TaskInputManifestRef
+	if media.Original != nil {
+		resolved, err := resolve(*media.Original)
+		if err != nil {
+			return nil, fmt.Errorf("resolve original media: %w", err)
+		}
+		original = &resolved
+	}
+	if media.Mask != nil {
+		resolved, err := resolve(*media.Mask)
+		if err != nil {
+			return nil, fmt.Errorf("resolve mask media: %w", err)
+		}
+		mask = &resolved
+	}
+	return tasks.NewTaskInputManifest(inputs, references, original, mask, media.UseMask)
 }
 
 func (r *MediaAssetRegistry) GetByAssetID(ctx context.Context, ownerUserID int64, assetID string) (dbsqlc.MediaAsset, error) {
@@ -311,7 +405,7 @@ func (r *MediaAssetRegistry) beginBoardUpload(ctx context.Context, request inges
 		return ingestion.Handle{}, fmt.Errorf("commit board upload media registration: %w", err)
 	}
 	committed = true
-	return ingestionHandle(id, false, request), nil
+	return ingestionHandle(id, assetID, false, request), nil
 }
 
 func (r *MediaAssetRegistry) beginTaskResult(ctx context.Context, request ingestion.Request, facts ingestion.TaskResultFacts) (ingestion.Handle, error) {
@@ -346,7 +440,7 @@ func (r *MediaAssetRegistry) beginTaskResult(ctx context.Context, request ingest
 	if err != nil {
 		return ingestion.Handle{}, fmt.Errorf("begin task result ingestion: %w", err)
 	}
-	return ingestionHandle(id, existingReady, request), nil
+	return ingestionHandle(id, assetID, existingReady, request), nil
 }
 
 func (r *MediaAssetRegistry) beginGenerationPreparation(ctx context.Context, request ingestion.Request, facts ingestion.GenerationPreparationFacts) (ingestion.Handle, error) {
@@ -392,7 +486,7 @@ func (r *MediaAssetRegistry) beginGenerationPreparation(ctx context.Context, req
 		return ingestion.Handle{}, fmt.Errorf("commit prepared media registration: %w", err)
 	}
 	committed = true
-	return ingestionHandle(asset, false, request), nil
+	return ingestionHandle(asset, assetID, false, request), nil
 }
 
 func ingestionMetadata(origin ingestion.OriginFacts, completion ingestion.Completion) ([]byte, error) {
@@ -579,7 +673,12 @@ func (r *MediaAssetRegistry) ValidateProcessingInputReadiness(ctx context.Contex
 	seen := make(map[int64]struct{}, len(assetIDs))
 	for _, assetID := range assetIDs {
 		if assetID <= 0 {
-			return fmt.Errorf("媒体 AssetID 无效: %d", assetID)
+			return mediaerrors.New(
+				mediaerrors.CodeMediaNotFound,
+				"media.derivative.validate_processing_input",
+				fmt.Sprintf("invalid asset id %d", assetID),
+				nil,
+			)
 		}
 		if _, ok := seen[assetID]; ok {
 			continue
@@ -589,21 +688,43 @@ func (r *MediaAssetRegistry) ValidateProcessingInputReadiness(ctx context.Contex
 			MediaAssetID: assetID, OwnerUserID: userID, Tier: "processing-input",
 		})
 		if errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("媒体 Asset %d 的 processing-input derivative 不存在", assetID)
+			return mediaerrors.New(
+				mediaerrors.CodeMediaProcessing,
+				"media.derivative.validate_processing_input",
+				fmt.Sprintf("media asset %d processing-input derivative is not yet scheduled", assetID),
+				err,
+			).WithFacts(fmt.Sprintf("%d", assetID), "", "", "", "", "")
 		}
 		if err != nil {
-			return fmt.Errorf("读取媒体 Asset %d 的 processing-input derivative 失败: %w", assetID, err)
+			return mediaerrors.New(
+				mediaerrors.CodeStorageTransient,
+				"media.derivative.validate_processing_input",
+				fmt.Sprintf("lookup media asset %d processing-input derivative failed", assetID),
+				err,
+			).WithFacts(fmt.Sprintf("%d", assetID), "", "", "", "", "")
 		}
 		if derivative.Status != "ready" {
-			return fmt.Errorf("媒体 Asset %d 的 processing-input derivative 状态为 %s", assetID, derivative.Status)
+			return mediaerrors.New(
+				mediaerrors.CodeMediaProcessing,
+				"media.derivative.validate_processing_input",
+				fmt.Sprintf("media asset %d processing-input derivative is in status %q", assetID, derivative.Status),
+				nil,
+			).WithFacts(fmt.Sprintf("%d", assetID), "", "", "", "", "")
+		}
+		if r.integrityVerifier == nil {
+			return fmt.Errorf("media integrity verifier is unavailable")
+		}
+		if err := r.integrityVerifier.Verify(ctx, derivative.StorageProfileID, derivative.StorageKey, derivative.ChecksumSha256, derivative.MimeType, derivative.SizeBytes); err != nil {
+			return mediaerrors.New(mediaerrors.CodeObjectMissing, "media.derivative.validate_processing_input", fmt.Sprintf("media asset %d processing-input object is not usable", assetID), err)
 		}
 	}
 	return nil
 }
 
-func ingestionHandle(assetID int64, existingReady bool, request ingestion.Request) ingestion.Handle {
+func ingestionHandle(assetID int64, publicAssetID string, existingReady bool, request ingestion.Request) ingestion.Handle {
 	return ingestion.Handle{
 		AssetID:        assetID,
+		PublicAssetID:  strings.TrimSpace(publicAssetID),
 		ExistingReady:  existingReady,
 		OwnerUserID:    request.OwnerUserID,
 		StorageProfile: request.StorageProfile,
