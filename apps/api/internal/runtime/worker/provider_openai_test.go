@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 	"image"
 	"image/color"
 	"image/png"

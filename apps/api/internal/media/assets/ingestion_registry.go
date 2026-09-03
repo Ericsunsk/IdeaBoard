@@ -19,8 +19,8 @@ import (
 	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/media/reclamation"
 	"ideaboard/api/internal/media/storage"
-	"ideaboard/api/internal/tasking/taskmedia"
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskmedia "ideaboard/api/internal/tasking/ports/media"
 )
 
 func (r *MediaAssetRegistry) Begin(ctx context.Context, request ingestion.Request) (ingestion.Handle, error) {

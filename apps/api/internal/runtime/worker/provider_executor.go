@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"io"
 	"log/slog"
 	"net/url"
@@ -16,9 +17,8 @@ import (
 	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/tasking/taskmedia"
-	"ideaboard/api/internal/tasking/taskqueue"
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskmedia "ideaboard/api/internal/tasking/ports/media"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -255,7 +255,7 @@ const (
 	providerRuntimeAdapterFluxFill
 )
 
-func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error) {
+func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) (providerCallOutput, error) {
 	correlationID := task.EnsureCorrelationID()
 
 	exec, err := c.resolveProviderExecution(ctx, account, task, assignment)
@@ -376,7 +376,7 @@ type providerExecutionInputs struct {
 	providerEndpointName string
 }
 
-func validateProviderExecutionInputs(ctx context.Context, account *accounts.RuntimeAccountAccess, assignment taskqueue.TaskAssignment) (providerExecutionInputs, error) {
+func validateProviderExecutionInputs(ctx context.Context, account *accounts.RuntimeAccountAccess, assignment taskqueueports.TaskAssignment) (providerExecutionInputs, error) {
 	if account == nil || account.ID <= 0 || assignment.AccountID != account.ID {
 		return providerExecutionInputs{}, fmt.Errorf("assignment account identity is invalid")
 	}
@@ -417,7 +417,7 @@ type providerExecutionPlan struct {
 	resolvedModel string
 }
 
-func (c *ProviderExecutor) resolveProviderExecutionPlan(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, inputs providerExecutionInputs, assignment taskqueue.TaskAssignment) (providerExecutionPlan, error) {
+func (c *ProviderExecutor) resolveProviderExecutionPlan(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, inputs providerExecutionInputs, assignment taskqueueports.TaskAssignment) (providerExecutionPlan, error) {
 	params, err := c.parseAndNormalizeTaskParams(ctx, task)
 	if err != nil {
 		return providerExecutionPlan{}, err
@@ -452,7 +452,7 @@ func (c *ProviderExecutor) resolveProviderExecutionPlan(ctx context.Context, acc
 	}, nil
 }
 
-func (c *ProviderExecutor) resolveProviderExecution(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (resolvedProviderExecution, error) {
+func (c *ProviderExecutor) resolveProviderExecution(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) (resolvedProviderExecution, error) {
 	if account == nil || account.ID <= 0 || assignment.AccountID != account.ID {
 		return resolvedProviderExecution{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, fmt.Errorf("assignment account identity is invalid"))
 	}

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"ideaboard/api/internal/tasking/taskmedia"
+	taskmedia "ideaboard/api/internal/tasking/ports/media"
 )
 
 type TaskMediaAuthorizer struct {

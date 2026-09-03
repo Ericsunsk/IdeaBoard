@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/media/mediarefs"
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow"
 )
 

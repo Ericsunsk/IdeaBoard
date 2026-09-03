@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"log/slog"
 	"strings"
 	"time"
@@ -13,10 +14,10 @@ import (
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/config"
-	"ideaboard/api/internal/tasking/taskmedia"
-	"ideaboard/api/internal/tasking/taskqueue"
-	"ideaboard/api/internal/tasking/taskruntime"
-	"ideaboard/api/internal/tasking/tasks"
+	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	taskmedia "ideaboard/api/internal/tasking/ports/media"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -68,9 +69,9 @@ type WorkerAccountStore interface {
 type RiverTaskWorkerDeps struct {
 	AccountRepo        WorkerAccountStore
 	TaskRepo           taskruntime.TaskStore
-	Enqueuer           taskqueue.TaskEnqueuer
-	Assigner           taskqueue.TaskAssigner
-	CancelStore        taskqueue.TaskCancellationStore
+	Enqueuer           taskqueueports.TaskEnqueuer
+	Assigner           taskqueueports.TaskAssigner
+	CancelStore        taskqueueports.TaskCancellationStore
 	MediaReader        taskmedia.UploadReader
 	ResultMaterializer taskmedia.ResultMaterializer
 	TaskEvents         events.TaskStatusPublisher
@@ -184,7 +185,7 @@ func (w *RiverTaskWorker) Work(ctx context.Context, job *river.Job[taskqueue.Dra
 		if errors.Is(err, errFinalAttemptMarkerUnavailable) {
 			return river.JobSnooze(w.finalFailureRetryDelay)
 		}
-		if errors.Is(err, taskqueue.ErrNoAccountCapacity) {
+		if errors.Is(err, taskqueueports.ErrNoAccountCapacity) {
 			return river.JobSnooze(w.noCapacityRetryDelay)
 		}
 		if isFinalAttempt {

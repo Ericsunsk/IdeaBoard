@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accountpool/accounts"
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow"
 )
 

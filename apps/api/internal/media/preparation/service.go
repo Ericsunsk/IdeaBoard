@@ -11,7 +11,7 @@ import (
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 type Service struct {

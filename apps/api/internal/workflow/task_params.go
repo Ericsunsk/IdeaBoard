@@ -3,7 +3,7 @@ package workflow
 import (
 	"strings"
 
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow/paramkeys"
 )
 

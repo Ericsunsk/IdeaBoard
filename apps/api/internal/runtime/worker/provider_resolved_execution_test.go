@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -10,8 +11,7 @@ import (
 
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/accountpool/providerendpoints"
-	"ideaboard/api/internal/tasking/taskqueue"
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -158,8 +158,8 @@ func TestResolveProviderExecutionDoesNotMutateInputs(t *testing.T) {
 	}
 }
 
-func resolvedExecutionAssignment(baseURL string, apiType string, protocol string, resolvedModel string) taskqueue.TaskAssignment {
-	return taskqueue.TaskAssignment{
+func resolvedExecutionAssignment(baseURL string, apiType string, protocol string, resolvedModel string) taskqueueports.TaskAssignment {
+	return taskqueueports.TaskAssignment{
 		AccountID:                17,
 		ProviderEndpointID:       23,
 		ProviderEndpointName:     "snapshot-endpoint",

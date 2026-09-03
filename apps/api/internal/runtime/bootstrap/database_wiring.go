@@ -26,8 +26,8 @@ import (
 	"ideaboard/api/internal/rewards"
 	"ideaboard/api/internal/runtime/worker"
 	"ideaboard/api/internal/searchcatalog"
-	"ideaboard/api/internal/tasking/taskbilling"
-	"ideaboard/api/internal/tasking/taskstore"
+	taskbilling "ideaboard/api/internal/tasking/application/billing"
+	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -137,7 +137,7 @@ func runtimePrivilegePolicies() []dbprivileges.Policy {
 		database.RuntimePrivilegePolicy(),
 		creditpostgres.RuntimePrivilegePolicy(),
 		billing.RuntimePrivilegePolicy(),
-		taskbilling.RuntimePrivilegePolicy(),
+		taskstore.RuntimePrivilegePolicy(),
 		worker.RuntimePrivilegePolicy(),
 		rewards.RuntimePrivilegePolicy(),
 		paymentpostgres.RuntimePrivilegePolicy(),

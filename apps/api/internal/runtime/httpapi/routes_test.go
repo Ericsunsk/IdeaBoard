@@ -28,8 +28,8 @@ import (
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/rewards"
 	"ideaboard/api/internal/searchcatalog"
-	"ideaboard/api/internal/tasking/taskservice"
-	"ideaboard/api/internal/tasking/taskstats"
+	statisticshttp "ideaboard/api/internal/tasking/interfaces/http/statistics"
+	taskhttp "ideaboard/api/internal/tasking/interfaces/http/task"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/usage"
 
@@ -316,7 +316,7 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 		Auth: authDeps,
 		UserRoutes: UserRouteDeps{
 			AuthHandler:       auth.NewAuthHandler(nil),
-			TaskHandler:       taskservice.NewHandler(nil),
+			TaskHandler:       taskhttp.NewHandler(taskhttp.HandlerDeps{}),
 			BoardHandler:      boards.NewBoardHandler(nil, config.PublicOriginsConfig{}),
 			BillingHandler:    billing.NewHandler(nil, nil),
 			BillingRecords:    billingrecords.NewHandler(nil),
@@ -335,8 +335,8 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 			CreditAdminReadHandler:      credithttp.NewAdminReadHandler(nil, nil),
 			CreditReconciliationHandler: credithttp.NewReconciliationHandler(nil, nil),
 			AccountHandler:              accounts.NewAccountHandler(nil),
-			TaskHandler:                 taskservice.NewHandler(nil),
-			TaskStatsHandler:            taskstats.NewHandler(nil, nil),
+			TaskHandler:                 taskhttp.NewHandler(taskhttp.HandlerDeps{}),
+			TaskStatsHandler:            statisticshttp.NewHandler(nil, nil),
 			ProviderEndpointHandler:     providerendpoints.NewProviderEndpointHandler(nil),
 			StorageHandler:              storage.NewStorageHandler(nil),
 			FeaturePromptHandler:        prompts.NewFeaturePromptHandler(nil),
@@ -490,7 +490,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 func TestUserTaskRoutesDoNotExposePhysicalTaskDeletion(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	registerUserTaskRoutes(router.Group("/api/user"), UserRouteDeps{TaskHandler: taskservice.NewHandler(nil)})
+	registerUserTaskRoutes(router.Group("/api/user"), UserRouteDeps{TaskHandler: taskhttp.NewHandler(taskhttp.HandlerDeps{})})
 
 	for _, route := range router.Routes() {
 		if route.Method == http.MethodDelete && route.Path == "/api/user/tasks/:task_id" {
@@ -547,7 +547,7 @@ func TestUserEventsRouteIsRegistered(t *testing.T) {
 func TestAdminTaskRoutesDoNotExposeBulkTaskDeletion(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	registerAdminTaskRoutes(router.Group("/api/admin"), AdminRouteDeps{TaskHandler: taskservice.NewHandler(nil)})
+	registerAdminTaskRoutes(router.Group("/api/admin"), AdminRouteDeps{TaskHandler: taskhttp.NewHandler(taskhttp.HandlerDeps{})})
 
 	for _, route := range router.Routes() {
 		if route.Method == http.MethodPost && route.Path == "/api/admin/tasks/bulk-delete" {

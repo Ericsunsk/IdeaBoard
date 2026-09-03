@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"ideaboard/api/internal/tasking/taskqueue"
-	"ideaboard/api/internal/tasking/taskruntime"
+	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 )
 
 type riverFinalFailureRuntime interface {

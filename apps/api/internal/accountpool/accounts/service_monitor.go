@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 func (s *AccountService) GetMonitorInfo(ctx context.Context) (*tasks.MonitorInfo, error) {

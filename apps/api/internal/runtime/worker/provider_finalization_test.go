@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/tasking/taskmedia"
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskmedia "ideaboard/api/internal/tasking/ports/media"
 )
 
 func TestProviderResultFinalizerMaterializesRemoteRefsOnce(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
+	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -18,13 +19,13 @@ import (
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/runtime/billingregistry"
-	"ideaboard/api/internal/tasking/taskbilling"
-	"ideaboard/api/internal/tasking/taskqueue"
-	"ideaboard/api/internal/tasking/taskruntime"
-	"ideaboard/api/internal/tasking/tasks"
-	"ideaboard/api/internal/tasking/taskservice"
-	"ideaboard/api/internal/tasking/taskstore"
-	"ideaboard/api/internal/tasking/tasksubmission"
+	taskbilling "ideaboard/api/internal/tasking/application/billing"
+	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	tasksubmission "ideaboard/api/internal/tasking/application/submission"
+	taskservice "ideaboard/api/internal/tasking/application/task"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/workflow"
 
@@ -72,7 +73,7 @@ func TestAIImageWorkflowBillingContractUsesCurrentProviderPoolAndConvergesFacts(
 		accountRepo,
 		riverQueue,
 		taskRuntime,
-		func(_ context.Context, runtimeAccount *accounts.RuntimeAccountAccess, _ *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error) {
+		func(_ context.Context, runtimeAccount *accounts.RuntimeAccountAccess, _ *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) (providerCallOutput, error) {
 			providerCalls.Add(1)
 			switch runtimeAccount.ID {
 			case failedProviderID.Load():
@@ -108,7 +109,7 @@ func TestAIImageWorkflowBillingContractUsesCurrentProviderPoolAndConvergesFacts(
 	if err != nil {
 		t.Fatalf("build Billable Item registry: %v", err)
 	}
-	submissionStore := tasksubmission.NewStore(pool, taskRepo, riverClient, queueName, 1, taskBilling)
+	submissionStore := tasksubmission.NewStore(pool, taskRepo, taskqueue.NewTransactionalEnqueuer(riverClient, queueName, 1), taskBilling)
 	taskService := taskservice.NewService(taskservice.ServiceDeps{
 		TaskIntake: taskservice.NewTaskIntake(taskservice.TaskIntakeDeps{
 			Accounts: accountRepo,
@@ -237,7 +238,7 @@ func saturateWorkflowContractProvider(
 	if err != nil {
 		t.Fatalf("occupy Provider capacity: %v", err)
 	}
-	if assignment.Status != taskqueue.AssignStatusAssigned || assignment.AccountID != provider.ID {
+	if assignment.Status != taskqueueports.AssignStatusAssigned || assignment.AccountID != provider.ID {
 		t.Fatalf("capacity fixture assignment=%+v, want Provider %d", assignment, provider.ID)
 	}
 }

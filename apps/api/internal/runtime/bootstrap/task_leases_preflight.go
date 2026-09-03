@@ -11,7 +11,7 @@ import (
 
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
-	"ideaboard/api/internal/tasking/taskstore"
+	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
 )
 
 const (

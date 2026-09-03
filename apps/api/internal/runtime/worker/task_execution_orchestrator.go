@@ -3,19 +3,19 @@ package worker
 import (
 	"context"
 	"errors"
+	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
 	"ideaboard/api/internal/accountpool/accounts"
-	"ideaboard/api/internal/tasking/taskqueue"
-	"ideaboard/api/internal/tasking/taskruntime"
-	"ideaboard/api/internal/tasking/tasks"
+	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow"
 )
 
-type providerCallFunc func(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error)
+type providerCallFunc func(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) (providerCallOutput, error)
 
 type accountLookupStore interface {
 	GetRuntimeAccountForAssignment(ctx context.Context, accountID int64, providerEndpointID int64, credentialID int64) (*accounts.RuntimeAccountAccess, error)
@@ -23,7 +23,7 @@ type accountLookupStore interface {
 
 type taskExecutionOrchestrator struct {
 	accountRepo        accountLookupStore
-	enqueuer           taskqueue.TaskEnqueuer
+	enqueuer           taskqueueports.TaskEnqueuer
 	taskRuntime        *taskruntime.Service
 	attemptLifecycle   *taskAttemptLifecycle
 	providerCall       providerCallFunc
@@ -34,7 +34,7 @@ const taskCleanupTimeout = 5 * time.Second
 
 func newTaskExecutionOrchestrator(
 	accountRepo accountLookupStore,
-	enqueuer taskqueue.TaskEnqueuer,
+	enqueuer taskqueueports.TaskEnqueuer,
 	taskRuntime *taskruntime.Service,
 	providerCall providerCallFunc,
 ) *taskExecutionOrchestrator {
@@ -48,7 +48,7 @@ func newTaskExecutionOrchestrator(
 	}
 }
 
-func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) error {
+func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) error {
 	phaseMachine := newTaskExecutionPhaseMachine(task.TaskID)
 	correlationID := task.EnsureCorrelationID()
 	accountID := assignment.AccountID
@@ -79,7 +79,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 func (o *taskExecutionOrchestrator) prepareTaskExecution(
 	ctx context.Context,
 	task *tasks.TaskPayload,
-	assignment taskqueue.TaskAssignment,
+	assignment taskqueueports.TaskAssignment,
 	phaseMachine *taskExecutionPhaseMachine,
 	correlationID string,
 ) (*accounts.RuntimeAccountAccess, bool, error) {
@@ -114,7 +114,7 @@ func (o *taskExecutionOrchestrator) prepareTaskExecution(
 func (o *taskExecutionOrchestrator) startTaskAttempt(
 	ctx context.Context,
 	task *tasks.TaskPayload,
-	assignment taskqueue.TaskAssignment,
+	assignment taskqueueports.TaskAssignment,
 	account *accounts.RuntimeAccountAccess,
 	startTime time.Time,
 	correlationID string,
@@ -141,7 +141,7 @@ func (o *taskExecutionOrchestrator) startTaskAttempt(
 		if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
 			return taskExecutionAttemptContext{}, true, phaseErr
 		}
-		return taskExecutionAttemptContext{}, true, o.requeueTask(ctx, task, taskqueue.TaskAssignment{}, "确认任务运行租约失败")
+		return taskExecutionAttemptContext{}, true, o.requeueTask(ctx, task, taskqueueports.TaskAssignment{}, "确认任务运行租约失败")
 	}
 
 	o.recordExecutionSnapshot(ctx, task.TaskID, taskExecutionSnapshot(task, account, assignment))
@@ -161,7 +161,7 @@ func (o *taskExecutionOrchestrator) startTaskAttempt(
 		if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
 			return taskExecutionAttemptContext{}, true, phaseErr
 		}
-		return taskExecutionAttemptContext{}, true, o.requeueTask(ctx, task, taskqueue.TaskAssignment{}, "记录任务执行尝试失败")
+		return taskExecutionAttemptContext{}, true, o.requeueTask(ctx, task, taskqueueports.TaskAssignment{}, "记录任务执行尝试失败")
 	}
 	o.recordExecutionMetrics(ctx, task.TaskID, tasks.TaskExecutionMetricsPatch{TaskID: task.TaskID, CurrentStage: tasks.StringPtr(tasks.ExecutionStageProvider), ProviderStartedAt: &providerStartAt, WorkerOverheadMS: int64Ptr(nonNegativeMilliseconds(providerStartAt.Sub(startTime)))})
 	if err := phaseMachine.advance(taskExecutionPhaseProvider); err != nil {
@@ -173,7 +173,7 @@ func (o *taskExecutionOrchestrator) startTaskAttempt(
 func (o *taskExecutionOrchestrator) finalizeSuccessfulExecution(
 	ctx context.Context,
 	task *tasks.TaskPayload,
-	assignment taskqueue.TaskAssignment,
+	assignment taskqueueports.TaskAssignment,
 	accountID int64,
 	attemptCtx taskExecutionAttemptContext,
 	providerOutput providerCallOutput,
@@ -420,7 +420,7 @@ func (o *taskExecutionOrchestrator) handleProviderFailoverRequeue(
 		FailureStage:     tasks.StringPtr(decision.FailureStage),
 		FailureCategory:  tasks.StringPtr(decision.FailureCategory),
 	})
-	if requeueErr := o.requeueTask(ctx, attempt.task, taskqueue.TaskAssignment{}, decision.Reason); requeueErr != nil {
+	if requeueErr := o.requeueTask(ctx, attempt.task, taskqueueports.TaskAssignment{}, decision.Reason); requeueErr != nil {
 		o.attemptLifecycle.finishFallback(ctx, attempt, tasks.TaskAttemptStatusFailed, decision.Reason, decision.FailureStage, decision.FailureCategory, time.Now())
 		return requeueErr
 	}
@@ -437,7 +437,7 @@ func (o *taskExecutionOrchestrator) decideTaskExecutionConvergence(input taskExe
 	return o.convergenceDecider.DecideTaskExecutionConvergence(input)
 }
 
-func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment, reason string) error {
+func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment, reason string) error {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
@@ -469,7 +469,7 @@ func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *tasks
 	return nil
 }
 
-func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment, result string, outputs []tasks.TaskOutput, elapsedSec float64, attemptFinish *tasks.TaskAttemptFinish) (bool, error) {
+func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment, result string, outputs []tasks.TaskOutput, elapsedSec float64, attemptFinish *tasks.TaskAttemptFinish) (bool, error) {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
@@ -497,14 +497,14 @@ func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *task
 	return true, nil
 }
 
-func (o *taskExecutionOrchestrator) completeFailedTask(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment, reason string, elapsedSec float64) error {
+func (o *taskExecutionOrchestrator) completeFailedTask(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment, reason string, elapsedSec float64) error {
 	return o.completeFailedTaskWithMetrics(ctx, task, assignment, reason, "", elapsedSec, tasks.ExecutionStageAssigned, tasks.FailureCategoryUnknown)
 }
 
 func (o *taskExecutionOrchestrator) completeFailedTaskWithMetrics(
 	ctx context.Context,
 	task *tasks.TaskPayload,
-	assignment taskqueue.TaskAssignment,
+	assignment taskqueueports.TaskAssignment,
 	reason string,
 	result string,
 	elapsedSec float64,
@@ -517,7 +517,7 @@ func (o *taskExecutionOrchestrator) completeFailedTaskWithMetrics(
 func (o *taskExecutionOrchestrator) completeFailedTaskWithMetricsAndAttempt(
 	ctx context.Context,
 	task *tasks.TaskPayload,
-	assignment taskqueue.TaskAssignment,
+	assignment taskqueueports.TaskAssignment,
 	reason string,
 	result string,
 	elapsedSec float64,
@@ -553,7 +553,7 @@ func (o *taskExecutionOrchestrator) completeFailedTaskWithMetricsAndAttempt(
 }
 
 func (o *taskExecutionOrchestrator) failTask(ctx context.Context, task *tasks.TaskPayload, reason string) error {
-	return o.completeFailedTask(ctx, task, taskqueue.TaskAssignment{}, reason, 0)
+	return o.completeFailedTask(ctx, task, taskqueueports.TaskAssignment{}, reason, 0)
 }
 
 func (o *taskExecutionOrchestrator) skipCancelledTask(ctx context.Context, task *tasks.TaskPayload, attemptFinish *tasks.TaskAttemptFinish) {
@@ -588,7 +588,7 @@ func (o *taskExecutionOrchestrator) dropTask(ctx context.Context, task *tasks.Ta
 	slog.Info("task dropped", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "reason", reason)
 }
 
-func (o *taskExecutionOrchestrator) handleExecutionInterrupted(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment, execErr error, attemptFinish *tasks.TaskAttemptFinish) error {
+func (o *taskExecutionOrchestrator) handleExecutionInterrupted(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment, execErr error, attemptFinish *tasks.TaskAttemptFinish) error {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
@@ -677,7 +677,7 @@ func (o *taskExecutionOrchestrator) recordExecutionSnapshot(ctx context.Context,
 	}
 }
 
-func taskExecutionSnapshot(task *tasks.TaskPayload, account *accounts.RuntimeAccountAccess, assignment taskqueue.TaskAssignment) tasks.TaskExecutionSnapshot {
+func taskExecutionSnapshot(task *tasks.TaskPayload, account *accounts.RuntimeAccountAccess, assignment taskqueueports.TaskAssignment) tasks.TaskExecutionSnapshot {
 	snapshot := tasks.TaskExecutionSnapshot{}
 	if task == nil {
 		return snapshot

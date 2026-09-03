@@ -15,12 +15,13 @@ import (
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits"
-	"ideaboard/api/internal/tasking/taskbilling"
-	"ideaboard/api/internal/tasking/taskqueue"
-	"ideaboard/api/internal/tasking/taskruntime"
-	"ideaboard/api/internal/tasking/tasks"
-	"ideaboard/api/internal/tasking/taskstore"
-	"ideaboard/api/internal/tasking/tasksubmission"
+	taskbilling "ideaboard/api/internal/tasking/application/billing"
+	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	tasksubmission "ideaboard/api/internal/tasking/application/submission"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/workflow"
 
@@ -63,7 +64,7 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 	taskRuntime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 
 	seenRiverJobID := make(chan int64, 1)
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, taskRuntime, func(_ context.Context, runtimeAccount *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, _ taskqueue.TaskAssignment) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, taskRuntime, func(_ context.Context, runtimeAccount *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, _ taskqueueports.TaskAssignment) (providerCallOutput, error) {
 		if runtimeAccount.ID != account.ID {
 			return providerCallOutput{}, fmt.Errorf("provider got account_id=%d, want %d", runtimeAccount.ID, account.ID)
 		}
@@ -92,7 +93,7 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 	if task.Status != tasks.StatusPending {
 		t.Fatalf("new task status=%q, want %q", task.Status, tasks.StatusPending)
 	}
-	store := tasksubmission.NewStore(pool, taskRepo, client, submitToRiverWorkerQueue, submitToRiverWorkerMaxAttempts, taskBilling)
+	store := tasksubmission.NewStore(pool, taskRepo, taskqueue.NewTransactionalEnqueuer(client, submitToRiverWorkerQueue, submitToRiverWorkerMaxAttempts), taskBilling)
 	result, err := store.SubmitTask(ctx, newSubmitToRiverWorkerCanonicalRequest(t, task))
 	if err != nil {
 		t.Fatalf("SubmitTask failed: %v", err)
@@ -140,7 +141,7 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 	if attempt.riverJobID != job.id {
 		t.Fatalf("task attempt river_job_id=%d, want %d", attempt.riverJobID, job.id)
 	}
-	if !taskqueue.LeaseBelongsToRiverJob(attempt.leaseToken, job.id) {
+	if !taskqueueports.LeaseBelongsToRiverJob(attempt.leaseToken, job.id) {
 		t.Fatalf("lease_token=%q does not belong to river_job.id=%d", attempt.leaseToken, job.id)
 	}
 	assertRiverTaskBillingState(t, db, task.TaskID, tasks.StatusCompleted, "captured", 15, 0)
@@ -180,7 +181,7 @@ func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t 
 	runtime := &failOnceFinalFailureRuntime{inner: innerRuntime}
 	var providerCalls atomic.Int32
 	newWorker := func() *RiverTaskWorker {
-		worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
+		worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueueports.TaskAssignment) error {
 			providerCalls.Add(1)
 			return errors.New("forced terminal provider failure")
 		}))
@@ -224,7 +225,7 @@ func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t 
 		Status:         tasks.StatusPending,
 		BillingRequest: &tasks.TaskBillingRequest{Feature: request.Feature, OutputResolution: string(request.OutputResolution), Quantity: request.Quantity},
 	}
-	store := tasksubmission.NewStore(pool, taskRepo, client, queueName, submitToRiverWorkerMaxAttempts, taskBilling)
+	store := tasksubmission.NewStore(pool, taskRepo, taskqueue.NewTransactionalEnqueuer(client, queueName, submitToRiverWorkerMaxAttempts), taskBilling)
 	result, err := store.SubmitTask(ctx, newSubmitToRiverWorkerCanonicalRequest(t, task))
 	if err != nil {
 		t.Fatal(err)
@@ -296,7 +297,7 @@ func TestFinalAttemptMarkerFailureResetsLeaseBeforeProviderRetry(t *testing.T) {
 	assigner := taskqueue.NewPostgresTaskAssigner(db)
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 	providerCalls := 0
-	processor := newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
+	processor := newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueueports.TaskAssignment) error {
 		providerCalls++
 		return nil
 	})

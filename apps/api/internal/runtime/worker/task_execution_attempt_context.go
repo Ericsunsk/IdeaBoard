@@ -1,15 +1,15 @@
 package worker
 
 import (
+	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"time"
 
-	"ideaboard/api/internal/tasking/taskqueue"
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 type taskExecutionAttemptContext struct {
 	task           *tasks.TaskPayload
-	assignment     taskqueue.TaskAssignment
+	assignment     taskqueueports.TaskAssignment
 	accountID      int64
 	startedAt      time.Time
 	attemptRef     tasks.TaskAttemptRef
@@ -18,7 +18,7 @@ type taskExecutionAttemptContext struct {
 
 func newTaskExecutionAttemptContext(
 	task *tasks.TaskPayload,
-	assignment taskqueue.TaskAssignment,
+	assignment taskqueueports.TaskAssignment,
 	accountID int64,
 	startedAt time.Time,
 	attemptRef tasks.TaskAttemptRef,

@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 func TestNormalizeStructuredPromptContractParamsMovesFlatVariationParams(t *testing.T) {

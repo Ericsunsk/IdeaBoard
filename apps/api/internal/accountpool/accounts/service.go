@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/events"
-	"ideaboard/api/internal/tasking/taskqueue"
+	taskqueue "ideaboard/api/internal/tasking/ports/queue"
 )
 
 type AccountTaskStore interface {

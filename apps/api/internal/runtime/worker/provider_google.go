@@ -18,7 +18,7 @@ import (
 	"ideaboard/api/internal/media/mediarefs"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/safehttp"
-	"ideaboard/api/internal/tasking/taskmedia"
+	taskmedia "ideaboard/api/internal/tasking/ports/media"
 	"ideaboard/api/internal/workflow"
 )
 

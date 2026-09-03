@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/media/storage"
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 // fakeObjectStore is the test double for the ObjectStore port.

@@ -2,17 +2,17 @@ package worker
 
 import (
 	"context"
+	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/tasking/taskqueue"
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 func TestTaskAttemptLifecycleContractBeginsWithExactLeaseIdentity(t *testing.T) {
 	startedAt := time.Date(2026, 8, 15, 10, 0, 0, 0, time.UTC)
 	providerStartedAt := startedAt.Add(40 * time.Millisecond)
-	assignment := taskqueue.TaskAssignment{
+	assignment := taskqueueports.TaskAssignment{
 		TaskID: "attempt-lifecycle-task", AccountID: 12, ProviderEndpointID: 34,
 		CredentialID: 56, LeaseToken: "lease-attempt-lifecycle",
 	}
@@ -57,7 +57,7 @@ func TestTaskAttemptLifecycleContractFallbackFinishPreservesTimelineAndLease(t *
 	lifecycle := newTaskAttemptLifecycle(runtime)
 	attempt := newTaskExecutionAttemptContext(
 		&tasks.TaskPayload{TaskID: "attempt-fallback-task"},
-		taskqueue.TaskAssignment{TaskID: "attempt-fallback-task", AccountID: 12, ProviderEndpointID: 34, CredentialID: 56, LeaseToken: "lease-fallback"},
+		taskqueueports.TaskAssignment{TaskID: "attempt-fallback-task", AccountID: 12, ProviderEndpointID: 34, CredentialID: 56, LeaseToken: "lease-fallback"},
 		12,
 		startedAt,
 		tasks.TaskAttemptRef{ID: 99, TaskID: "attempt-fallback-task", AccountID: 12, ProviderEndpointID: 34, CredentialID: 56, LeaseToken: "lease-fallback"},

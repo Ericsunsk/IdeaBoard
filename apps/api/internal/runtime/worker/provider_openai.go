@@ -23,7 +23,7 @@ import (
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/safehttp"
-	"ideaboard/api/internal/tasking/taskmedia"
+	taskmedia "ideaboard/api/internal/tasking/ports/media"
 )
 
 const maxOpenAIDataURLBytes = 10 * 1024 * 1024

@@ -11,8 +11,8 @@ import (
 
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/config"
-	"ideaboard/api/internal/tasking/tasks"
-	"ideaboard/api/internal/tasking/taskservice"
+	taskservice "ideaboard/api/internal/tasking/application/task"
+	tasks "ideaboard/api/internal/tasking/domain"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"

@@ -1,11 +1,11 @@
 package worker
 
 import (
+	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/tasking/taskqueue"
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 func TestTaskExecutionAttemptContextBuildsFinishFromProviderTimeline(t *testing.T) {
@@ -17,7 +17,7 @@ func TestTaskExecutionAttemptContextBuildsFinishFromProviderTimeline(t *testing.
 	completedAt := startedAt.Add(500 * time.Millisecond)
 	attempt := newTaskExecutionAttemptContext(
 		&tasks.TaskPayload{TaskID: "task-attempt-context"},
-		taskqueue.TaskAssignment{TaskID: "task-attempt-context", AccountID: 12},
+		taskqueueports.TaskAssignment{TaskID: "task-attempt-context", AccountID: 12},
 		12,
 		startedAt,
 		tasks.TaskAttemptRef{ID: 99},

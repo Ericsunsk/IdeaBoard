@@ -3,7 +3,7 @@ package worker
 import (
 	"testing"
 
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 func TestTaskExecutionConvergencePolicyDecidesOutcomes(t *testing.T) {

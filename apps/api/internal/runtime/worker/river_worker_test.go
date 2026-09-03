@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/platform/accountlimits"
-	"ideaboard/api/internal/tasking/taskqueue"
-	"ideaboard/api/internal/tasking/taskruntime"
-	"ideaboard/api/internal/tasking/tasks"
+	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
@@ -24,9 +25,9 @@ func TestDrawingWorkerTimeoutOutlivesProviderRequestBudget(t *testing.T) {
 }
 
 func TestRiverWorkerNoCapacitySnoozesJob(t *testing.T) {
-	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusNoCapacity}
+	assigner := &fakeAssigner{assignStatus: taskqueueports.AssignStatusNoCapacity}
 	runtime := &fakeRuntime{}
-	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
+	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueueports.TaskAssignment) error {
 		t.Fatal("execute should not be called without capacity")
 		return nil
 	}))
@@ -55,10 +56,10 @@ func TestRiverWorkerRejectsNilJob(t *testing.T) {
 }
 
 func TestRiverWorkerPropagatesCorrelationIDToProcessor(t *testing.T) {
-	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 9}
+	assigner := &fakeAssigner{assignStatus: taskqueueports.AssignStatusAssigned, assignAccount: 9}
 	runtime := &fakeRuntime{}
 	var gotCorrelationID string
-	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, runtime, func(_ context.Context, task *tasks.TaskPayload, _ taskqueue.TaskAssignment) error {
+	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, runtime, func(_ context.Context, task *tasks.TaskPayload, _ taskqueueports.TaskAssignment) error {
 		gotCorrelationID = task.EffectiveCorrelationID()
 		return nil
 	}))
@@ -169,10 +170,10 @@ func TestRiverFinalFailureHandlerIgnoresNonDrawingJobs(t *testing.T) {
 }
 
 func TestTaskProcessorProcessesSynchronously(t *testing.T) {
-	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 9}
+	assigner := &fakeAssigner{assignStatus: taskqueueports.AssignStatusAssigned, assignAccount: 9}
 	runtime := &fakeRuntime{}
 	executed := false
-	processor := newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
+	processor := newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueueports.TaskAssignment) error {
 		time.Sleep(80 * time.Millisecond)
 		executed = true
 		return nil
@@ -192,9 +193,9 @@ func TestTaskProcessorProcessesSynchronously(t *testing.T) {
 }
 
 func TestTaskProcessorDiscardDoesNotCallProvider(t *testing.T) {
-	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusDiscard}
+	assigner := &fakeAssigner{assignStatus: taskqueueports.AssignStatusDiscard}
 	runtime := &fakeRuntime{}
-	processor := newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
+	processor := newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueueports.TaskAssignment) error {
 		t.Fatal("execute should not be called for discarded assignment")
 		return nil
 	})
@@ -205,9 +206,9 @@ func TestTaskProcessorDiscardDoesNotCallProvider(t *testing.T) {
 }
 
 func TestRiverWorkerPassesRiverJobIDToProcessor(t *testing.T) {
-	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 9}
+	assigner := &fakeAssigner{assignStatus: taskqueueports.AssignStatusAssigned, assignAccount: 9}
 	runtime := &fakeRuntime{}
-	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
+	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueueports.TaskAssignment) error {
 		return nil
 	}))
 
@@ -226,9 +227,9 @@ func TestRiverWorkerPassesRiverJobIDToProcessor(t *testing.T) {
 func TestRiverWorkerFinalFailureSnoozesWithDurableConvergenceMarker(t *testing.T) {
 	runtime := &fakeRuntime{convergeErr: errors.New("database unavailable")}
 	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(
-		&fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 9},
+		&fakeAssigner{assignStatus: taskqueueports.AssignStatusAssigned, assignAccount: 9},
 		runtime,
-		func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
+		func(context.Context, *tasks.TaskPayload, taskqueueports.TaskAssignment) error {
 			return errors.New("provider failed")
 		},
 	))
@@ -262,9 +263,9 @@ func TestRiverWorkerFinalFailureSnoozesWithDurableConvergenceMarker(t *testing.T
 func TestRiverWorkerFallsBackToDedicatedSettlementJobWhenMarkerRecordingFails(t *testing.T) {
 	runtime := &fakeRuntime{convergeErr: errors.New("database unavailable")}
 	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(
-		&fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 9},
+		&fakeAssigner{assignStatus: taskqueueports.AssignStatusAssigned, assignAccount: 9},
 		runtime,
-		func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
+		func(context.Context, *tasks.TaskPayload, taskqueueports.TaskAssignment) error {
 			return errors.New("provider failed")
 		},
 	))
@@ -297,10 +298,10 @@ func TestRiverWorkerFallsBackToDedicatedSettlementJobWhenMarkerRecordingFails(t 
 }
 
 func TestRiverWorkerRetriesPreProviderMarkerFailureWithoutCallingProvider(t *testing.T) {
-	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 9}
+	assigner := &fakeAssigner{assignStatus: taskqueueports.AssignStatusAssigned, assignAccount: 9}
 	runtime := &fakeRuntime{}
 	providerCalls := 0
-	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
+	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueueports.TaskAssignment) error {
 		providerCalls++
 		return nil
 	}))
@@ -336,9 +337,9 @@ func TestRiverWorkerConvergesTerminallyWhenMarkerResetFails(t *testing.T) {
 	runtime := &fakeRuntime{resetErr: errors.New("forced reset failure")}
 	providerCalls := 0
 	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(
-		&fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 9},
+		&fakeAssigner{assignStatus: taskqueueports.AssignStatusAssigned, assignAccount: 9},
 		runtime,
-		func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
+		func(context.Context, *tasks.TaskPayload, taskqueueports.TaskAssignment) error {
 			providerCalls++
 			return nil
 		},
@@ -362,10 +363,10 @@ func TestRiverWorkerConvergesTerminallyWhenMarkerResetFails(t *testing.T) {
 }
 
 func TestRiverWorkerNoCapacityDoesNotCreateSettlementOnlyMarker(t *testing.T) {
-	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusNoCapacity}
+	assigner := &fakeAssigner{assignStatus: taskqueueports.AssignStatusNoCapacity}
 	runtime := &fakeRuntime{}
 	providerCalls := 0
-	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
+	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueueports.TaskAssignment) error {
 		providerCalls++
 		return nil
 	}))
@@ -386,7 +387,7 @@ func TestRiverWorkerNoCapacityDoesNotCreateSettlementOnlyMarker(t *testing.T) {
 	if !errors.As(err, &snoozeErr) || recordCalls != 0 || providerCalls != 0 || len(runtime.converged) != 0 {
 		t.Fatalf("no-capacity error=%v record/provider/converge=%d/%d/%d", err, recordCalls, providerCalls, len(runtime.converged))
 	}
-	assigner.assignStatus = taskqueue.AssignStatusAssigned
+	assigner.assignStatus = taskqueueports.AssignStatusAssigned
 	assigner.assignAccount = 9
 	if err := worker.Work(t.Context(), job); err != nil {
 		t.Fatalf("capacity recovery failed: %v", err)
@@ -436,9 +437,9 @@ func TestRiverFinalFailureWorkerTreatsAlreadyTerminalOrDeletedTaskAsConverged(t 
 func TestRiverWorkerFinalFailureRetryOnlyConvergesSettlement(t *testing.T) {
 	runtime := &fakeRuntime{}
 	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(
-		&fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 9},
+		&fakeAssigner{assignStatus: taskqueueports.AssignStatusAssigned, assignAccount: 9},
 		runtime,
-		func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
+		func(context.Context, *tasks.TaskPayload, taskqueueports.TaskAssignment) error {
 			t.Fatal("provider must not run during settlement-only retry")
 			return nil
 		},
@@ -520,9 +521,9 @@ func TestRiverFinalFailureHandlerPersistsFallbackWhenConvergenceFails(t *testing
 func TestConvergeFinalFailureDurablyOnlyEnqueuesSettlementFallback(t *testing.T) {
 	runtime := &fakeRuntime{convergeErr: errors.New("database unavailable")}
 	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(
-		&fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 9},
+		&fakeAssigner{assignStatus: taskqueueports.AssignStatusAssigned, assignAccount: 9},
 		runtime,
-		func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
+		func(context.Context, *tasks.TaskPayload, taskqueueports.TaskAssignment) error {
 			t.Fatal("provider must not run during durable settlement recovery")
 			return nil
 		},
@@ -555,9 +556,9 @@ func TestRiverWorkerFinalFailureConvergesAfterWorkContextCancellation(t *testing
 		return nil
 	}}
 	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(
-		&fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 9},
+		&fakeAssigner{assignStatus: taskqueueports.AssignStatusAssigned, assignAccount: 9},
 		runtime,
-		func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
+		func(context.Context, *tasks.TaskPayload, taskqueueports.TaskAssignment) error {
 			return errors.New("job timed out")
 		},
 	))
@@ -580,9 +581,9 @@ func TestRiverWorkerFinalFailureConvergesAfterWorkContextCancellation(t *testing
 func TestRiverWorkerFinalPanicSnoozesWhenConvergenceFails(t *testing.T) {
 	runtime := &fakeRuntime{convergeErr: errors.New("database unavailable")}
 	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(
-		&fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 9},
+		&fakeAssigner{assignStatus: taskqueueports.AssignStatusAssigned, assignAccount: 9},
 		runtime,
-		func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
+		func(context.Context, *tasks.TaskPayload, taskqueueports.TaskAssignment) error {
 			panic("provider panic")
 		},
 	))

@@ -3,13 +3,13 @@ package worker
 import (
 	"context"
 	"database/sql"
+	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/accountpool/accounts"
-	"ideaboard/api/internal/tasking/taskqueue"
-	"ideaboard/api/internal/tasking/taskruntime"
-	"ideaboard/api/internal/tasking/tasks"
+	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
 
@@ -38,9 +38,9 @@ type fakeAssigner struct {
 	lastRiverJobID        int64
 }
 
-func (f *fakeAssigner) Assign(_ context.Context, task *tasks.TaskPayload) (taskqueue.TaskAssignment, error) {
+func (f *fakeAssigner) Assign(_ context.Context, task *tasks.TaskPayload) (taskqueueports.TaskAssignment, error) {
 	if f.assignErr != nil {
-		return taskqueue.TaskAssignment{}, f.assignErr
+		return taskqueueports.TaskAssignment{}, f.assignErr
 	}
 	f.lastRiverJobID = task.RiverJobID
 	channelID := f.assignChannel
@@ -63,7 +63,7 @@ func (f *fakeAssigner) Assign(_ context.Context, task *tasks.TaskPayload) (taskq
 	if endpointBaseURL == "" {
 		endpointBaseURL = "https://example.com/fake-provider"
 	}
-	return taskqueue.TaskAssignment{
+	return taskqueueports.TaskAssignment{
 		TaskID:                   task.TaskID,
 		AccountID:                f.assignAccount,
 		ProviderEndpointID:       channelID,
@@ -78,7 +78,7 @@ func (f *fakeAssigner) Assign(_ context.Context, task *tasks.TaskPayload) (taskq
 	}, nil
 }
 
-func (f *fakeAssigner) ConfirmTaskLease(context.Context, taskqueue.TaskAssignment) error {
+func (f *fakeAssigner) ConfirmTaskLease(context.Context, taskqueueports.TaskAssignment) error {
 	f.confirmCalls++
 	return f.confirmErr
 }
@@ -87,7 +87,7 @@ func (f *fakeAssigner) leaseToken() string {
 	if f.assignToken != "" {
 		return f.assignToken
 	}
-	if f.assignStatus == taskqueue.AssignStatusAssigned {
+	if f.assignStatus == taskqueueports.AssignStatusAssigned {
 		return "fake-lease-token"
 	}
 	return ""
@@ -211,7 +211,7 @@ RETURNING id`,
 	return id
 }
 
-func riverTestAssignment(t testing.TB, db testRuntimeDB, account *accounts.ApiAccount, taskID string, leaseToken string) taskqueue.TaskAssignment {
+func riverTestAssignment(t testing.TB, db testRuntimeDB, account *accounts.ApiAccount, taskID string, leaseToken string) taskqueueports.TaskAssignment {
 	t.Helper()
 	var credentialID int64
 	var credentialFingerprint string
@@ -235,7 +235,7 @@ FROM provider_endpoints
 WHERE id = $1`, account.ProviderEndpointID).Scan(&endpointName, &endpointBaseURL, &apiType, &protocol); err != nil {
 		t.Fatalf("load provider endpoint snapshot failed: %v", err)
 	}
-	assignment := taskqueue.TaskAssignment{
+	assignment := taskqueueports.TaskAssignment{
 		TaskID:                   taskID,
 		AccountID:                account.ID,
 		ProviderEndpointID:       account.ProviderEndpointID,
@@ -247,7 +247,7 @@ WHERE id = $1`, account.ProviderEndpointID).Scan(&endpointName, &endpointBaseURL
 		ProviderEndpointBaseURL:  endpointBaseURL,
 		CredentialFingerprint:    credentialFingerprint,
 		CredentialKeyVersion:     credentialKeyVersion,
-		Status:                   taskqueue.AssignStatusAssigned,
+		Status:                   taskqueueports.AssignStatusAssigned,
 		LeaseToken:               leaseToken,
 	}
 	if _, err := db.ExecContext(context.Background(), `

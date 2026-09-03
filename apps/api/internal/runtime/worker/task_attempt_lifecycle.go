@@ -3,12 +3,12 @@ package worker
 import (
 	"context"
 	"fmt"
+	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"log/slog"
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/tasking/taskqueue"
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 // taskAttemptLifecycle owns the worker-side attempt record boundary. Terminal
@@ -30,7 +30,7 @@ func newTaskAttemptLifecycle(runtime taskAttemptLifecycleRuntime) *taskAttemptLi
 func (l *taskAttemptLifecycle) begin(
 	ctx context.Context,
 	task *tasks.TaskPayload,
-	assignment taskqueue.TaskAssignment,
+	assignment taskqueueports.TaskAssignment,
 	executionStartedAt time.Time,
 	providerStartedAt time.Time,
 ) (taskExecutionAttemptContext, error) {

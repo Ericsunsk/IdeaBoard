@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"log/slog"
 
-	"ideaboard/api/internal/tasking/taskqueue"
-	"ideaboard/api/internal/tasking/taskruntime"
-	"ideaboard/api/internal/tasking/tasks"
+	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 type consumerTaskRuntime interface {
@@ -22,15 +22,15 @@ var (
 )
 
 type taskProcessor struct {
-	assigner    taskqueue.TaskAssigner
+	assigner    taskqueueports.TaskAssigner
 	taskRuntime consumerTaskRuntime
-	executeTask func(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) error
+	executeTask func(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) error
 }
 
 func newTaskProcessor(
-	assigner taskqueue.TaskAssigner,
+	assigner taskqueueports.TaskAssigner,
 	taskRuntime consumerTaskRuntime,
-	executeTask func(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) error,
+	executeTask func(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) error,
 ) *taskProcessor {
 	return &taskProcessor{
 		assigner:    assigner,
@@ -66,12 +66,12 @@ func (p *taskProcessor) process(ctx context.Context, task *tasks.TaskPayload, be
 	}
 
 	switch assignment.Status {
-	case taskqueue.AssignStatusDiscard:
+	case taskqueueports.AssignStatusDiscard:
 		slog.Info("task converged; discard queued task", "task_id", task.TaskID, "correlation_id", correlationID)
 		return nil
-	case taskqueue.AssignStatusNoCapacity:
-		return fmt.Errorf("%w: task=%s", taskqueue.ErrNoAccountCapacity, task.TaskID)
-	case taskqueue.AssignStatusAssigned:
+	case taskqueueports.AssignStatusNoCapacity:
+		return fmt.Errorf("%w: task=%s", taskqueueports.ErrNoAccountCapacity, task.TaskID)
+	case taskqueueports.AssignStatusAssigned:
 		if !assignment.HasRuntimeSnapshot() {
 			return fmt.Errorf("invalid assignment snapshot for task=%s account=%d provider_endpoint=%d credential=%d has_token=%v",
 				task.TaskID,

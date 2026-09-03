@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"ideaboard/api/internal/tasking/taskstore"
+	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
 )
 
 func TestRecoverRunningTasksAfterStartupConvergesDurablyBeforeCancellingJobs(t *testing.T) {

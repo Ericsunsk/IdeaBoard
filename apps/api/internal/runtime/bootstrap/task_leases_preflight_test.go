@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/tasking/taskstore"
+	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
 )
 
 func TestParseRepairTaskLeasesArgsDefaults(t *testing.T) {

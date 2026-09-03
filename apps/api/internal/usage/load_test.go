@@ -13,7 +13,7 @@ import (
 
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits"
-	"ideaboard/api/internal/tasking/taskbilling"
+	taskbilling "ideaboard/api/internal/tasking/application/billing"
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5/pgxpool"

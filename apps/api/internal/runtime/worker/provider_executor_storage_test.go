@@ -21,8 +21,8 @@ import (
 	mediaassets "ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
-	"ideaboard/api/internal/tasking/taskmedia"
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskmedia "ideaboard/api/internal/tasking/ports/media"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/workflow"
 )

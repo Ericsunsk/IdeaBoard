@@ -12,7 +12,7 @@ import (
 
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits"
-	"ideaboard/api/internal/tasking/taskbilling"
+	taskbilling "ideaboard/api/internal/tasking/application/billing"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/workflow"
 
@@ -162,7 +162,7 @@ func seedDurableUsageSnapshots(
 		if err != nil {
 			t.Fatalf("begin task billing fixture: %v", err)
 		}
-		if _, err := billingWriter.HoldAndPersist(ctx, tx, taskID, userID, request); err != nil {
+		if _, err := billingWriter.HoldAndPersist(ctx, tx, taskbilling.HoldCommand{TaskID: taskID, UserID: userID, Billing: request}); err != nil {
 			_ = tx.Rollback(ctx)
 			t.Fatalf("persist task billing snapshot %s: %v", taskID, err)
 		}

@@ -5,7 +5,7 @@ import (
 
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/config"
-	"ideaboard/api/internal/tasking/taskservice"
+	taskservice "ideaboard/api/internal/tasking/application/task"
 )
 
 func newTaskStatusEventPublisher(

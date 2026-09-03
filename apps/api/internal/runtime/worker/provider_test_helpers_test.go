@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"strconv"
 	"strings"
 	"testing"
@@ -10,8 +11,8 @@ import (
 
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/accountpool/providerendpoints"
-	"ideaboard/api/internal/tasking/taskqueue"
-	"ideaboard/api/internal/tasking/tasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -249,9 +250,9 @@ func runtimeAccountAccessForTest(account *accounts.ApiAccount) *accounts.Runtime
 	}
 }
 
-func assignmentSnapshotForTest(account *accounts.ApiAccount, resolvedModel string) taskqueue.TaskAssignment {
+func assignmentSnapshotForTest(account *accounts.ApiAccount, resolvedModel string) taskqueueports.TaskAssignment {
 	if account == nil {
-		return taskqueue.TaskAssignment{}
+		return taskqueueports.TaskAssignment{}
 	}
 	accountID := account.ID
 	if accountID <= 0 {
@@ -273,7 +274,7 @@ func assignmentSnapshotForTest(account *accounts.ApiAccount, resolvedModel strin
 	if name == "" {
 		name = "test-provider"
 	}
-	return taskqueue.TaskAssignment{
+	return taskqueueports.TaskAssignment{
 		AccountID:                accountID,
 		ProviderEndpointID:       endpointID,
 		ResolvedModel:            strings.TrimSpace(resolvedModel),

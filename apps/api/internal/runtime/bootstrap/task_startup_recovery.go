@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"ideaboard/api/internal/tasking/taskstore"
+	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
 
 	"github.com/riverqueue/river/rivertype"
 )

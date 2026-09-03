@@ -6,15 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"strings"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/accountpool/accounts"
-	"ideaboard/api/internal/tasking/taskqueue"
-	"ideaboard/api/internal/tasking/taskruntime"
-	"ideaboard/api/internal/tasking/tasks"
-	"ideaboard/api/internal/tasking/taskstore"
+	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
 	"ideaboard/api/internal/testdb"
 )
 
@@ -72,7 +72,7 @@ func TestExecuteRequeuesTaskWhenLeaseConfirmationFails(t *testing.T) {
 	assigner := &fakeAssigner{confirmErr: errors.New("lease confirmation failed")}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 	providerCalled := false
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueue.TaskAssignment) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueueports.TaskAssignment) (providerCallOutput, error) {
 		providerCalled = true
 		return providerOutputJSON(`{"image_url":"https://example.com/image.png"}`), nil
 	})
@@ -124,11 +124,11 @@ func TestExecuteDropsTaskWhenLeaseConfirmationAlreadyConverged(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	assigner := &fakeAssigner{confirmErr: taskqueue.ErrTaskLeaseConflict}
+	assigner := &fakeAssigner{confirmErr: taskqueueports.ErrTaskLeaseConflict}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 	requeuer := &fakeRequeuer{}
 	providerCalled := false
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, requeuer, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueue.TaskAssignment) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, requeuer, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueueports.TaskAssignment) (providerCallOutput, error) {
 		providerCalled = true
 		return providerOutputJSON(`{"image_url":"https://example.com/image.png"}`), nil
 	})
@@ -177,7 +177,7 @@ func TestExecuteRequeuesWhenAssignmentProviderEndpointNoLongerMatchesAccount(t *
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 	requeuer := &fakeRequeuer{}
 	providerCalled := false
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, requeuer, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueue.TaskAssignment) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, requeuer, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueueports.TaskAssignment) (providerCallOutput, error) {
 		providerCalled = true
 		return providerOutputJSON(`{"image_url":"https://example.com/image.png"}`), nil
 	})
@@ -234,7 +234,7 @@ FOR EACH ROW EXECUTE FUNCTION fail_mark_completed();
 
 	assigner := &fakeAssigner{}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(_ context.Context, runtimeAccount *accounts.RuntimeAccountAccess, _ *tasks.TaskPayload, _ taskqueue.TaskAssignment) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(_ context.Context, runtimeAccount *accounts.RuntimeAccountAccess, _ *tasks.TaskPayload, _ taskqueueports.TaskAssignment) (providerCallOutput, error) {
 		if runtimeAccount.APIKey != "k" {
 			t.Fatalf("runtime account api key = %q, want secret", runtimeAccount.APIKey)
 		}
@@ -277,7 +277,7 @@ func TestExecuteReleasesRunningLeaseWhenCancelledAfterProviderReturns(t *testing
 	cancelStore := newFakeCancelStoreForRiver()
 	assigner := &fakeAssigner{}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(ctx context.Context, _ *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, _ taskqueue.TaskAssignment) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(ctx context.Context, _ *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, _ taskqueueports.TaskAssignment) (providerCallOutput, error) {
 		if err := cancelStore.MarkCancelled(ctx, task.TaskID, time.Minute); err != nil {
 			t.Fatalf("mark cancelled failed: %v", err)
 		}
@@ -343,7 +343,7 @@ func TestExecuteReleasesRunningLeaseWhenCancelledBeforeProvider(t *testing.T) {
 	assigner := &fakeAssigner{}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
 	providerCalled := false
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueue.TaskAssignment) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueueports.TaskAssignment) (providerCallOutput, error) {
 		providerCalled = true
 		return providerOutputJSON(`{"image_url":"https://example.com/image.png"}`), nil
 	})
@@ -418,7 +418,7 @@ FOR EACH ROW EXECUTE FUNCTION fail_mark_failed();
 
 	assigner := &fakeAssigner{}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueue.TaskAssignment) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueueports.TaskAssignment) (providerCallOutput, error) {
 		return providerCallOutput{}, errors.New("provider boom")
 	})
 
@@ -461,7 +461,7 @@ func TestExecuteProviderFailureRoutesThroughConvergenceDecision(t *testing.T) {
 	decider := &recordingTaskExecutionConvergenceDecider{
 		outcomes: []taskExecutionConvergenceOutcome{taskExecutionConvergenceFinalFail},
 	}
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, requeuer, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueue.TaskAssignment) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, requeuer, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueueports.TaskAssignment) (providerCallOutput, error) {
 		return providerOutputJSON(""), newUpstreamHTTPError(429, "rate limited")
 	})
 	orchestrator.convergenceDecider = decider
@@ -577,7 +577,7 @@ func TestExecuteTemporaryProviderFailureRequeuesWithoutFailureResult(t *testing.
 	assigner := &fakeAssigner{}
 	requeuer := &fakeRequeuer{}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, requeuer, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueue.TaskAssignment) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, requeuer, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueueports.TaskAssignment) (providerCallOutput, error) {
 		return providerOutputJSON(""), newUpstreamHTTPError(429, "rate limited")
 	})
 
@@ -636,7 +636,7 @@ func TestExecuteProviderParseFailureFinalFailsWithFailureResultEnvelope(t *testi
 	assigner := &fakeAssigner{}
 	requeuer := &fakeRequeuer{}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, requeuer, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueue.TaskAssignment) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, requeuer, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueueports.TaskAssignment) (providerCallOutput, error) {
 		return providerOutputJSON(failureResult), newExecutionFailureError(
 			tasks.ExecutionStageProvider,
 			tasks.FailureCategoryProviderError,

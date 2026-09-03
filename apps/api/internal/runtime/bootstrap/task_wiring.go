@@ -18,13 +18,13 @@ import (
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/runtime/worker"
 	"ideaboard/api/internal/searchcatalog"
-	"ideaboard/api/internal/tasking/taskbilling"
-	"ideaboard/api/internal/tasking/taskmedia"
-	"ideaboard/api/internal/tasking/taskqueue"
-	"ideaboard/api/internal/tasking/tasks"
-	"ideaboard/api/internal/tasking/taskservice"
-	"ideaboard/api/internal/tasking/taskstats"
-	"ideaboard/api/internal/tasking/tasksubmission"
+	taskbilling "ideaboard/api/internal/tasking/application/billing"
+	taskstats "ideaboard/api/internal/tasking/application/statistics"
+	tasksubmission "ideaboard/api/internal/tasking/application/submission"
+	taskservice "ideaboard/api/internal/tasking/application/task"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	taskmedia "ideaboard/api/internal/tasking/ports/media"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
@@ -179,7 +179,12 @@ func newAppTaskRuntime(
 	}
 	riverQueue.SetClient(riverClient)
 
-	submissionStore := tasksubmission.NewStore(dbs.riverPool, repos.taskRepo.Submission(), riverClient, taskqueue.RiverQueueDefault, taskqueue.RiverMaxAttemptsDefault, taskBillingService)
+	submissionStore := tasksubmission.NewStore(
+		dbs.riverPool,
+		repos.taskRepo.Submission(),
+		taskqueue.NewTransactionalEnqueuer(riverClient, taskqueue.RiverQueueDefault, taskqueue.RiverMaxAttemptsDefault),
+		taskBillingService,
+	)
 	taskService := taskservice.NewService(taskservice.ServiceDeps{
 		TaskIntake: taskservice.NewTaskIntake(taskservice.TaskIntakeDeps{
 			Accounts:       repos.accountRepo,

@@ -21,8 +21,8 @@ import (
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/rewards"
 	"ideaboard/api/internal/searchcatalog"
-	"ideaboard/api/internal/tasking/taskservice"
-	"ideaboard/api/internal/tasking/taskstats"
+	statisticshttp "ideaboard/api/internal/tasking/interfaces/http/statistics"
+	taskhttp "ideaboard/api/internal/tasking/interfaces/http/task"
 	"ideaboard/api/internal/usage"
 
 	"github.com/gin-gonic/gin"
@@ -78,7 +78,7 @@ type StaticUploadDeps struct {
 
 type UserRouteDeps struct {
 	AuthHandler            *auth.AuthHandler
-	TaskHandler            *taskservice.Handler
+	TaskHandler            *taskhttp.Handler
 	BoardHandler           *boards.BoardHandler
 	BillingHandler         *billing.Handler
 	BillingRecords         *billingrecords.Handler
@@ -105,8 +105,8 @@ type AdminRouteDeps struct {
 	CreditAdminReadHandler      *credithttp.AdminReadHandler
 	CreditReconciliationHandler *credithttp.ReconciliationHandler
 	AccountHandler              *accounts.AccountHandler
-	TaskHandler                 *taskservice.Handler
-	TaskStatsHandler            *taskstats.Handler
+	TaskHandler                 *taskhttp.Handler
+	TaskStatsHandler            *statisticshttp.Handler
 	ProviderEndpointHandler     *providerendpoints.ProviderEndpointHandler
 	StorageHandler              *storage.StorageHandler
 	FeaturePromptHandler        *prompts.FeaturePromptHandler

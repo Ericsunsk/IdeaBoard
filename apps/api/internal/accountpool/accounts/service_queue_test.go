@@ -7,8 +7,8 @@ import (
 	"errors"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/events"
-	"ideaboard/api/internal/tasking/tasks"
-	"ideaboard/api/internal/tasking/taskstore"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
 	"testing"
 	"time"
 

@@ -22,8 +22,8 @@ import (
 	"ideaboard/api/internal/runtime/httpapi"
 	"ideaboard/api/internal/runtime/webdist"
 	"ideaboard/api/internal/searchcatalog"
-	"ideaboard/api/internal/tasking/taskservice"
-	"ideaboard/api/internal/tasking/taskstats"
+	statisticshttp "ideaboard/api/internal/tasking/interfaces/http/statistics"
+	taskhttp "ideaboard/api/internal/tasking/interfaces/http/task"
 	"ideaboard/api/internal/usage"
 
 	"github.com/gin-gonic/gin"
@@ -37,8 +37,10 @@ func newAppRouter(
 	taskServices appTaskServices,
 ) *gin.Engine {
 	accountHandler := accounts.NewAccountHandler(taskServices.accountService)
-	taskHandler := taskservice.NewHandler(taskServices.taskService)
-	taskStatsHandler := taskstats.NewHandler(taskServices.taskStatsService, taskServices.accountService)
+	taskHandler := taskhttp.NewHandler(taskhttp.HandlerDeps{
+		Commands: taskServices.taskService, AdminQueries: taskServices.taskService, UserQueries: taskServices.taskService,
+	})
+	taskStatsHandler := statisticshttp.NewHandler(taskServices.taskStatsService, taskServices.accountService)
 	billingHandler := billing.NewHandler(services.billingCatalog, services.billingCatalog)
 	paymentUserHandler := paymenthttp.NewUserCheckoutHandler(services.paymentService, cfg.PublicOrigins)
 	userEventStreamHandler := httpapi.NewUserEventStreamHandler(taskServices.userEvents)
