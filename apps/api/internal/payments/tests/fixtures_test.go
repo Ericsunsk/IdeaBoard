@@ -1,12 +1,16 @@
-package payments
+package tests
 
 import (
+	payments "ideaboard/api/internal/payments"
+
 	"context"
+	"encoding/json"
 	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/credits"
+	platformevents "ideaboard/api/internal/events"
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentevents "ideaboard/api/internal/payments/infrastructure/events"
@@ -15,27 +19,27 @@ import (
 	"ideaboard/api/internal/testsupport/secretstest"
 )
 
-func mustNewCheckoutWorkflow(t *testing.T, deps CheckoutWorkflowDependencies) *CheckoutWorkflow {
+func mustNewCheckoutWorkflow(t *testing.T, deps payments.CheckoutWorkflowDependencies) *payments.CheckoutWorkflow {
 	t.Helper()
-	workflow, err := NewCheckoutWorkflow(deps)
+	workflow, err := payments.NewCheckoutWorkflow(deps)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return workflow
 }
 
-func mustNewStripeFactsWorkflow(t *testing.T, deps StripeFactsWorkflowDependencies) *StripeFactsWorkflow {
+func mustNewStripeFactsWorkflow(t *testing.T, deps payments.StripeFactsWorkflowDependencies) *payments.StripeFactsWorkflow {
 	t.Helper()
-	workflow, err := NewStripeFactsWorkflow(deps)
+	workflow, err := payments.NewStripeFactsWorkflow(deps)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return workflow
 }
 
-func mustNewPaymentsService(t *testing.T, checkout *CheckoutWorkflow, facts *StripeFactsWorkflow) *Service {
+func mustNewPaymentsService(t *testing.T, checkout *payments.CheckoutWorkflow, facts *payments.StripeFactsWorkflow) *payments.Service {
 	t.Helper()
-	service, err := NewService(checkout, facts)
+	service, err := payments.NewService(checkout, facts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +51,7 @@ func mustNewPaymentsService(t *testing.T, checkout *CheckoutWorkflow, facts *Str
 func newCompleteTestPaymentsService(
 	t *testing.T,
 	repo *paymentpostgres.Repository,
-	runtime *PaymentRuntime,
+	runtime *payments.PaymentRuntime,
 	configurationGateway paymentports.StripeGateway,
 	checkoutGateway paymentports.CheckoutGateway,
 	wallets credits.WalletReader,
@@ -55,17 +59,17 @@ func newCompleteTestPaymentsService(
 	refundGateway paymentports.RefundGateway,
 	disputeGateway paymentports.DisputeGateway,
 	shutdownEnqueuer paymentconfiguration.ShutdownEnqueuer,
-) *Service {
+) *payments.Service {
 	t.Helper()
-	transitions, err := NewPaymentOrderTransitions(repo, runtime)
+	transitions, err := payments.NewPaymentOrderTransitions(repo, runtime)
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkout := mustNewCheckoutWorkflow(t, CheckoutWorkflowDependencies{
+	checkout := mustNewCheckoutWorkflow(t, payments.CheckoutWorkflowDependencies{
 		Configuration: repo, ConfigurationGateway: configurationGateway, ShutdownEnqueuer: shutdownEnqueuer,
 		Store: repo, CheckoutGateway: checkoutGateway, Wallets: wallets, Convergence: repo, Transitions: transitions,
 	})
-	facts := mustNewStripeFactsWorkflow(t, StripeFactsWorkflowDependencies{
+	facts := mustNewStripeFactsWorkflow(t, payments.StripeFactsWorkflowDependencies{
 		Configuration: repo, Inbox: repo, Convergence: repo, Verifier: verifier, RefundGateway: refundGateway,
 		DisputeGateway: disputeGateway, CheckoutStore: repo, CheckoutGateway: checkoutGateway,
 		CheckoutRecovery: checkout, Transitions: transitions,
@@ -73,29 +77,21 @@ func newCompleteTestPaymentsService(
 	return mustNewPaymentsService(t, checkout, facts)
 }
 
-func (s *Service) eventHub() *paymentevents.Hub {
-	if s == nil || s.runtime == nil {
-		return nil
-	}
-	hub, _ := s.runtime.events.(*paymentevents.Hub)
-	return hub
-}
-
 func newCompleteTestCheckoutWorkflow(
 	t *testing.T,
 	repo *paymentpostgres.Repository,
-	runtime *PaymentRuntime,
+	runtime *payments.PaymentRuntime,
 	configurationGateway paymentports.StripeGateway,
 	checkoutGateway paymentports.CheckoutGateway,
 	wallets credits.WalletReader,
 	shutdownEnqueuer paymentconfiguration.ShutdownEnqueuer,
-) *CheckoutWorkflow {
+) *payments.CheckoutWorkflow {
 	t.Helper()
-	transitions, err := NewPaymentOrderTransitions(repo, runtime)
+	transitions, err := payments.NewPaymentOrderTransitions(repo, runtime)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return mustNewCheckoutWorkflow(t, CheckoutWorkflowDependencies{
+	return mustNewCheckoutWorkflow(t, payments.CheckoutWorkflowDependencies{
 		Configuration: repo, ConfigurationGateway: configurationGateway, ShutdownEnqueuer: shutdownEnqueuer,
 		Store: repo, CheckoutGateway: checkoutGateway, Wallets: wallets, Convergence: repo, Transitions: transitions,
 	})
@@ -187,4 +183,38 @@ func (testWalletReader) GetWallet(context.Context, int64) (credits.WalletDetails
 }
 func (testWalletReader) ListLedger(context.Context, credits.ListLedgerInput) (credits.LedgerPage, error) {
 	return credits.LedgerPage{}, credits.ErrWalletNotFound
+}
+
+// NewEventHub is a test-only composition helper for integration tests that
+// exercise multiple Payments application services together.
+func NewEventHub() *paymentevents.Hub { return paymentevents.NewHub() }
+
+type PaymentEvent = paymentports.PaymentEvent
+
+type paymentEventSubscriber interface {
+	Subscribe(int64) (<-chan platformevents.UserEvent, func(), bool)
+}
+
+func subscribePaymentUserEvents(t *testing.T, hub paymentEventSubscriber, userID int64) (<-chan platformevents.UserEvent, func()) {
+	t.Helper()
+	if hub == nil {
+		t.Fatal("payment user event hub is unavailable")
+	}
+	stream, unsubscribe, accepted := hub.Subscribe(userID)
+	if !accepted || stream == nil {
+		t.Fatal("payment user event subscription rejected")
+	}
+	return stream, unsubscribe
+}
+
+func decodePaymentUserEvent(t *testing.T, event platformevents.UserEvent) PaymentEvent {
+	t.Helper()
+	if event.Type != platformevents.EventTypePaymentUpdated {
+		t.Fatalf("event type=%q, want %q", event.Type, platformevents.EventTypePaymentUpdated)
+	}
+	var paymentEvent PaymentEvent
+	if err := json.Unmarshal(event.Data, &paymentEvent); err != nil {
+		t.Fatalf("decode payment user event: %v", err)
+	}
+	return paymentEvent
 }

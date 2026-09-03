@@ -1,6 +1,8 @@
-package payments
+package tests
 
 import (
+	payments "ideaboard/api/internal/payments"
+
 	"context"
 	"database/sql"
 	"errors"
@@ -37,8 +39,7 @@ func TestCreateCheckoutPersistsIntentBeforeStripeAndReusesCanonicalRequest(t *te
 			t.Fatalf("Payment Order status before Stripe = %q", status)
 		}
 	}
-	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, credits.NewService(pool))
-	service.runtime.now = func() time.Time { return now }
+	service := newConfiguredPurchaseServiceWithClock(t, db, configurationGateway, checkoutGateway, credits.NewService(pool), func() time.Time { return now })
 	requestedAt := now
 	command := paymentsdomain.CreateCheckoutCommand{
 		UserID: 42, ClientIdempotencyKey: "purchase-checkout-request-1", IdeaQuantity: 501,
@@ -163,9 +164,8 @@ func TestCreateCheckoutReplaysImmutableSecondPrecisionExpiryAfterProviderTimeout
 	db, pool := testdb.OpenWithPool(t)
 	seedRechargeableWallet(t, pool, 42)
 	checkoutGateway := &fakeCheckoutGateway{createSessionErrors: []error{paymentcontracts.ErrStripeProviderUnavailable}}
-	service := newConfiguredPurchaseService(t, db, configuredFakeStripeGateway("acct_checkout", "prod_checkout"), checkoutGateway, credits.NewService(pool))
 	now := time.Now().UTC().Truncate(time.Second).Add(987654321)
-	service.runtime.now = func() time.Time { return now }
+	service := newConfiguredPurchaseServiceWithClock(t, db, configuredFakeStripeGateway("acct_checkout", "prod_checkout"), checkoutGateway, credits.NewService(pool), func() time.Time { return now })
 	command := paymentsdomain.CreateCheckoutCommand{
 		UserID: 42, ClientIdempotencyKey: "purchase-checkout-timeout-recovery", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
@@ -390,7 +390,7 @@ func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testin
 	}}
 	events := NewEventHub()
 	repo := paymentpostgres.NewRepository(db)
-	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(events, func() time.Time { return verifiedAt }), configurationGateway, checkoutGateway, creditService, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
+	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(events, func() time.Time { return verifiedAt }), configurationGateway, checkoutGateway, creditService, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_webhook_purchase", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
@@ -483,13 +483,13 @@ func TestStripeKeyChangePreservesUnsettledOrderCredential(t *testing.T) {
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	})
 	if err != nil {
-		t.Fatalf("ConfigureStripe() error = %v", err)
+		t.Fatalf("payments.ConfigureStripe() error = %v", err)
 	}
 	stored, err := service.GetStripeConfiguration(t.Context())
 	if err != nil || stored.AccountID != "acct_replacement" {
 		t.Fatalf("Stripe configuration did not rotate: %+v, %v", stored, err)
 	}
-	orders, err := service.CheckoutWorkflow.checkoutStore.ListActivePaymentOrders(t.Context(), 42)
+	orders, err := paymentpostgres.NewRepository(db).ListActivePaymentOrders(t.Context(), 42)
 	if err != nil || len(orders) != 1 {
 		t.Fatalf("active orders = %+v, %v", orders, err)
 	}
@@ -538,7 +538,7 @@ func TestStripeKeyChangeDoesNotWaitForProviderIO(t *testing.T) {
 	select {
 	case err := <-configurationDone:
 		if err != nil {
-			t.Fatalf("ConfigureStripe() error = %v", err)
+			t.Fatalf("payments.ConfigureStripe() error = %v", err)
 		}
 	case <-time.After(150 * time.Millisecond):
 		t.Fatal("configuration waited for in-flight Stripe I/O")
@@ -674,11 +674,23 @@ func newConfiguredPurchaseService(
 	configurationGateway paymentports.StripeGateway,
 	checkoutGateway paymentports.CheckoutGateway,
 	wallets credits.WalletReader,
-) *Service {
+) *payments.Service {
+	return newConfiguredPurchaseServiceWithClock(t, db, configurationGateway, checkoutGateway, wallets, func() time.Time {
+		return time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	})
+}
+
+func newConfiguredPurchaseServiceWithClock(
+	t *testing.T,
+	db *sql.DB,
+	configurationGateway paymentports.StripeGateway,
+	checkoutGateway paymentports.CheckoutGateway,
+	wallets credits.WalletReader,
+	now func() time.Time,
+) *payments.Service {
 	t.Helper()
-	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	repo := paymentpostgres.NewRepository(db)
-	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(NewEventHub(), func() time.Time { return now }),
+	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(NewEventHub(), now),
 		configurationGateway, checkoutGateway, wallets, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_purchase", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",

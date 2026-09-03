@@ -1,6 +1,8 @@
-package payments
+package tests
 
 import (
+	payments "ideaboard/api/internal/payments"
+
 	"context"
 	"database/sql"
 	"errors"
@@ -179,19 +181,19 @@ func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *t
 	gateway := &refundGatewayFake{retrieve: map[string]paymentports.StripeRefund{
 		"re_reconcile": {ID: "re_reconcile", Status: "succeeded", ChargeID: "ch_refund", AmountMinor: 100, Currency: "usd"},
 	}}
-	runtime := NewPaymentRuntime(NewEventHub(), func() time.Time { return now })
-	transitions, err := NewPaymentOrderTransitions(repo, runtime)
+	runtime := payments.NewPaymentRuntime(NewEventHub(), func() time.Time { return now })
+	transitions, err := payments.NewPaymentOrderTransitions(repo, runtime)
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkout, err := NewCheckoutWorkflow(CheckoutWorkflowDependencies{
+	checkout, err := payments.NewCheckoutWorkflow(payments.CheckoutWorkflowDependencies{
 		Configuration: repo, ConfigurationGateway: testStripeGateway{}, ShutdownEnqueuer: testShutdownEnqueuer{},
 		Store: repo, CheckoutGateway: testCheckoutGateway{}, Wallets: testWalletReader{}, Convergence: repo, Transitions: transitions,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	facts, err := NewStripeFactsWorkflow(StripeFactsWorkflowDependencies{
+	facts, err := payments.NewStripeFactsWorkflow(payments.StripeFactsWorkflowDependencies{
 		Configuration: repo, Inbox: repo, Convergence: repo, Verifier: testWebhookVerifier{},
 		RefundGateway: gateway, DisputeGateway: testDisputeGateway{}, CheckoutStore: repo,
 		CheckoutGateway: testCheckoutGateway{}, CheckoutRecovery: checkout, Transitions: transitions,

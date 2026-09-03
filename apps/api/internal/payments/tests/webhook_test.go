@@ -1,6 +1,8 @@
-package payments
+package tests
 
 import (
+	payments "ideaboard/api/internal/payments"
+
 	"context"
 	"errors"
 	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
@@ -73,7 +75,7 @@ func TestReceiveStripeWebhookVerifiesRawBodyAndStoresOnlyMinimalInboxFact(t *tes
 		ID: "evt_1", Type: "refund.updated", ObjectID: "re_1", PaymentIntentID: "pi_webhook",
 		Livemode: false, CreatedAt: verifiedAt.Add(-time.Minute),
 	}}
-	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(NewEventHub(), func() time.Time { return verifiedAt }), gateway, testCheckoutGateway{}, testWalletReader{}, verifier,
+	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(NewEventHub(), func() time.Time { return verifiedAt }), gateway, testCheckoutGateway{}, testWalletReader{}, verifier,
 		&refundGatewayFake{retrieve: map[string]paymentports.StripeRefund{"re_1": {ID: "re_1", Status: "succeeded"}}}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_webhook", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
@@ -125,7 +127,7 @@ func TestReceiveStripeWebhookIgnoresVerifiedUnknownEventAndRejectsUnverifiedPayl
 		ID: "evt_unknown", Type: "customer.updated", ObjectID: "cus_1", CreatedAt: time.Now(),
 	}}
 	repo := paymentpostgres.NewRepository(db)
-	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
+	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_unknown", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		WebhookURL: "https://app.example.com/api/webhooks/stripe",
@@ -166,7 +168,7 @@ func TestReceiveStripeWebhookAcceptsARetainedCredentialSecret(t *testing.T) {
 		},
 	}
 	repo := paymentpostgres.NewRepository(db)
-	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
+	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_webhook_old", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",

@@ -1,4 +1,4 @@
-package payments
+package tests
 
 import (
 	"errors"

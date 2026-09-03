@@ -1,10 +1,13 @@
-package payments
+package tests
 
 import (
+	payments "ideaboard/api/internal/payments"
+
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	paymentevents "ideaboard/api/internal/payments/infrastructure/events"
 	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"sync"
 	"testing"
@@ -22,7 +25,7 @@ func TestCheckoutLifecycleConcurrentSameQuantityReusesOneOrderAndStripeSession(t
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	checkout := newLifecycleCheckoutGateway()
 	checkout.blockFirstSessionCreate()
-	db, service, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
+	db, service, _, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 
 	results := make(chan paymentcontracts.CheckoutResult, 2)
 	errs := make(chan error, 2)
@@ -70,7 +73,7 @@ func TestCheckoutLifecycleConcurrentSameQuantityReusesOneOrderAndStripeSession(t
 func TestCheckoutLifecyclePaidSessionIsNotReusedBeforeWebhookConverges(t *testing.T) {
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	checkout := newLifecycleCheckoutGateway()
-	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
+	db, service, wallets, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 
 	first, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "paid-before-webhook-first", 500))
 	if err != nil {
@@ -97,7 +100,7 @@ func TestCheckoutLifecyclePaidSessionIsNotReusedBeforeWebhookConverges(t *testin
 func TestCheckoutLifecycleExpiredSessionIsNotReusedBeforeLocalExpiry(t *testing.T) {
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	checkout := newLifecycleCheckoutGateway()
-	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
+	db, service, wallets, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 
 	first, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "expired-before-local-first", 500))
 	if err != nil {
@@ -124,7 +127,7 @@ func TestCheckoutLifecycleExpiredSessionIsNotReusedBeforeLocalExpiry(t *testing.
 func TestCheckoutLifecycleRetrieveFailurePreservesExistingSessionAndIntent(t *testing.T) {
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	checkout := newLifecycleCheckoutGateway()
-	db, service, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
+	db, service, _, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 
 	first, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "retrieve-failure-first", 500))
 	if err != nil {
@@ -155,7 +158,7 @@ func TestCheckoutLifecycleRetrieveFailurePreservesExistingSessionAndIntent(t *te
 func TestCheckoutLifecycleLimitsThreeActiveOrdersAndExpiredOrdersReleaseCapacity(t *testing.T) {
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	checkout := newLifecycleCheckoutGateway()
-	db, service, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
+	db, service, _, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 
 	for index, quantity := range []int64{500, 501, 502} {
 		if _, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, fmt.Sprintf("active-checkout-%d", index), quantity)); err != nil {
@@ -195,7 +198,7 @@ func TestCheckoutLifecycleExpiredWebhookConvergesToExpiredWithoutCredit(t *testi
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	checkout := newLifecycleCheckoutGateway()
 	verifier := &lifecycleWebhookVerifier{}
-	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, verifier)
+	db, service, wallets, _ := newCheckoutLifecycleService(t, &now, checkout, verifier)
 	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "expired-lifecycle-checkout", 500))
 	if err != nil {
 		t.Fatal(err)
@@ -220,7 +223,7 @@ func TestCheckoutLifecycleAsyncPaymentCreditsOnceAndPaidFactWinsOutOfOrderEvents
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	checkout := newLifecycleCheckoutGateway()
 	verifier := &lifecycleWebhookVerifier{}
-	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, verifier)
+	db, service, wallets, _ := newCheckoutLifecycleService(t, &now, checkout, verifier)
 
 	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "async-lifecycle-checkout", 700))
 	if err != nil {
@@ -286,7 +289,7 @@ SELECT paid_at, credited_at, credit_transaction_id FROM payment_orders WHERE pub
 func TestCheckoutLifecyclePaidPendingCreditRetriesOnceAfterCreditPurchaseFailureIsRepaired(t *testing.T) {
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	checkout := newLifecycleCheckoutGateway()
-	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
+	db, service, wallets, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "paid-pending-credit-checkout", 700))
 	if err != nil {
 		t.Fatal(err)
@@ -363,12 +366,12 @@ func TestCheckoutLifecycleLateAsyncFailureDoesNotPublishFalseFailedEvent(t *test
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	checkout := newLifecycleCheckoutGateway()
 	verifier := &lifecycleWebhookVerifier{}
-	_, service, _ := newCheckoutLifecycleService(t, &now, checkout, verifier)
+	_, service, _, hub := newCheckoutLifecycleService(t, &now, checkout, verifier)
 	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "late-failure-event-checkout", 500))
 	if err != nil {
 		t.Fatal(err)
 	}
-	events, unsubscribe := subscribePaymentUserEvents(t, service.eventHub(), 42)
+	events, unsubscribe := subscribePaymentUserEvents(t, hub, 42)
 	defer unsubscribe()
 	checkout.setPaid(true)
 	sessionID := checkout.onlySessionID(t)
@@ -401,7 +404,7 @@ func TestCheckoutLifecycleLateAsyncFailureDoesNotPublishFalseFailedEvent(t *test
 func TestCheckoutLifecycleAbandonRetriesProviderFailureWithoutChangingLocalOrder(t *testing.T) {
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	checkout := newLifecycleCheckoutGateway()
-	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
+	db, service, wallets, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "abandon-retry-checkout", 500))
 	if err != nil {
 		t.Fatal(err)
@@ -432,7 +435,7 @@ func TestCheckoutLifecycleAbandonRetriesProviderFailureWithoutChangingLocalOrder
 func TestCheckoutLifecycleDatabaseGuardRejectsIllegalTransitionsAndPaidFactMutation(t *testing.T) {
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	checkout := newLifecycleCheckoutGateway()
-	db, service, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
+	db, service, _, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 
 	cancelled, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "guard-cancelled-checkout", 500))
 	if err != nil {
@@ -476,7 +479,7 @@ UPDATE payment_orders SET paid_total_minor = paid_total_minor + 1 WHERE public_t
 func TestCheckoutLifecycleReturnStatusIsOwnedByAuthenticatedUser(t *testing.T) {
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	checkout := newLifecycleCheckoutGateway()
-	_, service, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
+	_, service, _, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "ownership-lifecycle-checkout", 500))
 	if err != nil {
 		t.Fatal(err)
@@ -492,13 +495,13 @@ func TestCheckoutLifecycleReturnStatusIsOwnedByAuthenticatedUser(t *testing.T) {
 func TestCheckoutLifecycleRepeatedReturnCreditsAndPublishesOnce(t *testing.T) {
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	checkout := newLifecycleCheckoutGateway()
-	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
+	db, service, wallets, hub := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "repeated-return-checkout", 700))
 	if err != nil {
 		t.Fatal(err)
 	}
 	checkout.setPaid(true)
-	events, unsubscribe := subscribePaymentUserEvents(t, service.eventHub(), 42)
+	events, unsubscribe := subscribePaymentUserEvents(t, hub, 42)
 	defer unsubscribe()
 
 	for attempt := 0; attempt < 2; attempt++ {
@@ -531,12 +534,12 @@ func TestCheckoutLifecycleRepeatedReturnCreditsAndPublishesOnce(t *testing.T) {
 func TestCheckoutLifecycleReturnExpiryAllowsVerifiedLatePayment(t *testing.T) {
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	checkout := newLifecycleCheckoutGateway()
-	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
+	db, service, wallets, hub := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "return-expiry-late-paid", 700))
 	if err != nil {
 		t.Fatal(err)
 	}
-	events, unsubscribe := subscribePaymentUserEvents(t, service.eventHub(), 42)
+	events, unsubscribe := subscribePaymentUserEvents(t, hub, 42)
 	defer unsubscribe()
 
 	checkout.status = paymentports.CheckoutSessionStatusExpired
@@ -576,14 +579,15 @@ func TestCheckoutLifecycleReturnExpiryAllowsVerifiedLatePayment(t *testing.T) {
 	}
 }
 
-func newCheckoutLifecycleService(t *testing.T, now *time.Time, checkout paymentports.CheckoutGateway, verifier paymentports.StripeWebhookVerifier) (*sql.DB, *Service, *credits.Service) {
+func newCheckoutLifecycleService(t *testing.T, now *time.Time, checkout paymentports.CheckoutGateway, verifier paymentports.StripeWebhookVerifier) (*sql.DB, *payments.Service, *credits.Service, *paymentevents.Hub) {
 	t.Helper()
 	secretstest.EnableEncryption(t)
 	db, pool := testdb.OpenWithPool(t)
 	wallets := credits.NewService(pool)
 	seedCheckoutLifecycleWallet(t, wallets, 42)
 	repo := paymentpostgres.NewRepository(db)
-	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(NewEventHub(), func() time.Time { return now.UTC() }),
+	hub := NewEventHub()
+	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(hub, func() time.Time { return now.UTC() }),
 		lifecycleStripeGateway{}, checkout, wallets, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_checkout_lifecycle", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
@@ -591,7 +595,7 @@ func newCheckoutLifecycleService(t *testing.T, now *time.Time, checkout paymentp
 	}); err != nil {
 		t.Fatalf("configure Stripe: %v", err)
 	}
-	return db, service, wallets
+	return db, service, wallets, hub
 }
 
 func lifecycleCheckoutCommand(userID int64, key string, quantity int64) paymentsdomain.CreateCheckoutCommand {

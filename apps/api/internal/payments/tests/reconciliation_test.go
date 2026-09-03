@@ -1,6 +1,8 @@
-package payments
+package tests
 
 import (
+	payments "ideaboard/api/internal/payments"
+
 	"context"
 	"errors"
 	"fmt"
@@ -21,7 +23,7 @@ import (
 func TestPaymentReconciliationRecoversCreatingIntentWithOriginalStripeIdempotencyKey(t *testing.T) {
 	now := time.Now().UTC()
 	checkout := newLifecycleCheckoutGateway()
-	db, service, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
+	db, service, _, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 	repo := paymentpostgres.NewRepository(db)
 	// This is a timeout recovery: a local deadline elapsed before the original
 	// provider response could be bound. Stripe idempotency, not that deadline,
@@ -58,7 +60,7 @@ func TestPaymentReconciliationRecoversCreatingIntentWithOriginalStripeIdempotenc
 func TestPaymentReconciliationPreservesCreatingOrderWhenPurchasePolicyIsUnavailable(t *testing.T) {
 	now := time.Now().UTC()
 	checkout := newLifecycleCheckoutGateway()
-	db, service, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
+	db, service, _, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 	repo := paymentpostgres.NewRepository(db)
 	configuration := activeTestStripeConfiguration(t, repo)
 	now = now.Add(3 * time.Minute)
@@ -86,7 +88,7 @@ func TestPaymentReconciliationPreservesCreatingOrderWhenPurchasePolicyIsUnavaila
 func TestPaymentReconciliationRetriesPaidPendingCreditWithoutSecondStripeFact(t *testing.T) {
 	now := time.Now().UTC()
 	checkout := newLifecycleCheckoutGateway()
-	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
+	db, service, wallets, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "reconciliation-paid-pending", 700))
 	if err != nil {
 		t.Fatal(err)
@@ -127,7 +129,7 @@ WHERE orders.public_token = $1`, created.PublicToken).Scan(&retryAt); err != nil
 func TestPaymentReconciliationRecoversLostWebhookPaidSessionExactlyOnce(t *testing.T) {
 	now := time.Now().UTC()
 	checkout := newLifecycleCheckoutGateway()
-	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
+	db, service, wallets, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "reconciliation-lost-webhook", 701))
 	if err != nil {
 		t.Fatal(err)
@@ -232,7 +234,7 @@ func TestPaymentReconciliationConcurrentWorkersClaimEachOrderOnce(t *testing.T) 
 func TestPaymentReconciliationRecordsLongLivedOperableAnomaly(t *testing.T) {
 	now := time.Now().UTC().Add(25 * time.Hour)
 	checkout := reconciliationDeterministicFailureGateway{}
-	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
+	db, service, wallets, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 	repo := paymentpostgres.NewRepository(db)
 	order := createReconciliationIntent(t, repo, 42, 503, now.Add(time.Hour))
 	if err := service.ReconcileDuePaymentOrders(t.Context()); err != nil {
@@ -247,7 +249,7 @@ func TestPaymentReconciliationRecordsLongLivedOperableAnomaly(t *testing.T) {
 	}
 	now = now.Add(paymentreconciliation.OperableDelay)
 	recoveryGateway := newLifecycleCheckoutGateway()
-	recovered := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, func() time.Time { return now }), testStripeGateway{}, recoveryGateway, wallets, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
+	recovered := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(nil, func() time.Time { return now }), testStripeGateway{}, recoveryGateway, wallets, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if err := recovered.ReconcileDuePaymentOrders(t.Context()); err != nil {
 		t.Fatalf("operable retry recovery = %v", err)
 	}

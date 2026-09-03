@@ -1,6 +1,8 @@
-package payments
+package tests
 
 import (
+	payments "ideaboard/api/internal/payments"
+
 	"context"
 	"database/sql"
 	"encoding/base64"
@@ -29,7 +31,7 @@ func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T)
 	db := testdb.Open(t)
 	repo := paymentpostgres.NewRepository(db)
 	publishTestStripeConfiguration(t, repo, "acct_admin_read", "prod_admin_read")
-	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), testStripeGateway{}, testCheckoutGateway{}, testWalletReader{}, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
+	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(nil, nil), testStripeGateway{}, testCheckoutGateway{}, testWalletReader{}, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	user42PublicID := adminPaymentUserPublicID(t, db, 42)
 	first := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-AAA000000001", 501)
 	second := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-BBB000000002", 502)
@@ -138,7 +140,7 @@ func TestAdminPaymentOrderDetailMasksProviderIdentifiersAndExcludesInternalField
 	db := testdb.Open(t)
 	repo := paymentpostgres.NewRepository(db)
 	publishTestStripeConfiguration(t, repo, "acct_admin_read", "prod_admin_read")
-	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), testStripeGateway{}, testCheckoutGateway{}, testWalletReader{}, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
+	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(nil, nil), testStripeGateway{}, testCheckoutGateway{}, testWalletReader{}, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	userPublicID := adminPaymentUserPublicID(t, db, 42)
 	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-DETAIL000001", 501)
 	bound, err := repo.BindPaymentOrderCheckout(t.Context(), paymentsdomain.BindPaymentOrderCheckoutInput{
@@ -208,7 +210,7 @@ func TestAdminPaymentOrderDetailAssociatesRefundAndDisputeWebhookFacts(t *testin
 	db := testdb.Open(t)
 	repo := paymentpostgres.NewRepository(db)
 	publishTestStripeConfiguration(t, repo, "acct_admin_read", "prod_admin_read")
-	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), testStripeGateway{}, testCheckoutGateway{}, testWalletReader{}, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
+	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(nil, nil), testStripeGateway{}, testCheckoutGateway{}, testWalletReader{}, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-EVENTS000001", 501)
 	bound, err := repo.BindPaymentOrderCheckout(t.Context(), paymentsdomain.BindPaymentOrderCheckoutInput{
 		OrderID: order.ID, StripeCustomerID: "cus_events", StripeSessionID: "cs_events",

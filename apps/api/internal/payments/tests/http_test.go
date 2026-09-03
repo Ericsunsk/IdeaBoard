@@ -1,6 +1,8 @@
-package payments
+package tests
 
 import (
+	payments "ideaboard/api/internal/payments"
+
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -33,7 +35,7 @@ func TestStripeConfigurationHTTPContractNeverReturnsSecretsAndRejectsUnknownFiel
 		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_http", WebhookEndpointID: "we_http", WebhookSecret: "whsec_http",
 	}}
 	repo := paymentpostgres.NewRepository(db)
-	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, &fakeWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
+	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, &fakeWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	handler := paymenthttp.NewAdminHandler(service, testPublicOrigins("https://app.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -81,9 +83,11 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	seedRechargeableWallet(t, pool, 42)
 	checkoutGateway := &fakeCheckoutGateway{}
-	service := newConfiguredPurchaseService(t, db, configuredFakeStripeGateway("acct_user_http", "prod_user_http"), checkoutGateway, credits.NewService(pool))
 	verifier := &fakeWebhookVerifier{}
-	service.verifier = verifier
+	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	hub := NewEventHub()
+	service := newCompleteTestPaymentsService(t, paymentpostgres.NewRepository(db), payments.NewPaymentRuntime(hub, func() time.Time { return now }),
+		configuredFakeStripeGateway("acct_user_http", "prod_user_http"), checkoutGateway, credits.NewService(pool), verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	userHandler := paymenthttp.NewUserCheckoutHandler(service, testPublicOrigins("https://configured.example.com"))
 	webhookHandler := paymenthttp.NewWebhookHandler(service)
 	router := gin.New()
@@ -131,12 +135,12 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 		t.Fatalf("status=%d %s", status.Code, status.Body.String())
 	}
 
-	paymentEvents, unsubscribe := subscribePaymentUserEvents(t, service.eventHub(), 42)
+	paymentEvents, unsubscribe := subscribePaymentUserEvents(t, hub, 42)
 	defer unsubscribe()
 	checkoutGateway.paid = true
 	verifier.event = paymentports.StripeWebhookEvent{
 		ID: "evt_user_http_paid", Type: "checkout.session.completed",
-		ObjectID: checkoutGateway.createdSession.ID, CreatedAt: service.runtime.now().UTC(),
+		ObjectID: checkoutGateway.createdSession.ID, CreatedAt: now.UTC(),
 	}
 	webhook := performPaymentRequest(router, http.MethodPost, "/api/webhooks/stripe", `{"id":"evt_user_http_paid"}`, map[string]string{"Stripe-Signature": "valid"})
 	if webhook.Code != http.StatusOK {
@@ -299,7 +303,7 @@ func TestStripeConfigurationHTTPRejectsOversizedAPIKeyBeforeGatewayAndAuditsFail
 	db := testdb.Open(t)
 	gateway := &fakeStripeGateway{}
 	repo := paymentpostgres.NewRepository(db)
-	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, &fakeWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
+	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, &fakeWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	handler := paymenthttp.NewAdminHandler(service, testPublicOrigins("https://app.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -351,7 +355,7 @@ func TestStripeWebhookHTTPContractUsesUnauthenticatedExactRawBody(t *testing.T) 
 		ID: "evt_http", Type: "customer.updated", ObjectID: "cus_http", CreatedAt: time.Now(),
 	}}
 	repo := paymentpostgres.NewRepository(db)
-	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
+	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_webhook_http", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		WebhookURL: "https://app.example.com/api/webhooks/stripe",
