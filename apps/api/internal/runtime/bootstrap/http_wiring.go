@@ -8,7 +8,7 @@ import (
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/billingrecords"
 	"ideaboard/api/internal/boards"
-	"ideaboard/api/internal/credits"
+	credithttp "ideaboard/api/internal/credits/interfaces/http"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/library"
@@ -45,10 +45,10 @@ func newAppRouter(
 	paymentAdminHandler := paymenthttp.NewAdminHandler(services.paymentService, cfg.PublicOrigins)
 	paymentWebhookHandler := paymenthttp.NewWebhookHandler(services.paymentService)
 	creditUserResolver := creditsUserResolver{repo: repos.userRepo}
-	creditUserHandler := credits.NewUserHandler(services.creditService, creditUserResolver)
-	creditAdminCommandHandler := credits.NewAdminCommandHandler(services.creditService, creditUserResolver)
-	creditAdminReadHandler := credits.NewAdminReadHandler(services.creditService, creditUserResolver)
-	creditReconciliationHandler := credits.NewReconciliationHandler(services.creditService, creditUserResolver)
+	creditUserHandler := credithttp.NewUserHandler(services.creditService, creditUserResolver)
+	creditAdminCommandHandler := credithttp.NewAdminCommandHandler(services.creditService, creditUserResolver)
+	creditAdminReadHandler := credithttp.NewAdminReadHandler(services.creditService, creditUserResolver)
+	creditReconciliationHandler := credithttp.NewReconciliationHandler(services.creditService, creditUserResolver)
 	rewardIdentityProjection := rewardIdentityProjector{repo: repos.userRepo}
 	rewardUserHandler := rewards.NewUserHandler(services.rewardService)
 	rewardAdminCommandHandler := rewards.NewAdminCommandHandler(services.rewardService)

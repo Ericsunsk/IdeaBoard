@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"sync"
 	"testing"
 	"time"
@@ -531,9 +533,9 @@ func newBillingSettlementFixtureForFeature(t *testing.T, db *sql.DB, pool *pgxpo
 		t.Fatal(err)
 	}
 	if grant > 0 {
-		amount, _ := credits.NewCreditAmount(grant)
-		if _, err := creditService.InTx(tx).Grant(t.Context(), credits.GrantCommand{UserID: userID, Amount: amount, Metadata: credits.CommandMetadata{
-			IdempotencyKey: fmt.Sprintf("settlement-grant:%d", userID), Actor: credits.Actor{Type: credits.ActorSystem, ID: "test"}, Source: "test", Reason: "test grant", BusinessReference: credits.BusinessReference{Type: "test", ID: fmt.Sprint(userID)},
+		amount, _ := domain.NewCreditAmount(grant)
+		if _, err := creditService.InTx(tx).Grant(t.Context(), ports.GrantCommand{UserID: userID, Amount: amount, Metadata: domain.CommandMetadata{
+			IdempotencyKey: fmt.Sprintf("settlement-grant:%d", userID), Actor: domain.Actor{Type: domain.ActorSystem, ID: "test"}, Source: "test", Reason: "test grant", BusinessReference: domain.BusinessReference{Type: "test", ID: fmt.Sprint(userID)},
 		}}); err != nil {
 			t.Fatal(err)
 		}

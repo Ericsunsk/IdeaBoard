@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/credits"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
@@ -34,11 +35,11 @@ type Service struct {
 	configuration ConfigurationStore
 	checkoutStore CheckoutStore
 	convergence   ConvergenceStore
-	wallets       credits.WalletReader
+	wallets       ports.WalletReader
 	now           func() time.Time
 }
 
-func NewService(configuration ConfigurationStore, checkoutStore CheckoutStore, convergence ConvergenceStore, wallets credits.WalletReader, now func() time.Time) (*Service, error) {
+func NewService(configuration ConfigurationStore, checkoutStore CheckoutStore, convergence ConvergenceStore, wallets ports.WalletReader, now func() time.Time) (*Service, error) {
 	if configuration == nil || checkoutStore == nil || convergence == nil || wallets == nil {
 		return nil, fmt.Errorf("read model service requires configuration, checkout store, convergence store, and wallet reader")
 	}
@@ -128,7 +129,7 @@ func (s *Service) setRefundableIdeaQuantity(ctx context.Context, detail *AdminPa
 		return nil
 	}
 	wallet, err := s.wallets.GetWallet(ctx, detail.InternalUserID)
-	if err != nil && !errors.Is(err, credits.ErrWalletNotFound) {
+	if err != nil && !errors.Is(err, domain.ErrWalletNotFound) {
 		return err
 	}
 	if err == nil {

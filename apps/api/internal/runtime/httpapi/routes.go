@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	credithttp "ideaboard/api/internal/credits/interfaces/http"
 	iofs "io/fs"
 
 	"ideaboard/api/internal/accountpool/accounts"
@@ -9,7 +10,6 @@ import (
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/billingrecords"
 	"ideaboard/api/internal/boards"
-	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/library"
@@ -82,7 +82,7 @@ type UserRouteDeps struct {
 	BoardHandler           *boards.BoardHandler
 	BillingHandler         *billing.Handler
 	BillingRecords         *billingrecords.Handler
-	CreditUserHandler      *credits.UserHandler
+	CreditUserHandler      *credithttp.UserHandler
 	UsageHandler           *usage.Handler
 	RewardUserHandler      *rewards.UserHandler
 	PaymentUserHandler     *paymenthttp.UserCheckoutHandler
@@ -101,9 +101,9 @@ type AdminRouteDeps struct {
 	MailConfigHandler           *auth.MailConfigAdminHandler
 	SocialProviderHandler       *auth.SocialProviderAdminHandler
 	BillingHandler              *billing.Handler
-	CreditAdminCommandHandler   *credits.AdminCommandHandler
-	CreditAdminReadHandler      *credits.AdminReadHandler
-	CreditReconciliationHandler *credits.ReconciliationHandler
+	CreditAdminCommandHandler   *credithttp.AdminCommandHandler
+	CreditAdminReadHandler      *credithttp.AdminReadHandler
+	CreditReconciliationHandler *credithttp.ReconciliationHandler
 	AccountHandler              *accounts.AccountHandler
 	TaskHandler                 *taskservice.Handler
 	TaskStatsHandler            *taskstats.Handler

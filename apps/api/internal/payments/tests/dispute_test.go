@@ -2,6 +2,8 @@ package tests
 
 import (
 	"errors"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
@@ -20,16 +22,16 @@ func TestPaymentDisputeDebitsAvailableIdeasAndRestoresOnLateWin(t *testing.T) {
 	now := time.Date(2026, 8, 5, 12, 0, 0, 0, time.UTC)
 	_ = createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	creditService := credits.NewService(pool)
-	spendAmount, err := credits.NewCreditAmount(450)
+	spendAmount, err := domain.NewCreditAmount(450)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := creditService.Deduct(t.Context(), credits.DeductionCommand{
+	if _, err := creditService.Deduct(t.Context(), ports.DeductionCommand{
 		UserID: 42, Amount: spendAmount,
-		Metadata: credits.CommandMetadata{
-			IdempotencyKey: "dispute-preexisting-spend", Actor: credits.Actor{Type: credits.ActorAdmin, ID: "42"},
+		Metadata: domain.CommandMetadata{
+			IdempotencyKey: "dispute-preexisting-spend", Actor: domain.Actor{Type: domain.ActorAdmin, ID: "42"},
 			Source: "admin", Reason: "test preexisting spend",
-			BusinessReference: credits.BusinessReference{Type: "test", ID: "dispute"},
+			BusinessReference: domain.BusinessReference{Type: "test", ID: "dispute"},
 		},
 	}); err != nil {
 		t.Fatal(err)
@@ -179,7 +181,7 @@ func TestPaymentDisputeSerializesWithConcurrentConsumption(t *testing.T) {
 	now := time.Date(2026, 8, 5, 15, 0, 0, 0, time.UTC)
 	_ = createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	creditService := credits.NewService(pool)
-	holdAmount, err := credits.NewCreditAmount(100)
+	holdAmount, err := domain.NewCreditAmount(100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,12 +194,12 @@ func TestPaymentDisputeSerializesWithConcurrentConsumption(t *testing.T) {
 	}, 1)
 	go func() {
 		<-start
-		_, holdErr := creditService.Hold(t.Context(), credits.HoldCommand{
+		_, holdErr := creditService.Hold(t.Context(), ports.HoldCommand{
 			UserID: 42, Amount: holdAmount,
-			Metadata: credits.CommandMetadata{
-				IdempotencyKey: "dispute-concurrent-hold", Actor: credits.Actor{Type: credits.ActorUser, ID: "42"},
+			Metadata: domain.CommandMetadata{
+				IdempotencyKey: "dispute-concurrent-hold", Actor: domain.Actor{Type: domain.ActorUser, ID: "42"},
 				Source: "task_submission", Reason: "concurrent task consumption",
-				BusinessReference: credits.BusinessReference{Type: "task", ID: "dispute-concurrent-task"},
+				BusinessReference: domain.BusinessReference{Type: "task", ID: "dispute-concurrent-task"},
 			},
 		})
 		holdResult <- holdErr
@@ -220,7 +222,7 @@ func TestPaymentDisputeSerializesWithConcurrentConsumption(t *testing.T) {
 	if converged.err != nil {
 		t.Fatalf("concurrent Dispute error=%v", converged.err)
 	}
-	if holdErr != nil && !errors.Is(holdErr, credits.ErrWalletRestricted) {
+	if holdErr != nil && !errors.Is(holdErr, domain.ErrWalletRestricted) {
 		t.Fatalf("concurrent Hold error=%v", holdErr)
 	}
 	wallet, err := creditService.GetWallet(t.Context(), 42)

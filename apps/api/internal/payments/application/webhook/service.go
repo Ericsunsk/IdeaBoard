@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/credits"
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentdispute "ideaboard/api/internal/payments/application/dispute"
@@ -235,7 +235,7 @@ func (s *Service) processRefund(ctx context.Context, event paymentports.StripeWe
 			return nil
 		}
 		if _, createErr := s.convergence.CreateExternalPaymentRefund(ctx, providerRefund, s.now().UTC()); createErr != nil {
-			if errors.Is(createErr, credits.ErrInsufficientCredits) || errors.Is(createErr, paymentcontracts.ErrRefundAmountExceeds) {
+			if errors.Is(createErr, domain.ErrInsufficientCredits) || errors.Is(createErr, paymentcontracts.ErrRefundAmountExceeds) {
 				userID, anomalyErr := s.convergence.RecordPaymentRefundAnomaly(ctx, providerRefund, "Stripe Dashboard refund requires manual balance recovery", s.now().UTC())
 				if anomalyErr == nil && s.events != nil {
 					s.events.Publish(userID, paymentports.PaymentEvent{Status: "refund_updated"})

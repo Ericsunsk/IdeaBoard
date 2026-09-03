@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"strings"
 	"time"
 
@@ -160,19 +162,19 @@ func (s *VisionBillingService) reserve(ctx context.Context, userID int64, key, r
 		}
 		return visionReservation{}, ErrVisionPricingUnavailable
 	}
-	amount, err := credits.NewCreditAmount(quote.TotalCredits)
+	amount, err := domain.NewCreditAmount(quote.TotalCredits)
 	if err != nil {
 		return visionReservation{}, ErrVisionPricingUnavailable
 	}
 	operationID := uuid.NewString()
-	hold, err := s.credits.InTx(tx).Hold(ctx, credits.HoldCommand{
+	hold, err := s.credits.InTx(tx).Hold(ctx, ports.HoldCommand{
 		UserID: userID, Amount: amount,
-		Metadata: credits.CommandMetadata{
+		Metadata: domain.CommandMetadata{
 			IdempotencyKey:    "ai-search:" + operationID + ":hold",
-			Actor:             credits.Actor{Type: credits.ActorUser, ID: fmt.Sprintf("%d", userID)},
+			Actor:             domain.Actor{Type: domain.ActorUser, ID: fmt.Sprintf("%d", userID)},
 			Source:            "ai_search_vision",
 			Reason:            "vision search hold",
-			BusinessReference: credits.BusinessReference{Type: "ai_search_operation", ID: operationID},
+			BusinessReference: domain.BusinessReference{Type: "ai_search_operation", ID: operationID},
 		},
 	})
 	if err != nil {
@@ -201,17 +203,17 @@ func (s *VisionBillingService) capture(ctx context.Context, operationID string, 
 	if err := tx.QueryRow(ctx, `SELECT hold_transaction_id, unit_credits FROM ai_search_operations WHERE operation_id = $1::uuid AND user_id = $2 AND status = 'pending' FOR UPDATE`, operationID, userID).Scan(&holdID, &amount); err != nil {
 		return err
 	}
-	creditAmount, err := credits.NewCreditAmount(amount)
+	creditAmount, err := domain.NewCreditAmount(amount)
 	if err != nil {
 		return err
 	}
-	if _, err := s.credits.InTx(tx).Capture(ctx, credits.CaptureCommand{
+	if _, err := s.credits.InTx(tx).Capture(ctx, ports.CaptureCommand{
 		UserID: userID, HoldTransactionID: holdID, Amount: creditAmount,
-		Metadata: credits.CommandMetadata{
+		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "ai-search:" + operationID + ":capture",
-			Actor:          credits.Actor{Type: credits.ActorUser, ID: fmt.Sprintf("%d", userID)},
+			Actor:          domain.Actor{Type: domain.ActorUser, ID: fmt.Sprintf("%d", userID)},
 			Source:         "ai_search_vision", Reason: "vision search completed",
-			BusinessReference: credits.BusinessReference{Type: "ai_search_operation", ID: operationID},
+			BusinessReference: domain.BusinessReference{Type: "ai_search_operation", ID: operationID},
 		},
 	}); err != nil {
 		return err
@@ -233,17 +235,17 @@ func (s *VisionBillingService) release(ctx context.Context, operationID string, 
 	if err := tx.QueryRow(ctx, `SELECT hold_transaction_id, unit_credits FROM ai_search_operations WHERE operation_id = $1::uuid AND user_id = $2 AND status = 'pending' FOR UPDATE`, operationID, userID).Scan(&holdID, &amount); err != nil {
 		return err
 	}
-	creditAmount, err := credits.NewCreditAmount(amount)
+	creditAmount, err := domain.NewCreditAmount(amount)
 	if err != nil {
 		return err
 	}
-	if _, err := s.credits.InTx(tx).Release(ctx, credits.ReleaseCommand{
+	if _, err := s.credits.InTx(tx).Release(ctx, ports.ReleaseCommand{
 		UserID: userID, HoldTransactionID: holdID, Amount: creditAmount,
-		Metadata: credits.CommandMetadata{
+		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "ai-search:" + operationID + ":release",
-			Actor:          credits.Actor{Type: credits.ActorUser, ID: fmt.Sprintf("%d", userID)},
+			Actor:          domain.Actor{Type: domain.ActorUser, ID: fmt.Sprintf("%d", userID)},
 			Source:         "ai_search_vision", Reason: "vision search failed",
-			BusinessReference: credits.BusinessReference{Type: "ai_search_operation", ID: operationID},
+			BusinessReference: domain.BusinessReference{Type: "ai_search_operation", ID: operationID},
 		},
 	}); err != nil {
 		return err
@@ -296,17 +298,17 @@ func (s *VisionBillingService) reconcileOne(ctx context.Context, operationID str
 		}
 		return err
 	}
-	creditAmount, err := credits.NewCreditAmount(amount)
+	creditAmount, err := domain.NewCreditAmount(amount)
 	if err != nil {
 		return err
 	}
-	if _, err := s.credits.InTx(tx).Release(ctx, credits.ReleaseCommand{
+	if _, err := s.credits.InTx(tx).Release(ctx, ports.ReleaseCommand{
 		UserID: userID, HoldTransactionID: holdID, Amount: creditAmount,
-		Metadata: credits.CommandMetadata{
+		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "ai-search:" + operationID + ":reconcile-release",
-			Actor:          credits.Actor{Type: credits.ActorSystem, ID: "vision-reconciliation"},
+			Actor:          domain.Actor{Type: domain.ActorSystem, ID: "vision-reconciliation"},
 			Source:         "ai_search_vision", Reason: "vision search reconciliation timeout",
-			BusinessReference: credits.BusinessReference{Type: "ai_search_operation", ID: operationID},
+			BusinessReference: domain.BusinessReference{Type: "ai_search_operation", ID: operationID},
 		},
 	}); err != nil {
 		return err

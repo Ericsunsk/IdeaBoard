@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -367,17 +369,17 @@ func seedRiverBillingWallet(t testing.TB, pool *pgxpool.Pool, service *credits.S
 	if err := service.LifecycleInTx(tx).ProvisionWallet(t.Context(), userID); err != nil {
 		t.Fatal(err)
 	}
-	creditAmount, err := credits.NewCreditAmount(amount)
+	creditAmount, err := domain.NewCreditAmount(amount)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.InTx(tx).Grant(t.Context(), credits.GrantCommand{
+	if _, err := service.InTx(tx).Grant(t.Context(), ports.GrantCommand{
 		UserID: userID, Amount: creditAmount,
-		Metadata: credits.CommandMetadata{
+		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "river-settlement-restart-grant",
-			Actor:          credits.Actor{Type: credits.ActorSystem, ID: "test"},
+			Actor:          domain.Actor{Type: domain.ActorSystem, ID: "test"},
 			Source:         "test", Reason: "seed River settlement retry",
-			BusinessReference: credits.BusinessReference{Type: "test", ID: "river-settlement-restart"},
+			BusinessReference: domain.BusinessReference{Type: "test", ID: "river-settlement-restart"},
 		},
 	}); err != nil {
 		t.Fatal(err)

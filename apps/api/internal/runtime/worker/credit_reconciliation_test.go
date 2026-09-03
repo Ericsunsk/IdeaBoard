@@ -4,10 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"ideaboard/api/internal/credits/ports"
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/testdb"
 
 	"github.com/riverqueue/river"
@@ -31,9 +31,9 @@ func TestCreditReconciliationScheduleWorkerMapsRuntimePolicyToDomainIntent(t *te
 	now := time.Date(2026, 7, 17, 10, 0, 0, 0, creditReconciliationScheduleLocation)
 	target := latestCreditReconciliationScheduleSlot(now)
 	service := &creditReconciliationScheduleServiceStub{
-		run: &credits.ReconciliationRun{
+		run: &ports.ReconciliationRun{
 			ID:           42,
-			Trigger:      credits.ReconciliationTriggerScheduled,
+			Trigger:      ports.ReconciliationTriggerScheduled,
 			ScheduledFor: &target,
 		},
 	}
@@ -50,7 +50,7 @@ func TestCreditReconciliationScheduleWorkerMapsRuntimePolicyToDomainIntent(t *te
 		t.Fatalf("ScheduleReconciliation() target = %v, onlyIfOverdue = %v", service.scheduledFor, service.onlyIfOverdue)
 	}
 
-	service.run = &credits.ReconciliationRun{ID: 41, Trigger: credits.ReconciliationTriggerManual}
+	service.run = &ports.ReconciliationRun{ID: 41, Trigger: ports.ReconciliationTriggerManual}
 	err := worker.Work(t.Context(), job)
 	var snoozeErr *river.JobSnoozeError
 	if !errors.As(err, &snoozeErr) || snoozeErr.Duration != creditReconciliationContentionRetryDelay {
@@ -61,7 +61,7 @@ func TestCreditReconciliationScheduleWorkerMapsRuntimePolicyToDomainIntent(t *te
 type creditReconciliationScheduleServiceStub struct {
 	scheduledFor  time.Time
 	onlyIfOverdue bool
-	run           *credits.ReconciliationRun
+	run           *ports.ReconciliationRun
 	err           error
 }
 
@@ -69,7 +69,7 @@ func (s *creditReconciliationScheduleServiceStub) ScheduleReconciliation(
 	_ context.Context,
 	scheduledFor time.Time,
 	onlyIfOverdue bool,
-) (*credits.ReconciliationRun, error) {
+) (*ports.ReconciliationRun, error) {
 	s.scheduledFor = scheduledFor
 	s.onlyIfOverdue = onlyIfOverdue
 	return s.run, s.err
@@ -133,7 +133,7 @@ type creditReconciliationWorkerServiceStub struct {
 	executeErr     error
 	failErr        error
 	getErr         error
-	run            credits.ReconciliationRun
+	run            ports.ReconciliationRun
 	failCalls      int
 	failedRunID    int64
 	failure        error
@@ -154,7 +154,7 @@ func (s *creditReconciliationWorkerServiceStub) FailReconciliation(ctx context.C
 	return s.failErr
 }
 
-func (s *creditReconciliationWorkerServiceStub) GetReconciliationRun(context.Context, int64) (credits.ReconciliationRun, error) {
+func (s *creditReconciliationWorkerServiceStub) GetReconciliationRun(context.Context, int64) (ports.ReconciliationRun, error) {
 	return s.run, s.getErr
 }
 

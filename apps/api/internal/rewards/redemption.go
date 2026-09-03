@@ -4,18 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"log/slog"
 	"time"
-
-	"ideaboard/api/internal/credits"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type CreditService interface {
-	InTx(pgx.Tx) credits.Commands
-	GetWallet(context.Context, int64) (credits.WalletDetails, error)
+	InTx(pgx.Tx) ports.Commands
+	GetWallet(context.Context, int64) (domain.WalletDetails, error)
 }
 
 type Service struct {
@@ -95,7 +95,7 @@ func (s *Service) Redeem(ctx context.Context, command RedeemCommand) (RedeemResu
 		return RedeemResult{}, fmt.Errorf("rewards credit service unavailable")
 	}
 	if _, err := s.credits.GetWallet(ctx, command.UserID); err != nil {
-		if errors.Is(err, credits.ErrWalletNotFound) {
+		if errors.Is(err, domain.ErrWalletNotFound) {
 			slog.Error("reward redemption Wallet is missing")
 		}
 		return RedeemResult{}, err

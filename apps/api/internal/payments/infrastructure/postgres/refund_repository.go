@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"strings"
 	"time"
 
@@ -112,13 +114,13 @@ func (r *Repository) createExternalRefundFact(ctx context.Context, tx *sql.Tx, o
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	creditAmount, err := credits.NewCreditAmount(qty)
+	creditAmount, err := domain.NewCreditAmount(qty)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	refundID := uuid.NewString()
-	holdResult, err := hold.Hold(ctx, credits.HoldCommand{UserID: order.UserID, Amount: creditAmount, Metadata: credits.CommandMetadata{
-		IdempotencyKey: "refund-hold-" + refundID, Actor: credits.Actor{Type: credits.ActorService, ID: "payments"}, Source: "stripe_refund", Reason: "Stripe Dashboard refund", BusinessReference: credits.BusinessReference{Type: "payment_refund", ID: refundID},
+	holdResult, err := hold.Hold(ctx, ports.HoldCommand{UserID: order.UserID, Amount: creditAmount, Metadata: domain.CommandMetadata{
+		IdempotencyKey: "refund-hold-" + refundID, Actor: domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_refund", Reason: "Stripe Dashboard refund", BusinessReference: domain.BusinessReference{Type: "payment_refund", ID: refundID},
 	}})
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
@@ -215,13 +217,13 @@ func (r *Repository) persistPendingRefund(ctx context.Context, tx *sql.Tx, order
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	creditAmount, err := credits.NewCreditAmount(input.IdeaQuantity)
+	creditAmount, err := domain.NewCreditAmount(input.IdeaQuantity)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, paymentcontracts.ErrRefundAmountInvalid
 	}
-	hold, err := commands.PurchaseRefundHold(ctx, credits.PurchaseRefundHoldCommand{UserID: order.UserID, Amount: creditAmount, Metadata: credits.CommandMetadata{
-		IdempotencyKey: "refund-hold-" + refundID, Actor: credits.Actor{Type: credits.ActorService, ID: "payments"}, Source: "stripe_refund_hold", Reason: input.Reason,
-		BusinessReference: credits.BusinessReference{Type: "payment_refund", ID: refundID},
+	hold, err := commands.PurchaseRefundHold(ctx, ports.PurchaseRefundHoldCommand{UserID: order.UserID, Amount: creditAmount, Metadata: domain.CommandMetadata{
+		IdempotencyKey: "refund-hold-" + refundID, Actor: domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_refund_hold", Reason: input.Reason,
+		BusinessReference: domain.BusinessReference{Type: "payment_refund", ID: refundID},
 	}})
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
@@ -268,11 +270,11 @@ func (r *Repository) MarkPaymentRefundFailed(ctx context.Context, refundID, summ
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	creditAmount, err := credits.NewCreditAmount(refund.IdeaQuantity)
+	creditAmount, err := domain.NewCreditAmount(refund.IdeaQuantity)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	if _, err := commands.Release(ctx, credits.ReleaseCommand{UserID: refund.UserID, HoldTransactionID: refund.CreditHoldTransactionID, Amount: creditAmount, Metadata: credits.CommandMetadata{IdempotencyKey: "refund-release-" + refund.ID, Actor: credits.Actor{Type: credits.ActorService, ID: "payments"}, Source: "stripe_refund", Reason: "Stripe refund failed", BusinessReference: credits.BusinessReference{Type: "payment_refund", ID: refund.ID}}}); err != nil && !errors.Is(err, credits.ErrHoldSettled) {
+	if _, err := commands.Release(ctx, ports.ReleaseCommand{UserID: refund.UserID, HoldTransactionID: refund.CreditHoldTransactionID, Amount: creditAmount, Metadata: domain.CommandMetadata{IdempotencyKey: "refund-release-" + refund.ID, Actor: domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_refund", Reason: "Stripe refund failed", BusinessReference: domain.BusinessReference{Type: "payment_refund", ID: refund.ID}}}); err != nil && !errors.Is(err, domain.ErrHoldSettled) {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	if err := scanPaymentRefund(tx.QueryRowContext(ctx, `UPDATE payment_refunds SET status = 'failed', error_summary = $2, failed_at = $3, updated_at = $3 WHERE id = $1::uuid RETURNING id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at`, refundID, boundedText(summary, 500), now), &refund); err != nil {
@@ -307,11 +309,11 @@ func (r *Repository) MarkPaymentRefundSucceeded(ctx context.Context, refundID st
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	creditResult, err := commands.PurchaseRefund(ctx, credits.PurchaseRefundCommand{
+	creditResult, err := commands.PurchaseRefund(ctx, ports.PurchaseRefundCommand{
 		UserID: refund.UserID, HoldTransactionID: refund.CreditHoldTransactionID,
-		Metadata: credits.CommandMetadata{IdempotencyKey: "purchase-refund-" + refund.ID,
-			Actor: credits.Actor{Type: credits.ActorService, ID: "payments"}, Source: "stripe_refund", Reason: "Stripe refund succeeded",
-			BusinessReference: credits.BusinessReference{Type: "payment_refund", ID: refund.ID}},
+		Metadata: domain.CommandMetadata{IdempotencyKey: "purchase-refund-" + refund.ID,
+			Actor: domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_refund", Reason: "Stripe refund succeeded",
+			BusinessReference: domain.BusinessReference{Type: "payment_refund", ID: refund.ID}},
 	})
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err

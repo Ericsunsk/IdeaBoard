@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	creditpostgres "ideaboard/api/internal/credits/infrastructure/postgres"
 	"os"
 	"strings"
 	"testing"
@@ -173,7 +174,7 @@ func TestRuntimeRoleCanUseRewardAdminServiceCommands(t *testing.T) {
 
 	runtimeRole := testdb.CreateRestrictedRole(t, db, "rewards_service_runtime")
 	policies := []dbprivileges.Policy{
-		database.RuntimePrivilegePolicy(), credits.RuntimePrivilegePolicy(), RuntimePrivilegePolicy(),
+		database.RuntimePrivilegePolicy(), creditpostgres.RuntimePrivilegePolicy(), RuntimePrivilegePolicy(),
 	}
 	if err := dbprivileges.Configure(ctx, db, runtimeRole, policies...); err != nil {
 		t.Fatalf("configure runtime privilege policies: %v", err)

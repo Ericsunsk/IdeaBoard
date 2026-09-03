@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"strings"
 	"time"
 
@@ -154,7 +156,7 @@ func (r *Repository) CreditPaidPaymentOrder(ctx context.Context, orderID string,
 		if order.Status != paymentsdomain.PaymentOrderPaidPendingCredit {
 			return fmt.Errorf("payment order is not ready for credit from status %q", order.Status)
 		}
-		amount, err := credits.NewCreditAmount(order.IdeaQuantity)
+		amount, err := domain.NewCreditAmount(order.IdeaQuantity)
 		if err != nil {
 			return fmt.Errorf("build purchase credit amount: %w", err)
 		}
@@ -162,13 +164,13 @@ func (r *Repository) CreditPaidPaymentOrder(ctx context.Context, orderID string,
 		if err != nil {
 			return err
 		}
-		creditResult, err := commands.Purchase(ctx, credits.PurchaseCommand{
+		creditResult, err := commands.Purchase(ctx, ports.PurchaseCommand{
 			UserID: order.UserID, Amount: amount,
-			Metadata: credits.CommandMetadata{
+			Metadata: domain.CommandMetadata{
 				IdempotencyKey: "payment-purchase:" + order.ID,
-				Actor:          credits.Actor{Type: credits.ActorService, ID: "payments"},
+				Actor:          domain.Actor{Type: domain.ActorService, ID: "payments"},
 				Source:         "stripe_purchase", Reason: "Stripe payment credited",
-				BusinessReference: credits.BusinessReference{Type: "payment_order", ID: order.ID},
+				BusinessReference: domain.BusinessReference{Type: "payment_order", ID: order.ID},
 			},
 		})
 		if err != nil {

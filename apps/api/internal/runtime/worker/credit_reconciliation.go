@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"log/slog"
 	"time"
-
-	"ideaboard/api/internal/credits"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
@@ -44,7 +44,7 @@ func (d *CreditReconciliationDispatcher) DispatchReconciliationRun(
 	runID int64,
 ) error {
 	if d == nil || d.client == nil || tx == nil || runID <= 0 {
-		return credits.ErrInvalidCommand
+		return domain.ErrInvalidCommand
 	}
 	_, err := d.client.InsertTx(ctx, tx, creditReconciliationJobArgs{RunID: runID}, &river.InsertOpts{
 		Queue: CreditReconciliationQueue, MaxAttempts: 5, Priority: 4,
@@ -55,7 +55,7 @@ func (d *CreditReconciliationDispatcher) DispatchReconciliationRun(
 type creditReconciliationWorkerService interface {
 	ExecuteReconciliation(context.Context, int64) error
 	FailReconciliation(context.Context, int64, error) error
-	GetReconciliationRun(context.Context, int64) (credits.ReconciliationRun, error)
+	GetReconciliationRun(context.Context, int64) (ports.ReconciliationRun, error)
 }
 
 type CreditReconciliationWorker struct {
@@ -69,7 +69,7 @@ func NewCreditReconciliationWorker(service creditReconciliationWorkerService) *C
 
 func (w *CreditReconciliationWorker) Work(ctx context.Context, job *river.Job[creditReconciliationJobArgs]) error {
 	if w == nil || w.service == nil || job == nil || job.Args.RunID <= 0 {
-		return credits.ErrInvalidCommand
+		return domain.ErrInvalidCommand
 	}
 	err := w.service.ExecuteReconciliation(ctx, job.Args.RunID)
 	if err == nil {
@@ -78,7 +78,7 @@ func (w *CreditReconciliationWorker) Work(ctx context.Context, job *river.Job[cr
 	lookupCtx, cancelLookup := context.WithTimeout(context.WithoutCancel(ctx), creditReconciliationTriggerLookupTimeout)
 	run, runErr := w.service.GetReconciliationRun(lookupCtx, job.Args.RunID)
 	cancelLookup()
-	if runErr == nil && run.Trigger == credits.ReconciliationTriggerScheduled {
+	if runErr == nil && run.Trigger == ports.ReconciliationTriggerScheduled {
 		slog.Error("scheduled Credit reconciliation execution failed",
 			"run_id", job.Args.RunID,
 			"attempt", job.Attempt,
@@ -161,7 +161,7 @@ func CreditReconciliationPeriodicJobs() []*river.PeriodicJob {
 }
 
 type creditReconciliationScheduleService interface {
-	ScheduleReconciliation(context.Context, time.Time, bool) (*credits.ReconciliationRun, error)
+	ScheduleReconciliation(context.Context, time.Time, bool) (*ports.ReconciliationRun, error)
 }
 
 type CreditReconciliationScheduleWorker struct {
@@ -179,7 +179,7 @@ func (w *CreditReconciliationScheduleWorker) Work(
 	job *river.Job[creditReconciliationScheduleJobArgs],
 ) error {
 	if w == nil || w.service == nil || job == nil {
-		return credits.ErrInvalidCommand
+		return domain.ErrInvalidCommand
 	}
 	onlyIfOverdue := false
 	switch job.Args.Mode {
@@ -187,7 +187,7 @@ func (w *CreditReconciliationScheduleWorker) Work(
 	case creditReconciliationScheduleCatchUp:
 		onlyIfOverdue = true
 	default:
-		return credits.ErrInvalidCommand
+		return domain.ErrInvalidCommand
 	}
 	now := time.Now()
 	if w.now != nil {
@@ -198,7 +198,7 @@ func (w *CreditReconciliationScheduleWorker) Work(
 	if err != nil || run == nil {
 		return err
 	}
-	if run.Trigger == credits.ReconciliationTriggerScheduled &&
+	if run.Trigger == ports.ReconciliationTriggerScheduled &&
 		run.ScheduledFor != nil &&
 		run.ScheduledFor.Equal(targetSlot) {
 		return nil

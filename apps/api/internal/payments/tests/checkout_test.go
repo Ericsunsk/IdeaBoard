@@ -1,6 +1,8 @@
 package tests
 
 import (
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	payments "ideaboard/api/internal/payments"
 
 	"context"
@@ -673,7 +675,7 @@ func newConfiguredPurchaseService(
 	db *sql.DB,
 	configurationGateway paymentports.StripeGateway,
 	checkoutGateway paymentports.CheckoutGateway,
-	wallets credits.WalletReader,
+	wallets ports.WalletReader,
 ) *payments.Service {
 	return newConfiguredPurchaseServiceWithClock(t, db, configurationGateway, checkoutGateway, wallets, func() time.Time {
 		return time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
@@ -685,7 +687,7 @@ func newConfiguredPurchaseServiceWithClock(
 	db *sql.DB,
 	configurationGateway paymentports.StripeGateway,
 	checkoutGateway paymentports.CheckoutGateway,
-	wallets credits.WalletReader,
+	wallets ports.WalletReader,
 	now func() time.Time,
 ) *payments.Service {
 	t.Helper()
@@ -703,17 +705,17 @@ func newConfiguredPurchaseServiceWithClock(
 
 func seedRechargeableWallet(t *testing.T, pool *pgxpool.Pool, userID int64) {
 	t.Helper()
-	amount, err := credits.NewCreditAmount(1)
+	amount, err := domain.NewCreditAmount(1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = credits.NewService(pool).Grant(t.Context(), credits.GrantCommand{
+	_, err = credits.NewService(pool).Grant(t.Context(), ports.GrantCommand{
 		UserID: userID, Amount: amount,
-		Metadata: credits.CommandMetadata{
+		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "payment-wallet-seed-" + strconv.FormatInt(userID, 10),
-			Actor:          credits.Actor{Type: credits.ActorAdmin, ID: "42"},
+			Actor:          domain.Actor{Type: domain.ActorAdmin, ID: "42"},
 			Source:         "admin_console", Reason: "seed rechargeable Wallet",
-			BusinessReference: credits.BusinessReference{Type: "admin_adjustment", ID: "payment-wallet-seed"},
+			BusinessReference: domain.BusinessReference{Type: "admin_adjustment", ID: "payment-wallet-seed"},
 		},
 	})
 	if err != nil {

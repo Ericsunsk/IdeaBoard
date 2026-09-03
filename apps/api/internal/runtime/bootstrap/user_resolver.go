@@ -2,8 +2,8 @@ package bootstrap
 
 import (
 	"context"
+	credithttp "ideaboard/api/internal/credits/interfaces/http"
 
-	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/rewards"
 
@@ -16,20 +16,20 @@ type creditsUserResolver struct {
 	repo *users.UserRepository
 }
 
-func (r creditsUserResolver) ResolvePublicID(ctx context.Context, publicID string) (credits.UserIdentity, error) {
+func (r creditsUserResolver) ResolvePublicID(ctx context.Context, publicID string) (credithttp.UserIdentity, error) {
 	user, err := r.repo.GetByPublicID(ctx, publicID)
 	if err != nil {
-		return credits.UserIdentity{}, err
+		return credithttp.UserIdentity{}, err
 	}
-	return credits.UserIdentity{ID: user.ID, PublicID: user.PublicID, DisplayName: user.DisplayName}, nil
+	return credithttp.UserIdentity{ID: user.ID, PublicID: user.PublicID, DisplayName: user.DisplayName}, nil
 }
 
-func (r creditsUserResolver) ResolveID(ctx context.Context, id int64) (credits.UserIdentity, error) {
+func (r creditsUserResolver) ResolveID(ctx context.Context, id int64) (credithttp.UserIdentity, error) {
 	user, err := r.repo.GetByID(ctx, id)
 	if err != nil {
-		return credits.UserIdentity{}, err
+		return credithttp.UserIdentity{}, err
 	}
-	return credits.UserIdentity{ID: user.ID, PublicID: user.PublicID, DisplayName: user.DisplayName}, nil
+	return credithttp.UserIdentity{ID: user.ID, PublicID: user.PublicID, DisplayName: user.DisplayName}, nil
 }
 
 type taskUserResolver struct {

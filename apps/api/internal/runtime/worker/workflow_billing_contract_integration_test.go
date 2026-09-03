@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -284,19 +286,19 @@ func seedWorkflowContractWallet(
 	if err := service.LifecycleInTx(tx).ProvisionWallet(t.Context(), userID); err != nil {
 		t.Fatal(err)
 	}
-	creditAmount, err := credits.NewCreditAmount(amount)
+	creditAmount, err := domain.NewCreditAmount(amount)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.InTx(tx).Grant(t.Context(), credits.GrantCommand{
+	if _, err := service.InTx(tx).Grant(t.Context(), ports.GrantCommand{
 		UserID: userID,
 		Amount: creditAmount,
-		Metadata: credits.CommandMetadata{
+		Metadata: domain.CommandMetadata{
 			IdempotencyKey: fmt.Sprintf("workflow-contract-grant-%d", runID),
-			Actor:          credits.Actor{Type: credits.ActorSystem, ID: "contract-test"},
+			Actor:          domain.Actor{Type: domain.ActorSystem, ID: "contract-test"},
 			Source:         "test",
 			Reason:         "seed Workflow billing contract",
-			BusinessReference: credits.BusinessReference{
+			BusinessReference: domain.BusinessReference{
 				Type: "test", ID: fmt.Sprintf("workflow-contract-%d", runID),
 			},
 		},

@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
@@ -357,7 +357,7 @@ func (h *UserHandler) Redeem(c *gin.Context) {
 
 func redemptionOutcomeForError(err error) redemptionOutcome {
 	switch {
-	case errors.Is(err, ErrInvalidCommand), errors.Is(err, ErrCodeUnavailable), errors.Is(err, credits.ErrWalletFrozen):
+	case errors.Is(err, ErrInvalidCommand), errors.Is(err, ErrCodeUnavailable), errors.Is(err, domain.ErrWalletFrozen):
 		return redemptionOutcomeInvalid
 	default:
 		return redemptionOutcomeInternalError
@@ -368,7 +368,7 @@ func writeRewardRedeemError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, ErrInvalidCommand), errors.Is(err, ErrCodeUnavailable):
 		response.Error(c, http.StatusUnprocessableEntity, "兑换码无效或已失效")
-	case errors.Is(err, credits.ErrWalletFrozen):
+	case errors.Is(err, domain.ErrWalletFrozen):
 		response.Error(c, http.StatusLocked, "当前账户无法兑换奖励")
 	default:
 		slog.Warn("reward redemption failed", "outcome", "internal_error", "error_type", fmt.Sprintf("%T", err))
@@ -496,7 +496,7 @@ func writeRewardError(c *gin.Context, err error) {
 		response.Error(c, http.StatusNotFound, "兑换记录不存在")
 	case errors.Is(err, ErrCodeUnavailable):
 		response.Error(c, http.StatusUnprocessableEntity, "兑换码无效或已失效")
-	case errors.Is(err, credits.ErrWalletFrozen):
+	case errors.Is(err, domain.ErrWalletFrozen):
 		response.Error(c, http.StatusLocked, "当前账户无法兑换奖励")
 	default:
 		slog.Warn("reward admin operation failed", "error_type", fmt.Sprintf("%T", err))

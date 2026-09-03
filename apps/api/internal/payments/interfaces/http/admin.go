@@ -2,10 +2,10 @@ package http
 
 import (
 	"errors"
+	"ideaboard/api/internal/credits/domain"
 	"net/http"
 	"strconv"
 
-	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
@@ -116,7 +116,7 @@ func (h *AdminHandler) CreateAdminPaymentRefund(c *gin.Context) {
 			response.Error(c, http.StatusBadRequest, err.Error())
 		case errors.Is(err, paymentcontracts.ErrRefundExpired), errors.Is(err, paymentcontracts.ErrRefundOrderNotEligible), errors.Is(err, paymentcontracts.ErrRefundAmountExceeds):
 			response.Error(c, http.StatusConflict, err.Error())
-		case errors.Is(err, credits.ErrInsufficientCredits):
+		case errors.Is(err, domain.ErrInsufficientCredits):
 			response.Error(c, http.StatusConflict, "Wallet 可用 Idea 不足")
 		case errors.Is(err, paymentcontracts.ErrStripeProviderUnavailable):
 			response.Error(c, http.StatusServiceUnavailable, "Stripe 服务暂不可用")

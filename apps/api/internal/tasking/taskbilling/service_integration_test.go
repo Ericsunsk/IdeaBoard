@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"testing"
 
 	"ideaboard/api/internal/billing"
@@ -35,9 +37,9 @@ func TestAIImageReadinessReturnsQuoteAndWalletAvailability(t *testing.T) {
 	if err := creditService.LifecycleInTx(tx).ProvisionWallet(t.Context(), 1); err != nil {
 		t.Fatal(err)
 	}
-	amount, _ := credits.NewCreditAmount(20)
-	if _, err := creditService.InTx(tx).Grant(t.Context(), credits.GrantCommand{UserID: 1, Amount: amount, Metadata: credits.CommandMetadata{
-		IdempotencyKey: "readiness-grant", Actor: credits.Actor{Type: credits.ActorSystem, ID: "test"}, Source: "test", Reason: "readiness", BusinessReference: credits.BusinessReference{Type: "test", ID: "readiness"},
+	amount, _ := domain.NewCreditAmount(20)
+	if _, err := creditService.InTx(tx).Grant(t.Context(), ports.GrantCommand{UserID: 1, Amount: amount, Metadata: domain.CommandMetadata{
+		IdempotencyKey: "readiness-grant", Actor: domain.Actor{Type: domain.ActorSystem, ID: "test"}, Source: "test", Reason: "readiness", BusinessReference: domain.BusinessReference{Type: "test", ID: "readiness"},
 	}}); err != nil {
 		t.Fatal(err)
 	}
@@ -114,14 +116,14 @@ func TestAllAIImageWorkflowReadinessPricingMatrix(t *testing.T) {
 				if err := creditService.LifecycleInTx(tx).ProvisionWallet(t.Context(), 1); err != nil {
 					t.Fatal(err)
 				}
-				amount, err := credits.NewCreditAmount(20)
+				amount, err := domain.NewCreditAmount(20)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if _, err := creditService.InTx(tx).Grant(t.Context(), credits.GrantCommand{UserID: 1, Amount: amount, Metadata: credits.CommandMetadata{
+				if _, err := creditService.InTx(tx).Grant(t.Context(), ports.GrantCommand{UserID: 1, Amount: amount, Metadata: domain.CommandMetadata{
 					IdempotencyKey: "readiness-matrix:" + feature + ":" + scenario.name,
-					Actor:          credits.Actor{Type: credits.ActorSystem, ID: "test"}, Source: "test", Reason: "readiness matrix",
-					BusinessReference: credits.BusinessReference{Type: "test", ID: feature + ":" + scenario.name},
+					Actor:          domain.Actor{Type: domain.ActorSystem, ID: "test"}, Source: "test", Reason: "readiness matrix",
+					BusinessReference: domain.BusinessReference{Type: "test", ID: feature + ":" + scenario.name},
 				}}); err != nil {
 					t.Fatal(err)
 				}
@@ -394,19 +396,19 @@ func seedTaskBillingFacts(t *testing.T, pool *pgxpool.Pool, taskID string, userI
 		t.Fatal(err)
 	}
 	if grant > 0 {
-		amount, err := credits.NewCreditAmount(grant)
+		amount, err := domain.NewCreditAmount(grant)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := creditService.InTx(tx).Grant(t.Context(), credits.GrantCommand{
+		if _, err := creditService.InTx(tx).Grant(t.Context(), ports.GrantCommand{
 			UserID: userID,
 			Amount: amount,
-			Metadata: credits.CommandMetadata{
+			Metadata: domain.CommandMetadata{
 				IdempotencyKey:    "settle-terminal-grant:" + taskID,
-				Actor:             credits.Actor{Type: credits.ActorSystem, ID: "test"},
+				Actor:             domain.Actor{Type: domain.ActorSystem, ID: "test"},
 				Source:            "test",
 				Reason:            "terminal settlement test",
-				BusinessReference: credits.BusinessReference{Type: "test", ID: taskID},
+				BusinessReference: domain.BusinessReference{Type: "test", ID: taskID},
 			},
 		}); err != nil {
 			t.Fatal(err)

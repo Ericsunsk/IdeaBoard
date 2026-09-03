@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	creditpostgres "ideaboard/api/internal/credits/infrastructure/postgres"
 	"strings"
 
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/boards"
-	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/assets"
@@ -135,7 +135,7 @@ func finalizeAppDatabases(ctx context.Context, cfg *config.Config) error {
 func runtimePrivilegePolicies() []dbprivileges.Policy {
 	return []dbprivileges.Policy{
 		database.RuntimePrivilegePolicy(),
-		credits.RuntimePrivilegePolicy(),
+		creditpostgres.RuntimePrivilegePolicy(),
 		billing.RuntimePrivilegePolicy(),
 		taskbilling.RuntimePrivilegePolicy(),
 		worker.RuntimePrivilegePolicy(),

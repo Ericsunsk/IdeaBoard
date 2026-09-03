@@ -7,11 +7,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"log/slog"
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/autherrors"
 	"ideaboard/api/internal/identity/trust"
 	"ideaboard/api/internal/platform/database"
@@ -31,7 +32,7 @@ type VerifiedIdentity = trust.ProvisioningIdentity
 
 type ProvisionResult struct {
 	User           User
-	Wallet         credits.WalletBalance
+	Wallet         domain.WalletBalance
 	WelcomeGranted bool
 }
 
@@ -67,8 +68,8 @@ type UserUploadCleaner interface {
 }
 
 type CreditWalletLifecycleService interface {
-	LifecycleInTx(pgx.Tx) credits.WalletLifecycle
-	GetWallet(context.Context, int64) (credits.WalletDetails, error)
+	LifecycleInTx(pgx.Tx) ports.WalletLifecycle
+	GetWallet(context.Context, int64) (domain.WalletDetails, error)
 }
 
 func (s *LifecycleService) InitializeExistingIdentities(
@@ -167,16 +168,16 @@ RETURNING id, public_id, display_name, auth_user_id, storage_uid, avatar, role, 
 	if err := lifecycle.ProvisionWallet(ctx, user.ID); err != nil {
 		return nil, fmt.Errorf("provision Credit Wallet: %w", err)
 	}
-	amount, _ := credits.NewCreditAmount(welcomeGrantCredits)
-	grant, granted, err := lifecycle.ClaimWelcomeGrant(ctx, fingerprint, credits.GrantCommand{
+	amount, _ := domain.NewCreditAmount(welcomeGrantCredits)
+	grant, granted, err := lifecycle.ClaimWelcomeGrant(ctx, fingerprint, ports.GrantCommand{
 		UserID: user.ID,
 		Amount: amount,
-		Metadata: credits.CommandMetadata{
+		Metadata: domain.CommandMetadata{
 			IdempotencyKey:    "welcome:" + fingerprint,
-			Actor:             credits.Actor{Type: credits.ActorSystem, ID: "identity-lifecycle"},
+			Actor:             domain.Actor{Type: domain.ActorSystem, ID: "identity-lifecycle"},
 			Source:            "welcome_grant",
 			Reason:            "initial Welcome Grant",
-			BusinessReference: credits.BusinessReference{Type: "welcome_claim", ID: fingerprint},
+			BusinessReference: domain.BusinessReference{Type: "welcome_claim", ID: fingerprint},
 		},
 	})
 	if err != nil {

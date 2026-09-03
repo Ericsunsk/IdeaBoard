@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"ideaboard/api/internal/credits/domain"
 	payments "ideaboard/api/internal/payments"
 
 	"context"
@@ -241,7 +242,7 @@ func TestPaymentRefundConcurrentRequestsCannotExceedOrderOrWallet(t *testing.T) 
 		switch {
 		case err == nil:
 			succeeded++
-		case errors.Is(err, paymentcontracts.ErrRefundAmountExceeds), errors.Is(err, credits.ErrInsufficientCredits):
+		case errors.Is(err, paymentcontracts.ErrRefundAmountExceeds), errors.Is(err, domain.ErrInsufficientCredits):
 			rejected++
 		default:
 			t.Fatalf("unexpected concurrent refund error: %v", err)

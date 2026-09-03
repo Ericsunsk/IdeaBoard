@@ -1,6 +1,8 @@
 package tests
 
 import (
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	payments "ideaboard/api/internal/payments"
 
 	"context"
@@ -9,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/credits"
 	platformevents "ideaboard/api/internal/events"
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
@@ -54,7 +55,7 @@ func newCompleteTestPaymentsService(
 	runtime *payments.PaymentRuntime,
 	configurationGateway paymentports.StripeGateway,
 	checkoutGateway paymentports.CheckoutGateway,
-	wallets credits.WalletReader,
+	wallets ports.WalletReader,
 	verifier paymentports.StripeWebhookVerifier,
 	refundGateway paymentports.RefundGateway,
 	disputeGateway paymentports.DisputeGateway,
@@ -83,7 +84,7 @@ func newCompleteTestCheckoutWorkflow(
 	runtime *payments.PaymentRuntime,
 	configurationGateway paymentports.StripeGateway,
 	checkoutGateway paymentports.CheckoutGateway,
-	wallets credits.WalletReader,
+	wallets ports.WalletReader,
 	shutdownEnqueuer paymentconfiguration.ShutdownEnqueuer,
 ) *payments.CheckoutWorkflow {
 	t.Helper()
@@ -178,11 +179,11 @@ func (testWebhookVerifier) Verify(context.Context, []byte, string, string, time.
 
 type testWalletReader struct{}
 
-func (testWalletReader) GetWallet(context.Context, int64) (credits.WalletDetails, error) {
-	return credits.WalletDetails{}, credits.ErrWalletNotFound
+func (testWalletReader) GetWallet(context.Context, int64) (domain.WalletDetails, error) {
+	return domain.WalletDetails{}, domain.ErrWalletNotFound
 }
-func (testWalletReader) ListLedger(context.Context, credits.ListLedgerInput) (credits.LedgerPage, error) {
-	return credits.LedgerPage{}, credits.ErrWalletNotFound
+func (testWalletReader) ListLedger(context.Context, domain.ListLedgerInput) (domain.LedgerPage, error) {
+	return domain.LedgerPage{}, domain.ErrWalletNotFound
 }
 
 // NewEventHub is a test-only composition helper for integration tests that

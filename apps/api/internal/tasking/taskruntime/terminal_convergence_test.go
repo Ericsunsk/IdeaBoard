@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"testing"
 	"time"
 
@@ -547,19 +549,19 @@ func newBilledCompletionConvergenceFixture(
 	if err := creditService.LifecycleInTx(tx).ProvisionWallet(ctx, userID); err != nil {
 		t.Fatal(err)
 	}
-	grantAmount, err := credits.NewCreditAmount(100)
+	grantAmount, err := domain.NewCreditAmount(100)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := creditService.InTx(tx).Grant(ctx, credits.GrantCommand{
+	if _, err := creditService.InTx(tx).Grant(ctx, ports.GrantCommand{
 		UserID: userID,
 		Amount: grantAmount,
-		Metadata: credits.CommandMetadata{
+		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "completion-convergence-grant:" + taskID,
-			Actor:          credits.Actor{Type: credits.ActorSystem, ID: "taskruntime-test"},
+			Actor:          domain.Actor{Type: domain.ActorSystem, ID: "taskruntime-test"},
 			Source:         "taskruntime_test",
 			Reason:         "seed completion convergence",
-			BusinessReference: credits.BusinessReference{
+			BusinessReference: domain.BusinessReference{
 				Type: "taskruntime_test",
 				ID:   taskID,
 			},

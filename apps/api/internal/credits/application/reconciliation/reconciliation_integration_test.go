@@ -1,0 +1,1037 @@
+package reconciliation_test
+
+import (
+	"ideaboard/api/internal/credits/testhelpers"
+
+	"ideaboard/api/internal/credits"
+
+	"context"
+	"database/sql"
+	"errors"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
+	"strconv"
+	"sync"
+	"testing"
+	"time"
+
+	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type reconciliationEnqueuerStub struct {
+	mu    sync.Mutex
+	calls []int64
+	err   error
+}
+
+func (e *reconciliationEnqueuerStub) DispatchReconciliationRun(_ context.Context, _ pgx.Tx, runID int64) error {
+	if e.err != nil {
+		return e.err
+	}
+	e.mu.Lock()
+	e.calls = append(e.calls, runID)
+	e.mu.Unlock()
+	return nil
+}
+
+func newReconciliationService(
+	t testing.TB,
+	pool *pgxpool.Pool,
+	dispatcher ports.ReconciliationRunDispatcher,
+) *credits.Service {
+	t.Helper()
+	service, err := credits.NewServiceWithReconciliation(pool, dispatcher)
+	if err != nil {
+		t.Fatalf("credits.NewServiceWithReconciliation() error = %v", err)
+	}
+	return service
+}
+
+func TestReconciliationRestrictionsTrackIndependentFindingsAndRecoverCommands(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
+	ctx := t.Context()
+
+	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: 94, Amount: testhelpers.MustCreditAmount(t, 100), Metadata: testhelpers.TestMetadata("reconcile:grant", "reconcile-grant")}); err != nil {
+		t.Fatalf("Grant() error = %v", err)
+	}
+	type accountProjection struct {
+		id      int64
+		balance int64
+	}
+	accounts := make(map[string]accountProjection)
+	rows, err := db.QueryContext(ctx, `
+SELECT account_role, id, balance
+FROM credit_accounts
+WHERE wallet_user_id = 94 AND account_role IN ('user_available', 'user_reserved')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var role string
+		var account accountProjection
+		if err := rows.Scan(&role, &account.id, &account.balance); err != nil {
+			rows.Close()
+			t.Fatal(err)
+		}
+		accounts[role] = account
+	}
+	if err := rows.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if len(accounts) != 2 {
+		t.Fatalf("accounts = %+v, want available and reserved", accounts)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts DISABLE TRIGGER guard_credit_account_projection`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `
+UPDATE credit_accounts
+SET balance = balance + CASE account_role WHEN 'user_available' THEN 7 ELSE 3 END
+WHERE wallet_user_id = 94 AND account_role IN ('user_available', 'user_reserved')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts ENABLE TRIGGER guard_credit_account_projection`); err != nil {
+		t.Fatal(err)
+	}
+
+	ledgerBefore := countRows(t, db, `SELECT COUNT(*) FROM credit_transactions`)
+	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
+	if err != nil {
+		t.Fatalf("StartReconciliation() error = %v", err)
+	}
+	if run.Trigger != ports.ReconciliationTriggerManual || run.RequestedBy == nil || *run.RequestedBy != 1 ||
+		run.Reason != "integration reconciliation" {
+		t.Fatalf("manual run audit = %+v", run)
+	}
+	if err := service.ExecuteReconciliation(ctx, run.ID); err != nil {
+		t.Fatalf("ExecuteReconciliation() error = %v", err)
+	}
+	run, err = service.GetReconciliationRun(ctx, run.ID)
+	if err != nil || run.Status != "completed" || run.CriticalCount == 0 || run.IsolatedWalletCount != 1 {
+		t.Fatalf("completed run = %+v, err = %v", run, err)
+	}
+	wallet, err := service.GetWallet(ctx, 94)
+	if err != nil || wallet.Status != domain.WalletStatusActive || len(wallet.ActiveRestrictions) != 2 {
+		t.Fatalf("wallet = %+v, err = %v", wallet, err)
+	}
+	page, err := service.ListGlobalReconciliationFindings(ctx, ports.ReconciliationFindingOpen, ports.ListReconciliationInput{Limit: 50})
+	if err != nil || len(page.Findings) == 0 {
+		t.Fatalf("findings = %+v, err = %v", page, err)
+	}
+	projectionFindings := make(map[string]ports.ReconciliationFinding)
+	for _, finding := range page.Findings {
+		if finding.FindingType == "wallet_projection_mismatch" {
+			projectionFindings[finding.SubjectID] = finding
+		}
+	}
+	if len(projectionFindings) != 2 {
+		t.Fatalf("projection findings = %+v, want two independent account findings", projectionFindings)
+	}
+	globalOpen, err := service.ListGlobalReconciliationFindings(ctx, ports.ReconciliationFindingOpen, ports.ListReconciliationInput{Limit: 1})
+	if err != nil || len(globalOpen.Findings) != 1 || globalOpen.NextBeforeID == 0 {
+		t.Fatalf("global open findings first page = %+v, err = %v", globalOpen, err)
+	}
+	globalOpenNext, err := service.ListGlobalReconciliationFindings(ctx, ports.ReconciliationFindingOpen, ports.ListReconciliationInput{
+		BeforeID: globalOpen.NextBeforeID,
+		Limit:    1,
+	})
+	if err != nil || len(globalOpenNext.Findings) != 1 || globalOpenNext.Findings[0].ID >= globalOpen.Findings[0].ID {
+		t.Fatalf("global open findings next page = %+v, err = %v", globalOpenNext, err)
+	}
+	availableFinding := projectionFindings[strconv.FormatInt(accounts["user_available"].id, 10)]
+	reservedFinding := projectionFindings[strconv.FormatInt(accounts["user_reserved"].id, 10)]
+	for _, finding := range []ports.ReconciliationFinding{availableFinding, reservedFinding} {
+		if finding.ID == 0 || !finding.Isolated || finding.Risk != ports.ReconciliationRiskHigh {
+			t.Fatalf("projection finding = %+v", finding)
+		}
+	}
+	if got := countRows(t, db, `
+SELECT COUNT(*)
+FROM credit_wallet_restrictions
+WHERE wallet_user_id = 94
+  AND restriction_type = 'ledger_integrity'
+  AND source = 'reconciliation'
+  AND related_object_type = 'finding'
+  AND released_at IS NULL`); got != 2 {
+		t.Fatalf("active reconciliation restriction count = %d, want 2", got)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_transactions`); got != ledgerBefore {
+		t.Fatalf("ledger transactions changed from %d to %d", ledgerBefore, got)
+	}
+	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: 94, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("reconcile:blocked-grant", "reconcile-blocked-grant")}); !errors.Is(err, domain.ErrWalletRestricted) {
+		t.Fatalf("Grant() error = %v, want domain.ErrWalletRestricted", err)
+	}
+	deductMetadata := testhelpers.TestMetadata("reconcile:blocked-deduct", "reconcile-blocked-deduct")
+	deductMetadata.Actor = domain.Actor{Type: domain.ActorAdmin, ID: "1"}
+	if _, err := service.Deduct(ctx, ports.DeductionCommand{UserID: 94, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: deductMetadata}); !errors.Is(err, domain.ErrWalletRestricted) {
+		t.Fatalf("Deduct() error = %v, want domain.ErrWalletRestricted", err)
+	}
+	if _, err := service.Hold(ctx, ports.HoldCommand{UserID: 94, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("reconcile:blocked-hold", "reconcile-blocked-hold")}); !errors.Is(err, domain.ErrWalletRestricted) {
+		t.Fatalf("Hold() error = %v, want domain.ErrWalletRestricted", err)
+	}
+
+	second, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ExecuteReconciliation(ctx, second.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, finding := range []ports.ReconciliationFinding{availableFinding, reservedFinding} {
+		if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_findings WHERE fingerprint = $1`, finding.Fingerprint); got != 1 {
+			t.Fatalf("deduplicated finding count = %d, want 1", got)
+		}
+		if got := countRows(t, db, `SELECT occurrence_count FROM credit_reconciliation_findings WHERE id = $1`, finding.ID); got != 2 {
+			t.Fatalf("occurrence count = %d, want 2", got)
+		}
+		if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_run_findings WHERE finding_id = $1`, finding.ID); got != 2 {
+			t.Fatalf("run history links = %d, want 2", got)
+		}
+		if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE related_object_type = 'finding' AND related_object_id = $1 AND released_at IS NULL`, strconv.FormatInt(finding.ID, 10)); got != 1 {
+			t.Fatalf("active restriction count for finding %d = %d, want 1", finding.ID, got)
+		}
+	}
+
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts DISABLE TRIGGER guard_credit_account_projection`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE credit_accounts SET balance = $2 WHERE id = $1`, accounts["user_available"].id, accounts["user_available"].balance); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts ENABLE TRIGGER guard_credit_account_projection`); err != nil {
+		t.Fatal(err)
+	}
+	third, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ExecuteReconciliation(ctx, third.ID); err != nil {
+		t.Fatal(err)
+	}
+	var status string
+	if err := db.QueryRowContext(ctx, `SELECT status FROM credit_reconciliation_findings WHERE id = $1`, availableFinding.ID).Scan(&status); err != nil || status != "resolved" {
+		t.Fatalf("resolved status = %q, err = %v", status, err)
+	}
+	globalResolved, err := service.ListGlobalReconciliationFindings(ctx, ports.ReconciliationFindingResolved, ports.ListReconciliationInput{Limit: 50})
+	if err != nil || len(globalResolved.Findings) != 1 || globalResolved.Findings[0].ID != availableFinding.ID || globalResolved.Findings[0].ResolvedAt == nil {
+		t.Fatalf("global resolved findings = %+v, err = %v", globalResolved, err)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE wallet_user_id = 94 AND released_at IS NULL`); got != 1 {
+		t.Fatalf("active restriction count after one repair = %d, want 1", got)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE related_object_id = $1 AND released_at IS NULL`, strconv.FormatInt(reservedFinding.ID, 10)); got != 1 {
+		t.Fatalf("reserved finding active restriction count = %d, want 1", got)
+	}
+	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: 94, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("reconcile:still-blocked", "reconcile-still-blocked")}); !errors.Is(err, domain.ErrWalletRestricted) {
+		t.Fatalf("Grant() after one repair error = %v, want domain.ErrWalletRestricted", err)
+	}
+
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts DISABLE TRIGGER guard_credit_account_projection`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE credit_accounts SET balance = $2 WHERE id = $1`, accounts["user_reserved"].id, accounts["user_reserved"].balance); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts ENABLE TRIGGER guard_credit_account_projection`); err != nil {
+		t.Fatal(err)
+	}
+	fourth, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ExecuteReconciliation(ctx, fourth.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE wallet_user_id = 94 AND released_at IS NULL`); got != 0 {
+		t.Fatalf("active restriction count after all repairs = %d, want 0", got)
+	}
+	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: 94, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("reconcile:recovered", "reconcile-recovered")}); err != nil {
+		t.Fatalf("Grant() after all repairs error = %v", err)
+	}
+
+	var recoveredAvailableBalance int64
+	if err := db.QueryRowContext(ctx, `SELECT balance FROM credit_accounts WHERE id = $1`, accounts["user_available"].id).Scan(&recoveredAvailableBalance); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts DISABLE TRIGGER guard_credit_account_projection`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE credit_accounts SET balance = $2 WHERE id = $1`, accounts["user_available"].id, recoveredAvailableBalance+7); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts ENABLE TRIGGER guard_credit_account_projection`); err != nil {
+		t.Fatal(err)
+	}
+	fifth, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ExecuteReconciliation(ctx, fifth.ID); err != nil {
+		t.Fatal(err)
+	}
+	var reopenedStatus string
+	var reopenedOccurrence int64
+	if err := db.QueryRowContext(ctx, `SELECT status, occurrence_count FROM credit_reconciliation_findings WHERE id = $1`, availableFinding.ID).Scan(&reopenedStatus, &reopenedOccurrence); err != nil {
+		t.Fatal(err)
+	}
+	if reopenedStatus != string(ports.ReconciliationFindingOpen) || reopenedOccurrence != 3 {
+		t.Fatalf("reopened finding status=%q occurrence=%d, want open/3", reopenedStatus, reopenedOccurrence)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE related_object_id = $1`, strconv.FormatInt(availableFinding.ID, 10)); got != 2 {
+		t.Fatalf("restriction history count after reopen = %d, want 2", got)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE related_object_id = $1 AND released_at IS NULL`, strconv.FormatInt(availableFinding.ID, 10)); got != 1 {
+		t.Fatalf("active restriction count after reopen = %d, want 1", got)
+	}
+
+	var observedStatus string
+	var observedIsolated bool
+	if err := db.QueryRowContext(ctx, `
+SELECT observed_status, observed_isolated
+FROM credit_reconciliation_run_findings
+WHERE run_id = $1 AND finding_id = $2`, run.ID, availableFinding.ID).Scan(&observedStatus, &observedIsolated); err != nil {
+		t.Fatal(err)
+	}
+	if observedStatus != string(ports.ReconciliationFindingOpen) || !observedIsolated {
+		t.Fatalf("historical run snapshot status=%q isolated=%v", observedStatus, observedIsolated)
+	}
+}
+
+func TestReconciliationStaleHoldOnlyReportsWithoutIsolation(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
+	ctx := t.Context()
+	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: 95, Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("stale:grant", "stale-grant")}); err != nil {
+		t.Fatal(err)
+	}
+	hold, err := service.Hold(ctx, ports.HoldCommand{UserID: 95, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: testhelpers.TestMetadata("stale:hold", "stale-hold")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE credit_holds SET created_at = clock_timestamp() - INTERVAL '25 hours' WHERE hold_transaction_id = $1`, hold.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ExecuteReconciliation(ctx, run.ID); err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.ListGlobalReconciliationFindings(ctx, ports.ReconciliationFindingOpen, ports.ListReconciliationInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var staleFinding ports.ReconciliationFinding
+	for _, finding := range page.Findings {
+		if finding.FindingType == "stale_hold" {
+			staleFinding = finding
+			if finding.Risk != "low" || finding.Severity != "warning" || finding.Isolated {
+				t.Fatalf("stale finding = %+v", finding)
+			}
+		}
+	}
+	if staleFinding.ID == 0 {
+		t.Fatal("stale_hold finding not reported")
+	}
+	wallet, err := service.GetWallet(ctx, 95)
+	if err != nil || wallet.Status != domain.WalletStatusActive {
+		t.Fatalf("wallet = %+v, err = %v", wallet, err)
+	}
+
+	if _, err := db.ExecContext(ctx, `UPDATE credit_reconciliation_findings SET risk = 'high', isolated = TRUE WHERE id = $1`, staleFinding.ID); err != nil {
+		t.Fatal(err)
+	}
+	restriction, err := service.RestrictWallet(ctx, ports.RestrictWalletCommand{
+		UserID: 95,
+		Type:   "ledger_integrity",
+		Source: "reconciliation",
+		RelatedObject: domain.BusinessReference{
+			Type: "finding",
+			ID:   strconv.FormatInt(staleFinding.ID, 10),
+		},
+		Reason: "test prior high-risk reconciliation isolation",
+		Actor:  domain.Actor{Type: domain.ActorSystem, ID: "credits-reconciliation"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ExecuteReconciliation(ctx, second.ID); err != nil {
+		t.Fatal(err)
+	}
+	var risk string
+	var isolated bool
+	if err := db.QueryRowContext(ctx, `SELECT risk, isolated FROM credit_reconciliation_findings WHERE id = $1`, staleFinding.ID).Scan(&risk, &isolated); err != nil {
+		t.Fatal(err)
+	}
+	if risk != string(ports.ReconciliationRiskLow) || isolated {
+		t.Fatalf("downgraded stale finding risk=%q isolated=%v, want low/false", risk, isolated)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE restriction_id = $1 AND released_at IS NOT NULL`, restriction.RestrictionID); got != 1 {
+		t.Fatalf("released downgraded restriction count = %d, want 1", got)
+	}
+}
+
+func TestReconciliationSeparatesBillingSnapshotRiskFromTaskTraceAnomaly(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
+	ctx := t.Context()
+	const userID int64 = 96
+	testhelpers.EnsureAdminOperationUser(t, pool, userID)
+	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: userID, Amount: testhelpers.MustCreditAmount(t, 30), Metadata: testhelpers.TestMetadata("reconciliation-fact-split:grant", "reconciliation-fact-split-grant")}); err != nil {
+		t.Fatal(err)
+	}
+	var priceID, priceVersion int64
+	if err := db.QueryRowContext(ctx, `SELECT price_version_id, version FROM publish_billing_price('test:reconciliation-fact-split', 'Reconciliation Fact Split', '', 5, 1)`).Scan(&priceID, &priceVersion); err != nil {
+		t.Fatal(err)
+	}
+
+	const missingSnapshotTaskID = "reconcile-missing-billing-snapshot"
+	missingSnapshotHold := createReconciliationTaskFixture(t, db, service, missingSnapshotTaskID, "pending", "", userID, priceID, priceVersion)
+	const missingTaskTraceID = "reconcile-missing-task-trace"
+	createReconciliationTaskFixture(t, db, service, missingTaskTraceID, "pending", "", userID, priceID, priceVersion)
+	const brokenTaskTraceID = "reconcile-broken-task-trace"
+	createReconciliationTaskFixture(t, db, service, brokenTaskTraceID, "pending", "", userID, priceID, priceVersion)
+
+	if _, err := db.ExecContext(ctx, `ALTER TABLE task_billing_snapshots DISABLE TRIGGER task_billing_snapshots_immutable`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE task_billing_settlements DISABLE TRIGGER task_billing_settlements_state_machine`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM task_billing_settlements WHERE task_id = $1`, missingSnapshotTaskID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE task_billing_settlements ENABLE TRIGGER task_billing_settlements_state_machine`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM task_billing_snapshots WHERE task_id = $1`, missingSnapshotTaskID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE task_billing_snapshots ENABLE TRIGGER task_billing_snapshots_immutable`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM tasks WHERE task_id = $1`, missingTaskTraceID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM tasks WHERE task_id = $1`, brokenTaskTraceID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_transactions DISABLE TRIGGER prevent_credit_transactions_mutation`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE credit_transactions SET business_reference_id = 'wrong-task-trace' WHERE business_reference_type = 'task' AND business_reference_id = $1 AND command_type = 'hold'`, brokenTaskTraceID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_transactions ENABLE TRIGGER prevent_credit_transactions_mutation`); err != nil {
+		t.Fatal(err)
+	}
+
+	first := executeReconciliationRun(t, service)
+	findings, err := service.ListGlobalReconciliationFindings(ctx, ports.ReconciliationFindingOpen, ports.ListReconciliationInput{Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var billingSnapshotFinding, taskTraceFinding, billingFactFinding ports.ReconciliationFinding
+	brokenTaskWasReportedOnly := false
+	for _, finding := range findings.Findings {
+		switch finding.FindingType {
+		case ports.ReconciliationFindingTaskHoldMissingBillingSnapshot:
+			if finding.SubjectID == missingSnapshotHold {
+				billingSnapshotFinding = finding
+			}
+		case ports.ReconciliationFindingTaskTraceMissing:
+			if finding.SubjectID == missingTaskTraceID {
+				taskTraceFinding = finding
+			}
+			if finding.SubjectID == brokenTaskTraceID {
+				brokenTaskWasReportedOnly = true
+			}
+		case ports.ReconciliationFindingTaskBillingFactMissing:
+			if finding.SubjectID == brokenTaskTraceID {
+				billingFactFinding = finding
+			}
+		}
+	}
+	if billingSnapshotFinding.ID == 0 || billingSnapshotFinding.Risk != ports.ReconciliationRiskHigh || !billingSnapshotFinding.Isolated {
+		t.Fatalf("Billing Snapshot finding = %+v, want isolated high-risk finding", billingSnapshotFinding)
+	}
+	if taskTraceFinding.ID == 0 || taskTraceFinding.Risk != ports.ReconciliationRiskLow || taskTraceFinding.Isolated {
+		t.Fatalf("Task trace finding = %+v, want report-only low-risk finding", taskTraceFinding)
+	}
+	if billingFactFinding.ID == 0 || billingFactFinding.Risk != ports.ReconciliationRiskHigh || !billingFactFinding.Isolated {
+		t.Fatalf("broken Task billing finding = %+v, want isolated high-risk finding", billingFactFinding)
+	}
+	if brokenTaskWasReportedOnly {
+		t.Fatal("broken Task Billing facts must not be reported as a low-risk Task trace anomaly")
+	}
+	if got := countRows(t, db, `
+SELECT COUNT(*) FROM credit_wallet_restrictions
+WHERE wallet_user_id = $1 AND restriction_type = 'ledger_integrity' AND source = 'reconciliation'
+  AND related_object_type = 'finding' AND related_object_id = $2 AND released_at IS NULL`, userID, strconv.FormatInt(billingSnapshotFinding.ID, 10)); got != 1 {
+		t.Fatalf("Billing Snapshot restriction count = %d, want 1", got)
+	}
+	if got := countRows(t, db, `
+SELECT COUNT(*) FROM credit_wallet_restrictions
+WHERE related_object_type = 'finding' AND related_object_id = $1 AND released_at IS NULL`, strconv.FormatInt(taskTraceFinding.ID, 10)); got != 0 {
+		t.Fatalf("Task trace restriction count = %d, want 0", got)
+	}
+
+	second := executeReconciliationRun(t, service)
+	for _, finding := range []ports.ReconciliationFinding{billingSnapshotFinding, taskTraceFinding} {
+		if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_findings WHERE fingerprint = $1`, finding.Fingerprint); got != 1 {
+			t.Fatalf("finding %s count = %d, want one fingerprint", finding.FindingType, got)
+		}
+		if got := countRows(t, db, `SELECT occurrence_count FROM credit_reconciliation_findings WHERE id = $1`, finding.ID); got != 2 {
+			t.Fatalf("finding %s occurrence count = %d, want 2", finding.FindingType, got)
+		}
+		if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_run_findings WHERE finding_id = $1 AND run_id IN ($2, $3)`, finding.ID, first, second); got != 2 {
+			t.Fatalf("finding %s run links = %d, want 2", finding.FindingType, got)
+		}
+	}
+
+	insertReconciliationTaskBillingSnapshot(t, db, missingSnapshotTaskID, userID, priceID, priceVersion, missingSnapshotHold)
+	if _, err := db.ExecContext(ctx, `INSERT INTO task_billing_settlements(task_id,state) VALUES ($1,'held')`, missingSnapshotTaskID); err != nil {
+		t.Fatal(err)
+	}
+	third := executeReconciliationRun(t, service)
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE related_object_type = 'finding' AND related_object_id = $1 AND released_at IS NULL`, strconv.FormatInt(billingSnapshotFinding.ID, 10)); got != 0 {
+		t.Fatalf("recovered Billing Snapshot restriction count = %d, want 0", got)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_run_findings WHERE finding_id = $1 AND run_id = $2`, taskTraceFinding.ID, third); got != 1 {
+		t.Fatalf("Task trace finding should remain reported after unrelated recovery, got %d links", got)
+	}
+
+	if _, err := db.ExecContext(ctx, `INSERT INTO tasks (task_id,user_id,prompt,user_prompt,params,status,error_msg,result) VALUES ($1,$2,'p','p','{}','pending','','')`, missingTaskTraceID, userID); err != nil {
+		t.Fatal(err)
+	}
+	executeReconciliationRun(t, service)
+	for _, finding := range []ports.ReconciliationFinding{billingSnapshotFinding, taskTraceFinding} {
+		var status string
+		if err := db.QueryRowContext(ctx, `SELECT status FROM credit_reconciliation_findings WHERE id = $1`, finding.ID).Scan(&status); err != nil {
+			t.Fatal(err)
+		}
+		if status != string(ports.ReconciliationFindingResolved) {
+			t.Fatalf("recovered %s finding status = %q, want resolved", finding.FindingType, status)
+		}
+	}
+}
+
+func TestReconciliationTreatsCorruptTerminalFactsAsHighRiskInsteadOfTaskTrace(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
+	ctx := t.Context()
+	const userID int64 = 97
+	testhelpers.EnsureAdminOperationUser(t, pool, userID)
+	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: userID, Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("terminal-fact-risk:grant", "terminal-fact-risk-grant")}); err != nil {
+		t.Fatal(err)
+	}
+	var priceID, priceVersion int64
+	if err := db.QueryRowContext(ctx, `SELECT price_version_id, version FROM publish_billing_price('test:terminal-fact-risk', 'Terminal Fact Risk', '', 5, 1)`).Scan(&priceID, &priceVersion); err != nil {
+		t.Fatal(err)
+	}
+
+	const capturedTaskID = "reconcile-corrupt-captured-terminal"
+	capturedHold := createReconciliationTaskFixture(t, db, service, capturedTaskID, "completed", "", userID, priceID, priceVersion)
+	capture, err := service.Capture(ctx, ports.CaptureCommand{UserID: userID, HoldTransactionID: capturedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("terminal-fact-risk:capture", capturedTaskID)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE task_billing_settlements SET state = 'captured', actual_output_count = 1, captured_credits = 5, capture_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, capturedTaskID, capture.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+
+	const releasedTaskID = "reconcile-corrupt-released-terminal"
+	releasedHold := createReconciliationTaskFixture(t, db, service, releasedTaskID, "failed", "provider failed", userID, priceID, priceVersion)
+	release, err := service.Release(ctx, ports.ReleaseCommand{UserID: userID, HoldTransactionID: releasedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("terminal-fact-risk:release", releasedTaskID)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE task_billing_settlements SET state = 'released', actual_output_count = 0, released_credits = 5, release_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, releasedTaskID, release.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM tasks WHERE task_id IN ($1, $2)`, capturedTaskID, releasedTaskID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_transactions DISABLE TRIGGER prevent_credit_transactions_mutation`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE credit_transactions SET command_amount = 4 WHERE transaction_id = $1`, capture.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_transactions ENABLE TRIGGER prevent_credit_transactions_mutation`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_postings DISABLE TRIGGER prevent_credit_postings_mutation`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE credit_postings SET amount = CASE WHEN amount > 0 THEN 4 ELSE -4 END WHERE transaction_id = $1`, release.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_postings ENABLE TRIGGER prevent_credit_postings_mutation`); err != nil {
+		t.Fatal(err)
+	}
+
+	executeReconciliationRun(t, service)
+	page, err := service.ListGlobalReconciliationFindings(ctx, ports.ReconciliationFindingOpen, ports.ListReconciliationInput{Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var capturedFactRisk, releasedLedgerRisk ports.ReconciliationFinding
+	for _, finding := range page.Findings {
+		if finding.FindingType == ports.ReconciliationFindingTaskTraceMissing && (finding.SubjectID == capturedTaskID || finding.SubjectID == releasedTaskID) {
+			t.Fatalf("corrupt terminal %q was incorrectly reported as low-risk Task trace", finding.SubjectID)
+		}
+		if finding.FindingType == ports.ReconciliationFindingTaskBillingFactMissing && finding.SubjectID == capturedTaskID {
+			capturedFactRisk = finding
+		}
+		if finding.FindingType == ports.ReconciliationFindingLedgerPostingsInvalid && finding.SubjectID == release.TransactionID {
+			releasedLedgerRisk = finding
+		}
+	}
+	for _, finding := range []ports.ReconciliationFinding{capturedFactRisk, releasedLedgerRisk} {
+		if finding.ID == 0 || finding.Risk != ports.ReconciliationRiskHigh || !finding.Isolated {
+			t.Fatalf("corrupt terminal finding = %+v, want isolated high-risk finding", finding)
+		}
+	}
+}
+
+func TestStartReconciliationIsMutuallyExclusiveAndRollsBackOnEnqueueFailure(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	enqueuer := &reconciliationEnqueuerStub{}
+	service := newReconciliationService(t, pool, enqueuer)
+	invalid := ports.StartManualReconciliationInput{}
+	if _, err := service.StartReconciliation(t.Context(), invalid); !errors.Is(err, domain.ErrInvalidCommand) {
+		t.Fatalf("StartReconciliation(blank reason) error = %v, want domain.ErrInvalidCommand", err)
+	}
+	first, err := service.StartReconciliation(t.Context(), reconciliationStartInput(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondAction := testsupport.AdminAction(t, 1, "second request must not overwrite active run reason")
+	secondInput := ports.StartManualReconciliationInput{ActorID: secondAction.ActorID(), Reason: secondAction.Reason()}
+	second, err := service.StartReconciliation(t.Context(), secondInput)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ID != second.ID || second.Reason != first.Reason {
+		t.Fatalf("concurrent active runs = %d and %d", first.ID, second.ID)
+	}
+	if len(enqueuer.calls) != 1 {
+		t.Fatalf("active Run enqueue calls = %d, want 1", len(enqueuer.calls))
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 1 {
+		t.Fatalf("run count = %d", got)
+	}
+
+	if err := service.ExecuteReconciliation(t.Context(), first.ID); err != nil {
+		t.Fatal(err)
+	}
+	riverErr := errors.New("river unavailable")
+	failing := newReconciliationService(t, pool, &reconciliationEnqueuerStub{err: riverErr})
+	if _, err := failing.StartReconciliation(t.Context(), reconciliationStartInput(t)); !errors.Is(err, riverErr) {
+		t.Fatalf("StartReconciliation() error = %v, want wrapped River error", err)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 1 {
+		t.Fatalf("run count after enqueue rollback = %d", got)
+	}
+}
+
+func TestReconciliationExecutionLockIsScopedToSchema(t *testing.T) {
+	_, firstPool := testdb.OpenWithPool(t)
+	_, secondPool := testdb.OpenWithPool(t)
+
+	firstTx, err := firstPool.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = firstTx.Rollback(t.Context()) }()
+	if _, err := firstTx.Exec(t.Context(), `
+SELECT
+  pg_advisory_xact_lock(5283921922134398278),
+  pg_advisory_xact_lock(hashtextextended(current_schema(), 5283921922134398278))
+`); err != nil {
+		t.Fatal(err)
+	}
+
+	service := newReconciliationService(t, secondPool, &reconciliationEnqueuerStub{})
+	run, err := service.StartReconciliation(t.Context(), reconciliationStartInput(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ExecuteReconciliation(t.Context(), run.ID); err != nil {
+		t.Fatalf("second schema reconciliation was blocked by the first schema: %v", err)
+	}
+}
+
+func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
+	ctx := t.Context()
+	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: 93, Amount: testhelpers.MustCreditAmount(t, 500), Metadata: testhelpers.TestMetadata("matrix:grant", "matrix-grant")}); err != nil {
+		t.Fatal(err)
+	}
+	var priceID, priceVersion int64
+	if err := db.QueryRowContext(ctx, `SELECT price_version_id, version FROM publish_billing_price('test:reconciliation', 'Reconciliation Test', '', 5, 1)`).Scan(&priceID, &priceVersion); err != nil {
+		t.Fatal(err)
+	}
+
+	releasedHold := createReconciliationTaskFixture(t, db, service, "reconcile-running-released", "pending", "", 93, priceID, priceVersion)
+	release, err := service.Release(ctx, ports.ReleaseCommand{UserID: 93, HoldTransactionID: releasedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("release:running", "reconcile-running-released")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE task_billing_settlements SET state = 'released', actual_output_count = 0, released_credits = 5, release_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, "reconcile-running-released", release.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+	createReconciliationTaskFixture(t, db, service, "reconcile-completed-held", "completed", "", 93, priceID, priceVersion)
+	createReconciliationTaskFixture(t, db, service, "reconcile-failed-held", "failed", "provider failed", 93, priceID, priceVersion)
+
+	missingTaskMetadata := taskReconciliationMetadata("hold:missing-task:1", "reconcile-missing-task")
+	if _, err := service.Hold(ctx, ports.HoldCommand{UserID: 93, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: missingTaskMetadata}); err != nil {
+		t.Fatal(err)
+	}
+	missingTaskMetadata.IdempotencyKey = "hold:missing-task:2"
+	if _, err := service.Hold(ctx, ports.HoldCommand{UserID: 93, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: missingTaskMetadata}); err != nil {
+		t.Fatal(err)
+	}
+
+	illegal, err := service.Grant(ctx, ports.GrantCommand{UserID: 93, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("matrix:illegal", "matrix-illegal")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_transactions DISABLE TRIGGER prevent_credit_transactions_mutation`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE credit_transactions SET related_transaction_id = transaction_id WHERE transaction_id = $1`, illegal.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+
+	hold, err := service.Hold(ctx, ports.HoldCommand{UserID: 93, Amount: testhelpers.MustCreditAmount(t, 10), Metadata: testhelpers.TestMetadata("matrix:capture-hold", "matrix-capture-hold")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	capture, err := service.Capture(ctx, ports.CaptureCommand{UserID: 93, HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 10), Metadata: testhelpers.TestMetadata("matrix:capture", "matrix-capture")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_charges DROP CONSTRAINT ck_credit_charges_refunded_range`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE credit_charges SET amount = 11, refunded_amount = 12 WHERE capture_transaction_id = $1`, capture.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+
+	badHold, err := service.Hold(ctx, ports.HoldCommand{UserID: 93, Amount: testhelpers.MustCreditAmount(t, 2), Metadata: testhelpers.TestMetadata("matrix:bad-hold", "matrix-bad-hold")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_holds DROP CONSTRAINT ck_credit_holds_terminal_consistency`); err != nil {
+		t.Fatal(err)
+	}
+
+	missingBillingHold := createReconciliationTaskFixture(t, db, service, "reconcile-missing-billing-facts", "pending", "", 93, priceID, priceVersion)
+	missingRunningHold := createReconciliationTaskFixture(t, db, service, "reconcile-running-missing-billing-facts", "pending", "", 93, priceID, priceVersion)
+	if _, err := db.ExecContext(ctx, `ALTER TABLE tasks DROP CONSTRAINT ck_tasks_assignment_status`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE tasks DROP CONSTRAINT ck_tasks_assignment_pair`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE tasks DROP CONSTRAINT ck_tasks_lease_status`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE tasks SET status='running' WHERE task_id='reconcile-running-missing-billing-facts'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE task_billing_settlements DISABLE TRIGGER task_billing_settlements_state_machine`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `
+UPDATE task_billing_settlements
+SET state = 'captured', actual_output_count = 1, captured_credits = 5, settled_at = clock_timestamp()
+WHERE task_id = 'reconcile-completed-held'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE task_billing_snapshots DROP CONSTRAINT task_billing_snapshot_hold_fk`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_holds DROP CONSTRAINT fk_credit_holds_hold_transaction_id`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM task_billing_settlements WHERE task_id = 'reconcile-missing-billing-facts'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM task_billing_settlements WHERE task_id = 'reconcile-running-missing-billing-facts'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM credit_holds WHERE hold_transaction_id = $1`, missingBillingHold); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM credit_holds WHERE hold_transaction_id = $1`, missingRunningHold); err != nil {
+		t.Fatal(err)
+	}
+
+	adminGrant, err := service.Grant(ctx, ports.GrantCommand{UserID: 93, Amount: testhelpers.MustCreditAmount(t, 4), Metadata: domain.CommandMetadata{IdempotencyKey: "matrix:admin-grant", Actor: domain.Actor{Type: domain.ActorAdmin, ID: "1"}, Source: "test", Reason: "admin grant", BusinessReference: domain.BusinessReference{Type: "admin_adjustment", ID: "matrix-admin-grant"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_transactions DISABLE TRIGGER validate_credit_transaction_on_insert`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_postings DISABLE TRIGGER guard_credit_posting_transaction_scope`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `
+INSERT INTO credit_transactions (transaction_id,wallet_user_id,command_type,idempotency_key,request_hash,actor_type,actor_id,source,reason,business_reference_type,business_reference_id,related_transaction_id,command_amount,posting_count,available_balance_after,reserved_balance_after)
+VALUES ('ctx_over_correction',93,'correction','matrix:over-correction',repeat('c',64),'admin','1','test','over correction','admin_adjustment','over-correction',$1,5,2,0,0)`, adminGrant.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+	var grantFromID, grantToID int64
+	if err := db.QueryRowContext(ctx, `SELECT MAX(account_id) FILTER (WHERE amount < 0), MAX(account_id) FILTER (WHERE amount > 0) FROM credit_postings WHERE transaction_id=$1`, adminGrant.TransactionID).Scan(&grantFromID, &grantToID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO credit_postings(transaction_id,account_id,amount) VALUES ('ctx_over_correction',$1,-5),('ctx_over_correction',$2,5)`, grantToID, grantFromID); err != nil {
+		t.Fatal(err)
+	}
+	duplicate := testhelpers.TestMetadata("matrix:duplicate-nontask", "duplicate-nontask")
+	duplicate.BusinessReference = domain.BusinessReference{Type: "external_order", ID: "order-1"}
+	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: 93, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: duplicate}); err != nil {
+		t.Fatal(err)
+	}
+	duplicate.IdempotencyKey = "matrix:duplicate-nontask-2"
+	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: 93, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: duplicate}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE credit_holds SET status = 'captured' WHERE hold_transaction_id = $1`, badHold.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_postings DISABLE TRIGGER prevent_credit_postings_mutation`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM credit_postings WHERE id = (SELECT MAX(id) FROM credit_postings WHERE transaction_id = $1)`, illegal.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_transactions DROP CONSTRAINT uq_credit_transactions_idempotency_key`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_transactions DISABLE TRIGGER validate_credit_transaction_on_insert`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_postings DISABLE TRIGGER guard_credit_posting_transaction_scope`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `
+INSERT INTO credit_transactions (transaction_id, wallet_user_id, command_type, idempotency_key, request_hash, actor_type, actor_id,
+ source, reason, business_reference_type, business_reference_id, command_amount, posting_count, available_balance_after, reserved_balance_after)
+SELECT 'ctx_reconcile_hash_conflict', wallet_user_id, command_type, idempotency_key, repeat('b', 64), actor_type, actor_id,
+ source, reason, business_reference_type, business_reference_id, command_amount, 2, available_balance_after, reserved_balance_after
+FROM credit_transactions WHERE transaction_id = $1`, illegal.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+	var issuanceID, availableID int64
+	if err := db.QueryRowContext(ctx, `SELECT MAX(id) FILTER (WHERE account_role='system_issuance'), MAX(id) FILTER (WHERE account_role='user_available') FROM credit_accounts WHERE shard_key='wallet:93' OR wallet_user_id=93`).Scan(&issuanceID, &availableID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO credit_postings(transaction_id, account_id, amount) VALUES ('ctx_reconcile_hash_conflict',$1,-1),('ctx_reconcile_hash_conflict',$2,1)`, issuanceID, availableID); err != nil {
+		t.Fatal(err)
+	}
+
+	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ExecuteReconciliation(ctx, run.ID); err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.ListGlobalReconciliationFindings(ctx, ports.ReconciliationFindingOpen, ports.ListReconciliationInput{Limit: 200})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := make(map[string]bool)
+	for _, finding := range page.Findings {
+		found[string(finding.FindingType)] = true
+	}
+	for _, expected := range []string{
+		"ledger_postings_invalid", "wallet_projection_mismatch", "task_hold_missing_billing_snapshot",
+		"active_task_not_held", "terminal_task_settlement_mismatch",
+		"task_terminal_transaction_count", "idempotency_request_hash_conflict", "duplicate_business_reference",
+		"refund_amount_invalid", "illegal_reference_chain", "hold_state_invalid", "charge_state_invalid",
+		"task_billing_fact_missing", "correction_amount_exceeds_original",
+	} {
+		if !found[expected] {
+			t.Errorf("missing finding type %q; got %v", expected, found)
+		}
+	}
+}
+
+func TestReconciliationRequiresPaidActiveTasksToRemainHeld(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
+	ctx := t.Context()
+	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: 93, Amount: testhelpers.MustCreditAmount(t, 50), Metadata: testhelpers.TestMetadata("active-held:grant", "active-held-grant")}); err != nil {
+		t.Fatal(err)
+	}
+	var priceID, priceVersion int64
+	if err := db.QueryRowContext(ctx, `SELECT price_version_id, version FROM publish_billing_price('test:reconciliation', 'Active Held Test', '', 5, 1)`).Scan(&priceID, &priceVersion); err != nil {
+		t.Fatal(err)
+	}
+
+	capturedHold := createReconciliationTaskFixture(t, db, service, "active-captured", "pending", "", 93, priceID, priceVersion)
+	capture, err := service.Capture(ctx, ports.CaptureCommand{UserID: 93, HoldTransactionID: capturedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("capture:active", "active-captured")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE task_billing_settlements SET state = 'captured', actual_output_count = 1, captured_credits = 5, capture_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, "active-captured", capture.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+
+	createReconciliationTaskFixture(t, db, service, "active-free", "pending", "", 93, priceID, priceVersion)
+	if _, err := db.ExecContext(ctx, `ALTER TABLE task_billing_settlements DISABLE TRIGGER task_billing_settlements_state_machine`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE task_billing_settlements SET state = 'free', settled_at = clock_timestamp() WHERE task_id = 'active-free'`); err != nil {
+		t.Fatal(err)
+	}
+	createReconciliationTaskFixture(t, db, service, "active-held", "pending", "", 93, priceID, priceVersion)
+
+	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ExecuteReconciliation(ctx, run.ID); err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.ListGlobalReconciliationFindings(ctx, ports.ReconciliationFindingOpen, ports.ListReconciliationInput{Limit: 200})
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundSubjects := make(map[string]bool)
+	for _, finding := range page.Findings {
+		if finding.FindingType == "active_task_not_held" {
+			foundSubjects[finding.SubjectID] = true
+			if finding.Risk != ports.ReconciliationRiskHigh {
+				t.Errorf("finding %q risk = %q", finding.SubjectID, finding.Risk)
+			}
+		}
+	}
+	for _, taskID := range []string{"active-captured", "active-free"} {
+		if !foundSubjects[taskID] {
+			t.Errorf("missing active_task_not_held for %q; got %v", taskID, foundSubjects)
+		}
+	}
+	if foundSubjects["active-held"] {
+		t.Fatal("normally held active task was reported")
+	}
+}
+
+func TestReconciliationScanDoesNotWaitOnNormalWalletHotRows(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	service := credits.NewService(pool)
+	if _, err := service.Grant(t.Context(), ports.GrantCommand{UserID: 99, Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("nonblock:grant", "nonblock-grant")}); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := pool.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(t.Context()) }()
+	if _, err := tx.Exec(t.Context(), `SELECT id FROM credit_accounts WHERE wallet_user_id = 99 ORDER BY id FOR UPDATE`); err != nil {
+		t.Fatal(err)
+	}
+	var runID int64
+	if err := pool.QueryRow(t.Context(), `SELECT run_id FROM start_credit_reconciliation('manual', 1, 'hot row test', NULL, FALSE)`).Scan(&runID); err != nil {
+		t.Fatal(err)
+	}
+	finished := make(chan error, 1)
+	go func() { finished <- service.ExecuteReconciliation(context.Background(), runID) }()
+	select {
+	case err := <-finished:
+		if err != nil {
+			t.Fatalf("ExecuteReconciliation() error = %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("reconciliation scan waited on a normal Wallet hot-row lock")
+	}
+}
+
+func createReconciliationTaskFixture(t *testing.T, db *sql.DB, service *credits.Service, taskID, status, errorMessage string, userID, priceID, priceVersion int64) string {
+	t.Helper()
+	hold, err := service.Hold(t.Context(), ports.HoldCommand{UserID: userID, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("hold:"+taskID, taskID)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	completedAt := "NULL"
+	if status == "completed" || status == "failed" {
+		completedAt = "clock_timestamp()"
+	}
+	query := `INSERT INTO tasks (task_id,user_id,prompt,user_prompt,params,status,error_msg,result,completed_at) VALUES ($1,$2,'p','p','{}',$3,$4,'',` + completedAt + `)`
+	if _, err := db.ExecContext(t.Context(), query, taskID, userID, status, errorMessage); err != nil {
+		t.Fatal(err)
+	}
+	insertReconciliationTaskBillingSnapshot(t, db, taskID, userID, priceID, priceVersion, hold.TransactionID)
+	if _, err := db.ExecContext(t.Context(), `INSERT INTO task_billing_settlements(task_id,state) VALUES ($1,'held')`, taskID); err != nil {
+		t.Fatal(err)
+	}
+	return hold.TransactionID
+}
+
+func insertReconciliationTaskBillingSnapshot(t testing.TB, db *sql.DB, taskID string, userID, priceID, priceVersion int64, holdTransactionID string) {
+	t.Helper()
+	result, err := db.ExecContext(t.Context(), `
+INSERT INTO task_billing_snapshots(task_id,user_id,feature_slug,sku,display_name,price_version_id,price_version,unit_credits,quantity,total_credits,quoted_at,hold_transaction_id)
+SELECT $1, $2, 'test', prices.sku, skus.display_name, prices.price_version_id, prices.version,
+       prices.unit_credits, 1, prices.unit_credits, clock_timestamp(), $5
+FROM billing_price_versions prices
+JOIN billing_skus skus ON skus.sku = prices.sku
+WHERE prices.price_version_id = $3 AND prices.version = $4`, taskID, userID, priceID, priceVersion, holdTransactionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rows, err := result.RowsAffected(); err != nil || rows != 1 {
+		t.Fatalf("insert task Billing snapshot rows=%d error=%v", rows, err)
+	}
+}
+
+func executeReconciliationRun(t testing.TB, service *credits.Service) int64 {
+	t.Helper()
+	run, err := service.StartReconciliation(t.Context(), reconciliationStartInput(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ExecuteReconciliation(t.Context(), run.ID); err != nil {
+		t.Fatal(err)
+	}
+	return run.ID
+}
+
+func taskReconciliationMetadata(key, taskID string) domain.CommandMetadata {
+	return domain.CommandMetadata{IdempotencyKey: key, Actor: domain.Actor{Type: domain.ActorService, ID: "reconciliation-test"}, Source: "test", Reason: "reconciliation matrix", BusinessReference: domain.BusinessReference{Type: "task", ID: taskID}}
+}
+
+func reconciliationStartInput(t testing.TB) ports.StartManualReconciliationInput {
+	action := testsupport.AdminAction(t, 1, "integration reconciliation")
+	return ports.StartManualReconciliationInput{ActorID: action.ActorID(), Reason: action.Reason()}
+}
+
+func countRows(t testing.TB, db interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}, query string, args ...any) int64 {
+	t.Helper()
+	var count int64
+	if err := db.QueryRowContext(t.Context(), query, args...).Scan(&count); err != nil {
+		t.Fatalf("count query error = %v", err)
+	}
+	return count
+}

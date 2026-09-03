@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"strings"
 	"sync"
 	"testing"
@@ -1111,49 +1113,49 @@ func rewardCodeString(value string) *string {
 	return &value
 }
 
-func (service failingGrantCreditService) InTx(pgx.Tx) credits.Commands {
+func (service failingGrantCreditService) InTx(pgx.Tx) ports.Commands {
 	return failingCreditCommands{}
 }
 
-func (service failingGrantCreditService) GetWallet(ctx context.Context, userID int64) (credits.WalletDetails, error) {
+func (service failingGrantCreditService) GetWallet(ctx context.Context, userID int64) (domain.WalletDetails, error) {
 	return service.reader.GetWallet(ctx, userID)
 }
 
 type failingCreditCommands struct{}
 
-func (failingCreditCommands) Grant(context.Context, credits.GrantCommand) (credits.CommandResult, error) {
-	return credits.CommandResult{}, fmt.Errorf("injected Credit Grant failure")
+func (failingCreditCommands) Grant(context.Context, ports.GrantCommand) (ports.CommandResult, error) {
+	return ports.CommandResult{}, fmt.Errorf("injected Credit Grant failure")
 }
-func (failingCreditCommands) Deduct(context.Context, credits.DeductionCommand) (credits.CommandResult, error) {
-	return credits.CommandResult{}, fmt.Errorf("unexpected Deduct")
+func (failingCreditCommands) Deduct(context.Context, ports.DeductionCommand) (ports.CommandResult, error) {
+	return ports.CommandResult{}, fmt.Errorf("unexpected Deduct")
 }
-func (failingCreditCommands) Correct(context.Context, credits.CorrectionCommand) (credits.CommandResult, error) {
-	return credits.CommandResult{}, fmt.Errorf("unexpected Correct")
+func (failingCreditCommands) Correct(context.Context, ports.CorrectionCommand) (ports.CommandResult, error) {
+	return ports.CommandResult{}, fmt.Errorf("unexpected Correct")
 }
-func (failingCreditCommands) Hold(context.Context, credits.HoldCommand) (credits.CommandResult, error) {
-	return credits.CommandResult{}, fmt.Errorf("unexpected Hold")
+func (failingCreditCommands) Hold(context.Context, ports.HoldCommand) (ports.CommandResult, error) {
+	return ports.CommandResult{}, fmt.Errorf("unexpected Hold")
 }
-func (failingCreditCommands) Capture(context.Context, credits.CaptureCommand) (credits.CommandResult, error) {
-	return credits.CommandResult{}, fmt.Errorf("unexpected Capture")
+func (failingCreditCommands) Capture(context.Context, ports.CaptureCommand) (ports.CommandResult, error) {
+	return ports.CommandResult{}, fmt.Errorf("unexpected Capture")
 }
-func (failingCreditCommands) Release(context.Context, credits.ReleaseCommand) (credits.CommandResult, error) {
-	return credits.CommandResult{}, fmt.Errorf("unexpected Release")
+func (failingCreditCommands) Release(context.Context, ports.ReleaseCommand) (ports.CommandResult, error) {
+	return ports.CommandResult{}, fmt.Errorf("unexpected Release")
 }
-func (failingCreditCommands) Refund(context.Context, credits.RefundCommand) (credits.CommandResult, error) {
-	return credits.CommandResult{}, fmt.Errorf("unexpected Refund")
+func (failingCreditCommands) Refund(context.Context, ports.RefundCommand) (ports.CommandResult, error) {
+	return ports.CommandResult{}, fmt.Errorf("unexpected Refund")
 }
-func (failingCreditCommands) Purchase(context.Context, credits.PurchaseCommand) (credits.CommandResult, error) {
-	return credits.CommandResult{}, fmt.Errorf("unexpected Purchase")
+func (failingCreditCommands) Purchase(context.Context, ports.PurchaseCommand) (ports.CommandResult, error) {
+	return ports.CommandResult{}, fmt.Errorf("unexpected Purchase")
 }
-func (failingCreditCommands) PurchaseRefundHold(context.Context, credits.PurchaseRefundHoldCommand) (credits.CommandResult, error) {
-	return credits.CommandResult{}, fmt.Errorf("unexpected PurchaseRefundHold")
+func (failingCreditCommands) PurchaseRefundHold(context.Context, ports.PurchaseRefundHoldCommand) (ports.CommandResult, error) {
+	return ports.CommandResult{}, fmt.Errorf("unexpected PurchaseRefundHold")
 }
-func (failingCreditCommands) PurchaseRefund(context.Context, credits.PurchaseRefundCommand) (credits.CommandResult, error) {
-	return credits.CommandResult{}, fmt.Errorf("unexpected PurchaseRefund")
+func (failingCreditCommands) PurchaseRefund(context.Context, ports.PurchaseRefundCommand) (ports.CommandResult, error) {
+	return ports.CommandResult{}, fmt.Errorf("unexpected PurchaseRefund")
 }
-func (failingCreditCommands) PaymentDisputeDebit(context.Context, credits.PaymentDisputeDebitCommand) (credits.PaymentDisputeDebitResult, error) {
-	return credits.PaymentDisputeDebitResult{}, fmt.Errorf("unexpected PaymentDisputeDebit")
+func (failingCreditCommands) PaymentDisputeDebit(context.Context, ports.PaymentDisputeDebitCommand) (ports.PaymentDisputeDebitResult, error) {
+	return ports.PaymentDisputeDebitResult{}, fmt.Errorf("unexpected PaymentDisputeDebit")
 }
-func (failingCreditCommands) PaymentDisputeRestore(context.Context, credits.PaymentDisputeRestoreCommand) (credits.CommandResult, error) {
-	return credits.CommandResult{}, fmt.Errorf("unexpected PaymentDisputeRestore")
+func (failingCreditCommands) PaymentDisputeRestore(context.Context, ports.PaymentDisputeRestoreCommand) (ports.CommandResult, error) {
+	return ports.CommandResult{}, fmt.Errorf("unexpected PaymentDisputeRestore")
 }

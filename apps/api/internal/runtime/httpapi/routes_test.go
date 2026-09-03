@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	credithttp "ideaboard/api/internal/credits/interfaces/http"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -40,20 +41,20 @@ type routeCreditUserResolver struct {
 	repo *users.UserRepository
 }
 
-func (r routeCreditUserResolver) ResolvePublicID(ctx context.Context, publicID string) (credits.UserIdentity, error) {
+func (r routeCreditUserResolver) ResolvePublicID(ctx context.Context, publicID string) (credithttp.UserIdentity, error) {
 	user, err := r.repo.GetByPublicID(ctx, publicID)
 	if err != nil {
-		return credits.UserIdentity{}, err
+		return credithttp.UserIdentity{}, err
 	}
-	return credits.UserIdentity{ID: user.ID, PublicID: user.PublicID, DisplayName: user.DisplayName}, nil
+	return credithttp.UserIdentity{ID: user.ID, PublicID: user.PublicID, DisplayName: user.DisplayName}, nil
 }
 
-func (r routeCreditUserResolver) ResolveID(ctx context.Context, id int64) (credits.UserIdentity, error) {
+func (r routeCreditUserResolver) ResolveID(ctx context.Context, id int64) (credithttp.UserIdentity, error) {
 	user, err := r.repo.GetByID(ctx, id)
 	if err != nil {
-		return credits.UserIdentity{}, err
+		return credithttp.UserIdentity{}, err
 	}
-	return credits.UserIdentity{ID: user.ID, PublicID: user.PublicID, DisplayName: user.DisplayName}, nil
+	return credithttp.UserIdentity{ID: user.ID, PublicID: user.PublicID, DisplayName: user.DisplayName}, nil
 }
 
 type stubBrandingSettingsProvider struct {
@@ -227,7 +228,7 @@ func TestAdminRoutesRequireAuthenticatedAdminAccess(t *testing.T) {
 		t.Fatalf("promote route user to admin: %v", err)
 	}
 	adminDeps := newAdminRouteGuardTestDependencies(authDeps)
-	adminDeps.AdminRoutes.CreditAdminCommandHandler = credits.NewAdminCommandHandler(credits.NewService(pool), routeCreditUserResolver{repo: userRepo})
+	adminDeps.AdminRoutes.CreditAdminCommandHandler = credithttp.NewAdminCommandHandler(credits.NewService(pool), routeCreditUserResolver{repo: userRepo})
 	router = gin.New()
 	RegisterRoutes(router, adminDeps, fstest.MapFS{}, FrontendRouteOptions{})
 	adminRecorder := httptest.NewRecorder()
@@ -319,7 +320,7 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 			BoardHandler:      boards.NewBoardHandler(nil, config.PublicOriginsConfig{}),
 			BillingHandler:    billing.NewHandler(nil, nil),
 			BillingRecords:    billingrecords.NewHandler(nil),
-			CreditUserHandler: credits.NewUserHandler(nil, nil),
+			CreditUserHandler: credithttp.NewUserHandler(nil, nil),
 			UsageHandler:      usage.NewHandler(nil),
 			Uploads: UploadDeps{
 				UserRepo:       authDeps.UserRepo,
@@ -330,9 +331,9 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 			AdminHandler:                users.NewAdminHandler(nil, nil, nil),
 			SocialProviderHandler:       auth.NewSocialProviderAdminHandler(authDeps.AuthServiceClient),
 			BillingHandler:              billing.NewHandler(nil, nil),
-			CreditAdminCommandHandler:   credits.NewAdminCommandHandler(nil, nil),
-			CreditAdminReadHandler:      credits.NewAdminReadHandler(nil, nil),
-			CreditReconciliationHandler: credits.NewReconciliationHandler(nil, nil),
+			CreditAdminCommandHandler:   credithttp.NewAdminCommandHandler(nil, nil),
+			CreditAdminReadHandler:      credithttp.NewAdminReadHandler(nil, nil),
+			CreditReconciliationHandler: credithttp.NewReconciliationHandler(nil, nil),
 			AccountHandler:              accounts.NewAccountHandler(nil),
 			TaskHandler:                 taskservice.NewHandler(nil),
 			TaskStatsHandler:            taskstats.NewHandler(nil, nil),

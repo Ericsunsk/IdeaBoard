@@ -1,6 +1,8 @@
 package tests
 
 import (
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	payments "ideaboard/api/internal/payments"
 
 	"context"
@@ -608,17 +610,17 @@ func lifecycleCheckoutCommand(userID int64, key string, quantity int64) payments
 
 func seedCheckoutLifecycleWallet(t *testing.T, wallets *credits.Service, userID int64) {
 	t.Helper()
-	amount, err := credits.NewCreditAmount(1)
+	amount, err := domain.NewCreditAmount(1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := wallets.Grant(t.Context(), credits.GrantCommand{
+	if _, err := wallets.Grant(t.Context(), ports.GrantCommand{
 		UserID: userID, Amount: amount,
-		Metadata: credits.CommandMetadata{
+		Metadata: domain.CommandMetadata{
 			IdempotencyKey: fmt.Sprintf("checkout-lifecycle-wallet-%d", userID),
-			Actor:          credits.Actor{Type: credits.ActorAdmin, ID: "42"},
+			Actor:          domain.Actor{Type: domain.ActorAdmin, ID: "42"},
 			Source:         "admin_console", Reason: "seed Checkout lifecycle Wallet",
-			BusinessReference: credits.BusinessReference{Type: "admin_adjustment", ID: fmt.Sprintf("checkout-lifecycle-wallet-%d", userID)},
+			BusinessReference: domain.BusinessReference{Type: "admin_adjustment", ID: fmt.Sprintf("checkout-lifecycle-wallet-%d", userID)},
 		},
 	}); err != nil {
 		t.Fatalf("seed Wallet: %v", err)

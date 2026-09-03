@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -13,7 +15,6 @@ import (
 
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/billing"
-	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/tasking/taskbilling"
@@ -571,15 +572,15 @@ func (q handlerBillingQuoter) QuoteAtResolutionInTx(ctx context.Context, _ pgx.T
 
 type handlerBillingCredits struct{}
 
-func (handlerBillingCredits) GetWallet(context.Context, int64) (credits.WalletDetails, error) {
-	return credits.WalletDetails{WalletBalance: credits.WalletBalance{Available: 100}, Status: credits.WalletStatusActive}, nil
+func (handlerBillingCredits) GetWallet(context.Context, int64) (domain.WalletDetails, error) {
+	return domain.WalletDetails{WalletBalance: domain.WalletBalance{Available: 100}, Status: domain.WalletStatusActive}, nil
 }
 
-func (handlerBillingCredits) ListLedger(context.Context, credits.ListLedgerInput) (credits.LedgerPage, error) {
-	return credits.LedgerPage{}, nil
+func (handlerBillingCredits) ListLedger(context.Context, domain.ListLedgerInput) (domain.LedgerPage, error) {
+	return domain.LedgerPage{}, nil
 }
 
-func (handlerBillingCredits) InTx(pgx.Tx) credits.Commands { return nil }
+func (handlerBillingCredits) InTx(pgx.Tx) ports.Commands { return nil }
 
 func newHandlerTaskBillingService() *taskbilling.Service {
 	return taskbilling.NewService(handlerBillingQuoter{}, handlerBillingCredits{})

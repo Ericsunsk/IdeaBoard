@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"strings"
 	"testing"
 	"time"
@@ -161,76 +163,76 @@ func seedWallet(t *testing.T, ctx context.Context, pool *pgxpool.Pool, service *
 	}
 }
 
-func grant(t *testing.T, ctx context.Context, service *credits.Service, userID, amount int64, commandMetadata credits.CommandMetadata) credits.CommandResult {
+func grant(t *testing.T, ctx context.Context, service *credits.Service, userID, amount int64, commandMetadata domain.CommandMetadata) ports.CommandResult {
 	t.Helper()
-	creditAmount, _ := credits.NewCreditAmount(amount)
-	result, err := service.Grant(ctx, credits.GrantCommand{UserID: userID, Amount: creditAmount, Metadata: commandMetadata})
+	creditAmount, _ := domain.NewCreditAmount(amount)
+	result, err := service.Grant(ctx, ports.GrantCommand{UserID: userID, Amount: creditAmount, Metadata: commandMetadata})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return result
 }
 
-func deduct(t *testing.T, ctx context.Context, service *credits.Service, userID, amount int64, commandMetadata credits.CommandMetadata) credits.CommandResult {
+func deduct(t *testing.T, ctx context.Context, service *credits.Service, userID, amount int64, commandMetadata domain.CommandMetadata) ports.CommandResult {
 	t.Helper()
-	creditAmount, _ := credits.NewCreditAmount(amount)
-	result, err := service.Deduct(ctx, credits.DeductionCommand{UserID: userID, Amount: creditAmount, Metadata: commandMetadata})
+	creditAmount, _ := domain.NewCreditAmount(amount)
+	result, err := service.Deduct(ctx, ports.DeductionCommand{UserID: userID, Amount: creditAmount, Metadata: commandMetadata})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return result
 }
 
-func hold(t *testing.T, ctx context.Context, service *credits.Service, userID, amount int64, commandMetadata credits.CommandMetadata) credits.CommandResult {
+func hold(t *testing.T, ctx context.Context, service *credits.Service, userID, amount int64, commandMetadata domain.CommandMetadata) ports.CommandResult {
 	t.Helper()
-	creditAmount, _ := credits.NewCreditAmount(amount)
-	result, err := service.Hold(ctx, credits.HoldCommand{UserID: userID, Amount: creditAmount, Metadata: commandMetadata})
+	creditAmount, _ := domain.NewCreditAmount(amount)
+	result, err := service.Hold(ctx, ports.HoldCommand{UserID: userID, Amount: creditAmount, Metadata: commandMetadata})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return result
 }
 
-func capture(t *testing.T, ctx context.Context, service *credits.Service, userID int64, holdID string, amountValue int64, commandMetadata credits.CommandMetadata) credits.CommandResult {
+func capture(t *testing.T, ctx context.Context, service *credits.Service, userID int64, holdID string, amountValue int64, commandMetadata domain.CommandMetadata) ports.CommandResult {
 	t.Helper()
-	amount, err := credits.NewCreditAmount(amountValue)
+	amount, err := domain.NewCreditAmount(amountValue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := service.Capture(ctx, credits.CaptureCommand{UserID: userID, HoldTransactionID: holdID, Amount: amount, Metadata: commandMetadata})
+	result, err := service.Capture(ctx, ports.CaptureCommand{UserID: userID, HoldTransactionID: holdID, Amount: amount, Metadata: commandMetadata})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return result
 }
 
-func refund(t *testing.T, ctx context.Context, service *credits.Service, userID int64, captureID string, amount int64, commandMetadata credits.CommandMetadata) credits.CommandResult {
+func refund(t *testing.T, ctx context.Context, service *credits.Service, userID int64, captureID string, amount int64, commandMetadata domain.CommandMetadata) ports.CommandResult {
 	t.Helper()
-	creditAmount, _ := credits.NewCreditAmount(amount)
-	result, err := service.Refund(ctx, credits.RefundCommand{UserID: userID, ChargeTransactionID: captureID, Amount: creditAmount, Metadata: commandMetadata})
+	creditAmount, _ := domain.NewCreditAmount(amount)
+	result, err := service.Refund(ctx, ports.RefundCommand{UserID: userID, ChargeTransactionID: captureID, Amount: creditAmount, Metadata: commandMetadata})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return result
 }
 
-func correct(t *testing.T, ctx context.Context, service *credits.Service, userID int64, originalID string, amount int64, commandMetadata credits.CommandMetadata) credits.CommandResult {
+func correct(t *testing.T, ctx context.Context, service *credits.Service, userID int64, originalID string, amount int64, commandMetadata domain.CommandMetadata) ports.CommandResult {
 	t.Helper()
-	creditAmount, _ := credits.NewCreditAmount(amount)
-	result, err := service.Correct(ctx, credits.CorrectionCommand{UserID: userID, OriginalTransactionID: originalID, Amount: creditAmount, Metadata: commandMetadata})
+	creditAmount, _ := domain.NewCreditAmount(amount)
+	result, err := service.Correct(ctx, ports.CorrectionCommand{UserID: userID, OriginalTransactionID: originalID, Amount: creditAmount, Metadata: commandMetadata})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return result
 }
 
-func metadata(key, actorType, actorID, source, referenceType, referenceID string) credits.CommandMetadata {
-	return credits.CommandMetadata{
+func metadata(key, actorType, actorID, source, referenceType, referenceID string) domain.CommandMetadata {
+	return domain.CommandMetadata{
 		IdempotencyKey:    key,
-		Actor:             credits.Actor{Type: credits.ActorType(actorType), ID: actorID},
+		Actor:             domain.Actor{Type: domain.ActorType(actorType), ID: actorID},
 		Source:            source,
 		Reason:            "billing records integration test",
-		BusinessReference: credits.BusinessReference{Type: referenceType, ID: referenceID},
+		BusinessReference: domain.BusinessReference{Type: referenceType, ID: referenceID},
 	}
 }
 

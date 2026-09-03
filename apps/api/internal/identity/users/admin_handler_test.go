@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -211,22 +213,22 @@ func TestAdminListUsersIncludesAvailableCreditBalance(t *testing.T) {
 	if err := tx.Commit(t.Context()); err != nil {
 		t.Fatalf("commit wallet transaction failed: %v", err)
 	}
-	amount, err := credits.NewCreditAmount(125)
+	amount, err := domain.NewCreditAmount(125)
 	if err != nil {
 		t.Fatalf("build credit amount failed: %v", err)
 	}
-	if _, err := creditService.Grant(t.Context(), credits.GrantCommand{
+	if _, err := creditService.Grant(t.Context(), ports.GrantCommand{
 		UserID: user.ID,
 		Amount: amount,
-		Metadata: credits.CommandMetadata{
+		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "admin-list-balance-user",
-			Actor: credits.Actor{
-				Type: credits.ActorAdmin,
+			Actor: domain.Actor{
+				Type: domain.ActorAdmin,
 				ID:   "admin-list-test",
 			},
 			Source: "admin_grant",
 			Reason: "seed admin user balance",
-			BusinessReference: credits.BusinessReference{
+			BusinessReference: domain.BusinessReference{
 				Type: "test",
 				ID:   "admin-list-balance-user",
 			},
@@ -462,19 +464,19 @@ func createAdminListUserWithBalance(t *testing.T, repo *UserRepository, pool *pg
 	if balance == 0 {
 		return user
 	}
-	amount, err := credits.NewCreditAmount(balance)
+	amount, err := domain.NewCreditAmount(balance)
 	if err != nil {
 		t.Fatalf("build credit amount failed: %v", err)
 	}
-	if _, err := creditService.Grant(t.Context(), credits.GrantCommand{
+	if _, err := creditService.Grant(t.Context(), ports.GrantCommand{
 		UserID: user.ID,
 		Amount: amount,
-		Metadata: credits.CommandMetadata{
+		Metadata: domain.CommandMetadata{
 			IdempotencyKey:    "admin-list-contract-" + strconv.FormatInt(user.ID, 10),
-			Actor:             credits.Actor{Type: credits.ActorAdmin, ID: "admin-list-test"},
+			Actor:             domain.Actor{Type: domain.ActorAdmin, ID: "admin-list-test"},
 			Source:            "admin_grant",
 			Reason:            "seed admin user balance",
-			BusinessReference: credits.BusinessReference{Type: "test", ID: strconv.FormatInt(user.ID, 10)},
+			BusinessReference: domain.BusinessReference{Type: "test", ID: strconv.FormatInt(user.ID, 10)},
 		},
 	}); err != nil {
 		t.Fatalf("grant credits for %q failed: %v", displayName, err)

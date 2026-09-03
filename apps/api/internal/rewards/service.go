@@ -7,12 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
-
-	"ideaboard/api/internal/credits"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -93,7 +93,7 @@ func (s *Service) prepareRewardCodeCreation(command CreateRewardCodeCommand) (re
 		command.MaxRedemptions < 0 {
 		return rewardCodeCreationInput{}, ErrInvalidCommand
 	}
-	if _, err := credits.NewCreditAmount(command.CreditAmount); err != nil {
+	if _, err := domain.NewCreditAmount(command.CreditAmount); err != nil {
 		return rewardCodeCreationInput{}, errors.Join(ErrInvalidCommand, err)
 	}
 	normalized, err := normalizeCode(command.Code)
@@ -421,41 +421,41 @@ func (s *Service) finishRewardRedemptionReplay(ctx context.Context, tx pgx.Tx, u
 	return canonicalRedeemResult(redemption, wallet.Available, true), true, nil
 }
 
-func (s *Service) grantRewardCodeCredits(ctx context.Context, tx pgx.Tx, userID int64, rewardCode RewardCode) (int64, credits.CommandResult, error) {
+func (s *Service) grantRewardCodeCredits(ctx context.Context, tx pgx.Tx, userID int64, rewardCode RewardCode) (int64, ports.CommandResult, error) {
 	var redemptionID int64
 	if err := tx.QueryRow(ctx, `SELECT nextval(pg_get_serial_sequence('reward_redemptions', 'id'))`).Scan(&redemptionID); err != nil {
-		return 0, credits.CommandResult{}, fmt.Errorf("allocate reward Code redemption id: %w", err)
+		return 0, ports.CommandResult{}, fmt.Errorf("allocate reward Code redemption id: %w", err)
 	}
 	var capacityReserved bool
 	if err := tx.QueryRow(ctx, `SELECT reserve_reward_code_redemption_v1($1)`, rewardCode.ID).Scan(&capacityReserved); err != nil {
-		return 0, credits.CommandResult{}, fmt.Errorf("reserve reward Code capacity: %w", err)
+		return 0, ports.CommandResult{}, fmt.Errorf("reserve reward Code capacity: %w", err)
 	}
 	if !capacityReserved {
-		return 0, credits.CommandResult{}, ErrCodeUnavailable
+		return 0, ports.CommandResult{}, ErrCodeUnavailable
 	}
-	amount, err := credits.NewCreditAmount(rewardCode.CreditAmount)
+	amount, err := domain.NewCreditAmount(rewardCode.CreditAmount)
 	if err != nil {
-		return 0, credits.CommandResult{}, errors.Join(ErrInvalidCommand, err)
+		return 0, ports.CommandResult{}, errors.Join(ErrInvalidCommand, err)
 	}
 	reference := strconv.FormatInt(redemptionID, 10)
-	grant, err := s.credits.InTx(tx).Grant(ctx, credits.GrantCommand{
+	grant, err := s.credits.InTx(tx).Grant(ctx, ports.GrantCommand{
 		UserID: userID,
 		Amount: amount,
-		Metadata: credits.CommandMetadata{
+		Metadata: domain.CommandMetadata{
 			IdempotencyKey:    "reward-code-redemption:" + reference,
-			Actor:             credits.Actor{Type: credits.ActorUser, ID: strconv.FormatInt(userID, 10)},
+			Actor:             domain.Actor{Type: domain.ActorUser, ID: strconv.FormatInt(userID, 10)},
 			Source:            "reward_redemption",
 			Reason:            "兑换奖励",
-			BusinessReference: credits.BusinessReference{Type: "reward_code_redemption", ID: "rc:" + reference},
+			BusinessReference: domain.BusinessReference{Type: "reward_code_redemption", ID: "rc:" + reference},
 		},
 	})
 	if err != nil {
-		return 0, credits.CommandResult{}, err
+		return 0, ports.CommandResult{}, err
 	}
 	return redemptionID, grant, nil
 }
 
-func insertRewardRedemption(ctx context.Context, tx pgx.Tx, redemptionID, userID int64, rewardCode RewardCode, grant credits.CommandResult) (Redemption, error) {
+func insertRewardRedemption(ctx context.Context, tx pgx.Tx, redemptionID, userID int64, rewardCode RewardCode, grant ports.CommandResult) (Redemption, error) {
 	var redemption Redemption
 	err := tx.QueryRow(ctx, `INSERT INTO reward_redemptions (
   id, reward_code_id, user_id, reward_code_display_name, masked_code_hint,

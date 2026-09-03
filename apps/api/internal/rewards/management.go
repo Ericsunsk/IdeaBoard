@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
 	"strings"
 	"time"
 	"unicode/utf8"
-
-	"ideaboard/api/internal/credits"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -68,7 +67,7 @@ func (s *Service) prepareRewardCodeUpdate(command UpdateRewardCodeCommand) (rewa
 		displayName == "" || utf8.RuneCountInString(displayName) > 120 || command.MaxRedemptions < 0 {
 		return rewardCodeUpdateInput{}, ErrInvalidCommand
 	}
-	if _, err := credits.NewCreditAmount(command.CreditAmount); err != nil {
+	if _, err := domain.NewCreditAmount(command.CreditAmount); err != nil {
 		return rewardCodeUpdateInput{}, errors.Join(ErrInvalidCommand, err)
 	}
 	input := rewardCodeUpdateInput{command: command, displayName: displayName, expiresAt: cloneOptionalTime(command.ExpiresAt)}

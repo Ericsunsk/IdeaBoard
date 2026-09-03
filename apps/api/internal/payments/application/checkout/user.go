@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
 
-	"ideaboard/api/internal/credits"
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentorder "ideaboard/api/internal/payments/application/order"
@@ -151,13 +151,13 @@ func (s *Service) GetPurchaseOptions(ctx context.Context, userID int64) (payment
 	}
 	wallet, err := s.wallets.GetWallet(ctx, userID)
 	if err != nil {
-		if errors.Is(err, credits.ErrWalletNotFound) {
+		if errors.Is(err, domain.ErrWalletNotFound) {
 			options.UnavailableReason = "wallet_restricted"
 			return options, nil
 		}
 		return paymentcontracts.PurchaseOptions{}, fmt.Errorf("get Wallet purchase eligibility: %w", err)
 	}
-	if wallet.Status != credits.WalletStatusActive || len(wallet.ActiveRestrictions) > 0 {
+	if wallet.Status != domain.WalletStatusActive || len(wallet.ActiveRestrictions) > 0 {
 		options.UnavailableReason = "wallet_restricted"
 		for _, restriction := range wallet.ActiveRestrictions {
 			if restriction.Type == "payment_dispute" {

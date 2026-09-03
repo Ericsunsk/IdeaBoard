@@ -3,6 +3,8 @@ package users
 import (
 	"context"
 	"errors"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"sync"
 	"testing"
 
@@ -15,16 +17,16 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func lifecycleHold(userID int64, key string) credits.HoldCommand {
-	return credits.HoldCommand{
+func lifecycleHold(userID int64, key string) ports.HoldCommand {
+	return ports.HoldCommand{
 		UserID: userID,
-		Amount: credits.CreditAmount(1),
-		Metadata: credits.CommandMetadata{
+		Amount: domain.CreditAmount(1),
+		Metadata: domain.CommandMetadata{
 			IdempotencyKey:    key,
-			Actor:             credits.Actor{Type: credits.ActorUser, ID: "lifecycle-test"},
+			Actor:             domain.Actor{Type: domain.ActorUser, ID: "lifecycle-test"},
 			Source:            "lifecycle_test",
 			Reason:            "verify wallet lifecycle",
-			BusinessReference: credits.BusinessReference{Type: "test", ID: key},
+			BusinessReference: domain.BusinessReference{Type: "test", ID: key},
 		},
 	}
 }
@@ -211,13 +213,13 @@ func TestSetUserStatusFreezesAndRestoresWalletAtomically(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ProvisionIdentity() error = %v", err)
 	}
-	restriction, err := creditService.RestrictWallet(ctx, credits.RestrictWalletCommand{
+	restriction, err := creditService.RestrictWallet(ctx, ports.RestrictWalletCommand{
 		UserID:        result.User.ID,
 		Type:          "ledger_integrity",
 		Source:        "reconciliation",
-		RelatedObject: credits.BusinessReference{Type: "finding", ID: "identity-status-finding"},
+		RelatedObject: domain.BusinessReference{Type: "finding", ID: "identity-status-finding"},
 		Reason:        "verify Identity lifecycle isolation",
-		Actor:         credits.Actor{Type: credits.ActorSystem, ID: "reconciliation"},
+		Actor:         domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
 	})
 	if err != nil {
 		t.Fatalf("RestrictWallet() error = %v", err)
@@ -226,7 +228,7 @@ func TestSetUserStatusFreezesAndRestoresWalletAtomically(t *testing.T) {
 	if err := service.SetUserStatus(ctx, result.User.ID, 0); err != nil {
 		t.Fatalf("SetUserStatus(banned) error = %v", err)
 	}
-	if _, err := creditService.Hold(ctx, lifecycleHold(result.User.ID, "status:frozen")); !errors.Is(err, credits.ErrWalletFrozen) {
+	if _, err := creditService.Hold(ctx, lifecycleHold(result.User.ID, "status:frozen")); !errors.Is(err, domain.ErrWalletFrozen) {
 		t.Fatalf("Hold(frozen wallet) error = %v, want ErrWalletFrozen", err)
 	}
 	var userStatus int16
@@ -248,16 +250,16 @@ WHERE users.id = $1`, result.User.ID).Scan(&userStatus, &walletStatus); err != n
 	if err != nil {
 		t.Fatalf("GetWallet(restored lifecycle) error = %v", err)
 	}
-	if wallet.Status != credits.WalletStatusActive || len(wallet.ActiveRestrictions) != 1 || wallet.ActiveRestrictions[0].RestrictionID != restriction.RestrictionID {
+	if wallet.Status != domain.WalletStatusActive || len(wallet.ActiveRestrictions) != 1 || wallet.ActiveRestrictions[0].RestrictionID != restriction.RestrictionID {
 		t.Fatalf("restored lifecycle cleared independent restriction: %+v", wallet)
 	}
-	if _, err := creditService.Hold(ctx, lifecycleHold(result.User.ID, "status:active-restricted")); !errors.Is(err, credits.ErrWalletRestricted) {
+	if _, err := creditService.Hold(ctx, lifecycleHold(result.User.ID, "status:active-restricted")); !errors.Is(err, domain.ErrWalletRestricted) {
 		t.Fatalf("Hold(restored but restricted Wallet) error = %v, want ErrWalletRestricted", err)
 	}
-	if _, err := creditService.ReleaseWalletRestriction(ctx, credits.ReleaseWalletRestrictionCommand{
+	if _, err := creditService.ReleaseWalletRestriction(ctx, ports.ReleaseWalletRestrictionCommand{
 		RestrictionID: restriction.RestrictionID,
 		Reason:        "identity lifecycle test complete",
-		Actor:         credits.Actor{Type: credits.ActorSystem, ID: "reconciliation"},
+		Actor:         domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
 	}); err != nil {
 		t.Fatalf("ReleaseWalletRestriction() error = %v", err)
 	}
@@ -289,13 +291,13 @@ func TestTombstoneUserPreservesAccountingAndPreventsWelcomeReclaim(t *testing.T)
 	if err != nil {
 		t.Fatalf("ProvisionIdentity(first) error = %v", err)
 	}
-	restriction, err := creditService.RestrictWallet(ctx, credits.RestrictWalletCommand{
+	restriction, err := creditService.RestrictWallet(ctx, ports.RestrictWalletCommand{
 		UserID:        first.User.ID,
 		Type:          "ledger_integrity",
 		Source:        "reconciliation",
-		RelatedObject: credits.BusinessReference{Type: "finding", ID: "deletion-finding"},
+		RelatedObject: domain.BusinessReference{Type: "finding", ID: "deletion-finding"},
 		Reason:        "verify deletion preserves restrictions",
-		Actor:         credits.Actor{Type: credits.ActorSystem, ID: "reconciliation"},
+		Actor:         domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
 	})
 	if err != nil {
 		t.Fatalf("RestrictWallet(deletion) error = %v", err)
@@ -412,7 +414,7 @@ RETURNING id`, authUserID).Scan(&userID); err != nil {
 	if len(results) != 1 || !results[0].WelcomeGranted || results[0].Wallet.Available != 100 {
 		t.Fatalf("initializer results = %+v", results)
 	}
-	if _, err := creditService.Hold(ctx, lifecycleHold(userID, "initializer:banned")); !errors.Is(err, credits.ErrWalletFrozen) {
+	if _, err := creditService.Hold(ctx, lifecycleHold(userID, "initializer:banned")); !errors.Is(err, domain.ErrWalletFrozen) {
 		t.Fatalf("Hold(initialized banned wallet) error = %v, want ErrWalletFrozen", err)
 	}
 }
@@ -425,14 +427,14 @@ func TestWelcomeIdentityKeyRotationFailsClosedWithoutPartialState(t *testing.T) 
 		t.Fatalf("bind first Welcome key: %v", err)
 	}
 	rotated := NewLifecycleService(pool, credits.NewService(pool), []byte("abcdef0123456789abcdef0123456789"))
-	if err := rotated.VerifyWelcomeIdentityKey(ctx); !errors.Is(err, credits.ErrWelcomeIdentityKeyMismatch) {
+	if err := rotated.VerifyWelcomeIdentityKey(ctx); !errors.Is(err, domain.ErrWelcomeIdentityKeyMismatch) {
 		t.Fatalf("rotated key error = %v, want ErrWelcomeIdentityKeyMismatch", err)
 	}
 	if _, err := rotated.ProvisionIdentity(ctx, VerifiedIdentity{
 		AuthUserID: "auth-rotated-key", DisplayName: "rotated-key",
 		ClaimIdentity: "rotated-key@example.com", ClaimIdentityKind: "canonical_email",
 		ClaimIdentityVerified: true, Role: "user",
-	}); !errors.Is(err, credits.ErrWelcomeIdentityKeyMismatch) {
+	}); !errors.Is(err, domain.ErrWelcomeIdentityKeyMismatch) {
 		t.Fatalf("ProvisionIdentity(rotated key) error = %v, want ErrWelcomeIdentityKeyMismatch", err)
 	}
 	var userCount, claimCount int

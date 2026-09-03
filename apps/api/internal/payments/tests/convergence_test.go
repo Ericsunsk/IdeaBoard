@@ -2,6 +2,8 @@ package tests
 
 import (
 	"errors"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"sync"
 	"testing"
@@ -15,16 +17,16 @@ import (
 func TestPaidPaymentOrderAndPurchaseCreditConvergeAtomicallyOnce(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
-	seedAmount, err := credits.NewCreditAmount(1)
+	seedAmount, err := domain.NewCreditAmount(1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := creditService.Grant(t.Context(), credits.GrantCommand{
+	if _, err := creditService.Grant(t.Context(), ports.GrantCommand{
 		UserID: 42, Amount: seedAmount,
-		Metadata: credits.CommandMetadata{
-			IdempotencyKey: "payment-convergence-seed", Actor: credits.Actor{Type: credits.ActorAdmin, ID: "42"},
+		Metadata: domain.CommandMetadata{
+			IdempotencyKey: "payment-convergence-seed", Actor: domain.Actor{Type: domain.ActorAdmin, ID: "42"},
 			Source: "admin_console", Reason: "seed payment convergence Wallet",
-			BusinessReference: credits.BusinessReference{Type: "admin_adjustment", ID: "payment-convergence-seed"},
+			BusinessReference: domain.BusinessReference{Type: "admin_adjustment", ID: "payment-convergence-seed"},
 		},
 	}); err != nil {
 		t.Fatalf("seed Wallet: %v", err)
@@ -85,13 +87,13 @@ WHERE command_type = 'purchase_credit' AND business_reference_id = $1`, order.ID
 func TestPaidPaymentOrderFactConflictRollsBackWithoutCredit(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
-	seedAmount, _ := credits.NewCreditAmount(1)
-	if _, err := creditService.Grant(t.Context(), credits.GrantCommand{
+	seedAmount, _ := domain.NewCreditAmount(1)
+	if _, err := creditService.Grant(t.Context(), ports.GrantCommand{
 		UserID: 42, Amount: seedAmount,
-		Metadata: credits.CommandMetadata{
-			IdempotencyKey: "payment-conflict-seed", Actor: credits.Actor{Type: credits.ActorAdmin, ID: "42"},
+		Metadata: domain.CommandMetadata{
+			IdempotencyKey: "payment-conflict-seed", Actor: domain.Actor{Type: domain.ActorAdmin, ID: "42"},
 			Source: "admin_console", Reason: "seed payment convergence Wallet",
-			BusinessReference: credits.BusinessReference{Type: "admin_adjustment", ID: "payment-conflict-seed"},
+			BusinessReference: domain.BusinessReference{Type: "admin_adjustment", ID: "payment-conflict-seed"},
 		},
 	}); err != nil {
 		t.Fatal(err)

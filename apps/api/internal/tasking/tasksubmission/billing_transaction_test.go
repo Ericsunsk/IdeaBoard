@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	creditpostgres "ideaboard/api/internal/credits/infrastructure/postgres"
+	"ideaboard/api/internal/credits/ports"
 	"strings"
 	"sync"
 	"testing"
@@ -53,7 +56,7 @@ func TestBilledVariationsSubmissionSucceedsAsRuntimeRole(t *testing.T) {
 
 	policies := []dbprivileges.Policy{
 		database.RuntimePrivilegePolicy(),
-		credits.RuntimePrivilegePolicy(),
+		creditpostgres.RuntimePrivilegePolicy(),
 		billing.RuntimePrivilegePolicy(),
 		taskbilling.RuntimePrivilegePolicy(),
 	}
@@ -560,9 +563,9 @@ func seedCreditWallet(t *testing.T, pool *pgxpool.Pool, service *credits.Service
 		t.Fatal(err)
 	}
 	if amount > 0 {
-		creditAmount, _ := credits.NewCreditAmount(amount)
-		if _, err := service.InTx(tx).Grant(t.Context(), credits.GrantCommand{UserID: userID, Amount: creditAmount, Metadata: credits.CommandMetadata{
-			IdempotencyKey: "test-grant:" + fmt.Sprint(userID), Actor: credits.Actor{Type: credits.ActorSystem, ID: "test"}, Source: "test", Reason: "test grant", BusinessReference: credits.BusinessReference{Type: "test", ID: fmt.Sprint(userID)},
+		creditAmount, _ := domain.NewCreditAmount(amount)
+		if _, err := service.InTx(tx).Grant(t.Context(), ports.GrantCommand{UserID: userID, Amount: creditAmount, Metadata: domain.CommandMetadata{
+			IdempotencyKey: "test-grant:" + fmt.Sprint(userID), Actor: domain.Actor{Type: domain.ActorSystem, ID: "test"}, Source: "test", Reason: "test grant", BusinessReference: domain.BusinessReference{Type: "test", ID: fmt.Sprint(userID)},
 		}}); err != nil {
 			t.Fatal(err)
 		}

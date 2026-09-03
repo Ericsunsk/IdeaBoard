@@ -3,10 +3,10 @@ package payments
 import (
 	"context"
 	"fmt"
+	"ideaboard/api/internal/credits/ports"
 	paymentpersistence "ideaboard/api/internal/payments/application/persistence"
 	"time"
 
-	"ideaboard/api/internal/credits"
 	paymentcheckout "ideaboard/api/internal/payments/application/checkout"
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
@@ -78,7 +78,7 @@ type CheckoutWorkflowDependencies struct {
 	ShutdownEnqueuer     paymentconfiguration.ShutdownEnqueuer
 	Store                paymentpersistence.PaymentCheckoutStore
 	CheckoutGateway      paymentports.CheckoutGateway
-	Wallets              credits.WalletReader
+	Wallets              ports.WalletReader
 	Convergence          paymentpersistence.PaymentConvergenceStore
 	Transitions          *PaymentOrderTransitions
 }
@@ -91,7 +91,7 @@ type CheckoutWorkflow struct {
 	shutdownEnqueuer     paymentconfiguration.ShutdownEnqueuer
 	checkoutStore        paymentpersistence.PaymentCheckoutStore
 	checkoutGateway      paymentports.CheckoutGateway
-	wallets              credits.WalletReader
+	wallets              ports.WalletReader
 	convergenceStore     paymentpersistence.PaymentConvergenceStore
 	orderLifecycle       *paymentorder.PaymentOrderLifecycle
 	runtime              *PaymentRuntime

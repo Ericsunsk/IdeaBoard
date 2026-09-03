@@ -5,12 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"ideaboard/api/internal/credits"
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentorder "ideaboard/api/internal/payments/application/order"
@@ -78,12 +79,12 @@ func (s *Service) PrepareRequest(ctx context.Context, command paymentsdomain.Cre
 func (s *Service) requireWallet(ctx context.Context, userID int64) error {
 	wallet, err := s.wallets.GetWallet(ctx, userID)
 	if err != nil {
-		if errors.Is(err, credits.ErrWalletNotFound) {
+		if errors.Is(err, domain.ErrWalletNotFound) {
 			return paymentsdomain.ErrWalletNotRechargeable
 		}
 		return fmt.Errorf("get Wallet recharge eligibility: %w", err)
 	}
-	if wallet.Status != credits.WalletStatusActive || len(wallet.ActiveRestrictions) != 0 {
+	if wallet.Status != domain.WalletStatusActive || len(wallet.ActiveRestrictions) != 0 {
 		return paymentsdomain.ErrWalletNotRechargeable
 	}
 	return nil
@@ -153,12 +154,12 @@ type Service struct {
 	configuration ConfigurationStore
 	store         Store
 	gateway       paymentports.CheckoutGateway
-	wallets       credits.WalletReader
+	wallets       ports.WalletReader
 	lifecycle     *paymentorder.PaymentOrderLifecycle
 	now           func() time.Time
 }
 
-func NewService(configuration ConfigurationStore, store Store, gateway paymentports.CheckoutGateway, wallets credits.WalletReader, lifecycle *paymentorder.PaymentOrderLifecycle, now func() time.Time) (*Service, error) {
+func NewService(configuration ConfigurationStore, store Store, gateway paymentports.CheckoutGateway, wallets ports.WalletReader, lifecycle *paymentorder.PaymentOrderLifecycle, now func() time.Time) (*Service, error) {
 	if configuration == nil || store == nil || gateway == nil || wallets == nil || lifecycle == nil {
 		return nil, fmt.Errorf("checkout service requires configuration, store, gateway, wallet reader, and lifecycle")
 	}

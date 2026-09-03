@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"strings"
 	"testing"
 	"time"
@@ -28,7 +30,7 @@ func TestServiceGetCurrentReportsDurableLogicalTasks(t *testing.T) {
 	firstCapture := captureUsageCredits(t, ctx, creditService, userID, 20, "usage-capture-1")
 	latestCapture := captureUsageCredits(t, ctx, creditService, userID, 100, "usage-capture-2")
 	_ = captureUsageCredits(t, ctx, creditService, 902, 10, "usage-other-user-capture")
-	if _, err := creditService.Refund(ctx, credits.RefundCommand{
+	if _, err := creditService.Refund(ctx, ports.RefundCommand{
 		UserID:              userID,
 		ChargeTransactionID: firstCapture.TransactionID,
 		Amount:              mustUsageCreditAmount(t, 20),
@@ -92,16 +94,16 @@ VALUES ($1, $2, $3, 'user', 1)`, userID, fmt.Sprintf("usage-user-%d", userID), s
 	}
 }
 
-func captureUsageCredits(t *testing.T, ctx context.Context, service *credits.Service, userID, amount int64, key string) credits.CommandResult {
+func captureUsageCredits(t *testing.T, ctx context.Context, service *credits.Service, userID, amount int64, key string) ports.CommandResult {
 	t.Helper()
-	if _, err := service.Grant(ctx, credits.GrantCommand{
+	if _, err := service.Grant(ctx, ports.GrantCommand{
 		UserID:   userID,
 		Amount:   mustUsageCreditAmount(t, amount),
 		Metadata: usageCreditMetadata("usage-grant-" + key),
 	}); err != nil {
 		t.Fatalf("grant user %d: %v", userID, err)
 	}
-	hold, err := service.Hold(ctx, credits.HoldCommand{
+	hold, err := service.Hold(ctx, ports.HoldCommand{
 		UserID:   userID,
 		Amount:   mustUsageCreditAmount(t, amount),
 		Metadata: usageCreditMetadata("usage-hold-" + key),
@@ -109,7 +111,7 @@ func captureUsageCredits(t *testing.T, ctx context.Context, service *credits.Ser
 	if err != nil {
 		t.Fatalf("hold user %d: %v", userID, err)
 	}
-	capture, err := service.Capture(ctx, credits.CaptureCommand{
+	capture, err := service.Capture(ctx, ports.CaptureCommand{
 		UserID:            userID,
 		HoldTransactionID: hold.TransactionID,
 		Amount:            mustUsageCreditAmount(t, amount),
@@ -121,22 +123,22 @@ func captureUsageCredits(t *testing.T, ctx context.Context, service *credits.Ser
 	return capture
 }
 
-func mustUsageCreditAmount(t *testing.T, value int64) credits.CreditAmount {
+func mustUsageCreditAmount(t *testing.T, value int64) domain.CreditAmount {
 	t.Helper()
-	amount, err := credits.NewCreditAmount(value)
+	amount, err := domain.NewCreditAmount(value)
 	if err != nil {
 		t.Fatalf("credit amount %d: %v", value, err)
 	}
 	return amount
 }
 
-func usageCreditMetadata(key string) credits.CommandMetadata {
-	return credits.CommandMetadata{
+func usageCreditMetadata(key string) domain.CommandMetadata {
+	return domain.CommandMetadata{
 		IdempotencyKey: key,
-		Actor:          credits.Actor{Type: credits.ActorService, ID: "usage-test"},
+		Actor:          domain.Actor{Type: domain.ActorService, ID: "usage-test"},
 		Source:         "usage_test",
 		Reason:         "usage summary fixture",
-		BusinessReference: credits.BusinessReference{
+		BusinessReference: domain.BusinessReference{
 			Type: "usage_test",
 			ID:   key,
 		},

@@ -2,9 +2,9 @@ package searchcatalog
 
 import (
 	"errors"
+	"ideaboard/api/internal/credits/domain"
 	"net/http"
 
-	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/response"
 
@@ -77,7 +77,7 @@ func (h *VisionHandler) Extract(c *gin.Context) {
 			response.MachineError(c, http.StatusPaymentRequired, "vision_search_pricing_unavailable", "视觉搜索暂未开放")
 			return
 		}
-		if errors.Is(err, credits.ErrInsufficientCredits) {
+		if errors.Is(err, domain.ErrInsufficientCredits) {
 			response.MachineError(c, http.StatusPaymentRequired, "insufficient_credits", "Ideas 余额不足")
 			return
 		}

@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"strings"
 	"time"
 
@@ -164,11 +166,11 @@ INSERT INTO payment_disputes (
 
 func applyNewPaymentDisputeRecovery(ctx context.Context, tx *sql.Tx, dispute *paymentsdomain.PaymentDispute) error {
 	restrictions := credits.RestrictionsInSQLTx(tx)
-	change, err := restrictions.RestrictWallet(ctx, credits.RestrictWalletCommand{
+	change, err := restrictions.RestrictWallet(ctx, ports.RestrictWalletCommand{
 		UserID: dispute.UserID, Type: "payment_dispute", Source: "stripe_dispute",
-		RelatedObject: credits.BusinessReference{Type: "payment_dispute", ID: dispute.ID},
+		RelatedObject: domain.BusinessReference{Type: "payment_dispute", ID: dispute.ID},
 		Reason:        "Stripe Dispute " + dispute.StripeDisputeID,
-		Actor:         credits.Actor{Type: credits.ActorService, ID: "payments"},
+		Actor:         domain.Actor{Type: domain.ActorService, ID: "payments"},
 	})
 	if err != nil {
 		return err
@@ -177,7 +179,7 @@ func applyNewPaymentDisputeRecovery(ctx context.Context, tx *sql.Tx, dispute *pa
 	if dispute.TargetIdeaQuantity == 0 {
 		return nil
 	}
-	amount, err := credits.NewCreditAmount(dispute.TargetIdeaQuantity)
+	amount, err := domain.NewCreditAmount(dispute.TargetIdeaQuantity)
 	if err != nil {
 		return err
 	}
@@ -185,12 +187,12 @@ func applyNewPaymentDisputeRecovery(ctx context.Context, tx *sql.Tx, dispute *pa
 	if err != nil {
 		return err
 	}
-	result, err := commands.PaymentDisputeDebit(ctx, credits.PaymentDisputeDebitCommand{
+	result, err := commands.PaymentDisputeDebit(ctx, ports.PaymentDisputeDebitCommand{
 		UserID: dispute.UserID, RequestedAmount: amount,
-		Metadata: credits.CommandMetadata{
+		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "dispute-debit-" + dispute.ID,
-			Actor:          credits.Actor{Type: credits.ActorService, ID: "payments"}, Source: "stripe_dispute",
-			Reason: "Stripe Dispute debit", BusinessReference: credits.BusinessReference{Type: "payment_dispute", ID: dispute.ID},
+			Actor:          domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_dispute",
+			Reason: "Stripe Dispute debit", BusinessReference: domain.BusinessReference{Type: "payment_dispute", ID: dispute.ID},
 		},
 	})
 	if err != nil {
@@ -249,7 +251,7 @@ func validateExistingPaymentDispute(dispute paymentsdomain.PaymentDispute, provi
 
 func recoverWonPaymentDispute(ctx context.Context, tx *sql.Tx, dispute *paymentsdomain.PaymentDispute) error {
 	if dispute.DebitedIdeaQuantity > 0 && dispute.RestoreTransactionID == "" {
-		amount, err := credits.NewCreditAmount(dispute.DebitedIdeaQuantity)
+		amount, err := domain.NewCreditAmount(dispute.DebitedIdeaQuantity)
 		if err != nil {
 			return err
 		}
@@ -257,12 +259,12 @@ func recoverWonPaymentDispute(ctx context.Context, tx *sql.Tx, dispute *payments
 		if err != nil {
 			return err
 		}
-		restored, err := commands.PaymentDisputeRestore(ctx, credits.PaymentDisputeRestoreCommand{
+		restored, err := commands.PaymentDisputeRestore(ctx, ports.PaymentDisputeRestoreCommand{
 			UserID: dispute.UserID, OriginalTransactionID: dispute.DebitTransactionID, Amount: amount,
-			Metadata: credits.CommandMetadata{
+			Metadata: domain.CommandMetadata{
 				IdempotencyKey: "dispute-restore-" + dispute.ID,
-				Actor:          credits.Actor{Type: credits.ActorService, ID: "payments"}, Source: "stripe_dispute",
-				Reason: "Stripe Dispute won", BusinessReference: credits.BusinessReference{Type: "payment_dispute", ID: dispute.ID},
+				Actor:          domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_dispute",
+				Reason: "Stripe Dispute won", BusinessReference: domain.BusinessReference{Type: "payment_dispute", ID: dispute.ID},
 			},
 		})
 		if err != nil {
@@ -273,9 +275,9 @@ func recoverWonPaymentDispute(ctx context.Context, tx *sql.Tx, dispute *payments
 	if dispute.RestrictionID == "" {
 		return nil
 	}
-	_, err := credits.RestrictionsInSQLTx(tx).ReleaseWalletRestriction(ctx, credits.ReleaseWalletRestrictionCommand{
+	_, err := credits.RestrictionsInSQLTx(tx).ReleaseWalletRestriction(ctx, ports.ReleaseWalletRestrictionCommand{
 		RestrictionID: dispute.RestrictionID, Reason: "Stripe Dispute won",
-		Actor: credits.Actor{Type: credits.ActorService, ID: "payments"},
+		Actor: domain.Actor{Type: domain.ActorService, ID: "payments"},
 	})
 	return err
 }

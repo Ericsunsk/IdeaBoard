@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"strconv"
 	"strings"
 	"time"
@@ -34,8 +36,8 @@ type Quoter interface {
 }
 
 type CreditService interface {
-	credits.WalletReader
-	InTx(pgx.Tx) credits.Commands
+	ports.WalletReader
+	InTx(pgx.Tx) ports.Commands
 }
 
 type Service struct {
@@ -187,19 +189,19 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, taskID string, 
 	settledAt := any(quote.QuotedAt)
 	var holdTransactionID any
 	if quote.TotalCredits > 0 {
-		amount, amountErr := credits.NewCreditAmount(quote.TotalCredits)
+		amount, amountErr := domain.NewCreditAmount(quote.TotalCredits)
 		if amountErr != nil {
 			return Snapshot{}, amountErr
 		}
-		hold, holdErr := s.credits.InTx(tx).Hold(ctx, credits.HoldCommand{
+		hold, holdErr := s.credits.InTx(tx).Hold(ctx, ports.HoldCommand{
 			UserID:   userID,
 			Amount:   amount,
-			Metadata: taskCommandMetadata("task-hold:"+taskID, credits.ActorUser, fmt.Sprint(userID), "task_submission", "AI 生图任务 Idea 预授权", taskID),
+			Metadata: taskCommandMetadata("task-hold:"+taskID, domain.ActorUser, fmt.Sprint(userID), "task_submission", "AI 生图任务 Idea 预授权", taskID),
 		})
-		if errors.Is(holdErr, credits.ErrInsufficientCredits) {
+		if errors.Is(holdErr, domain.ErrInsufficientCredits) {
 			return Snapshot{}, ErrInsufficientCredits
 		}
-		if errors.Is(holdErr, credits.ErrWalletRestricted) {
+		if errors.Is(holdErr, domain.ErrWalletRestricted) {
 			return Snapshot{}, ErrWalletRestricted
 		}
 		if holdErr != nil {
@@ -371,13 +373,13 @@ func applySettlementCommands(ctx context.Context, tx *sql.Tx, taskID string, fac
 	}
 	var transactions settlementTransactions
 	if decision.releaseAmount > 0 {
-		amount, amountErr := credits.NewCreditAmount(decision.releaseAmount)
+		amount, amountErr := domain.NewCreditAmount(decision.releaseAmount)
 		if amountErr != nil {
 			return settlementTransactions{}, amountErr
 		}
-		result, releaseErr := commands.Release(ctx, credits.ReleaseCommand{
+		result, releaseErr := commands.Release(ctx, ports.ReleaseCommand{
 			UserID: facts.userID, HoldTransactionID: facts.holdTransactionID.String, Amount: amount,
-			Metadata: taskCommandMetadata("task-release:"+taskID, credits.ActorService, "task-runtime", "task_terminal", "AI 生图任务未产出部分释放", taskID),
+			Metadata: taskCommandMetadata("task-release:"+taskID, domain.ActorService, "task-runtime", "task_terminal", "AI 生图任务未产出部分释放", taskID),
 		})
 		if releaseErr != nil {
 			return settlementTransactions{}, releaseErr
@@ -386,13 +388,13 @@ func applySettlementCommands(ctx context.Context, tx *sql.Tx, taskID string, fac
 		transactions.settledAt = result.CreatedAt
 	}
 	if decision.captureAmount > 0 {
-		amount, amountErr := credits.NewCreditAmount(decision.captureAmount)
+		amount, amountErr := domain.NewCreditAmount(decision.captureAmount)
 		if amountErr != nil {
 			return settlementTransactions{}, amountErr
 		}
-		result, captureErr := commands.Capture(ctx, credits.CaptureCommand{
+		result, captureErr := commands.Capture(ctx, ports.CaptureCommand{
 			UserID: facts.userID, HoldTransactionID: facts.holdTransactionID.String, Amount: amount,
-			Metadata: taskCommandMetadata("task-capture:"+taskID, credits.ActorService, "task-runtime", "task_terminal", "AI 生图任务实际产出结算", taskID),
+			Metadata: taskCommandMetadata("task-capture:"+taskID, domain.ActorService, "task-runtime", "task_terminal", "AI 生图任务实际产出结算", taskID),
 		})
 		if captureErr != nil {
 			return settlementTransactions{}, captureErr
@@ -423,12 +425,12 @@ WHERE task_id = $1 AND state = 'held'`, taskID, decision.target, decision.actual
 	return nil
 }
 
-func taskCommandMetadata(key string, actorType credits.ActorType, actorID, source, reason, taskID string) credits.CommandMetadata {
-	return credits.CommandMetadata{
+func taskCommandMetadata(key string, actorType domain.ActorType, actorID, source, reason, taskID string) domain.CommandMetadata {
+	return domain.CommandMetadata{
 		IdempotencyKey:    key,
-		Actor:             credits.Actor{Type: actorType, ID: actorID},
+		Actor:             domain.Actor{Type: actorType, ID: actorID},
 		Source:            source,
 		Reason:            reason,
-		BusinessReference: credits.BusinessReference{Type: "task", ID: taskID},
+		BusinessReference: domain.BusinessReference{Type: "task", ID: taskID},
 	}
 }
