@@ -1,4 +1,4 @@
-package payments
+package reconciliation_test
 
 import (
 	"errors"

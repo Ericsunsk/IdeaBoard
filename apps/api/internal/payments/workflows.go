@@ -22,6 +22,13 @@ import (
 	"ideaboard/api/internal/platform/secrets"
 )
 
+// checkoutApplicationService gives the embedded checkout service a distinct field name
+// from the read-model Service while keeping both application APIs promoted on
+// CheckoutWorkflow.
+type checkoutApplicationService = paymentcheckout.Service
+type paymentRefundService = paymentrefund.Service
+type paymentWebhookService = paymentwebhook.Service
+
 // PaymentRuntime is intentionally shared by every Payments workflow. Event
 // delivery is only a post-commit hint, while the repository remains the fact
 // source. A nil clock is safe to default because it is not an external seam.
@@ -68,7 +75,7 @@ type PaymentCheckoutRecovery interface {
 type CheckoutWorkflowDependencies struct {
 	Configuration        paymentpersistence.StripeConfigurationStore
 	ConfigurationGateway paymentports.StripeGateway
-	ShutdownEnqueuer     PaymentCheckoutShutdownEnqueuer
+	ShutdownEnqueuer     paymentconfiguration.ShutdownEnqueuer
 	Store                paymentpersistence.PaymentCheckoutStore
 	CheckoutGateway      paymentports.CheckoutGateway
 	Wallets              credits.WalletReader
@@ -81,16 +88,16 @@ type CheckoutWorkflowDependencies struct {
 type CheckoutWorkflow struct {
 	configuration        paymentpersistence.StripeConfigurationStore
 	configurationGateway paymentports.StripeGateway
-	shutdownEnqueuer     PaymentCheckoutShutdownEnqueuer
+	shutdownEnqueuer     paymentconfiguration.ShutdownEnqueuer
 	checkoutStore        paymentpersistence.PaymentCheckoutStore
 	checkoutGateway      paymentports.CheckoutGateway
 	wallets              credits.WalletReader
 	convergenceStore     paymentpersistence.PaymentConvergenceStore
 	orderLifecycle       *paymentorder.PaymentOrderLifecycle
 	runtime              *PaymentRuntime
-	*paymentcheckout.Service
+	*checkoutApplicationService
+	*paymentreadmodel.Service
 	configurationService *paymentconfiguration.Service
-	readModelService     *paymentreadmodel.Service
 }
 
 // GetStripeConfiguration delegates to the configuration application service;
@@ -136,7 +143,7 @@ func NewCheckoutWorkflow(deps CheckoutWorkflowDependencies) (*CheckoutWorkflow, 
 	return &CheckoutWorkflow{
 		configuration: deps.Configuration, configurationGateway: deps.ConfigurationGateway, shutdownEnqueuer: deps.ShutdownEnqueuer,
 		checkoutStore: deps.Store, checkoutGateway: deps.CheckoutGateway, wallets: deps.Wallets, convergenceStore: deps.Convergence,
-		orderLifecycle: deps.Transitions.orderLifecycle, runtime: deps.Transitions.runtime, Service: checkoutService, configurationService: configurationService, readModelService: readModelService,
+		orderLifecycle: deps.Transitions.orderLifecycle, runtime: deps.Transitions.runtime, checkoutApplicationService: checkoutService, Service: readModelService, configurationService: configurationService,
 	}, nil
 }
 
@@ -156,11 +163,12 @@ type StripeFactsWorkflowDependencies struct {
 // StripeFactsWorkflow owns verified Stripe facts and every durable reversal or
 // recovery transition derived from them.
 type StripeFactsWorkflow struct {
+	*paymentreconciliation.Service
 	configuration    paymentpersistence.StripeConfigurationStore
 	webhookInbox     paymentpersistence.StripeWebhookInboxStore
 	convergenceStore paymentpersistence.PaymentConvergenceStore
 	refundGateway    paymentports.RefundGateway
-	refundService    *paymentrefund.Service
+	*paymentRefundService
 	disputeGateway   paymentports.DisputeGateway
 	disputeService   *paymentdispute.Service
 	checkoutStore    paymentpersistence.PaymentCheckoutStore
@@ -169,8 +177,7 @@ type StripeFactsWorkflow struct {
 	checkoutRecovery PaymentCheckoutRecovery
 	verifier         paymentports.StripeWebhookVerifier
 	runtime          *PaymentRuntime
-	reconciliation   *paymentreconciliation.Service
-	webhook          *paymentwebhook.Service
+	*paymentWebhookService
 }
 
 func NewStripeFactsWorkflow(deps StripeFactsWorkflowDependencies) (*StripeFactsWorkflow, error) {
@@ -255,7 +262,7 @@ func NewStripeFactsWorkflow(deps StripeFactsWorkflowDependencies) (*StripeFactsW
 	if err != nil {
 		return nil, err
 	}
-	return &StripeFactsWorkflow{configuration: deps.Configuration, webhookInbox: deps.Inbox, convergenceStore: deps.Convergence, refundGateway: deps.RefundGateway, refundService: refundService, disputeGateway: deps.DisputeGateway, disputeService: disputeService, checkoutStore: deps.CheckoutStore, checkoutGateway: deps.CheckoutGateway, orderLifecycle: deps.Transitions.orderLifecycle, checkoutRecovery: deps.CheckoutRecovery, verifier: deps.Verifier, runtime: deps.Transitions.runtime, reconciliation: reconciliationService, webhook: webhookService}, nil
+	return &StripeFactsWorkflow{Service: reconciliationService, configuration: deps.Configuration, webhookInbox: deps.Inbox, convergenceStore: deps.Convergence, refundGateway: deps.RefundGateway, paymentRefundService: refundService, disputeGateway: deps.DisputeGateway, disputeService: disputeService, checkoutStore: deps.CheckoutStore, checkoutGateway: deps.CheckoutGateway, orderLifecycle: deps.Transitions.orderLifecycle, checkoutRecovery: deps.CheckoutRecovery, verifier: deps.Verifier, runtime: deps.Transitions.runtime, paymentWebhookService: webhookService}, nil
 }
 
 // NewService is the only supported Payments root constructor. It accepts

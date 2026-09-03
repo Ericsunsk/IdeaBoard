@@ -1,4 +1,4 @@
-package payments_test
+package stripe_test
 
 import (
 	"os"

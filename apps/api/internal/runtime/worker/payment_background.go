@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"ideaboard/api/internal/payments"
+	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentreconciliation "ideaboard/api/internal/payments/application/reconciliation"
 
 	"github.com/jackc/pgx/v5"
@@ -123,7 +123,7 @@ type PaymentCheckoutShutdownDispatcher struct {
 	client *river.Client[pgx.Tx]
 }
 
-func NewPaymentCheckoutShutdownDispatcher(client *river.Client[pgx.Tx]) (payments.PaymentCheckoutShutdownEnqueuer, error) {
+func NewPaymentCheckoutShutdownDispatcher(client *river.Client[pgx.Tx]) (paymentconfiguration.ShutdownEnqueuer, error) {
 	if client == nil {
 		return nil, fmt.Errorf("configure Payment Checkout shutdown dispatcher: River client is nil")
 	}

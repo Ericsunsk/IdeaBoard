@@ -9,6 +9,7 @@ import (
 	"ideaboard/api/internal/credits"
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
+	paymentevents "ideaboard/api/internal/payments/infrastructure/events"
 	paymentports "ideaboard/api/internal/payments/ports"
 	"ideaboard/api/internal/platform/secrets"
 	"ideaboard/api/internal/testsupport/secretstest"
@@ -53,7 +54,7 @@ func newCompleteTestPaymentsService(
 	verifier paymentports.StripeWebhookVerifier,
 	refundGateway paymentports.RefundGateway,
 	disputeGateway paymentports.DisputeGateway,
-	shutdownEnqueuer PaymentCheckoutShutdownEnqueuer,
+	shutdownEnqueuer paymentconfiguration.ShutdownEnqueuer,
 ) *Service {
 	t.Helper()
 	transitions, err := NewPaymentOrderTransitions(repo, runtime)
@@ -72,6 +73,14 @@ func newCompleteTestPaymentsService(
 	return mustNewPaymentsService(t, checkout, facts)
 }
 
+func (s *Service) eventHub() *paymentevents.Hub {
+	if s == nil || s.runtime == nil {
+		return nil
+	}
+	hub, _ := s.runtime.events.(*paymentevents.Hub)
+	return hub
+}
+
 func newCompleteTestCheckoutWorkflow(
 	t *testing.T,
 	repo *paymentpostgres.Repository,
@@ -79,7 +88,7 @@ func newCompleteTestCheckoutWorkflow(
 	configurationGateway paymentports.StripeGateway,
 	checkoutGateway paymentports.CheckoutGateway,
 	wallets credits.WalletReader,
-	shutdownEnqueuer PaymentCheckoutShutdownEnqueuer,
+	shutdownEnqueuer paymentconfiguration.ShutdownEnqueuer,
 ) *CheckoutWorkflow {
 	t.Helper()
 	transitions, err := NewPaymentOrderTransitions(repo, runtime)

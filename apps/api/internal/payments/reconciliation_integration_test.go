@@ -64,7 +64,7 @@ func TestPaymentReconciliationPreservesCreatingOrderWhenPurchasePolicyIsUnavaila
 	now = now.Add(3 * time.Minute)
 	order := createReconciliationIntent(t, repo, 42, 504, now.Add(time.Hour))
 
-	outcome, err := service.reconciliation.ReconcilePaymentOrderClaim(
+	outcome, err := service.ReconcilePaymentOrderClaim(
 		t.Context(),
 		configuration,
 		"sk_test_fixture",
@@ -75,7 +75,7 @@ func TestPaymentReconciliationPreservesCreatingOrderWhenPurchasePolicyIsUnavaila
 		now,
 	)
 	if !errors.Is(err, paymentcontracts.ErrStripeConfigurationNotFound) {
-		t.Fatalf("reconcilePaymentOrderClaim() error = %v, want paymentcontracts.ErrStripeConfigurationNotFound", err)
+		t.Fatalf("ReconcilePaymentOrderClaim() error = %v, want paymentcontracts.ErrStripeConfigurationNotFound", err)
 	}
 	if outcome.ClearAnomaly || outcome.NextAttemptAt.Before(now.Add(paymentreconciliation.OperableDelay)) {
 		t.Fatalf("reconciliation outcome = %+v, want delayed retry", outcome)
@@ -258,7 +258,7 @@ func TestPaymentReconciliationRecordsLongLivedOperableAnomaly(t *testing.T) {
 	if err := recovered.ReconcileDuePaymentOrders(t.Context()); err != nil {
 		t.Fatalf("terminal reconciliation recovery = %v", err)
 	}
-	anomalies, err = recovered.ListPaymentReconciliationAnomalies(t.Context(), 100)
+	anomalies, err = recovered.ListAnomalies(t.Context(), 100)
 	if err != nil {
 		t.Fatal(err)
 	}

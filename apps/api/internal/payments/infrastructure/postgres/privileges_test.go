@@ -1,15 +1,14 @@
-package payments
+package postgres
 
 import (
 	"slices"
 	"testing"
 
-	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	dbprivileges "ideaboard/api/internal/platform/database/privileges"
 )
 
 func TestRuntimePrivilegePolicyIncludesPaymentCheckoutShutdowns(t *testing.T) {
-	policy := paymentpostgres.RuntimePrivilegePolicy()
+	policy := RuntimePrivilegePolicy()
 	for _, rule := range policy.Objects {
 		if rule.Kind != dbprivileges.KindTable || !slices.Contains(rule.Names, "payment_checkout_shutdowns") {
 			continue

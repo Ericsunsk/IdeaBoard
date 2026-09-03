@@ -199,10 +199,10 @@ func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := facts.reconciliation.ReconcileDuePaymentRefunds(t.Context(), now.Add(3*time.Minute)); err != nil {
+	if err := facts.ReconcileDuePaymentRefunds(t.Context(), now.Add(3*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if err := facts.reconciliation.ReconcileDuePaymentRefunds(t.Context(), now.Add(4*time.Minute)); err != nil {
+	if err := facts.ReconcileDuePaymentRefunds(t.Context(), now.Add(4*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	settled, err := repo.GetPaymentRefundByID(t.Context(), refund.ID)
