@@ -1,4 +1,4 @@
-package runtime
+package execution
 
 import (
 	"context"
@@ -40,7 +40,7 @@ func TestCompletedTaskConvergenceCommitsTerminalFactsBeforePublishing(t *testing
 	}
 
 	err := service.CompleteTask(ctx, CompleteTaskInput{
-		Assignment: taskRuntimeAssignment(task),
+		Assignment: taskExecutionAssignment(task),
 		Result:     `{"status":"success"}`,
 		Outputs:    []tasks.TaskOutput{output},
 		AttemptFinish: &tasks.TaskAttemptFinish{
@@ -104,7 +104,7 @@ WHERE task_id = $1 AND released_at IS NULL
 	}
 
 	err = service.CompleteTask(ctx, CompleteTaskInput{
-		Assignment: taskRuntimeAssignment(task),
+		Assignment: taskExecutionAssignment(task),
 		Result:     `{"status":"success"}`,
 		Outputs: []tasks.TaskOutput{{
 			OutputKind: "remote",
@@ -147,7 +147,7 @@ func TestCompletedTaskConvergenceRejectsStaleLeaseWithoutPartialWrites(t *testin
 	service, repo, task, attemptID, publisher := newBilledCompletionConvergenceFixture(t, db, pool, "completion-convergence-stale")
 
 	err := service.CompleteTask(ctx, CompleteTaskInput{
-		Assignment: taskRuntimeAssignmentWithLease(task, "stale-lease-token"),
+		Assignment: taskExecutionAssignmentWithLease(task, "stale-lease-token"),
 		Result:     `{"status":"success"}`,
 		Outputs: []tasks.TaskOutput{{
 			OutputKind: "remote",
@@ -197,7 +197,7 @@ WHERE task_id = $1 AND released_at IS NULL
 	}
 
 	err := service.CompleteTask(ctx, CompleteTaskInput{
-		Assignment: taskRuntimeAssignment(task),
+		Assignment: taskExecutionAssignment(task),
 		Result:     `{"status":"success"}`,
 		Outputs: []tasks.TaskOutput{{
 			OutputKind: "remote",
@@ -242,7 +242,7 @@ func TestFailedTaskConvergenceReleasesHoldBeforePublishing(t *testing.T) {
 	service.SetTaskStatusPublisher(commitObserver)
 
 	err := service.FailTask(ctx, FailTaskInput{
-		Assignment: taskRuntimeAssignment(task),
+		Assignment: taskExecutionAssignment(task),
 		Reason:     "provider failed",
 		Result:     `{"status":"failed"}`,
 		AttemptFinish: &tasks.TaskAttemptFinish{
@@ -286,7 +286,7 @@ func TestRequeueAndResetConvergenceKeepHoldAndReleaseExactLease(t *testing.T) {
 			name: "requeue",
 			run: func(ctx context.Context, service *Service, task *tasks.Task, attemptID int64) error {
 				_, err := service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{
-					Assignment: taskRuntimeAssignment(task),
+					Assignment: taskExecutionAssignment(task),
 					Reason:     "provider retryable failure",
 					RequeuedAttemptFinish: &tasks.TaskAttemptFinish{
 						ID:          attemptID,
@@ -300,7 +300,7 @@ func TestRequeueAndResetConvergenceKeepHoldAndReleaseExactLease(t *testing.T) {
 			name: "reset",
 			run: func(ctx context.Context, service *Service, task *tasks.Task, attemptID int64) error {
 				return service.ResetRunningTask(ctx, ResetRunningTaskInput{
-					Assignment: taskRuntimeAssignment(task),
+					Assignment: taskExecutionAssignment(task),
 					Reason:     "worker reset",
 					AttemptFinish: &tasks.TaskAttemptFinish{
 						ID:          attemptID,
@@ -353,7 +353,7 @@ func TestFinalFailureConvergenceRollsBackLateLeaseMismatch(t *testing.T) {
 	}
 
 	_, err := service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{
-		Assignment: taskRuntimeAssignment(task),
+		Assignment: taskExecutionAssignment(task),
 		Reason:     "retry limit reached",
 		FinalFailAttemptFinish: &tasks.TaskAttemptFinish{
 			ID:          attemptID,
@@ -419,7 +419,7 @@ BEFORE UPDATE ON task_billing_settlements FOR EACH ROW EXECUTE FUNCTION fail_run
 			tc.prepare(t, db, task, attemptID)
 
 			err := service.FailTask(t.Context(), FailTaskInput{
-				Assignment: taskRuntimeAssignment(task),
+				Assignment: taskExecutionAssignment(task),
 				Reason:     "provider failed",
 				AttemptFinish: &tasks.TaskAttemptFinish{
 					ID:          attemptID,
@@ -558,11 +558,11 @@ func newBilledCompletionConvergenceFixture(
 		Amount: grantAmount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "completion-convergence-grant:" + taskID,
-			Actor:          domain.Actor{Type: domain.ActorSystem, ID: "taskruntime-test"},
-			Source:         "taskruntime_test",
+			Actor:          domain.Actor{Type: domain.ActorSystem, ID: "taskexecution-test"},
+			Source:         "taskexecution_test",
 			Reason:         "seed completion convergence",
 			BusinessReference: domain.BusinessReference{
-				Type: "taskruntime_test",
+				Type: "taskexecution_test",
 				ID:   taskID,
 			},
 		},
@@ -573,19 +573,19 @@ func newBilledCompletionConvergenceFixture(
 		t.Fatal(err)
 	}
 
-	seedTaskRuntimeUser(t, db, userID)
-	seedTaskRuntimeAccount(t, db, accountID)
+	seedTaskExecutionUser(t, db, userID)
+	seedTaskExecutionAccount(t, db, accountID)
 	repo := taskstore.NewRepository(db)
 	task := &tasks.Task{
 		TaskID:                     taskID,
 		UserID:                     userID,
 		FeatureSlug:                workflow.FeatureSlugGeneration,
-		AssignedProviderEndpointID: testPtr(taskRuntimeProviderEndpointID(accountID)),
+		AssignedProviderEndpointID: testPtr(taskExecutionProviderEndpointID(accountID)),
 		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "current-lease-token",
 	}
-	if err := seedTaskRuntimeTask(t, db, repo, ctx, task); err != nil {
+	if err := seedTaskExecutionTask(t, db, repo, ctx, task); err != nil {
 		t.Fatalf("seed task: %v", err)
 	}
 	holdTx, err := pool.Begin(ctx)

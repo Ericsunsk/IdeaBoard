@@ -1,4 +1,4 @@
-package runtime
+package execution
 
 import (
 	"context"
@@ -12,14 +12,14 @@ import (
 
 func (s *Service) RecordExecutionMetrics(ctx context.Context, patch tasks.TaskExecutionMetricsPatch) error {
 	if s == nil || s.taskRepo == nil {
-		return fmt.Errorf("task runtime metrics store not configured")
+		return fmt.Errorf("task execution metrics store not configured")
 	}
 	return s.taskRepo.PatchExecutionMetrics(ctx, patch)
 }
 
 func (s *Service) RecordExecutionSnapshot(ctx context.Context, snapshot tasks.TaskExecutionSnapshot) error {
 	if s == nil || s.taskRepo == nil {
-		return fmt.Errorf("task runtime snapshot store not configured")
+		return fmt.Errorf("task execution snapshot store not configured")
 	}
 	_, err := s.taskRepo.PatchExecutionSnapshot(ctx, snapshot)
 	return err
@@ -27,7 +27,7 @@ func (s *Service) RecordExecutionSnapshot(ctx context.Context, snapshot tasks.Ta
 
 func (s *Service) StartTaskAttempt(ctx context.Context, start tasks.TaskAttemptStart) (tasks.TaskAttemptRef, error) {
 	if s == nil || s.taskRepo == nil {
-		return tasks.TaskAttemptRef{}, fmt.Errorf("task runtime attempt store not configured")
+		return tasks.TaskAttemptRef{}, fmt.Errorf("task execution attempt store not configured")
 	}
 	ref, err := s.taskRepo.CreateTaskAttempt(ctx, start)
 	if database.IsNotFound(err) {
@@ -38,7 +38,7 @@ func (s *Service) StartTaskAttempt(ctx context.Context, start tasks.TaskAttemptS
 
 func (s *Service) FinishTaskAttempt(ctx context.Context, finish tasks.TaskAttemptFinish) error {
 	if s == nil || s.taskRepo == nil {
-		return fmt.Errorf("task runtime attempt store not configured")
+		return fmt.Errorf("task execution attempt store not configured")
 	}
 	updated, err := s.taskRepo.FinishTaskAttempt(ctx, finish)
 	if err != nil {
@@ -63,7 +63,7 @@ func (s *Service) RecordTaskCancelledWithAttempt(ctx context.Context, snapshot t
 
 func (s *Service) recordTaskCancelled(ctx context.Context, snapshot tasks.TaskCancellationSnapshot, attemptFinish *tasks.TaskAttemptFinish) error {
 	if s == nil || s.taskRepo == nil {
-		return fmt.Errorf("task runtime cancellation store not configured")
+		return fmt.Errorf("task execution cancellation store not configured")
 	}
 	rows, err := s.taskRepo.MarkTaskCancelled(ctx, snapshot, attemptFinish)
 	if err := normalizeTaskTransitionWriteError(err); err != nil {
@@ -81,7 +81,7 @@ func (s *Service) recordTaskCancelled(ctx context.Context, snapshot tasks.TaskCa
 
 func (s *Service) RecordExecutionTerminal(ctx context.Context, taskID string, currentStage string, failureStage string, failureCategory string, finishedAt time.Time) error {
 	if s == nil || s.taskRepo == nil {
-		return fmt.Errorf("task runtime metrics store not configured")
+		return fmt.Errorf("task execution metrics store not configured")
 	}
 	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
 	if err != nil {

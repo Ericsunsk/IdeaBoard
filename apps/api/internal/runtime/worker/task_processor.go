@@ -7,13 +7,13 @@ import (
 	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"log/slog"
 
-	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	taskexecution "ideaboard/api/internal/tasking/application/execution"
 	tasks "ideaboard/api/internal/tasking/domain"
 )
 
-type consumerTaskRuntime interface {
-	FailTask(ctx context.Context, input taskruntime.FailTaskInput) error
-	ResetRunningTask(ctx context.Context, input taskruntime.ResetRunningTaskInput) error
+type consumerTaskExecution interface {
+	FailTask(ctx context.Context, input taskexecution.FailTaskInput) error
+	ResetRunningTask(ctx context.Context, input taskexecution.ResetRunningTaskInput) error
 }
 
 var (
@@ -22,20 +22,20 @@ var (
 )
 
 type taskProcessor struct {
-	assigner    taskqueueports.TaskAssigner
-	taskRuntime consumerTaskRuntime
-	executeTask func(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) error
+	assigner      taskqueueports.TaskAssigner
+	taskExecution consumerTaskExecution
+	executeTask   func(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) error
 }
 
 func newTaskProcessor(
 	assigner taskqueueports.TaskAssigner,
-	taskRuntime consumerTaskRuntime,
+	taskExecution consumerTaskExecution,
 	executeTask func(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) error,
 ) *taskProcessor {
 	return &taskProcessor{
-		assigner:    assigner,
-		taskRuntime: taskRuntime,
-		executeTask: executeTask,
+		assigner:      assigner,
+		taskExecution: taskExecution,
+		executeTask:   executeTask,
 	}
 }
 
@@ -86,7 +86,7 @@ func (p *taskProcessor) process(ctx context.Context, task *tasks.TaskPayload, be
 	}
 	if beforeExecute != nil {
 		if err := beforeExecute(); err != nil {
-			resetErr := p.taskRuntime.ResetRunningTask(context.WithoutCancel(ctx), taskruntime.ResetRunningTaskInput{
+			resetErr := p.taskExecution.ResetRunningTask(context.WithoutCancel(ctx), taskexecution.ResetRunningTaskInput{
 				Assignment: assignment,
 				Reason:     "final attempt marker unavailable; waiting retry",
 			})

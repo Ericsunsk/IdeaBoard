@@ -14,7 +14,7 @@ import (
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/config"
-	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	taskexecution "ideaboard/api/internal/tasking/application/execution"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
@@ -62,13 +62,13 @@ type finalFailureRetryOutput struct {
 }
 
 type WorkerAccountStore interface {
-	taskruntime.AccountStore
+	taskexecution.AccountStore
 	GetRuntimeAccountForAssignment(ctx context.Context, accountID int64, providerEndpointID int64, credentialID int64) (*accounts.RuntimeAccountAccess, error)
 }
 
 type RiverTaskWorkerDeps struct {
 	AccountRepo        WorkerAccountStore
-	TaskRepo           taskruntime.TaskStore
+	TaskRepo           taskexecution.TaskStore
 	Enqueuer           taskqueueports.TaskEnqueuer
 	Assigner           taskqueueports.TaskAssigner
 	CancelStore        taskqueueports.TaskCancellationStore
@@ -89,10 +89,10 @@ func NewRiverTaskWorker(
 	if resolver, ok := deps.MediaReader.(taskmedia.RuntimeMediaResolver); ok {
 		executor.mediaResolver = resolver
 	}
-	taskRuntime := taskruntime.NewService(deps.AccountRepo, deps.TaskRepo, deps.Assigner, deps.CancelStore)
-	taskRuntime.SetTaskStatusPublisher(deps.TaskEvents)
-	orchestrator := newTaskExecutionOrchestrator(deps.AccountRepo, deps.Enqueuer, taskRuntime, executor.callDrawingAPIWithAssignment)
-	return newRiverTaskWorkerWithProcessor(newTaskProcessor(deps.Assigner, taskRuntime, orchestrator.execute))
+	taskExecution := taskexecution.NewService(deps.AccountRepo, deps.TaskRepo, deps.Assigner, deps.CancelStore)
+	taskExecution.SetTaskStatusPublisher(deps.TaskEvents)
+	orchestrator := newTaskExecutionOrchestrator(deps.AccountRepo, deps.Enqueuer, taskExecution, executor.callDrawingAPIWithAssignment)
+	return newRiverTaskWorkerWithProcessor(newTaskProcessor(deps.Assigner, taskExecution, orchestrator.execute))
 }
 
 func newRiverTaskWorkerWithProcessor(processor *taskProcessor) *RiverTaskWorker {
@@ -103,9 +103,9 @@ func newRiverTaskWorkerWithProcessor(processor *taskProcessor) *RiverTaskWorker 
 		recordOutput:           river.RecordOutput,
 	}
 	if processor != nil {
-		if taskRuntime, ok := processor.taskRuntime.(riverFinalFailureRuntime); ok {
+		if taskExecution, ok := processor.taskExecution.(riverFinalFailureRuntime); ok {
 			worker.finalFailures = &finalFailureOrchestrator{
-				taskRuntime: taskRuntime,
+				taskExecution: taskExecution,
 				recordOutput: func(ctx context.Context, output finalFailureRetryOutput) error {
 					if worker.recordOutput == nil {
 						return errors.New("river output recorder is unavailable")

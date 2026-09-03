@@ -16,7 +16,7 @@ import (
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits"
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
-	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	taskexecution "ideaboard/api/internal/tasking/application/execution"
 	tasksubmission "ideaboard/api/internal/tasking/application/submission"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
@@ -61,10 +61,10 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 	taskRepo := taskstore.NewRepository(db)
 	account := createRiverTestAccount(t, db, accountRepo, "submit-worker-convergence")
 	assigner := taskqueue.NewPostgresTaskAssigner(db)
-	taskRuntime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
+	taskExecution := taskexecution.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 
 	seenRiverJobID := make(chan int64, 1)
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, taskRuntime, func(_ context.Context, runtimeAccount *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, _ taskqueueports.TaskAssignment) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, taskExecution, func(_ context.Context, runtimeAccount *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, _ taskqueueports.TaskAssignment) (providerCallOutput, error) {
 		if runtimeAccount.ID != account.ID {
 			return providerCallOutput{}, fmt.Errorf("provider got account_id=%d, want %d", runtimeAccount.ID, account.ID)
 		}
@@ -74,7 +74,7 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 		}
 		return providerOutputJSON(`{"status":"success","image_url":"https://example.com/river-worker-result.png"}`), nil
 	})
-	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, taskRuntime, orchestrator.execute))
+	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, taskExecution, orchestrator.execute))
 	client, err := NewRiverClient(pool, worker, RiverServerOptions{
 		QueueName:   submitToRiverWorkerQueue,
 		Concurrency: 1,
@@ -177,7 +177,7 @@ func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t 
 	taskRepo := taskstore.NewRepository(db)
 	createRiverTestAccount(t, db, accountRepo, "settlement-restart")
 	assigner := taskqueue.NewPostgresTaskAssigner(db)
-	innerRuntime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
+	innerRuntime := taskexecution.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 	runtime := &failOnceFinalFailureRuntime{inner: innerRuntime}
 	var providerCalls atomic.Int32
 	newWorker := func() *RiverTaskWorker {
@@ -295,7 +295,7 @@ func TestFinalAttemptMarkerFailureResetsLeaseBeforeProviderRetry(t *testing.T) {
 	taskRepo := taskstore.NewRepository(db)
 	createRiverTestAccount(t, db, accountRepo, "marker-reset")
 	assigner := taskqueue.NewPostgresTaskAssigner(db)
-	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
+	runtime := taskexecution.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 	providerCalls := 0
 	processor := newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueueports.TaskAssignment) error {
 		providerCalls++
@@ -341,15 +341,15 @@ func TestFinalAttemptMarkerFailureResetsLeaseBeforeProviderRetry(t *testing.T) {
 }
 
 type failOnceFinalFailureRuntime struct {
-	inner         *taskruntime.Service
+	inner         *taskexecution.Service
 	convergeCalls atomic.Int32
 }
 
-func (r *failOnceFinalFailureRuntime) FailTask(ctx context.Context, input taskruntime.FailTaskInput) error {
+func (r *failOnceFinalFailureRuntime) FailTask(ctx context.Context, input taskexecution.FailTaskInput) error {
 	return r.inner.FailTask(ctx, input)
 }
 
-func (r *failOnceFinalFailureRuntime) ResetRunningTask(ctx context.Context, input taskruntime.ResetRunningTaskInput) error {
+func (r *failOnceFinalFailureRuntime) ResetRunningTask(ctx context.Context, input taskexecution.ResetRunningTaskInput) error {
 	return r.inner.ResetRunningTask(ctx, input)
 }
 

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	taskexecution "ideaboard/api/internal/tasking/application/execution"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 )
 
@@ -39,7 +39,7 @@ func (r finalFailureResult) isDurable() bool {
 }
 
 type finalFailureOrchestrator struct {
-	taskRuntime     riverFinalFailureRuntime
+	taskExecution   riverFinalFailureRuntime
 	recordOutput    func(context.Context, finalFailureRetryOutput) error
 	enqueueFallback func(context.Context, taskqueue.DrawingFinalFailureArgs) error
 }
@@ -107,18 +107,18 @@ func (o *finalFailureOrchestrator) converge(ctx context.Context, request finalFa
 	if err != nil {
 		return err
 	}
-	if o == nil || o.taskRuntime == nil {
-		return errors.New("task final failure runtime is unavailable")
+	if o == nil || o.taskExecution == nil {
+		return errors.New("task final failure execution service is unavailable")
 	}
 	convergeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), finalFailureConvergeTimeout)
 	defer cancel()
-	err = o.taskRuntime.ConvergeTaskAfterRiverFinalFailure(
+	err = o.taskExecution.ConvergeTaskAfterRiverFinalFailure(
 		convergeCtx,
 		request.taskID,
 		request.riverJobID,
 		request.reason,
 	)
-	if errors.Is(err, taskruntime.ErrTaskTerminal) || errors.Is(err, taskruntime.ErrTaskNotFound) {
+	if errors.Is(err, taskexecution.ErrTaskTerminal) || errors.Is(err, taskexecution.ErrTaskNotFound) {
 		return nil
 	}
 	return err

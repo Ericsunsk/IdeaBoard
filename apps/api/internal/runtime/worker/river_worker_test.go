@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/platform/accountlimits"
-	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	taskexecution "ideaboard/api/internal/tasking/application/execution"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 
@@ -80,7 +80,7 @@ func TestRiverWorkerPropagatesCorrelationIDToProcessor(t *testing.T) {
 
 func TestRiverFinalFailureHandlerConvergesOnlyFinalDrawingAttempts(t *testing.T) {
 	runtime := &fakeRuntime{}
-	handler := newRiverFinalFailureHandler(&finalFailureOrchestrator{taskRuntime: runtime})
+	handler := newRiverFinalFailureHandler(&finalFailureOrchestrator{taskExecution: runtime})
 	if handler == nil {
 		t.Fatal("expected final failure handler")
 	}
@@ -123,7 +123,7 @@ func TestRiverFinalFailureHandlerConvergesOnlyFinalDrawingAttempts(t *testing.T)
 
 func TestRiverFinalFailureHandlerConvergesPanicWithSafeReason(t *testing.T) {
 	runtime := &fakeRuntime{}
-	handler := newRiverFinalFailureHandler(&finalFailureOrchestrator{taskRuntime: runtime})
+	handler := newRiverFinalFailureHandler(&finalFailureOrchestrator{taskExecution: runtime})
 	if handler == nil {
 		t.Fatal("expected final failure handler")
 	}
@@ -155,7 +155,7 @@ func TestRiverFinalFailureHandlerConvergesPanicWithSafeReason(t *testing.T) {
 
 func TestRiverFinalFailureHandlerIgnoresNonDrawingJobs(t *testing.T) {
 	runtime := &fakeRuntime{}
-	handler := newRiverFinalFailureHandler(&finalFailureOrchestrator{taskRuntime: runtime})
+	handler := newRiverFinalFailureHandler(&finalFailureOrchestrator{taskExecution: runtime})
 
 	handler.HandleError(context.Background(), &rivertype.JobRow{
 		ID:          9002,
@@ -400,7 +400,7 @@ func TestRiverWorkerNoCapacityDoesNotCreateSettlementOnlyMarker(t *testing.T) {
 func TestRiverFinalFailureWorkerOnlyRetriesTerminalConvergence(t *testing.T) {
 	runtime := &fakeRuntime{convergeErr: errors.New("database unavailable")}
 	worker := &RiverFinalFailureWorker{
-		finalFailures: &finalFailureOrchestrator{taskRuntime: runtime},
+		finalFailures: &finalFailureOrchestrator{taskExecution: runtime},
 		retryDelay:    time.Millisecond,
 	}
 	job := &river.Job[taskqueue.DrawingFinalFailureArgs]{Args: taskqueue.DrawingFinalFailureArgs{
@@ -422,9 +422,9 @@ func TestRiverFinalFailureWorkerOnlyRetriesTerminalConvergence(t *testing.T) {
 }
 
 func TestRiverFinalFailureWorkerTreatsAlreadyTerminalOrDeletedTaskAsConverged(t *testing.T) {
-	for _, terminalErr := range []error{taskruntime.ErrTaskTerminal, taskruntime.ErrTaskNotFound} {
+	for _, terminalErr := range []error{taskexecution.ErrTaskTerminal, taskexecution.ErrTaskNotFound} {
 		runtime := &fakeRuntime{convergeErr: terminalErr}
-		worker := &RiverFinalFailureWorker{finalFailures: &finalFailureOrchestrator{taskRuntime: runtime}}
+		worker := &RiverFinalFailureWorker{finalFailures: &finalFailureOrchestrator{taskExecution: runtime}}
 		err := worker.Work(t.Context(), &river.Job[taskqueue.DrawingFinalFailureArgs]{Args: taskqueue.DrawingFinalFailureArgs{
 			TaskID: "already-converged-task", RiverJobID: 9012, Reason: finalFailureErrorReason,
 		}})
@@ -467,7 +467,7 @@ func TestRiverWorkerFinalFailureRetryOnlyConvergesSettlement(t *testing.T) {
 
 func TestRiverFinalFailureHandlerLeavesSettlementSnoozeToDurableRetry(t *testing.T) {
 	runtime := &fakeRuntime{}
-	handler := newRiverFinalFailureHandler(&finalFailureOrchestrator{taskRuntime: runtime})
+	handler := newRiverFinalFailureHandler(&finalFailureOrchestrator{taskExecution: runtime})
 	encodedArgs, err := json.Marshal(taskqueue.DrawingTaskArgs{
 		Task: tasks.TaskPayload{TaskID: "snoozed-settlement-task"},
 	})
@@ -492,7 +492,7 @@ func TestRiverFinalFailureHandlerPersistsFallbackWhenConvergenceFails(t *testing
 	runtime := &fakeRuntime{convergeErr: errors.New("database unavailable")}
 	var enqueued []taskqueue.DrawingFinalFailureArgs
 	handler := newRiverFinalFailureHandler(&finalFailureOrchestrator{
-		taskRuntime: runtime,
+		taskExecution: runtime,
 		enqueueFallback: func(_ context.Context, args taskqueue.DrawingFinalFailureArgs) error {
 			enqueued = append(enqueued, args)
 			return nil

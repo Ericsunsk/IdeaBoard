@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accountpool/accounts"
-	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	taskexecution "ideaboard/api/internal/tasking/application/execution"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow"
 )
@@ -24,7 +24,7 @@ type accountLookupStore interface {
 type taskExecutionOrchestrator struct {
 	accountRepo        accountLookupStore
 	enqueuer           taskqueueports.TaskEnqueuer
-	taskRuntime        *taskruntime.Service
+	taskExecution      *taskexecution.Service
 	attemptLifecycle   *taskAttemptLifecycle
 	providerCall       providerCallFunc
 	convergenceDecider taskExecutionConvergenceDecider
@@ -35,14 +35,14 @@ const taskCleanupTimeout = 5 * time.Second
 func newTaskExecutionOrchestrator(
 	accountRepo accountLookupStore,
 	enqueuer taskqueueports.TaskEnqueuer,
-	taskRuntime *taskruntime.Service,
+	taskExecution *taskexecution.Service,
 	providerCall providerCallFunc,
 ) *taskExecutionOrchestrator {
 	return &taskExecutionOrchestrator{
 		accountRepo:        accountRepo,
 		enqueuer:           enqueuer,
-		taskRuntime:        taskRuntime,
-		attemptLifecycle:   newTaskAttemptLifecycle(taskRuntime),
+		taskExecution:      taskExecution,
+		attemptLifecycle:   newTaskAttemptLifecycle(taskExecution),
 		providerCall:       providerCall,
 		convergenceDecider: taskExecutionConvergencePolicy{},
 	}
@@ -59,7 +59,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 	if handled || err != nil {
 		return err
 	}
-	taskCtx, stop := o.taskRuntime.WatchTaskCancellation(ctx, task.TaskID)
+	taskCtx, stop := o.taskExecution.WatchTaskCancellation(ctx, task.TaskID)
 	defer stop()
 
 	attemptCtx, handled, err := o.startTaskAttempt(ctx, task, assignment, account, startTime, correlationID, phaseMachine)
@@ -90,7 +90,7 @@ func (o *taskExecutionOrchestrator) prepareTaskExecution(
 		}
 		return nil, true, o.requeueTask(ctx, task, assignment, "运行时账号、服务端点或凭据不可用，重新调度")
 	}
-	cancelled, err := o.taskRuntime.IsTaskCancelled(ctx, task.TaskID)
+	cancelled, err := o.taskExecution.IsTaskCancelled(ctx, task.TaskID)
 	if err != nil {
 		slog.Warn("check task cancellation failed", "task_id", task.TaskID, "correlation_id", correlationID, "err", err)
 		if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
@@ -120,7 +120,7 @@ func (o *taskExecutionOrchestrator) startTaskAttempt(
 	correlationID string,
 	phaseMachine *taskExecutionPhaseMachine,
 ) (taskExecutionAttemptContext, bool, error) {
-	if err := o.taskRuntime.ConfirmTaskLease(ctx, assignment); err != nil {
+	if err := o.taskExecution.ConfirmTaskLease(ctx, assignment); err != nil {
 		slog.Warn("confirm task running lease failed", "task_id", task.TaskID, "correlation_id", correlationID, "account_id", assignment.AccountID, "err", err)
 		if isTaskConvergedError(err) {
 			if phaseErr := phaseMachine.advance(taskExecutionPhaseDropped); phaseErr != nil {
@@ -131,7 +131,7 @@ func (o *taskExecutionOrchestrator) startTaskAttempt(
 		}
 		cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 		defer cleanupCancel()
-		if resetErr := o.taskRuntime.ResetRunningTask(cleanupCtx, taskruntime.ResetRunningTaskInput{Assignment: assignment, Reason: "确认任务运行租约失败"}); resetErr != nil {
+		if resetErr := o.taskExecution.ResetRunningTask(cleanupCtx, taskexecution.ResetRunningTaskInput{Assignment: assignment, Reason: "确认任务运行租约失败"}); resetErr != nil {
 			if isTaskConvergedError(resetErr) {
 				o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
 				return taskExecutionAttemptContext{}, true, nil
@@ -151,7 +151,7 @@ func (o *taskExecutionOrchestrator) startTaskAttempt(
 		slog.Warn("start task attempt failed", "task_id", task.TaskID, "correlation_id", correlationID, "err", err)
 		cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 		defer cleanupCancel()
-		if resetErr := o.taskRuntime.ResetRunningTask(cleanupCtx, taskruntime.ResetRunningTaskInput{Assignment: assignment, Reason: "记录任务执行尝试失败"}); resetErr != nil {
+		if resetErr := o.taskExecution.ResetRunningTask(cleanupCtx, taskexecution.ResetRunningTaskInput{Assignment: assignment, Reason: "记录任务执行尝试失败"}); resetErr != nil {
 			if isTaskConvergedError(resetErr) {
 				o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
 				return taskExecutionAttemptContext{}, true, nil
@@ -185,7 +185,7 @@ func (o *taskExecutionOrchestrator) finalizeSuccessfulExecution(
 		return err
 	}
 	checkCtx, checkCancel := taskCleanupContext(ctx)
-	cancelled, err := o.taskRuntime.IsTaskCancelled(checkCtx, task.TaskID)
+	cancelled, err := o.taskExecution.IsTaskCancelled(checkCtx, task.TaskID)
 	checkCancel()
 	if err != nil {
 		if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
@@ -227,7 +227,7 @@ func (o *taskExecutionOrchestrator) finalizeSuccessfulExecution(
 		}
 		o.recordFinalizeFinished(ctx, task.TaskID, providerOutput.Timeline, finishedAt)
 		o.recordExecutionTerminal(ctx, task.TaskID, tasks.ExecutionStageCompleted, "", "", finishedAt)
-		if err := o.taskRuntime.ResetAccountFailure(ctx, accountID); err != nil {
+		if err := o.taskExecution.ResetAccountFailure(ctx, accountID); err != nil {
 			slog.Warn("reset account failure counter failed", "account_id", accountID, "err", err)
 		}
 	} else {
@@ -247,7 +247,7 @@ func (o *taskExecutionOrchestrator) handleProviderFailure(
 ) error {
 	if isContextInterrupted(taskCtx.Err()) || isContextInterrupted(ctx.Err()) {
 		checkCtx, checkCancel := taskCleanupContext(ctx)
-		cancelled, checkErr := o.taskRuntime.IsTaskCancelled(checkCtx, attempt.task.TaskID)
+		cancelled, checkErr := o.taskExecution.IsTaskCancelled(checkCtx, attempt.task.TaskID)
 		checkCancel()
 		if checkErr != nil {
 			slog.Warn("check task cancellation failed", "task_id", attempt.task.TaskID, "err", checkErr)
@@ -303,7 +303,7 @@ func (o *taskExecutionOrchestrator) handleProviderFailure(
 	}
 
 	if decisionInput.ProviderFailure.IsFailoverable {
-		disabled, failCount, statErr := o.taskRuntime.RecordAccountFailure(ctx, attempt.accountID)
+		disabled, failCount, statErr := o.taskExecution.RecordAccountFailure(ctx, attempt.accountID)
 		if statErr != nil {
 			slog.Warn("record account failure state failed", "account_id", attempt.accountID, "err", statErr)
 		}
@@ -355,7 +355,7 @@ func (o *taskExecutionOrchestrator) handleProviderFailoverRequeue(
 ) error {
 	finalFailFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusFailed, decision.Reason, decision.FailureStage, decision.FailureCategory, time.Now())
 	requeueFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusRequeued, decision.Reason, decision.FailureStage, decision.FailureCategory, time.Now())
-	requeued, requeueErr := o.taskRuntime.RequeueTaskForFailover(ctx, taskruntime.RequeueForFailoverInput{
+	requeued, requeueErr := o.taskExecution.RequeueTaskForFailover(ctx, taskexecution.RequeueForFailoverInput{
 		Assignment:             attempt.assignment,
 		Reason:                 decision.Reason,
 		Result:                 attempt.providerOutput.Result,
@@ -441,7 +441,7 @@ func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *tasks
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
-	cancelled, err := o.taskRuntime.IsTaskCancelled(cleanupCtx, task.TaskID)
+	cancelled, err := o.taskExecution.IsTaskCancelled(cleanupCtx, task.TaskID)
 	if err != nil {
 		slog.Warn("check task cancellation failed", "task_id", task.TaskID, "err", err)
 	} else if cancelled {
@@ -449,14 +449,14 @@ func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *tasks
 		return nil
 	}
 	if assignment.AccountID != 0 && assignment.LeaseToken != "" {
-		if err := o.taskRuntime.ResetRunningTask(cleanupCtx, taskruntime.ResetRunningTaskInput{
+		if err := o.taskExecution.ResetRunningTask(cleanupCtx, taskexecution.ResetRunningTaskInput{
 			Assignment: assignment,
 			Reason:     reason,
 		}); err != nil && !isTaskConvergedError(err) {
 			slog.Warn("reset task running to pending failed", "task_id", task.TaskID, "account_id", assignment.AccountID, "err", err)
 		}
 	}
-	cancelled, err = o.taskRuntime.IsTaskCancelled(cleanupCtx, task.TaskID)
+	cancelled, err = o.taskExecution.IsTaskCancelled(cleanupCtx, task.TaskID)
 	if err != nil {
 		slog.Warn("check task cancellation failed", "task_id", task.TaskID, "err", err)
 	} else if cancelled {
@@ -473,7 +473,7 @@ func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *task
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
-	err := o.taskRuntime.CompleteTask(cleanupCtx, taskruntime.CompleteTaskInput{
+	err := o.taskExecution.CompleteTask(cleanupCtx, taskexecution.CompleteTaskInput{
 		Assignment:    assignment,
 		Result:        result,
 		Outputs:       outputs,
@@ -485,7 +485,7 @@ func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *task
 			return false, nil
 		}
 		slog.Warn("mark task completed failed", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "err", err)
-		if failErr := o.taskRuntime.FailTask(cleanupCtx, taskruntime.FailTaskInput{
+		if failErr := o.taskExecution.FailTask(cleanupCtx, taskexecution.FailTaskInput{
 			Assignment: assignment,
 			Reason:     "任务结果保存失败，请稍后重试",
 		}); failErr != nil {
@@ -528,7 +528,7 @@ func (o *taskExecutionOrchestrator) completeFailedTaskWithMetricsAndAttempt(
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
-	err := o.taskRuntime.FailTask(cleanupCtx, taskruntime.FailTaskInput{
+	err := o.taskExecution.FailTask(cleanupCtx, taskexecution.FailTaskInput{
 		TaskID:        task.TaskID,
 		Assignment:    assignment,
 		Reason:        reason,
@@ -571,14 +571,14 @@ func (o *taskExecutionOrchestrator) skipCancelledTask(ctx context.Context, task 
 	}
 	var err error
 	if attemptFinish != nil {
-		err = o.taskRuntime.RecordTaskCancelledWithAttempt(cleanupCtx, snapshot, *attemptFinish)
+		err = o.taskExecution.RecordTaskCancelledWithAttempt(cleanupCtx, snapshot, *attemptFinish)
 	} else {
-		err = o.taskRuntime.RecordTaskCancelled(cleanupCtx, snapshot)
+		err = o.taskExecution.RecordTaskCancelled(cleanupCtx, snapshot)
 	}
 	if err != nil {
 		slog.Warn("record task cancellation snapshot failed", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "err", err)
 	}
-	if err := o.taskRuntime.ClearTaskCancelled(cleanupCtx, task.TaskID); err != nil {
+	if err := o.taskExecution.ClearTaskCancelled(cleanupCtx, task.TaskID); err != nil {
 		slog.Warn("clear task cancellation marker failed", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "err", err)
 	}
 	slog.Info("task cancelled; stop execution", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID())
@@ -592,13 +592,13 @@ func (o *taskExecutionOrchestrator) handleExecutionInterrupted(ctx context.Conte
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
-	err := o.taskRuntime.ResetRunningTask(cleanupCtx, taskruntime.ResetRunningTaskInput{
+	err := o.taskExecution.ResetRunningTask(cleanupCtx, taskexecution.ResetRunningTaskInput{
 		Assignment:    assignment,
 		Reason:        "worker context interrupted, waiting retry",
 		AttemptFinish: attemptFinish,
 	})
 	if err != nil {
-		if errors.Is(err, taskruntime.ErrTaskNotFound) || errors.Is(err, taskruntime.ErrTaskTerminal) || errors.Is(err, taskruntime.ErrTaskStateConflict) {
+		if errors.Is(err, taskexecution.ErrTaskNotFound) || errors.Is(err, taskexecution.ErrTaskTerminal) || errors.Is(err, taskexecution.ErrTaskStateConflict) {
 			slog.Info("interrupted task already converged", "task_id", task.TaskID, "err", err)
 		} else {
 			slog.Warn("interrupted task reset failed", "task_id", task.TaskID, "err", err)
@@ -656,7 +656,7 @@ func (o *taskExecutionOrchestrator) recordFinalizeFinished(ctx context.Context, 
 func (o *taskExecutionOrchestrator) recordExecutionMetrics(ctx context.Context, taskID string, patch tasks.TaskExecutionMetricsPatch) {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
-	if err := o.taskRuntime.RecordExecutionMetrics(cleanupCtx, patch); err != nil {
+	if err := o.taskExecution.RecordExecutionMetrics(cleanupCtx, patch); err != nil {
 		slog.Warn("record task execution metrics failed", "task_id", taskID, "err", err)
 	}
 }
@@ -664,7 +664,7 @@ func (o *taskExecutionOrchestrator) recordExecutionMetrics(ctx context.Context, 
 func (o *taskExecutionOrchestrator) recordExecutionTerminal(ctx context.Context, taskID string, currentStage string, failureStage string, failureCategory string, finishedAt time.Time) {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
-	if err := o.taskRuntime.RecordExecutionTerminal(cleanupCtx, taskID, currentStage, failureStage, failureCategory, finishedAt); err != nil {
+	if err := o.taskExecution.RecordExecutionTerminal(cleanupCtx, taskID, currentStage, failureStage, failureCategory, finishedAt); err != nil {
 		slog.Warn("record terminal task execution metrics failed", "task_id", taskID, "err", err)
 	}
 }
@@ -672,7 +672,7 @@ func (o *taskExecutionOrchestrator) recordExecutionTerminal(ctx context.Context,
 func (o *taskExecutionOrchestrator) recordExecutionSnapshot(ctx context.Context, taskID string, snapshot tasks.TaskExecutionSnapshot) {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
-	if err := o.taskRuntime.RecordExecutionSnapshot(cleanupCtx, snapshot); err != nil {
+	if err := o.taskExecution.RecordExecutionSnapshot(cleanupCtx, snapshot); err != nil {
 		slog.Warn("record task execution snapshot failed", "task_id", taskID, "err", err)
 	}
 }
@@ -752,7 +752,7 @@ func isContextInterrupted(err error) bool {
 }
 
 func isTaskConvergedError(err error) bool {
-	return errors.Is(err, taskruntime.ErrTaskNotFound) || errors.Is(err, taskruntime.ErrTaskTerminal) || errors.Is(err, taskruntime.ErrTaskStateConflict)
+	return errors.Is(err, taskexecution.ErrTaskNotFound) || errors.Is(err, taskexecution.ErrTaskTerminal) || errors.Is(err, taskexecution.ErrTaskStateConflict)
 }
 
 func userFacingProviderError(err error) string {

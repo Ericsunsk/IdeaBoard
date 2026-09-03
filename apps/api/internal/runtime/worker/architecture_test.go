@@ -6,7 +6,7 @@ import (
 )
 
 // The worker implementation collaborates with Tasking exclusively through
-// task/queue/runtime contracts (tasks, taskqueue, taskruntime, taskmedia).
+// task, execution, queue and media contracts (tasks, taskexecution, taskqueue, taskmedia).
 // It must never reach into persistence, facades or sibling application
 // packages; those seams belong to Tasking and Runtime wiring.
 var forbiddenWorkerTaskingImports = []string{

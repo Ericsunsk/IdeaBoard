@@ -20,7 +20,7 @@ import (
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/runtime/billingregistry"
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
-	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	taskexecution "ideaboard/api/internal/tasking/application/execution"
 	tasksubmission "ideaboard/api/internal/tasking/application/submission"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	tasks "ideaboard/api/internal/tasking/domain"
@@ -62,7 +62,7 @@ func TestAIImageWorkflowBillingContractUsesCurrentProviderPoolAndConvergesFacts(
 	taskRepo := taskstore.NewRepository(db)
 
 	assigner := taskqueue.NewPostgresTaskAssigner(db)
-	taskRuntime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
+	taskExecution := taskexecution.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 	var providerCalls atomic.Int32
 	var failedProviderCalls atomic.Int32
 	var successfulProviderCalls atomic.Int32
@@ -72,7 +72,7 @@ func TestAIImageWorkflowBillingContractUsesCurrentProviderPoolAndConvergesFacts(
 	orchestrator := newTaskExecutionOrchestrator(
 		accountRepo,
 		riverQueue,
-		taskRuntime,
+		taskExecution,
 		func(_ context.Context, runtimeAccount *accounts.RuntimeAccountAccess, _ *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) (providerCallOutput, error) {
 			providerCalls.Add(1)
 			switch runtimeAccount.ID {
@@ -96,7 +96,7 @@ func TestAIImageWorkflowBillingContractUsesCurrentProviderPoolAndConvergesFacts(
 			return providerOutputJSON(`{"status":"success","image_url":"https://example.com/workflow-contract.png"}`), nil
 		},
 	)
-	riverWorker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, taskRuntime, orchestrator.execute))
+	riverWorker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, taskExecution, orchestrator.execute))
 	riverClient, err := NewRiverClient(pool, riverWorker, RiverServerOptions{
 		QueueName: queueName, Concurrency: 1, MaxRetry: 1, JobTimeout: 5 * time.Second,
 	})

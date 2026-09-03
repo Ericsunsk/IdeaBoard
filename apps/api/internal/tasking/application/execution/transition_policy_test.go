@@ -1,4 +1,4 @@
-package runtime
+package execution
 
 import (
 	"context"
@@ -13,20 +13,20 @@ import (
 	runtimecontracts "ideaboard/api/internal/tasking/ports/runtime"
 )
 
-func TestTaskRuntimeTransitionRowsAffectedZeroPolicy(t *testing.T) {
+func TestTaskExecutionTransitionRowsAffectedZeroPolicy(t *testing.T) {
 	ctx := context.Background()
 	assignment := taskTransitionTestAssignment("transition-policy-task")
 
 	testCases := []struct {
 		name    string
-		store   *fakeTaskRuntimeTransitionStore
+		store   *fakeTaskExecutionTransitionStore
 		run     func(context.Context, *Service) (bool, error)
 		want    bool
 		wantErr error
 	}{
 		{
 			name: "complete stale terminal conflicts",
-			store: &fakeTaskRuntimeTransitionStore{
+			store: &fakeTaskExecutionTransitionStore{
 				tasks:        []*tasks.Task{taskTransitionTestTask(tasks.StatusCompleted)},
 				completeRows: 0,
 			},
@@ -37,7 +37,7 @@ func TestTaskRuntimeTransitionRowsAffectedZeroPolicy(t *testing.T) {
 		},
 		{
 			name: "running fail stale terminal conflicts",
-			store: &fakeTaskRuntimeTransitionStore{
+			store: &fakeTaskExecutionTransitionStore{
 				tasks:              []*tasks.Task{taskTransitionTestTask(tasks.StatusFailed)},
 				markFailedRows:     0,
 				markFailedUseLease: true,
@@ -49,7 +49,7 @@ func TestTaskRuntimeTransitionRowsAffectedZeroPolicy(t *testing.T) {
 		},
 		{
 			name: "pending fail terminal failed is idempotent",
-			store: &fakeTaskRuntimeTransitionStore{
+			store: &fakeTaskExecutionTransitionStore{
 				tasks:          []*tasks.Task{taskTransitionTestTask(tasks.StatusFailed)},
 				markFailedRows: 0,
 			},
@@ -59,7 +59,7 @@ func TestTaskRuntimeTransitionRowsAffectedZeroPolicy(t *testing.T) {
 		},
 		{
 			name: "requeue rows zero pending is idempotent",
-			store: &fakeTaskRuntimeTransitionStore{
+			store: &fakeTaskExecutionTransitionStore{
 				tasks:       []*tasks.Task{taskTransitionTestTask(tasks.StatusRunning), taskTransitionTestTask(tasks.StatusPending)},
 				requeueRows: 0,
 			},
@@ -70,7 +70,7 @@ func TestTaskRuntimeTransitionRowsAffectedZeroPolicy(t *testing.T) {
 		},
 		{
 			name: "final fail stale terminal conflicts",
-			store: &fakeTaskRuntimeTransitionStore{
+			store: &fakeTaskExecutionTransitionStore{
 				tasks:         []*tasks.Task{taskTransitionTestTaskWithRetry(tasks.StatusRunning, defaultTaskRetryLimit-1), taskTransitionTestTask(tasks.StatusFailed)},
 				finalFailRows: 0,
 			},
@@ -81,7 +81,7 @@ func TestTaskRuntimeTransitionRowsAffectedZeroPolicy(t *testing.T) {
 		},
 		{
 			name: "cancel rows zero nonterminal conflicts",
-			store: &fakeTaskRuntimeTransitionStore{
+			store: &fakeTaskExecutionTransitionStore{
 				tasks:      []*tasks.Task{taskTransitionTestTask(tasks.StatusRunning)},
 				cancelRows: 0,
 			},
@@ -92,7 +92,7 @@ func TestTaskRuntimeTransitionRowsAffectedZeroPolicy(t *testing.T) {
 		},
 		{
 			name: "cancel rows zero cancelled is idempotent",
-			store: &fakeTaskRuntimeTransitionStore{
+			store: &fakeTaskExecutionTransitionStore{
 				tasks:      []*tasks.Task{taskTransitionTestTask(tasks.StatusCancelled)},
 				cancelRows: 0,
 			},
@@ -119,47 +119,47 @@ func TestTaskRuntimeTransitionRowsAffectedZeroPolicy(t *testing.T) {
 	}
 }
 
-func TestTaskRuntimeTransitionValidWrites(t *testing.T) {
+func TestTaskExecutionTransitionValidWrites(t *testing.T) {
 	ctx := context.Background()
 	assignment := taskTransitionTestAssignment("transition-policy-task")
 
 	testCases := []struct {
 		name  string
-		store *fakeTaskRuntimeTransitionStore
+		store *fakeTaskExecutionTransitionStore
 		run   func(context.Context, *Service) (bool, error)
 		want  bool
 	}{
 		{
 			name:  "complete",
-			store: &fakeTaskRuntimeTransitionStore{completeRows: 1},
+			store: &fakeTaskExecutionTransitionStore{completeRows: 1},
 			run: func(ctx context.Context, service *Service) (bool, error) {
 				return false, service.CompleteTask(ctx, CompleteTaskInput{Assignment: assignment, Result: `{"status":"success"}`})
 			},
 		},
 		{
 			name:  "fail pending",
-			store: &fakeTaskRuntimeTransitionStore{markFailedRows: 1},
+			store: &fakeTaskExecutionTransitionStore{markFailedRows: 1},
 			run: func(ctx context.Context, service *Service) (bool, error) {
 				return false, service.FailTask(ctx, FailTaskInput{TaskID: assignment.TaskID, Reason: "final failure"})
 			},
 		},
 		{
 			name:  "fail running",
-			store: &fakeTaskRuntimeTransitionStore{markFailedRows: 1},
+			store: &fakeTaskExecutionTransitionStore{markFailedRows: 1},
 			run: func(ctx context.Context, service *Service) (bool, error) {
 				return false, service.FailTask(ctx, FailTaskInput{Assignment: assignment, Reason: "provider failed"})
 			},
 		},
 		{
 			name:  "reset",
-			store: &fakeTaskRuntimeTransitionStore{resetRows: 1},
+			store: &fakeTaskExecutionTransitionStore{resetRows: 1},
 			run: func(ctx context.Context, service *Service) (bool, error) {
 				return false, service.ResetRunningTask(ctx, ResetRunningTaskInput{Assignment: assignment, Reason: "interrupted"})
 			},
 		},
 		{
 			name:  "requeue",
-			store: &fakeTaskRuntimeTransitionStore{tasks: []*tasks.Task{taskTransitionTestTask(tasks.StatusRunning)}, requeueRows: 1},
+			store: &fakeTaskExecutionTransitionStore{tasks: []*tasks.Task{taskTransitionTestTask(tasks.StatusRunning)}, requeueRows: 1},
 			run: func(ctx context.Context, service *Service) (bool, error) {
 				return service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: assignment, Reason: "retryable"})
 			},
@@ -167,14 +167,14 @@ func TestTaskRuntimeTransitionValidWrites(t *testing.T) {
 		},
 		{
 			name:  "final fail",
-			store: &fakeTaskRuntimeTransitionStore{tasks: []*tasks.Task{taskTransitionTestTaskWithRetry(tasks.StatusRunning, defaultTaskRetryLimit-1)}, finalFailRows: 1},
+			store: &fakeTaskExecutionTransitionStore{tasks: []*tasks.Task{taskTransitionTestTaskWithRetry(tasks.StatusRunning, defaultTaskRetryLimit-1)}, finalFailRows: 1},
 			run: func(ctx context.Context, service *Service) (bool, error) {
 				return service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: assignment, Reason: "retry limit"})
 			},
 		},
 		{
 			name:  "cancel",
-			store: &fakeTaskRuntimeTransitionStore{cancelRows: 1},
+			store: &fakeTaskExecutionTransitionStore{cancelRows: 1},
 			run: func(ctx context.Context, service *Service) (bool, error) {
 				return false, service.RecordTaskCancelled(ctx, tasks.TaskCancellationSnapshot{TaskID: assignment.TaskID, CancelledAt: time.Now(), Reason: "user cancelled"})
 			},
@@ -198,9 +198,9 @@ func TestTaskRuntimeTransitionValidWrites(t *testing.T) {
 	}
 }
 
-func TestTaskRuntimeTransitionWriteLeaseConflictIsStateConflict(t *testing.T) {
+func TestTaskExecutionTransitionWriteLeaseConflictIsStateConflict(t *testing.T) {
 	ctx := context.Background()
-	store := &fakeTaskRuntimeTransitionStore{
+	store := &fakeTaskExecutionTransitionStore{
 		writeErr: fmt.Errorf("%w: finish task attempt affected 0 rows, want 1", runtimecontracts.ErrTaskLeaseStateConflict),
 	}
 	service := NewService(nil, store, nil, nil)
@@ -221,7 +221,7 @@ func TestCompleteTaskPassesOneConvergenceIntentAndPublishesCompleted(t *testing.
 	completedAt := time.Date(2026, time.July, 31, 12, 0, 0, 0, time.UTC)
 	attemptFinish := &tasks.TaskAttemptFinish{ID: 41, CompletedAt: completedAt}
 	outputs := []tasks.TaskOutput{{OutputKind: "remote", Role: "image", URL: "https://provider.example/result.png"}}
-	store := &fakeTaskRuntimeTransitionStore{completeRows: 1}
+	store := &fakeTaskExecutionTransitionStore{completeRows: 1}
 	service := NewService(nil, store, nil, nil)
 	publisher := newRecordingTaskStatusPublisher()
 	service.SetTaskStatusPublisher(publisher)
@@ -263,9 +263,9 @@ func TestCompleteTaskPassesOneConvergenceIntentAndPublishesCompleted(t *testing.
 	}
 }
 
-func TestTaskRuntimeTransitionMissingLeaseIdentityConflicts(t *testing.T) {
+func TestTaskExecutionTransitionMissingLeaseIdentityConflicts(t *testing.T) {
 	ctx := context.Background()
-	store := &fakeTaskRuntimeTransitionStore{}
+	store := &fakeTaskExecutionTransitionStore{}
 	service := NewService(nil, store, nil, nil)
 
 	testCases := []struct {
@@ -305,9 +305,9 @@ func TestTaskRuntimeTransitionMissingLeaseIdentityConflicts(t *testing.T) {
 	}
 }
 
-func TestTaskRuntimeFinalFailureConvergenceIsIdempotentForFailedTask(t *testing.T) {
+func TestTaskExecutionFinalFailureConvergenceIsIdempotentForFailedTask(t *testing.T) {
 	ctx := context.Background()
-	store := &fakeTaskRuntimeTransitionStore{
+	store := &fakeTaskExecutionTransitionStore{
 		tasks: []*tasks.Task{taskTransitionTestTask(tasks.StatusFailed)},
 	}
 	service := NewService(nil, store, nil, nil)
@@ -320,8 +320,8 @@ func TestTaskRuntimeFinalFailureConvergenceIsIdempotentForFailedTask(t *testing.
 	}
 }
 
-func TestTaskRuntimeRiverFinalFailureUsesFinalFailureConvergenceIntent(t *testing.T) {
-	store := &fakeTaskRuntimeTransitionStore{
+func TestTaskExecutionRiverFinalFailureUsesFinalFailureConvergenceIntent(t *testing.T) {
+	store := &fakeTaskExecutionTransitionStore{
 		tasks:         []*tasks.Task{taskTransitionTestTask(tasks.StatusPending)},
 		finalFailRows: 1,
 	}
@@ -336,8 +336,8 @@ func TestTaskRuntimeRiverFinalFailureUsesFinalFailureConvergenceIntent(t *testin
 	}
 }
 
-func TestTaskRuntimeRiverFinalFailureTreatsConcurrentFailedWriteAsConverged(t *testing.T) {
-	store := &fakeTaskRuntimeTransitionStore{
+func TestTaskExecutionRiverFinalFailureTreatsConcurrentFailedWriteAsConverged(t *testing.T) {
+	store := &fakeTaskExecutionTransitionStore{
 		tasks: []*tasks.Task{
 			taskTransitionTestTask(tasks.StatusPending),
 			taskTransitionTestTask(tasks.StatusFailed),
@@ -360,7 +360,7 @@ func TestTaskRuntimeRiverFinalFailureTreatsConcurrentFailedWriteAsConverged(t *t
 	}
 }
 
-type fakeTaskRuntimeTransitionStore struct {
+type fakeTaskExecutionTransitionStore struct {
 	tasks              []*tasks.Task
 	getCalls           int
 	writeCount         int
@@ -375,7 +375,7 @@ type fakeTaskRuntimeTransitionStore struct {
 	convergenceIntent  *runtimecontracts.TaskConvergenceIntent
 }
 
-func (f *fakeTaskRuntimeTransitionStore) ConvergeTask(_ context.Context, intent runtimecontracts.TaskConvergenceIntent) (int64, error) {
+func (f *fakeTaskExecutionTransitionStore) ConvergeTask(_ context.Context, intent runtimecontracts.TaskConvergenceIntent) (int64, error) {
 	f.writeCount++
 	f.convergenceIntent = &intent
 	switch intent.Kind {
@@ -394,7 +394,7 @@ func (f *fakeTaskRuntimeTransitionStore) ConvergeTask(_ context.Context, intent 
 	}
 }
 
-func (f *fakeTaskRuntimeTransitionStore) GetByTaskID(context.Context, string) (*tasks.Task, error) {
+func (f *fakeTaskExecutionTransitionStore) GetByTaskID(context.Context, string) (*tasks.Task, error) {
 	if len(f.tasks) == 0 {
 		return nil, sql.ErrNoRows
 	}
@@ -407,30 +407,30 @@ func (f *fakeTaskRuntimeTransitionStore) GetByTaskID(context.Context, string) (*
 	return &task, nil
 }
 
-func (f *fakeTaskRuntimeTransitionStore) GetActiveTaskLeaseByTaskID(context.Context, string) (*runtimecontracts.ActiveTaskLease, error) {
+func (f *fakeTaskExecutionTransitionStore) GetActiveTaskLeaseByTaskID(context.Context, string) (*runtimecontracts.ActiveTaskLease, error) {
 	return nil, sql.ErrNoRows
 }
 
-func (f *fakeTaskRuntimeTransitionStore) PatchExecutionMetrics(context.Context, tasks.TaskExecutionMetricsPatch) error {
+func (f *fakeTaskExecutionTransitionStore) PatchExecutionMetrics(context.Context, tasks.TaskExecutionMetricsPatch) error {
 	return f.writeErr
 }
 
-func (f *fakeTaskRuntimeTransitionStore) PatchExecutionSnapshot(context.Context, tasks.TaskExecutionSnapshot) (int64, error) {
+func (f *fakeTaskExecutionTransitionStore) PatchExecutionSnapshot(context.Context, tasks.TaskExecutionSnapshot) (int64, error) {
 	f.writeCount++
 	return 1, f.writeErr
 }
 
-func (f *fakeTaskRuntimeTransitionStore) CreateTaskAttempt(context.Context, tasks.TaskAttemptStart) (tasks.TaskAttemptRef, error) {
+func (f *fakeTaskExecutionTransitionStore) CreateTaskAttempt(context.Context, tasks.TaskAttemptStart) (tasks.TaskAttemptRef, error) {
 	f.writeCount++
 	return tasks.TaskAttemptRef{ID: 1, LeaseID: 1, AttemptNo: 1}, f.writeErr
 }
 
-func (f *fakeTaskRuntimeTransitionStore) FinishTaskAttempt(context.Context, tasks.TaskAttemptFinish) (int64, error) {
+func (f *fakeTaskExecutionTransitionStore) FinishTaskAttempt(context.Context, tasks.TaskAttemptFinish) (int64, error) {
 	f.writeCount++
 	return 1, f.writeErr
 }
 
-func (f *fakeTaskRuntimeTransitionStore) MarkTaskCancelled(context.Context, tasks.TaskCancellationSnapshot, *tasks.TaskAttemptFinish) (int64, error) {
+func (f *fakeTaskExecutionTransitionStore) MarkTaskCancelled(context.Context, tasks.TaskCancellationSnapshot, *tasks.TaskAttemptFinish) (int64, error) {
 	f.writeCount++
 	return f.cancelRows, f.writeErr
 }

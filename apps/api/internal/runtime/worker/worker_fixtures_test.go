@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accountpool/accounts"
-	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	taskexecution "ideaboard/api/internal/tasking/application/execution"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
@@ -104,14 +104,14 @@ type fakeRuntime struct {
 	resetCalls      int
 }
 
-func (f *fakeRuntime) FailTask(_ context.Context, input taskruntime.FailTaskInput) error {
+func (f *fakeRuntime) FailTask(_ context.Context, input taskexecution.FailTaskInput) error {
 	f.failedCalls++
 	f.lastFailedTask = input.TaskID
 	f.lastFailedCause = input.Reason
 	return nil
 }
 
-func (f *fakeRuntime) ResetRunningTask(context.Context, taskruntime.ResetRunningTaskInput) error {
+func (f *fakeRuntime) ResetRunningTask(context.Context, taskexecution.ResetRunningTaskInput) error {
 	f.resetCalls++
 	return f.resetErr
 }

@@ -12,7 +12,7 @@ var forbiddenTaskqueueImports = []string{
 	"ideaboard/api/internal/runtime",
 	"ideaboard/api/internal/tasking/application/task",
 	"ideaboard/api/internal/tasking/infrastructure/postgres",
-	"ideaboard/api/internal/tasking/application/runtime",
+	"ideaboard/api/internal/tasking/application/execution",
 	"ideaboard/api/internal/tasking/application/statistics",
 	"ideaboard/api/internal/tasking/application/submission",
 	"ideaboard/api/internal/tasking/application/billing",

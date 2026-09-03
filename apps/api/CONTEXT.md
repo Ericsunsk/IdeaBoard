@@ -8,7 +8,7 @@
 | ------- | ----------- | -------------- | --------------- |
 | Runtime | `cmd`, `internal/runtime` | 启动 API 进程、注册 HTTP routes、装配 worker adapters、服务 embedded frontend dist | `bootstrap`, `httpapi.RegisterRoutes`, `worker.RiverTaskWorker` |
 | Platform | `internal/platform`, `internal/db`, `internal/events` | config、database pools、response helpers、safe HTTP、settings、event bus、generated SQL | `config.Config`, sqlc queries, event publishers |
-| Tasking | `internal/tasking` | Task model、submission、queueing、Task Billing orchestration、media validation、runtime lifecycle、persistence、statistics | `taskservice.Service`, `tasksubmission.Store`, `taskbilling.Service`, `taskqueue.TaskAssigner`, `taskruntime.Service`, `taskstats.Service`, `taskstore.Repository` |
+| Tasking | `internal/tasking` | Task model、submission、queueing、Task Billing orchestration、media validation、execution lifecycle、persistence、statistics | `application/task.Service`, `application/submission.Store`, `application/billing.Service`, `ports/queue.TaskAssigner`, `application/execution.Service`, `application/statistics.Service`, `infrastructure/postgres.Repository` |
 | Identity | `internal/identity/auth`, `internal/identity/autherrors`, `internal/identity/users` | Auth middleware/client、user persistence、user/admin management | Auth handlers/middleware, `users.UserRepository`, `users.UserService` |
 | AccountPool | `internal/accountpool/accounts`, `internal/accountpool/channels` | Account pool、channel config、account load、task scheduling visibility | `accounts.AccountService`, account/channel handlers and repositories |
 | Boards | `internal/boards` | Board ownership、access checks、board management API | `boards.BoardService`, board handler/repository |
