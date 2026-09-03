@@ -2,11 +2,13 @@ package payments
 
 import (
 	"errors"
+	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"sync"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/credits"
+	paymentsdomain "ideaboard/api/internal/payments/domain"
 	"ideaboard/api/internal/testdb"
 )
 
@@ -28,13 +30,13 @@ func TestPaidPaymentOrderAndPurchaseCreditConvergeAtomicallyOnce(t *testing.T) {
 		t.Fatalf("seed Wallet: %v", err)
 	}
 
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	order := createBoundPaymentOrder(t, repo)
 	facts := paidCheckoutFacts(order)
 	creditedAt := time.Date(2026, 8, 1, 12, 10, 0, 0, time.UTC)
 
 	const workers = 4
-	results := make(chan PaymentConvergenceResult, workers)
+	results := make(chan paymentsdomain.PaymentConvergenceResult, workers)
 	errorsSeen := make(chan error, workers)
 	var group sync.WaitGroup
 	for range workers {
@@ -56,7 +58,7 @@ func TestPaidPaymentOrderAndPurchaseCreditConvergeAtomicallyOnce(t *testing.T) {
 	}
 	var firstCount, replayCount int
 	for result := range results {
-		if result.Order.Status != PaymentOrderCredited || result.AvailableIdeas != 502 {
+		if result.Order.Status != paymentsdomain.PaymentOrderCredited || result.AvailableIdeas != 502 {
 			t.Fatalf("convergence result = %+v", result)
 		}
 		if result.Replayed {
@@ -94,12 +96,12 @@ func TestPaidPaymentOrderFactConflictRollsBackWithoutCredit(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	order := createBoundPaymentOrder(t, repo)
 	facts := paidCheckoutFacts(order)
 	facts.RequestHash = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
 
-	if _, err := repo.ConvergePaidPaymentOrder(t.Context(), facts, time.Now()); !errors.Is(err, ErrCheckoutIdempotencyConflict) {
+	if _, err := repo.ConvergePaidPaymentOrder(t.Context(), facts, time.Now()); !errors.Is(err, paymentsdomain.ErrCheckoutIdempotencyConflict) {
 		t.Fatalf("ConvergePaidPaymentOrder() error = %v, want idempotency conflict", err)
 	}
 	var purchaseCount int
@@ -113,20 +115,20 @@ func TestPaidPaymentOrderFactConflictRollsBackWithoutCredit(t *testing.T) {
 	if err := db.QueryRowContext(t.Context(), `SELECT status FROM payment_orders WHERE id = $1`, order.ID).Scan(&status); err != nil {
 		t.Fatal(err)
 	}
-	if status != string(PaymentOrderCheckoutOpen) {
+	if status != string(paymentsdomain.PaymentOrderCheckoutOpen) {
 		t.Fatalf("payment order status = %q", status)
 	}
 }
 
-func createBoundPaymentOrder(t *testing.T, repo *Repository) PaymentOrder {
+func createBoundPaymentOrder(t *testing.T, repo *paymentpostgres.Repository) paymentsdomain.PaymentOrder {
 	t.Helper()
 	configuration := publishTestStripeConfiguration(t, repo, "acct_payment", "prod_idea")
-	input := CreatePaymentOrderIntentInput{
+	input := paymentsdomain.CreatePaymentOrderIntentInput{
 		ID: "0198cd29-f457-7e4b-b95e-6cfde41b8111", PublicOrderNumber: "IBP-20260801-ABC123DEF456",
 		PublicToken: "0198cd29-f457-7e4b-b95e-6cfde41b8222", UserID: 42,
 		ClientIdempotencyKey: "payment-convergence-checkout", RequestHash: "841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
 		StripeCredentialID: configuration.CredentialID, StripeAccountID: "acct_payment", StripeProductID: "prod_idea", IdeaQuantity: 501,
-		TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
+		TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 		ReturnBaseURL: "http://localhost:5173",
 		ExpiresAt:     time.Date(2026, 8, 1, 12, 30, 0, 0, time.UTC),
 	}
@@ -134,7 +136,7 @@ func createBoundPaymentOrder(t *testing.T, repo *Repository) PaymentOrder {
 	if err != nil {
 		t.Fatal(err)
 	}
-	order, err = repo.BindPaymentOrderCheckout(t.Context(), BindPaymentOrderCheckoutInput{
+	order, err = repo.BindPaymentOrderCheckout(t.Context(), paymentsdomain.BindPaymentOrderCheckoutInput{
 		OrderID: order.ID, StripeCustomerID: "cus_payment", StripeSessionID: "cs_test_payment",
 		CheckoutURL: "https://checkout.stripe.com/c/pay/cs_test_payment", ExpiresAt: input.ExpiresAt,
 	})
@@ -144,8 +146,8 @@ func createBoundPaymentOrder(t *testing.T, repo *Repository) PaymentOrder {
 	return order
 }
 
-func paidCheckoutFacts(order PaymentOrder) PaidCheckoutFacts {
-	return PaidCheckoutFacts{
+func paidCheckoutFacts(order paymentsdomain.PaymentOrder) paymentsdomain.PaidCheckoutFacts {
+	return paymentsdomain.PaidCheckoutFacts{
 		StripeAccountID: order.StripeAccountID, StripeSessionID: order.StripeCheckoutSessionID,
 		ExpiresAt:         order.ExpiresAt,
 		PublicOrderNumber: order.PublicOrderNumber, PaymentOrderID: order.ID, RequestHash: order.RequestHash,

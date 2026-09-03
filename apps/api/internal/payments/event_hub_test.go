@@ -6,13 +6,21 @@ import (
 	"time"
 
 	platformevents "ideaboard/api/internal/events"
+	paymentevents "ideaboard/api/internal/payments/infrastructure/events"
+	paymentports "ideaboard/api/internal/payments/ports"
 )
+
+func NewEventHub() *paymentevents.Hub { return paymentevents.NewHub() }
+
+type PaymentEvent = paymentports.PaymentEvent
 
 func TestPaymentEventHubScopesEventsByUserAndKeepsLatest(t *testing.T) {
 	hub := NewEventHub()
-	first, unsubscribeFirst := subscribePaymentUserEvents(t, hub, 42)
+	userHub := platformevents.NewUserEventHub()
+	hub.SetUserEventHub(userHub)
+	first, unsubscribeFirst := subscribePaymentUserEvents(t, userHub, 42)
 	defer unsubscribeFirst()
-	second, unsubscribeSecond := subscribePaymentUserEvents(t, hub, 99)
+	second, unsubscribeSecond := subscribePaymentUserEvents(t, userHub, 99)
 	defer unsubscribeSecond()
 
 	hub.Publish(42, PaymentEvent{PublicToken: "first", Status: "processing"})
@@ -49,12 +57,16 @@ func TestPaymentEventHubScopesEventsByUserAndKeepsLatest(t *testing.T) {
 	}
 }
 
-func subscribePaymentUserEvents(t *testing.T, hub *EventHub, userID int64) (<-chan platformevents.UserEvent, func()) {
+type paymentEventSubscriber interface {
+	Subscribe(int64) (<-chan platformevents.UserEvent, func(), bool)
+}
+
+func subscribePaymentUserEvents(t *testing.T, hub paymentEventSubscriber, userID int64) (<-chan platformevents.UserEvent, func()) {
 	t.Helper()
-	if hub == nil || hub.currentUserEventHub() == nil {
+	if hub == nil {
 		t.Fatal("payment user event hub is unavailable")
 	}
-	stream, unsubscribe, accepted := hub.currentUserEventHub().Subscribe(userID)
+	stream, unsubscribe, accepted := hub.Subscribe(userID)
 	if !accepted || stream == nil {
 		t.Fatal("payment user event subscription rejected")
 	}

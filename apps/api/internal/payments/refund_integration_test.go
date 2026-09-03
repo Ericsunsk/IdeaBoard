@@ -2,25 +2,31 @@ package payments
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"sync"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/credits"
+	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
+	paymentrefund "ideaboard/api/internal/payments/application/refund"
+	paymentsdomain "ideaboard/api/internal/payments/domain"
+	paymentports "ideaboard/api/internal/payments/ports"
 	"ideaboard/api/internal/testdb"
 )
 
 type refundGatewayFake struct {
 	mu             sync.Mutex
-	createResponse StripeRefund
-	retrieve       map[string]StripeRefund
+	createResponse paymentports.StripeRefund
+	retrieve       map[string]paymentports.StripeRefund
 	createCalls    int
 	retrieveCalls  int
 }
 
-func (f *refundGatewayFake) CreateRefund(_ context.Context, input CreateStripeRefundInput) (StripeRefund, error) {
+func (f *refundGatewayFake) CreateRefund(_ context.Context, input paymentports.CreateStripeRefundInput) (paymentports.StripeRefund, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.createCalls++
@@ -37,7 +43,7 @@ func (f *refundGatewayFake) CreateRefund(_ context.Context, input CreateStripeRe
 	return result, nil
 }
 
-func (f *refundGatewayFake) RetrieveRefund(_ context.Context, _ string, refundID string) (StripeRefund, error) {
+func (f *refundGatewayFake) RetrieveRefund(_ context.Context, _ string, refundID string) (paymentports.StripeRefund, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.retrieveCalls++
@@ -46,52 +52,52 @@ func (f *refundGatewayFake) RetrieveRefund(_ context.Context, _ string, refundID
 
 func TestPaymentRefundReservesIdeasIdempotentlyAndReleasesOnFailure(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
-	order := createCreditedRefundOrder(t, repo, now.Add(-13*24*time.Hour))
+	order := createCreditedRefundOrder(t, db, repo, now.Add(-13*24*time.Hour))
 
-	refund, replayed, err := repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
+	refund, replayed, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 200,
 		IdempotencyKey: "refund-integration-1", Reason: "unused Ideas", Now: now,
 	})
 	if err != nil || replayed {
 		t.Fatalf("CreatePendingPaymentRefund() refund=%+v replayed=%v error=%v", refund, replayed, err)
 	}
-	if refund.AmountMinor != 200 || refund.Currency != "usd" || refund.Status != PaymentRefundPending {
+	if refund.AmountMinor != 200 || refund.Currency != "usd" || refund.Status != paymentsdomain.PaymentRefundPending {
 		t.Fatalf("refund = %+v", refund)
 	}
 	wallet, err := credits.NewService(pool).GetWallet(t.Context(), 42)
 	if err != nil || wallet.Available != 300 || wallet.Reserved != 200 {
 		t.Fatalf("reserved Wallet=%+v error=%v", wallet, err)
 	}
-	_, replayed, err = repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
+	_, replayed, err = repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 200,
 		IdempotencyKey: "refund-integration-1", Reason: "unused Ideas", Now: now,
 	})
 	if err != nil || !replayed {
 		t.Fatalf("refund replay replayed=%v error=%v", replayed, err)
 	}
-	if _, _, err := repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
+	if _, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 199,
 		IdempotencyKey: "refund-integration-1", Reason: "unused Ideas", Now: now,
-	}); !errors.Is(err, ErrRefundIdempotency) {
+	}); !errors.Is(err, paymentcontracts.ErrRefundIdempotency) {
 		t.Fatalf("refund idempotency conflict error = %v", err)
 	}
-	if _, _, err := repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
+	if _, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 301,
 		IdempotencyKey: "refund-integration-over", Reason: "unused Ideas", Now: now,
-	}); !errors.Is(err, ErrRefundAmountExceeds) {
+	}); !errors.Is(err, paymentcontracts.ErrRefundAmountExceeds) {
 		t.Fatalf("over-limit refund error = %v", err)
 	}
 	failed, err := repo.MarkPaymentRefundFailed(t.Context(), refund.ID, "provider rejected", now.Add(time.Minute))
-	if err != nil || failed.Status != PaymentRefundFailed {
+	if err != nil || failed.Status != paymentsdomain.PaymentRefundFailed {
 		t.Fatalf("MarkPaymentRefundFailed() refund=%+v error=%v", failed, err)
 	}
 	wallet, err = credits.NewService(pool).GetWallet(t.Context(), 42)
 	if err != nil || wallet.Available != 500 || wallet.Reserved != 0 {
 		t.Fatalf("released Wallet=%+v error=%v", wallet, err)
 	}
-	second, _, err := repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
+	second, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 200,
 		IdempotencyKey: "refund-integration-2", Reason: "unused Ideas", Now: now.Add(2 * time.Minute),
 	})
@@ -99,7 +105,7 @@ func TestPaymentRefundReservesIdeasIdempotentlyAndReleasesOnFailure(t *testing.T
 		t.Fatal(err)
 	}
 	succeeded, err := repo.MarkPaymentRefundSucceeded(t.Context(), second.ID, now.Add(3*time.Minute))
-	if err != nil || succeeded.Status != PaymentRefundSucceeded || succeeded.CreditTransactionID == "" {
+	if err != nil || succeeded.Status != paymentsdomain.PaymentRefundSucceeded || succeeded.CreditTransactionID == "" {
 		t.Fatalf("MarkPaymentRefundSucceeded() refund=%+v error=%v", succeeded, err)
 	}
 	wallet, err = credits.NewService(pool).GetWallet(t.Context(), 42)
@@ -113,9 +119,9 @@ func TestPaymentRefundReservesIdeasIdempotentlyAndReleasesOnFailure(t *testing.T
 }
 
 func TestProportionalRefundAmountUsesCumulativeRounding(t *testing.T) {
-	first := proportionalRefundAmount(10, 3, 0, 1)
-	second := proportionalRefundAmount(10, 3, 1, 1)
-	third := proportionalRefundAmount(10, 3, 2, 1)
+	first := paymentsdomain.ProportionalRefundAmount(10, 3, 0, 1)
+	second := paymentsdomain.ProportionalRefundAmount(10, 3, 1, 1)
+	third := paymentsdomain.ProportionalRefundAmount(10, 3, 2, 1)
 	if first != 3 || second != 3 || third != 4 || first+second+third != 10 {
 		t.Fatalf("cumulative refund amounts = %d, %d, %d", first, second, third)
 	}
@@ -123,24 +129,24 @@ func TestProportionalRefundAmountUsesCumulativeRounding(t *testing.T) {
 
 func TestPaymentRefundRejectsExactFourteenDayBoundary(t *testing.T) {
 	db := testdb.Open(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
-	order := createCreditedRefundOrder(t, repo, now.Add(-refundEligibilityWindow))
-	_, _, err := repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
+	order := createCreditedRefundOrder(t, db, repo, now.Add(-paymentsdomain.RefundEligibilityWindow))
+	_, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 1,
 		IdempotencyKey: "refund-integration-expired", Reason: "unused Idea", Now: now,
 	})
-	if !errors.Is(err, ErrRefundExpired) {
+	if !errors.Is(err, paymentcontracts.ErrRefundExpired) {
 		t.Fatalf("exact boundary error = %v", err)
 	}
 }
 
 func TestPaymentRefundTerminalFactsCannotRegress(t *testing.T) {
 	db := testdb.Open(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
-	order := createCreditedRefundOrder(t, repo, now.Add(-time.Hour))
-	refund, _, err := repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
+	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
+	refund, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 1,
 		IdempotencyKey: "refund-terminal-immutable", Reason: "unused Idea", Now: now,
 	})
@@ -157,10 +163,10 @@ func TestPaymentRefundTerminalFactsCannotRegress(t *testing.T) {
 
 func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	now := time.Now().UTC()
-	order := createCreditedRefundOrder(t, repo, now.Add(-time.Hour))
-	refund, _, err := repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
+	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
+	refund, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 100,
 		IdempotencyKey: "refund-reconciliation", Reason: "unused Ideas", Now: now.Add(-3 * time.Minute),
 	})
@@ -170,7 +176,7 @@ func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *t
 	if _, err := repo.MarkPaymentRefundProviderResult(t.Context(), refund.ID, "re_reconcile", "pending", now.Add(-3*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	gateway := &refundGatewayFake{retrieve: map[string]StripeRefund{
+	gateway := &refundGatewayFake{retrieve: map[string]paymentports.StripeRefund{
 		"re_reconcile": {ID: "re_reconcile", Status: "succeeded", ChargeID: "ch_refund", AmountMinor: 100, Currency: "usd"},
 	}}
 	runtime := NewPaymentRuntime(NewEventHub(), func() time.Time { return now })
@@ -193,14 +199,14 @@ func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := facts.reconcileDuePaymentRefunds(t.Context(), now.Add(3*time.Minute)); err != nil {
+	if err := facts.reconciliation.ReconcileDuePaymentRefunds(t.Context(), now.Add(3*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if err := facts.reconcileDuePaymentRefunds(t.Context(), now.Add(4*time.Minute)); err != nil {
+	if err := facts.reconciliation.ReconcileDuePaymentRefunds(t.Context(), now.Add(4*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	settled, err := repo.GetPaymentRefundByID(t.Context(), refund.ID)
-	if err != nil || settled.Status != PaymentRefundSucceeded {
+	if err != nil || settled.Status != paymentsdomain.PaymentRefundSucceeded {
 		t.Fatalf("settled refund=%+v error=%v", settled, err)
 	}
 	wallet, err := credits.NewService(pool).GetWallet(t.Context(), 42)
@@ -214,13 +220,13 @@ func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *t
 
 func TestPaymentRefundConcurrentRequestsCannotExceedOrderOrWallet(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
-	order := createCreditedRefundOrder(t, repo, now.Add(-time.Hour))
+	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	errs := make(chan error, 2)
 	for index := range 2 {
 		go func() {
-			_, _, err := repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
+			_, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 				ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 300,
 				IdempotencyKey: fmt.Sprintf("refund-concurrent-%d", index), Reason: "unused Ideas", Now: now,
 			})
@@ -233,7 +239,7 @@ func TestPaymentRefundConcurrentRequestsCannotExceedOrderOrWallet(t *testing.T) 
 		switch {
 		case err == nil:
 			succeeded++
-		case errors.Is(err, ErrRefundAmountExceeds), errors.Is(err, credits.ErrInsufficientCredits):
+		case errors.Is(err, paymentcontracts.ErrRefundAmountExceeds), errors.Is(err, credits.ErrInsufficientCredits):
 			rejected++
 		default:
 			t.Fatalf("unexpected concurrent refund error: %v", err)
@@ -248,21 +254,21 @@ func TestPaymentRefundConcurrentRequestsCannotExceedOrderOrWallet(t *testing.T) 
 	}
 }
 
-func createCreditedRefundOrder(t *testing.T, repo *Repository, paidAt time.Time) PaymentOrder {
+func createCreditedRefundOrder(t *testing.T, db *sql.DB, repo *paymentpostgres.Repository, paidAt time.Time) paymentsdomain.PaymentOrder {
 	t.Helper()
 	publishTestStripeConfiguration(t, repo, "acct_admin_read", "prod_admin_read")
-	if _, err := repo.db.ExecContext(t.Context(), `SELECT provision_credit_wallet(42)`); err != nil {
+	if _, err := db.ExecContext(t.Context(), `SELECT provision_credit_wallet(42)`); err != nil {
 		t.Fatal(err)
 	}
 	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260804-REFUND000001", 500)
-	bound, err := repo.BindPaymentOrderCheckout(t.Context(), BindPaymentOrderCheckoutInput{
+	bound, err := repo.BindPaymentOrderCheckout(t.Context(), paymentsdomain.BindPaymentOrderCheckoutInput{
 		OrderID: order.ID, StripeCustomerID: "cus_refund", StripeSessionID: "cs_refund",
 		CheckoutURL: "https://checkout.stripe.example/refund", ExpiresAt: order.ExpiresAt,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	paid, _, err := repo.RecordPaidPaymentOrder(t.Context(), PaidCheckoutFacts{
+	paid, _, err := repo.RecordPaidPaymentOrder(t.Context(), paymentsdomain.PaidCheckoutFacts{
 		StripeAccountID: bound.StripeAccountID, StripeSessionID: bound.StripeCheckoutSessionID,
 		ExpiresAt: bound.ExpiresAt, PublicOrderNumber: bound.PublicOrderNumber, PaymentOrderID: bound.ID,
 		RequestHash: bound.RequestHash, StripeCustomerID: bound.StripeCustomerID,

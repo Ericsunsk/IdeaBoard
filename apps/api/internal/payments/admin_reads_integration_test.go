@@ -5,12 +5,18 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/identity/principal"
+	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
+	paymentreadmodel "ideaboard/api/internal/payments/application/readmodel"
+	paymentsdomain "ideaboard/api/internal/payments/domain"
+	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
+	paymentports "ideaboard/api/internal/payments/ports"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport"
@@ -21,7 +27,7 @@ import (
 
 func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T) {
 	db := testdb.Open(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	publishTestStripeConfiguration(t, repo, "acct_admin_read", "prod_admin_read")
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), testStripeGateway{}, testCheckoutGateway{}, testWalletReader{}, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	user42PublicID := adminPaymentUserPublicID(t, db, 42)
@@ -30,7 +36,7 @@ func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T)
 	third := createAdminPaymentOrder(t, repo, 99, "IBP-20260801-CCC000000003", 503)
 	markAdminPaymentOrderAnomalous(t, db, second.ID)
 
-	handler := NewAdminHandler(service, config.PublicOriginsConfig{})
+	handler := paymenthttp.NewAdminHandler(service, config.PublicOriginsConfig{})
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -48,7 +54,7 @@ func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T)
 	if firstPageResponse.Code != http.StatusOK || firstPageResponse.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("first page status=%d headers=%v body=%s", firstPageResponse.Code, firstPageResponse.Header(), firstPageResponse.Body.String())
 	}
-	var firstPage AdminPaymentOrderPage
+	var firstPage paymentcontracts.AdminPaymentOrderPage
 	decodePaymentResponseData(t, firstPageResponse.Body.Bytes(), &firstPage)
 	if firstPage.Total != 3 || len(firstPage.Orders) != 1 || firstPage.NextCursor == "" {
 		t.Fatalf("first page=%+v", firstPage)
@@ -58,7 +64,7 @@ func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T)
 	if secondPageResponse.Code != http.StatusOK {
 		t.Fatalf("second page status=%d body=%s", secondPageResponse.Code, secondPageResponse.Body.String())
 	}
-	var secondPage AdminPaymentOrderPage
+	var secondPage paymentcontracts.AdminPaymentOrderPage
 	decodePaymentResponseData(t, secondPageResponse.Body.Bytes(), &secondPage)
 	if secondPage.Total != 3 || len(secondPage.Orders) != 1 || secondPage.Orders[0].PublicOrderNumber == firstPage.Orders[0].PublicOrderNumber {
 		t.Fatalf("second page=%+v first=%+v", secondPage, firstPage)
@@ -81,7 +87,7 @@ func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T)
 		if response.Code != http.StatusOK {
 			t.Fatalf("%s status=%d body=%s", testCase.name, response.Code, response.Body.String())
 		}
-		var page AdminPaymentOrderPage
+		var page paymentcontracts.AdminPaymentOrderPage
 		decodePaymentResponseData(t, response.Body.Bytes(), &page)
 		if page.Total != int64(testCase.want) || len(page.Orders) != testCase.want {
 			t.Fatalf("%s page=%+v", testCase.name, page)
@@ -91,7 +97,7 @@ func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T)
 	if third.PublicOrderNumber == first.PublicOrderNumber || second.PublicOrderNumber == first.PublicOrderNumber {
 		t.Fatal("test orders must have distinct public numbers")
 	}
-	nonCanonicalCursorPayload, err := json.Marshal(adminPaymentOrderCursor{
+	nonCanonicalCursorPayload, err := json.Marshal(paymentreadmodel.AdminPaymentOrderCursor{
 		CreatedAt: third.CreatedAt.In(time.FixedZone("UTC+8", 8*60*60)).Format(time.RFC3339Nano),
 		OrderID:   third.ID,
 	})
@@ -130,12 +136,12 @@ func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T)
 
 func TestAdminPaymentOrderDetailMasksProviderIdentifiersAndExcludesInternalFields(t *testing.T) {
 	db := testdb.Open(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	publishTestStripeConfiguration(t, repo, "acct_admin_read", "prod_admin_read")
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), testStripeGateway{}, testCheckoutGateway{}, testWalletReader{}, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	userPublicID := adminPaymentUserPublicID(t, db, 42)
 	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-DETAIL000001", 501)
-	bound, err := repo.BindPaymentOrderCheckout(t.Context(), BindPaymentOrderCheckoutInput{
+	bound, err := repo.BindPaymentOrderCheckout(t.Context(), paymentsdomain.BindPaymentOrderCheckoutInput{
 		OrderID: order.ID, StripeCustomerID: "cus_admin_detail_secret", StripeSessionID: "cs_admin_detail_secret",
 		CheckoutURL: "https://checkout.stripe.example/session", ExpiresAt: order.ExpiresAt,
 	})
@@ -144,7 +150,7 @@ func TestAdminPaymentOrderDetailMasksProviderIdentifiersAndExcludesInternalField
 	}
 	markAdminPaymentOrderAnomalous(t, db, bound.ID)
 
-	handler := NewAdminHandler(service, config.PublicOriginsConfig{})
+	handler := paymenthttp.NewAdminHandler(service, config.PublicOriginsConfig{})
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -157,9 +163,9 @@ func TestAdminPaymentOrderDetailMasksProviderIdentifiersAndExcludesInternalField
 	if response.Code != http.StatusOK || response.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("detail status=%d headers=%v body=%s", response.Code, response.Header(), response.Body.String())
 	}
-	var detail AdminPaymentOrderDetail
+	var detail paymentcontracts.AdminPaymentOrderDetail
 	decodePaymentResponseData(t, response.Body.Bytes(), &detail)
-	if detail.User.PublicID != userPublicID || detail.User.DisplayName != "test-fixture-user-42" || detail.Status != PaymentOrderCheckoutOpen ||
+	if detail.User.PublicID != userPublicID || detail.User.DisplayName != "test-fixture-user-42" || detail.Status != paymentsdomain.PaymentOrderCheckoutOpen ||
 		detail.Stripe.CustomerID == "" || strings.Contains(detail.Stripe.CustomerID, "admin_detail_secret") ||
 		!detail.Reconciliation.Anomalous || detail.Reconciliation.LastErrorSummary != "需要人工检查" {
 		t.Fatalf("detail=%+v", detail)
@@ -200,11 +206,11 @@ func adminPaymentUserPublicID(t *testing.T, db *sql.DB, userID int64) uuid.UUID 
 
 func TestAdminPaymentOrderDetailAssociatesRefundAndDisputeWebhookFacts(t *testing.T) {
 	db := testdb.Open(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	publishTestStripeConfiguration(t, repo, "acct_admin_read", "prod_admin_read")
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), testStripeGateway{}, testCheckoutGateway{}, testWalletReader{}, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-EVENTS000001", 501)
-	bound, err := repo.BindPaymentOrderCheckout(t.Context(), BindPaymentOrderCheckoutInput{
+	bound, err := repo.BindPaymentOrderCheckout(t.Context(), paymentsdomain.BindPaymentOrderCheckoutInput{
 		OrderID: order.ID, StripeCustomerID: "cus_events", StripeSessionID: "cs_events",
 		CheckoutURL: "https://checkout.stripe.example/events", ExpiresAt: order.ExpiresAt,
 	})
@@ -212,7 +218,7 @@ func TestAdminPaymentOrderDetailAssociatesRefundAndDisputeWebhookFacts(t *testin
 		t.Fatalf("BindPaymentOrderCheckout() error = %v", err)
 	}
 	paidAt := time.Now().UTC().Truncate(time.Second)
-	if _, _, err := repo.RecordPaidPaymentOrder(t.Context(), PaidCheckoutFacts{
+	if _, _, err := repo.RecordPaidPaymentOrder(t.Context(), paymentsdomain.PaidCheckoutFacts{
 		StripeAccountID: bound.StripeAccountID, StripeSessionID: bound.StripeCheckoutSessionID,
 		ExpiresAt: bound.ExpiresAt, PublicOrderNumber: bound.PublicOrderNumber, PaymentOrderID: bound.ID,
 		RequestHash: bound.RequestHash, StripeCustomerID: bound.StripeCustomerID,
@@ -223,7 +229,7 @@ func TestAdminPaymentOrderDetailAssociatesRefundAndDisputeWebhookFacts(t *testin
 		t.Fatalf("RecordPaidPaymentOrder() error = %v", err)
 	}
 	processedAt := paidAt.Add(time.Minute)
-	for _, event := range []StripeWebhookEvent{
+	for _, event := range []paymentports.StripeWebhookEvent{
 		{ID: "evt_refund_events", Type: "refund.updated", ObjectID: "re_events_12345678", PaymentIntentID: "pi_events", Livemode: false, CreatedAt: processedAt},
 		{ID: "evt_dispute_events", Type: "charge.dispute.created", ObjectID: "dp_events_12345678", ChargeID: "ch_events", Livemode: false, CreatedAt: processedAt.Add(time.Second)},
 	} {
@@ -245,16 +251,16 @@ func TestAdminPaymentOrderDetailAssociatesRefundAndDisputeWebhookFacts(t *testin
 	}
 }
 
-func createAdminPaymentOrder(t *testing.T, repo *Repository, userID int64, publicOrderNumber string, quantity int64) PaymentOrder {
+func createAdminPaymentOrder(t *testing.T, repo *paymentpostgres.Repository, userID int64, publicOrderNumber string, quantity int64) paymentsdomain.PaymentOrder {
 	t.Helper()
 	configuration := activeTestStripeConfiguration(t, repo)
-	order, _, err := repo.CreatePaymentOrderIntent(t.Context(), CreatePaymentOrderIntentInput{
+	order, _, err := repo.CreatePaymentOrderIntent(t.Context(), paymentsdomain.CreatePaymentOrderIntentInput{
 		ID: uuid.NewString(), PublicOrderNumber: publicOrderNumber, PublicToken: uuid.NewString(), UserID: userID,
 		ClientIdempotencyKey: "admin-read-" + strings.ToLower(publicOrderNumber[len(publicOrderNumber)-12:]),
 		RequestHash:          "841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
 		StripeCredentialID:   configuration.CredentialID,
 		StripeAccountID:      "acct_admin_read", StripeProductID: "prod_admin_read", IdeaQuantity: quantity,
-		TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
+		TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 		ReturnBaseURL: "https://app.example.com/user/boards", ExpiresAt: time.Now().UTC().Add(30 * time.Minute),
 	})
 	if err != nil {

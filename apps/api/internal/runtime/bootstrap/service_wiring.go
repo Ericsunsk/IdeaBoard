@@ -13,7 +13,8 @@ import (
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/payments"
-	"ideaboard/api/internal/payments/stripeadapter"
+	paymentevents "ideaboard/api/internal/payments/infrastructure/events"
+	"ideaboard/api/internal/payments/infrastructure/stripe"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
@@ -97,12 +98,12 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 	}
 	authServiceClient := auth.NewServiceClient(cfg.Auth)
 	userService := users.NewUserServiceWithEmailReader(repos.userRepo, userLifecycle, creditService, storageService, authServiceClient)
-	stripeAdapter := stripeadapter.New()
+	stripeAdapter := stripe.New()
 	paymentCheckoutShutdownDispatcher, err := worker.NewPaymentCheckoutShutdownDispatcher(riverProducer)
 	if err != nil {
 		return appDomainServices{}, err
 	}
-	paymentRuntime := payments.NewPaymentRuntime(payments.NewEventHub(), nil)
+	paymentRuntime := payments.NewPaymentRuntime(paymentevents.NewHub(), nil)
 	paymentTransitions, err := payments.NewPaymentOrderTransitions(repos.paymentRepo, paymentRuntime)
 	if err != nil {
 		return appDomainServices{}, fmt.Errorf("initialize payment order transitions: %w", err)

@@ -16,7 +16,7 @@ import (
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
-	"ideaboard/api/internal/payments"
+	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
@@ -54,7 +54,7 @@ type appRepositories struct {
 	storageProfileRepo   *storage.StorageProfileRepository
 	mediaAssetRegistry   *assets.MediaAssetRegistry
 	boardRepo            *boards.BoardRepository
-	paymentRepo          *payments.Repository
+	paymentRepo          *paymentpostgres.Repository
 	libraryRepo          *library.Repository
 	adminBrandLogoRepo   *adminbranding.Repository
 }
@@ -140,7 +140,7 @@ func runtimePrivilegePolicies() []dbprivileges.Policy {
 		taskbilling.RuntimePrivilegePolicy(),
 		worker.RuntimePrivilegePolicy(),
 		rewards.RuntimePrivilegePolicy(),
-		payments.RuntimePrivilegePolicy(),
+		paymentpostgres.RuntimePrivilegePolicy(),
 		searchcatalog.RuntimePrivilegePolicy(),
 	}
 }
@@ -185,7 +185,7 @@ func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error
 		storageProfileRepo:   storage.NewStorageProfileRepository(db),
 		mediaAssetRegistry:   assets.NewMediaAssetRegistry(db),
 		boardRepo:            boards.NewBoardRepository(db),
-		paymentRepo:          payments.NewRepository(db),
+		paymentRepo:          paymentpostgres.NewRepository(db),
 		libraryRepo:          library.NewRepository(db),
 		adminBrandLogoRepo:   adminbranding.NewRepository(db),
 	}

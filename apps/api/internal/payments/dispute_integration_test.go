@@ -2,18 +2,23 @@ package payments
 
 import (
 	"errors"
+	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
+	paymentsdomain "ideaboard/api/internal/payments/domain"
+	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
+	paymentports "ideaboard/api/internal/payments/ports"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/credits"
+	paymentrefund "ideaboard/api/internal/payments/application/refund"
 	"ideaboard/api/internal/testdb"
 )
 
 func TestPaymentDisputeDebitsAvailableIdeasAndRestoresOnLateWin(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	now := time.Date(2026, 8, 5, 12, 0, 0, 0, time.UTC)
-	_ = createCreditedRefundOrder(t, repo, now.Add(-time.Hour))
+	_ = createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	creditService := credits.NewService(pool)
 	spendAmount, err := credits.NewCreditAmount(450)
 	if err != nil {
@@ -30,7 +35,7 @@ func TestPaymentDisputeDebitsAvailableIdeasAndRestoresOnLateWin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	provider := StripeDispute{
+	provider := paymentports.StripeDispute{
 		ID: "dp_partial", Status: "under_review", ChargeID: "ch_refund", PaymentIntentID: "pi_refund",
 		AmountMinor: 210, Currency: "usd", CreatedAt: now,
 	}
@@ -38,7 +43,7 @@ func TestPaymentDisputeDebitsAvailableIdeasAndRestoresOnLateWin(t *testing.T) {
 	if err != nil || !changed {
 		t.Fatalf("ConvergePaymentDispute(open) dispute=%+v changed=%v err=%v", dispute, changed, err)
 	}
-	if dispute.Status != PaymentDisputeOpen || dispute.TargetIdeaQuantity != 200 ||
+	if dispute.Status != paymentsdomain.PaymentDisputeOpen || dispute.TargetIdeaQuantity != 200 ||
 		dispute.DebitedIdeaQuantity != 50 || dispute.UnrecoveredCredits != 150 ||
 		dispute.RestrictionID == "" || dispute.DebitTransactionID == "" {
 		t.Fatalf("open Dispute = %+v", dispute)
@@ -54,12 +59,12 @@ func TestPaymentDisputeDebitsAvailableIdeasAndRestoresOnLateWin(t *testing.T) {
 	}
 	provider.Status = "lost"
 	lost, changed, err := repo.ConvergePaymentDispute(t.Context(), provider, now.Add(2*time.Minute))
-	if err != nil || !changed || lost.Status != PaymentDisputeLost || lost.RestoreTransactionID != "" {
+	if err != nil || !changed || lost.Status != paymentsdomain.PaymentDisputeLost || lost.RestoreTransactionID != "" {
 		t.Fatalf("lost Dispute=%+v changed=%v err=%v", lost, changed, err)
 	}
 	provider.Status = "won"
 	won, changed, err := repo.ConvergePaymentDispute(t.Context(), provider, now.Add(3*time.Minute))
-	if err != nil || !changed || won.Status != PaymentDisputeWon || won.RestoreTransactionID == "" {
+	if err != nil || !changed || won.Status != paymentsdomain.PaymentDisputeWon || won.RestoreTransactionID == "" {
 		t.Fatalf("late-win Dispute=%+v changed=%v err=%v", won, changed, err)
 	}
 	wallet, err = creditService.GetWallet(t.Context(), 42)
@@ -70,10 +75,10 @@ func TestPaymentDisputeDebitsAvailableIdeasAndRestoresOnLateWin(t *testing.T) {
 
 func TestPaymentDisputeFullDebitRetainsRestrictionAfterLoss(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	now := time.Date(2026, 8, 5, 12, 30, 0, 0, time.UTC)
-	_ = createCreditedRefundOrder(t, repo, now.Add(-time.Hour))
-	dispute, changed, err := repo.ConvergePaymentDispute(t.Context(), StripeDispute{
+	_ = createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
+	dispute, changed, err := repo.ConvergePaymentDispute(t.Context(), paymentports.StripeDispute{
 		ID: "dp_full_loss", Status: "lost", ChargeID: "ch_refund", PaymentIntentID: "pi_refund",
 		AmountMinor: 525, Currency: "usd", CreatedAt: now,
 	}, now)
@@ -88,18 +93,18 @@ func TestPaymentDisputeFullDebitRetainsRestrictionAfterLoss(t *testing.T) {
 
 func TestWonDisputeDiscoveredAfterCloseDoesNotCreateTransientRecovery(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	now := time.Date(2026, 8, 5, 13, 0, 0, 0, time.UTC)
-	_ = createCreditedRefundOrder(t, repo, now.Add(-time.Hour))
+	_ = createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 
-	dispute, changed, err := repo.ConvergePaymentDispute(t.Context(), StripeDispute{
+	dispute, changed, err := repo.ConvergePaymentDispute(t.Context(), paymentports.StripeDispute{
 		ID: "dp_close_first", Status: "won", ChargeID: "ch_refund", PaymentIntentID: "pi_refund",
 		AmountMinor: 105, Currency: "usd", CreatedAt: now.Add(-30 * time.Minute),
 	}, now)
 	if err != nil || !changed {
 		t.Fatalf("ConvergePaymentDispute(won) dispute=%+v changed=%v err=%v", dispute, changed, err)
 	}
-	if dispute.Status != PaymentDisputeWon || dispute.TargetIdeaQuantity != 100 ||
+	if dispute.Status != paymentsdomain.PaymentDisputeWon || dispute.TargetIdeaQuantity != 100 ||
 		dispute.DebitedIdeaQuantity != 0 || dispute.UnrecoveredCredits != 0 ||
 		dispute.RestrictionID != "" || dispute.DebitTransactionID != "" {
 		t.Fatalf("close-first Dispute = %+v", dispute)
@@ -112,24 +117,24 @@ func TestWonDisputeDiscoveredAfterCloseDoesNotCreateTransientRecovery(t *testing
 
 func TestPaymentDisputeAndLaterRefundShareTheOrderIdeaCap(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	now := time.Date(2026, 8, 5, 14, 0, 0, 0, time.UTC)
-	order := createCreditedRefundOrder(t, repo, now.Add(-time.Hour))
+	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 
-	dispute, _, err := repo.ConvergePaymentDispute(t.Context(), StripeDispute{
+	dispute, _, err := repo.ConvergePaymentDispute(t.Context(), paymentports.StripeDispute{
 		ID: "dp_before_refund", Status: "under_review", ChargeID: "ch_refund", PaymentIntentID: "pi_refund",
 		AmountMinor: 210, Currency: "usd", CreatedAt: now,
 	}, now)
 	if err != nil || dispute.TargetIdeaQuantity != 200 || dispute.DebitedIdeaQuantity != 200 {
 		t.Fatalf("Dispute=%+v err=%v", dispute, err)
 	}
-	if _, _, err := repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
+	if _, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 301,
 		IdempotencyKey: "refund-after-dispute-over", Reason: "unused Ideas", Now: now.Add(time.Minute),
-	}); !errors.Is(err, ErrRefundAmountExceeds) {
+	}); !errors.Is(err, paymentcontracts.ErrRefundAmountExceeds) {
 		t.Fatalf("over-cap refund error=%v", err)
 	}
-	refund, _, err := repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
+	refund, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 300,
 		IdempotencyKey: "refund-after-dispute-exact", Reason: "unused Ideas", Now: now.Add(time.Minute),
 	})
@@ -144,18 +149,18 @@ func TestPaymentDisputeAndLaterRefundShareTheOrderIdeaCap(t *testing.T) {
 
 func TestPaymentRefundAndLaterDisputeShareTheOrderIdeaCap(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	now := time.Date(2026, 8, 5, 14, 30, 0, 0, time.UTC)
-	order := createCreditedRefundOrder(t, repo, now.Add(-time.Hour))
+	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 
-	refund, _, err := repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
+	refund, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 300,
 		IdempotencyKey: "refund-before-dispute", Reason: "unused Ideas", Now: now,
 	})
 	if err != nil || refund.IdeaQuantity != 300 {
 		t.Fatalf("pending refund=%+v err=%v", refund, err)
 	}
-	dispute, changed, err := repo.ConvergePaymentDispute(t.Context(), StripeDispute{
+	dispute, changed, err := repo.ConvergePaymentDispute(t.Context(), paymentports.StripeDispute{
 		ID: "dp_after_refund", Status: "under_review", ChargeID: "ch_refund", PaymentIntentID: "pi_refund",
 		AmountMinor: 525, Currency: "usd", CreatedAt: now.Add(time.Minute),
 	}, now.Add(time.Minute))
@@ -170,9 +175,9 @@ func TestPaymentRefundAndLaterDisputeShareTheOrderIdeaCap(t *testing.T) {
 
 func TestPaymentDisputeSerializesWithConcurrentConsumption(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	now := time.Date(2026, 8, 5, 15, 0, 0, 0, time.UTC)
-	_ = createCreditedRefundOrder(t, repo, now.Add(-time.Hour))
+	_ = createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	creditService := credits.NewService(pool)
 	holdAmount, err := credits.NewCreditAmount(100)
 	if err != nil {
@@ -182,7 +187,7 @@ func TestPaymentDisputeSerializesWithConcurrentConsumption(t *testing.T) {
 	start := make(chan struct{})
 	holdResult := make(chan error, 1)
 	disputeResult := make(chan struct {
-		dispute PaymentDispute
+		dispute paymentsdomain.PaymentDispute
 		err     error
 	}, 1)
 	go func() {
@@ -199,12 +204,12 @@ func TestPaymentDisputeSerializesWithConcurrentConsumption(t *testing.T) {
 	}()
 	go func() {
 		<-start
-		dispute, _, convergeErr := repo.ConvergePaymentDispute(t.Context(), StripeDispute{
+		dispute, _, convergeErr := repo.ConvergePaymentDispute(t.Context(), paymentports.StripeDispute{
 			ID: "dp_concurrent_hold", Status: "under_review", ChargeID: "ch_refund", PaymentIntentID: "pi_refund",
 			AmountMinor: 525, Currency: "usd", CreatedAt: now,
 		}, now)
 		disputeResult <- struct {
-			dispute PaymentDispute
+			dispute paymentsdomain.PaymentDispute
 			err     error
 		}{dispute: dispute, err: convergeErr}
 	}()

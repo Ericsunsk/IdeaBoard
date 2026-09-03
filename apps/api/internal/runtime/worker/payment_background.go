@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/payments"
+	paymentreconciliation "ideaboard/api/internal/payments/application/reconciliation"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
@@ -43,7 +44,7 @@ func (w *PaymentReconciliationWorker) Work(ctx context.Context, job *river.Job[p
 
 func PaymentReconciliationPeriodicJobs() []*river.PeriodicJob {
 	return []*river.PeriodicJob{river.NewPeriodicJob(
-		river.PeriodicInterval(payments.PaymentReconciliationInterval()),
+		river.PeriodicInterval(paymentreconciliation.Interval),
 		func() (river.JobArgs, *river.InsertOpts) {
 			return paymentReconciliationScheduleJobArgs{}, &river.InsertOpts{
 				Queue: PaymentReconciliationQueue, MaxAttempts: 8, Priority: 4,
@@ -108,7 +109,7 @@ func (w *PaymentCheckoutShutdownScheduleWorker) Work(ctx context.Context, job *r
 
 func PaymentCheckoutShutdownPeriodicJobs() []*river.PeriodicJob {
 	return []*river.PeriodicJob{river.NewPeriodicJob(
-		river.PeriodicInterval(payments.PaymentReconciliationInterval()),
+		river.PeriodicInterval(paymentreconciliation.Interval),
 		func() (river.JobArgs, *river.InsertOpts) {
 			return paymentCheckoutShutdownScheduleJobArgs{}, &river.InsertOpts{
 				Queue: PaymentCheckoutShutdownQueue, MaxAttempts: 8, Priority: 1,

@@ -118,7 +118,7 @@ func newAppTaskRuntime(
 	checkoutShutdownPeriodicJobs := worker.PaymentCheckoutShutdownPeriodicJobs()
 	mediaDerivativeEvents := derivatives.NewUserEventPublisher(userEventHub)
 	mediaDerivativeService := derivatives.NewService(dbs.db, services.storageService, mediaDerivativeEvents)
-	if err := configureUserEventFanout(ctx, eventBus, userEventHub, services.paymentService.EventHub()); err != nil {
+	if err := configureUserEventFanout(ctx, eventBus, userEventHub, services.paymentService); err != nil {
 		if eventBus != nil {
 			_ = eventBus.Close()
 		}
@@ -215,11 +215,13 @@ func newAppTaskRuntime(
 		}, nil
 }
 
-func configureUserEventFanout(ctx context.Context, bus *events.NATSJetStreamEventBus, userHub *events.UserEventHub, paymentHub *payments.EventHub) error {
-	if userHub == nil || paymentHub == nil {
-		return fmt.Errorf("user event fanout requires user and payment hubs")
+func configureUserEventFanout(ctx context.Context, bus *events.NATSJetStreamEventBus, userHub *events.UserEventHub, paymentService *payments.Service) error {
+	if userHub == nil || paymentService == nil {
+		return fmt.Errorf("user event fanout requires user hub and payment service")
 	}
-	paymentHub.SetUserEventHub(userHub)
+	if err := paymentService.AttachUserEventHub(userHub); err != nil {
+		return err
+	}
 	if bus != nil {
 		userHub.SetRemotePublisher(func(event events.UserEvent) {
 			publishCtx, cancel := context.WithTimeout(context.Background(), events.DefaultPublishTimeout)

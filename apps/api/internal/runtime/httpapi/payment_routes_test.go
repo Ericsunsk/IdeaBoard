@@ -3,7 +3,7 @@ package httpapi
 import (
 	"testing"
 
-	"ideaboard/api/internal/payments"
+	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/config"
 
 	"github.com/gin-gonic/gin"
@@ -13,7 +13,7 @@ func TestAdminPaymentRoutesExposeStripeConfigurationAndOrderReads(t *testing.T) 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	registerAdminPaymentRoutes(router.Group("/api/admin"), AdminRouteDeps{
-		PaymentAdminHandler: payments.NewAdminHandler(nil, config.PublicOriginsConfig{}),
+		PaymentAdminHandler: paymenthttp.NewAdminHandler(nil, config.PublicOriginsConfig{}),
 	})
 	routes := make(map[string]struct{})
 	for _, route := range router.Routes() {

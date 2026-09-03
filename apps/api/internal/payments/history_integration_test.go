@@ -2,11 +2,16 @@ package payments
 
 import (
 	"errors"
+	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"strings"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/credits"
+	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
+	paymentreadmodel "ideaboard/api/internal/payments/application/readmodel"
+	paymentrefund "ideaboard/api/internal/payments/application/refund"
+	paymentsdomain "ideaboard/api/internal/payments/domain"
 	"ideaboard/api/internal/testdb"
 )
 
@@ -14,7 +19,7 @@ func TestListRechargesReturnsCurrentUsersRecentCreditedAndCancelledOrders(t *tes
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	seedRechargeableWallet(t, pool, 42)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	now := time.Now().UTC()
 	order := createBoundPaymentOrder(t, repo)
 	configuration := activeTestStripeConfiguration(t, repo)
@@ -23,19 +28,19 @@ func TestListRechargesReturnsCurrentUsersRecentCreditedAndCancelledOrders(t *tes
 	if _, err := repo.ConvergePaidPaymentOrder(t.Context(), paidFacts, now.Add(-time.Hour)); err != nil {
 		t.Fatalf("ConvergePaidPaymentOrder() error = %v", err)
 	}
-	cancelledInput := CreatePaymentOrderIntentInput{
+	cancelledInput := paymentsdomain.CreatePaymentOrderIntentInput{
 		ID: "0198cd29-f457-7e4b-b95e-6cfde41b8333", PublicOrderNumber: "IBP-20260801-ABC123DEF457",
 		PublicToken: "0198cd29-f457-7e4b-b95e-6cfde41b8444", UserID: 42,
 		ClientIdempotencyKey: "payment-history-cancelled", RequestHash: "941d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
 		StripeCredentialID: configuration.CredentialID, StripeAccountID: "acct_payment", StripeProductID: "prod_idea", IdeaQuantity: 1000,
-		TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
+		TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 		ReturnBaseURL: "http://localhost:5173", ExpiresAt: now.Add(time.Hour),
 	}
 	cancelled, _, err := repo.CreatePaymentOrderIntent(t.Context(), cancelledInput)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cancelled, err = repo.BindPaymentOrderCheckout(t.Context(), BindPaymentOrderCheckoutInput{
+	cancelled, err = repo.BindPaymentOrderCheckout(t.Context(), paymentsdomain.BindPaymentOrderCheckoutInput{
 		OrderID: cancelled.ID, StripeCustomerID: "cus_cancelled", StripeSessionID: "cs_test_cancelled",
 		CheckoutURL: "https://checkout.stripe.com/c/pay/cs_test_cancelled", ExpiresAt: cancelledInput.ExpiresAt,
 	})
@@ -84,19 +89,19 @@ func TestListRechargesReturnsCurrentUsersRecentCreditedAndCancelledOrders(t *tes
 }
 
 func TestRechargeHistoryCursorRejectsOversizedRawValue(t *testing.T) {
-	if _, err := decodeRechargeHistoryCursor(strings.Repeat("a", maxRechargeHistoryCursorLen+1)); !errors.Is(err, ErrRechargeHistoryCursor) {
-		t.Fatalf("decodeRechargeHistoryCursor() error = %v, want invalid cursor", err)
+	if _, err := paymentreadmodel.DecodeRechargeHistoryCursor(strings.Repeat("a", paymentreadmodel.MaxRechargeHistoryCursorLen+1)); !errors.Is(err, paymentcontracts.ErrRechargeHistoryCursor) {
+		t.Fatalf("DecodeRechargeHistoryCursor() error = %v, want invalid cursor", err)
 	}
 }
 
 func TestListRechargesShowsPartialAndFullRefundState(t *testing.T) {
 	db := testdb.Open(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
-	order := createCreditedRefundOrder(t, repo, now.Add(-time.Hour))
+	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	service := newCompleteTestCheckoutWorkflow(t, repo, NewPaymentRuntime(nil, func() time.Time { return now }), testStripeGateway{}, testCheckoutGateway{}, testWalletReader{}, testShutdownEnqueuer{})
 
-	first, _, err := repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
+	first, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 200,
 		IdempotencyKey: "history-partial-refund", Reason: "unused Ideas", Now: now,
 	})
@@ -111,7 +116,7 @@ func TestListRechargesShowsPartialAndFullRefundState(t *testing.T) {
 		t.Fatalf("partial recharge history=%+v error=%v", partial, err)
 	}
 
-	second, _, err := repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
+	second, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 300,
 		IdempotencyKey: "history-full-refund", Reason: "unused Ideas", Now: now,
 	})

@@ -3,9 +3,13 @@ package payments
 import (
 	"context"
 	"errors"
+	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"strings"
 	"testing"
 
+	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
+	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
+	paymentports "ideaboard/api/internal/payments/ports"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
@@ -14,14 +18,14 @@ func TestConfigureStripePreparesThenAtomicallyPublishesSafeSummary(t *testing.T)
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
 	db.SetMaxOpenConns(1)
-	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
-		AccountID: "acct_test", Mode: StripeModeTest, ChargesEnabled: true,
+	gateway := &fakeStripeGateway{prepared: paymentports.PreparedStripeConfiguration{
+		AccountID: "acct_test", Mode: paymentports.StripeModeTest, ChargesEnabled: true,
 		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_idea", WebhookEndpointID: "we_idea", WebhookSecret: "whsec_test",
 	}}
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	service := newCompleteTestCheckoutWorkflow(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, testShutdownEnqueuer{})
 
-	summary, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+	summary, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_safe_fixture", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	})
@@ -31,7 +35,7 @@ func TestConfigureStripePreparesThenAtomicallyPublishesSafeSummary(t *testing.T)
 	if !summary.Configured || !summary.APIKeyConfigured || !summary.WebhookSecretConfigured {
 		t.Fatalf("summary secret readiness = %+v", summary)
 	}
-	if summary.AccountID != "acct_test" || summary.Mode != StripeModeTest || !summary.ChargesEnabled {
+	if summary.AccountID != "acct_test" || summary.Mode != paymentports.StripeModeTest || !summary.ChargesEnabled {
 		t.Fatalf("summary account = %+v", summary)
 	}
 	if !summary.ProductReady || !summary.WebhookReady || !summary.PurchasesEnabled {
@@ -72,26 +76,26 @@ SELECT actor_id, outcome FROM payment_admin_actions ORDER BY id DESC LIMIT 1`).S
 func TestConfigureStripeFailurePreservesCurrentConfigurationAndAuditsSanitizedError(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
-	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
-		AccountID: "acct_original", Mode: StripeModeTest, ChargesEnabled: true,
+	gateway := &fakeStripeGateway{prepared: paymentports.PreparedStripeConfiguration{
+		AccountID: "acct_original", Mode: paymentports.StripeModeTest, ChargesEnabled: true,
 		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_original", WebhookEndpointID: "we_original", WebhookSecret: "whsec_original",
 	}}
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	service := newCompleteTestCheckoutWorkflow(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, testShutdownEnqueuer{})
-	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_original", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}); err != nil {
 		t.Fatalf("seed configuration: %v", err)
 	}
 
-	gateway.err = NewGatewayError(GatewayErrorPermissionDenied, "permission denied", errors.New("raw provider body sk_test_new"))
-	_, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+	gateway.err = paymentports.NewGatewayError(paymentports.GatewayErrorPermissionDenied, "permission denied", errors.New("raw provider body sk_test_new"))
+	_, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 99, APIKey: "rk_live_new", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: false, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	})
-	if !errors.Is(err, ErrStripePermissionDenied) {
-		t.Fatalf("ConfigureStripe() error = %v, want ErrStripePermissionDenied", err)
+	if !errors.Is(err, paymentcontracts.ErrStripePermissionDenied) {
+		t.Fatalf("ConfigureStripe() error = %v, want paymentcontracts.ErrStripePermissionDenied", err)
 	}
 
 	loaded, loadErr := service.GetStripeConfiguration(t.Context())
@@ -105,7 +109,7 @@ SELECT outcome, error_code, error_summary
 FROM payment_admin_actions ORDER BY id DESC LIMIT 1`).Scan(&outcome, &errorCode, &errorSummary); err != nil {
 		t.Fatalf("read failure audit: %v", err)
 	}
-	if outcome != "failed" || errorCode != string(GatewayErrorPermissionDenied) {
+	if outcome != "failed" || errorCode != string(paymentports.GatewayErrorPermissionDenied) {
 		t.Fatalf("failure audit = outcome=%q code=%q", outcome, errorCode)
 	}
 	if strings.Contains(errorSummary, "sk_test_new") || strings.Contains(errorSummary, "raw provider") {
@@ -116,13 +120,13 @@ FROM payment_admin_actions ORDER BY id DESC LIMIT 1`).Scan(&outcome, &errorCode,
 func TestConfigureStripeReusesOnlyAnUnchangedCredentialGeneration(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
-	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
-		AccountID: "acct_stable", Mode: StripeModeTest, ChargesEnabled: true,
+	gateway := &fakeStripeGateway{prepared: paymentports.PreparedStripeConfiguration{
+		AccountID: "acct_stable", Mode: paymentports.StripeModeTest, ChargesEnabled: true,
 		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_stable", WebhookEndpointID: "we_stable", WebhookSecret: "whsec_stable",
 	}}
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	service := newCompleteTestCheckoutWorkflow(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, testShutdownEnqueuer{})
-	command := ConfigureStripeCommand{
+	command := paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_stable", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}
@@ -167,13 +171,13 @@ func TestConfigureStripeReusesOnlyAnUnchangedCredentialGeneration(t *testing.T) 
 func TestReplaceStripeConfigurationRejectsAStaleRevision(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
-	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
-		AccountID: "acct_revision", Mode: StripeModeTest, ChargesEnabled: true,
+	gateway := &fakeStripeGateway{prepared: paymentports.PreparedStripeConfiguration{
+		AccountID: "acct_revision", Mode: paymentports.StripeModeTest, ChargesEnabled: true,
 		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_revision", WebhookEndpointID: "we_revision", WebhookSecret: "whsec_revision",
 	}}
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	service := newCompleteTestCheckoutWorkflow(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, testShutdownEnqueuer{})
-	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_revision", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}); err != nil {
@@ -185,25 +189,25 @@ func TestReplaceStripeConfigurationRejectsAStaleRevision(t *testing.T) {
 	}
 	updated := current
 	updated.UpdatedBy = 99
-	if _, _, err := repo.ReplaceStripeConfiguration(t.Context(), current.Revision, updated, ConfigurationAudit{ActorID: 99, Outcome: "succeeded"}); err != nil {
+	if _, _, err := repo.ReplaceStripeConfiguration(t.Context(), current.Revision, updated, paymentconfiguration.Audit{ActorID: 99, Outcome: "succeeded"}); err != nil {
 		t.Fatalf("first ReplaceStripeConfiguration() error = %v", err)
 	}
 	updated.UpdatedBy = 42
-	if _, _, err := repo.ReplaceStripeConfiguration(t.Context(), current.Revision, updated, ConfigurationAudit{ActorID: 42, Outcome: "succeeded"}); !errors.Is(err, ErrStripeConfigurationChanged) {
-		t.Fatalf("stale ReplaceStripeConfiguration() error = %v, want ErrStripeConfigurationChanged", err)
+	if _, _, err := repo.ReplaceStripeConfiguration(t.Context(), current.Revision, updated, paymentconfiguration.Audit{ActorID: 42, Outcome: "succeeded"}); !errors.Is(err, paymentcontracts.ErrStripeConfigurationChanged) {
+		t.Fatalf("stale ReplaceStripeConfiguration() error = %v, want paymentcontracts.ErrStripeConfigurationChanged", err)
 	}
 }
 
 func TestDisablingPurchasesShutsDownThePreviousCredentialAccount(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
-	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
-		AccountID: "acct_previous", Mode: StripeModeTest, ChargesEnabled: true,
+	gateway := &fakeStripeGateway{prepared: paymentports.PreparedStripeConfiguration{
+		AccountID: "acct_previous", Mode: paymentports.StripeModeTest, ChargesEnabled: true,
 		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_previous", WebhookEndpointID: "we_previous", WebhookSecret: "whsec_previous",
 	}}
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	service := newCompleteTestCheckoutWorkflow(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, testShutdownEnqueuer{})
-	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_previous", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}); err != nil {
@@ -213,11 +217,11 @@ func TestDisablingPurchasesShutsDownThePreviousCredentialAccount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gateway.prepared = PreparedStripeConfiguration{
-		AccountID: "acct_next", Mode: StripeModeTest, ChargesEnabled: true,
+	gateway.prepared = paymentports.PreparedStripeConfiguration{
+		AccountID: "acct_next", Mode: paymentports.StripeModeTest, ChargesEnabled: true,
 		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_next", WebhookEndpointID: "we_next", WebhookSecret: "whsec_next",
 	}
-	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_next", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: false, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}); err != nil {
@@ -236,24 +240,24 @@ func TestStripeAPIKeyModePolicy(t *testing.T) {
 	tests := []struct {
 		name string
 		key  string
-		mode StripeMode
+		mode paymentports.StripeMode
 		ok   bool
 	}{
-		{name: "test secret", key: "sk_test_value", mode: StripeModeTest, ok: true},
-		{name: "test restricted", key: "rk_test_value", mode: StripeModeTest, ok: true},
-		{name: "live secret", key: "sk_live_value", mode: StripeModeLive, ok: true},
-		{name: "live restricted", key: "rk_live_value", mode: StripeModeLive, ok: true},
+		{name: "test secret", key: "sk_test_value", mode: paymentports.StripeModeTest, ok: true},
+		{name: "test restricted", key: "rk_test_value", mode: paymentports.StripeModeTest, ok: true},
+		{name: "live secret", key: "sk_live_value", mode: paymentports.StripeModeLive, ok: true},
+		{name: "live restricted", key: "rk_live_value", mode: paymentports.StripeModeLive, ok: true},
 		{name: "publishable rejected", key: "pk_live_value", ok: false},
 		{name: "malformed", key: "secret", ok: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mode, err := ClassifyStripeAPIKey(tt.key)
+			mode, err := paymentports.ClassifyStripeAPIKey(tt.key)
 			if tt.ok && (err != nil || mode != tt.mode) {
-				t.Fatalf("ClassifyStripeAPIKey() = %q, %v", mode, err)
+				t.Fatalf("paymentports.ClassifyStripeAPIKey() = %q, %v", mode, err)
 			}
 			if !tt.ok && err == nil {
-				t.Fatalf("ClassifyStripeAPIKey() accepted %q", tt.key)
+				t.Fatalf("paymentports.ClassifyStripeAPIKey() accepted %q", tt.key)
 			}
 		})
 	}
@@ -273,11 +277,11 @@ func TestPaymentMethodConfigurationIDPolicy(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := normalizePaymentMethodConfigurationID(test.raw)
+			got, err := paymentconfiguration.NormalizePaymentMethodConfigurationID(test.raw)
 			if test.ok && (err != nil || got != test.want) {
 				t.Fatalf("normalizePaymentMethodConfigurationID() = %q, %v", got, err)
 			}
-			if !test.ok && !errors.Is(err, ErrInvalidPaymentMethodConfiguration) {
+			if !test.ok && !errors.Is(err, paymentcontracts.ErrInvalidPaymentMethodConfiguration) {
 				t.Fatalf("normalizePaymentMethodConfigurationID() error = %v", err)
 			}
 		})
@@ -285,15 +289,15 @@ func TestPaymentMethodConfigurationIDPolicy(t *testing.T) {
 }
 
 type fakeStripeGateway struct {
-	prepared PreparedStripeConfiguration
+	prepared paymentports.PreparedStripeConfiguration
 	err      error
-	calls    []PrepareStripeConfiguration
+	calls    []paymentports.PrepareStripeConfiguration
 }
 
-func (f *fakeStripeGateway) PrepareConfiguration(_ context.Context, input PrepareStripeConfiguration) (PreparedStripeConfiguration, error) {
+func (f *fakeStripeGateway) PrepareConfiguration(_ context.Context, input paymentports.PrepareStripeConfiguration) (paymentports.PreparedStripeConfiguration, error) {
 	f.calls = append(f.calls, input)
 	if f.err != nil {
-		return PreparedStripeConfiguration{}, f.err
+		return paymentports.PreparedStripeConfiguration{}, f.err
 	}
 	return f.prepared, nil
 }

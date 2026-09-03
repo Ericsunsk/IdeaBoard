@@ -1,12 +1,12 @@
 package httpapi
 
 import (
-	"ideaboard/api/internal/payments"
+	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-func registerPaymentWebhookRoutes(r *gin.Engine, handler *payments.WebhookHandler) {
+func registerPaymentWebhookRoutes(r *gin.Engine, handler *paymenthttp.WebhookHandler) {
 	if handler == nil {
 		return
 	}

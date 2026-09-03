@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"ideaboard/api/internal/platform/database"
 	dbprivileges "ideaboard/api/internal/platform/database/privileges"
 	"ideaboard/api/internal/testdb"
@@ -33,7 +34,7 @@ func TestRuntimeRoleCanUsePaymentsTablesWithoutMutatingAuditOrDeletingConfigurat
 		}
 	})
 
-	policies := []dbprivileges.Policy{database.RuntimePrivilegePolicy(), RuntimePrivilegePolicy()}
+	policies := []dbprivileges.Policy{database.RuntimePrivilegePolicy(), paymentpostgres.RuntimePrivilegePolicy()}
 	if err := dbprivileges.Configure(ctx, db, runtimeRole, policies...); err != nil {
 		t.Fatalf("configure runtime privilege policies: %v", err)
 	}

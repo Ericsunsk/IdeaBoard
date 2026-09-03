@@ -14,7 +14,7 @@ import (
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/librarymaterialization"
 	"ideaboard/api/internal/media/storage"
-	"ideaboard/api/internal/payments"
+	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/prompts"
@@ -40,10 +40,10 @@ func newAppRouter(
 	taskHandler := taskservice.NewHandler(taskServices.taskService)
 	taskStatsHandler := taskstats.NewHandler(taskServices.taskStatsService, taskServices.accountService)
 	billingHandler := billing.NewHandler(services.billingCatalog, services.billingCatalog)
-	paymentUserHandler := payments.NewUserCheckoutHandler(services.paymentService, cfg.PublicOrigins)
+	paymentUserHandler := paymenthttp.NewUserCheckoutHandler(services.paymentService, cfg.PublicOrigins)
 	userEventStreamHandler := httpapi.NewUserEventStreamHandler(taskServices.userEvents)
-	paymentAdminHandler := payments.NewAdminHandler(services.paymentService, cfg.PublicOrigins)
-	paymentWebhookHandler := payments.NewWebhookHandler(services.paymentService)
+	paymentAdminHandler := paymenthttp.NewAdminHandler(services.paymentService, cfg.PublicOrigins)
+	paymentWebhookHandler := paymenthttp.NewWebhookHandler(services.paymentService)
 	creditUserResolver := creditsUserResolver{repo: repos.userRepo}
 	creditUserHandler := credits.NewUserHandler(services.creditService, creditUserResolver)
 	creditAdminCommandHandler := credits.NewAdminCommandHandler(services.creditService, creditUserResolver)

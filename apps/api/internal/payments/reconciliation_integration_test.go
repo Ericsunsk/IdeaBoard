@@ -4,10 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
+	paymentreconciliation "ideaboard/api/internal/payments/application/reconciliation"
+	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"strings"
 	"testing"
 	"time"
 
+	paymentsdomain "ideaboard/api/internal/payments/domain"
+	paymentports "ideaboard/api/internal/payments/ports"
 	"ideaboard/api/internal/testdb"
 
 	"github.com/google/uuid"
@@ -17,7 +22,7 @@ func TestPaymentReconciliationRecoversCreatingIntentWithOriginalStripeIdempotenc
 	now := time.Now().UTC()
 	checkout := newLifecycleCheckoutGateway()
 	db, service, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	// This is a timeout recovery: a local deadline elapsed before the original
 	// provider response could be bound. Stripe idempotency, not that deadline,
 	// decides whether a Session exists.
@@ -27,7 +32,7 @@ func TestPaymentReconciliationRecoversCreatingIntentWithOriginalStripeIdempotenc
 	if err := service.ReconcileDuePaymentOrders(t.Context()); err != nil {
 		t.Fatalf("ReconcileDuePaymentOrders() = %v", err)
 	}
-	assertLifecycleOrderStatus(t, db, order.PublicToken, PaymentOrderCheckoutOpen)
+	assertLifecycleOrderStatus(t, db, order.PublicToken, paymentsdomain.PaymentOrderCheckoutOpen)
 	if calls := checkout.createSessionCalls(); calls != 1 {
 		t.Fatalf("Stripe CreateCheckoutSession calls = %d, want 1", calls)
 	}
@@ -41,7 +46,7 @@ func TestPaymentReconciliationRecoversCreatingIntentWithOriginalStripeIdempotenc
 
 	// A restarted scan only retrieves the previously bound Session. It never asks
 	// Stripe to create another one because the public order number fences creation.
-	now = now.Add(paymentReconciliationInterval)
+	now = now.Add(paymentreconciliation.Interval)
 	if err := service.ReconcileDuePaymentOrders(t.Context()); err != nil {
 		t.Fatalf("replayed reconciliation = %v", err)
 	}
@@ -51,29 +56,31 @@ func TestPaymentReconciliationRecoversCreatingIntentWithOriginalStripeIdempotenc
 }
 
 func TestPaymentReconciliationPreservesCreatingOrderWhenPurchasePolicyIsUnavailable(t *testing.T) {
-	db := testdb.Open(t)
-	repo := NewRepository(db)
-	configuration := publishTestStripeConfiguration(t, repo, "acct_checkout_lifecycle", "prod_checkout_lifecycle")
-	now := time.Now().UTC().Add(3 * time.Minute)
+	now := time.Now().UTC()
+	checkout := newLifecycleCheckoutGateway()
+	db, service, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
+	repo := paymentpostgres.NewRepository(db)
+	configuration := activeTestStripeConfiguration(t, repo)
+	now = now.Add(3 * time.Minute)
 	order := createReconciliationIntent(t, repo, 42, 504, now.Add(time.Hour))
 
-	outcome, err := (&StripeFactsWorkflow{}).reconcilePaymentOrderClaim(
+	outcome, err := service.reconciliation.ReconcilePaymentOrderClaim(
 		t.Context(),
 		configuration,
 		"sk_test_fixture",
 		nil,
 		false,
-		ErrStripeConfigurationNotFound,
-		PaymentReconciliationClaim{Order: order},
+		paymentcontracts.ErrStripeConfigurationNotFound,
+		paymentreconciliation.Claim{Order: order},
 		now,
 	)
-	if !errors.Is(err, ErrStripeConfigurationNotFound) {
-		t.Fatalf("reconcilePaymentOrderClaim() error = %v, want ErrStripeConfigurationNotFound", err)
+	if !errors.Is(err, paymentcontracts.ErrStripeConfigurationNotFound) {
+		t.Fatalf("reconcilePaymentOrderClaim() error = %v, want paymentcontracts.ErrStripeConfigurationNotFound", err)
 	}
-	if outcome.ClearAnomaly || outcome.NextAttemptAt.Before(now.Add(paymentReconciliationOperableDelay)) {
+	if outcome.ClearAnomaly || outcome.NextAttemptAt.Before(now.Add(paymentreconciliation.OperableDelay)) {
 		t.Fatalf("reconciliation outcome = %+v, want delayed retry", outcome)
 	}
-	assertLifecycleOrderStatus(t, db, order.PublicToken, PaymentOrderCreating)
+	assertLifecycleOrderStatus(t, db, order.PublicToken, paymentsdomain.PaymentOrderCreating)
 }
 
 func TestPaymentReconciliationRetriesPaidPendingCreditWithoutSecondStripeFact(t *testing.T) {
@@ -89,13 +96,13 @@ func TestPaymentReconciliationRetriesPaidPendingCreditWithoutSecondStripeFact(t 
 	if _, err := service.GetPaymentOrderReturnStatus(t.Context(), 42, created.PublicToken); err == nil {
 		t.Fatal("expected initial Ledger failure")
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderPaidPendingCredit)
+	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderPaidPendingCredit)
 
 	now = now.Add(3 * time.Minute)
 	if err := service.ReconcileDuePaymentOrders(t.Context()); err == nil {
 		t.Fatal("transient Ledger failure must request River retry")
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderPaidPendingCredit)
+	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderPaidPendingCredit)
 	var retryAt time.Time
 	if err := db.QueryRowContext(t.Context(), `
 SELECT next_attempt_at
@@ -108,11 +115,11 @@ WHERE orders.public_token = $1`, created.PublicToken).Scan(&retryAt); err != nil
 		t.Fatalf("transient retry was deferred until %v; River must be able to reclaim immediately", retryAt)
 	}
 	removeFailure()
-	now = now.Add(paymentReconciliationInterval)
+	now = now.Add(paymentreconciliation.Interval)
 	if err := service.ReconcileDuePaymentOrders(t.Context()); err != nil {
 		t.Fatalf("Ledger retry reconciliation = %v", err)
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderCredited)
+	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderCredited)
 	assertLifecyclePurchaseCount(t, db, 1)
 	assertLifecycleWalletAvailable(t, wallets, 42, 701)
 }
@@ -130,10 +137,10 @@ func TestPaymentReconciliationRecoversLostWebhookPaidSessionExactlyOnce(t *testi
 	if err := service.ReconcileDuePaymentOrders(t.Context()); err != nil {
 		t.Fatalf("lost webhook reconciliation = %v", err)
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderCredited)
+	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderCredited)
 	assertLifecyclePurchaseCount(t, db, 1)
 	assertLifecycleWalletAvailable(t, wallets, 42, 702)
-	now = now.Add(paymentReconciliationInterval)
+	now = now.Add(paymentreconciliation.Interval)
 	if err := service.ReconcileDuePaymentOrders(t.Context()); err != nil {
 		t.Fatalf("replayed lost webhook reconciliation = %v", err)
 	}
@@ -142,7 +149,7 @@ func TestPaymentReconciliationRecoversLostWebhookPaidSessionExactlyOnce(t *testi
 
 func TestPaymentReconciliationClaimsAtMostOneHundredAndFencesStaleWorkers(t *testing.T) {
 	db := testdb.Open(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	publishTestStripeConfiguration(t, repo, "acct_checkout_lifecycle", "prod_checkout_lifecycle")
 	now := time.Now().UTC()
 	for index := int64(0); index < 101; index++ {
@@ -176,7 +183,7 @@ WHERE payment_order_id = $1`, first[0].Order.ID, now.Add(-2*time.Minute), now.Ad
 	if len(takenOver) != 1 || takenOver[0].Order.ID != first[0].Order.ID || takenOver[0].Generation <= first[0].Generation {
 		t.Fatalf("stale lease takeover = %+v, first = %+v", takenOver, first[0])
 	}
-	completed, err := repo.CompletePaymentOrderReconciliationClaim(t.Context(), first[0], PaymentReconciliationOutcome{
+	completed, err := repo.CompletePaymentOrderReconciliationClaim(t.Context(), first[0], paymentreconciliation.Outcome{
 		CheckedAt: now, NextAttemptAt: now.Add(time.Hour), ClearAnomaly: true,
 	})
 	if err != nil {
@@ -189,14 +196,14 @@ WHERE payment_order_id = $1`, first[0].Order.ID, now.Add(-2*time.Minute), now.Ad
 
 func TestPaymentReconciliationConcurrentWorkersClaimEachOrderOnce(t *testing.T) {
 	db := testdb.Open(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	publishTestStripeConfiguration(t, repo, "acct_checkout_lifecycle", "prod_checkout_lifecycle")
 	now := time.Now().UTC()
 	for index := int64(0); index < 12; index++ {
 		createReconciliationIntent(t, repo, 42, 800+index, now.Add(time.Hour))
 	}
 	now = now.Add(3 * time.Minute)
-	claimsByWorker := make(chan []PaymentReconciliationClaim, 2)
+	claimsByWorker := make(chan []paymentreconciliation.Claim, 2)
 	errs := make(chan error, 2)
 	for range 2 {
 		go func() {
@@ -226,7 +233,7 @@ func TestPaymentReconciliationRecordsLongLivedOperableAnomaly(t *testing.T) {
 	now := time.Now().UTC().Add(25 * time.Hour)
 	checkout := reconciliationDeterministicFailureGateway{}
 	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	order := createReconciliationIntent(t, repo, 42, 503, now.Add(time.Hour))
 	if err := service.ReconcileDuePaymentOrders(t.Context()); err != nil {
 		t.Fatalf("deterministic provider failure must not cause River retry: %v", err)
@@ -235,10 +242,10 @@ func TestPaymentReconciliationRecordsLongLivedOperableAnomaly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(anomalies) != 1 || anomalies[0].PaymentOrderID != order.ID || anomalies[0].LastErrorCode != string(GatewayErrorInvalidResponse) {
+	if len(anomalies) != 1 || anomalies[0].PaymentOrderID != order.ID || anomalies[0].LastErrorCode != string(paymentports.GatewayErrorInvalidResponse) {
 		t.Fatalf("anomalies = %+v", anomalies)
 	}
-	now = now.Add(paymentReconciliationOperableDelay)
+	now = now.Add(paymentreconciliation.OperableDelay)
 	recoveryGateway := newLifecycleCheckoutGateway()
 	recovered := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, func() time.Time { return now }), testStripeGateway{}, recoveryGateway, wallets, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if err := recovered.ReconcileDuePaymentOrders(t.Context()); err != nil {
@@ -247,7 +254,7 @@ func TestPaymentReconciliationRecordsLongLivedOperableAnomaly(t *testing.T) {
 	// A successful replay that is still open remains an anomaly; only a terminal
 	// Stripe fact resolves it. The next scan observes the delayed paid fact.
 	recoveryGateway.setPaid(true)
-	now = now.Add(paymentReconciliationInterval)
+	now = now.Add(paymentreconciliation.Interval)
 	if err := recovered.ReconcileDuePaymentOrders(t.Context()); err != nil {
 		t.Fatalf("terminal reconciliation recovery = %v", err)
 	}
@@ -261,7 +268,7 @@ func TestPaymentReconciliationRecordsLongLivedOperableAnomaly(t *testing.T) {
 }
 
 func TestPaymentReconciliationFailureSummaryNeverPersistsUnknownProviderBody(t *testing.T) {
-	code, summary := reconciliationFailureDetail(errors.New(`Stripe response: {"api_key":"sk_live_should_not_persist","body":"raw provider response"}`))
+	code, summary := paymentreconciliation.FailureDetail(errors.New(`Stripe response: {"api_key":"sk_live_should_not_persist","body":"raw provider response"}`))
 	if code != "ledger_retry" || summary != "账本写入暂时失败" {
 		t.Fatalf("unknown failure detail = %q, %q", code, summary)
 	}
@@ -270,23 +277,23 @@ func TestPaymentReconciliationFailureSummaryNeverPersistsUnknownProviderBody(t *
 	}
 }
 
-func createReconciliationIntent(t *testing.T, repo *Repository, userID, quantity int64, expiresAt time.Time) PaymentOrder {
+func createReconciliationIntent(t *testing.T, repo *paymentpostgres.Repository, userID, quantity int64, expiresAt time.Time) paymentsdomain.PaymentOrder {
 	return createReconciliationIntentForStripeAccount(t, repo, userID, quantity, expiresAt, "acct_checkout_lifecycle", "prod_checkout_lifecycle")
 }
 
-func createReconciliationIntentForStripeAccount(t *testing.T, repo *Repository, userID, quantity int64, expiresAt time.Time, accountID, productID string) PaymentOrder {
+func createReconciliationIntentForStripeAccount(t *testing.T, repo *paymentpostgres.Repository, userID, quantity int64, expiresAt time.Time, accountID, productID string) paymentsdomain.PaymentOrder {
 	t.Helper()
 	configuration := activeTestStripeConfiguration(t, repo)
 	if configuration.AccountID != accountID || configuration.StripeProductID != productID {
 		t.Fatalf("active Stripe configuration = %q/%q, want %q/%q", configuration.AccountID, configuration.StripeProductID, accountID, productID)
 	}
 	id := uuid.New()
-	order, _, err := repo.CreatePaymentOrderIntent(t.Context(), CreatePaymentOrderIntentInput{
+	order, _, err := repo.CreatePaymentOrderIntent(t.Context(), paymentsdomain.CreatePaymentOrderIntentInput{
 		ID: id.String(), PublicOrderNumber: fmt.Sprintf("IBP-20260801-%012d", quantity), PublicToken: uuid.NewString(),
 		UserID: userID, ClientIdempotencyKey: fmt.Sprintf("reconciliation-order-%d-%s", quantity, id.String()[:8]),
 		RequestHash:        "841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
 		StripeCredentialID: configuration.CredentialID, StripeAccountID: accountID, StripeProductID: productID, IdeaQuantity: quantity,
-		TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
+		TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 		ReturnBaseURL: "https://app.example.com/user/boards", ExpiresAt: expiresAt,
 	})
 	if err != nil {
@@ -297,15 +304,15 @@ func createReconciliationIntentForStripeAccount(t *testing.T, repo *Repository, 
 
 type reconciliationDeterministicFailureGateway struct{}
 
-func (reconciliationDeterministicFailureGateway) CreateCustomer(context.Context, CreateCheckoutCustomerInput) (CheckoutCustomer, error) {
-	return CheckoutCustomer{ID: "cus_reconciliation"}, nil
+func (reconciliationDeterministicFailureGateway) CreateCustomer(context.Context, paymentports.CreateCheckoutCustomerInput) (paymentports.CheckoutCustomer, error) {
+	return paymentports.CheckoutCustomer{ID: "cus_reconciliation"}, nil
 }
-func (reconciliationDeterministicFailureGateway) CreateCheckoutSession(context.Context, CreateCheckoutSessionInput) (CheckoutSession, error) {
-	return CheckoutSession{}, NewGatewayError(GatewayErrorInvalidResponse, "Stripe Checkout Session 响应无效", nil)
+func (reconciliationDeterministicFailureGateway) CreateCheckoutSession(context.Context, paymentports.CreateCheckoutSessionInput) (paymentports.CheckoutSession, error) {
+	return paymentports.CheckoutSession{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, "Stripe Checkout Session 响应无效", nil)
 }
-func (reconciliationDeterministicFailureGateway) RetrieveCheckoutSession(context.Context, RetrieveCheckoutSessionInput) (CheckoutSession, error) {
-	return CheckoutSession{}, NewGatewayError(GatewayErrorInvalidResponse, "Stripe Checkout Session 响应无效", nil)
+func (reconciliationDeterministicFailureGateway) RetrieveCheckoutSession(context.Context, paymentports.RetrieveCheckoutSessionInput) (paymentports.CheckoutSession, error) {
+	return paymentports.CheckoutSession{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, "Stripe Checkout Session 响应无效", nil)
 }
-func (reconciliationDeterministicFailureGateway) ExpireCheckoutSession(context.Context, ExpireCheckoutSessionInput) (ExpireCheckoutSessionResult, error) {
-	return ExpireCheckoutSessionResult{}, NewGatewayError(GatewayErrorInvalidResponse, "Stripe Checkout Session 响应无效", nil)
+func (reconciliationDeterministicFailureGateway) ExpireCheckoutSession(context.Context, paymentports.ExpireCheckoutSessionInput) (paymentports.ExpireCheckoutSessionResult, error) {
+	return paymentports.ExpireCheckoutSessionResult{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, "Stripe Checkout Session 响应无效", nil)
 }

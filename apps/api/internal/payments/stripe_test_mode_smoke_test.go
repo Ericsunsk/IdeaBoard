@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/payments"
-	"ideaboard/api/internal/payments/stripeadapter"
+	"ideaboard/api/internal/payments/infrastructure/stripe"
+	paymentports "ideaboard/api/internal/payments/ports"
 )
 
 func TestStripeTestModeSmoke(t *testing.T) {
@@ -21,14 +21,14 @@ func TestStripeTestModeSmoke(t *testing.T) {
 	if apiKey == "" || baseURL == "" || taxCode == "" || paymentMethodConfigurationID == "" {
 		t.Fatal("API_TEST_STRIPE_SECRET_KEY, API_TEST_STRIPE_BASE_URL, API_TEST_STRIPE_TAX_CODE, and API_TEST_STRIPE_PAYMENT_METHOD_CONFIGURATION_ID are required")
 	}
-	mode, err := payments.ClassifyStripeAPIKey(apiKey)
-	if err != nil || mode != payments.StripeModeTest {
+	mode, err := paymentports.ClassifyStripeAPIKey(apiKey)
+	if err != nil || mode != paymentports.StripeModeTest {
 		t.Fatal("API_TEST_STRIPE_SECRET_KEY must be a Test Mode sk_test_* or rk_test_* Key")
 	}
 
-	adapter := stripeadapter.New()
-	prepared, err := adapter.PrepareConfiguration(t.Context(), payments.PrepareStripeConfiguration{
-		APIKey: apiKey, Mode: payments.StripeModeTest, PurchasesEnabled: true,
+	adapter := stripe.New()
+	prepared, err := adapter.PrepareConfiguration(t.Context(), paymentports.PrepareStripeConfiguration{
+		APIKey: apiKey, Mode: paymentports.StripeModeTest, PurchasesEnabled: true,
 		ProductTaxCode: taxCode, PaymentMethodConfigurationID: paymentMethodConfigurationID,
 		WebhookURL: baseURL + "/api/webhooks/stripe",
 	})
@@ -43,14 +43,14 @@ func TestStripeTestModeSmoke(t *testing.T) {
 
 	const paymentOrderID = "1db90f9a-c836-4ef7-b449-6f58457d8f79"
 	const requestHash = "c8ea3f9d5e50ee5151ff8535c87822384f1ea2d3fb092b6795d223244e0f9068"
-	customer, err := adapter.CreateCustomer(t.Context(), payments.CreateCheckoutCustomerInput{
+	customer, err := adapter.CreateCustomer(t.Context(), paymentports.CreateCheckoutCustomerInput{
 		APIKey: apiKey, UserID: 9_000_000_001, IdempotencyKey: "ideaboard-stripe-smoke-customer-v1",
 	})
 	if err != nil {
 		t.Fatalf("create Stripe Test Mode customer: %v", err)
 	}
 	expiresAt := time.Now().UTC().Truncate(time.Second).Add(31 * time.Minute)
-	session, err := adapter.CreateCheckoutSession(t.Context(), payments.CreateCheckoutSessionInput{
+	session, err := adapter.CreateCheckoutSession(t.Context(), paymentports.CreateCheckoutSessionInput{
 		APIKey: apiKey, PaymentMethodConfigurationID: prepared.PaymentMethodConfigurationID,
 		CustomerID: customer.ID, ProductID: prepared.ProductID,
 		PublicOrderNumber: "IBP-SMOKE-TEST-MODE", PaymentOrderID: paymentOrderID,
@@ -66,7 +66,7 @@ func TestStripeTestModeSmoke(t *testing.T) {
 			session.ID != "", session.URL != "", session.ExpiresAt)
 	}
 	t.Cleanup(func() {
-		if _, expireErr := adapter.ExpireCheckoutSession(t.Context(), payments.ExpireCheckoutSessionInput{
+		if _, expireErr := adapter.ExpireCheckoutSession(t.Context(), paymentports.ExpireCheckoutSessionInput{
 			APIKey: apiKey, SessionID: session.ID,
 		}); expireErr != nil {
 			t.Logf("expire Stripe Test Mode Checkout Session %q: %v", session.ID, expireErr)

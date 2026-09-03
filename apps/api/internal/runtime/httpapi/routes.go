@@ -15,7 +15,7 @@ import (
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
-	"ideaboard/api/internal/payments"
+	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
@@ -37,7 +37,7 @@ type Dependencies struct {
 	CORSMiddleware      gin.HandlerFunc
 	RateLimit           settings.RateLimitSettingProvider
 	Branding            settings.BrandingSettingProvider
-	PaymentWebhook      *payments.WebhookHandler
+	PaymentWebhook      *paymenthttp.WebhookHandler
 	Internal            InternalRouteDeps
 }
 
@@ -85,7 +85,7 @@ type UserRouteDeps struct {
 	CreditUserHandler      *credits.UserHandler
 	UsageHandler           *usage.Handler
 	RewardUserHandler      *rewards.UserHandler
-	PaymentUserHandler     *payments.UserCheckoutHandler
+	PaymentUserHandler     *paymenthttp.UserCheckoutHandler
 	UserEventStreamHandler *UserEventStreamHandler
 	MediaAssetRegistry     assets.ReadRegistry
 	MediaStorageService    *storage.StorageService
@@ -114,7 +114,7 @@ type AdminRouteDeps struct {
 	UploadSettings              settings.MediaUploadSettingProvider
 	RewardAdminCommandHandler   *rewards.AdminCommandHandler
 	RewardAdminReadHandler      *rewards.AdminReadHandler
-	PaymentAdminHandler         *payments.AdminHandler
+	PaymentAdminHandler         *paymenthttp.AdminHandler
 	SearchCatalogHandler        *searchcatalog.Handler
 	AdminBrandLogoHandler       *adminbranding.Handler
 }

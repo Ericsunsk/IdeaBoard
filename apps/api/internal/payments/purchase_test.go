@@ -3,37 +3,39 @@ package payments
 import (
 	"errors"
 	"testing"
+
+	paymentsdomain "ideaboard/api/internal/payments/domain"
 )
 
 func TestNewPurchaseQuoteUsesExactIntegerUSDMinorUnits(t *testing.T) {
 	for _, quantity := range []int64{500, 501, 1000, 500000} {
-		quote, err := NewPurchaseQuote(quantity)
+		quote, err := paymentsdomain.NewPurchaseQuote(quantity)
 		if err != nil {
-			t.Fatalf("NewPurchaseQuote(%d) error = %v", quantity, err)
+			t.Fatalf("paymentsdomain.NewPurchaseQuote(%d) error = %v", quantity, err)
 		}
 		if quote.IdeaQuantity != quantity || quote.BaseCurrency != "usd" || quote.BaseAmountMinor != quantity {
-			t.Fatalf("NewPurchaseQuote(%d) = %+v", quantity, quote)
+			t.Fatalf("paymentsdomain.NewPurchaseQuote(%d) = %+v", quantity, quote)
 		}
 	}
 	for _, quantity := range []int64{-1, 0, 499, 500001} {
-		if _, err := NewPurchaseQuote(quantity); !errors.Is(err, ErrInvalidIdeaQuantity) {
-			t.Fatalf("NewPurchaseQuote(%d) error = %v, want ErrInvalidIdeaQuantity", quantity, err)
+		if _, err := paymentsdomain.NewPurchaseQuote(quantity); !errors.Is(err, paymentsdomain.ErrInvalidIdeaQuantity) {
+			t.Fatalf("paymentsdomain.NewPurchaseQuote(%d) error = %v, want paymentsdomain.ErrInvalidIdeaQuantity", quantity, err)
 		}
 	}
 }
 
 func TestCheckoutRequestFingerprintIsCanonicalAndTermsAreCurrent(t *testing.T) {
-	command := CreateCheckoutCommand{
+	command := paymentsdomain.CreateCheckoutCommand{
 		UserID: 42, ClientIdempotencyKey: "checkout-request-1", IdeaQuantity: 501,
-		TermsAccepted: true, TermsVersion: CurrentTermsVersion,
-		RefundPolicyVersion: CurrentRefundPolicyVersion,
+		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion,
+		RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 	}
-	first, err := CheckoutRequestFingerprint(command)
+	first, err := paymentsdomain.CheckoutRequestFingerprint(command)
 	if err != nil {
 		t.Fatal(err)
 	}
 	command.ClientIdempotencyKey = "checkout-request-replay"
-	second, err := CheckoutRequestFingerprint(command)
+	second, err := paymentsdomain.CheckoutRequestFingerprint(command)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +43,7 @@ func TestCheckoutRequestFingerprintIsCanonicalAndTermsAreCurrent(t *testing.T) {
 		t.Fatalf("fingerprints first=%q second=%q", first, second)
 	}
 	command.IdeaQuantity++
-	third, err := CheckoutRequestFingerprint(command)
+	third, err := paymentsdomain.CheckoutRequestFingerprint(command)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,12 +53,12 @@ func TestCheckoutRequestFingerprintIsCanonicalAndTermsAreCurrent(t *testing.T) {
 
 	command.IdeaQuantity = 501
 	command.TermsVersion = "stale"
-	if _, err := CheckoutRequestFingerprint(command); !errors.Is(err, ErrTermsAcceptanceRequired) {
+	if _, err := paymentsdomain.CheckoutRequestFingerprint(command); !errors.Is(err, paymentsdomain.ErrTermsAcceptanceRequired) {
 		t.Fatalf("stale terms error = %v", err)
 	}
-	command.TermsVersion = CurrentTermsVersion
+	command.TermsVersion = paymentsdomain.CurrentTermsVersion
 	command.TermsAccepted = false
-	if _, err := CheckoutRequestFingerprint(command); !errors.Is(err, ErrTermsAcceptanceRequired) {
+	if _, err := paymentsdomain.CheckoutRequestFingerprint(command); !errors.Is(err, paymentsdomain.ErrTermsAcceptanceRequired) {
 		t.Fatalf("missing acceptance error = %v", err)
 	}
 }

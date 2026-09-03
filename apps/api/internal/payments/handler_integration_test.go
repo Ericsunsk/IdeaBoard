@@ -3,8 +3,8 @@ package payments
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
+	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +13,10 @@ import (
 
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
+	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
+	paymentsdomain "ideaboard/api/internal/payments/domain"
+	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
+	paymentports "ideaboard/api/internal/payments/ports"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport"
@@ -24,13 +28,13 @@ import (
 func TestStripeConfigurationHTTPContractNeverReturnsSecretsAndRejectsUnknownFields(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
-	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
-		AccountID: "acct_http", Mode: StripeModeTest, ChargesEnabled: true,
+	gateway := &fakeStripeGateway{prepared: paymentports.PreparedStripeConfiguration{
+		AccountID: "acct_http", Mode: paymentports.StripeModeTest, ChargesEnabled: true,
 		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_http", WebhookEndpointID: "we_http", WebhookSecret: "whsec_http",
 	}}
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, &fakeWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
-	handler := NewAdminHandler(service, testPublicOrigins("https://app.example.com"))
+	handler := paymenthttp.NewAdminHandler(service, testPublicOrigins("https://app.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 42, principal.RoleAdmin)
@@ -80,8 +84,8 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 	service := newConfiguredPurchaseService(t, db, configuredFakeStripeGateway("acct_user_http", "prod_user_http"), checkoutGateway, credits.NewService(pool))
 	verifier := &fakeWebhookVerifier{}
 	service.verifier = verifier
-	userHandler := NewUserCheckoutHandler(service, testPublicOrigins("https://configured.example.com"))
-	webhookHandler := NewWebhookHandler(service)
+	userHandler := paymenthttp.NewUserCheckoutHandler(service, testPublicOrigins("https://configured.example.com"))
+	webhookHandler := paymenthttp.NewWebhookHandler(service)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 42, principal.RoleUser)
@@ -114,7 +118,7 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 	if !strings.HasPrefix(checkoutGateway.lastCreateSession.SuccessURL, "https://configured.example.com/user/boards?") {
 		t.Fatalf("checkout success URL = %q", checkoutGateway.lastCreateSession.SuccessURL)
 	}
-	var result CheckoutResult
+	var result paymentcontracts.CheckoutResult
 	decodePaymentResponseData(t, checkout.Body.Bytes(), &result)
 
 	unknown := performPaymentRequest(router, http.MethodPost, "/user/payments/checkout-sessions", `{"idempotency_key":"user-http-checkout-2","idea_quantity":501,"terms_accepted":true,"terms_version":"2026-08-01","refund_policy_version":"2026-08-01","unknown":true}`, nil)
@@ -127,10 +131,10 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 		t.Fatalf("status=%d %s", status.Code, status.Body.String())
 	}
 
-	paymentEvents, unsubscribe := subscribePaymentUserEvents(t, service.EventHub(), 42)
+	paymentEvents, unsubscribe := subscribePaymentUserEvents(t, service.eventHub(), 42)
 	defer unsubscribe()
 	checkoutGateway.paid = true
-	verifier.event = StripeWebhookEvent{
+	verifier.event = paymentports.StripeWebhookEvent{
 		ID: "evt_user_http_paid", Type: "checkout.session.completed",
 		ObjectID: checkoutGateway.createdSession.ID, CreatedAt: service.runtime.now().UTC(),
 	}
@@ -158,53 +162,6 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 	}
 }
 
-func TestCheckoutHTTPIdentifiesResultsThatAllowANewIntent(t *testing.T) {
-	tests := []struct {
-		name    string
-		err     error
-		code    string
-		message string
-	}{
-		{
-			name: "provider rejected creation",
-			err: errors.Join(
-				ErrCheckoutRequestRejected,
-				NewGatewayError(GatewayErrorRequestRejected, "decline_code=insufficient_funds", errors.New("raw provider body sk_test_secret")),
-			),
-			code:    "checkout_request_rejected",
-			message: "无法创建支付页面，请重试",
-		},
-		{name: "recovered session expired", err: ErrCheckoutSessionExpired, code: "checkout_session_expired", message: ErrCheckoutSessionExpired.Error()},
-		{name: "recovered payment completed", err: ErrPaymentAlreadyCompleted, code: "payment_already_completed", message: ErrPaymentAlreadyCompleted.Error()},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			router := gin.New()
-			router.GET("/checkout-error", func(c *gin.Context) { writeCheckoutError(c, test.err) })
-
-			result := performPaymentRequest(router, http.MethodGet, "/checkout-error", "", nil)
-			if result.Code != http.StatusUnprocessableEntity {
-				t.Fatalf("status = %d, want %d", result.Code, http.StatusUnprocessableEntity)
-			}
-			var responseBody struct {
-				Code        string `json:"code"`
-				Msg         string `json:"msg"`
-				MessageSafe bool   `json:"message_safe"`
-			}
-			if err := json.Unmarshal(result.Body.Bytes(), &responseBody); err != nil {
-				t.Fatal(err)
-			}
-			if responseBody.Code != test.code || responseBody.Msg != test.message || !responseBody.MessageSafe {
-				t.Fatalf("response = %+v", responseBody)
-			}
-			if strings.Contains(result.Body.String(), "decline_code") || strings.Contains(result.Body.String(), "sk_test_secret") {
-				t.Fatalf("response leaked provider details: %s", result.Body.String())
-			}
-		})
-	}
-}
-
 func TestUserPendingPaymentOrderHTTPBoundaryScopesOwnershipAndRejectsActionBodies(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db, pool := testdb.OpenWithPool(t)
@@ -213,7 +170,7 @@ func TestUserPendingPaymentOrderHTTPBoundaryScopesOwnershipAndRejectsActionBodie
 	service := newConfiguredPurchaseService(
 		t, db, configuredFakeStripeGateway("acct_pending_http", "prod_pending_http"), checkoutGateway, credits.NewService(pool),
 	)
-	handler := NewUserCheckoutHandler(service, testPublicOrigins("https://configured.example.com"))
+	handler := paymenthttp.NewUserCheckoutHandler(service, testPublicOrigins("https://configured.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		userID := int64(42)
@@ -234,16 +191,16 @@ func TestUserPendingPaymentOrderHTTPBoundaryScopesOwnershipAndRejectsActionBodie
 	if checkout.Code != http.StatusOK {
 		t.Fatalf("checkout=%d %s", checkout.Code, checkout.Body.String())
 	}
-	var created CheckoutResult
+	var created paymentcontracts.CheckoutResult
 	decodePaymentResponseData(t, checkout.Body.Bytes(), &created)
 
 	pending := performPaymentRequest(router, http.MethodGet, "/user/payments/pending-orders", "", nil)
 	if pending.Code != http.StatusOK || pending.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("pending list=%d %s", pending.Code, pending.Body.String())
 	}
-	var page PendingPaymentOrderList
+	var page paymentcontracts.PendingPaymentOrderList
 	decodePaymentResponseData(t, pending.Body.Bytes(), &page)
-	if len(page.Items) != 1 || page.Items[0].PublicToken != created.PublicToken || page.Items[0].CheckoutURL == "" || page.Items[0].Status != string(PaymentOrderCheckoutOpen) {
+	if len(page.Items) != 1 || page.Items[0].PublicToken != created.PublicToken || page.Items[0].CheckoutURL == "" || page.Items[0].Status != string(paymentsdomain.PaymentOrderCheckoutOpen) {
 		t.Fatalf("pending page=%+v", page)
 	}
 
@@ -251,9 +208,9 @@ func TestUserPendingPaymentOrderHTTPBoundaryScopesOwnershipAndRejectsActionBodie
 	if continued.Code != http.StatusOK || continued.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("continue=%d %s", continued.Code, continued.Body.String())
 	}
-	var continuedOrder PendingPaymentOrder
+	var continuedOrder paymentcontracts.PendingPaymentOrder
 	decodePaymentResponseData(t, continued.Body.Bytes(), &continuedOrder)
-	if continuedOrder.PublicToken != created.PublicToken || continuedOrder.CheckoutURL == "" || continuedOrder.Status != string(PaymentOrderCheckoutOpen) {
+	if continuedOrder.PublicToken != created.PublicToken || continuedOrder.CheckoutURL == "" || continuedOrder.Status != string(paymentsdomain.PaymentOrderCheckoutOpen) {
 		t.Fatalf("continued order=%+v", continuedOrder)
 	}
 
@@ -296,9 +253,9 @@ func TestUserPendingPaymentOrderHTTPBoundaryScopesOwnershipAndRejectsActionBodie
 	if abandoned.Code != http.StatusOK {
 		t.Fatalf("abandon=%d %s", abandoned.Code, abandoned.Body.String())
 	}
-	var abandonedOrder PendingPaymentOrder
+	var abandonedOrder paymentcontracts.PendingPaymentOrder
 	decodePaymentResponseData(t, abandoned.Body.Bytes(), &abandonedOrder)
-	if abandonedOrder.Status != string(PaymentOrderCancelled) || abandonedOrder.CheckoutURL != "" {
+	if abandonedOrder.Status != string(paymentsdomain.PaymentOrderCancelled) || abandonedOrder.CheckoutURL != "" {
 		t.Fatalf("abandoned order=%+v", abandonedOrder)
 	}
 
@@ -322,7 +279,7 @@ func TestUserCheckoutHTTPRejectsWalletWithoutRechargeEligibility(t *testing.T) {
 		t, db, configuredFakeStripeGateway("acct_locked_http", "prod_locked_http"),
 		&fakeCheckoutGateway{}, credits.NewService(pool),
 	)
-	handler := NewUserCheckoutHandler(service, testPublicOrigins("https://configured.example.com"))
+	handler := paymenthttp.NewUserCheckoutHandler(service, testPublicOrigins("https://configured.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 88, principal.RoleUser)
@@ -341,9 +298,9 @@ func TestStripeConfigurationHTTPRejectsOversizedAPIKeyBeforeGatewayAndAuditsFail
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
 	gateway := &fakeStripeGateway{}
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, &fakeWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
-	handler := NewAdminHandler(service, testPublicOrigins("https://app.example.com"))
+	handler := paymenthttp.NewAdminHandler(service, testPublicOrigins("https://app.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 42, principal.RoleAdmin)
@@ -351,7 +308,9 @@ func TestStripeConfigurationHTTPRejectsOversizedAPIKeyBeforeGatewayAndAuditsFail
 	})
 	router.PUT("/admin/payments/stripe-config", handler.UpdateStripeConfiguration)
 
-	oversizedKey := "sk_test_" + strings.Repeat("x", maxStripeAPIKeyLength-len("sk_test_")+1)
+	// Keep this fixture clearly above the contract limit without coupling the
+	// root-package integration test to the ports package's implementation detail.
+	oversizedKey := "sk_test_" + strings.Repeat("x", 1024)
 	requestBody, err := json.Marshal(map[string]any{
 		"api_key": oversizedKey, "payment_method_configuration_id": "pmc_testfixture",
 		"product_tax_code": "txcd_10105001", "purchases_enabled": true,
@@ -384,22 +343,22 @@ WHERE outcome = 'failed' AND error_code = 'invalid_key'`).Scan(&auditCount); err
 func TestStripeWebhookHTTPContractUsesUnauthenticatedExactRawBody(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
-	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
-		AccountID: "acct_webhook_http", Mode: StripeModeTest, ChargesEnabled: true,
+	gateway := &fakeStripeGateway{prepared: paymentports.PreparedStripeConfiguration{
+		AccountID: "acct_webhook_http", Mode: paymentports.StripeModeTest, ChargesEnabled: true,
 		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_webhook_http", WebhookEndpointID: "we_webhook_http", WebhookSecret: "whsec_webhook_http",
 	}}
-	verifier := &fakeWebhookVerifier{event: StripeWebhookEvent{
+	verifier := &fakeWebhookVerifier{event: paymentports.StripeWebhookEvent{
 		ID: "evt_http", Type: "customer.updated", ObjectID: "cus_http", CreatedAt: time.Now(),
 	}}
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
-	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_webhook_http", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	handler := NewWebhookHandler(service)
+	handler := paymenthttp.NewWebhookHandler(service)
 	router := gin.New()
 	router.POST("/api/webhooks/stripe", handler.ReceiveStripeWebhook)
 

@@ -2,18 +2,20 @@ package payments
 
 import (
 	"errors"
+	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"strings"
 	"testing"
 	"time"
 
+	paymentsdomain "ideaboard/api/internal/payments/domain"
 	"ideaboard/api/internal/testdb"
 )
 
 func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) {
 	db := testdb.Open(t)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	configuration := publishTestStripeConfiguration(t, repo, "acct_order", "prod_idea")
-	input := CreatePaymentOrderIntentInput{
+	input := paymentsdomain.CreatePaymentOrderIntentInput{
 		ID:                   "0198cd29-f457-7e4b-b95e-6cfde41b7111",
 		PublicOrderNumber:    "IBP-20260801-ABC123DEF456",
 		PublicToken:          "0198cd29-f457-7e4b-b95e-6cfde41b7222",
@@ -24,8 +26,8 @@ func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) 
 		StripeAccountID:      "acct_order",
 		StripeProductID:      "prod_idea",
 		IdeaQuantity:         501,
-		TermsVersion:         CurrentTermsVersion,
-		RefundPolicyVersion:  CurrentRefundPolicyVersion,
+		TermsVersion:         paymentsdomain.CurrentTermsVersion,
+		RefundPolicyVersion:  paymentsdomain.CurrentRefundPolicyVersion,
 		ReturnBaseURL:        "http://localhost:5173",
 		ExpiresAt:            time.Date(2026, 8, 1, 12, 30, 0, 0, time.UTC),
 	}
@@ -34,11 +36,11 @@ func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if reused || first.Status != PaymentOrderCreating || first.PublicToken != input.PublicToken {
+	if reused || first.Status != paymentsdomain.PaymentOrderCreating || first.PublicToken != input.PublicToken {
 		t.Fatalf("first order=%+v reused=%t", first, reused)
 	}
 
-	replayed, reused, err := repo.CreatePaymentOrderIntent(t.Context(), CreatePaymentOrderIntentInput{
+	replayed, reused, err := repo.CreatePaymentOrderIntent(t.Context(), paymentsdomain.CreatePaymentOrderIntentInput{
 		ID:                "0198cd29-f457-7e4b-b95e-6cfde41b7333",
 		PublicOrderNumber: "IBP-20260801-XYZ123DEF456",
 		PublicToken:       "0198cd29-f457-7e4b-b95e-6cfde41b7444",
@@ -54,8 +56,8 @@ func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) 
 
 	conflict := input
 	conflict.RequestHash = "bdb12e222d029f0ef71c1f62dc883f7c9111486712cd2d862397bc562e36fc99"
-	if _, _, err := repo.CreatePaymentOrderIntent(t.Context(), conflict); !errors.Is(err, ErrCheckoutIdempotencyConflict) {
-		t.Fatalf("conflict error=%v, want ErrCheckoutIdempotencyConflict", err)
+	if _, _, err := repo.CreatePaymentOrderIntent(t.Context(), conflict); !errors.Is(err, paymentsdomain.ErrCheckoutIdempotencyConflict) {
+		t.Fatalf("conflict error=%v, want paymentsdomain.ErrCheckoutIdempotencyConflict", err)
 	}
 
 	var count int
@@ -68,8 +70,8 @@ func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) 
 }
 
 func TestCreatePaymentOrderIntentRejectsInvalidStripeCredentialID(t *testing.T) {
-	repo := NewRepository(testdb.Open(t))
-	_, _, err := repo.CreatePaymentOrderIntent(t.Context(), CreatePaymentOrderIntentInput{
+	repo := paymentpostgres.NewRepository(testdb.Open(t))
+	_, _, err := repo.CreatePaymentOrderIntent(t.Context(), paymentsdomain.CreatePaymentOrderIntentInput{
 		ID: "0198cd29-f457-7e4b-b95e-6cfde41b7111", PublicToken: "0198cd29-f457-7e4b-b95e-6cfde41b7222",
 	})
 	if err == nil || !strings.Contains(err.Error(), "parse Stripe credential ID") {

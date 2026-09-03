@@ -2,10 +2,14 @@ package payments
 
 import (
 	"context"
+	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/credits"
+	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
+	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
+	paymentports "ideaboard/api/internal/payments/ports"
 	"ideaboard/api/internal/platform/secrets"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
@@ -41,14 +45,14 @@ func mustNewPaymentsService(t *testing.T, checkout *CheckoutWorkflow, facts *Str
 // callers state every workflow dependency used by the complete transport seam.
 func newCompleteTestPaymentsService(
 	t *testing.T,
-	repo *Repository,
+	repo *paymentpostgres.Repository,
 	runtime *PaymentRuntime,
-	configurationGateway StripeGateway,
-	checkoutGateway CheckoutGateway,
+	configurationGateway paymentports.StripeGateway,
+	checkoutGateway paymentports.CheckoutGateway,
 	wallets credits.WalletReader,
-	verifier StripeWebhookVerifier,
-	refundGateway RefundGateway,
-	disputeGateway DisputeGateway,
+	verifier paymentports.StripeWebhookVerifier,
+	refundGateway paymentports.RefundGateway,
+	disputeGateway paymentports.DisputeGateway,
 	shutdownEnqueuer PaymentCheckoutShutdownEnqueuer,
 ) *Service {
 	t.Helper()
@@ -70,10 +74,10 @@ func newCompleteTestPaymentsService(
 
 func newCompleteTestCheckoutWorkflow(
 	t *testing.T,
-	repo *Repository,
+	repo *paymentpostgres.Repository,
 	runtime *PaymentRuntime,
-	configurationGateway StripeGateway,
-	checkoutGateway CheckoutGateway,
+	configurationGateway paymentports.StripeGateway,
+	checkoutGateway paymentports.CheckoutGateway,
 	wallets credits.WalletReader,
 	shutdownEnqueuer PaymentCheckoutShutdownEnqueuer,
 ) *CheckoutWorkflow {
@@ -88,7 +92,7 @@ func newCompleteTestCheckoutWorkflow(
 	})
 }
 
-func publishTestStripeConfiguration(t *testing.T, repo *Repository, accountID, productID string) StoredStripeConfiguration {
+func publishTestStripeConfiguration(t *testing.T, repo *paymentpostgres.Repository, accountID, productID string) paymentconfiguration.StoredStripeConfiguration {
 	t.Helper()
 	secretstest.EnableEncryption(t)
 	apiKeyCiphertext, err := secrets.EncryptString("sk_test_fixture")
@@ -99,20 +103,20 @@ func publishTestStripeConfiguration(t *testing.T, repo *Repository, accountID, p
 	if err != nil {
 		t.Fatalf("encrypt test Stripe webhook secret: %v", err)
 	}
-	configuration, _, err := repo.ReplaceStripeConfiguration(t.Context(), 0, StoredStripeConfiguration{
-		AccountID: accountID, Mode: StripeModeTest, ChargesEnabled: true,
+	configuration, _, err := repo.ReplaceStripeConfiguration(t.Context(), 0, paymentconfiguration.StoredStripeConfiguration{
+		AccountID: accountID, Mode: paymentports.StripeModeTest, ChargesEnabled: true,
 		PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001", PurchasesEnabled: true, StripeProductID: productID,
 		StripeWebhookEndpointID: "we_test_fixture", APIKeyCiphertext: apiKeyCiphertext,
 		WebhookSecretCiphertext: webhookSecretCiphertext, SecretMaterialKind: secrets.MaterialKindEncrypted,
 		UpdatedBy: 42,
-	}, ConfigurationAudit{ActorID: 42, Outcome: "succeeded"})
+	}, paymentconfiguration.Audit{ActorID: 42, Outcome: "succeeded"})
 	if err != nil {
 		t.Fatalf("publish test Stripe configuration: %v", err)
 	}
 	return configuration
 }
 
-func activeTestStripeConfiguration(t *testing.T, repo *Repository) StoredStripeConfiguration {
+func activeTestStripeConfiguration(t *testing.T, repo *paymentpostgres.Repository) paymentconfiguration.StoredStripeConfiguration {
 	t.Helper()
 	configuration, err := repo.GetStripeConfiguration(t.Context())
 	if err != nil {
@@ -123,38 +127,38 @@ func activeTestStripeConfiguration(t *testing.T, repo *Repository) StoredStripeC
 
 type testStripeGateway struct{}
 
-func (testStripeGateway) PrepareConfiguration(context.Context, PrepareStripeConfiguration) (PreparedStripeConfiguration, error) {
-	return PreparedStripeConfiguration{}, ErrStripeProviderUnavailable
+func (testStripeGateway) PrepareConfiguration(context.Context, paymentports.PrepareStripeConfiguration) (paymentports.PreparedStripeConfiguration, error) {
+	return paymentports.PreparedStripeConfiguration{}, paymentcontracts.ErrStripeProviderUnavailable
 }
 
 type testCheckoutGateway struct{}
 
-func (testCheckoutGateway) CreateCustomer(context.Context, CreateCheckoutCustomerInput) (CheckoutCustomer, error) {
-	return CheckoutCustomer{}, ErrStripeProviderUnavailable
+func (testCheckoutGateway) CreateCustomer(context.Context, paymentports.CreateCheckoutCustomerInput) (paymentports.CheckoutCustomer, error) {
+	return paymentports.CheckoutCustomer{}, paymentcontracts.ErrStripeProviderUnavailable
 }
-func (testCheckoutGateway) CreateCheckoutSession(context.Context, CreateCheckoutSessionInput) (CheckoutSession, error) {
-	return CheckoutSession{}, ErrStripeProviderUnavailable
+func (testCheckoutGateway) CreateCheckoutSession(context.Context, paymentports.CreateCheckoutSessionInput) (paymentports.CheckoutSession, error) {
+	return paymentports.CheckoutSession{}, paymentcontracts.ErrStripeProviderUnavailable
 }
-func (testCheckoutGateway) RetrieveCheckoutSession(context.Context, RetrieveCheckoutSessionInput) (CheckoutSession, error) {
-	return CheckoutSession{}, ErrStripeProviderUnavailable
+func (testCheckoutGateway) RetrieveCheckoutSession(context.Context, paymentports.RetrieveCheckoutSessionInput) (paymentports.CheckoutSession, error) {
+	return paymentports.CheckoutSession{}, paymentcontracts.ErrStripeProviderUnavailable
 }
-func (testCheckoutGateway) ExpireCheckoutSession(context.Context, ExpireCheckoutSessionInput) (ExpireCheckoutSessionResult, error) {
-	return ExpireCheckoutSessionResult{}, ErrStripeProviderUnavailable
+func (testCheckoutGateway) ExpireCheckoutSession(context.Context, paymentports.ExpireCheckoutSessionInput) (paymentports.ExpireCheckoutSessionResult, error) {
+	return paymentports.ExpireCheckoutSessionResult{}, paymentcontracts.ErrStripeProviderUnavailable
 }
 
 type testRefundGateway struct{}
 
-func (testRefundGateway) CreateRefund(context.Context, CreateStripeRefundInput) (StripeRefund, error) {
-	return StripeRefund{}, ErrStripeProviderUnavailable
+func (testRefundGateway) CreateRefund(context.Context, paymentports.CreateStripeRefundInput) (paymentports.StripeRefund, error) {
+	return paymentports.StripeRefund{}, paymentcontracts.ErrStripeProviderUnavailable
 }
-func (testRefundGateway) RetrieveRefund(context.Context, string, string) (StripeRefund, error) {
-	return StripeRefund{}, ErrStripeProviderUnavailable
+func (testRefundGateway) RetrieveRefund(context.Context, string, string) (paymentports.StripeRefund, error) {
+	return paymentports.StripeRefund{}, paymentcontracts.ErrStripeProviderUnavailable
 }
 
 type testDisputeGateway struct{}
 
-func (testDisputeGateway) RetrieveDispute(context.Context, string, string) (StripeDispute, error) {
-	return StripeDispute{}, ErrStripeProviderUnavailable
+func (testDisputeGateway) RetrieveDispute(context.Context, string, string) (paymentports.StripeDispute, error) {
+	return paymentports.StripeDispute{}, paymentcontracts.ErrStripeProviderUnavailable
 }
 
 type testShutdownEnqueuer struct{}
@@ -163,8 +167,8 @@ func (testShutdownEnqueuer) EnqueuePaymentCheckoutShutdown(context.Context, stri
 
 type testWebhookVerifier struct{}
 
-func (testWebhookVerifier) Verify(context.Context, []byte, string, string, time.Duration, time.Time) (StripeWebhookEvent, error) {
-	return StripeWebhookEvent{}, ErrInvalidWebhookSignature
+func (testWebhookVerifier) Verify(context.Context, []byte, string, string, time.Duration, time.Time) (paymentports.StripeWebhookEvent, error) {
+	return paymentports.StripeWebhookEvent{}, paymentports.ErrInvalidWebhookSignature
 }
 
 type testWalletReader struct{}

@@ -5,11 +5,15 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"sync"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/credits"
+	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
+	paymentsdomain "ideaboard/api/internal/payments/domain"
+	paymentports "ideaboard/api/internal/payments/ports"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
@@ -20,7 +24,7 @@ func TestCheckoutLifecycleConcurrentSameQuantityReusesOneOrderAndStripeSession(t
 	checkout.blockFirstSessionCreate()
 	db, service, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 
-	results := make(chan CheckoutResult, 2)
+	results := make(chan paymentcontracts.CheckoutResult, 2)
 	errs := make(chan error, 2)
 	create := func(key string) {
 		result, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, key, 500))
@@ -38,7 +42,7 @@ func TestCheckoutLifecycleConcurrentSameQuantityReusesOneOrderAndStripeSession(t
 	}
 	close(checkout.releaseFirstSession)
 
-	var checkouts []CheckoutResult
+	var checkouts []paymentcontracts.CheckoutResult
 	for range 2 {
 		if err := <-errs; err != nil {
 			t.Fatalf("CreateCheckout() error = %v", err)
@@ -84,8 +88,8 @@ func TestCheckoutLifecyclePaidSessionIsNotReusedBeforeWebhookConverges(t *testin
 	if calls := checkout.createSessionCalls(); calls != 2 {
 		t.Fatalf("Stripe Checkout sessions created = %d, want 2", calls)
 	}
-	assertLifecycleOrderStatus(t, db, first.PublicToken, PaymentOrderCredited)
-	assertLifecycleOrderStatus(t, db, second.PublicToken, PaymentOrderCheckoutOpen)
+	assertLifecycleOrderStatus(t, db, first.PublicToken, paymentsdomain.PaymentOrderCredited)
+	assertLifecycleOrderStatus(t, db, second.PublicToken, paymentsdomain.PaymentOrderCheckoutOpen)
 	assertLifecyclePurchaseCount(t, db, 1)
 	assertLifecycleWalletAvailable(t, wallets, 42, 501)
 }
@@ -99,7 +103,7 @@ func TestCheckoutLifecycleExpiredSessionIsNotReusedBeforeLocalExpiry(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkout.status = CheckoutSessionStatusExpired
+	checkout.status = paymentports.CheckoutSessionStatusExpired
 
 	second, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "expired-before-local-second", 500))
 	if err != nil {
@@ -111,8 +115,8 @@ func TestCheckoutLifecycleExpiredSessionIsNotReusedBeforeLocalExpiry(t *testing.
 	if calls := checkout.createSessionCalls(); calls != 2 {
 		t.Fatalf("Stripe Checkout sessions created = %d, want 2", calls)
 	}
-	assertLifecycleOrderStatus(t, db, first.PublicToken, PaymentOrderExpired)
-	assertLifecycleOrderStatus(t, db, second.PublicToken, PaymentOrderCheckoutOpen)
+	assertLifecycleOrderStatus(t, db, first.PublicToken, paymentsdomain.PaymentOrderExpired)
+	assertLifecycleOrderStatus(t, db, second.PublicToken, paymentsdomain.PaymentOrderCheckoutOpen)
 	assertLifecyclePurchaseCount(t, db, 0)
 	assertLifecycleWalletAvailable(t, wallets, 42, 1)
 }
@@ -126,10 +130,10 @@ func TestCheckoutLifecycleRetrieveFailurePreservesExistingSessionAndIntent(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkout.setRetrieveErrorOnce(NewGatewayError(GatewayErrorProviderUnavailable, "Stripe unavailable", nil))
+	checkout.setRetrieveErrorOnce(paymentports.NewGatewayError(paymentports.GatewayErrorProviderUnavailable, "Stripe unavailable", nil))
 	retryCommand := lifecycleCheckoutCommand(42, "retrieve-failure-retry", 500)
-	if _, err := service.CreateCheckout(t.Context(), retryCommand); !errors.Is(err, ErrStripeProviderUnavailable) {
-		t.Fatalf("CreateCheckout() error = %v, want ErrStripeProviderUnavailable", err)
+	if _, err := service.CreateCheckout(t.Context(), retryCommand); !errors.Is(err, paymentcontracts.ErrStripeProviderUnavailable) {
+		t.Fatalf("CreateCheckout() error = %v, want paymentcontracts.ErrStripeProviderUnavailable", err)
 	}
 	if calls := checkout.createSessionCalls(); calls != 1 {
 		t.Fatalf("Stripe Checkout sessions after unknown retrieve result = %d, want 1", calls)
@@ -158,7 +162,7 @@ func TestCheckoutLifecycleLimitsThreeActiveOrdersAndExpiredOrdersReleaseCapacity
 			t.Fatalf("CreateCheckout(%d) error = %v", quantity, err)
 		}
 	}
-	if _, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "active-checkout-limit", 503)); !errors.Is(err, ErrPendingCheckoutLimit) {
+	if _, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "active-checkout-limit", 503)); !errors.Is(err, paymentcontracts.ErrPendingCheckoutLimit) {
 		t.Fatalf("fourth active Checkout error = %v, want ErrPendingCheckoutLimit", err)
 	}
 	if calls := checkout.createSessionCalls(); calls != 3 {
@@ -196,20 +200,20 @@ func TestCheckoutLifecycleExpiredWebhookConvergesToExpiredWithoutCredit(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkout.status = CheckoutSessionStatusExpired
+	checkout.status = paymentports.CheckoutSessionStatusExpired
 	verifier.event = lifecycleWebhookEvent("evt-lifecycle-expired", "checkout.session.expired", checkout.onlySessionID(t), now)
 
 	if receipt, err := service.ReceiveStripeWebhook(t.Context(), []byte(`{"id":"evt-lifecycle-expired"}`), "valid"); err != nil || receipt.Duplicate || receipt.Ignored {
 		t.Fatalf("expired webhook = %+v, %v", receipt, err)
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderExpired)
+	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderExpired)
 	assertLifecyclePurchaseCount(t, db, 0)
 	assertLifecycleWalletAvailable(t, wallets, 42, 1)
 
 	if receipt, err := service.ReceiveStripeWebhook(t.Context(), []byte(`{"id":"evt-lifecycle-expired"}`), "valid"); err != nil || !receipt.Duplicate {
 		t.Fatalf("duplicate expired webhook = %+v, %v", receipt, err)
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderExpired)
+	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderExpired)
 }
 
 func TestCheckoutLifecycleAsyncPaymentCreditsOnceAndPaidFactWinsOutOfOrderEvents(t *testing.T) {
@@ -224,12 +228,12 @@ func TestCheckoutLifecycleAsyncPaymentCreditsOnceAndPaidFactWinsOutOfOrderEvents
 	}
 	sessionID := checkout.onlySessionID(t)
 
-	checkout.status = CheckoutSessionStatusComplete
+	checkout.status = paymentports.CheckoutSessionStatusComplete
 	verifier.event = lifecycleWebhookEvent("evt-lifecycle-completed", "checkout.session.completed", sessionID, now)
 	if receipt, err := service.ReceiveStripeWebhook(t.Context(), []byte(`{"id":"evt-lifecycle-completed"}`), "valid"); err != nil || receipt.Duplicate || receipt.Ignored {
 		t.Fatalf("completed webhook = %+v, %v", receipt, err)
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderAsyncPaymentPending)
+	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderAsyncPaymentPending)
 	assertLifecyclePurchaseCount(t, db, 0)
 	assertLifecycleWalletAvailable(t, wallets, 42, 1)
 
@@ -239,7 +243,7 @@ func TestCheckoutLifecycleAsyncPaymentCreditsOnceAndPaidFactWinsOutOfOrderEvents
 	if _, err := service.ReceiveStripeWebhook(t.Context(), []byte(`{"id":"evt-lifecycle-failed"}`), "valid"); err != nil {
 		t.Fatalf("async failed webhook error = %v", err)
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderFailed)
+	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderFailed)
 	assertLifecyclePurchaseCount(t, db, 0)
 
 	checkout.setPaid(true)
@@ -247,7 +251,7 @@ func TestCheckoutLifecycleAsyncPaymentCreditsOnceAndPaidFactWinsOutOfOrderEvents
 	if receipt, err := service.ReceiveStripeWebhook(t.Context(), []byte(`{"id":"evt-lifecycle-success"}`), "valid"); err != nil || receipt.Duplicate || receipt.Ignored {
 		t.Fatalf("async success webhook = %+v, %v", receipt, err)
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderCredited)
+	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderCredited)
 	assertLifecyclePurchaseCount(t, db, 1)
 	assertLifecycleWalletAvailable(t, wallets, 42, 701)
 
@@ -264,7 +268,7 @@ func TestCheckoutLifecycleAsyncPaymentCreditsOnceAndPaidFactWinsOutOfOrderEvents
 	if _, err := service.ReceiveStripeWebhook(t.Context(), []byte(`{"id":"evt-lifecycle-expired-late"}`), "valid"); err != nil {
 		t.Fatalf("late expiry webhook error = %v", err)
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderCredited)
+	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderCredited)
 	assertLifecyclePurchaseCount(t, db, 1)
 	assertLifecycleWalletAvailable(t, wallets, 42, 701)
 
@@ -296,7 +300,7 @@ func TestCheckoutLifecyclePaidPendingCreditRetriesOnceAfterCreditPurchaseFailure
 	if _, err := service.GetPaymentOrderReturnStatus(t.Context(), 42, created.PublicToken); err == nil {
 		t.Fatal("GetPaymentOrderReturnStatus() unexpectedly credited an injected failed purchase_credit")
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderPaidPendingCredit)
+	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderPaidPendingCredit)
 	assertLifecyclePurchaseCount(t, db, 0)
 	assertLifecycleWalletAvailable(t, wallets, 42, 1)
 
@@ -305,7 +309,7 @@ func TestCheckoutLifecyclePaidPendingCreditRetriesOnceAfterCreditPurchaseFailure
 	if err != nil || status.Status != "credited" {
 		t.Fatalf("recovery GetPaymentOrderReturnStatus() = %+v, %v", status, err)
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderCredited)
+	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderCredited)
 	assertLifecyclePurchaseCount(t, db, 1)
 	assertLifecycleWalletAvailable(t, wallets, 42, 701)
 
@@ -364,7 +368,7 @@ func TestCheckoutLifecycleLateAsyncFailureDoesNotPublishFalseFailedEvent(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	events, unsubscribe := subscribePaymentUserEvents(t, service.EventHub(), 42)
+	events, unsubscribe := subscribePaymentUserEvents(t, service.eventHub(), 42)
 	defer unsubscribe()
 	checkout.setPaid(true)
 	sessionID := checkout.onlySessionID(t)
@@ -402,12 +406,12 @@ func TestCheckoutLifecycleAbandonRetriesProviderFailureWithoutChangingLocalOrder
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkout.setExpireErrorOnce(NewGatewayError(GatewayErrorProviderUnavailable, "Stripe unavailable", errors.New("provider outage")))
+	checkout.setExpireErrorOnce(paymentports.NewGatewayError(paymentports.GatewayErrorProviderUnavailable, "Stripe unavailable", errors.New("provider outage")))
 
-	if _, err := service.AbandonPendingOrder(t.Context(), 42, created.PublicToken); !errors.Is(err, ErrStripeProviderUnavailable) {
-		t.Fatalf("first AbandonPendingOrder() error = %v, want ErrStripeProviderUnavailable", err)
+	if _, err := service.AbandonPendingOrder(t.Context(), 42, created.PublicToken); !errors.Is(err, paymentcontracts.ErrStripeProviderUnavailable) {
+		t.Fatalf("first AbandonPendingOrder() error = %v, want paymentcontracts.ErrStripeProviderUnavailable", err)
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderCheckoutOpen)
+	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderCheckoutOpen)
 	assertLifecyclePurchaseCount(t, db, 0)
 	assertLifecycleWalletAvailable(t, wallets, 42, 1)
 	if calls := checkout.expireSessionCalls(); calls != 1 {
@@ -415,10 +419,10 @@ func TestCheckoutLifecycleAbandonRetriesProviderFailureWithoutChangingLocalOrder
 	}
 
 	abandoned, err := service.AbandonPendingOrder(t.Context(), 42, created.PublicToken)
-	if err != nil || abandoned.Status != string(PaymentOrderCancelled) {
+	if err != nil || abandoned.Status != string(paymentsdomain.PaymentOrderCancelled) {
 		t.Fatalf("second AbandonPendingOrder() = %+v, %v", abandoned, err)
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderCancelled)
+	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderCancelled)
 	assertLifecyclePurchaseCount(t, db, 0)
 	if calls := checkout.expireSessionCalls(); calls != 2 {
 		t.Fatalf("Stripe Expire calls after retry = %d, want 2", calls)
@@ -440,7 +444,7 @@ func TestCheckoutLifecycleDatabaseGuardRejectsIllegalTransitionsAndPaidFactMutat
 	if _, err := db.ExecContext(t.Context(), `UPDATE payment_orders SET status = 'checkout_open' WHERE public_token = $1`, cancelled.PublicToken); err == nil {
 		t.Fatal("cancelled -> checkout_open direct SQL transition unexpectedly succeeded")
 	}
-	assertLifecycleOrderStatus(t, db, cancelled.PublicToken, PaymentOrderCancelled)
+	assertLifecycleOrderStatus(t, db, cancelled.PublicToken, paymentsdomain.PaymentOrderCancelled)
 
 	paid, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "guard-paid-pending-checkout", 501))
 	if err != nil {
@@ -452,21 +456,21 @@ func TestCheckoutLifecycleDatabaseGuardRejectsIllegalTransitionsAndPaidFactMutat
 		t.Fatal("injected purchase_credit failure unexpectedly succeeded")
 	}
 	removeFailure()
-	assertLifecycleOrderStatus(t, db, paid.PublicToken, PaymentOrderPaidPendingCredit)
+	assertLifecycleOrderStatus(t, db, paid.PublicToken, paymentsdomain.PaymentOrderPaidPendingCredit)
 	if _, err := db.ExecContext(t.Context(), `UPDATE payment_orders SET status = 'payment_failed' WHERE public_token = $1`, paid.PublicToken); err == nil {
 		t.Fatal("paid_pending_credit -> payment_failed direct SQL transition unexpectedly succeeded")
 	}
-	assertLifecycleOrderStatus(t, db, paid.PublicToken, PaymentOrderPaidPendingCredit)
+	assertLifecycleOrderStatus(t, db, paid.PublicToken, paymentsdomain.PaymentOrderPaidPendingCredit)
 
 	if _, err := service.GetPaymentOrderReturnStatus(t.Context(), 42, paid.PublicToken); err != nil {
 		t.Fatalf("credit paid_pending_credit order error = %v", err)
 	}
-	assertLifecycleOrderStatus(t, db, paid.PublicToken, PaymentOrderCredited)
+	assertLifecycleOrderStatus(t, db, paid.PublicToken, paymentsdomain.PaymentOrderCredited)
 	if _, err := db.ExecContext(t.Context(), `
 UPDATE payment_orders SET paid_total_minor = paid_total_minor + 1 WHERE public_token = $1`, paid.PublicToken); err == nil {
 		t.Fatal("credited paid fact mutation unexpectedly succeeded")
 	}
-	assertLifecycleOrderStatus(t, db, paid.PublicToken, PaymentOrderCredited)
+	assertLifecycleOrderStatus(t, db, paid.PublicToken, paymentsdomain.PaymentOrderCredited)
 }
 
 func TestCheckoutLifecycleReturnStatusIsOwnedByAuthenticatedUser(t *testing.T) {
@@ -477,10 +481,10 @@ func TestCheckoutLifecycleReturnStatusIsOwnedByAuthenticatedUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.GetPaymentOrderReturnStatus(t.Context(), 99, created.PublicToken); !errors.Is(err, ErrPaymentOrderNotFound) {
+	if _, err := service.GetPaymentOrderReturnStatus(t.Context(), 99, created.PublicToken); !errors.Is(err, paymentcontracts.ErrPaymentOrderNotFound) {
 		t.Fatalf("cross-user return status error = %v, want ErrPaymentOrderNotFound", err)
 	}
-	if _, err := service.GetPaymentOrderReturnStatus(t.Context(), 42, "not-a-payment-order-token"); !errors.Is(err, ErrPaymentOrderNotFound) {
+	if _, err := service.GetPaymentOrderReturnStatus(t.Context(), 42, "not-a-payment-order-token"); !errors.Is(err, paymentcontracts.ErrPaymentOrderNotFound) {
 		t.Fatalf("invalid return token error = %v, want ErrPaymentOrderNotFound", err)
 	}
 }
@@ -494,7 +498,7 @@ func TestCheckoutLifecycleRepeatedReturnCreditsAndPublishesOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkout.setPaid(true)
-	events, unsubscribe := subscribePaymentUserEvents(t, service.EventHub(), 42)
+	events, unsubscribe := subscribePaymentUserEvents(t, service.eventHub(), 42)
 	defer unsubscribe()
 
 	for attempt := 0; attempt < 2; attempt++ {
@@ -519,7 +523,7 @@ func TestCheckoutLifecycleRepeatedReturnCreditsAndPublishesOnce(t *testing.T) {
 		t.Fatalf("repeated Return published duplicate event: %+v", event)
 	case <-time.After(100 * time.Millisecond):
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderCredited)
+	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderCredited)
 	assertLifecyclePurchaseCount(t, db, 1)
 	assertLifecycleWalletAvailable(t, wallets, 42, 701)
 }
@@ -532,15 +536,15 @@ func TestCheckoutLifecycleReturnExpiryAllowsVerifiedLatePayment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	events, unsubscribe := subscribePaymentUserEvents(t, service.EventHub(), 42)
+	events, unsubscribe := subscribePaymentUserEvents(t, service.eventHub(), 42)
 	defer unsubscribe()
 
-	checkout.status = CheckoutSessionStatusExpired
+	checkout.status = paymentports.CheckoutSessionStatusExpired
 	status, err := service.GetPaymentOrderReturnStatus(t.Context(), 42, created.PublicToken)
 	if err != nil || status.Status != "failed" {
 		t.Fatalf("expired Return status = %+v, %v", status, err)
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderExpired)
+	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderExpired)
 
 	select {
 	case rawEvent := <-events:
@@ -557,7 +561,7 @@ func TestCheckoutLifecycleReturnExpiryAllowsVerifiedLatePayment(t *testing.T) {
 	if err != nil || status.Status != "credited" {
 		t.Fatalf("late paid Return status = %+v, %v", status, err)
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderCredited)
+	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderCredited)
 	assertLifecyclePurchaseCount(t, db, 1)
 	assertLifecycleWalletAvailable(t, wallets, 42, 701)
 
@@ -572,16 +576,16 @@ func TestCheckoutLifecycleReturnExpiryAllowsVerifiedLatePayment(t *testing.T) {
 	}
 }
 
-func newCheckoutLifecycleService(t *testing.T, now *time.Time, checkout CheckoutGateway, verifier StripeWebhookVerifier) (*sql.DB, *Service, *credits.Service) {
+func newCheckoutLifecycleService(t *testing.T, now *time.Time, checkout paymentports.CheckoutGateway, verifier paymentports.StripeWebhookVerifier) (*sql.DB, *Service, *credits.Service) {
 	t.Helper()
 	secretstest.EnableEncryption(t)
 	db, pool := testdb.OpenWithPool(t)
 	wallets := credits.NewService(pool)
 	seedCheckoutLifecycleWallet(t, wallets, 42)
-	repo := NewRepository(db)
+	repo := paymentpostgres.NewRepository(db)
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(NewEventHub(), func() time.Time { return now.UTC() }),
 		lifecycleStripeGateway{}, checkout, wallets, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
-	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_checkout_lifecycle", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}); err != nil {
@@ -590,10 +594,10 @@ func newCheckoutLifecycleService(t *testing.T, now *time.Time, checkout Checkout
 	return db, service, wallets
 }
 
-func lifecycleCheckoutCommand(userID int64, key string, quantity int64) CreateCheckoutCommand {
-	return CreateCheckoutCommand{
+func lifecycleCheckoutCommand(userID int64, key string, quantity int64) paymentsdomain.CreateCheckoutCommand {
+	return paymentsdomain.CreateCheckoutCommand{
 		UserID: userID, ClientIdempotencyKey: key, IdeaQuantity: quantity,
-		TermsAccepted: true, TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
+		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 		ReturnBaseURL: "https://app.example.com/user/boards",
 	}
 }
@@ -617,9 +621,9 @@ func seedCheckoutLifecycleWallet(t *testing.T, wallets *credits.Service, userID 
 	}
 }
 
-func assertLifecycleOrderStatus(t *testing.T, db *sql.DB, publicToken string, want PaymentOrderStatus) {
+func assertLifecycleOrderStatus(t *testing.T, db *sql.DB, publicToken string, want paymentsdomain.PaymentOrderStatus) {
 	t.Helper()
-	var status PaymentOrderStatus
+	var status paymentsdomain.PaymentOrderStatus
 	if err := db.QueryRowContext(t.Context(), `SELECT status FROM payment_orders WHERE public_token = $1`, publicToken).Scan(&status); err != nil {
 		t.Fatal(err)
 	}
@@ -652,41 +656,41 @@ func assertLifecycleWalletAvailable(t *testing.T, wallets *credits.Service, user
 
 type lifecycleStripeGateway struct{}
 
-func (lifecycleStripeGateway) PrepareConfiguration(context.Context, PrepareStripeConfiguration) (PreparedStripeConfiguration, error) {
-	return PreparedStripeConfiguration{
-		AccountID: "acct_checkout_lifecycle", Mode: StripeModeTest, ChargesEnabled: true,
+func (lifecycleStripeGateway) PrepareConfiguration(context.Context, paymentports.PrepareStripeConfiguration) (paymentports.PreparedStripeConfiguration, error) {
+	return paymentports.PreparedStripeConfiguration{
+		AccountID: "acct_checkout_lifecycle", Mode: paymentports.StripeModeTest, ChargesEnabled: true,
 		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_checkout_lifecycle", WebhookEndpointID: "we_checkout_lifecycle", WebhookSecret: "whsec_checkout_lifecycle",
 	}, nil
 }
 
 type lifecycleWebhookVerifier struct {
-	event StripeWebhookEvent
+	event paymentports.StripeWebhookEvent
 }
 
-func (v *lifecycleWebhookVerifier) Verify(context.Context, []byte, string, string, time.Duration, time.Time) (StripeWebhookEvent, error) {
+func (v *lifecycleWebhookVerifier) Verify(context.Context, []byte, string, string, time.Duration, time.Time) (paymentports.StripeWebhookEvent, error) {
 	return v.event, nil
 }
 
-func lifecycleWebhookEvent(id, eventType, sessionID string, createdAt time.Time) StripeWebhookEvent {
-	return StripeWebhookEvent{ID: id, Type: eventType, ObjectID: sessionID, CreatedAt: createdAt}
+func lifecycleWebhookEvent(id, eventType, sessionID string, createdAt time.Time) paymentports.StripeWebhookEvent {
+	return paymentports.StripeWebhookEvent{ID: id, Type: eventType, ObjectID: sessionID, CreatedAt: createdAt}
 }
 
 type lifecycleCheckoutGateway struct {
 	mu                  sync.Mutex
-	sessions            map[string]CheckoutSession
+	sessions            map[string]paymentports.CheckoutSession
 	createCalls         int
 	expireCalls         int
 	expireErr           error
 	retrieveErr         error
 	paid                bool
-	status              CheckoutSessionStatus
+	status              paymentports.CheckoutSessionStatus
 	firstSessionStarted chan struct{}
 	releaseFirstSession chan struct{}
 	blockFirst          bool
 }
 
 func newLifecycleCheckoutGateway() *lifecycleCheckoutGateway {
-	return &lifecycleCheckoutGateway{sessions: make(map[string]CheckoutSession)}
+	return &lifecycleCheckoutGateway{sessions: make(map[string]paymentports.CheckoutSession)}
 }
 
 func (g *lifecycleCheckoutGateway) blockFirstSessionCreate() {
@@ -697,19 +701,19 @@ func (g *lifecycleCheckoutGateway) blockFirstSessionCreate() {
 	g.releaseFirstSession = make(chan struct{})
 }
 
-func (g *lifecycleCheckoutGateway) CreateCustomer(context.Context, CreateCheckoutCustomerInput) (CheckoutCustomer, error) {
-	return CheckoutCustomer{ID: "cus_checkout_lifecycle"}, nil
+func (g *lifecycleCheckoutGateway) CreateCustomer(context.Context, paymentports.CreateCheckoutCustomerInput) (paymentports.CheckoutCustomer, error) {
+	return paymentports.CheckoutCustomer{ID: "cus_checkout_lifecycle"}, nil
 }
 
-func (g *lifecycleCheckoutGateway) CreateCheckoutSession(_ context.Context, input CreateCheckoutSessionInput) (CheckoutSession, error) {
+func (g *lifecycleCheckoutGateway) CreateCheckoutSession(_ context.Context, input paymentports.CreateCheckoutSessionInput) (paymentports.CheckoutSession, error) {
 	g.mu.Lock()
 	g.createCalls++
-	session := CheckoutSession{
+	session := paymentports.CheckoutSession{
 		ID:         fmt.Sprintf("cs_checkout_lifecycle_%d", g.createCalls),
 		URL:        "https://checkout.stripe.test/c/pay/checkout-lifecycle",
 		CustomerID: input.CustomerID, PublicOrderNumber: input.PublicOrderNumber,
 		PaymentOrderID: input.PaymentOrderID, RequestHash: input.RequestHash,
-		IdeaQuantity: input.IdeaQuantity, ExpiresAt: input.ExpiresAt, Status: CheckoutSessionStatusOpen,
+		IdeaQuantity: input.IdeaQuantity, ExpiresAt: input.ExpiresAt, Status: paymentports.CheckoutSessionStatusOpen,
 	}
 	g.sessions[session.ID] = session
 	shouldBlock := g.blockFirst && g.createCalls == 1
@@ -722,22 +726,22 @@ func (g *lifecycleCheckoutGateway) CreateCheckoutSession(_ context.Context, inpu
 	return session, nil
 }
 
-func (g *lifecycleCheckoutGateway) RetrieveCheckoutSession(_ context.Context, input RetrieveCheckoutSessionInput) (CheckoutSession, error) {
+func (g *lifecycleCheckoutGateway) RetrieveCheckoutSession(_ context.Context, input paymentports.RetrieveCheckoutSessionInput) (paymentports.CheckoutSession, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.retrieveErr != nil {
 		err := g.retrieveErr
 		g.retrieveErr = nil
-		return CheckoutSession{}, err
+		return paymentports.CheckoutSession{}, err
 	}
 	session, ok := g.sessions[input.SessionID]
 	if !ok {
-		return CheckoutSession{}, fmt.Errorf("unknown Checkout Session %q", input.SessionID)
+		return paymentports.CheckoutSession{}, fmt.Errorf("unknown Checkout Session %q", input.SessionID)
 	}
 	if g.paid {
-		session.Status = CheckoutSessionStatusComplete
+		session.Status = paymentports.CheckoutSessionStatusComplete
 		session.URL = ""
-		session.PaymentStatus = CheckoutPaymentStatusPaid
+		session.PaymentStatus = paymentports.CheckoutPaymentStatusPaid
 		session.PaymentIntentID = "pi_" + session.ID
 		session.ChargeID = "ch_" + session.ID
 		session.ReceiptURL = "https://pay.stripe.test/receipts/" + session.ID
@@ -746,7 +750,7 @@ func (g *lifecycleCheckoutGateway) RetrieveCheckoutSession(_ context.Context, in
 		session.AmountTotalMinor = session.IdeaQuantity + 1
 		session.Currency = "usd"
 	} else {
-		session.PaymentStatus = CheckoutPaymentStatusUnpaid
+		session.PaymentStatus = paymentports.CheckoutPaymentStatusUnpaid
 		if g.status != "" {
 			session.Status = g.status
 		}
@@ -754,24 +758,24 @@ func (g *lifecycleCheckoutGateway) RetrieveCheckoutSession(_ context.Context, in
 	return session, nil
 }
 
-func (g *lifecycleCheckoutGateway) ExpireCheckoutSession(_ context.Context, input ExpireCheckoutSessionInput) (ExpireCheckoutSessionResult, error) {
+func (g *lifecycleCheckoutGateway) ExpireCheckoutSession(_ context.Context, input paymentports.ExpireCheckoutSessionInput) (paymentports.ExpireCheckoutSessionResult, error) {
 	g.mu.Lock()
 	g.expireCalls++
 	err := g.expireErr
 	g.expireErr = nil
 	g.mu.Unlock()
 	if err != nil {
-		return ExpireCheckoutSessionResult{}, err
+		return paymentports.ExpireCheckoutSessionResult{}, err
 	}
-	session, err := g.RetrieveCheckoutSession(context.Background(), RetrieveCheckoutSessionInput{SessionID: input.SessionID})
+	session, err := g.RetrieveCheckoutSession(context.Background(), paymentports.RetrieveCheckoutSessionInput{SessionID: input.SessionID})
 	if err != nil {
-		return ExpireCheckoutSessionResult{}, err
+		return paymentports.ExpireCheckoutSessionResult{}, err
 	}
 	if session.IsPaid() {
-		return ExpireCheckoutSessionResult{Outcome: CheckoutSessionExpirationOutcomePaid, Session: session}, nil
+		return paymentports.ExpireCheckoutSessionResult{Outcome: paymentports.CheckoutSessionExpirationOutcomePaid, Session: session}, nil
 	}
-	session.Status = CheckoutSessionStatusExpired
-	return ExpireCheckoutSessionResult{Outcome: CheckoutSessionExpirationOutcomeExpired, Session: session}, nil
+	session.Status = paymentports.CheckoutSessionStatusExpired
+	return paymentports.ExpireCheckoutSessionResult{Outcome: paymentports.CheckoutSessionExpirationOutcomeExpired, Session: session}, nil
 }
 
 func (g *lifecycleCheckoutGateway) createSessionCalls() int {
