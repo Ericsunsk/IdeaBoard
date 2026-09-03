@@ -288,3 +288,7 @@ LIMIT 1`, accountID).Scan(&credentialID); err != nil {
 	}
 	return credentialID
 }
+
+func testPtr(value int64) *int64 {
+	return &value
+}

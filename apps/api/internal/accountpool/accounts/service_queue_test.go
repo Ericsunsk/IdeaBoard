@@ -592,3 +592,7 @@ func TestStopAccountReturnsErrorAndSkipsSideEffectsWhenTaskFinalizerFails(t *tes
 		t.Fatalf("task list calls=%d, want 0 before commit", taskRepo.listCalls)
 	}
 }
+
+func testPtr(value int64) *int64 {
+	return &value
+}

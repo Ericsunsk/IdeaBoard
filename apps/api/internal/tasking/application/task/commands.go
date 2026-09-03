@@ -22,6 +22,15 @@ var (
 	errTaskBillingUnavailable         = errors.New("task billing service not configured")
 )
 
+// CommandService is the application boundary for task mutations and billing
+// readiness checks consumed by HTTP adapters.
+type CommandService interface {
+	SubmitTask(context.Context, int64, *tasks.SubmitTaskRequest) (string, error)
+	CheckSubmitTaskReadiness(context.Context, int64, *tasks.SubmitTaskRequest) (SubmitTaskReadiness, error)
+	CancelUserTask(context.Context, string, int64) error
+	CancelAdminTask(context.Context, string, int64) error
+}
+
 func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (string, error) {
 	if s == nil || s.taskIntake == nil {
 		return "", newSubmissionError("submission_failed", "任务提交失败，请稍后重试", errTaskIntakeUnavailable)

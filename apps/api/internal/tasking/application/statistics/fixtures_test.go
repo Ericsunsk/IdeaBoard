@@ -64,3 +64,7 @@ func createTaskStatsTestTask(t testing.TB, db *sql.DB, repo *taskstore.Repositor
 	}
 	return nil
 }
+
+func testPtr(value int64) *int64 {
+	return &value
+}

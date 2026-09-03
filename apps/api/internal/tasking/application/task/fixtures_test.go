@@ -97,3 +97,7 @@ FROM provider_endpoints pe JOIN api_account_secrets secrets ON secrets.id=$5 WHE
 	}
 	return nil
 }
+
+func testPtr(value int64) *int64 {
+	return &value
+}

@@ -89,3 +89,7 @@ func createRepositoryTestTask(t testing.TB, repo *Repository, ctx context.Contex
 	}
 	return nil
 }
+
+func testPtr(value int64) *int64 {
+	return &value
+}

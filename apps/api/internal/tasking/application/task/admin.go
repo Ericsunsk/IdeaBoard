@@ -15,6 +15,14 @@ import (
 
 const maxTaskKeywordLength = 200
 
+// AdminQueryService is the application boundary consumed by admin HTTP
+// handlers. It deliberately excludes user commands and submission flows.
+type AdminQueryService interface {
+	GetTask(context.Context, string) (*AdminTaskMonitorDetail, error)
+	ListTasks(context.Context, *tasks.TaskListRequest) ([]AdminTaskMonitorListItem, tasks.TaskListCounts, error)
+	ResolveAdminTaskUserID(context.Context, string) (int64, error)
+}
+
 type AdminTaskMonitorListItem struct {
 	TaskID          string                             `json:"task_id"`
 	UserPublicID    uuid.UUID                          `json:"user_public_id"`
