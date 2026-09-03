@@ -86,15 +86,7 @@ type CheckoutWorkflowDependencies struct {
 // CheckoutWorkflow owns Stripe configuration, Payment Order intent creation,
 // Checkout customer/session lifecycle, and user-facing Payment Order reads.
 type CheckoutWorkflow struct {
-	configuration        paymentpersistence.StripeConfigurationStore
-	configurationGateway paymentports.StripeGateway
-	shutdownEnqueuer     paymentconfiguration.ShutdownEnqueuer
-	checkoutStore        paymentpersistence.PaymentCheckoutStore
-	checkoutGateway      paymentports.CheckoutGateway
-	wallets              ports.WalletReader
-	convergenceStore     paymentpersistence.PaymentConvergenceStore
-	orderLifecycle       *paymentorder.PaymentOrderLifecycle
-	runtime              *PaymentRuntime
+	runtime *PaymentRuntime
 	*checkoutApplicationService
 	*paymentreadmodel.Service
 	configurationService *paymentconfiguration.Service
@@ -141,9 +133,7 @@ func NewCheckoutWorkflow(deps CheckoutWorkflowDependencies) (*CheckoutWorkflow, 
 		return nil, err
 	}
 	return &CheckoutWorkflow{
-		configuration: deps.Configuration, configurationGateway: deps.ConfigurationGateway, shutdownEnqueuer: deps.ShutdownEnqueuer,
-		checkoutStore: deps.Store, checkoutGateway: deps.CheckoutGateway, wallets: deps.Wallets, convergenceStore: deps.Convergence,
-		orderLifecycle: deps.Transitions.orderLifecycle, runtime: deps.Transitions.runtime, checkoutApplicationService: checkoutService, Service: readModelService, configurationService: configurationService,
+		runtime: deps.Transitions.runtime, checkoutApplicationService: checkoutService, Service: readModelService, configurationService: configurationService,
 	}, nil
 }
 
@@ -164,20 +154,25 @@ type StripeFactsWorkflowDependencies struct {
 // recovery transition derived from them.
 type StripeFactsWorkflow struct {
 	*paymentreconciliation.Service
-	configuration    paymentpersistence.StripeConfigurationStore
-	webhookInbox     paymentpersistence.StripeWebhookInboxStore
-	convergenceStore paymentpersistence.PaymentConvergenceStore
-	refundGateway    paymentports.RefundGateway
 	*paymentRefundService
-	disputeGateway   paymentports.DisputeGateway
-	disputeService   *paymentdispute.Service
-	checkoutStore    paymentpersistence.PaymentCheckoutStore
-	checkoutGateway  paymentports.CheckoutGateway
-	orderLifecycle   *paymentorder.PaymentOrderLifecycle
-	checkoutRecovery PaymentCheckoutRecovery
-	verifier         paymentports.StripeWebhookVerifier
-	runtime          *PaymentRuntime
+	runtime *PaymentRuntime
 	*paymentWebhookService
+}
+
+type stripeCredentialLoader func(context.Context, string) (paymentconfiguration.StoredStripeConfiguration, error)
+
+func credentialAccess(load stripeCredentialLoader) func(context.Context, string) (paymentconfiguration.StoredStripeConfiguration, string, error) {
+	return func(ctx context.Context, id string) (paymentconfiguration.StoredStripeConfiguration, string, error) {
+		configuration, err := load(ctx, id)
+		if err != nil {
+			return paymentconfiguration.StoredStripeConfiguration{}, "", paymentcontracts.ErrStripeConfigurationInvalid
+		}
+		key, err := secrets.DecryptMaterialString(configuration.APIKeyCiphertext, configuration.SecretMaterialKind)
+		if err != nil {
+			return paymentconfiguration.StoredStripeConfiguration{}, "", paymentcontracts.ErrStripeConfigurationInvalid
+		}
+		return configuration, key, nil
+	}
 }
 
 func NewStripeFactsWorkflow(deps StripeFactsWorkflowDependencies) (*StripeFactsWorkflow, error) {
@@ -193,18 +188,8 @@ func NewStripeFactsWorkflow(deps StripeFactsWorkflowDependencies) (*StripeFactsW
 	}
 	disputeService, err := paymentdispute.NewService(paymentdispute.Dependencies{
 		CheckoutStore: deps.CheckoutStore, CheckoutGateway: deps.CheckoutGateway,
-		OrderLifecycle: deps.Transitions.orderLifecycle,
-		CredentialAccess: func(ctx context.Context, id string) (paymentconfiguration.StoredStripeConfiguration, string, error) {
-			c, err := deps.Configuration.GetStripeCredential(ctx, id)
-			if err != nil {
-				return paymentconfiguration.StoredStripeConfiguration{}, "", paymentcontracts.ErrStripeConfigurationInvalid
-			}
-			key, err := secrets.DecryptMaterialString(c.APIKeyCiphertext, c.SecretMaterialKind)
-			if err != nil {
-				return paymentconfiguration.StoredStripeConfiguration{}, "", paymentcontracts.ErrStripeConfigurationInvalid
-			}
-			return c, key, nil
-		},
+		OrderLifecycle:   deps.Transitions.orderLifecycle,
+		CredentialAccess: credentialAccess(deps.Configuration.GetStripeCredential),
 	})
 	if err != nil {
 		return nil, err
@@ -213,28 +198,8 @@ func NewStripeFactsWorkflow(deps StripeFactsWorkflowDependencies) (*StripeFactsW
 		Configuration: deps.Configuration, Convergence: deps.Convergence, CheckoutRecovery: deps.CheckoutRecovery,
 		CheckoutStore: deps.CheckoutStore, CheckoutGateway: deps.CheckoutGateway, RefundGateway: deps.RefundGateway,
 		DisputeGateway: deps.DisputeGateway, DisputeExpiry: disputeService, OrderLifecycle: deps.Transitions.orderLifecycle,
-		CredentialAccess: func(ctx context.Context, id string) (paymentconfiguration.StoredStripeConfiguration, string, error) {
-			c, err := deps.Configuration.GetStripeCredential(ctx, id)
-			if err != nil {
-				return paymentconfiguration.StoredStripeConfiguration{}, "", paymentcontracts.ErrStripeConfigurationInvalid
-			}
-			key, err := secrets.DecryptMaterialString(c.APIKeyCiphertext, c.SecretMaterialKind)
-			if err != nil {
-				return paymentconfiguration.StoredStripeConfiguration{}, "", paymentcontracts.ErrStripeConfigurationInvalid
-			}
-			return c, key, nil
-		},
-		OrderAccess: func(ctx context.Context, id string) (paymentconfiguration.StoredStripeConfiguration, string, error) {
-			c, err := deps.Configuration.GetStripeCredentialForOrder(ctx, id)
-			if err != nil {
-				return paymentconfiguration.StoredStripeConfiguration{}, "", paymentcontracts.ErrStripeConfigurationInvalid
-			}
-			key, err := secrets.DecryptMaterialString(c.APIKeyCiphertext, c.SecretMaterialKind)
-			if err != nil {
-				return paymentconfiguration.StoredStripeConfiguration{}, "", paymentcontracts.ErrStripeConfigurationInvalid
-			}
-			return c, key, nil
-		},
+		CredentialAccess: credentialAccess(deps.Configuration.GetStripeCredential),
+		OrderAccess:      credentialAccess(deps.Configuration.GetStripeCredentialForOrder),
 		Publish: func(userID int64, status string) {
 			deps.Transitions.runtime.events.Publish(userID, paymentports.PaymentEvent{Status: status})
 		}, Now: deps.Transitions.runtime.now,
@@ -246,23 +211,13 @@ func NewStripeFactsWorkflow(deps StripeFactsWorkflowDependencies) (*StripeFactsW
 		Configuration: deps.Configuration, Inbox: deps.Inbox, Convergence: deps.Convergence,
 		Verifier: deps.Verifier, CheckoutStore: deps.CheckoutStore, Checkout: deps.Transitions.orderLifecycle,
 		Refund: refundService, Dispute: disputeService, CheckoutGateway: deps.CheckoutGateway, DisputeGateway: deps.DisputeGateway,
-		CredentialAccess: func(ctx context.Context, id string) (paymentconfiguration.StoredStripeConfiguration, string, error) {
-			c, err := deps.Configuration.GetStripeCredential(ctx, id)
-			if err != nil {
-				return paymentconfiguration.StoredStripeConfiguration{}, "", paymentcontracts.ErrStripeConfigurationInvalid
-			}
-			key, err := secrets.DecryptMaterialString(c.APIKeyCiphertext, c.SecretMaterialKind)
-			if err != nil {
-				return paymentconfiguration.StoredStripeConfiguration{}, "", paymentcontracts.ErrStripeConfigurationInvalid
-			}
-			return c, key, nil
-		},
-		Events: deps.Transitions.runtime.events, Now: deps.Transitions.runtime.now,
+		CredentialAccess: credentialAccess(deps.Configuration.GetStripeCredential),
+		Events:           deps.Transitions.runtime.events, Now: deps.Transitions.runtime.now,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &StripeFactsWorkflow{Service: reconciliationService, configuration: deps.Configuration, webhookInbox: deps.Inbox, convergenceStore: deps.Convergence, refundGateway: deps.RefundGateway, paymentRefundService: refundService, disputeGateway: deps.DisputeGateway, disputeService: disputeService, checkoutStore: deps.CheckoutStore, checkoutGateway: deps.CheckoutGateway, orderLifecycle: deps.Transitions.orderLifecycle, checkoutRecovery: deps.CheckoutRecovery, verifier: deps.Verifier, runtime: deps.Transitions.runtime, paymentWebhookService: webhookService}, nil
+	return &StripeFactsWorkflow{Service: reconciliationService, paymentRefundService: refundService, runtime: deps.Transitions.runtime, paymentWebhookService: webhookService}, nil
 }
 
 // NewService is the only supported Payments root constructor. It accepts

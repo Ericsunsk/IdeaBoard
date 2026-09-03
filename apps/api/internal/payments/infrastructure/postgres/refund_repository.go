@@ -257,7 +257,7 @@ func (r *Repository) MarkPaymentRefundFailed(ctx context.Context, refundID, summ
 	}
 	defer func() { _ = tx.Rollback() }()
 	var refund paymentsdomain.PaymentRefund
-	if err := scanPaymentRefund(tx.QueryRowContext(ctx, `SELECT id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at FROM payment_refunds WHERE id = $1::uuid FOR UPDATE`, refundID), &refund); err != nil {
+	if err := scanPaymentRefund(tx.QueryRowContext(ctx, paymentRefundSelect+` WHERE id = $1::uuid FOR UPDATE`, refundID), &refund); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	if refund.Status == paymentsdomain.PaymentRefundFailed || refund.Status == paymentsdomain.PaymentRefundAnomaly {
@@ -296,7 +296,7 @@ func (r *Repository) MarkPaymentRefundSucceeded(ctx context.Context, refundID st
 	}
 	defer func() { _ = tx.Rollback() }()
 	var refund paymentsdomain.PaymentRefund
-	if err := scanPaymentRefund(tx.QueryRowContext(ctx, `SELECT id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at FROM payment_refunds WHERE id = $1::uuid FOR UPDATE`, refundID), &refund); err != nil {
+	if err := scanPaymentRefund(tx.QueryRowContext(ctx, paymentRefundSelect+` WHERE id = $1::uuid FOR UPDATE`, refundID), &refund); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	if refund.Status == paymentsdomain.PaymentRefundSucceeded || refund.Status == paymentsdomain.PaymentRefundAnomaly {

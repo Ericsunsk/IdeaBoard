@@ -69,7 +69,7 @@ FROM payment_orders WHERE public_order_number = $1 FOR UPDATE`, orderNumber).Sca
 
 func findPendingRefundReplay(ctx context.Context, tx refundQueryer, order paymentsdomain.PaymentOrder, input paymentrefund.CreatePendingPaymentRefundInput) (paymentsdomain.PaymentRefund, bool, error) {
 	var existing paymentsdomain.PaymentRefund
-	err := scanPaymentRefund(tx.QueryRowContext(ctx, `SELECT id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at FROM payment_refunds WHERE payment_order_id = $1::uuid AND idempotency_key = $2`, order.ID, input.IdempotencyKey), &existing)
+	err := scanPaymentRefund(tx.QueryRowContext(ctx, paymentRefundSelect+` WHERE payment_order_id = $1::uuid AND idempotency_key = $2`, order.ID, input.IdempotencyKey), &existing)
 	if err == nil {
 		if existing.IdeaQuantity != input.IdeaQuantity {
 			return paymentsdomain.PaymentRefund{}, false, paymentcontracts.ErrRefundIdempotency
@@ -98,7 +98,7 @@ func (r *Repository) GetPaymentRefundByID(ctx context.Context, refundID string) 
 		return paymentsdomain.PaymentRefund{}, fmt.Errorf("payments repository: database unavailable")
 	}
 	var refund paymentsdomain.PaymentRefund
-	err := scanPaymentRefund(r.dbWithContext(ctx).executor.QueryRowContext(ctx, `SELECT id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at FROM payment_refunds WHERE id = $1::uuid`, refundID), &refund)
+	err := scanPaymentRefund(r.dbWithContext(ctx).executor.QueryRowContext(ctx, paymentRefundSelect+` WHERE id = $1::uuid`, refundID), &refund)
 	return refund, err
 }
 
@@ -107,7 +107,7 @@ func (r *Repository) GetPaymentRefundByStripeID(ctx context.Context, stripeRefun
 		return paymentsdomain.PaymentRefund{}, fmt.Errorf("payments repository: database unavailable")
 	}
 	var refund paymentsdomain.PaymentRefund
-	err := scanPaymentRefund(r.dbWithContext(ctx).executor.QueryRowContext(ctx, `SELECT id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at FROM payment_refunds WHERE stripe_refund_id = $1`, stripeRefundID), &refund)
+	err := scanPaymentRefund(r.dbWithContext(ctx).executor.QueryRowContext(ctx, paymentRefundSelect+` WHERE stripe_refund_id = $1`, stripeRefundID), &refund)
 	return refund, err
 }
 
