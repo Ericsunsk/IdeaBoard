@@ -246,45 +246,62 @@ func (o *taskExecutionOrchestrator) handleProviderFailure(
 	phaseMachine *taskExecutionPhaseMachine,
 ) error {
 	if isContextInterrupted(taskCtx.Err()) || isContextInterrupted(ctx.Err()) {
-		checkCtx, checkCancel := taskCleanupContext(ctx)
-		cancelled, checkErr := o.taskExecution.IsTaskCancelled(checkCtx, attempt.task.TaskID)
-		checkCancel()
-		if checkErr != nil {
-			slog.Warn("check task cancellation failed", "task_id", attempt.task.TaskID, "err", checkErr)
-		}
-		decision := o.decideTaskExecutionConvergence(taskExecutionConvergenceInput{
-			IsExecutionInterrupted: true,
-			IsTaskCancelled:        cancelled,
-			ProviderFailure: taskExecutionConvergenceProviderFailure{
-				Reason:   err.Error(),
-				Stage:    tasks.ExecutionStageProvider,
-				Category: tasks.FailureCategoryUnknown,
-			},
-		})
-		switch decision.Outcome {
-		case taskExecutionConvergenceCancel:
-			if phaseErr := phaseMachine.advance(taskExecutionPhaseCancelled); phaseErr != nil {
-				return phaseErr
-			}
-			cancelFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusCancelled, "任务已取消", tasks.ExecutionStageProvider, tasks.FailureCategoryCancelled, time.Now())
-			o.skipCancelledTask(ctx, attempt.task, &cancelFinish)
-			return nil
-		case taskExecutionConvergenceInterruptRequeue:
-			if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
-				return phaseErr
-			}
-			requeueFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusRequeued, decision.Reason, decision.FailureStage, decision.FailureCategory, time.Now())
-			return o.handleExecutionInterrupted(ctx, attempt.task, attempt.assignment, err, &requeueFinish)
-		default:
-			slog.Warn("unexpected task execution convergence outcome for interrupted provider failure", "task_id", attempt.task.TaskID, "outcome", decision.Outcome)
-			if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
-				return phaseErr
-			}
-			requeueFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusRequeued, err.Error(), tasks.ExecutionStageProvider, tasks.FailureCategoryUnknown, time.Now())
-			return o.handleExecutionInterrupted(ctx, attempt.task, attempt.assignment, err, &requeueFinish)
-		}
+		return o.handleInterruptedProviderFailure(ctx, attempt, err, phaseMachine)
 	}
+	return o.handleProviderFailureConvergence(ctx, attempt, err, phaseMachine)
+}
 
+func (o *taskExecutionOrchestrator) handleInterruptedProviderFailure(
+	ctx context.Context,
+	attempt taskExecutionAttemptContext,
+	err error,
+	phaseMachine *taskExecutionPhaseMachine,
+) error {
+	checkCtx, checkCancel := taskCleanupContext(ctx)
+	cancelled, checkErr := o.taskExecution.IsTaskCancelled(checkCtx, attempt.task.TaskID)
+	checkCancel()
+	if checkErr != nil {
+		slog.Warn("check task cancellation failed", "task_id", attempt.task.TaskID, "err", checkErr)
+	}
+	decision := o.decideTaskExecutionConvergence(taskExecutionConvergenceInput{
+		IsExecutionInterrupted: true,
+		IsTaskCancelled:        cancelled,
+		ProviderFailure: taskExecutionConvergenceProviderFailure{
+			Reason:   err.Error(),
+			Stage:    tasks.ExecutionStageProvider,
+			Category: tasks.FailureCategoryUnknown,
+		},
+	})
+	switch decision.Outcome {
+	case taskExecutionConvergenceCancel:
+		if phaseErr := phaseMachine.advance(taskExecutionPhaseCancelled); phaseErr != nil {
+			return phaseErr
+		}
+		cancelFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusCancelled, "任务已取消", tasks.ExecutionStageProvider, tasks.FailureCategoryCancelled, time.Now())
+		o.skipCancelledTask(ctx, attempt.task, &cancelFinish)
+		return nil
+	case taskExecutionConvergenceInterruptRequeue:
+		if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
+			return phaseErr
+		}
+		requeueFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusRequeued, decision.Reason, decision.FailureStage, decision.FailureCategory, time.Now())
+		return o.handleExecutionInterrupted(ctx, attempt.task, attempt.assignment, err, &requeueFinish)
+	default:
+		slog.Warn("unexpected task execution convergence outcome for interrupted provider failure", "task_id", attempt.task.TaskID, "outcome", decision.Outcome)
+		if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
+			return phaseErr
+		}
+		requeueFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusRequeued, err.Error(), tasks.ExecutionStageProvider, tasks.FailureCategoryUnknown, time.Now())
+		return o.handleExecutionInterrupted(ctx, attempt.task, attempt.assignment, err, &requeueFinish)
+	}
+}
+
+func (o *taskExecutionOrchestrator) handleProviderFailureConvergence(
+	ctx context.Context,
+	attempt taskExecutionAttemptContext,
+	err error,
+	phaseMachine *taskExecutionPhaseMachine,
+) error {
 	slog.Warn("upstream provider call failed", "task_id", attempt.task.TaskID, "correlation_id", attempt.task.EffectiveCorrelationID(), "account_id", attempt.accountID, "err", err)
 	elapsed := attempt.elapsedSeconds()
 	reason := userFacingProviderError(err)

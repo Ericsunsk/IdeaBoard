@@ -159,54 +159,53 @@ func (w *RiverTaskWorker) Work(ctx context.Context, job *river.Job[taskqueue.Dra
 			}
 		}()
 	}
-	process := func() error { return w.processor.Process(ctx, &task) }
-	if isFinalAttempt {
-		process = func() error {
-			return w.processor.ProcessBeforeExecute(ctx, &task, func() error {
-				return w.finalFailures.prepareFinalAttempt(ctx, finalFailureRequest{
-					taskID: task.TaskID, riverJobID: job.ID, reason: finalFailureErrorReason,
-				})
-			})
-		}
-	}
-	if err := process(); err != nil {
-		if errors.Is(err, errFinalAttemptMarkerResetFailed) {
-			result := w.finalFailures.convergeDurably(ctx, finalFailureRequest{
-				taskID: task.TaskID, riverJobID: job.ID, reason: finalFailureErrorReason,
-			}, false)
-			if result.durability == finalFailureDurabilityConverged {
-				return nil
-			}
-			if result.durability == finalFailureDurabilityFallback {
-				return err
-			}
-			return river.JobSnooze(w.finalFailureRetryDelay)
-		}
-		if errors.Is(err, errFinalAttemptMarkerUnavailable) {
-			return river.JobSnooze(w.finalFailureRetryDelay)
-		}
-		if errors.Is(err, taskqueueports.ErrNoAccountCapacity) {
-			return river.JobSnooze(w.noCapacityRetryDelay)
-		}
-		if isFinalAttempt {
-			result := w.finalFailures.convergeDurably(ctx, finalFailureRequest{
-				taskID: task.TaskID, riverJobID: job.ID, reason: finalFailureErrorReason,
-			}, true)
-			switch result.durability {
-			case finalFailureDurabilityConverged, finalFailureDurabilityFallback:
-				return err
-			case finalFailureDurabilityMarker:
-				return river.JobSnooze(w.finalFailureRetryDelay)
-			default:
-				slog.Error("durable final failure retry unavailable; retaining original River job",
-					"task_id", task.TaskID, "river_job_id", job.ID, "err", result.err,
-				)
-				return river.JobSnooze(w.finalFailureRetryDelay)
-			}
-		}
-		return err
+	if err := w.processTask(ctx, &task, job, isFinalAttempt); err != nil {
+		return w.handleProcessError(ctx, job, task, isFinalAttempt, err)
 	}
 	return nil
+}
+
+func (w *RiverTaskWorker) processTask(ctx context.Context, task *tasks.TaskPayload, job *river.Job[taskqueue.DrawingTaskArgs], isFinalAttempt bool) error {
+	if !isFinalAttempt {
+		return w.processor.Process(ctx, task)
+	}
+	return w.processor.ProcessBeforeExecute(ctx, task, func() error {
+		return w.finalFailures.prepareFinalAttempt(ctx, finalFailureRequest{
+			taskID: task.TaskID, riverJobID: job.ID, reason: finalFailureErrorReason,
+		})
+	})
+}
+
+func (w *RiverTaskWorker) handleProcessError(ctx context.Context, job *river.Job[taskqueue.DrawingTaskArgs], task tasks.TaskPayload, isFinalAttempt bool, err error) error {
+	if errors.Is(err, errFinalAttemptMarkerResetFailed) {
+		result := w.finalFailures.convergeDurably(ctx, finalFailureRequest{taskID: task.TaskID, riverJobID: job.ID, reason: finalFailureErrorReason}, false)
+		if result.durability == finalFailureDurabilityConverged {
+			return nil
+		}
+		if result.durability == finalFailureDurabilityFallback {
+			return err
+		}
+		return river.JobSnooze(w.finalFailureRetryDelay)
+	}
+	if errors.Is(err, errFinalAttemptMarkerUnavailable) {
+		return river.JobSnooze(w.finalFailureRetryDelay)
+	}
+	if errors.Is(err, taskqueueports.ErrNoAccountCapacity) {
+		return river.JobSnooze(w.noCapacityRetryDelay)
+	}
+	if !isFinalAttempt {
+		return err
+	}
+	result := w.finalFailures.convergeDurably(ctx, finalFailureRequest{taskID: task.TaskID, riverJobID: job.ID, reason: finalFailureErrorReason}, true)
+	switch result.durability {
+	case finalFailureDurabilityConverged, finalFailureDurabilityFallback:
+		return err
+	case finalFailureDurabilityMarker:
+		return river.JobSnooze(w.finalFailureRetryDelay)
+	default:
+		slog.Error("durable final failure retry unavailable; retaining original River job", "task_id", task.TaskID, "river_job_id", job.ID, "err", result.err)
+		return river.JobSnooze(w.finalFailureRetryDelay)
+	}
 }
 
 func (w *RiverTaskWorker) retryFinalFailureConvergence(ctx context.Context, job *rivertype.JobRow, retry finalFailureRetryOutput) error {

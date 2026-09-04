@@ -195,61 +195,86 @@ func (r *Repository) LockAndFindSubmissionByClientActionWithPGXTx(ctx context.Co
 	if strings.TrimSpace(expectedHash) == "" {
 		return tasks.TaskSubmissionResult{}, false, fmt.Errorf("taskstore: submission request hash is required")
 	}
-	lockStartedAt := time.Now()
-	_, lockErr := tx.Exec(
-		ctx,
-		`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
-		fmt.Sprintf("task-submit:%d:%s", userID, clientActionID),
-	)
-	r.metrics.RecordLock(taskstoreLockSubmissionClaim, lockStartedAt, lockErr)
-	if lockErr != nil {
-		return tasks.TaskSubmissionResult{}, false, fmt.Errorf("taskstore: lock submission claim: %w", lockErr)
+	if err := r.lockSubmissionClaim(ctx, tx, userID, clientActionID); err != nil {
+		return tasks.TaskSubmissionResult{}, false, err
 	}
-	result = tasks.TaskSubmissionResult{}
-	var actualHash string
-	err = tx.QueryRow(ctx, `
-SELECT task_id, request_hash
-FROM task_submission_claims
-WHERE user_id = $1 AND client_action_id = $2`, userID, clientActionID).Scan(&result.TaskID, &actualHash)
-	if errors.Is(err, pgx.ErrNoRows) {
-		var existingTaskID, feature string
-		taskErr := tx.QueryRow(ctx, `
-SELECT task_id, feature_slug
-FROM tasks
-WHERE user_id = $1 AND client_action_id = $2`, userID, clientActionID).Scan(&existingTaskID, &feature)
-		if errors.Is(taskErr, pgx.ErrNoRows) {
-			return tasks.TaskSubmissionResult{}, false, nil
-		}
-		if taskErr != nil {
-			return tasks.TaskSubmissionResult{}, false, fmt.Errorf("taskstore: inspect existing submission without claim: %w", taskErr)
-		}
-		if workflow.IsAIImageFeature(feature) {
-			return tasks.TaskSubmissionResult{}, false, fmt.Errorf("%w: billed submission %s has no durable idempotency claim", taskbilling.ErrIntegrity, existingTaskID)
-		}
-		return tasks.TaskSubmissionResult{}, false, fmt.Errorf("%w: client action already belongs to task %s", taskbilling.ErrIdempotencyConflict, existingTaskID)
-	}
+	result, actualHash, found, err := findSubmissionClaim(ctx, tx, userID, clientActionID)
 	if err != nil {
-		return tasks.TaskSubmissionResult{}, false, fmt.Errorf("taskstore: find durable submission claim: %w", err)
+		return tasks.TaskSubmissionResult{}, false, err
+	}
+	if !found {
+		return r.findLegacySubmission(ctx, tx, userID, clientActionID)
 	}
 	if actualHash != expectedHash {
 		return tasks.TaskSubmissionResult{}, false, fmt.Errorf("%w: client action %s was reused with a different billed product", taskbilling.ErrIdempotencyConflict, clientActionID)
 	}
+	if err := r.loadSubmissionBillingFacts(ctx, tx, &result); err != nil {
+		return tasks.TaskSubmissionResult{}, false, err
+	}
+	result.Created = false
+	return result, true, nil
+}
+
+func (r *Repository) lockSubmissionClaim(ctx context.Context, tx pgx.Tx, userID int64, clientActionID string) error {
+	startedAt := time.Now()
+	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, fmt.Sprintf("task-submit:%d:%s", userID, clientActionID))
+	r.metrics.RecordLock(taskstoreLockSubmissionClaim, startedAt, err)
+	if err != nil {
+		return fmt.Errorf("taskstore: lock submission claim: %w", err)
+	}
+	return nil
+}
+
+func findSubmissionClaim(ctx context.Context, tx pgx.Tx, userID int64, clientActionID string) (tasks.TaskSubmissionResult, string, bool, error) {
+	var result tasks.TaskSubmissionResult
+	var actualHash string
+	err := tx.QueryRow(ctx, `
+SELECT task_id, request_hash
+FROM task_submission_claims
+WHERE user_id = $1 AND client_action_id = $2`, userID, clientActionID).Scan(&result.TaskID, &actualHash)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return tasks.TaskSubmissionResult{}, "", false, nil
+	}
+	if err != nil {
+		return tasks.TaskSubmissionResult{}, "", false, fmt.Errorf("taskstore: find durable submission claim: %w", err)
+	}
+	return result, actualHash, true, nil
+}
+
+func (r *Repository) findLegacySubmission(ctx context.Context, tx pgx.Tx, userID int64, clientActionID string) (tasks.TaskSubmissionResult, bool, error) {
+	var existingTaskID, feature string
+	taskErr := tx.QueryRow(ctx, `
+SELECT task_id, feature_slug
+FROM tasks
+WHERE user_id = $1 AND client_action_id = $2`, userID, clientActionID).Scan(&existingTaskID, &feature)
+	if errors.Is(taskErr, pgx.ErrNoRows) {
+		return tasks.TaskSubmissionResult{}, false, nil
+	}
+	if taskErr != nil {
+		return tasks.TaskSubmissionResult{}, false, fmt.Errorf("taskstore: inspect existing submission without claim: %w", taskErr)
+	}
+	if workflow.IsAIImageFeature(feature) {
+		return tasks.TaskSubmissionResult{}, false, fmt.Errorf("%w: billed submission %s has no durable idempotency claim", taskbilling.ErrIntegrity, existingTaskID)
+	}
+	return tasks.TaskSubmissionResult{}, false, fmt.Errorf("%w: client action already belongs to task %s", taskbilling.ErrIdempotencyConflict, existingTaskID)
+}
+
+func (r *Repository) loadSubmissionBillingFacts(ctx context.Context, tx pgx.Tx, result *tasks.TaskSubmissionResult) error {
 	var settlementState taskbilling.SettlementState
 	if err := tx.QueryRow(ctx, `
 SELECT COALESCE(snapshots.hold_transaction_id, ''), settlements.state
 FROM task_billing_snapshots snapshots
 JOIN task_billing_settlements settlements USING (task_id)
-WHERE snapshots.task_id = $1`, result.TaskID).Scan(&result.HoldTransactionID, &settlementState); err != nil {
+	WHERE snapshots.task_id = $1`, result.TaskID).Scan(&result.HoldTransactionID, &settlementState); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return tasks.TaskSubmissionResult{}, false, fmt.Errorf("%w: billed submission %s has incomplete billing facts", taskbilling.ErrIntegrity, result.TaskID)
+			return fmt.Errorf("%w: billed submission %s has incomplete billing facts", taskbilling.ErrIntegrity, result.TaskID)
 		}
-		return tasks.TaskSubmissionResult{}, false, fmt.Errorf("taskstore: load billed submission %s facts: %w", result.TaskID, err)
+		return fmt.Errorf("taskstore: load billed submission %s facts: %w", result.TaskID, err)
 	}
 	if settlementState == taskbilling.SettlementStateHeld && result.HoldTransactionID == "" {
-		return tasks.TaskSubmissionResult{}, false, fmt.Errorf("%w: billed submission %s has held state without Hold", taskbilling.ErrIntegrity, result.TaskID)
+		return fmt.Errorf("%w: billed submission %s has held state without Hold", taskbilling.ErrIntegrity, result.TaskID)
 	}
-	result.Created = false
-	return result, true, nil
+	return nil
 }
 
 func (r *Repository) PersistSubmissionClaim(ctx context.Context, tx pgx.Tx, claim submissioncontracts.Claim) error {

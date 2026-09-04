@@ -170,68 +170,10 @@ func (b *openAIImageRequestBody) setExtra(key string, value interface{}) {
 }
 
 func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *accounts.ApiAccount, providerReq providerRequest, timeout time.Duration) (providerCallResult, error) {
-	baseURL := "https://api.openai.com"
-	if account.ProxyURL != "" {
-		baseURL = strings.TrimRight(account.ProxyURL, "/")
+	req, endpoint, model, size, imageInputCount, useEditEndpoint, err := c.buildOpenAIRequest(ctx, account, providerReq, timeout)
+	if err != nil {
+		return providerCallResult{}, err
 	}
-	validatedBaseURL, validateErr := outbound.ValidateConfiguredEndpoint(baseURL, outbound.AllowHosts(ctx)...)
-	if validateErr != nil {
-		return providerCallResult{}, validateErr
-	}
-	baseURL = validatedBaseURL
-
-	model := strings.TrimSpace(providerReq.Model)
-
-	size := providerReq.Size
-	openAIParams := readOpenAIProviderParams(providerReq)
-	useEditEndpoint := openAIParams.useEditEndpoint()
-	imageInputCount := len(providerReq.ImageRefs)
-
-	reqBody := newOpenAIImageRequestBody(providerReq)
-
-	if useEditEndpoint {
-		appendOpenAIEditParams(&reqBody, openAIParams)
-	} else {
-		appendOpenAIAllowedParams(&reqBody, providerReq, openAIParams)
-	}
-	finalizeOpenAIRequestBody(&reqBody, openAIParams)
-
-	// 如果 ProxyURL 已包含 /v1，则不再拼接 /v1
-	endpoint := baseURL + "/v1/images/generations"
-	if strings.HasSuffix(baseURL, "/v1") {
-		endpoint = baseURL + "/images/generations"
-	}
-	if useEditEndpoint {
-		endpoint = baseURL + "/v1/images/edits"
-		if strings.HasSuffix(baseURL, "/v1") {
-			endpoint = baseURL + "/images/edits"
-		}
-	}
-
-	var req *http.Request
-	var err error
-	if useEditEndpoint {
-		body, contentType, buildErr := c.buildOpenAIEditMultipartRequestBody(ctx, reqBody, timeout)
-		if buildErr != nil {
-			return providerCallResult{}, buildErr
-		}
-		req, err = http.NewRequestWithContext(ctx, "POST", endpoint, body)
-		if err != nil {
-			return providerCallResult{}, err
-		}
-		req.Header.Set("Content-Type", contentType)
-	} else {
-		bodyJSON, marshalErr := json.Marshal(reqBody)
-		if marshalErr != nil {
-			return providerCallResult{}, fmt.Errorf("序列化 OpenAI 请求失败: %w", marshalErr)
-		}
-		req, err = http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(bodyJSON))
-		if err != nil {
-			return providerCallResult{}, err
-		}
-		req.Header.Set("Content-Type", "application/json")
-	}
-	req.Header.Set("Authorization", "Bearer "+account.ApiKey)
 
 	slog.Info("OpenAI-compatible image request", "endpoint", redactLogURL(endpoint), "model", model, "size", size, "edit", useEditEndpoint, "images", imageInputCount)
 
@@ -272,6 +214,71 @@ func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *a
 		ParsedOutputKind:  "image-results",
 		ParsedOutputCount: len(imageURLs),
 	}, nil
+}
+
+func (c *ProviderExecutor) buildOpenAIRequest(ctx context.Context, account *accounts.ApiAccount, providerReq providerRequest, timeout time.Duration) (*http.Request, string, string, string, int, bool, error) {
+	baseURL := "https://api.openai.com"
+	if account.ProxyURL != "" {
+		baseURL = strings.TrimRight(account.ProxyURL, "/")
+	}
+	validatedBaseURL, err := outbound.ValidateConfiguredEndpoint(baseURL, outbound.AllowHosts(ctx)...)
+	if err != nil {
+		return nil, "", "", "", 0, false, err
+	}
+	model := strings.TrimSpace(providerReq.Model)
+	openAIParams := readOpenAIProviderParams(providerReq)
+	useEditEndpoint := openAIParams.useEditEndpoint()
+	reqBody := newOpenAIImageRequestBody(providerReq)
+	if useEditEndpoint {
+		appendOpenAIEditParams(&reqBody, openAIParams)
+	} else {
+		appendOpenAIAllowedParams(&reqBody, providerReq, openAIParams)
+	}
+	finalizeOpenAIRequestBody(&reqBody, openAIParams)
+	endpoint := openAIImageEndpoint(validatedBaseURL, useEditEndpoint)
+	req, err := c.newOpenAIRequest(ctx, account, reqBody, endpoint, useEditEndpoint, timeout)
+	if err != nil {
+		return nil, "", "", "", 0, false, err
+	}
+	return req, endpoint, model, providerReq.Size, len(providerReq.ImageRefs), useEditEndpoint, nil
+}
+
+func openAIImageEndpoint(baseURL string, useEditEndpoint bool) string {
+	path := "/v1/images/generations"
+	if useEditEndpoint {
+		path = "/v1/images/edits"
+	}
+	if strings.HasSuffix(baseURL, "/v1") {
+		path = strings.TrimPrefix(path, "/v1")
+	}
+	return baseURL + path
+}
+
+func (c *ProviderExecutor) newOpenAIRequest(ctx context.Context, account *accounts.ApiAccount, reqBody openAIImageRequestBody, endpoint string, useEditEndpoint bool, timeout time.Duration) (*http.Request, error) {
+	if useEditEndpoint {
+		body, contentType, err := c.buildOpenAIEditMultipartRequestBody(ctx, reqBody, timeout)
+		if err != nil {
+			return nil, err
+		}
+		req, err := http.NewRequestWithContext(ctx, "POST", endpoint, body)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", contentType)
+		req.Header.Set("Authorization", "Bearer "+account.ApiKey)
+		return req, nil
+	}
+	bodyJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("序列化 OpenAI 请求失败: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(bodyJSON))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+account.ApiKey)
+	return req, nil
 }
 
 func (c *ProviderExecutor) buildOpenAIEditMultipartRequestBody(ctx context.Context, reqBody openAIImageRequestBody, timeout time.Duration) (*bytes.Buffer, string, error) {
