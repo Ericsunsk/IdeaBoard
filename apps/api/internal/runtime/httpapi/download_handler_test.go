@@ -9,30 +9,31 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/domain"
+	"ideaboard/api/internal/media/storage/ports"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 type fakeUploadResourceReader struct {
-	object *storage.StoredUploadObject
+	object *ports.StoredUploadObject
 	calls  int
 }
 
-func (f *fakeUploadResourceReader) ReadUploadResourceByURL(_ context.Context, _ string, _ int64) (*storage.StoredUploadObject, error) {
+func (f *fakeUploadResourceReader) ReadUploadResourceByURL(_ context.Context, _ string, _ int64) (*ports.StoredUploadObject, error) {
 	f.calls++
 	return f.object, nil
 }
 
 type allowUploadReadAccess struct{}
 
-func (allowUploadReadAccess) AuthorizeUploadPathRead(_ context.Context, _ int64, _ string) (storage.ReadableUploadAccessResult, error) {
-	return storage.ReadableUploadAccessResult{}, nil
+func (allowUploadReadAccess) AuthorizeUploadPathRead(_ context.Context, _ int64, _ string) (ports.ReadableUploadAccessResult, error) {
+	return ports.ReadableUploadAccessResult{}, nil
 }
 
-func (allowUploadReadAccess) AuthorizeUploadResourceRead(_ context.Context, _ int64, resource storage.UploadResource) (storage.ReadableUploadAccessResult, error) {
-	return storage.ReadableUploadAccessResult{Resource: resource}, nil
+func (allowUploadReadAccess) AuthorizeUploadResourceRead(_ context.Context, _ int64, resource domain.UploadResource) (ports.ReadableUploadAccessResult, error) {
+	return ports.ReadableUploadAccessResult{Resource: resource}, nil
 }
 
 func TestDownloadImageHandlerReadsManagedUploadThroughStorage(t *testing.T) {
@@ -41,7 +42,7 @@ func TestDownloadImageHandlerReadsManagedUploadThroughStorage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	reader := &fakeUploadResourceReader{object: &storage.StoredUploadObject{
+	reader := &fakeUploadResourceReader{object: &ports.StoredUploadObject{
 		Filename:    "future.png",
 		ContentType: "image/png",
 		Data:        pngData,

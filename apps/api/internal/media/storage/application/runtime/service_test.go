@@ -1,0 +1,117 @@
+package runtime
+
+import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"mime/multipart"
+	"net/textproto"
+	"net/url"
+	"testing"
+
+	"ideaboard/api/internal/media/storage/domain"
+	"ideaboard/api/internal/media/storage/ports"
+)
+
+type stubDriverResolver struct{}
+
+func (d stubDriverResolver) GetDriver(provider domain.StorageProvider) (ports.StorageDriver, error) {
+	return nil, nil
+}
+
+func TestPublicUploadURL(t *testing.T) {
+	svc := NewService(nil, stubDriverResolver{}, nil, "https://ideaboard.art")
+	url := svc.PublicUploadURL("uploads/canvas/sample.png")
+	if url != "https://ideaboard.art/uploads/canvas/sample.png" {
+		t.Fatalf("public URL = %q, want https://ideaboard.art/uploads/canvas/sample.png", url)
+	}
+
+	svcNoOrigin := NewService(nil, stubDriverResolver{}, nil, "")
+	urlNoOrigin := svcNoOrigin.PublicUploadURL("uploads/canvas/sample.png")
+	if urlNoOrigin != "/uploads/canvas/sample.png" {
+		t.Fatalf("public URL = %q, want /uploads/canvas/sample.png", urlNoOrigin)
+	}
+}
+
+func TestExtractObjectKeyFromAccessDomainURL(t *testing.T) {
+	t.Run("virtual host style", func(t *testing.T) {
+		parsed, err := url.Parse("https://img.example.com/uploads/canvas/AB12C3/2026/04/24/demo.png")
+		if err != nil {
+			t.Fatalf("parse url failed: %v", err)
+		}
+
+		got, err := extractObjectKeyFromAccessDomainURL("https://img.example.com", parsed)
+		if err != nil {
+			t.Fatalf("extractObjectKeyFromAccessDomainURL returned error: %v", err)
+		}
+		want := "uploads/canvas/AB12C3/2026/04/24/demo.png"
+		if got != want {
+			t.Fatalf("object key = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("access domain base path is removed once", func(t *testing.T) {
+		parsed, err := url.Parse("https://minio.example.com/feng-assets/uploads/canvas/AB12C3/2026/04/24/demo.png")
+		if err != nil {
+			t.Fatalf("parse url failed: %v", err)
+		}
+
+		got, err := extractObjectKeyFromAccessDomainURL("https://minio.example.com/feng-assets", parsed)
+		if err != nil {
+			t.Fatalf("extractObjectKeyFromAccessDomainURL returned error: %v", err)
+		}
+		want := "uploads/canvas/AB12C3/2026/04/24/demo.png"
+		if got != want {
+			t.Fatalf("object key = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("rejects mismatched host", func(t *testing.T) {
+		parsed, err := url.Parse("https://evil.example.com/uploads/canvas/AB12C3/2026/04/24/demo.png")
+		if err != nil {
+			t.Fatalf("parse url failed: %v", err)
+		}
+
+		if _, err := extractObjectKeyFromAccessDomainURL("https://img.example.com", parsed); err == nil {
+			t.Fatalf("expected host mismatch error")
+		}
+	})
+}
+
+func TestChecksumMultipartFile(t *testing.T) {
+	payload := []byte("deduplicated-media-payload")
+	file := multipartHeaderForTest(t, "client.png", payload)
+	checksum, err := checksumMultipartFile(file)
+	if err != nil {
+		t.Fatalf("checksum upload: %v", err)
+	}
+	expectedBytes := sha256.Sum256(payload)
+	if checksum != hex.EncodeToString(expectedBytes[:]) {
+		t.Fatalf("checksum = %q, want %q", checksum, hex.EncodeToString(expectedBytes[:]))
+	}
+}
+
+func multipartHeaderForTest(t *testing.T, filename string, data []byte) *multipart.FileHeader {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreatePart(textproto.MIMEHeader{
+		"Content-Disposition": {`form-data; name="file"; filename="` + filename + `"`},
+		"Content-Type":        {"image/png"},
+	})
+	if err != nil {
+		t.Fatalf("create part: %v", err)
+	}
+	if _, err := part.Write(data); err != nil {
+		t.Fatalf("write part: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart: %v", err)
+	}
+	form, err := multipart.NewReader(&body, writer.Boundary()).ReadForm(int64(len(data) + 1024))
+	if err != nil {
+		t.Fatalf("read form: %v", err)
+	}
+	t.Cleanup(func() { _ = form.RemoveAll() })
+	return form.File["file"][0]
+}

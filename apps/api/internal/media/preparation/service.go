@@ -8,7 +8,8 @@ import (
 
 	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/ingestion"
-	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/domain"
+	"ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/outbound"
 	tasks "ideaboard/api/internal/tasking/domain"
@@ -20,8 +21,8 @@ type Service struct {
 }
 
 type mediaStore interface {
-	PrepareUploadRef(context.Context, string, storage.StorageStoreOptions) (*storage.StoredUploadRef, error)
-	StoreMediaRefAtProfile(context.Context, string, string, storage.StorageStoreOptions) (*storage.StoredUploadRef, error)
+	PrepareUploadRef(context.Context, string, ports.StorageStoreOptions) (*ports.StoredUploadRef, error)
+	StoreMediaRefAtProfile(context.Context, string, string, ports.StorageStoreOptions) (*ports.StoredUploadRef, error)
 	DeleteObjectByStorageProfile(context.Context, string, string) error
 }
 
@@ -95,7 +96,7 @@ func (s *Service) materializePreparedGenerationMedia(ctx context.Context, userID
 	if err != nil {
 		return err
 	}
-	stored, err := s.storage.StoreMediaRefAtProfile(ctx, item.StorageProfile, media.Source, storage.StorageStoreOptions{ObjectKey: item.StorageKey, AllowHosts: outbound.AllowHosts(ctx)})
+	stored, err := s.storage.StoreMediaRefAtProfile(ctx, item.StorageProfile, media.Source, ports.StorageStoreOptions{ObjectKey: item.StorageKey, AllowHosts: outbound.AllowHosts(ctx)})
 	if err != nil {
 		_ = s.registry.Fail(context.WithoutCancel(ctx), handle, err)
 		return fmt.Errorf("prepare media index=%d: %w", media.InputIndex, err)
@@ -177,16 +178,16 @@ func (s *Service) discardPreparedMedia(ctx context.Context, handle ingestion.Han
 }
 
 func (s *Service) beginPreparedMedia(ctx context.Context, userID int64, clientActionID string, media tasks.GenerationMediaIntent) (ingestion.Handle, error) {
-	dirPrefix, err := storage.TaskOutputUploadDirPrefix(userID, "prepare-"+clientActionID)
+	dirPrefix, err := domain.TaskOutputUploadDirPrefix(userID, "prepare-"+clientActionID)
 	if err != nil {
 		return ingestion.Handle{}, err
 	}
 	filename := fmt.Sprintf("%s-%d", strings.TrimSpace(media.Role), media.InputIndex)
-	objectKey, err := storage.StableUploadObjectKey(dirPrefix, filename)
+	objectKey, err := domain.StableUploadObjectKey(dirPrefix, filename)
 	if err != nil {
 		return ingestion.Handle{}, err
 	}
-	planned, err := s.storage.PrepareUploadRef(ctx, filename, storage.StorageStoreOptions{ObjectKey: objectKey})
+	planned, err := s.storage.PrepareUploadRef(ctx, filename, ports.StorageStoreOptions{ObjectKey: objectKey})
 	if err != nil {
 		return ingestion.Handle{}, err
 	}

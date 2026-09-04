@@ -16,6 +16,8 @@ import (
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/domain"
+	"ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
 
@@ -116,12 +118,12 @@ func uploadProfileAvatarHandler(h UploadDeps) gin.HandlerFunc {
 			response.InternalError(c, 500, "头像上传失败", err)
 			return
 		}
-		dirPrefix, err := storage.ProfileAvatarUploadDirPrefix(user.StorageUID)
+		dirPrefix, err := domain.ProfileAvatarUploadDirPrefix(user.StorageUID)
 		if err != nil {
 			response.InternalError(c, 500, "头像上传失败", err)
 			return
 		}
-		stored, err := h.StorageService.UploadRefWithOptions(c.Request.Context(), file, storage.StorageStoreOptions{
+		stored, err := h.StorageService.UploadRefWithOptions(c.Request.Context(), file, ports.StorageStoreOptions{
 			DirPrefix: dirPrefix,
 		})
 		if err != nil {
@@ -219,10 +221,10 @@ func parseBoardUploadFile(c *gin.Context) (*multipart.FileHeader, bool) {
 	return file, true
 }
 
-func resolveBoardUploadTarget(c *gin.Context, h UploadDeps, userID int64) (*boards.UserBoard, storage.StorageStoreOptions, bool) {
+func resolveBoardUploadTarget(c *gin.Context, h UploadDeps, userID int64) (*boards.UserBoard, ports.StorageStoreOptions, bool) {
 	if h.BoardService == nil || h.UserRepo == nil || h.StorageService == nil || h.MediaAssets == nil {
 		response.InternalError(c, 500, "上传失败", fmt.Errorf("board upload dependencies not configured"))
-		return nil, storage.StorageStoreOptions{}, false
+		return nil, ports.StorageStoreOptions{}, false
 	}
 	boardID := strings.TrimSpace(c.Param("board_id"))
 	board, _, err := h.BoardService.ResolveBoardWriteAccess(c.Request.Context(), userID, boardID)
@@ -237,22 +239,22 @@ func resolveBoardUploadTarget(c *gin.Context, h UploadDeps, userID int64) (*boar
 		default:
 			response.InternalError(c, 500, "上传失败", err)
 		}
-		return nil, storage.StorageStoreOptions{}, false
+		return nil, ports.StorageStoreOptions{}, false
 	}
 	owner, err := h.UserRepo.GetByID(c.Request.Context(), board.OwnerUserID)
 	if err != nil {
 		response.InternalError(c, 500, "上传失败", err)
-		return nil, storage.StorageStoreOptions{}, false
+		return nil, ports.StorageStoreOptions{}, false
 	}
-	dirPrefix, err := storage.CanvasContentUploadDirPrefix(owner.StorageUID, board.BoardID)
+	dirPrefix, err := domain.CanvasContentUploadDirPrefix(owner.StorageUID, board.BoardID)
 	if err != nil {
 		response.InternalError(c, 500, "上传失败", err)
-		return nil, storage.StorageStoreOptions{}, false
+		return nil, ports.StorageStoreOptions{}, false
 	}
-	return board, storage.StorageStoreOptions{DirPrefix: dirPrefix}, true
+	return board, ports.StorageStoreOptions{DirPrefix: dirPrefix}, true
 }
 
-func prepareBoardUpload(c *gin.Context, h UploadDeps, file *multipart.FileHeader, storeOpts storage.StorageStoreOptions) (*storage.StoredUploadRef, bool) {
+func prepareBoardUpload(c *gin.Context, h UploadDeps, file *multipart.FileHeader, storeOpts ports.StorageStoreOptions) (*ports.StoredUploadRef, bool) {
 	// Inspect bytes before planning the Media Asset so the object key and
 	// metadata use the canonical format rather than the client filename.
 	prepared, err := h.StorageService.PrepareUploadRefFromFile(c.Request.Context(), file, storeOpts)
@@ -263,7 +265,7 @@ func prepareBoardUpload(c *gin.Context, h UploadDeps, file *multipart.FileHeader
 	return prepared, true
 }
 
-func findExistingBoardAsset(c *gin.Context, h UploadDeps, ownerUserID int64, prepared *storage.StoredUploadRef) (dbsqlc.MediaAsset, bool, bool) {
+func findExistingBoardAsset(c *gin.Context, h UploadDeps, ownerUserID int64, prepared *ports.StoredUploadRef) (dbsqlc.MediaAsset, bool, bool) {
 	if prepared.ChecksumSHA256 == "" {
 		return dbsqlc.MediaAsset{}, false, true
 	}
@@ -278,7 +280,7 @@ func findExistingBoardAsset(c *gin.Context, h UploadDeps, ownerUserID int64, pre
 	return existing, found, true
 }
 
-func persistBoardAsset(c *gin.Context, h UploadDeps, board *boards.UserBoard, file *multipart.FileHeader, storeOpts storage.StorageStoreOptions, prepared *storage.StoredUploadRef) (uploadImageResponse, bool) {
+func persistBoardAsset(c *gin.Context, h UploadDeps, board *boards.UserBoard, file *multipart.FileHeader, storeOpts ports.StorageStoreOptions, prepared *ports.StoredUploadRef) (uploadImageResponse, bool) {
 	handle, err := h.MediaAssets.Begin(c.Request.Context(), ingestion.Request{
 		OwnerUserID: board.OwnerUserID, StorageProfile: prepared.StorageProfile,
 		StorageKey: prepared.StorageKey, URL: prepared.URL,
@@ -318,7 +320,7 @@ func persistBoardAsset(c *gin.Context, h UploadDeps, board *boards.UserBoard, fi
 	return payload, true
 }
 
-func convergeBoardAssetCompletionFailure(c *gin.Context, h UploadDeps, ownerUserID int64, handle ingestion.Handle, stored *storage.StoredUploadRef, completionErr error) (uploadImageResponse, bool) {
+func convergeBoardAssetCompletionFailure(c *gin.Context, h UploadDeps, ownerUserID int64, handle ingestion.Handle, stored *ports.StoredUploadRef, completionErr error) (uploadImageResponse, bool) {
 	// A concurrent identical upload may have committed first and won the
 	// checksum unique index. Re-read the canonical asset before surfacing an
 	// error so the loser still succeeds without retaining its object.
@@ -334,7 +336,7 @@ func convergeBoardAssetCompletionFailure(c *gin.Context, h UploadDeps, ownerUser
 	return uploadImageResponse{}, false
 }
 
-func newUploadImageResponseFromStored(urlKey string, stored *storage.StoredUploadRef) uploadImageResponse {
+func newUploadImageResponseFromStored(urlKey string, stored *ports.StoredUploadRef) uploadImageResponse {
 	payload := uploadImageResponse{}
 	if stored == nil {
 		return payload
@@ -399,8 +401,8 @@ func adminUploadHandler(storageService *storage.StorageService, uploadSettings s
 			response.InternalError(c, 500, "上传失败", fmt.Errorf("storage service not configured"))
 			return
 		}
-		stored, err := storageService.UploadRefWithOptions(c.Request.Context(), file, storage.StorageStoreOptions{
-			DirPrefix: storage.SiteAssetUploadDirPrefix(),
+		stored, err := storageService.UploadRefWithOptions(c.Request.Context(), file, ports.StorageStoreOptions{
+			DirPrefix: domain.SiteAssetUploadDirPrefix(),
 		})
 		if err != nil {
 			response.InternalError(c, 500, "上传失败", err)

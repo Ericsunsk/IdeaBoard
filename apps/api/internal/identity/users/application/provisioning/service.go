@@ -60,6 +60,9 @@ func (s *Service) VerifyWelcomeIdentityKey(ctx context.Context) error {
 }
 
 func (s *Service) ProvisionIdentity(ctx context.Context, identity ports.VerifiedIdentity) (*ports.ProvisionResult, error) {
+	if s == nil {
+		return nil, fmt.Errorf("identity lifecycle dependencies are not configured")
+	}
 	identity, fingerprint, err := s.normalizeVerifiedIdentity(identity)
 	if err != nil {
 		return nil, err

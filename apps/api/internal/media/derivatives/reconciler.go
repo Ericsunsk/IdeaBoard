@@ -10,6 +10,7 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	mediaerrors "ideaboard/api/internal/media/errors"
 	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/application/integrity"
 )
 
 const (
@@ -20,7 +21,7 @@ const (
 
 type Reconciler struct {
 	q            *dbsqlc.Queries
-	verifier     *storage.IntegrityVerifier
+	verifier     *integrity.IntegrityVerifier
 	events       EventPublisher
 	probeTimeout time.Duration
 	batchSize    int32
@@ -62,7 +63,7 @@ func NewReconciler(q *dbsqlc.Queries, storageService *storage.StorageService, ev
 	}
 	return &Reconciler{
 		q: q,
-		verifier: storage.NewIntegrityVerifier(storageService, storage.IntegrityConfig{
+		verifier: integrity.NewIntegrityVerifier(storageService, integrity.IntegrityConfig{
 			Timeout: cfg.ProbeTimeout,
 		}),
 		events:       events,

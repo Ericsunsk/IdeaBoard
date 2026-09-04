@@ -13,7 +13,8 @@ import (
 	"ideaboard/api/internal/media/derivatives"
 	"ideaboard/api/internal/media/preparation"
 	"ideaboard/api/internal/media/reclamation"
-	"ideaboard/api/internal/media/storage"
+	storageauth "ideaboard/api/internal/media/storage/application/authorization"
+	storagetaskmedia "ideaboard/api/internal/media/storage/application/taskmedia"
 	"ideaboard/api/internal/payments"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/runtime/worker"
@@ -75,11 +76,11 @@ func newAppTaskRuntime(
 	taskBillingService := taskbilling.NewService(services.billingCatalog, services.creditService)
 	postgresAssigner := taskqueue.NewPostgresTaskAssigner(dbs.db)
 	postgresRuntimeStore := taskqueue.NewPostgresTaskRuntimeStore(dbs.db)
-	taskMediaAuthorizer := storage.NewTaskMediaAuthorizer(
+	taskMediaAuthorizer := storageauth.NewTaskMediaAuthorizer(
 		uploadBoardAccessResolver{service: services.boardService},
 		uploadOwnerStorageUIDResolver{repo: repos.userRepo},
 	)
-	runtimeTaskMediaStore := storage.NewRuntimeTaskMediaStore(services.storageService, repos.mediaAssetRegistry)
+	runtimeTaskMediaStore := storagetaskmedia.NewRuntimeTaskMediaStore(services.storageService, repos.mediaAssetRegistry)
 	generationMediaPreparer := preparation.NewService(services.storageService, repos.mediaAssetRegistry)
 	submitMediaValidator := taskmedia.NewSubmitMediaValidator(cfg.PublicOrigins, taskMediaAuthorizer, repos.mediaAssetRegistry)
 	userEventHub := events.NewUserEventHub()

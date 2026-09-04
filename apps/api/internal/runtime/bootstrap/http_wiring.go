@@ -14,7 +14,8 @@ import (
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/librarymaterialization"
-	"ideaboard/api/internal/media/storage"
+	storageauth "ideaboard/api/internal/media/storage/application/authorization"
+	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/config"
@@ -69,7 +70,7 @@ func newAppRouter(
 		BoardService:   services.boardService,
 		UploadSettings: services.runtimeSettings,
 	}
-	uploadReadAccess := storage.NewReadableUploadAccess(
+	uploadReadAccess := storageauth.NewReadableUploadAccess(
 		uploadBoardAccessResolver{service: services.boardService},
 		uploadOwnerStorageUIDResolver{repo: repos.userRepo},
 	)
@@ -129,7 +130,7 @@ func newAppRouter(
 			TaskHandler:                 taskHandler,
 			TaskStatsHandler:            taskStatsHandler,
 			ProviderEndpointHandler:     providerendpoints.NewProviderEndpointHandler(repos.providerEndpointRepo, cfg.App.Env),
-			StorageHandler:              storage.NewStorageHandler(services.storageService),
+			StorageHandler:              storagehttp.NewStorageHandler(services.storageService),
 			FeaturePromptHandler:        prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
 			StorageService:              services.storageService,
 			UploadSettings:              services.runtimeSettings,

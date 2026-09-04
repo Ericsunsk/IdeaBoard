@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/domain"
+	"ideaboard/api/internal/media/storage/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 )
 
@@ -15,10 +16,10 @@ import (
 // runtime/worker package only consumes the port, never the
 // concrete adapter. This test guards that contract.
 type fakeObjectStore struct {
-	presign func(req storage.PresignRequest) (storage.PresignedURL, error)
+	presign func(req ports.PresignRequest) (ports.PresignedURL, error)
 }
 
-func (f *fakeObjectStore) Presign(ctx context.Context, req storage.PresignRequest) (storage.PresignedURL, error) {
+func (f *fakeObjectStore) Presign(ctx context.Context, req ports.PresignRequest) (ports.PresignedURL, error) {
 	return f.presign(req)
 }
 
@@ -63,12 +64,12 @@ func TestWorkerPresignIntegrationUsesObjectStorePort(t *testing.T) {
 	}
 
 	calls := 0
-	port := &fakeObjectStore{presign: func(req storage.PresignRequest) (storage.PresignedURL, error) {
+	port := &fakeObjectStore{presign: func(req ports.PresignRequest) (ports.PresignedURL, error) {
 		calls++
-		if req.TTL > storage.MaxPresignTTL {
+		if req.TTL > ports.MaxPresignTTL {
 			t.Errorf("TTL %v exceeds MaxPresignTTL", req.TTL)
 		}
-		return storage.PresignedURL{
+		return ports.PresignedURL{
 			URL:              "https://signed.example/" + req.ObjectKey + "?signature=secret",
 			ExpiresAt:        time.Now().Add(req.TTL),
 			StorageProfileID: req.StorageProfileID,
@@ -83,7 +84,7 @@ func TestWorkerPresignIntegrationUsesObjectStorePort(t *testing.T) {
 	storageProfile := "primary"
 	ttl := 5 * time.Minute
 	for _, ref := range manifest.ResolveInputs() {
-		req := storage.PresignRequest{
+		req := ports.PresignRequest{
 			StorageProfileID:         storageProfile,
 			ObjectKey:                ref.ObjectKey,
 			TTL:                      ttl,
@@ -114,18 +115,18 @@ func TestWorkerPresignIntegrationUsesObjectStorePort(t *testing.T) {
 }
 
 func TestWorkerPresignIntegrationRejectsTTLGreaterThanCap(t *testing.T) {
-	port := &fakeObjectStore{presign: func(req storage.PresignRequest) (storage.PresignedURL, error) {
-		return storage.PresignedURL{}, storage.ErrPresignTTLTooLong
+	port := &fakeObjectStore{presign: func(req ports.PresignRequest) (ports.PresignedURL, error) {
+		return ports.PresignedURL{}, domain.ErrPresignTTLTooLong
 	}}
 	// The port surfaces ErrPresignTTLTooLong; the worker
 	// must fall back to MaxPresignTTL and re-issue. The
 	// test asserts the typed error is the contract surface.
-	_, err := port.Presign(context.Background(), storage.PresignRequest{
+	_, err := port.Presign(context.Background(), ports.PresignRequest{
 		StorageProfileID: "primary",
 		ObjectKey:        "uploads/foo.png",
 		TTL:              30 * time.Minute,
 	})
-	if err != storage.ErrPresignTTLTooLong {
+	if err != domain.ErrPresignTTLTooLong {
 		t.Fatalf("expected ErrPresignTTLTooLong, got %v", err)
 	}
 }

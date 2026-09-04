@@ -11,7 +11,7 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/ingestion"
-	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
 )
@@ -19,24 +19,24 @@ import (
 type materializationStoreStub struct {
 	mu            sync.Mutex
 	storeCalls    []string
-	storeOptions  []storage.StorageStoreOptions
+	storeOptions  []ports.StorageStoreOptions
 	storeErrors   map[string]error
-	stored        storage.StoredUploadRef
-	deleteCalls   []storage.StoredUploadLocation
+	stored        ports.StoredUploadRef
+	deleteCalls   []ports.StoredUploadLocation
 	firstStarted  chan struct{}
 	continueFirst chan struct{}
 	firstCall     bool
 }
 
-func (s *materializationStoreStub) PrepareUploadRef(_ context.Context, _ string, opts storage.StorageStoreOptions) (*storage.StoredUploadRef, error) {
-	return &storage.StoredUploadRef{
+func (s *materializationStoreStub) PrepareUploadRef(_ context.Context, _ string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+	return &ports.StoredUploadRef{
 		URL:            "/uploads/" + opts.DirPrefix + "/original.png",
 		StorageKey:     "uploads/" + opts.DirPrefix + "/original.png",
 		StorageProfile: "profile-library",
 	}, nil
 }
 
-func (s *materializationStoreStub) StoreMediaRefAtProfile(_ context.Context, _ string, source string, opts storage.StorageStoreOptions) (*storage.StoredUploadRef, error) {
+func (s *materializationStoreStub) StoreMediaRefAtProfile(_ context.Context, _ string, source string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	s.mu.Lock()
 	s.storeCalls = append(s.storeCalls, source)
 	s.storeOptions = append(s.storeOptions, opts)
@@ -60,7 +60,7 @@ func (s *materializationStoreStub) StoreMediaRefAtProfile(_ context.Context, _ s
 func (s *materializationStoreStub) DeleteObjectByStorageProfile(_ context.Context, profileID, key string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.deleteCalls = append(s.deleteCalls, storage.StoredUploadLocation{StorageProfileID: profileID, StorageKey: key})
+	s.deleteCalls = append(s.deleteCalls, ports.StoredUploadLocation{StorageProfileID: profileID, StorageKey: key})
 	return nil
 }
 
@@ -167,7 +167,7 @@ func TestMaterializeLibraryAssetFallsBackToPreviewAndPreservesProvenance(t *test
 	t.Cleanup(restore)
 	store := &materializationStoreStub{
 		storeErrors: map[string]error{"https://images.unsplash.com/original.png": errors.New("original unavailable")},
-		stored:      storage.StoredUploadRef{URL: "/uploads/library/1/9/original.png", StorageKey: "uploads/library/1/9/original.png", StorageProfile: "profile-library", MIMEType: "image/png", Width: 640, Height: 480},
+		stored:      ports.StoredUploadRef{URL: "/uploads/library/1/9/original.png", StorageKey: "uploads/library/1/9/original.png", StorageProfile: "profile-library", MIMEType: "image/png", Width: 640, Height: 480},
 	}
 	registry := &materializationRegistryStub{nextID: 41}
 	service := newService(store, registry, newSerialLibraryLocker(), newMaterializationGate())
@@ -196,7 +196,7 @@ func TestMaterializeLibraryAssetFallsBackToPreviewAndPreservesProvenance(t *test
 
 func TestMaterializeLibraryAssetReusesReadyMappingAfterAdvisoryLock(t *testing.T) {
 	store := &materializationStoreStub{
-		stored:       storage.StoredUploadRef{URL: "/uploads/library/1/9/original.png", StorageKey: "uploads/library/1/9/original.png", StorageProfile: "profile-library", MIMEType: "image/png", Width: 640, Height: 480},
+		stored:       ports.StoredUploadRef{URL: "/uploads/library/1/9/original.png", StorageKey: "uploads/library/1/9/original.png", StorageProfile: "profile-library", MIMEType: "image/png", Width: 640, Height: 480},
 		firstStarted: make(chan struct{}), continueFirst: make(chan struct{}),
 	}
 	registry := &materializationRegistryStub{nextID: 52}
@@ -243,7 +243,7 @@ func TestMaterializeLibraryAssetReusesReadyMappingAfterAdvisoryLock(t *testing.T
 }
 
 func TestMaterializeLibraryAssetCleansObjectWhenCompletionFails(t *testing.T) {
-	store := &materializationStoreStub{stored: storage.StoredUploadRef{URL: "/uploads/library/1/9/original.png", StorageKey: "uploads/library/1/9/original.png", StorageProfile: "profile-library", MIMEType: "image/png"}}
+	store := &materializationStoreStub{stored: ports.StoredUploadRef{URL: "/uploads/library/1/9/original.png", StorageKey: "uploads/library/1/9/original.png", StorageProfile: "profile-library", MIMEType: "image/png"}}
 	registry := &materializationRegistryStub{nextID: 68, completeErr: errors.New("completion failed")}
 	service := newService(store, registry, newSerialLibraryLocker(), newMaterializationGate())
 

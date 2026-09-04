@@ -12,10 +12,12 @@ import (
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/auth"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
-	"ideaboard/api/internal/identity/users/ports"
+	identityports "ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
+	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
+	storageports "ideaboard/api/internal/media/storage/ports"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/settings"
@@ -50,31 +52,31 @@ type FrontendRouteOptions struct {
 
 type AuthDeps struct {
 	AuthServiceClient *auth.ServiceClient
-	UserRepo          ports.UserRepository
+	UserRepo          identityports.UserRepository
 	UserLifecycle     auth.IdentityProvisioner
 }
 
 type UploadDeps struct {
 	StorageService *storage.StorageService
 	MediaAssets    assets.UploadRegistry
-	UserRepo       ports.UserRepository
+	UserRepo       identityports.UserRepository
 	BoardService   *boards.BoardService
 	UploadSettings settings.MediaUploadSettingProvider
 }
 
 type UploadResourceReader interface {
-	ReadUploadResourceByURL(context.Context, string, int64) (*storage.StoredUploadObject, error)
+	ReadUploadResourceByURL(context.Context, string, int64) (*storageports.StoredUploadObject, error)
 }
 
 type UploadDownloadDeps struct {
 	Reader     UploadResourceReader
-	ReadAccess storage.ReadableUploadAccess
+	ReadAccess storageports.ReadableUploadAccess
 }
 
 type StaticUploadDeps struct {
 	Auth         AuthDeps
 	BoardService *boards.BoardService
-	ReadAccess   storage.ReadableUploadAccess
+	ReadAccess   storageports.ReadableUploadAccess
 }
 
 type UserRouteDeps struct {
@@ -109,7 +111,7 @@ type AdminRouteDeps struct {
 	TaskHandler                 *taskhttp.Handler
 	TaskStatsHandler            *statisticshttp.Handler
 	ProviderEndpointHandler     *providerendpoints.ProviderEndpointHandler
-	StorageHandler              *storage.StorageHandler
+	StorageHandler              *storagehttp.StorageHandler
 	FeaturePromptHandler        *prompts.FeaturePromptHandler
 	StorageService              *storage.StorageService
 	UploadSettings              settings.MediaUploadSettingProvider

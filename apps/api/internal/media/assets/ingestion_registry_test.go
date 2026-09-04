@@ -13,7 +13,7 @@ import (
 	identitydomain "ideaboard/api/internal/identity/users/domain"
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/media/ingestion"
-	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/testdb"
 )
 
@@ -39,7 +39,7 @@ func TestBoardUploadIngestionTransitionsToReadyWithDerivativeOutbox(t *testing.T
 	registry := newMediaAssetRegistryForTest(db)
 	upload := ingestion.Request{OwnerUserID: owner.ID, Origin: ingestion.BoardUploadFacts{BoardID: "board-ingestion"},
 		StorageProfile: "builtin-local", URL: "/uploads/canvas/owner/board-ingestion/content/image.png", StorageKey: "uploads/canvas/owner/board-ingestion/content/image.png"}
-	stored := storage.StoredUploadRef{
+	stored := ports.StoredUploadRef{
 		URL: "/uploads/canvas/owner/board-ingestion/content/image.png", StorageKey: "uploads/canvas/owner/board-ingestion/content/image.png",
 		StorageProfile: "builtin-local", MIMEType: "image/png",
 	}
@@ -216,7 +216,7 @@ func TestEnsureDerivativeKeepsOutboxWhenImmediateEnqueueFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("begin upload: %v", err)
 	}
-	stored := storage.StoredUploadRef{
+	stored := ports.StoredUploadRef{
 		URL: request.URL, StorageKey: request.StorageKey, StorageProfile: request.StorageProfile,
 		MIMEType: "image/png", Width: 64, Height: 64, SizeBytes: 128, ChecksumSHA256: "fallback-checksum",
 	}
@@ -259,7 +259,7 @@ func TestLibraryMaterializationReusesManagedAssetAndQueuesDerivatives(t *testing
 		t.Fatalf("begin library materialization: %v", err)
 	}
 	mediaAssetID := handle.AssetID
-	stored := storage.StoredUploadRef{URL: "/uploads/library/1/materialized/original.jpg", StorageKey: "uploads/library/1/materialized/original.jpg", StorageProfile: media.StorageProfile, MIMEType: "image/jpeg", Width: 640, Height: 480, SizeBytes: 2048, ChecksumSHA256: "library-checksum"}
+	stored := ports.StoredUploadRef{URL: "/uploads/library/1/materialized/original.jpg", StorageKey: "uploads/library/1/materialized/original.jpg", StorageProfile: media.StorageProfile, MIMEType: "image/jpeg", Width: 640, Height: 480, SizeBytes: 2048, ChecksumSHA256: "library-checksum"}
 	if err := registry.Complete(ctx, handle, stored.IngestionCompletion("https://images.unsplash.com/materialized-original")); err != nil {
 		t.Fatalf("complete library materialization: %v", err)
 	}
@@ -313,7 +313,7 @@ func TestTaskResultIngestionTransitionsToReadyIdempotently(t *testing.T) {
 	if err != nil || asset.Status != "uploading" {
 		t.Fatalf("uploading task result asset=%#v err=%v", asset, err)
 	}
-	stored := storage.StoredUploadRef{
+	stored := ports.StoredUploadRef{
 		URL: request.URL, StorageKey: request.StorageKey, StorageProfile: request.StorageProfile,
 		MIMEType: "image/png", Width: 640, Height: 480, SizeBytes: 2048, ChecksumSHA256: "task-result-checksum",
 	}
@@ -382,7 +382,7 @@ func TestGenerationPreparationIngestionCompletesWithTypedMediaRef(t *testing.T) 
 	if err != nil {
 		t.Fatalf("begin generation preparation: %v", err)
 	}
-	if err := registry.Complete(ctx, handle, storage.StoredUploadRef{
+	if err := registry.Complete(ctx, handle, ports.StoredUploadRef{
 		URL: request.URL, StorageKey: request.StorageKey, StorageProfile: request.StorageProfile,
 		MIMEType: "image/png", Width: 640, Height: 480, SizeBytes: 2048, ChecksumSHA256: "prepared-checksum",
 	}.IngestionCompletion(request.SourceURL)); err != nil {
@@ -448,7 +448,7 @@ func TestMediaAssetRegistryRegistersBoardUploadForInitialReclamation(t *testing.
 	registry.now = func() time.Time { return now }
 
 	upload := ingestion.Request{OwnerUserID: owner.ID, StorageProfile: "builtin-local", StorageKey: "uploads/canvas/OWNER/shared-board/content/image.png", URL: "https://media.example.com/uploads/canvas/OWNER/shared-board/content/image.png", Origin: ingestion.BoardUploadFacts{BoardID: "shared-board"}}
-	stored := storage.StoredUploadRef{
+	stored := ports.StoredUploadRef{
 		URL:            "https://media.example.com/uploads/canvas/OWNER/shared-board/content/image.png",
 		StorageKey:     "uploads/canvas/OWNER/shared-board/content/image.png",
 		StorageProfile: "builtin-local",
@@ -497,7 +497,7 @@ func TestMediaAssetRegistryRegistersBoardUploadForInitialReclamation(t *testing.
 		t.Fatalf("other owner reusable asset = %d, %v, %v, want 0, false, nil", gotID, found, err)
 	}
 
-	for name, lookup := range map[string]storage.StoredUploadLookup{
+	for name, lookup := range map[string]ports.StoredUploadLookup{
 		"AssetID": {AssetID: mediaAssetID},
 		"URL":     {URL: asset.Url, ObjectKey: "unused"},
 		"storage key": {

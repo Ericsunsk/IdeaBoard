@@ -15,7 +15,7 @@ import (
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/assets"
-	"ideaboard/api/internal/media/storage"
+	storagepostgres "ideaboard/api/internal/media/storage/infrastructure/postgres"
 	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/config"
@@ -51,7 +51,7 @@ type appRepositories struct {
 	providerEndpointRepo *providerendpoints.ProviderEndpointRepository
 	systemConfigRepo     *settings.SystemConfigRepository
 	featurePromptRepo    *prompts.FeaturePromptRepository
-	storageProfileRepo   *storage.StorageProfileRepository
+	storageProfileRepo   *storagepostgres.StorageProfileRepository
 	mediaAssetRegistry   *assets.MediaAssetRegistry
 	boardRepo            *boards.BoardRepository
 	paymentRepo          *paymentpostgres.Repository
@@ -182,7 +182,7 @@ func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error
 		providerEndpointRepo: providerendpoints.NewProviderEndpointRepository(db),
 		systemConfigRepo:     settings.NewSystemConfigRepository(db),
 		featurePromptRepo:    prompts.NewFeaturePromptRepository(db),
-		storageProfileRepo:   storage.NewStorageProfileRepository(db),
+		storageProfileRepo:   storagepostgres.NewStorageProfileRepository(db),
 		mediaAssetRegistry:   assets.NewMediaAssetRegistry(db),
 		boardRepo:            boards.NewBoardRepository(db),
 		paymentRepo:          paymentpostgres.NewRepository(db),

@@ -16,7 +16,7 @@ import (
 	"ideaboard/api/internal/events"
 	identitydomain "ideaboard/api/internal/identity/users/domain"
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
-	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/application/authorization"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/prompts"
@@ -835,7 +835,7 @@ func TestSubmitTaskCanvasUploadRefsRequireBoardAccess(t *testing.T) {
 		t.Fatalf("create board member failed: %v", err)
 	}
 
-	mediaAuthorizer := storage.NewTaskMediaAuthorizer(
+	mediaAuthorizer := authorization.NewTaskMediaAuthorizer(
 		testTaskUploadBoardAccessResolver{service: boards.NewBoardService(boardRepo, userRepo)},
 		testTaskUploadOwnerStorageUIDResolver{repo: userRepo},
 	)

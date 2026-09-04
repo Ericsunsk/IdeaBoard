@@ -12,7 +12,8 @@ import (
 
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/media/imageformat"
-	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/domain"
+	"ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/safehttp"
 
@@ -61,14 +62,14 @@ func downloadImageHandler(deps UploadDownloadDeps) gin.HandlerFunc {
 	}
 }
 
-func parseManagedUploadResource(rawURL string) (storage.UploadResource, bool) {
+func parseManagedUploadResource(rawURL string) (domain.UploadResource, bool) {
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil || (parsed.Scheme != "" && (parsed.Scheme != "http" && parsed.Scheme != "https")) {
-		return storage.UploadResource{}, false
+		return domain.UploadResource{}, false
 	}
-	resource, err := storage.ParseUploadResource(strings.TrimPrefix(parsed.Path, "/"))
+	resource, err := domain.ParseUploadResource(strings.TrimPrefix(parsed.Path, "/"))
 	if err != nil {
-		return storage.UploadResource{}, false
+		return domain.UploadResource{}, false
 	}
 	return resource, true
 }
@@ -77,7 +78,7 @@ func readManagedUpload(
 	c *gin.Context,
 	deps UploadDownloadDeps,
 	rawURL string,
-	resource storage.UploadResource,
+	resource domain.UploadResource,
 ) (downloadImageSource, bool) {
 	object, ok := readManagedUploadObject(c, deps, rawURL, resource)
 	if !ok {
@@ -95,15 +96,15 @@ func readManagedUploadObject(
 	c *gin.Context,
 	deps UploadDownloadDeps,
 	rawURL string,
-	resource storage.UploadResource,
-) (*storage.StoredUploadObject, bool) {
+	resource domain.UploadResource,
+) (*ports.StoredUploadObject, bool) {
 	if !authorizeManagedUploadRead(c, deps, resource) {
 		return nil, false
 	}
 	return readManagedUploadObjectAfterAuthorization(c, deps, rawURL)
 }
 
-func authorizeManagedUploadRead(c *gin.Context, deps UploadDownloadDeps, resource storage.UploadResource) bool {
+func authorizeManagedUploadRead(c *gin.Context, deps UploadDownloadDeps, resource domain.UploadResource) bool {
 	identity, ok := principal.Require(c)
 	if !ok {
 		return false
@@ -119,7 +120,7 @@ func authorizeManagedUploadRead(c *gin.Context, deps UploadDownloadDeps, resourc
 	return true
 }
 
-func readManagedUploadObjectAfterAuthorization(c *gin.Context, deps UploadDownloadDeps, rawURL string) (*storage.StoredUploadObject, bool) {
+func readManagedUploadObjectAfterAuthorization(c *gin.Context, deps UploadDownloadDeps, rawURL string) (*ports.StoredUploadObject, bool) {
 	object, err := deps.Reader.ReadUploadResourceByURL(c.Request.Context(), rawURL, maxDownloadSize+1)
 	if err != nil {
 		response.InternalError(c, 500, "下载失败", err)

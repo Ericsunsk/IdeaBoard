@@ -2,97 +2,40 @@ package storage
 
 import (
 	"context"
-	"errors"
+	"fmt"
+	"mime/multipart"
+	"path/filepath"
 	"strings"
 
-	"ideaboard/api/internal/media/ingestion"
+	"ideaboard/api/internal/media/storage/application/profiles"
+	"ideaboard/api/internal/media/storage/application/runtime"
+	"ideaboard/api/internal/media/storage/domain"
+	"ideaboard/api/internal/media/storage/infrastructure/local"
+	"ideaboard/api/internal/media/storage/infrastructure/remote"
+	"ideaboard/api/internal/media/storage/infrastructure/s3"
+	"ideaboard/api/internal/media/storage/ports"
 )
 
-var errProviderHTTPSUnavailable = errors.New("storage profile does not expose a provider HTTPS URL")
-
-// ErrStoredObjectNotFound is the sentinel returned by ReadObjectAtProfile
-// and any other storage probe when the underlying object is absent. The
-// reconciler, the readiness validator, and the integrity verifier all
-// branch on errors.Is(err, ErrStoredObjectNotFound). It is exported
-// because the storage package's public surface intentionally hides the
-// concrete adapter from the media subsystem; the sentinel is the only
-// signal a non-storage caller may rely on.
-var ErrStoredObjectNotFound = errors.New("stored object not found")
-
-// ErrObjectGenerationUnavailable is returned when an object store cannot
-// prove the immutable generation recorded in the task manifest.
-var ErrObjectGenerationUnavailable = errors.New("stored object generation unavailable")
-
-type StorageStoreOptions struct {
-	DirPrefix  string
-	AllowHosts []string
-	ObjectKey  string
+type dynamicAssetLocator struct {
+	svc *StorageService
 }
 
-type StoredUploadRef struct {
-	URL            string
-	StorageKey     string
-	StorageProfile string
-	MIMEType       string
-	Width          int
-	Height         int
-	SizeBytes      int64
-	ChecksumSHA256 string
-	Animated       bool
-}
-
-func (r StoredUploadRef) IngestionCompletion(sourceURL string) ingestion.Completion {
-	return ingestion.Completion{
-		StorageKey: r.StorageKey,
-		URL:        r.URL, SourceURL: sourceURL, MIMEType: r.MIMEType,
-		Width: r.Width, Height: r.Height, SizeBytes: r.SizeBytes,
-		ChecksumSHA256: r.ChecksumSHA256, Animated: r.Animated,
+func (d dynamicAssetLocator) LocateStoredUpload(ctx context.Context, lookup ports.StoredUploadLookup) (ports.StoredUploadLocation, bool, error) {
+	if d.svc == nil || d.svc.assetLocator == nil {
+		return ports.StoredUploadLocation{}, false, nil
 	}
-}
-
-type StoredUploadObject struct {
-	ObjectKey   string
-	Filename    string
-	ContentType string
-	Data        []byte
-}
-
-type StoredUploadLookup struct {
-	AssetID   int64
-	URL       string
-	ObjectKey string
-}
-
-type StoredDerivativeLookup struct {
-	AssetID int64
-	Tier    string
-}
-
-type StoredUploadLocation struct {
-	StorageProfileID string
-	StorageKey       string
-}
-
-type StoredUploadLocator interface {
-	LocateStoredUpload(context.Context, StoredUploadLookup) (StoredUploadLocation, bool, error)
-}
-
-type StoredDerivativeLocator interface {
-	LocateStoredDerivative(context.Context, StoredDerivativeLookup) (StoredUploadLocation, bool, error)
+	return d.svc.assetLocator.LocateStoredUpload(ctx, lookup)
 }
 
 type StorageService struct {
-	profileRepo         *StorageProfileRepository
-	assetLocator        StoredUploadLocator
-	publicAPIOrigin     string
-	s3CompatibleService *S3CompatibleService
-	adapterRegistry     *storageAdapterRegistry
-	providerMeta        map[StorageProvider]StorageProviderMeta
+	assetLocator        ports.StoredUploadLocator
+	s3CompatibleService *s3.S3CompatibleService
+
+	profilesService *profiles.Service
+	runtimeService  *runtime.Service
 }
 
-// NewStorageService binds local upload URLs to the public web origin when one
-// is provided, so browser-visible references stay on the same-origin Gateway.
-func NewStorageService(profileRepo *StorageProfileRepository, assetLocator StoredUploadLocator, publicAPIOrigin ...string) *StorageService {
+func NewStorageService(profileRepo ports.StorageProfileRepository, assetLocator ports.StoredUploadLocator, publicAPIOrigin ...string) *StorageService {
 	origin := ""
 	if len(publicAPIOrigin) > 0 {
 		origin = publicAPIOrigin[0]
@@ -100,59 +43,249 @@ func NewStorageService(profileRepo *StorageProfileRepository, assetLocator Store
 	return newStorageService(profileRepo, assetLocator, origin)
 }
 
-func newStorageService(profileRepo *StorageProfileRepository, assetLocator StoredUploadLocator, publicAPIOrigin string) *StorageService {
+func newStorageService(profileRepo ports.StorageProfileRepository, assetLocator ports.StoredUploadLocator, publicAPIOrigin string) *StorageService {
+	origin := strings.TrimRight(strings.TrimSpace(publicAPIOrigin), "/")
+	s3Svc := s3.NewS3CompatibleService()
+	localDriver := local.NewLocalStorageDriver(origin)
+	s3Driver := s3.NewS3CompatibleStorageDriver(s3Svc, remote.DownloadImage)
+
+	drivers := profiles.DriverResolverFunc(func(provider domain.StorageProvider) (ports.StorageDriver, error) {
+		switch provider {
+		case domain.StorageProviderLocal:
+			return localDriver, nil
+		case domain.StorageProviderS3Compatible:
+			return s3Driver, nil
+		default:
+			return nil, fmt.Errorf("不支持的存储类型")
+		}
+	})
+
+	profilesSvc := profiles.NewService(profileRepo, drivers)
+
 	service := &StorageService{
-		profileRepo:         profileRepo,
 		assetLocator:        assetLocator,
-		publicAPIOrigin:     strings.TrimRight(strings.TrimSpace(publicAPIOrigin), "/"),
-		s3CompatibleService: NewS3CompatibleService(),
-		providerMeta:        make(map[StorageProvider]StorageProviderMeta),
+		s3CompatibleService: s3Svc,
+		profilesService:     profilesSvc,
 	}
-	for _, meta := range []StorageProviderMeta{
-		{
-			Provider:      StorageProviderLocal,
-			Label:         "本地存储",
-			Description:   "使用服务器本地 /uploads 目录保存文件。",
-			Builtin:       true,
-			CreateAllowed: false,
-		},
-		{
-			Provider:           StorageProviderS3Compatible,
-			Label:              "S3 兼容存储",
-			Description:        "统一接入 Amazon S3、阿里云 OSS、腾讯云 COS、Cloudflare R2、MinIO 等 S3 兼容对象存储。",
-			Builtin:            false,
-			CreateAllowed:      true,
-			SupportsTest:       true,
-			SupportsBucketInfo: true,
-			Fields: []StorageProviderField{
-				{Key: "access_key_id", Label: "Access Key ID", Type: StorageFieldTypeText, Placeholder: "请输入 Access Key ID", Required: true},
-				{Key: "secret_access_key", Label: "Secret Access Key", Type: StorageFieldTypePassword, Placeholder: "请输入 Secret Access Key", Required: true, Secret: true},
-				{Key: "bucket_name", Label: "Bucket 名称", Type: StorageFieldTypeText, Placeholder: "请输入 Bucket 名称", Required: true},
-				{Key: "endpoint", Label: "Endpoint", Type: StorageFieldTypeText, Placeholder: "例如：s3.us-east-1.amazonaws.com / <account>.r2.cloudflarestorage.com", Required: true},
-				{Key: "region_id", Label: "地域 / Region", Type: StorageFieldTypeText, Placeholder: "例如：us-east-1，可留空"},
-				{Key: "access_domain", Label: "公开访问域名", Type: StorageFieldTypeText, Placeholder: "例如：https://bucket.s3.us-east-1.amazonaws.com", Hint: "直接拼接对象 Key；若服务需要 Bucket 路径，请在域名中包含 /bucket。", Required: true},
-				{Key: "force_path_style", Label: "Path Style", Type: StorageFieldTypeSwitch, Hint: "部分兼容存储需要使用 path-style 访问。"},
-			},
-		},
-	} {
-		service.providerMeta[meta.Provider] = meta
-	}
-	service.adapterRegistry = newStorageAdapterRegistry(
-		newLocalStorageAdapter(service),
-		newS3CompatibleStorageAdapter(service),
-	)
+
+	runtimeSvc := runtime.NewService(profilesSvc, drivers, dynamicAssetLocator{svc: service}, origin)
+	service.runtimeService = runtimeSvc
+
 	return service
 }
 
-func (s *StorageService) ListProviderMeta() []StorageProviderMeta {
-	providers := []StorageProviderMeta{
-		s.providerMeta[StorageProviderLocal],
-		s.providerMeta[StorageProviderS3Compatible],
+func (s *StorageService) SetAssetLocator(locator ports.StoredUploadLocator) {
+	s.assetLocator = locator
+	if s.runtimeService != nil {
+		s.runtimeService.SetAssetLocator(locator)
 	}
-	for i := range providers {
-		if providers[i].Fields == nil {
-			providers[i].Fields = []StorageProviderField{}
-		}
+}
+
+func (s *StorageService) SetCapabilityProbe(fn func(context.Context, *s3.S3CompatibleConfig) error) {
+	if s != nil && s.s3CompatibleService != nil {
+		s.s3CompatibleService.SetCapabilityProbe(fn)
 	}
-	return providers
+}
+
+func (s *StorageService) ListProviderMeta() []domain.StorageProviderMeta {
+	return s.profilesService.ListProviderMeta()
+}
+
+func (s *StorageService) ListProfiles(ctx context.Context) ([]domain.StorageProfile, error) {
+	return s.profilesService.ListProfiles(ctx)
+}
+
+func (s *StorageService) GetProfile(ctx context.Context, id string) (*domain.StorageProfile, error) {
+	return s.profilesService.GetProfile(ctx, id)
+}
+
+func (s *StorageService) SaveProfile(ctx context.Context, profile *domain.StorageProfile) (*domain.StorageProfile, error) {
+	return s.profilesService.SaveProfile(ctx, profile)
+}
+
+func (s *StorageService) SaveAndApplyProfile(ctx context.Context, profile *domain.StorageProfile) (*domain.StorageProfile, error) {
+	return s.profilesService.SaveAndApplyProfile(ctx, profile)
+}
+
+func (s *StorageService) DeleteProfile(ctx context.Context, id string) error {
+	return s.profilesService.DeleteProfile(ctx, id)
+}
+
+func (s *StorageService) ApplyProfile(ctx context.Context, id string) (*domain.StorageProfile, error) {
+	return s.profilesService.ApplyProfile(ctx, id)
+}
+
+func (s *StorageService) TestProfile(ctx context.Context, id string) error {
+	return s.profilesService.TestProfile(ctx, id)
+}
+
+func (s *StorageService) GetBucketInfo(ctx context.Context, id string) (map[string]interface{}, error) {
+	return s.profilesService.GetBucketInfo(ctx, id)
+}
+
+func (s *StorageService) EnsureProfileReadyForRuntime(ctx context.Context, profile domain.StorageProfile) error {
+	return s.profilesService.EnsureProfileReadyForRuntime(ctx, profile)
+}
+
+func (s *StorageService) ResolveProfileByID(ctx context.Context, id string) (*domain.StorageProfile, error) {
+	return s.profilesService.ResolveProfileByID(ctx, id)
+}
+
+func (s *StorageService) ResolveActiveProfile(ctx context.Context) (*domain.StorageProfile, error) {
+	return s.profilesService.ResolveActiveProfile(ctx)
+}
+
+func (s *StorageService) EnsureDefaultProfiles(ctx context.Context) error {
+	return s.profilesService.EnsureDefaultProfiles(ctx)
+}
+
+func (s *StorageService) DefaultLocalStorageProfile(isCurrent bool) domain.StorageProfile {
+	return s.profilesService.DefaultLocalStorageProfile(isCurrent)
+}
+
+func (s *StorageService) LoadProfilesWithSecrets(ctx context.Context) ([]domain.StorageProfile, error) {
+	return s.profilesService.LoadProfilesWithSecrets(ctx)
+}
+
+func (s *StorageService) LoadProfileForReclamation(ctx context.Context, id string) (*domain.StorageProfile, error) {
+	return s.profilesService.LoadProfileForReclamation(ctx, id)
+}
+
+func (s *StorageService) Upload(ctx context.Context, file *multipart.FileHeader) (string, error) {
+	return s.runtimeService.Upload(ctx, file)
+}
+
+func (s *StorageService) UploadWithOptions(ctx context.Context, file *multipart.FileHeader, opts ports.StorageStoreOptions) (string, error) {
+	return s.runtimeService.UploadWithOptions(ctx, file, opts)
+}
+
+func (s *StorageService) UploadRefWithOptions(ctx context.Context, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+	return s.runtimeService.UploadRefWithOptions(ctx, file, opts)
+}
+
+func (s *StorageService) UploadRefAtProfile(ctx context.Context, profileID string, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+	return s.runtimeService.UploadRefAtProfile(ctx, profileID, file, opts)
+}
+
+func (s *StorageService) PrepareUploadRefFromFile(ctx context.Context, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+	return s.runtimeService.PrepareUploadRefFromFile(ctx, file, opts)
+}
+
+func (s *StorageService) PrepareUploadRef(ctx context.Context, filename string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+	return s.runtimeService.PrepareUploadRef(ctx, filename, opts)
+}
+
+func (s *StorageService) StoreRemoteRef(ctx context.Context, remoteURL string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+	return s.runtimeService.StoreRemoteRef(ctx, remoteURL, opts)
+}
+
+func (s *StorageService) StoreMediaRef(ctx context.Context, sourceRef string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+	return s.runtimeService.StoreMediaRef(ctx, sourceRef, opts)
+}
+
+func (s *StorageService) StoreMediaRefAtProfile(ctx context.Context, profileID, sourceRef string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+	return s.runtimeService.StoreMediaRefAtProfile(ctx, profileID, sourceRef, opts)
+}
+
+func (s *StorageService) StoreMediaRefWithProfile(ctx context.Context, profile domain.StorageProfile, sourceRef string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+	return s.runtimeService.StoreMediaRefWithProfile(ctx, profile, sourceRef, opts)
+}
+
+func (s *StorageService) StoreBytesRef(ctx context.Context, filename string, data []byte, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+	return s.runtimeService.StoreBytesRef(ctx, filename, data, opts)
+}
+
+func (s *StorageService) StoreBytesRefAtProfile(ctx context.Context, profileID, filename string, data []byte, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+	return s.runtimeService.StoreBytesRefAtProfile(ctx, profileID, filename, data, opts)
+}
+
+func (s *StorageService) StoreBytesRefWithProfile(ctx context.Context, profile domain.StorageProfile, filename string, data []byte, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+	return s.runtimeService.StoreBytesRefWithProfile(ctx, profile, filename, data, opts)
+}
+
+func (s *StorageService) StoreRemoteRefAtProfile(ctx context.Context, profileID, remoteURL string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+	return s.runtimeService.StoreRemoteRefAtProfile(ctx, profileID, remoteURL, opts)
+}
+
+func (s *StorageService) StoreRemoteRefWithProfile(ctx context.Context, profile domain.StorageProfile, remoteURL string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+	return s.runtimeService.StoreRemoteRefWithProfile(ctx, profile, remoteURL, opts)
+}
+
+func (s *StorageService) UploadRefWithProfile(ctx context.Context, profile domain.StorageProfile, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+	return s.runtimeService.UploadRefWithProfile(ctx, profile, file, opts)
+}
+
+func (s *StorageService) ReadUploadResourceByURL(ctx context.Context, rawURL string, maxBytes int64) (*ports.StoredUploadObject, error) {
+	return s.runtimeService.ReadUploadResourceByURL(ctx, rawURL, maxBytes)
+}
+
+func (s *StorageService) PutObjectAtProfile(ctx context.Context, profileID, objectKey string, data []byte, contentType string) error {
+	return s.runtimeService.PutObjectAtProfile(ctx, profileID, objectKey, data, contentType)
+}
+
+func (s *StorageService) ReadObjectAtProfile(ctx context.Context, profileID, objectKey string, maxBytes int64) (*ports.StoredUploadObject, error) {
+	return s.runtimeService.ReadObjectAtProfile(ctx, profileID, objectKey, maxBytes)
+}
+
+func (s *StorageService) ResolveProviderDerivativeURL(ctx context.Context, assetID int64, tier string) (string, error) {
+	return s.runtimeService.ResolveProviderDerivativeURL(ctx, assetID, tier)
+}
+
+func (s *StorageService) DeleteProfileAvatarByURL(ctx context.Context, storageUID string, rawURL string) error {
+	return s.runtimeService.DeleteProfileAvatarByURL(ctx, storageUID, rawURL)
+}
+
+func (s *StorageService) DeleteCanvasByStorageUID(ctx context.Context, storageUID string) error {
+	return s.runtimeService.DeleteCanvasByStorageUID(ctx, storageUID)
+}
+
+func (s *StorageService) DeleteUserUploads(ctx context.Context, userID int64, storageUID string) error {
+	return s.runtimeService.DeleteUserUploads(ctx, userID, storageUID)
+}
+
+func (s *StorageService) DeleteObjectByKey(ctx context.Context, objectKey string) error {
+	return s.runtimeService.DeleteObjectByKey(ctx, objectKey)
+}
+
+func (s *StorageService) DeleteObjectByStorageProfile(ctx context.Context, storageProfileID string, objectKey string) error {
+	return s.runtimeService.DeleteObjectByStorageProfile(ctx, storageProfileID, objectKey)
+}
+
+func (s *StorageService) ListObjectKeysByStorageProfile(ctx context.Context, storageProfileID string, objectKeyPrefix string) ([]string, error) {
+	return s.runtimeService.ListObjectKeysByStorageProfile(ctx, storageProfileID, objectKeyPrefix)
+}
+
+func (s *StorageService) DeleteUploadObjectPrefix(ctx context.Context, prefix string) error {
+	return s.runtimeService.DeleteUploadObjectPrefix(ctx, prefix)
+}
+
+func (s *StorageService) DeleteUploadObjectPrefixes(ctx context.Context, prefixes []string) error {
+	return s.runtimeService.DeleteUploadObjectPrefixes(ctx, prefixes)
+}
+
+func (s *StorageService) DeleteCanvasBoardByStorageUID(ctx context.Context, storageUID string, boardID string) error {
+	return s.runtimeService.DeleteCanvasBoardByStorageUID(ctx, storageUID, boardID)
+}
+
+func (s *StorageService) UsesObjectStorage(ctx context.Context) bool {
+	return s.runtimeService.UsesObjectStorage(ctx)
+}
+
+func (s *StorageService) ResolveStoredUploadTarget(ctx context.Context, rawURL string) (*domain.StorageProfile, string, error) {
+	return s.runtimeService.ResolveStoredUploadTarget(ctx, rawURL)
+}
+
+func (s *StorageService) PublicUploadURL(objectKey string) string {
+	if s != nil && s.runtimeService != nil {
+		return s.runtimeService.PublicUploadURL(objectKey)
+	}
+	return publicUploadURL(objectKey)
+}
+
+func (s *StorageService) Presign(ctx context.Context, req ports.PresignRequest) (ports.PresignedURL, error) {
+	return s.runtimeService.Presign(ctx, req)
+}
+
+func publicUploadURL(objectKey string) string {
+	return "/" + strings.TrimLeft(filepath.ToSlash(objectKey), "/")
 }

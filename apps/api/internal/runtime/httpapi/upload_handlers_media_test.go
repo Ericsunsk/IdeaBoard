@@ -3,11 +3,11 @@ package httpapi
 import (
 	"testing"
 
-	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/ports"
 )
 
 func TestUploadImageResponseUsesStoredCanonicalMetadata(t *testing.T) {
-	stored := &storage.StoredUploadRef{
+	stored := &ports.StoredUploadRef{
 		URL: "https://cdn.example.com/uploads/site/assets/logo.png", MIMEType: "image/png",
 		Width: 320, Height: 180,
 	}
@@ -18,7 +18,7 @@ func TestUploadImageResponseUsesStoredCanonicalMetadata(t *testing.T) {
 }
 
 func TestUploadImageResponseUsesAvatarFieldForStoredReference(t *testing.T) {
-	stored := &storage.StoredUploadRef{URL: "/uploads/profile/OWNER/avatar/avatar.webp", MIMEType: "image/webp"}
+	stored := &ports.StoredUploadRef{URL: "/uploads/profile/OWNER/avatar/avatar.webp", MIMEType: "image/webp"}
 	payload := newUploadImageResponseFromStored("avatar", stored)
 	if payload.Avatar != profileAvatarDeliveryURL || payload.URL != "" || payload.Ext != "webp" {
 		t.Fatalf("payload = %+v, want avatar response", payload)

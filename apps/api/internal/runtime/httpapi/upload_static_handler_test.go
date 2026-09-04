@@ -16,7 +16,7 @@ import (
 	"ideaboard/api/internal/identity/auth"
 	identitydomain "ideaboard/api/internal/identity/users/domain"
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
-	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/application/authorization"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/testdb"
 
@@ -247,7 +247,7 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 		},
 		BoardService: boards.NewBoardService(boardRepo, userRepo),
 	}
-	deps.ReadAccess = storage.NewReadableUploadAccess(
+	deps.ReadAccess = authorization.NewReadableUploadAccess(
 		staticUploadBoardAccessResolver{service: deps.BoardService},
 		staticUploadOwnerStorageUIDResolver{repo: userRepo},
 	)

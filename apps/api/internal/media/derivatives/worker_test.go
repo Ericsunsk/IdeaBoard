@@ -6,11 +6,11 @@ import (
 	"reflect"
 	"testing"
 
-	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/domain"
 )
 
 func TestScanDerivativeOrphanObjectsContinuesAfterProfileFailure(t *testing.T) {
-	expectedKey, err := storage.ImageDerivativeObjectKey(
+	expectedKey, err := domain.ImageDerivativeObjectKey(
 		"uploads/tasks/source.png",
 		"asset-expected",
 		"preview",
@@ -19,7 +19,7 @@ func TestScanDerivativeOrphanObjectsContinuesAfterProfileFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	orphanKey, err := storage.ImageDerivativeObjectKey(
+	orphanKey, err := domain.ImageDerivativeObjectKey(
 		"uploads/tasks/source.png",
 		"asset-orphan",
 		"preview",
@@ -29,7 +29,7 @@ func TestScanDerivativeOrphanObjectsContinuesAfterProfileFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	profiles := []storage.StorageProfile{
+	profiles := []domain.StorageProfile{
 		{ID: "profile-failed", Enabled: true},
 		{ID: "profile-disabled", Enabled: false},
 		{ID: "profile-ready", Enabled: true},
@@ -68,7 +68,7 @@ func TestScanDerivativeOrphanObjectsContinuesAfterProfileFailure(t *testing.T) {
 }
 
 func TestScanDerivativeOrphanObjectsReportsNoFailureForExpectedObjects(t *testing.T) {
-	expectedKey, err := storage.ImageDerivativeObjectKey(
+	expectedKey, err := domain.ImageDerivativeObjectKey(
 		"uploads/tasks/source.png",
 		"asset-expected",
 		"preview",
@@ -80,7 +80,7 @@ func TestScanDerivativeOrphanObjectsReportsNoFailureForExpectedObjects(t *testin
 
 	result := scanDerivativeOrphanObjects(
 		context.Background(),
-		[]storage.StorageProfile{{ID: "profile-ready", Enabled: true}},
+		[]domain.StorageProfile{{ID: "profile-ready", Enabled: true}},
 		map[string]map[string]struct{}{
 			"profile-ready": {expectedKey: {}},
 		},

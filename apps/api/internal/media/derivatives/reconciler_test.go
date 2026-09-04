@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/domain"
 )
 
 func TestReconcilerResultCounters(t *testing.T) {
@@ -48,6 +48,6 @@ func TestReconcilerOutcomeClassification(t *testing.T) {
 
 // _ ensures unused-import elimination does not eat the storage
 // sentinel.
-var _ = storage.ErrStoredObjectNotFound
+var _ = domain.ErrStoredObjectNotFound
 var _ = errors.Is
 var _ = context.Background

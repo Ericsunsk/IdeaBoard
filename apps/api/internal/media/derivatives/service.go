@@ -23,6 +23,8 @@ import (
 	mediaerrors "ideaboard/api/internal/media/errors"
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/application/integrity"
+	"ideaboard/api/internal/media/storage/domain"
 
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp"
@@ -57,7 +59,7 @@ var TierSpecs = map[string]TierSpec{
 type Service struct {
 	db       *sql.DB
 	storage  *storage.StorageService
-	verifier *storage.IntegrityVerifier
+	verifier *integrity.IntegrityVerifier
 	renderer renderer
 	events   EventPublisher
 }
@@ -96,7 +98,7 @@ func NewService(db *sql.DB, storageService *storage.StorageService, publishers .
 	}
 	return &Service{
 		db: db, storage: storageService,
-		verifier: storage.NewIntegrityVerifier(storageService, storage.IntegrityConfig{MaxBytes: maxOutputBytes + 1}),
+		verifier: integrity.NewIntegrityVerifier(storageService, integrity.IntegrityConfig{MaxBytes: maxOutputBytes + 1}),
 		renderer: newRenderer(), events: publisher,
 	}
 }
@@ -192,7 +194,7 @@ type persistedDerivative struct {
 }
 
 func (s *Service) persistRenderedDerivative(ctx context.Context, asset dbsqlc.MediaAsset, processing dbsqlc.MediaDerivative, rendered renderedDerivative) (persistedDerivative, string, error) {
-	key, err := storage.ImageDerivativeObjectKey(asset.StorageKey, asset.AssetID, processing.Tier, rendered.format)
+	key, err := domain.ImageDerivativeObjectKey(asset.StorageKey, asset.AssetID, processing.Tier, rendered.format)
 	if err != nil {
 		return persistedDerivative{}, "key_failed", err
 	}

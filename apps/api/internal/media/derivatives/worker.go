@@ -16,6 +16,7 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/media/maintenance"
 	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/domain"
 )
 
 const QueueName = "media_derivatives"
@@ -356,7 +357,7 @@ func (d *OutboxDispatcher) reconcileOrphanObjects(ctx context.Context) error {
 
 func scanDerivativeOrphanObjects(
 	ctx context.Context,
-	profiles []storage.StorageProfile,
+	profiles []domain.StorageProfile,
 	expected map[string]map[string]struct{},
 	listObjectKeys func(context.Context, string, string) ([]string, error),
 ) derivativeOrphanScanResult {
@@ -375,7 +376,7 @@ func scanDerivativeOrphanObjects(
 		}
 		orphanCount := 0
 		for _, key := range keys {
-			if !storage.IsImageDerivativeObjectKey(key) {
+			if !domain.IsImageDerivativeObjectKey(key) {
 				continue
 			}
 			if _, ok := expected[profile.ID][key]; ok {

@@ -11,7 +11,7 @@ import (
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/ingestion"
-	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/testdb"
 )
@@ -19,24 +19,24 @@ import (
 type recordingMediaStore struct {
 	storeCalls  int
 	storeError  error
-	storeOption storage.StorageStoreOptions
+	storeOption ports.StorageStoreOptions
 	checksum    string
 	deleteCalls int
 	deletedKey  string
 	profile     string
 }
 
-func (s *recordingMediaStore) PrepareUploadRef(_ context.Context, _ string, opts storage.StorageStoreOptions) (*storage.StoredUploadRef, error) {
-	return &storage.StoredUploadRef{URL: "/" + opts.ObjectKey, StorageKey: opts.ObjectKey, StorageProfile: s.storageProfile()}, nil
+func (s *recordingMediaStore) PrepareUploadRef(_ context.Context, _ string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+	return &ports.StoredUploadRef{URL: "/" + opts.ObjectKey, StorageKey: opts.ObjectKey, StorageProfile: s.storageProfile()}, nil
 }
 
-func (s *recordingMediaStore) StoreMediaRefAtProfile(_ context.Context, _ string, _ string, opts storage.StorageStoreOptions) (*storage.StoredUploadRef, error) {
+func (s *recordingMediaStore) StoreMediaRefAtProfile(_ context.Context, _ string, _ string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	s.storeCalls++
 	s.storeOption = opts
 	if s.storeError != nil {
 		return nil, s.storeError
 	}
-	return &storage.StoredUploadRef{
+	return &ports.StoredUploadRef{
 		URL:            "https://media.example.com/" + opts.ObjectKey,
 		StorageKey:     opts.ObjectKey,
 		StorageProfile: s.storageProfile(),
@@ -209,7 +209,7 @@ func TestPrepareGenerationMediaReusesReadyChecksumWithPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := registry.Complete(ctx, existingHandle, storage.StoredUploadRef{
+	if err := registry.Complete(ctx, existingHandle, ports.StoredUploadRef{
 		URL: existingRequest.URL, StorageKey: existingRequest.StorageKey, StorageProfile: existingRequest.StorageProfile,
 		MIMEType: "image/png", Width: 640, Height: 480, SizeBytes: 2048, ChecksumSHA256: "same-content",
 	}.IngestionCompletion(existingRequest.SourceURL)); err != nil {

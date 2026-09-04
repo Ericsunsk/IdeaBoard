@@ -13,6 +13,7 @@ import (
 	"ideaboard/api/internal/identity/users/application/administration"
 	identitycreditsadapter "ideaboard/api/internal/identity/users/infrastructure/credits"
 	"ideaboard/api/internal/media/storage"
+	storageintegrity "ideaboard/api/internal/media/storage/application/integrity"
 	"ideaboard/api/internal/payments"
 	paymentevents "ideaboard/api/internal/payments/infrastructure/events"
 	"ideaboard/api/internal/payments/infrastructure/stripe"
@@ -57,7 +58,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		// integrations; using it here would leak a separate API host into the SPA.
 		cfg.PublicOrigins.Web,
 	)
-	repos.mediaAssetRegistry.SetIntegrityVerifier(storage.NewIntegrityVerifier(storageService, storage.IntegrityConfig{}))
+	repos.mediaAssetRegistry.SetIntegrityVerifier(storageintegrity.NewIntegrityVerifier(storageService, storageintegrity.IntegrityConfig{}))
 	if err := storageService.EnsureDefaultProfiles(ctx); err != nil {
 		return appDomainServices{}, fmt.Errorf("failed to ensure default storage profiles: %w", err)
 	}

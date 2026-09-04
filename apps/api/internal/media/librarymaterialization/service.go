@@ -16,13 +16,14 @@ import (
 	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/ingestion"
-	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/domain"
+	"ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/platform/outbound"
 )
 
 type mediaStore interface {
-	PrepareUploadRef(context.Context, string, storage.StorageStoreOptions) (*storage.StoredUploadRef, error)
-	StoreMediaRefAtProfile(context.Context, string, string, storage.StorageStoreOptions) (*storage.StoredUploadRef, error)
+	PrepareUploadRef(context.Context, string, ports.StorageStoreOptions) (*ports.StoredUploadRef, error)
+	StoreMediaRefAtProfile(context.Context, string, string, ports.StorageStoreOptions) (*ports.StoredUploadRef, error)
 	DeleteObjectByStorageProfile(context.Context, string, string) error
 }
 
@@ -81,11 +82,11 @@ func (s *Service) MaterializeLibraryAsset(ctx context.Context, input library.Mat
 }
 
 func (s *Service) materializeLocked(ctx context.Context, input library.MaterializeInput) (library.MaterializedAsset, error) {
-	dirPrefix, err := storage.LibraryAssetUploadDirPrefix(input.OwnerUserID, input.LibraryAssetID)
+	dirPrefix, err := domain.LibraryAssetUploadDirPrefix(input.OwnerUserID, input.LibraryAssetID)
 	if err != nil {
 		return library.MaterializedAsset{}, err
 	}
-	planned, err := s.storage.PrepareUploadRef(ctx, "original", storage.StorageStoreOptions{DirPrefix: dirPrefix})
+	planned, err := s.storage.PrepareUploadRef(ctx, "original", ports.StorageStoreOptions{DirPrefix: dirPrefix})
 	if err != nil {
 		return library.MaterializedAsset{}, fmt.Errorf("prepare library media storage: %w", err)
 	}
@@ -218,11 +219,11 @@ func (g *materializationGate) releaseUser(userID int64, user *userMaterializatio
 	}
 }
 
-func (s *Service) storeOriginalThenPreview(ctx context.Context, planned *storage.StoredUploadRef, input library.MaterializeInput) (*storage.StoredUploadRef, string, error) {
+func (s *Service) storeOriginalThenPreview(ctx context.Context, planned *ports.StoredUploadRef, input library.MaterializeInput) (*ports.StoredUploadRef, string, error) {
 	if planned == nil {
 		return nil, "", fmt.Errorf("library materialization storage plan is missing")
 	}
-	options := storage.StorageStoreOptions{ObjectKey: planned.StorageKey, AllowHosts: outbound.AllowHosts(ctx)}
+	options := ports.StorageStoreOptions{ObjectKey: planned.StorageKey, AllowHosts: outbound.AllowHosts(ctx)}
 	urls := []string{strings.TrimSpace(input.OriginalURL)}
 	if preview := strings.TrimSpace(input.PreviewURL); preview != "" && preview != urls[0] {
 		urls = append(urls, preview)

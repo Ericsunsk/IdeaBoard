@@ -24,7 +24,7 @@ import (
 	identitydomain "ideaboard/api/internal/identity/users/domain"
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
-	"ideaboard/api/internal/media/storage"
+	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
@@ -340,7 +340,7 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 			TaskHandler:                 taskhttp.NewHandler(taskhttp.HandlerDeps{}),
 			TaskStatsHandler:            statisticshttp.NewHandler(nil, nil),
 			ProviderEndpointHandler:     providerendpoints.NewProviderEndpointHandler(nil),
-			StorageHandler:              storage.NewStorageHandler(nil),
+			StorageHandler:              storagehttp.NewStorageHandler(nil),
 			FeaturePromptHandler:        prompts.NewFeaturePromptHandler(nil),
 			RewardAdminCommandHandler:   rewards.NewAdminCommandHandler(nil),
 			RewardAdminReadHandler:      rewards.NewAdminReadHandler(nil, nil),

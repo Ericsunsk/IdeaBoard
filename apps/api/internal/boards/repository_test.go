@@ -13,7 +13,7 @@ import (
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	mediaassets "ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/ingestion"
-	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/testdb"
 
@@ -297,7 +297,7 @@ func TestBoardUploadRegistrationConvergesThroughSaveDeleteAndGraceScheduling(t *
 	}
 	registry := mediaassets.NewMediaAssetRegistry(db)
 	upload := ingestion.Request{OwnerUserID: owner.ID, StorageProfile: "builtin-local", StorageKey: "uploads/canvas/owner/upload-reclamation-board/content/image.png", URL: "/uploads/canvas/owner/upload-reclamation-board/content/image.png", Origin: ingestion.BoardUploadFacts{BoardID: "upload-reclamation-board"}}
-	stored := storage.StoredUploadRef{
+	stored := ports.StoredUploadRef{
 		URL:            "/uploads/canvas/owner/upload-reclamation-board/content/image.png",
 		StorageKey:     "uploads/canvas/owner/upload-reclamation-board/content/image.png",
 		StorageProfile: "builtin-local",

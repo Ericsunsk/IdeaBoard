@@ -18,7 +18,8 @@ import (
 	mediaerrors "ideaboard/api/internal/media/errors"
 	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/media/reclamation"
-	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/media/storage/domain"
+	"ideaboard/api/internal/media/storage/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
 )
@@ -570,7 +571,7 @@ func (r *MediaAssetRegistry) FindReusableGenerationMedia(ctx context.Context, ow
 		return 0, false, nil
 	}
 	if strings.HasPrefix(trimmed, "/uploads/") {
-		resource, err := storage.ParseUploadResource(strings.TrimPrefix(trimmed, "/"))
+		resource, err := domain.ParseUploadResource(strings.TrimPrefix(trimmed, "/"))
 		if err != nil {
 			return 0, false, nil
 		}
@@ -607,68 +608,68 @@ func (r *MediaAssetRegistry) FindReusableGenerationMedia(ctx context.Context, ow
 	return assetID, true, nil
 }
 
-func (r *MediaAssetRegistry) LocateStoredUpload(ctx context.Context, lookup storage.StoredUploadLookup) (storage.StoredUploadLocation, bool, error) {
+func (r *MediaAssetRegistry) LocateStoredUpload(ctx context.Context, lookup ports.StoredUploadLookup) (ports.StoredUploadLocation, bool, error) {
 	if r == nil || r.q == nil {
-		return storage.StoredUploadLocation{}, false, fmt.Errorf("media asset registry is unavailable")
+		return ports.StoredUploadLocation{}, false, fmt.Errorf("media asset registry is unavailable")
 	}
 	if lookup.AssetID > 0 {
 		row, err := r.q.GetReadyMediaAssetStorageLocationByID(ctx, lookup.AssetID)
 		if err == nil {
-			return storage.StoredUploadLocation{StorageProfileID: row.StorageProfileID, StorageKey: row.StorageKey}, true, nil
+			return ports.StoredUploadLocation{StorageProfileID: row.StorageProfileID, StorageKey: row.StorageKey}, true, nil
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
-			return storage.StoredUploadLocation{}, false, fmt.Errorf("locate media asset by ID: %w", err)
+			return ports.StoredUploadLocation{}, false, fmt.Errorf("locate media asset by ID: %w", err)
 		}
-		return storage.StoredUploadLocation{}, false, nil
+		return ports.StoredUploadLocation{}, false, nil
 	}
 	if rawURL := strings.TrimSpace(lookup.URL); rawURL != "" {
 		row, err := r.q.FindMediaAssetStorageLocationByURL(ctx, rawURL)
 		if err == nil {
-			return storage.StoredUploadLocation{
+			return ports.StoredUploadLocation{
 				StorageProfileID: row.StorageProfileID,
 				StorageKey:       row.StorageKey,
 			}, true, nil
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
-			return storage.StoredUploadLocation{}, false, fmt.Errorf("locate media asset by URL: %w", err)
+			return ports.StoredUploadLocation{}, false, fmt.Errorf("locate media asset by URL: %w", err)
 		}
 	}
 
 	storageKey := strings.TrimSpace(lookup.ObjectKey)
 	if storageKey == "" {
-		return storage.StoredUploadLocation{}, false, nil
+		return ports.StoredUploadLocation{}, false, nil
 	}
 	rows, err := r.q.ListMediaAssetStorageLocationsByKey(ctx, storageKey)
 	if err != nil {
-		return storage.StoredUploadLocation{}, false, fmt.Errorf("locate media asset by storage key: %w", err)
+		return ports.StoredUploadLocation{}, false, fmt.Errorf("locate media asset by storage key: %w", err)
 	}
 	if len(rows) == 0 {
-		return storage.StoredUploadLocation{}, false, nil
+		return ports.StoredUploadLocation{}, false, nil
 	}
 	if len(rows) > 1 {
-		return storage.StoredUploadLocation{}, false, fmt.Errorf("media asset storage key is ambiguous")
+		return ports.StoredUploadLocation{}, false, fmt.Errorf("media asset storage key is ambiguous")
 	}
-	return storage.StoredUploadLocation{
+	return ports.StoredUploadLocation{
 		StorageProfileID: rows[0].StorageProfileID,
 		StorageKey:       rows[0].StorageKey,
 	}, true, nil
 }
 
-func (r *MediaAssetRegistry) LocateStoredDerivative(ctx context.Context, lookup storage.StoredDerivativeLookup) (storage.StoredUploadLocation, bool, error) {
+func (r *MediaAssetRegistry) LocateStoredDerivative(ctx context.Context, lookup ports.StoredDerivativeLookup) (ports.StoredUploadLocation, bool, error) {
 	if r == nil || r.q == nil || lookup.AssetID <= 0 || strings.TrimSpace(lookup.Tier) == "" {
-		return storage.StoredUploadLocation{}, false, fmt.Errorf("invalid media derivative lookup")
+		return ports.StoredUploadLocation{}, false, fmt.Errorf("invalid media derivative lookup")
 	}
 	row, err := r.q.GetReadyMediaDerivativeStorageLocationByAssetID(ctx, dbsqlc.GetReadyMediaDerivativeStorageLocationByAssetIDParams{
 		MediaAssetID: lookup.AssetID,
 		Tier:         strings.TrimSpace(lookup.Tier),
 	})
 	if errors.Is(err, sql.ErrNoRows) {
-		return storage.StoredUploadLocation{}, false, nil
+		return ports.StoredUploadLocation{}, false, nil
 	}
 	if err != nil {
-		return storage.StoredUploadLocation{}, false, fmt.Errorf("locate media derivative: %w", err)
+		return ports.StoredUploadLocation{}, false, fmt.Errorf("locate media derivative: %w", err)
 	}
-	return storage.StoredUploadLocation{StorageProfileID: row.StorageProfileID, StorageKey: row.StorageKey}, true, nil
+	return ports.StoredUploadLocation{StorageProfileID: row.StorageProfileID, StorageKey: row.StorageKey}, true, nil
 }
 
 func (r *MediaAssetRegistry) ValidateProcessingInputReadiness(ctx context.Context, userID int64, assetIDs []int64) error {
