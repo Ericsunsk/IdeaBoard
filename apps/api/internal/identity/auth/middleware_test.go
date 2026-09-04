@@ -11,7 +11,8 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/identity/users"
+	identitydomain "ideaboard/api/internal/identity/users/domain"
+	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/testdb"
@@ -20,20 +21,20 @@ import (
 	"github.com/google/uuid"
 )
 
-type localUserReaderFunc func(context.Context, string) (*users.User, error)
+type localUserReaderFunc func(context.Context, string) (*identitydomain.User, error)
 
-func (f localUserReaderFunc) GetByAuthUserID(ctx context.Context, authUserID string) (*users.User, error) {
+func (f localUserReaderFunc) GetByAuthUserID(ctx context.Context, authUserID string) (*identitydomain.User, error) {
 	return f(ctx, authUserID)
 }
 
 func TestResolveLocalUserByAuthIdentityRequiresExistingLocalUser(t *testing.T) {
 	db := testdb.Open(t)
-	userRepo := users.NewUserRepository(db)
-	if err := userRepo.Create(context.Background(), &users.User{DisplayName: "alice", Status: 1, Role: "user"}); err != nil {
+	userRepo := identitypostgres.NewRepository(db)
+	if err := userRepo.Create(context.Background(), &identitydomain.User{DisplayName: "alice", Status: 1, Role: "user"}); err != nil {
 		t.Fatalf("seed existing user failed: %v", err)
 	}
 
-	resolvedUser := &users.User{DisplayName: "alice_auth", AuthUserID: func() *string { v := "auth-1234567890"; return &v }(), Status: 1, Role: "user"}
+	resolvedUser := &identitydomain.User{DisplayName: "alice_auth", AuthUserID: func() *string { v := "auth-1234567890"; return &v }(), Status: 1, Role: "user"}
 	if err := userRepo.Create(context.Background(), resolvedUser); err != nil {
 		t.Fatalf("seed auth-bound user failed: %v", err)
 	}
@@ -78,7 +79,7 @@ func TestAuthMiddlewareReturnsServiceUnavailableWhenLocalLookupFails(t *testing.
 	defer authServer.Close()
 
 	db := testdb.Open(t)
-	userRepo := users.NewUserRepository(db)
+	userRepo := identitypostgres.NewRepository(db)
 	if err := db.Close(); err != nil {
 		t.Fatalf("close test db failed: %v", err)
 	}
@@ -111,7 +112,7 @@ func TestAuthMiddlewareAbortsQuietlyWhenSessionRequestIsCanceled(t *testing.T) {
 	defer authServer.Close()
 
 	db := testdb.Open(t)
-	userRepo := users.NewUserRepository(db)
+	userRepo := identitypostgres.NewRepository(db)
 
 	router := gin.New()
 	router.Use(AuthMiddleware(NewServiceClient(config.AuthServiceConfig{
@@ -143,7 +144,7 @@ func TestAuthMiddlewareAbortsQuietlyWhenLocalLookupIsCanceled(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	db := testdb.Open(t)
-	userRepo := users.NewUserRepository(db)
+	userRepo := identitypostgres.NewRepository(db)
 	var cancelRequest context.CancelFunc
 	authService := NewServiceClient(config.AuthServiceConfig{
 		BaseURL:        "http://auth.test",
@@ -201,8 +202,8 @@ func TestAuthMiddlewareSetsOnlyCompletePrincipal(t *testing.T) {
 			}))
 			defer authServer.Close()
 
-			userRepo := users.NewUserRepository(testdb.Open(t))
-			user := &users.User{DisplayName: databaseDisplayName, AuthUserID: &authUserID, Status: 1, Role: role}
+			userRepo := identitypostgres.NewRepository(testdb.Open(t))
+			user := &identitydomain.User{DisplayName: databaseDisplayName, AuthUserID: &authUserID, Status: 1, Role: role}
 			if err := userRepo.Create(t.Context(), user); err != nil {
 				t.Fatal(err)
 			}
@@ -249,7 +250,7 @@ func TestAuthMiddlewareRejectsRequestWithoutSession(t *testing.T) {
 	router := gin.New()
 	router.Use(AuthMiddleware(NewServiceClient(config.AuthServiceConfig{
 		BaseURL: authServer.URL, TimeoutSeconds: 1,
-	}), users.NewUserRepository(testdb.Open(t)), nil))
+	}), identitypostgres.NewRepository(testdb.Open(t)), nil))
 	router.GET("/me", func(*gin.Context) {
 		t.Fatal("unauthenticated request reached handler")
 	})
@@ -270,11 +271,11 @@ func TestAuthMiddlewareRejectsInvalidLocalPrincipal(t *testing.T) {
 	}))
 	defer authServer.Close()
 
-	userRepo := localUserReaderFunc(func(_ context.Context, gotAuthUserID string) (*users.User, error) {
+	userRepo := localUserReaderFunc(func(_ context.Context, gotAuthUserID string) (*identitydomain.User, error) {
 		if gotAuthUserID != authUserID {
 			t.Fatalf("auth user id = %q, want %q", gotAuthUserID, authUserID)
 		}
-		return &users.User{ID: 1, DisplayName: "alice", AuthUserID: &authUserID, Status: 1, Role: "owner"}, nil
+		return &identitydomain.User{ID: 1, DisplayName: "alice", AuthUserID: &authUserID, Status: 1, Role: "owner"}, nil
 	})
 
 	handlerRan := false

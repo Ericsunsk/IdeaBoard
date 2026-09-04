@@ -9,7 +9,8 @@ import (
 	"time"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
-	"ideaboard/api/internal/identity/users"
+	identitydomain "ideaboard/api/internal/identity/users/domain"
+	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	mediaassets "ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/media/storage"
@@ -27,13 +28,13 @@ func newBoardRepoTestDB(t *testing.T) *sql.DB {
 func TestBoardRepositoryOwnerAndAccessibleLookup(t *testing.T) {
 	db := newBoardRepoTestDB(t)
 	repo := NewBoardRepository(db)
-	userRepo := users.NewUserRepository(db)
+	userRepo := identitypostgres.NewRepository(db)
 
-	owner := &users.User{DisplayName: "owner", Status: 1, Role: "user"}
+	owner := &identitydomain.User{DisplayName: "owner", Status: 1, Role: "user"}
 	if err := userRepo.Create(context.Background(), owner); err != nil {
 		t.Fatalf("seed owner failed: %v", err)
 	}
-	member := &users.User{DisplayName: "member", Status: 1, Role: "user"}
+	member := &identitydomain.User{DisplayName: "member", Status: 1, Role: "user"}
 	if err := userRepo.Create(context.Background(), member); err != nil {
 		t.Fatalf("seed member failed: %v", err)
 	}
@@ -99,10 +100,10 @@ func TestBoardRepositoryUpsertReconcilesBoardMediaRefs(t *testing.T) {
 	ctx := context.Background()
 	db := newBoardRepoTestDB(t)
 	repo := NewBoardRepository(db)
-	userRepo := users.NewUserRepository(db)
+	userRepo := identitypostgres.NewRepository(db)
 	q := dbsqlc.New(db)
 
-	owner := &users.User{DisplayName: "media-owner", Status: 1, Role: "user"}
+	owner := &identitydomain.User{DisplayName: "media-owner", Status: 1, Role: "user"}
 	if err := userRepo.Create(ctx, owner); err != nil {
 		t.Fatalf("seed owner failed: %v", err)
 	}
@@ -207,10 +208,10 @@ func TestBoardRepositoryMediaReclamationWaitsForLastBoardReferenceAndCancelsOnUn
 	ctx := context.Background()
 	db := newBoardRepoTestDB(t)
 	repo := NewBoardRepository(db)
-	userRepo := users.NewUserRepository(db)
+	userRepo := identitypostgres.NewRepository(db)
 	q := dbsqlc.New(db)
 
-	owner := &users.User{DisplayName: "shared-media-owner", Status: 1, Role: "user"}
+	owner := &identitydomain.User{DisplayName: "shared-media-owner", Status: 1, Role: "user"}
 	if err := userRepo.Create(ctx, owner); err != nil {
 		t.Fatalf("seed owner failed: %v", err)
 	}
@@ -290,8 +291,8 @@ func TestBoardUploadRegistrationConvergesThroughSaveDeleteAndGraceScheduling(t *
 	ctx := context.Background()
 	db := newBoardRepoTestDB(t)
 	repo := NewBoardRepository(db)
-	owner := &users.User{DisplayName: "upload-reclamation-owner", Status: 1, Role: "user"}
-	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
+	owner := &identitydomain.User{DisplayName: "upload-reclamation-owner", Status: 1, Role: "user"}
+	if err := identitypostgres.NewRepository(db).Create(ctx, owner); err != nil {
 		t.Fatalf("create owner: %v", err)
 	}
 	registry := mediaassets.NewMediaAssetRegistry(db)
@@ -353,17 +354,17 @@ func TestBoardRepositoryStableBoardIdentityConstraints(t *testing.T) {
 	ctx := context.Background()
 	db := newBoardRepoTestDB(t)
 	repo := NewBoardRepository(db)
-	userRepo := users.NewUserRepository(db)
+	userRepo := identitypostgres.NewRepository(db)
 
-	owner := &users.User{DisplayName: "identity-owner", Status: 1, Role: "user"}
+	owner := &identitydomain.User{DisplayName: "identity-owner", Status: 1, Role: "user"}
 	if err := userRepo.Create(ctx, owner); err != nil {
 		t.Fatalf("seed owner failed: %v", err)
 	}
-	creator := &users.User{DisplayName: "identity-creator", Status: 1, Role: "user"}
+	creator := &identitydomain.User{DisplayName: "identity-creator", Status: 1, Role: "user"}
 	if err := userRepo.Create(ctx, creator); err != nil {
 		t.Fatalf("seed creator failed: %v", err)
 	}
-	member := &users.User{DisplayName: "identity-member", Status: 1, Role: "user"}
+	member := &identitydomain.User{DisplayName: "identity-member", Status: 1, Role: "user"}
 	if err := userRepo.Create(ctx, member); err != nil {
 		t.Fatalf("seed member failed: %v", err)
 	}
@@ -392,7 +393,7 @@ func TestBoardRepositoryStableBoardIdentityConstraints(t *testing.T) {
 		t.Fatalf("identity fields = owner:%d created:%d saved:%v, want owner:%d created:%d saved:%d", reloaded.OwnerUserID, reloaded.CreatedBy, reloaded.LastSavedBy, owner.ID, creator.ID, member.ID)
 	}
 
-	otherOwner := &users.User{DisplayName: "identity-other-owner", Status: 1, Role: "user"}
+	otherOwner := &identitydomain.User{DisplayName: "identity-other-owner", Status: 1, Role: "user"}
 	if err := userRepo.Create(ctx, otherOwner); err != nil {
 		t.Fatalf("seed other owner failed: %v", err)
 	}

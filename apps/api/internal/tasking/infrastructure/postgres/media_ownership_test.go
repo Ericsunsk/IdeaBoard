@@ -7,7 +7,8 @@ import (
 	"testing"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
-	"ideaboard/api/internal/identity/users"
+	identitydomain "ideaboard/api/internal/identity/users/domain"
+	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/testdb"
 )
@@ -211,10 +212,10 @@ func TestInsertTaskOutputsReusesReadyMaterializedAssetAndPersistsLineage(t *test
 	}
 }
 
-func createMediaOwnerForTest(t *testing.T, db *sql.DB, displayName string, storageUID string) *users.User {
+func createMediaOwnerForTest(t *testing.T, db *sql.DB, displayName string, storageUID string) *identitydomain.User {
 	t.Helper()
-	repo := users.NewUserRepository(db)
-	user := &users.User{
+	repo := identitypostgres.NewRepository(db)
+	user := &identitydomain.User{
 		DisplayName: displayName,
 		StorageUID:  storageUID,
 		Role:        "user",

@@ -1,4 +1,4 @@
-package users
+package tests
 
 import (
 	"context"
@@ -8,64 +8,7 @@ import (
 	"ideaboard/api/internal/platform/validation"
 )
 
-type recordingUserUploadCleaner struct {
-	calls []userUploadCleanupCall
-	err   error
-}
-
-type spyUserCreditBalanceReader struct {
-	calls    [][]int64
-	balances map[int64]int64
-}
-
-func (r *spyUserCreditBalanceReader) GetAvailableBalances(_ context.Context, userIDs []int64) (map[int64]int64, error) {
-	r.calls = append(r.calls, append([]int64(nil), userIDs...))
-	balances := make(map[int64]int64, len(userIDs))
-	for _, userID := range userIDs {
-		balances[userID] = r.balances[userID]
-	}
-	return balances, nil
-}
-
-type userUploadCleanupCall struct {
-	userID     int64
-	storageUID string
-}
-
-type recordingUserLifecycle struct {
-	statusCalls []int16
-	deleteCalls []int64
-	deleteErr   error
-	deleteFn    func(context.Context, int64, AuthUserDeleter, UserUploadCleaner) error
-}
-
-func (l *recordingUserLifecycle) SetUserStatus(_ context.Context, _ int64, status int16) error {
-	l.statusCalls = append(l.statusCalls, status)
-	return nil
-}
-
-func (l *recordingUserLifecycle) DeleteUser(ctx context.Context, userID int64, authDeleter AuthUserDeleter, uploadCleaner UserUploadCleaner) error {
-	l.deleteCalls = append(l.deleteCalls, userID)
-	if l.deleteFn != nil {
-		return l.deleteFn(ctx, userID, authDeleter, uploadCleaner)
-	}
-	return l.deleteErr
-}
-
-type recordingAuthUserDeleter struct {
-	authUserIDs []string
-	err         error
-}
-
-func (d *recordingAuthUserDeleter) DeleteUser(_ context.Context, authUserID string) error {
-	d.authUserIDs = append(d.authUserIDs, authUserID)
-	return d.err
-}
-
-func (c *recordingUserUploadCleaner) DeleteUserUploads(_ context.Context, userID int64, storageUID string) error {
-	c.calls = append(c.calls, userUploadCleanupCall{userID: userID, storageUID: storageUID})
-	return c.err
-}
+const maxUserKeywordLength = 64
 
 func TestListUsersRejectsOverlongKeyword(t *testing.T) {
 	db := newUserRepoTestDB(t)

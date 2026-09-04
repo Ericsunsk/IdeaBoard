@@ -10,7 +10,8 @@ import (
 	"ideaboard/api/internal/boards"
 	credithttp "ideaboard/api/internal/credits/interfaces/http"
 	"ideaboard/api/internal/identity/auth"
-	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/identity/users/application/administration"
+	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/librarymaterialization"
 	"ideaboard/api/internal/media/storage"
@@ -112,10 +113,10 @@ func newAppRouter(
 			LibraryHandler:       libraryHandler,
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
-			AdminHandler: users.NewAdminHandler(
+			AdminHandler: identityhttp.NewAdminHandler(
 				services.userService,
 				services.runtimeSettings,
-				users.NewIdentityAdminCommands(services.userService, services.authServiceClient),
+				administration.NewIdentityAdminCommands(services.userService, services.authServiceClient),
 				services.authServiceClient,
 			),
 			MailConfigHandler:           auth.NewMailConfigAdminHandler(services.authServiceClient),
@@ -139,7 +140,7 @@ func newAppRouter(
 			AdminBrandLogoHandler:       adminbranding.NewHandler(repos.adminBrandLogoRepo),
 		},
 		PaymentWebhook: paymentWebhookHandler,
-		Internal:       httpapi.InternalRouteDeps{UserHandler: users.NewInternalHandler(repos.userRepo, cfg.Auth.InternalAPIKey)},
+		Internal:       httpapi.InternalRouteDeps{UserHandler: identityhttp.NewInternalHandler(repos.userRepo, cfg.Auth.InternalAPIKey)},
 		StaticUploads: httpapi.StaticUploadDeps{
 			Auth:         authDeps,
 			BoardService: services.boardService,

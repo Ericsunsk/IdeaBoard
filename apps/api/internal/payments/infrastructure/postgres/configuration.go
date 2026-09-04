@@ -24,31 +24,12 @@ func (r *Repository) ReplaceStripeConfiguration(ctx context.Context, expectedRev
 	var shutdown *paymentconfiguration.PaymentCheckoutShutdown
 	err := r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, _ *sql.Tx) error {
 		previous, previousErr := q.GetPaymentStripeConfiguration(ctx)
-		if previousErr != nil && !errors.Is(previousErr, sql.ErrNoRows) {
-			return fmt.Errorf("load previous Stripe configuration: %w", previousErr)
+		if err := validateConfigurationRevision(previous, previousErr, expectedRevision); err != nil {
+			return err
 		}
-		if previousErr == nil && previous.Revision != expectedRevision {
-			return paymentcontracts.ErrStripeConfigurationChanged
-		}
-		if errors.Is(previousErr, sql.ErrNoRows) && expectedRevision != 0 {
-			return paymentcontracts.ErrStripeConfigurationChanged
-		}
-		credentialID, err := uuid.Parse(value.CredentialID)
+		credentialID, err := r.ensureStripeCredential(ctx, q, &value)
 		if err != nil {
-			credentialID = uuid.New()
-			credential, insertErr := q.InsertPaymentStripeCredential(ctx, dbsqlc.InsertPaymentStripeCredentialParams{
-				ID: credentialID, AccountID: value.AccountID, Mode: string(value.Mode), ChargesEnabled: value.ChargesEnabled,
-				PaymentMethodConfigurationID: sql.NullString{String: value.PaymentMethodConfigurationID, Valid: true},
-				StripeProductID:              value.StripeProductID, StripeWebhookEndpointID: value.StripeWebhookEndpointID,
-				ApiKeyCiphertext: value.APIKeyCiphertext, WebhookSecretCiphertext: value.WebhookSecretCiphertext,
-				SecretMaterialKind: value.SecretMaterialKind, CreatedBy: value.UpdatedBy,
-			})
-			if insertErr != nil {
-				return fmt.Errorf("insert Stripe credential generation: %w", insertErr)
-			}
-			value.CredentialID = credential.ID.String()
-			value.CreatedBy = credential.CreatedBy
-			value.CreatedAt = credential.CreatedAt
+			return err
 		}
 		row, err := q.ReplacePaymentStripeConfiguration(ctx, dbsqlc.ReplacePaymentStripeConfigurationParams{
 			ActiveCredentialID: credentialID, ProductTaxCode: value.ProductTaxCode,
@@ -86,6 +67,41 @@ func (r *Repository) ReplaceStripeConfiguration(ctx context.Context, expectedRev
 		return nil
 	})
 	return stored, shutdown, err
+}
+
+func validateConfigurationRevision(previous dbsqlc.PaymentStripeConfiguration, previousErr error, expectedRevision int64) error {
+	if previousErr != nil && !errors.Is(previousErr, sql.ErrNoRows) {
+		return fmt.Errorf("load previous Stripe configuration: %w", previousErr)
+	}
+	if previousErr == nil && previous.Revision != expectedRevision {
+		return paymentcontracts.ErrStripeConfigurationChanged
+	}
+	if errors.Is(previousErr, sql.ErrNoRows) && expectedRevision != 0 {
+		return paymentcontracts.ErrStripeConfigurationChanged
+	}
+	return nil
+}
+
+func (r *Repository) ensureStripeCredential(ctx context.Context, q *dbsqlc.Queries, value *paymentconfiguration.StoredStripeConfiguration) (uuid.UUID, error) {
+	credentialID, err := uuid.Parse(value.CredentialID)
+	if err == nil {
+		return credentialID, nil
+	}
+	credentialID = uuid.New()
+	credential, insertErr := q.InsertPaymentStripeCredential(ctx, dbsqlc.InsertPaymentStripeCredentialParams{
+		ID: credentialID, AccountID: value.AccountID, Mode: string(value.Mode), ChargesEnabled: value.ChargesEnabled,
+		PaymentMethodConfigurationID: sql.NullString{String: value.PaymentMethodConfigurationID, Valid: true},
+		StripeProductID:              value.StripeProductID, StripeWebhookEndpointID: value.StripeWebhookEndpointID,
+		ApiKeyCiphertext: value.APIKeyCiphertext, WebhookSecretCiphertext: value.WebhookSecretCiphertext,
+		SecretMaterialKind: value.SecretMaterialKind, CreatedBy: value.UpdatedBy,
+	})
+	if insertErr != nil {
+		return uuid.Nil, fmt.Errorf("insert Stripe credential generation: %w", insertErr)
+	}
+	value.CredentialID = credential.ID.String()
+	value.CreatedBy = credential.CreatedBy
+	value.CreatedAt = credential.CreatedAt
+	return credentialID, nil
 }
 
 func (r *Repository) CompletePaymentCheckoutShutdown(ctx context.Context, id string, completedAt time.Time) error {

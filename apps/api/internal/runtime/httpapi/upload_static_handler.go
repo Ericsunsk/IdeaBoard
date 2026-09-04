@@ -11,7 +11,7 @@ import (
 
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/auth"
-	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/response"
 
@@ -168,7 +168,7 @@ func writeOwnedUploadReadError(c *gin.Context, err error) {
 }
 
 type staticUploadOwnerStorageUIDResolver struct {
-	repo *users.UserRepository
+	repo ports.UserRepository
 }
 
 func (r staticUploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context.Context, userID int64) (string, error) {

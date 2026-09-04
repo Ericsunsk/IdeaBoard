@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/identity/users/application/administration"
+	identitydomain "ideaboard/api/internal/identity/users/domain"
+	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport"
 
@@ -46,7 +48,7 @@ func TestGetCurrentUserReturnsNotFoundWhenUserMissing(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	db := testdb.Open(t)
-	handler := NewAuthHandler(users.NewUserServiceWithEmailReader(users.NewUserRepository(db), nil, nil, nil, nil))
+	handler := NewAuthHandler(administration.NewService(identitypostgres.NewRepository(db), nil, nil, nil, nil))
 	router := gin.New()
 	router.GET("/api/user/info", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleUser)
@@ -61,8 +63,8 @@ func TestGetCurrentUserReturnsPublicIdentity(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	db := testdb.Open(t)
-	repo := users.NewUserRepository(db)
-	user := &users.User{
+	repo := identitypostgres.NewRepository(db)
+	user := &identitydomain.User{
 		DisplayName: "公开展示名",
 		Role:        "user",
 		Status:      1,
@@ -70,7 +72,7 @@ func TestGetCurrentUserReturnsPublicIdentity(t *testing.T) {
 	if err := repo.Create(t.Context(), user); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	handler := NewAuthHandler(users.NewUserServiceWithEmailReader(repo, nil, nil, nil, nil))
+	handler := NewAuthHandler(administration.NewService(repo, nil, nil, nil, nil))
 	router := gin.New()
 	router.GET("/api/user/info", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, user.ID, principal.RoleUser)

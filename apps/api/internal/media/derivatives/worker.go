@@ -191,38 +191,67 @@ func (d *OutboxDispatcher) reconcile(ctx context.Context) error {
 	if err := d.reconcileReadyAssets(ctx); err != nil {
 		return err
 	}
+	d.reconcileReadyObjects(ctx)
+	d.repairMissingObjects(ctx)
+	if err := d.restoreStaleProcessing(ctx); err != nil {
+		return err
+	}
+	if err := d.restoreMissingOutbox(ctx); err != nil {
+		return err
+	}
+	if err := d.reconcileOrphanObjects(ctx); err != nil {
+		slog.Warn("media derivative orphan scan failed", "err", err)
+	}
+	return nil
+}
+
+// reconcileReadyObjects observes ready derivatives without stopping the
+// scheduler when object storage is transiently unavailable.
+func (d *OutboxDispatcher) reconcileReadyObjects(ctx context.Context) {
 	// Reconcile ready-but-object-missing or invalid derivatives
 	// (issue #661/#663). Errors are logged but do not abort the
 	// rest of the reconcile cycle; the runbook triages a slow
 	// reconciler via the metrics counters below.
-	if d.reconciler != nil {
-		result, recErr := d.reconciler.Reconcile(ctx)
-		if recErr != nil {
-			slog.Warn("media derivative ready-object reconcile failed", "err", recErr)
-		} else {
-			if result.Missing > 0 {
-				mediaDerivativeReconcileMissing.Add(float64(result.Missing))
-			}
-			if result.Invalid > 0 {
-				mediaDerivativeReconcileInvalid.Add(float64(result.Invalid))
-			}
-			if result.Errors > 0 {
-				mediaDerivativeReconcileErrors.Add(float64(result.Errors))
-			}
-		}
+	if d.reconciler == nil {
+		return
 	}
+	result, err := d.reconciler.Reconcile(ctx)
+	if err != nil {
+		slog.Warn("media derivative ready-object reconcile failed", "err", err)
+		return
+	}
+	if result.Missing > 0 {
+		mediaDerivativeReconcileMissing.Add(float64(result.Missing))
+	}
+	if result.Invalid > 0 {
+		mediaDerivativeReconcileInvalid.Add(float64(result.Invalid))
+	}
+	if result.Errors > 0 {
+		mediaDerivativeReconcileErrors.Add(float64(result.Errors))
+	}
+}
+
+// repairMissingObjects has the same best-effort policy as ready-object
+// reconciliation: a repair outage must not block queue recovery.
+func (d *OutboxDispatcher) repairMissingObjects(ctx context.Context) {
 	// Bounded repair for missing/invalid derivatives (issue
 	// #663). Errors are logged but do not abort the cycle; the
 	// runbook triages a stalled repair via the metrics
 	// counters below.
-	if d.repair != nil {
-		_, terminals, repErr := d.repair.RunOnce(ctx, reconcileBatchSize)
-		if repErr != nil {
-			slog.Warn("media derivative repair run failed", "err", repErr)
-		} else if len(terminals) > 0 {
-			mediaDerivativeRepairTerminals.Add(float64(len(terminals)))
-		}
+	if d.repair == nil {
+		return
 	}
+	_, terminals, err := d.repair.RunOnce(ctx, reconcileBatchSize)
+	if err != nil {
+		slog.Warn("media derivative repair run failed", "err", err)
+		return
+	}
+	if len(terminals) > 0 {
+		mediaDerivativeRepairTerminals.Add(float64(len(terminals)))
+	}
+}
+
+func (d *OutboxDispatcher) restoreStaleProcessing(ctx context.Context) error {
 	staleBefore := time.Now().Add(-processingLease)
 	staleIDs, err := d.q.ListStaleProcessingMediaDerivativeIDs(ctx, dbsqlc.ListStaleProcessingMediaDerivativeIDsParams{
 		StaleBefore: staleBefore,
@@ -240,6 +269,10 @@ func (d *OutboxDispatcher) reconcile(ctx context.Context) error {
 			return fmt.Errorf("reset stale media derivatives: %w", err)
 		}
 	}
+	return nil
+}
+
+func (d *OutboxDispatcher) restoreMissingOutbox(ctx context.Context) error {
 	missingIDs, err := d.q.ListMediaDerivativeIDsMissingOutbox(ctx, dbsqlc.ListMediaDerivativeIDsMissingOutboxParams{
 		MaxAttemptCount: MaxAttempts,
 		RowLimit:        reconcileBatchSize,
@@ -251,9 +284,6 @@ func (d *OutboxDispatcher) reconcile(ctx context.Context) error {
 		if _, err := d.q.EnqueueMediaDerivativeOutbox(ctx, id); err != nil {
 			return fmt.Errorf("restore media derivative outbox id=%d: %w", id, err)
 		}
-	}
-	if err := d.reconcileOrphanObjects(ctx); err != nil {
-		slog.Warn("media derivative orphan scan failed", "err", err)
 	}
 	return nil
 }

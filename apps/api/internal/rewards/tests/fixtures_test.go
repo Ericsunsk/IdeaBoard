@@ -49,7 +49,6 @@ type (
 
 	redemptionHandlerOptions    = rewards.RedemptionHandlerOptions
 	redemptionMetricObservation = rewards.RedemptionMetricObservation
-	redemptionMetricsRecorder   = rewards.RedemptionMetricsRecorder
 	redemptionOutcome           = rewards.RedemptionOutcome
 )
 

@@ -9,7 +9,7 @@ import (
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/events"
-	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/media/derivatives"
 	"ideaboard/api/internal/media/preparation"
 	"ideaboard/api/internal/media/reclamation"
@@ -355,7 +355,7 @@ func (r uploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context,
 }
 
 type uploadOwnerStorageUIDResolver struct {
-	repo *users.UserRepository
+	repo ports.UserRepository
 }
 
 func (r uploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context.Context, userID int64) (string, error) {

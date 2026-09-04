@@ -14,7 +14,8 @@ import (
 
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/auth"
-	"ideaboard/api/internal/identity/users"
+	identitydomain "ideaboard/api/internal/identity/users/domain"
+	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/testdb"
@@ -215,7 +216,7 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 	mustWriteTestFile(t, filepath.Join("uploads", "2026", "05", "13", "legacy.txt"), "legacy upload")
 
 	db := testdb.Open(t)
-	userRepo := users.NewUserRepository(db)
+	userRepo := identitypostgres.NewRepository(db)
 	owner := mustCreateUploadStaticUser(t, userRepo, "owner", "owner-auth", "OWNR1A")
 	member := mustCreateUploadStaticUser(t, userRepo, "member", "member-auth", "MEMB1A")
 	mustCreateUploadStaticUser(t, userRepo, "outsider", "outsider-auth", "OUTS1A")
@@ -309,9 +310,9 @@ func performUploadStaticRequest(router http.Handler, method string, target strin
 	return rec
 }
 
-func mustCreateUploadStaticUser(t *testing.T, repo *users.UserRepository, displayName string, authUserID string, storageUID string) *users.User {
+func mustCreateUploadStaticUser(t *testing.T, repo *identitypostgres.Repository, displayName string, authUserID string, storageUID string) *identitydomain.User {
 	t.Helper()
-	user := &users.User{
+	user := &identitydomain.User{
 		DisplayName: displayName,
 		AuthUserID:  &authUserID,
 		StorageUID:  storageUID,

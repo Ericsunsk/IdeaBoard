@@ -37,50 +37,57 @@ func (s *Service) ContinuePendingOrder(ctx context.Context, userID int64, public
 	}
 	var result paymentcontracts.PendingPaymentOrder
 	err := s.store.WithUserCheckoutLock(ctx, userID, func(locked context.Context) error {
-		order, err := s.store.GetPaymentOrderByPublicToken(locked, userID, publicToken)
-		if errors.Is(err, sql.ErrNoRows) {
-			return paymentcontracts.ErrPaymentOrderNotFound
-		}
-		if err != nil {
-			return fmt.Errorf("get pending payment order to continue: %w", err)
-		}
-		if order.Status == paymentsdomain.PaymentOrderPaidPendingCredit {
-			order, err = s.lifecycle.CreditPaidOrder(locked, order, s.now().UTC())
-			if err != nil {
-				return err
-			}
-			result = pendingPaymentOrder(order)
-			return nil
-		}
-		if order.Status != paymentsdomain.PaymentOrderCheckoutOpen {
-			result = pendingPaymentOrder(order)
-			return nil
-		}
-		configuration, apiKey, err := s.CredentialForOrder(locked, order)
-		if err != nil || configuration.AccountID != order.StripeAccountID {
-			return paymentsdomain.ErrPurchasesUnavailable
-		}
-		if err := s.requireWallet(locked, userID); err != nil {
-			return err
-		}
-		session, err := s.gateway.RetrieveCheckoutSession(locked, ports.RetrieveCheckoutSessionInput{APIKey: apiKey, SessionID: order.StripeCheckoutSessionID})
-		if err != nil {
-			return OperationError(err)
-		}
-		order, err = s.lifecycle.ConvergeCheckoutSession(locked, order, session, paymentorder.SignalObserved)
-		if err != nil {
-			return err
-		}
-		if order.Status == paymentsdomain.PaymentOrderCheckoutOpen && !order.ExpiresAt.After(s.now().UTC()) {
-			order, err = s.lifecycle.ExpireOrder(locked, order)
-			if err != nil {
-				return err
-			}
-		}
-		result = pendingPaymentOrder(order)
-		return nil
+		var err error
+		result, err = s.continuePendingOrderLocked(locked, userID, publicToken)
+		return err
 	})
 	return result, err
+}
+
+func (s *Service) continuePendingOrderLocked(ctx context.Context, userID int64, publicToken string) (paymentcontracts.PendingPaymentOrder, error) {
+	var result paymentcontracts.PendingPaymentOrder
+	order, err := s.store.GetPaymentOrderByPublicToken(ctx, userID, publicToken)
+	if errors.Is(err, sql.ErrNoRows) {
+		return result, paymentcontracts.ErrPaymentOrderNotFound
+	}
+	if err != nil {
+		return result, fmt.Errorf("get pending payment order to continue: %w", err)
+	}
+	if order.Status == paymentsdomain.PaymentOrderPaidPendingCredit {
+		order, err = s.lifecycle.CreditPaidOrder(ctx, order, s.now().UTC())
+		if err != nil {
+			return result, err
+		}
+		result = pendingPaymentOrder(order)
+		return result, nil
+	}
+	if order.Status != paymentsdomain.PaymentOrderCheckoutOpen {
+		result = pendingPaymentOrder(order)
+		return result, nil
+	}
+	configuration, apiKey, err := s.CredentialForOrder(ctx, order)
+	if err != nil || configuration.AccountID != order.StripeAccountID {
+		return result, paymentsdomain.ErrPurchasesUnavailable
+	}
+	if err := s.requireWallet(ctx, userID); err != nil {
+		return result, err
+	}
+	session, err := s.gateway.RetrieveCheckoutSession(ctx, ports.RetrieveCheckoutSessionInput{APIKey: apiKey, SessionID: order.StripeCheckoutSessionID})
+	if err != nil {
+		return result, OperationError(err)
+	}
+	order, err = s.lifecycle.ConvergeCheckoutSession(ctx, order, session, paymentorder.SignalObserved)
+	if err != nil {
+		return result, err
+	}
+	if order.Status == paymentsdomain.PaymentOrderCheckoutOpen && !order.ExpiresAt.After(s.now().UTC()) {
+		order, err = s.lifecycle.ExpireOrder(ctx, order)
+		if err != nil {
+			return result, err
+		}
+	}
+	result = pendingPaymentOrder(order)
+	return result, nil
 }
 
 func (s *Service) AbandonPendingOrder(ctx context.Context, userID int64, publicToken string) (paymentcontracts.PendingPaymentOrder, error) {

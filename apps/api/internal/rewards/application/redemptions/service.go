@@ -46,11 +46,6 @@ type Service struct {
 	now     func() time.Time
 }
 
-// NewService creates a new redemptions service.
-func NewService(pool *pgxpool.Pool, credits CreditGateway, keyring rewardsdomain.CodeKeyring) *Service {
-	return NewServiceWithOptions(pool, credits, keyring, ServiceOptions{})
-}
-
 // ServiceOptions configures the service.
 type ServiceOptions struct {
 	Now func() time.Time

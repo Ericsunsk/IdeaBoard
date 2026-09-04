@@ -1,4 +1,4 @@
-package users
+package postgres
 
 import (
 	"context"
@@ -8,39 +8,53 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/identity/users/domain"
+	"ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/platform/database"
 
 	"github.com/google/uuid"
 )
 
-type UserRepository struct {
+type Repository struct {
 	db *sql.DB
 	q  *dbsqlc.Queries
 }
 
-type userRepositoryQueryer struct {
+type repositoryQueryer struct {
 	ctx context.Context
+	db  *sql.DB
 	q   *dbsqlc.Queries
 }
 
-func NewUserRepository(db *sql.DB) *UserRepository {
-	return &UserRepository{db: db, q: dbsqlc.New(db)}
+func NewRepository(db *sql.DB) *Repository {
+	return &Repository{db: db, q: dbsqlc.New(db)}
 }
 
-func (r *UserRepository) dbWithContext(ctx context.Context) userRepositoryQueryer {
-	return userRepositoryQueryer{ctx: ctx, q: r.q}
+func (r *Repository) DB() *sql.DB {
+	if r == nil {
+		return nil
+	}
+	return r.db
 }
 
-func (q userRepositoryQueryer) getUsersByIDs(ids []int64) ([]dbsqlc.User, error) {
+func (r *Repository) dbWithContext(ctx context.Context) repositoryQueryer {
+	return repositoryQueryer{ctx: ctx, db: r.db, q: r.q}
+}
+
+func (db repositoryQueryer) withTx(run func(*dbsqlc.Queries) error) error {
+	return dbutil.WithTx(db.ctx, db.db, run)
+}
+
+func (q repositoryQueryer) getUsersByIDs(ids []int64) ([]dbsqlc.User, error) {
 	return q.q.GetUsersByIDs(q.ctx, ids)
 }
 
 // Create 创建用户
-func (r *UserRepository) Create(ctx context.Context, user *User) error {
+func (r *Repository) Create(ctx context.Context, user *domain.User) error {
 	if user == nil {
 		return fmt.Errorf("用户不能为空")
 	}
-	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+	return r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
 		uid, err := allocateStorageUID(ctx, q, strings.TrimSpace(user.StorageUID), 0)
 		if err != nil {
 			return err
@@ -48,7 +62,7 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 		user.StorageUID = uid
 		role := strings.ToLower(strings.TrimSpace(user.Role))
 		if role == "" {
-			role = "user"
+			role = domain.RoleUser
 		}
 		displayName := strings.TrimSpace(user.DisplayName)
 		if displayName == "" {
@@ -73,8 +87,8 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 }
 
 // GetByID 根据ID获取用户
-func (r *UserRepository) GetByID(ctx context.Context, id int64) (*User, error) {
-	row, err := r.q.GetUserByID(ctx, id)
+func (r *Repository) GetByID(ctx context.Context, id int64) (*domain.User, error) {
+	row, err := r.dbWithContext(ctx).q.GetUserByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -83,8 +97,8 @@ func (r *UserRepository) GetByID(ctx context.Context, id int64) (*User, error) {
 }
 
 // GetByIDs resolves a bounded set of users with one database query.
-func (r *UserRepository) GetByIDs(ctx context.Context, ids []int64) (map[int64]*User, error) {
-	usersByID := make(map[int64]*User, len(ids))
+func (r *Repository) GetByIDs(ctx context.Context, ids []int64) (map[int64]*domain.User, error) {
+	usersByID := make(map[int64]*domain.User, len(ids))
 	if len(ids) == 0 {
 		return usersByID, nil
 	}
@@ -100,12 +114,12 @@ func (r *UserRepository) GetByIDs(ctx context.Context, ids []int64) (map[int64]*
 }
 
 // GetByPublicID resolves the immutable identifier accepted at public API boundaries.
-func (r *UserRepository) GetByPublicID(ctx context.Context, rawPublicID string) (*User, error) {
+func (r *Repository) GetByPublicID(ctx context.Context, rawPublicID string) (*domain.User, error) {
 	publicID, err := uuid.Parse(strings.TrimSpace(rawPublicID))
 	if err != nil {
 		return nil, database.ErrNotFound
 	}
-	row, err := r.q.GetUserByPublicID(ctx, publicID)
+	row, err := r.dbWithContext(ctx).q.GetUserByPublicID(ctx, publicID)
 	if err != nil {
 		return nil, err
 	}
@@ -114,8 +128,8 @@ func (r *UserRepository) GetByPublicID(ctx context.Context, rawPublicID string) 
 }
 
 // GetByAuthUserID 根据 Better Auth user id 获取用户
-func (r *UserRepository) GetByAuthUserID(ctx context.Context, authUserID string) (*User, error) {
-	row, err := r.q.GetUserByAuthUserID(ctx, sql.NullString{String: strings.TrimSpace(authUserID), Valid: strings.TrimSpace(authUserID) != ""})
+func (r *Repository) GetByAuthUserID(ctx context.Context, authUserID string) (*domain.User, error) {
+	row, err := r.dbWithContext(ctx).q.GetUserByAuthUserID(ctx, sql.NullString{String: strings.TrimSpace(authUserID), Valid: strings.TrimSpace(authUserID) != ""})
 	if err != nil {
 		return nil, err
 	}
@@ -124,12 +138,12 @@ func (r *UserRepository) GetByAuthUserID(ctx context.Context, authUserID string)
 }
 
 // GetByStorageUID 根据 storage uid 获取用户
-func (r *UserRepository) GetByStorageUID(ctx context.Context, storageUID string) (*User, error) {
+func (r *Repository) GetByStorageUID(ctx context.Context, storageUID string) (*domain.User, error) {
 	normalized := strings.TrimSpace(storageUID)
-	if !IsValidStorageUID(normalized) {
+	if !domain.IsValidStorageUID(normalized) {
 		return nil, database.ErrNotFound
 	}
-	row, err := r.q.GetUserByStorageUID(ctx, normalized)
+	row, err := r.dbWithContext(ctx).q.GetUserByStorageUID(ctx, normalized)
 	if err != nil {
 		return nil, err
 	}
@@ -138,8 +152,8 @@ func (r *UserRepository) GetByStorageUID(ctx context.Context, storageUID string)
 }
 
 // Update 更新用户
-func (r *UserRepository) Update(ctx context.Context, user *User) error {
-	updated, err := r.q.UpdateUser(ctx, dbsqlc.UpdateUserParams{
+func (r *Repository) Update(ctx context.Context, user *domain.User) error {
+	updated, err := r.dbWithContext(ctx).q.UpdateUser(ctx, dbsqlc.UpdateUserParams{
 		DisplayName: strings.TrimSpace(user.DisplayName),
 		AuthUserID:  dbutil.NullString(user.AuthUserID),
 		StorageUid:  user.StorageUID,
@@ -155,8 +169,8 @@ func (r *UserRepository) Update(ctx context.Context, user *User) error {
 }
 
 // UpdateLastLoginMetadata records the latest successful auth session.
-func (r *UserRepository) UpdateLastLoginMetadata(ctx context.Context, authUserID, ip, country string) error {
-	updated, err := r.q.UpdateUserLastLoginMetadata(ctx, dbsqlc.UpdateUserLastLoginMetadataParams{
+func (r *Repository) UpdateLastLoginMetadata(ctx context.Context, authUserID, ip, country string) error {
+	updated, err := r.dbWithContext(ctx).q.UpdateUserLastLoginMetadata(ctx, dbsqlc.UpdateUserLastLoginMetadataParams{
 		AuthUserID:       sql.NullString{String: authUserID, Valid: authUserID != ""},
 		LastLoginIp:      sql.NullString{String: ip, Valid: ip != ""},
 		LastLoginCountry: sql.NullString{String: country, Valid: country != ""},
@@ -168,7 +182,7 @@ func (r *UserRepository) UpdateLastLoginMetadata(ctx context.Context, authUserID
 }
 
 // List 获取用户列表
-func (r *UserRepository) List(
+func (r *Repository) List(
 	ctx context.Context,
 	keyword string,
 	role string,
@@ -176,13 +190,14 @@ func (r *UserRepository) List(
 	hasStatus bool,
 	page int,
 	pageSize int,
-) ([]*User, UserListCounts, error) {
+) ([]*domain.User, ports.UserListCounts, error) {
 	keyword = strings.TrimSpace(keyword)
 	role = strings.TrimSpace(role)
 	hasKeyword := keyword != ""
 	hasRole := role != ""
 	keywordLike := "%" + keyword + "%"
-	summary, err := r.q.SummarizeUsers(ctx, dbsqlc.SummarizeUsersParams{
+	queries := r.dbWithContext(ctx).q
+	summary, err := queries.SummarizeUsers(ctx, dbsqlc.SummarizeUsersParams{
 		HasKeyword:  hasKeyword,
 		KeywordLike: keywordLike,
 		HasRole:     hasRole,
@@ -191,10 +206,10 @@ func (r *UserRepository) List(
 		Status:      status,
 	})
 	if err != nil {
-		return nil, UserListCounts{}, err
+		return nil, ports.UserListCounts{}, err
 	}
 	offset := (page - 1) * pageSize
-	rows, err := r.q.ListUsers(ctx, dbsqlc.ListUsersParams{
+	rows, err := queries.ListUsers(ctx, dbsqlc.ListUsersParams{
 		HasKeyword:  hasKeyword,
 		KeywordLike: keywordLike,
 		HasRole:     hasRole,
@@ -205,14 +220,14 @@ func (r *UserRepository) List(
 		PageOffset:  int32(offset),
 	})
 	if err != nil {
-		return nil, UserListCounts{}, err
+		return nil, ports.UserListCounts{}, err
 	}
-	result := make([]*User, 0, len(rows))
+	result := make([]*domain.User, 0, len(rows))
 	for _, row := range rows {
 		user := userFromSQLC(row)
 		result = append(result, &user)
 	}
-	return result, UserListCounts{
+	return result, ports.UserListCounts{
 		Total:       summary.Total,
 		ActiveCount: summary.ActiveCount,
 		BannedCount: summary.BannedCount,
@@ -221,32 +236,32 @@ func (r *UserRepository) List(
 }
 
 // UpdateStatus 更新用户状态
-func (r *UserRepository) UpdateStatus(ctx context.Context, id int64, status int16) error {
-	updated, err := r.q.UpdateUserStatus(ctx, dbsqlc.UpdateUserStatusParams{Status: status, ID: id})
+func (r *Repository) UpdateStatus(ctx context.Context, id int64, status int16) error {
+	updated, err := r.dbWithContext(ctx).q.UpdateUserStatus(ctx, dbsqlc.UpdateUserStatusParams{Status: status, ID: id})
 	if err != nil {
 		return err
 	}
 	return requireOneUserRow(updated)
 }
 
-func (r *UserRepository) UpdateRoleByID(ctx context.Context, id int64, role string) error {
-	updated, err := r.q.UpdateUserRole(ctx, dbsqlc.UpdateUserRoleParams{Role: role, ID: id})
+func (r *Repository) UpdateRoleByID(ctx context.Context, id int64, role string) error {
+	updated, err := r.dbWithContext(ctx).q.UpdateUserRole(ctx, dbsqlc.UpdateUserRoleParams{Role: role, ID: id})
 	if err != nil {
 		return err
 	}
 	return requireOneUserRow(updated)
 }
 
-func (r *UserRepository) UpdateAvatarByID(ctx context.Context, id int64, avatar string) error {
-	updated, err := r.q.UpdateUserAvatar(ctx, dbsqlc.UpdateUserAvatarParams{Avatar: strings.TrimSpace(avatar), ID: id})
+func (r *Repository) UpdateAvatarByID(ctx context.Context, id int64, avatar string) error {
+	updated, err := r.dbWithContext(ctx).q.UpdateUserAvatar(ctx, dbsqlc.UpdateUserAvatarParams{Avatar: strings.TrimSpace(avatar), ID: id})
 	if err != nil {
 		return err
 	}
 	return requireOneUserRow(updated)
 }
 
-func (r *UserRepository) EnsureStorageUIDs(ctx context.Context) error {
-	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+func (r *Repository) EnsureStorageUIDs(ctx context.Context) error {
+	return r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
 		rows, err := q.ListUserStorageUIDs(ctx)
 		if err != nil {
 			return err
@@ -259,7 +274,7 @@ func (r *UserRepository) EnsureStorageUIDs(ctx context.Context) error {
 			}
 
 			uid := strings.TrimSpace(row.StorageUid)
-			if IsValidStorageUID(uid) {
+			if domain.IsValidStorageUID(uid) {
 				if firstUserID, duplicated := seen[uid]; !duplicated || firstUserID == row.ID {
 					if err := ensureUsedUIDRecorded(ctx, q, uid); err != nil {
 						return err
@@ -288,7 +303,7 @@ func (r *UserRepository) EnsureStorageUIDs(ctx context.Context) error {
 
 func allocateStorageUID(ctx context.Context, q *dbsqlc.Queries, preferredUID string, excludeID int64) (string, error) {
 	normalizedPreferred := strings.TrimSpace(preferredUID)
-	if IsValidStorageUID(normalizedPreferred) {
+	if domain.IsValidStorageUID(normalizedPreferred) {
 		reserved, err := reserveStorageUID(ctx, q, normalizedPreferred, excludeID)
 		if err != nil {
 			return "", err
@@ -299,7 +314,7 @@ func allocateStorageUID(ctx context.Context, q *dbsqlc.Queries, preferredUID str
 	}
 
 	for i := 0; i < 128; i++ {
-		storageUID, err := NewStorageUID()
+		storageUID, err := domain.NewStorageUID()
 		if err != nil {
 			return "", err
 		}
@@ -383,8 +398,8 @@ func requireOneUserRow(rows int64) error {
 	return nil
 }
 
-func userFromSQLC(row dbsqlc.User) User {
-	return User{
+func userFromSQLC(row dbsqlc.User) domain.User {
+	return domain.User{
 		ID:               row.ID,
 		PublicID:         row.PublicID,
 		DisplayName:      row.DisplayName,

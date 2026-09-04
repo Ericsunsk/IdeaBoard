@@ -74,6 +74,30 @@ type openAIChatResponse struct {
 }
 
 func extractOpenAICompatibleVision(ctx context.Context, config VisionProviderConfig, input VisionInput) (VisionExtraction, error) {
+	body, err := marshalOpenAIChatRequest(config.Model, input)
+	if err != nil {
+		return VisionExtraction{}, err
+	}
+	request, err := newOpenAIChatRequest(ctx, config.EndpointURL, config.APIKey, body)
+	if err != nil {
+		return VisionExtraction{}, err
+	}
+	data, err := executeOpenAIChatRequest(ctx, request)
+	if err != nil {
+		return VisionExtraction{}, err
+	}
+	return decodeOpenAIChatExtraction(data)
+}
+
+func marshalOpenAIChatRequest(model string, input VisionInput) ([]byte, error) {
+	content := openAIUserContent(input)
+	return json.Marshal(openAIChatRequest{Model: model, Messages: []openAIChatMessage{
+		{Role: "system", Content: []openAIContentPart{{Type: "text", Text: visionSystemPrompt()}}},
+		{Role: "user", Content: content},
+	}})
+}
+
+func openAIUserContent(input VisionInput) []openAIContentPart {
 	content := make([]openAIContentPart, 0, len(input.Images)+1)
 	if userText := strings.TrimSpace(input.UserText); userText != "" {
 		content = append(content, openAIContentPart{Type: "text", Text: "<user_intent>\n" + userText + "\n</user_intent>"})
@@ -83,49 +107,65 @@ func extractOpenAICompatibleVision(ctx context.Context, config VisionProviderCon
 			URL: "data:" + imageContentType(image) + ";base64," + base64.StdEncoding.EncodeToString(image.Data),
 		}})
 	}
-	body, err := json.Marshal(openAIChatRequest{Model: config.Model, Messages: []openAIChatMessage{
-		{Role: "system", Content: []openAIContentPart{{Type: "text", Text: visionSystemPrompt()}}},
-		{Role: "user", Content: content},
-	}})
+	return content
+}
+
+func newOpenAIChatRequest(ctx context.Context, endpointURL, apiKey string, body []byte) (*http.Request, error) {
+	endpoint, err := openAIChatCompletionsURL(endpointURL)
 	if err != nil {
-		return VisionExtraction{}, err
-	}
-	endpoint, err := openAIChatCompletionsURL(config.EndpointURL)
-	if err != nil {
-		return VisionExtraction{}, &visionProviderError{kind: visionProviderFailureResponse, cause: err}
+		return nil, &visionProviderError{kind: visionProviderFailureResponse, cause: err}
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
-		return VisionExtraction{}, &visionProviderError{kind: visionProviderFailureResponse, cause: err}
+		return nil, &visionProviderError{kind: visionProviderFailureResponse, cause: err}
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
-	if strings.TrimSpace(config.APIKey) != "" {
-		request.Header.Set("Authorization", "Bearer "+config.APIKey)
+	if strings.TrimSpace(apiKey) != "" {
+		request.Header.Set("Authorization", "Bearer "+apiKey)
 	}
+	return request, nil
+}
+
+func executeOpenAIChatRequest(ctx context.Context, request *http.Request) ([]byte, error) {
 	response, err := safehttp.DoRequestWithAllowHosts(ctx, request, visionSearchTimeout, outbound.AllowHosts(ctx)...)
 	if err != nil {
-		kind := visionProviderFailureNetwork
-		if errors.Is(err, context.DeadlineExceeded) || isTimeoutError(err) {
-			kind = visionProviderFailureTimeout
-		}
-		return VisionExtraction{}, &visionProviderError{kind: kind, cause: err}
+		return nil, classifyVisionNetworkError(err)
 	}
 	defer response.Body.Close()
 	data, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
 	if err != nil {
-		return VisionExtraction{}, &visionProviderError{kind: visionProviderFailureResponse, cause: err}
+		return nil, &visionProviderError{kind: visionProviderFailureResponse, cause: err}
 	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		kind := visionProviderFailureResponse
-		switch response.StatusCode {
-		case http.StatusUnauthorized, http.StatusForbidden:
-			kind = visionProviderFailureCredentials
-		case http.StatusTooManyRequests:
-			kind = visionProviderFailureQuota
-		}
-		return VisionExtraction{}, &visionProviderError{kind: kind, cause: fmt.Errorf("status %d: %s", response.StatusCode, safeProviderErrorMessage(data))}
+	if err := validateOpenAIResponseStatus(response.StatusCode, data); err != nil {
+		return nil, err
 	}
+	return data, nil
+}
+
+func classifyVisionNetworkError(err error) error {
+	kind := visionProviderFailureNetwork
+	if errors.Is(err, context.DeadlineExceeded) || isTimeoutError(err) {
+		kind = visionProviderFailureTimeout
+	}
+	return &visionProviderError{kind: kind, cause: err}
+}
+
+func validateOpenAIResponseStatus(statusCode int, data []byte) error {
+	if statusCode >= 200 && statusCode < 300 {
+		return nil
+	}
+	kind := visionProviderFailureResponse
+	switch statusCode {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		kind = visionProviderFailureCredentials
+	case http.StatusTooManyRequests:
+		kind = visionProviderFailureQuota
+	}
+	return &visionProviderError{kind: kind, cause: fmt.Errorf("status %d: %s", statusCode, safeProviderErrorMessage(data))}
+}
+
+func decodeOpenAIChatExtraction(data []byte) (VisionExtraction, error) {
 	var envelope openAIChatResponse
 	if err := json.Unmarshal(data, &envelope); err != nil || len(envelope.Choices) == 0 {
 		return VisionExtraction{}, fmt.Errorf("%w: invalid OpenAI-compatible response", ErrVisionSchema)

@@ -1,4 +1,4 @@
-package users
+package domain
 
 import (
 	"crypto/rand"
@@ -16,7 +16,7 @@ var storageUIDPattern = regexp.MustCompile(`^[A-Z0-9]{6}$`)
 func NewStorageUID() (string, error) {
 	randomBytes := make([]byte, storageUIDLength)
 	if _, err := rand.Read(randomBytes); err != nil {
-		return "", fmt.Errorf("生成用户存储标识失败: %v", err)
+		return "", fmt.Errorf("生成用户存储标识失败: %w", err)
 	}
 	buf := make([]byte, storageUIDLength)
 	for i, b := range randomBytes {

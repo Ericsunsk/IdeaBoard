@@ -34,46 +34,89 @@ func (s *Service) PublishPrice(ctx context.Context, input PublishPriceInput) (Pr
 }
 
 func (s *Service) PublishPrices(ctx context.Context, input PublishPricesInput) (map[OutputResolution]PriceInfo, error) {
-	definition := input.Definition
-	sku, err := CanonicalizeSKU(string(definition.SKU))
-	variants := definition.pricingVariants()
-	if err != nil || input.ActorID <= 0 || len(variants) == 0 {
-		return nil, ErrInvalidCatalogEntry
-	}
-	requiredPrice, hasRequired := input.Prices[variants[0]]
-	if !hasRequired || requiredPrice < 0 || requiredPrice > MaxQuoteCredits {
-		return nil, ErrInvalidCatalogEntry
-	}
-	prices := make(map[string]int64, len(input.Prices))
-	for resolution, unitCredits := range input.Prices {
-		if err := validatePricingVariant(definition, resolution); err != nil || unitCredits < 0 || unitCredits > MaxQuoteCredits {
-			return nil, ErrInvalidCatalogEntry
-		}
-		prices[string(resolution)] = unitCredits
-	}
-	displayName, err := normalizeDisplayName(definition.DisplayName)
-	if err != nil {
-		return nil, err
-	}
-	description, err := normalizeDescription(definition.Description)
+	command, err := preparePublishPrices(input)
 	if err != nil {
 		return nil, err
 	}
 	if err := s.requirePool(); err != nil {
 		return nil, err
 	}
-	encodedPrices, err := json.Marshal(prices)
+	encodedPrices, err := json.Marshal(command.prices)
 	if err != nil {
 		return nil, fmt.Errorf("encode prices for publish: %w", err)
 	}
-	published := make(map[OutputResolution]PriceInfo, len(prices))
 	rows, err := s.pool.Query(ctx, `SELECT output_resolution, price_version_id, version, unit_credits, created_by, created_at
 	FROM publish_billing_prices($1, $2, $3, $4::jsonb, $5)
-	ORDER BY CASE output_resolution WHEN 'default' THEN 1 WHEN '1k' THEN 2 WHEN '2k' THEN 3 ELSE 4 END`, sku, displayName, description, string(encodedPrices), input.ActorID)
+	ORDER BY CASE output_resolution WHEN 'default' THEN 1 WHEN '1k' THEN 2 WHEN '2k' THEN 3 ELSE 4 END`, command.sku, command.displayName, command.description, string(encodedPrices), command.actorID)
 	if err != nil {
 		return nil, mapDatabaseError("publish price version", err)
 	}
 	defer rows.Close()
+	published, err := scanPublishedPrices(rows, len(command.prices))
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := published[command.requiredVariant]; !ok {
+		return nil, ErrInvalidCatalogEntry
+	}
+	return published, nil
+}
+
+type publishPricesCommand struct {
+	sku             SKU
+	requiredVariant OutputResolution
+	displayName     string
+	description     string
+	prices          map[string]int64
+	actorID         int64
+}
+
+func preparePublishPrices(input PublishPricesInput) (publishPricesCommand, error) {
+	definition := input.Definition
+	sku, err := CanonicalizeSKU(string(definition.SKU))
+	variants := definition.pricingVariants()
+	if err != nil || input.ActorID <= 0 || len(variants) == 0 {
+		return publishPricesCommand{}, ErrInvalidCatalogEntry
+	}
+	prices, err := normalizePublishedPrices(definition, variants[0], input.Prices)
+	if err != nil {
+		return publishPricesCommand{}, err
+	}
+	displayName, err := normalizeDisplayName(definition.DisplayName)
+	if err != nil {
+		return publishPricesCommand{}, err
+	}
+	description, err := normalizeDescription(definition.Description)
+	if err != nil {
+		return publishPricesCommand{}, err
+	}
+	return publishPricesCommand{
+		sku:             sku,
+		requiredVariant: variants[0],
+		displayName:     displayName,
+		description:     description,
+		prices:          prices,
+		actorID:         input.ActorID,
+	}, nil
+}
+
+func normalizePublishedPrices(definition BillableItemDefinition, requiredVariant OutputResolution, input map[OutputResolution]int64) (map[string]int64, error) {
+	requiredPrice, hasRequired := input[requiredVariant]
+	if !hasRequired || requiredPrice < 0 || requiredPrice > MaxQuoteCredits {
+		return nil, ErrInvalidCatalogEntry
+	}
+	prices := make(map[string]int64, len(input))
+	for resolution, unitCredits := range input {
+		if err := validatePricingVariant(definition, resolution); err != nil || unitCredits < 0 || unitCredits > MaxQuoteCredits {
+			return nil, ErrInvalidCatalogEntry
+		}
+		prices[string(resolution)] = unitCredits
+	}
+	return prices, nil
+}
+
+func scanPublishedPrices(rows pgx.Rows, capacity int) (map[OutputResolution]PriceInfo, error) {
+	published := make(map[OutputResolution]PriceInfo, capacity)
 	for rows.Next() {
 		var candidate PriceInfo
 		if err := rows.Scan(&candidate.OutputResolution, &candidate.PriceVersionID, &candidate.Version, &candidate.UnitCredits, &candidate.CreatedBy, &candidate.CreatedAt); err != nil {
@@ -83,9 +126,6 @@ func (s *Service) PublishPrices(ctx context.Context, input PublishPricesInput) (
 	}
 	if err := rows.Err(); err != nil {
 		return nil, mapDatabaseError("publish price version", err)
-	}
-	if _, ok := published[variants[0]]; !ok {
-		return nil, ErrInvalidCatalogEntry
 	}
 	return published, nil
 }

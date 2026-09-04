@@ -10,7 +10,8 @@ import (
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
-	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/identity/users/application/administration"
+	identitycreditsadapter "ideaboard/api/internal/identity/users/infrastructure/credits"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/payments"
 	paymentevents "ideaboard/api/internal/payments/infrastructure/events"
@@ -32,7 +33,7 @@ type appDomainServices struct {
 	authServiceClient    *auth.ServiceClient
 	runtimeSettings      *settings.RuntimeSettingsService
 	storageService       *storage.StorageService
-	userService          *users.UserService
+	userService          *administration.Service
 	boardService         *boards.BoardService
 	billingService       *billing.Service
 	billingCatalog       *billing.BillableItemCatalog
@@ -42,7 +43,7 @@ type appDomainServices struct {
 	usageService         *usage.Service
 	rewardService        *rewards.Service
 	paymentService       *payments.Service
-	userLifecycle        *users.LifecycleService
+	userLifecycle        *identityLifecycle
 }
 
 func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepositories, appPool *pgxpool.Pool) (appDomainServices, error) {
@@ -93,12 +94,12 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 	}
 	billingService := billing.NewService(appPool)
 	billingCatalog := billing.NewBillableItemCatalog(billableItemRegistry, billingService)
-	userLifecycle := users.NewLifecycleService(appPool, creditService, welcomeIdentityKey)
+	userLifecycle := newIdentityLifecycle(appPool, identitycreditsadapter.New(creditService), welcomeIdentityKey)
 	if err := userLifecycle.VerifyWelcomeIdentityKey(ctx); err != nil {
 		return appDomainServices{}, err
 	}
 	authServiceClient := auth.NewServiceClient(cfg.Auth)
-	userService := users.NewUserServiceWithEmailReader(repos.userRepo, userLifecycle, creditService, storageService, authServiceClient)
+	userService := administration.NewService(repos.userRepo, userLifecycle, creditService, storageService, authServiceClient)
 	stripeAdapter := stripe.New()
 	paymentCheckoutShutdownDispatcher, err := worker.NewPaymentCheckoutShutdownDispatcher(riverProducer)
 	if err != nil {

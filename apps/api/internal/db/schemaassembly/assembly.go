@@ -90,6 +90,20 @@ func validateRegisteredFragments(manifest Manifest, root string) error {
 }
 
 func validateManifest(manifest Manifest) error {
+	if err := validateManifestHeader(manifest); err != nil {
+		return err
+	}
+	positions, err := validateManifestFragments(manifest.Fragments)
+	if err != nil {
+		return err
+	}
+	if err := validateCanonicalManifest(manifest, positions); err != nil {
+		return err
+	}
+	return validateManifestDependencies(manifest.Fragments, positions)
+}
+
+func validateManifestHeader(manifest Manifest) error {
 	if manifest.Version != 1 {
 		return fmt.Errorf("unsupported schema manifest version %d", manifest.Version)
 	}
@@ -99,30 +113,43 @@ func validateManifest(manifest Manifest) error {
 	if len(manifest.Fragments) == 0 {
 		return errors.New("schema manifest must declare at least one fragment")
 	}
-	positions := make(map[string]int, len(manifest.Fragments))
-	for index, fragment := range manifest.Fragments {
+	return nil
+}
+
+func validateManifestFragments(fragments []Fragment) (map[string]int, error) {
+	positions := make(map[string]int, len(fragments))
+	for index, fragment := range fragments {
 		if strings.TrimSpace(fragment.Name) == "" {
-			return fmt.Errorf("fragment %d has empty name", index)
+			return nil, fmt.Errorf("fragment %d has empty name", index)
 		}
 		if _, exists := positions[fragment.Name]; exists {
-			return fmt.Errorf("duplicate manifest fragment %q", fragment.Name)
+			return nil, fmt.Errorf("duplicate manifest fragment %q", fragment.Name)
 		}
 		positions[fragment.Name] = index
 		if strings.TrimSpace(fragment.Path) == "" {
-			return fmt.Errorf("fragment %q has empty path", fragment.Name)
+			return nil, fmt.Errorf("fragment %q has empty path", fragment.Name)
 		}
 		if fragment.StartLine < 0 || fragment.EndLine < 0 || (fragment.StartLine == 0) != (fragment.EndLine == 0) || (fragment.StartLine > 0 && fragment.EndLine < fragment.StartLine) {
-			return fmt.Errorf("fragment %q has invalid line range", fragment.Name)
+			return nil, fmt.Errorf("fragment %q has invalid line range", fragment.Name)
 		}
 	}
-	if isCanonicalManifest(manifest) {
-		for _, required := range requiredFragmentNames {
-			if _, exists := positions[required]; !exists {
-				return fmt.Errorf("schema manifest is missing required fragment %q", required)
-			}
+	return positions, nil
+}
+
+func validateCanonicalManifest(manifest Manifest, positions map[string]int) error {
+	if !isCanonicalManifest(manifest) {
+		return nil
+	}
+	for _, required := range requiredFragmentNames {
+		if _, exists := positions[required]; !exists {
+			return fmt.Errorf("schema manifest is missing required fragment %q", required)
 		}
 	}
-	for index, fragment := range manifest.Fragments {
+	return nil
+}
+
+func validateManifestDependencies(fragments []Fragment, positions map[string]int) error {
+	for index, fragment := range fragments {
 		for _, dependency := range fragment.DependsOn {
 			dependencyIndex, exists := positions[dependency]
 			if !exists {

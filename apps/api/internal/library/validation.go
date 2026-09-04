@@ -24,6 +24,17 @@ func validateOwner(ownerUserID int64) error {
 }
 
 func normalizeAndValidateAsset(input AssetInput) (AssetInput, error) {
+	normalizeAssetFields(&input)
+	if err := validateAssetMetadata(input); err != nil {
+		return AssetInput{}, err
+	}
+	if err := validateAssetURLs(input); err != nil {
+		return AssetInput{}, err
+	}
+	return input, nil
+}
+
+func normalizeAssetFields(input *AssetInput) {
 	input.Provider = strings.ToLower(strings.TrimSpace(input.Provider))
 	input.SourceID = strings.TrimSpace(input.SourceID)
 	input.SourceURL = strings.TrimSpace(input.SourceURL)
@@ -31,29 +42,36 @@ func normalizeAndValidateAsset(input AssetInput) (AssetInput, error) {
 	input.OriginalURL = strings.TrimSpace(input.OriginalURL)
 	input.Title = strings.TrimSpace(input.Title)
 	input.Author = strings.TrimSpace(input.Author)
-	if input.Provider != ProviderUnsplash && input.Provider != ProviderPexels {
-		return AssetInput{}, ErrInvalidProvider
-	}
 	if input.OriginalURL == "" && input.PreviewURL != "" {
 		input.OriginalURL = input.PreviewURL
 	}
 	if input.SourceURL == "" && input.PreviewURL != "" {
 		input.SourceURL = input.PreviewURL
 	}
+}
+
+func validateAssetMetadata(input AssetInput) error {
+	if input.Provider != ProviderUnsplash && input.Provider != ProviderPexels {
+		return ErrInvalidProvider
+	}
 	if input.SourceID == "" || utf8.RuneCountInString(input.SourceID) > 128 ||
 		input.SourceURL == "" || input.PreviewURL == "" || input.OriginalURL == "" {
-		return AssetInput{}, ErrInvalidSource
+		return ErrInvalidSource
 	}
 	if utf8.RuneCountInString(input.Title) > 255 || utf8.RuneCountInString(input.Author) > 255 ||
 		input.Width < 0 || input.Height < 0 {
-		return AssetInput{}, ErrInvalidSource
+		return ErrInvalidSource
 	}
+	return nil
+}
+
+func validateAssetURLs(input AssetInput) error {
 	for _, rawURL := range []string{input.SourceURL, input.PreviewURL, input.OriginalURL} {
 		if !isAllowedProviderURL(input.Provider, rawURL) {
-			return AssetInput{}, ErrInvalidSource
+			return ErrInvalidSource
 		}
 	}
-	return input, nil
+	return nil
 }
 
 func isAllowedProviderURL(provider, raw string) bool {

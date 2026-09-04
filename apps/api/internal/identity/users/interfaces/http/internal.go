@@ -1,38 +1,38 @@
-package users
+package http
 
 import (
+	"context"
 	"crypto/subtle"
 	"net"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/platform/response"
 )
 
 const maxAuthUserIDLength = 128
 
-type LoginMetadataRequest struct {
-	AuthUserID string `json:"auth_user_id"`
-	IP         string `json:"ip"`
-	Country    string `json:"country"`
+type LoginMetadataUpdater interface {
+	UpdateLastLoginMetadata(ctx context.Context, authUserID, ip, country string) error
 }
 
 type InternalHandler struct {
-	repo *UserRepository
-	key  string
+	updater LoginMetadataUpdater
+	key     string
 }
 
-func NewInternalHandler(repo *UserRepository, key string) *InternalHandler {
-	return &InternalHandler{repo: repo, key: strings.TrimSpace(key)}
+func NewInternalHandler(updater LoginMetadataUpdater, key string) *InternalHandler {
+	return &InternalHandler{updater: updater, key: strings.TrimSpace(key)}
 }
 
 func (h *InternalHandler) UpdateLoginMetadata(c *gin.Context) {
-	if h == nil || h.repo == nil || !constantTimeHeaderEquals(c.GetHeader("X-Internal-Key"), h.key) {
+	if h == nil || h.updater == nil || !constantTimeHeaderEquals(c.GetHeader("X-Internal-Key"), h.key) {
 		response.Error(c, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	var req LoginMetadataRequest
+	var req ports.LoginMetadataRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
@@ -42,7 +42,7 @@ func (h *InternalHandler) UpdateLoginMetadata(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
-	if err := h.repo.UpdateLastLoginMetadata(c.Request.Context(), req.AuthUserID, req.IP, req.Country); err != nil {
+	if err := h.updater.UpdateLastLoginMetadata(c.Request.Context(), req.AuthUserID, req.IP, req.Country); err != nil {
 		response.InternalError(c, http.StatusInternalServerError, "更新登录信息失败", err)
 		return
 	}

@@ -1,4 +1,4 @@
-package users
+package tests
 
 import (
 	"context"
@@ -9,13 +9,19 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/credits"
+	identitycreditsadapter "ideaboard/api/internal/identity/users/infrastructure/credits"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/secrets"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+func newLifecycleService(pool *pgxpool.Pool, creditService *credits.Service, key []byte) *LifecycleService {
+	return NewLifecycleService(pool, identitycreditsadapter.New(creditService), key)
+}
 
 func lifecycleHold(userID int64, key string) ports.HoldCommand {
 	return ports.HoldCommand{
@@ -33,7 +39,7 @@ func lifecycleHold(userID int64, key string) ports.HoldCommand {
 
 func TestProvisionIdentityCreatesUserWalletAndWelcomeGrantAtomically(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
-	service := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
+	service := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	ctx := context.Background()
 	identity := VerifiedIdentity{
 		AuthUserID: "auth-welcome-1", DisplayName: "welcome-user",
@@ -81,7 +87,7 @@ func TestProvisionIdentityCreatesUserWalletAndWelcomeGrantAtomically(t *testing.
 
 func TestProvisionIdentityConcurrentRetriesGrantWelcomeCreditsOnce(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
-	service := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
+	service := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	identity := VerifiedIdentity{
 		AuthUserID: "auth-concurrent-1", DisplayName: "concurrent-user",
 		ClaimIdentity: "concurrent-user@example.com", ClaimIdentityKind: "canonical_email",
@@ -131,7 +137,7 @@ func TestProvisionIdentityConcurrentRetriesGrantWelcomeCreditsOnce(t *testing.T)
 
 func TestProvisionIdentityDoesNotGrantAgainAfterTrustedClaimIdentityChanges(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
-	service := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
+	service := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	ctx := context.Background()
 	identity := VerifiedIdentity{
 		AuthUserID: "auth-email-change-1", DisplayName: "email-change", ClaimIdentity: "first@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user",
@@ -174,12 +180,12 @@ func TestProvisionIdentityFailsClosedWithoutTrustedClaimIdentityOrClaimKey(t *te
 	}{
 		{
 			name:     "missing claim key",
-			service:  NewLifecycleService(pool, creditService, nil),
+			service:  newLifecycleService(pool, creditService, nil),
 			identity: VerifiedIdentity{AuthUserID: "auth-no-key", DisplayName: "no-key", ClaimIdentity: "no-key@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user"},
 		},
 		{
 			name:     "claim identity not trusted",
-			service:  NewLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef")),
+			service:  newLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef")),
 			identity: VerifiedIdentity{AuthUserID: "auth-unverified", DisplayName: "unverified", ClaimIdentity: "unverified@example.com", ClaimIdentityKind: "canonical_email", Role: "user", ClaimIdentityVerified: false},
 		},
 	} {
@@ -205,7 +211,7 @@ func TestProvisionIdentityFailsClosedWithoutTrustedClaimIdentityOrClaimKey(t *te
 func TestSetUserStatusFreezesAndRestoresWalletAtomically(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
-	service := NewLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef"))
+	service := newLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef"))
 	ctx := context.Background()
 	result, err := service.ProvisionIdentity(ctx, VerifiedIdentity{
 		AuthUserID: "auth-status-1", DisplayName: "status-user", ClaimIdentity: "status-user@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user",
@@ -270,7 +276,7 @@ WHERE users.id = $1`, result.User.ID).Scan(&userStatus, &walletStatus); err != n
 
 func TestSetUserStatusAndTombstoneMissingUserReturnNotFound(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
-	service := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
+	service := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 
 	if err := service.SetUserStatus(context.Background(), 999999, 0); !database.IsNotFound(err) {
 		t.Fatalf("SetUserStatus(missing) error = %v, want not found", err)
@@ -283,7 +289,7 @@ func TestSetUserStatusAndTombstoneMissingUserReturnNotFound(t *testing.T) {
 func TestTombstoneUserPreservesAccountingAndPreventsWelcomeReclaim(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
-	service := NewLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef"))
+	service := newLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef"))
 	ctx := context.Background()
 	first, err := service.ProvisionIdentity(ctx, VerifiedIdentity{
 		AuthUserID: "auth-delete-1", DisplayName: "delete-user", ClaimIdentity: "same@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user",
@@ -362,7 +368,7 @@ VALUES ('existing-user', $1, 'EXST01', 'user', 1)
 RETURNING id`, authUserID).Scan(&userID); err != nil {
 		t.Fatalf("seed existing user: %v", err)
 	}
-	service := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
+	service := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	results, err := service.InitializeExistingIdentities(ctx, []VerifiedIdentity{{
 		AuthUserID: authUserID, DisplayName: "existing-user", ClaimIdentity: "existing-user@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user",
 	}})
@@ -404,7 +410,7 @@ RETURNING id`, authUserID).Scan(&userID); err != nil {
 		t.Fatalf("seed banned user: %v", err)
 	}
 	creditService := credits.NewService(pool)
-	service := NewLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef"))
+	service := newLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef"))
 	results, err := service.InitializeExistingIdentities(ctx, []VerifiedIdentity{{
 		AuthUserID: authUserID, DisplayName: "existing-banned-user", ClaimIdentity: "existing-banned-user@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user",
 	}})
@@ -422,11 +428,11 @@ RETURNING id`, authUserID).Scan(&userID); err != nil {
 func TestWelcomeIdentityKeyRotationFailsClosedWithoutPartialState(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	ctx := context.Background()
-	first := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
+	first := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	if err := first.VerifyWelcomeIdentityKey(ctx); err != nil {
 		t.Fatalf("bind first Welcome key: %v", err)
 	}
-	rotated := NewLifecycleService(pool, credits.NewService(pool), []byte("abcdef0123456789abcdef0123456789"))
+	rotated := newLifecycleService(pool, credits.NewService(pool), []byte("abcdef0123456789abcdef0123456789"))
 	if err := rotated.VerifyWelcomeIdentityKey(ctx); !errors.Is(err, domain.ErrWelcomeIdentityKeyMismatch) {
 		t.Fatalf("rotated key error = %v, want ErrWelcomeIdentityKeyMismatch", err)
 	}
@@ -452,7 +458,7 @@ func TestWelcomeIdentityKeyRotationFailsClosedWithoutPartialState(t *testing.T) 
 func TestAdminProvisionCreatesAndRepairsLifecycleAtomically(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	ctx := context.Background()
-	service := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
+	service := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	identity := VerifiedIdentity{
 		AuthUserID: "auth-admin-lifecycle", DisplayName: "admin",
 		ClaimIdentity: "admin@example.com", ClaimIdentityKind: "canonical_email",
@@ -490,7 +496,7 @@ func TestAdminProvisionCreatesAndRepairsLifecycleAtomically(t *testing.T) {
 func TestUserDeletionFailuresRemainFrozenAndRetryConverges(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	ctx := context.Background()
-	lifecycle := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
+	lifecycle := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	provisioned, err := lifecycle.ProvisionIdentity(ctx, VerifiedIdentity{
 		AuthUserID: "auth-delete-converge", DisplayName: "delete-converge",
 		ClaimIdentity: "delete-converge@example.com", ClaimIdentityKind: "canonical_email",
@@ -591,7 +597,7 @@ FOR EACH ROW EXECUTE FUNCTION fail_user_tombstone_once()`); err != nil {
 func TestUserDeletionIsBlockedByUnsettledPaymentState(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	ctx := context.Background()
-	lifecycle := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
+	lifecycle := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	provisioned, err := lifecycle.ProvisionIdentity(ctx, VerifiedIdentity{
 		AuthUserID: "auth-delete-payment-guard", DisplayName: "delete-payment-guard",
 		ClaimIdentity: "delete-payment-guard@example.com", ClaimIdentityKind: "canonical_email",
@@ -664,7 +670,7 @@ WHERE users.id = $1`, provisioned.User.ID).Scan(&userStatus, &walletStatus); err
 func TestIdentityAdminCommandsResumeDeletionFromPendingStorage(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	ctx := context.Background()
-	lifecycle := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
+	lifecycle := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	provisioned, err := lifecycle.ProvisionIdentity(ctx, VerifiedIdentity{
 		AuthUserID: "auth-command-delete-resume", DisplayName: "command-delete-resume",
 		ClaimIdentity: "command-delete-resume@example.com", ClaimIdentityKind: "canonical_email",
@@ -686,7 +692,7 @@ func TestIdentityAdminCommandsResumeDeletionFromPendingStorage(t *testing.T) {
 	assertDeletionState(t, pool, provisioned.User.ID, DeletionPendingStorage, 0, "frozen")
 
 	cleaner.err = nil
-	commands.auth = nil
+	commands = newIdentityAdminCommands(userService, nil)
 	if err := commands.Delete(ctx, actor, provisioned.User.PublicID.String()); err != nil {
 		t.Fatalf("resume deletion from pending storage: %v", err)
 	}
@@ -704,7 +710,7 @@ func TestProvisionConcurrentWithBanOrDeleteNeverLeavesInactiveUserWithActiveWall
 		t.Run(operation, func(t *testing.T) {
 			_, pool := testdb.OpenWithPool(t)
 			ctx := context.Background()
-			lifecycle := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
+			lifecycle := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 			identity := VerifiedIdentity{
 				AuthUserID: "auth-concurrent-" + operation, DisplayName: "concurrent-" + operation,
 				ClaimIdentity: "concurrent-" + operation + "@example.com", ClaimIdentityKind: "canonical_email",

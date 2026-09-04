@@ -105,27 +105,11 @@ func validateProviderTaskContract(params *tasks.WorkflowTaskParams, plan workflo
 	}
 	generation := params.Generation
 	runtimeInputs := plan.RuntimeInputs()
-	if generation.SchemaVersion != tasks.CurrentParamsSchemaVersion ||
-		generation.Feature != plan.Feature() ||
-		generation.Primitive != string(runtimeInputs.GenerationPrimitive()) ||
-		generation.RequestedOutputCount != plan.RequestedOutputCount().Int() {
-		return fmt.Errorf("task generation snapshot does not match execution plan")
+	if err := validateGenerationSnapshot(generation, plan, runtimeInputs); err != nil {
+		return err
 	}
-
-	generationImageCount := 0
-	generationHasMask := false
-	for index, media := range generation.Media {
-		if media.InputIndex != index || media.AssetID <= 0 || !tasks.IsGenerationMediaRole(media.Role) {
-			return fmt.Errorf("task generation media is invalid")
-		}
-		if media.Role == tasks.MediaRoleMask {
-			generationHasMask = true
-			continue
-		}
-		generationImageCount++
-	}
-	if generationImageCount != runtimeInputs.ImageInputCount() || generationHasMask != runtimeInputs.HasMaskInput() {
-		return fmt.Errorf("task generation media facts do not match execution plan")
+	if err := validateGenerationMedia(generation.Media, runtimeInputs); err != nil {
+		return err
 	}
 
 	if params.Controls == nil || params.Controls.OutputCount != plan.RequestedOutputCount().Int() {
@@ -139,6 +123,35 @@ func validateProviderTaskContract(params *tasks.WorkflowTaskParams, plan workflo
 		return err
 	}
 	return validateCanonicalRuntimeControls(params, runtimeInputs.ControlContract())
+}
+
+func validateGenerationSnapshot(generation *tasks.GenerationRequestSnapshot, plan workflow.FeatureExecutionPlan, runtimeInputs workflow.RuntimeInputSemantics) error {
+	if generation.SchemaVersion != tasks.CurrentParamsSchemaVersion ||
+		generation.Feature != plan.Feature() ||
+		generation.Primitive != string(runtimeInputs.GenerationPrimitive()) ||
+		generation.RequestedOutputCount != plan.RequestedOutputCount().Int() {
+		return fmt.Errorf("task generation snapshot does not match execution plan")
+	}
+	return nil
+}
+
+func validateGenerationMedia(media []tasks.GenerationMediaIntent, runtimeInputs workflow.RuntimeInputSemantics) error {
+	generationImageCount := 0
+	generationHasMask := false
+	for index, item := range media {
+		if item.InputIndex != index || item.AssetID <= 0 || !tasks.IsGenerationMediaRole(item.Role) {
+			return fmt.Errorf("task generation media is invalid")
+		}
+		if item.Role == tasks.MediaRoleMask {
+			generationHasMask = true
+			continue
+		}
+		generationImageCount++
+	}
+	if generationImageCount != runtimeInputs.ImageInputCount() || generationHasMask != runtimeInputs.HasMaskInput() {
+		return fmt.Errorf("task generation media facts do not match execution plan")
+	}
+	return nil
 }
 
 func validateCanonicalRuntimeControls(params *tasks.WorkflowTaskParams, contract workflow.RuntimeControlContract) error {

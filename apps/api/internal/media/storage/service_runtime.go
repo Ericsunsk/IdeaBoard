@@ -620,25 +620,39 @@ func (s *StorageService) resolveProfileFromUploadURL(ctx context.Context, rawURL
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
 		return nil, fmt.Errorf("图片地址格式错误")
 	}
-	// Local uploads may be persisted as an absolute public-web URL. Resolve
-	// that URL back to the builtin local adapter before probing S3 profiles.
-	if s != nil && s.publicAPIOrigin != "" && strings.HasPrefix("/"+strings.TrimPrefix(parsed.Path, "/"), "/uploads/") {
-		publicOrigin, originErr := url.Parse(s.publicAPIOrigin)
-		if originErr == nil && strings.EqualFold(publicOrigin.Scheme, parsed.Scheme) && strings.EqualFold(publicOrigin.Host, parsed.Host) {
-			return s.resolveProfileByID(ctx, builtinLocalProfileID())
-		}
+	if s.isPublicLocalUploadURL(parsed) {
+		return s.resolveProfileByID(ctx, builtinLocalProfileID())
 	}
 	profiles, err := s.loadProfilesWithSecrets(ctx)
 	if err != nil {
 		return nil, err
 	}
+	return s.findS3ProfileForUploadURL(profiles, trimmed, key)
+}
+
+// isPublicLocalUploadURL recognizes locally stored uploads which were persisted
+// with the API's absolute public URL rather than their canonical relative path.
+func (s *StorageService) isPublicLocalUploadURL(candidate *url.URL) bool {
+	if s == nil || s.publicAPIOrigin == "" {
+		return false
+	}
+	if !strings.HasPrefix("/"+strings.TrimPrefix(candidate.Path, "/"), "/uploads/") {
+		return false
+	}
+	publicOrigin, err := url.Parse(s.publicAPIOrigin)
+	return err == nil &&
+		strings.EqualFold(publicOrigin.Scheme, candidate.Scheme) &&
+		strings.EqualFold(publicOrigin.Host, candidate.Host)
+}
+
+func (s *StorageService) findS3ProfileForUploadURL(profiles []StorageProfile, rawURL string, key string) (*StorageProfile, error) {
 	var matched *StorageProfile
 	for index := range profiles {
 		profile := &profiles[index]
 		if profile.Provider != StorageProviderS3Compatible {
 			continue
 		}
-		candidate, candidateErr := s.extractObjectKeyFromUserUploadURL(*profile, trimmed)
+		candidate, candidateErr := s.extractObjectKeyFromUserUploadURL(*profile, rawURL)
 		if candidateErr != nil || candidate != key {
 			continue
 		}

@@ -21,7 +21,9 @@ import (
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
-	"ideaboard/api/internal/identity/users"
+	identitydomain "ideaboard/api/internal/identity/users/domain"
+	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
+	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/settings"
@@ -38,7 +40,7 @@ import (
 )
 
 type routeCreditUserResolver struct {
-	repo *users.UserRepository
+	repo *identitypostgres.Repository
 }
 
 func (r routeCreditUserResolver) ResolvePublicID(ctx context.Context, publicID string) (credithttp.UserIdentity, error) {
@@ -185,8 +187,8 @@ func TestAdminRoutesRequireAuthenticatedAdminAccess(t *testing.T) {
 	defer authServer.Close()
 
 	db, pool := testdb.OpenWithPool(t)
-	userRepo := users.NewUserRepository(db)
-	routeUser := &users.User{
+	userRepo := identitypostgres.NewRepository(db)
+	routeUser := &identitydomain.User{
 		DisplayName: "route-user",
 		AuthUserID:  &authUserID,
 		Status:      1,
@@ -328,7 +330,7 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 			},
 		},
 		AdminRoutes: AdminRouteDeps{
-			AdminHandler:                users.NewAdminHandler(nil, nil, nil),
+			AdminHandler:                identityhttp.NewAdminHandler(nil, nil, nil),
 			SocialProviderHandler:       auth.NewSocialProviderAdminHandler(authDeps.AuthServiceClient),
 			BillingHandler:              billing.NewHandler(nil, nil),
 			CreditAdminCommandHandler:   credithttp.NewAdminCommandHandler(nil, nil),

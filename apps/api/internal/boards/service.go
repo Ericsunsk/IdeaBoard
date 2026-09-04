@@ -14,7 +14,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/identity/users/domain"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/jsonlimit"
 )
@@ -40,15 +40,21 @@ const maxBoardStateDepth = 32
 
 type BoardService struct {
 	repo          *BoardRepository
-	userRepo      *users.UserRepository
+	userRepo      BoardUserReader
 	canvasCleaner BoardCanvasCleaner
+}
+
+// BoardUserReader is the identity data this context needs to resolve board ownership.
+type BoardUserReader interface {
+	GetByID(context.Context, int64) (*domain.User, error)
+	GetByPublicID(context.Context, string) (*domain.User, error)
 }
 
 type BoardCanvasCleaner interface {
 	DeleteCanvasBoardByStorageUID(ctx context.Context, storageUID string, boardID string) error
 }
 
-func NewBoardService(repo *BoardRepository, userRepo *users.UserRepository, canvasCleaner ...BoardCanvasCleaner) *BoardService {
+func NewBoardService(repo *BoardRepository, userRepo BoardUserReader, canvasCleaner ...BoardCanvasCleaner) *BoardService {
 	var cleaner BoardCanvasCleaner
 	if len(canvasCleaner) > 0 {
 		cleaner = canvasCleaner[0]

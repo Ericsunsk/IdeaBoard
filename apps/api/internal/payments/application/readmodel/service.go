@@ -158,32 +158,39 @@ func (s *Service) ListRecharges(ctx context.Context, userID int64, cursor string
 	}
 	page := paymentcontracts.RechargeHistoryPage{Items: make([]paymentcontracts.RechargeHistoryItem, 0, min(limit, len(rows)))}
 	if len(rows) > limit {
-		last := rows[limit-1]
-		page.NextCursor, err = EncodeRechargeHistoryCursor(last.OccurredAt, last.ID)
+		page.NextCursor, err = EncodeRechargeHistoryCursor(rows[limit-1].OccurredAt, rows[limit-1].ID)
 		if err != nil {
 			return paymentcontracts.RechargeHistoryPage{}, fmt.Errorf("encode recharge history cursor: %w", err)
 		}
 		rows = rows[:limit]
 	}
 	for _, row := range rows {
-		status, paidAmountMinor, paidCurrency := row.Status, int64(0), ""
-		switch row.Status {
-		case string(paymentsdomain.PaymentOrderCredited):
-			if !row.PaidTotalMinor.Valid || row.PaidCurrency == "" {
-				return paymentcontracts.RechargeHistoryPage{}, fmt.Errorf("invalid credited payment order history row")
-			}
-			paidAmountMinor, paidCurrency = row.PaidTotalMinor.Int64, strings.ToLower(row.PaidCurrency)
-			if row.RefundedIdeaQuantity >= row.IdeaQuantity {
-				status = "refunded"
-			}
-		case string(paymentsdomain.PaymentOrderCancelled):
-			if row.PaidTotalMinor.Valid || row.PaidCurrency != "" || row.ReceiptUrl != "" {
-				return paymentcontracts.RechargeHistoryPage{}, fmt.Errorf("invalid cancelled payment order history row")
-			}
-		default:
-			return paymentcontracts.RechargeHistoryPage{}, fmt.Errorf("invalid payment order history status %q", row.Status)
+		item, err := rechargeHistoryItem(row)
+		if err != nil {
+			return paymentcontracts.RechargeHistoryPage{}, err
 		}
-		page.Items = append(page.Items, paymentcontracts.RechargeHistoryItem{OccurredAt: row.OccurredAt, IdeaQuantity: row.IdeaQuantity, PaidAmountMinor: paidAmountMinor, PaidCurrency: paidCurrency, Status: status, RefundedIdeaQuantity: row.RefundedIdeaQuantity, RefundedAmountMinor: row.RefundedAmountMinor, ReceiptURL: row.ReceiptUrl})
+		page.Items = append(page.Items, item)
 	}
 	return page, nil
+}
+
+func rechargeHistoryItem(row dbsqlc.ListPaymentRechargeHistoryRow) (paymentcontracts.RechargeHistoryItem, error) {
+	status, paidAmountMinor, paidCurrency := row.Status, int64(0), ""
+	switch row.Status {
+	case string(paymentsdomain.PaymentOrderCredited):
+		if !row.PaidTotalMinor.Valid || row.PaidCurrency == "" {
+			return paymentcontracts.RechargeHistoryItem{}, fmt.Errorf("invalid credited payment order history row")
+		}
+		paidAmountMinor, paidCurrency = row.PaidTotalMinor.Int64, strings.ToLower(row.PaidCurrency)
+		if row.RefundedIdeaQuantity >= row.IdeaQuantity {
+			status = "refunded"
+		}
+	case string(paymentsdomain.PaymentOrderCancelled):
+		if row.PaidTotalMinor.Valid || row.PaidCurrency != "" || row.ReceiptUrl != "" {
+			return paymentcontracts.RechargeHistoryItem{}, fmt.Errorf("invalid cancelled payment order history row")
+		}
+	default:
+		return paymentcontracts.RechargeHistoryItem{}, fmt.Errorf("invalid payment order history status %q", row.Status)
+	}
+	return paymentcontracts.RechargeHistoryItem{OccurredAt: row.OccurredAt, IdeaQuantity: row.IdeaQuantity, PaidAmountMinor: paidAmountMinor, PaidCurrency: paidCurrency, Status: status, RefundedIdeaQuantity: row.RefundedIdeaQuantity, RefundedAmountMinor: row.RefundedAmountMinor, ReceiptURL: row.ReceiptUrl}, nil
 }

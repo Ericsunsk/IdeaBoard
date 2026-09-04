@@ -5,12 +5,12 @@ import (
 	"net/url"
 	"strings"
 
-	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/identity/users/domain"
 )
 
 func NormalizeCanvasStorageUserSegment(storageUID string) (string, error) {
 	normalized := strings.TrimSpace(storageUID)
-	if !users.IsValidStorageUID(normalized) {
+	if !domain.IsValidStorageUID(normalized) {
 		return "", fmt.Errorf("用户存储标识无效")
 	}
 	escaped := url.PathEscape(normalized)

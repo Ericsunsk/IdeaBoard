@@ -1,19 +1,24 @@
 package auth
 
 import (
+	"context"
 	"net/url"
 	"strings"
 	"time"
 
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/identity/users/domain"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
 )
 
 type AuthHandler struct {
-	userService *users.UserService
+	userReader CurrentUserReader
+}
+
+type CurrentUserReader interface {
+	GetByID(context.Context, int64) (*domain.User, error)
 }
 
 type currentUserResponse struct {
@@ -31,9 +36,9 @@ type currentUserPublicInfo struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
-func NewAuthHandler(userService *users.UserService) *AuthHandler {
+func NewAuthHandler(userReader CurrentUserReader) *AuthHandler {
 	return &AuthHandler{
-		userService: userService,
+		userReader: userReader,
 	}
 }
 
@@ -44,7 +49,11 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.GetByID(c.Request.Context(), identityPrincipal.UserID())
+	if h == nil || h.userReader == nil {
+		response.Error(c, 500, "用户服务未配置")
+		return
+	}
+	user, err := h.userReader.GetByID(c.Request.Context(), identityPrincipal.UserID())
 	if err != nil {
 		response.Error(c, 404, "用户不存在")
 		return

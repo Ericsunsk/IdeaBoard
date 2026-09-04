@@ -17,7 +17,8 @@ import (
 	"time"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
-	"ideaboard/api/internal/identity/users"
+	identitydomain "ideaboard/api/internal/identity/users/domain"
+	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/secrets"
 	"ideaboard/api/internal/testdb"
@@ -46,8 +47,8 @@ func TestStorageProfileLocatorIsImmutableAfterMediaAssetRegistration(t *testing.
 	if _, err := service.SaveProfile(ctx, &seed); err != nil {
 		t.Fatalf("seed storage profile: %v", err)
 	}
-	owner := &users.User{DisplayName: "profile-locator-owner", Status: 1, Role: "user"}
-	if err := users.NewUserRepository(repo.db).Create(ctx, owner); err != nil {
+	owner := &identitydomain.User{DisplayName: "profile-locator-owner", Status: 1, Role: "user"}
+	if err := identitypostgres.NewRepository(repo.db).Create(ctx, owner); err != nil {
 		t.Fatalf("create media owner: %v", err)
 	}
 	if _, err := dbsqlc.New(repo.db).UpsertMediaAsset(ctx, dbsqlc.UpsertMediaAssetParams{

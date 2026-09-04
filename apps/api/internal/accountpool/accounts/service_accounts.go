@@ -129,28 +129,26 @@ func (s *AccountService) UpdateAccount(ctx context.Context, id int64, req *Updat
 	if err != nil {
 		return fmt.Errorf("%w", ErrAccountNotFound)
 	}
+	if err := applyAccountUpdateFields(account, req); err != nil {
+		return err
+	}
+	replaceModels, err := s.applyAccountModelUpdate(ctx, account, req.Models)
+	if err != nil {
+		return err
+	}
+	if err := s.persistAccountUpdate(ctx, account, replaceModels); err != nil {
+		return err
+	}
+	return nil
+}
 
+func applyAccountUpdateFields(account *ApiAccount, req *UpdateAccountRequest) error {
 	if req.Name != nil {
 		name := strings.TrimSpace(*req.Name)
 		if name == "" {
 			return validation.New("name 不能为空")
 		}
 		account.Name = name
-	}
-	shouldReplaceModels := req.Models != nil
-	if shouldReplaceModels {
-		protocol, capabilities, configErr := s.accountRepo.ProviderEndpointConfig(ctx, account.ProviderEndpointID)
-		if configErr != nil {
-			return configErr
-		}
-		models := []AccountModel(nil)
-		if len(*req.Models) > 0 || !providerendpoints.AllowsModellessAccounts(protocol, capabilities) {
-			models, err = normalizeAccountModelInputs(*req.Models)
-			if err != nil {
-				return err
-			}
-		}
-		account.Models = models
 	}
 	if req.MaxConcurrent != nil {
 		account.MaxConcurrent = accountlimits.NormalizeMaxConcurrent(*req.MaxConcurrent)
@@ -162,31 +160,51 @@ func (s *AccountService) UpdateAccount(ctx context.Context, id int64, req *Updat
 		account.ExtraConfig = *req.ExtraConfig
 	}
 	if req.Weight != nil {
-		if *req.Weight <= 0 {
-			account.Weight = 1
-		} else {
-			account.Weight = *req.Weight
-		}
+		account.Weight = normalizeAccountWeight(*req.Weight)
 	}
-
 	if req.Secret != nil && *req.Secret != "" {
 		account.ApiKey = *req.Secret
 	}
-
-	var updateErr error
-	if shouldReplaceModels {
-		updateErr = s.accountRepo.Update(ctx, account)
-	} else {
-		updateErr = s.accountRepo.UpdateFields(ctx, account)
-	}
-	if updateErr != nil {
-		if database.IsNotFound(updateErr) {
-			return fmt.Errorf("%w", ErrAccountNotFound)
-		}
-		return updateErr
-	}
-
 	return nil
+}
+
+func normalizeAccountWeight(weight int) int {
+	if weight <= 0 {
+		return 1
+	}
+	return weight
+}
+
+func (s *AccountService) applyAccountModelUpdate(ctx context.Context, account *ApiAccount, inputs *[]AccountModelInput) (bool, error) {
+	if inputs == nil {
+		return false, nil
+	}
+	protocol, capabilities, err := s.accountRepo.ProviderEndpointConfig(ctx, account.ProviderEndpointID)
+	if err != nil {
+		return false, err
+	}
+	models := []AccountModel(nil)
+	if len(*inputs) > 0 || !providerendpoints.AllowsModellessAccounts(protocol, capabilities) {
+		models, err = normalizeAccountModelInputs(*inputs)
+		if err != nil {
+			return false, err
+		}
+	}
+	account.Models = models
+	return true, nil
+}
+
+func (s *AccountService) persistAccountUpdate(ctx context.Context, account *ApiAccount, replaceModels bool) error {
+	var err error
+	if replaceModels {
+		err = s.accountRepo.Update(ctx, account)
+	} else {
+		err = s.accountRepo.UpdateFields(ctx, account)
+	}
+	if database.IsNotFound(err) {
+		return fmt.Errorf("%w", ErrAccountNotFound)
+	}
+	return err
 }
 
 func (s *AccountService) PatchAccountModel(ctx context.Context, accountID int64, req *PatchAccountModelRequest) (*ApiAccount, error) {

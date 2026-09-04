@@ -79,41 +79,10 @@ func validateRule(policyName string, ruleIndex int, rule ObjectRule) (validatedR
 	if !supportedKind {
 		return validatedRule{}, fmt.Errorf("policy %q rule %d: unsupported object kind %q", policyName, ruleIndex+1, rule.Kind)
 	}
-	hasNames := len(rule.Names) > 0
-	prefix := strings.TrimSpace(rule.NamePrefix)
-	hasPrefix := prefix != ""
-	if hasNames == hasPrefix {
-		return validatedRule{}, fmt.Errorf("policy %q rule %d: select exactly one of Names or NamePrefix", policyName, ruleIndex+1)
+	names, prefix, err := validateRuleSelectors(policyName, ruleIndex, rule)
+	if err != nil {
+		return validatedRule{}, err
 	}
-	if prefix != rule.NamePrefix {
-		return validatedRule{}, fmt.Errorf("policy %q rule %d: NamePrefix has surrounding whitespace", policyName, ruleIndex+1)
-	}
-	if strings.ContainsRune(prefix, 0) {
-		return validatedRule{}, fmt.Errorf("policy %q rule %d: NamePrefix contains a null byte", policyName, ruleIndex+1)
-	}
-
-	names := make([]string, 0, len(rule.Names))
-	seenNames := make(map[string]struct{}, len(rule.Names))
-	for _, rawName := range rule.Names {
-		name := strings.TrimSpace(rawName)
-		if name == "" || name != rawName || strings.ContainsRune(name, 0) {
-			return validatedRule{}, fmt.Errorf("policy %q rule %d: invalid object name %q", policyName, ruleIndex+1, rawName)
-		}
-		if rule.Kind == KindFunction {
-			functionName, arguments, err := parseFunctionSignature(name)
-			if err != nil {
-				return validatedRule{}, fmt.Errorf("policy %q rule %d: %w", policyName, ruleIndex+1, err)
-			}
-			name = functionName + "(" + arguments + ")"
-		}
-		if _, duplicate := seenNames[name]; duplicate {
-			return validatedRule{}, fmt.Errorf("policy %q rule %d: duplicate object name %q", policyName, ruleIndex+1, name)
-		}
-		seenNames[name] = struct{}{}
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
 	required, err := validatePrivilegeSet(policyName, ruleIndex, rule.Kind, "Required", rule.Required, allowed)
 	if err != nil {
 		return validatedRule{}, err
@@ -143,6 +112,44 @@ func validateRule(policyName string, ruleIndex int, rule ObjectRule) (validatedR
 		required: required, forbidden: forbidden, publicForbidden: publicForbidden,
 		policyName: policyName,
 	}, nil
+}
+
+func validateRuleSelectors(policyName string, ruleIndex int, rule ObjectRule) ([]string, string, error) {
+	hasNames := len(rule.Names) > 0
+	prefix := strings.TrimSpace(rule.NamePrefix)
+	hasPrefix := prefix != ""
+	if hasNames == hasPrefix {
+		return nil, "", fmt.Errorf("policy %q rule %d: select exactly one of Names or NamePrefix", policyName, ruleIndex+1)
+	}
+	if prefix != rule.NamePrefix {
+		return nil, "", fmt.Errorf("policy %q rule %d: NamePrefix has surrounding whitespace", policyName, ruleIndex+1)
+	}
+	if strings.ContainsRune(prefix, 0) {
+		return nil, "", fmt.Errorf("policy %q rule %d: NamePrefix contains a null byte", policyName, ruleIndex+1)
+	}
+
+	names := make([]string, 0, len(rule.Names))
+	seenNames := make(map[string]struct{}, len(rule.Names))
+	for _, rawName := range rule.Names {
+		name := strings.TrimSpace(rawName)
+		if name == "" || name != rawName || strings.ContainsRune(name, 0) {
+			return nil, "", fmt.Errorf("policy %q rule %d: invalid object name %q", policyName, ruleIndex+1, rawName)
+		}
+		if rule.Kind == KindFunction {
+			functionName, arguments, err := parseFunctionSignature(name)
+			if err != nil {
+				return nil, "", fmt.Errorf("policy %q rule %d: %w", policyName, ruleIndex+1, err)
+			}
+			name = functionName + "(" + arguments + ")"
+		}
+		if _, duplicate := seenNames[name]; duplicate {
+			return nil, "", fmt.Errorf("policy %q rule %d: duplicate object name %q", policyName, ruleIndex+1, name)
+		}
+		seenNames[name] = struct{}{}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names, prefix, nil
 }
 
 func validatePrivilegeSet(

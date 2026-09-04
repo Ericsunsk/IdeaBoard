@@ -10,7 +10,8 @@ import (
 
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
-	"ideaboard/api/internal/identity/users"
+	identitycreditsadapter "ideaboard/api/internal/identity/users/infrastructure/credits"
+	"ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/runtime/worker"
@@ -101,7 +102,7 @@ func runInitCreditWallets(args []string) {
 	if err != nil {
 		fatal("failed to read verified identities", "err", err)
 	}
-	var identities []users.VerifiedIdentity
+	var identities []ports.VerifiedIdentity
 	if err := json.Unmarshal(contents, &identities); err != nil {
 		fatal("failed to parse verified identities", "err", err)
 	}
@@ -112,7 +113,7 @@ func runInitCreditWallets(args []string) {
 	}
 	defer pool.Close()
 	creditService := credits.NewService(pool)
-	service := users.NewLifecycleService(pool, creditService, rawKey)
+	service := newIdentityLifecycle(pool, identitycreditsadapter.New(creditService), rawKey)
 	if err := service.VerifyWelcomeIdentityKey(ctx); err != nil {
 		fatal("failed to verify Welcome identity key", "err", err)
 	}
@@ -153,7 +154,7 @@ func runInitAdmin() {
 	}
 	defer pool.Close()
 	creditService := credits.NewService(pool)
-	lifecycle := users.NewLifecycleService(pool, creditService, rawKey)
+	lifecycle := newIdentityLifecycle(pool, identitycreditsadapter.New(creditService), rawKey)
 	if err := lifecycle.VerifyWelcomeIdentityKey(ctx); err != nil {
 		fatal("failed to verify Welcome identity key", "err", err)
 	}
@@ -175,7 +176,7 @@ func runInitAdmin() {
 	if err != nil {
 		fatal("failed to ensure Better Auth admin user", "err", err)
 	}
-	result, err := lifecycle.ProvisionIdentity(ctx, users.VerifiedIdentity{
+	result, err := lifecycle.ProvisionIdentity(ctx, ports.VerifiedIdentity{
 		AuthUserID:    provisioned.AuthUserID,
 		DisplayName:   provisioned.DisplayName,
 		ClaimIdentity: provisioned.ClaimIdentity, ClaimIdentityKind: provisioned.ClaimIdentityKind,

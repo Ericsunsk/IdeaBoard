@@ -34,11 +34,6 @@ type Service struct {
 	now     func() time.Time
 }
 
-// NewService creates a new reward_codes service.
-func NewService(pool PoolInterface, keyring rewardsdomain.CodeKeyring) *Service {
-	return NewServiceWithOptions(pool, keyring, ServiceOptions{})
-}
-
 // ServiceOptions configures the service.
 type ServiceOptions struct {
 	Now func() time.Time
@@ -294,23 +289,9 @@ VALUES ($1, $1, 'create_reward_code', $2, $3::JSONB, $4::JSONB)`,
 
 // SearchRewardCodes searches reward codes by name, HMAC, or status.
 func (s *Service) SearchRewardCodes(ctx context.Context, input SearchRewardCodesInput) (RewardCodePage, error) {
-	query := strings.TrimSpace(input.Query)
-	if s == nil || s.pool == nil || input.BeforeID < 0 || !validRewardCodeStatusFilter(string(input.Status)) ||
-		utf8.RuneCountInString(query) > rewardsdomain.MaxRawCodeBytes {
-		return RewardCodePage{}, ErrInvalidCommand
-	}
-	limit := input.Limit
-	if limit == 0 {
-		limit = 20
-	}
-	if limit < 1 || limit > 100 {
-		return RewardCodePage{}, ErrInvalidCommand
-	}
-	var current, previous codeDigest
-	nameQuery := query
-	if normalized, err := rewardsdomain.NormalizeCode(query); err == nil {
-		current, previous = splitCodeDigestCandidates(s.keyring.LookupDigests(normalized))
-		nameQuery = ""
+	search, err := s.prepareRewardCodeSearch(input)
+	if err != nil {
+		return RewardCodePage{}, err
 	}
 	now := s.currentTime()
 	tx, err := s.beginReadSnapshot(ctx)
@@ -318,47 +299,106 @@ func (s *Service) SearchRewardCodes(ctx context.Context, input SearchRewardCodes
 		return RewardCodePage{}, fmt.Errorf("begin reward Code search: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	arguments := []any{
-		query != "", nameQuery, current.Version, current.Digest, previous.Version, previous.Digest,
-		string(input.Status), now,
+
+	total, err := countRewardCodes(ctx, tx, search.arguments(now))
+	if err != nil {
+		return RewardCodePage{}, err
 	}
+	items, err := searchRewardCodeRows(ctx, tx, search.arguments(now), input.BeforeID, search.limit, now)
+	if err != nil {
+		return RewardCodePage{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return RewardCodePage{}, fmt.Errorf("commit reward Code search: %w", err)
+	}
+	return buildRewardCodePage(items, total, search.limit), nil
+}
+
+type preparedRewardCodeSearch struct {
+	query     string
+	nameQuery string
+	current   codeDigest
+	previous  codeDigest
+	status    RewardCodeStatus
+	limit     int
+}
+
+func (s *Service) prepareRewardCodeSearch(input SearchRewardCodesInput) (preparedRewardCodeSearch, error) {
+	query := strings.TrimSpace(input.Query)
+	if s == nil || s.pool == nil || input.BeforeID < 0 || !validRewardCodeStatusFilter(string(input.Status)) ||
+		utf8.RuneCountInString(query) > rewardsdomain.MaxRawCodeBytes {
+		return preparedRewardCodeSearch{}, ErrInvalidCommand
+	}
+	limit := input.Limit
+	if limit == 0 {
+		limit = 20
+	}
+	if limit < 1 || limit > 100 {
+		return preparedRewardCodeSearch{}, ErrInvalidCommand
+	}
+	var current, previous codeDigest
+	nameQuery := query
+	if normalized, err := rewardsdomain.NormalizeCode(query); err == nil {
+		current, previous = splitCodeDigestCandidates(s.keyring.LookupDigests(normalized))
+		nameQuery = ""
+	}
+	return preparedRewardCodeSearch{
+		query: query, nameQuery: nameQuery, current: current, previous: previous,
+		status: input.Status, limit: limit,
+	}, nil
+}
+
+func (search preparedRewardCodeSearch) arguments(now time.Time) []any {
+	return []any{
+		search.query != "", search.nameQuery,
+		search.current.Version, search.current.Digest,
+		search.previous.Version, search.previous.Digest,
+		string(search.status), now,
+	}
+}
+
+func countRewardCodes(ctx context.Context, tx pgx.Tx, arguments []any) (int64, error) {
 	var total int64
 	if err := tx.QueryRow(ctx, `SELECT COUNT(*)
 FROM reward_codes codes
 WHERE `+rewardCodeSearchPredicateSQL, arguments...).Scan(&total); err != nil {
-		return RewardCodePage{}, fmt.Errorf("count filtered reward Codes: %w", err)
+		return 0, fmt.Errorf("count filtered reward Codes: %w", err)
 	}
+	return total, nil
+}
+
+func searchRewardCodeRows(ctx context.Context, tx pgx.Tx, arguments []any, beforeID int64, limit int, now time.Time) ([]RewardCode, error) {
 	rows, err := tx.Query(ctx, `SELECT `+rewardCodeProjectionSQL+`
 FROM reward_codes codes
 WHERE `+rewardCodeSearchPredicateSQL+`
   AND ($9::BIGINT <= 0 OR id < $9)
 ORDER BY id DESC
-LIMIT $10`, append(arguments, input.BeforeID, limit+1)...)
+LIMIT $10`, append(arguments, beforeID, limit+1)...)
 	if err != nil {
-		return RewardCodePage{}, fmt.Errorf("search reward Codes: %w", err)
+		return nil, fmt.Errorf("search reward Codes: %w", err)
 	}
 	defer rows.Close()
 	items := make([]RewardCode, 0, limit+1)
 	for rows.Next() {
 		var item RewardCode
 		if err := scanRewardCode(rows, &item, now); err != nil {
-			return RewardCodePage{}, fmt.Errorf("scan reward Code search: %w", err)
+			return nil, fmt.Errorf("scan reward Code search: %w", err)
 		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		return RewardCodePage{}, fmt.Errorf("read reward Code search: %w", err)
+		return nil, fmt.Errorf("read reward Code search: %w", err)
 	}
-	rows.Close()
-	if err := tx.Commit(ctx); err != nil {
-		return RewardCodePage{}, fmt.Errorf("commit reward Code search: %w", err)
-	}
+	return items, nil
+}
+
+func buildRewardCodePage(items []RewardCode, total int64, limit int) RewardCodePage {
 	page := RewardCodePage{RewardCodes: items, Total: total}
 	if len(items) > limit {
 		page.RewardCodes = items[:limit]
 		page.NextBeforeID = page.RewardCodes[len(page.RewardCodes)-1].ID
 	}
-	return page, nil
+	return page
 }
 
 const rewardCodeSearchPredicateSQL = `

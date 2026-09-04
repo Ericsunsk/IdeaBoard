@@ -8,13 +8,14 @@ import (
 	"testing"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
-	"ideaboard/api/internal/identity/users"
+	identitydomain "ideaboard/api/internal/identity/users/domain"
+	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/testdb"
 )
 
 func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {
 	db := testdb.Open(t)
-	userRepo := users.NewUserRepository(db)
+	userRepo := identitypostgres.NewRepository(db)
 	repo := NewBoardRepository(db)
 	service := NewBoardService(repo, userRepo)
 	ctx := context.Background()
@@ -103,7 +104,7 @@ func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {
 
 func TestBoardServiceEditorCanUpdateStateButNotRename(t *testing.T) {
 	db := testdb.Open(t)
-	userRepo := users.NewUserRepository(db)
+	userRepo := identitypostgres.NewRepository(db)
 	repo := NewBoardRepository(db)
 	service := NewBoardService(repo, userRepo)
 	ctx := context.Background()
@@ -156,7 +157,7 @@ func TestBoardServiceEditorCanUpdateStateButNotRename(t *testing.T) {
 
 func TestBoardServiceShareJoinReadsTypedMediaRefs(t *testing.T) {
 	db := testdb.Open(t)
-	userRepo := users.NewUserRepository(db)
+	userRepo := identitypostgres.NewRepository(db)
 	repo := NewBoardRepository(db)
 	service := NewBoardService(repo, userRepo)
 	q := dbsqlc.New(db)
@@ -199,7 +200,7 @@ func TestBoardServiceShareJoinReadsTypedMediaRefs(t *testing.T) {
 
 func TestBoardServiceShareTokenUsesBoardIdentityForPermissions(t *testing.T) {
 	db := testdb.Open(t)
-	userRepo := users.NewUserRepository(db)
+	userRepo := identitypostgres.NewRepository(db)
 	repo := NewBoardRepository(db)
 	service := NewBoardService(repo, userRepo)
 	ctx := context.Background()
@@ -256,9 +257,9 @@ func TestBoardServiceShareTokenUsesBoardIdentityForPermissions(t *testing.T) {
 	}
 }
 
-func createBoardTestUser(t *testing.T, repo *users.UserRepository, displayName string) *users.User {
+func createBoardTestUser(t *testing.T, repo *identitypostgres.Repository, displayName string) *identitydomain.User {
 	t.Helper()
-	user := &users.User{
+	user := &identitydomain.User{
 		DisplayName: displayName + " display",
 		Status:      1,
 		Role:        "user",

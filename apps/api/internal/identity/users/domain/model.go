@@ -1,9 +1,17 @@
-package users
+package domain
 
 import (
 	"time"
 
 	"github.com/google/uuid"
+)
+
+const (
+	RoleUser  = "user"
+	RoleAdmin = "admin"
+
+	StatusActive int16 = 1
+	StatusBanned int16 = 0
 )
 
 type User struct {
@@ -19,6 +27,14 @@ type User struct {
 	LastLoginCountry string    `json:"-"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+func (u *User) IsActive() bool {
+	return u != nil && u.Status == StatusActive
+}
+
+func (u *User) IsAdmin() bool {
+	return u != nil && u.Role == RoleAdmin
 }
 
 type UsedUID struct {

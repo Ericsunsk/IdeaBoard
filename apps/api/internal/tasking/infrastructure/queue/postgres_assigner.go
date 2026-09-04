@@ -22,14 +22,6 @@ func NewPostgresTaskAssigner(db *sql.DB) *PostgresTaskAssigner {
 	return &PostgresTaskAssigner{db: db}
 }
 
-func commitTaskAssignment(tx *sql.Tx, committed *bool, assignment taskqueueports.TaskAssignment) (taskqueueports.TaskAssignment, error) {
-	if err := tx.Commit(); err != nil {
-		return taskqueueports.TaskAssignment{}, err
-	}
-	*committed = true
-	return assignment, nil
-}
-
 func (a *PostgresTaskAssigner) Assign(ctx context.Context, task *tasks.TaskPayload) (taskqueueports.TaskAssignment, error) {
 	if a == nil || a.db == nil {
 		return taskqueueports.TaskAssignment{}, fmt.Errorf("postgres task assigner: db not configured")
@@ -49,23 +41,35 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, task *tasks.TaskPaylo
 		}
 	}()
 
+	assignment, err := assignTaskTx(ctx, tx, task)
+	if err != nil {
+		return taskqueueports.TaskAssignment{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return taskqueueports.TaskAssignment{}, err
+	}
+	committed = true
+	return assignment, nil
+}
+
+func assignTaskTx(ctx context.Context, tx *sql.Tx, task *tasks.TaskPayload) (taskqueueports.TaskAssignment, error) {
 	policy := taskAssignmentPolicy{}
 	taskState, err := getTaskStateForUpdate(ctx, tx, task.TaskID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return commitTaskAssignment(tx, &committed, policy.discard(task.TaskID))
+			return policy.discard(task.TaskID), nil
 		}
 		return taskqueueports.TaskAssignment{}, err
 	}
 	if tasks.IsTerminalStatus(taskState.Status) {
-		return commitTaskAssignment(tx, &committed, policy.discard(task.TaskID))
+		return policy.discard(task.TaskID), nil
 	}
 	executionPlan, err := taskExecutionPlan(taskState.Params)
 	if err != nil {
 		return taskqueueports.TaskAssignment{}, fmt.Errorf("resolve task routing requirement: %w", err)
 	}
 	if decision := policy.decideLockedTask(task.TaskID, task.RiverJobID, taskState); decision.done {
-		return commitTaskAssignment(tx, &committed, decision.assignment)
+		return decision.assignment, nil
 	}
 
 	featureSlug := executionPlan.Feature()
@@ -79,12 +83,12 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, task *tasks.TaskPaylo
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return commitTaskAssignment(tx, &committed, policy.noCapacity(task.TaskID))
+			return policy.noCapacity(task.TaskID), nil
 		}
 		return taskqueueports.TaskAssignment{}, err
 	}
 	if shouldDefer {
-		return commitTaskAssignment(tx, &committed, policy.noCapacity(task.TaskID))
+		return policy.noCapacity(task.TaskID), nil
 	}
 
 	leaseToken, err := newTaskLeaseToken(task.RiverJobID)
@@ -105,7 +109,7 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, task *tasks.TaskPaylo
 			return taskqueueports.TaskAssignment{}, err
 		}
 	}
-	return commitTaskAssignment(tx, &committed, decision.assignment)
+	return decision.assignment, nil
 }
 
 func (a *PostgresTaskAssigner) ConfirmTaskLease(ctx context.Context, assignment taskqueueports.TaskAssignment) error {

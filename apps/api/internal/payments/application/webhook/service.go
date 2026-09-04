@@ -103,23 +103,9 @@ func (s *Service) ReceiveStripeWebhook(ctx context.Context, raw []byte, signatur
 		return paymentports.StripeWebhookReceipt{}, paymentcontracts.ErrStripeConfigurationNotFound
 	}
 	now := s.now()
-	var stored paymentconfiguration.StoredStripeConfiguration
-	var event paymentports.StripeWebhookEvent
-	var verifyErr error
-	for _, credential := range credentials {
-		secret, decryptErr := secrets.DecryptMaterialString(credential.WebhookSecretCiphertext, credential.SecretMaterialKind)
-		if decryptErr != nil {
-			return paymentports.StripeWebhookReceipt{}, paymentcontracts.ErrStripeConfigurationInvalid
-		}
-		candidate, candidateErr := s.verifier.Verify(ctx, raw, signature, secret, paymentports.StripeWebhookTolerance, now)
-		if candidateErr == nil {
-			stored, event, verifyErr = credential, candidate, nil
-			break
-		}
-		verifyErr = candidateErr
-	}
-	if stored.CredentialID == "" {
-		return paymentports.StripeWebhookReceipt{}, verifyErr
+	stored, event, err := s.verifyWebhook(ctx, raw, signature, credentials, now)
+	if err != nil {
+		return paymentports.StripeWebhookReceipt{}, err
 	}
 	if err := paymentports.ValidateStripeWebhookEvent(event); err != nil {
 		return paymentports.StripeWebhookReceipt{}, err
@@ -145,6 +131,22 @@ func (s *Service) ReceiveStripeWebhook(ctx context.Context, raw []byte, signatur
 		return paymentports.StripeWebhookReceipt{}, err
 	}
 	return receipt, nil
+}
+
+func (s *Service) verifyWebhook(ctx context.Context, raw []byte, signature string, credentials []paymentconfiguration.StoredStripeConfiguration, now time.Time) (paymentconfiguration.StoredStripeConfiguration, paymentports.StripeWebhookEvent, error) {
+	var lastErr error
+	for _, credential := range credentials {
+		secret, decryptErr := secrets.DecryptMaterialString(credential.WebhookSecretCiphertext, credential.SecretMaterialKind)
+		if decryptErr != nil {
+			return paymentconfiguration.StoredStripeConfiguration{}, paymentports.StripeWebhookEvent{}, paymentcontracts.ErrStripeConfigurationInvalid
+		}
+		event, verifyErr := s.verifier.Verify(ctx, raw, signature, secret, paymentports.StripeWebhookTolerance, now)
+		if verifyErr == nil {
+			return credential, event, nil
+		}
+		lastErr = verifyErr
+	}
+	return paymentconfiguration.StoredStripeConfiguration{}, paymentports.StripeWebhookEvent{}, lastErr
 }
 
 func (s *Service) processEvent(ctx context.Context, event paymentports.StripeWebhookEvent, stored paymentconfiguration.StoredStripeConfiguration, now time.Time) error {
@@ -223,40 +225,7 @@ func (s *Service) processRefund(ctx context.Context, event paymentports.StripeWe
 	}
 	refund, err := s.convergence.GetPaymentRefundByStripeID(ctx, event.ObjectID)
 	if errors.Is(err, sql.ErrNoRows) {
-		_, apiKey, accessErr := s.credentialAccess(ctx, credentialID)
-		if accessErr != nil {
-			return accessErr
-		}
-		providerRefund, retrieveErr := s.refund.RetrieveProviderRefund(ctx, apiKey, event.ObjectID)
-		if retrieveErr != nil {
-			return retrieveErr
-		}
-		if providerRefund.ChargeID == "" {
-			return nil
-		}
-		if _, createErr := s.convergence.CreateExternalPaymentRefund(ctx, providerRefund, s.now().UTC()); createErr != nil {
-			if errors.Is(createErr, domain.ErrInsufficientCredits) || errors.Is(createErr, paymentcontracts.ErrRefundAmountExceeds) {
-				userID, anomalyErr := s.convergence.RecordPaymentRefundAnomaly(ctx, providerRefund, "Stripe Dashboard refund requires manual balance recovery", s.now().UTC())
-				if anomalyErr == nil && s.events != nil {
-					s.events.Publish(userID, paymentports.PaymentEvent{Status: "refund_updated"})
-				}
-				return anomalyErr
-			}
-			if errors.Is(createErr, sql.ErrNoRows) || errors.Is(createErr, paymentcontracts.ErrRefundOrderNotEligible) {
-				return nil
-			}
-			return createErr
-		}
-		refund, err = s.convergence.GetPaymentRefundByStripeID(ctx, event.ObjectID)
-		if err != nil {
-			return err
-		}
-		if s.events != nil {
-			s.events.Publish(refund.UserID, paymentports.PaymentEvent{Status: "refund_updated"})
-		}
-		providerRefund.Status = strings.ToLower(strings.TrimSpace(providerRefund.Status))
-		_, err = s.refund.Converge(ctx, refund, providerRefund)
-		return err
+		return s.processExternalRefund(ctx, event.ObjectID, credentialID)
 	}
 	if err != nil {
 		return err
@@ -269,6 +238,43 @@ func (s *Service) processRefund(ctx context.Context, event paymentports.StripeWe
 	if err != nil {
 		return err
 	}
+	_, err = s.refund.Converge(ctx, refund, providerRefund)
+	return err
+}
+
+func (s *Service) processExternalRefund(ctx context.Context, refundID, credentialID string) error {
+	_, apiKey, err := s.credentialAccess(ctx, credentialID)
+	if err != nil {
+		return err
+	}
+	providerRefund, err := s.refund.RetrieveProviderRefund(ctx, apiKey, refundID)
+	if err != nil {
+		return err
+	}
+	if providerRefund.ChargeID == "" {
+		return nil
+	}
+	if _, createErr := s.convergence.CreateExternalPaymentRefund(ctx, providerRefund, s.now().UTC()); createErr != nil {
+		if errors.Is(createErr, domain.ErrInsufficientCredits) || errors.Is(createErr, paymentcontracts.ErrRefundAmountExceeds) {
+			userID, anomalyErr := s.convergence.RecordPaymentRefundAnomaly(ctx, providerRefund, "Stripe Dashboard refund requires manual balance recovery", s.now().UTC())
+			if anomalyErr == nil && s.events != nil {
+				s.events.Publish(userID, paymentports.PaymentEvent{Status: "refund_updated"})
+			}
+			return anomalyErr
+		}
+		if errors.Is(createErr, sql.ErrNoRows) || errors.Is(createErr, paymentcontracts.ErrRefundOrderNotEligible) {
+			return nil
+		}
+		return createErr
+	}
+	refund, err := s.convergence.GetPaymentRefundByStripeID(ctx, refundID)
+	if err != nil {
+		return err
+	}
+	if s.events != nil {
+		s.events.Publish(refund.UserID, paymentports.PaymentEvent{Status: "refund_updated"})
+	}
+	providerRefund.Status = strings.ToLower(strings.TrimSpace(providerRefund.Status))
 	_, err = s.refund.Converge(ctx, refund, providerRefund)
 	return err
 }

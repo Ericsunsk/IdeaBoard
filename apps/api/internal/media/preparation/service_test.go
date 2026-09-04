@@ -7,7 +7,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"ideaboard/api/internal/identity/users"
+	identitydomain "ideaboard/api/internal/identity/users/domain"
+	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/media/storage"
@@ -190,8 +191,8 @@ func TestPrepareGenerationMediaRecoversChecksumCompletionRace(t *testing.T) {
 func TestPrepareGenerationMediaReusesReadyChecksumWithPostgres(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := t.Context()
-	owner := &users.User{DisplayName: "prepared-checksum-owner", Status: 1, Role: "user"}
-	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
+	owner := &identitydomain.User{DisplayName: "prepared-checksum-owner", Status: 1, Role: "user"}
+	if err := identitypostgres.NewRepository(db).Create(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
 	registry := assets.NewMediaAssetRegistry(db)

@@ -76,54 +76,22 @@ func validateBoardStateEnvelopeJSON(payload []byte) (BoardStateEnvelope, error) 
 	if err := json.Unmarshal(payload, &raw); err != nil || raw == nil {
 		return BoardStateEnvelope{}, ErrInvalidBoardInput
 	}
-	for key := range raw {
-		if _, ok := allowedBoardStateEnvelopeFields[key]; !ok {
-			return BoardStateEnvelope{}, ErrInvalidBoardInput
-		}
+	if err := validateBoardStateEnvelopeFields(raw); err != nil {
+		return BoardStateEnvelope{}, err
 	}
-
 	schemaVersion, err := requiredIntegerField(raw, "schemaVersion")
 	if err != nil || schemaVersion != CurrentBoardStateSchemaVersion {
 		return BoardStateEnvelope{}, ErrInvalidBoardInput
 	}
-
-	imageNodes, err := requiredArrayField(raw, "imageNodes")
-	if err != nil {
-		return BoardStateEnvelope{}, err
-	}
-	promptNodes, err := requiredArrayField(raw, "promptNodes")
-	if err != nil {
-		return BoardStateEnvelope{}, err
-	}
-	fusionNodes, err := requiredArrayField(raw, "fusionNodes")
-	if err != nil {
-		return BoardStateEnvelope{}, err
-	}
-	connections, err := requiredArrayField(raw, "connections")
-	if err != nil {
-		return BoardStateEnvelope{}, err
-	}
-	groups, err := requiredArrayField(raw, "groups")
+	imageNodes, promptNodes, fusionNodes, connections, groups, err := requiredBoardStateArrays(raw)
 	if err != nil {
 		return BoardStateEnvelope{}, err
 	}
 	if err := validateBoardStateGroups(groups); err != nil {
 		return BoardStateEnvelope{}, err
 	}
-	if _, err := requiredNumberField(raw, "updatedAt"); err != nil {
-		return BoardStateEnvelope{}, err
-	}
-	mediaRefs, err := optionalMediaRefsField(raw, "mediaRefs")
+	mediaRefs, err := validateBoardStateMetadata(raw)
 	if err != nil {
-		return BoardStateEnvelope{}, err
-	}
-	if _, err := optionalStringField(raw, "previewSnapshotDataUrl"); err != nil {
-		return BoardStateEnvelope{}, err
-	}
-	if _, err := optionalNumberField(raw, "previewSnapshotUpdatedAt"); err != nil {
-		return BoardStateEnvelope{}, err
-	}
-	if _, err := optionalPositiveIntegerField(raw, "previewSnapshotVersion"); err != nil {
 		return BoardStateEnvelope{}, err
 	}
 
@@ -136,6 +104,59 @@ func validateBoardStateEnvelopeJSON(payload []byte) (BoardStateEnvelope, error) 
 		Groups:        groups,
 		MediaRefs:     mediaRefs,
 	}, nil
+}
+
+func validateBoardStateEnvelopeFields(raw map[string]json.RawMessage) error {
+	for key := range raw {
+		if _, ok := allowedBoardStateEnvelopeFields[key]; !ok {
+			return ErrInvalidBoardInput
+		}
+	}
+	return nil
+}
+
+func requiredBoardStateArrays(raw map[string]json.RawMessage) ([]json.RawMessage, []json.RawMessage, []json.RawMessage, []json.RawMessage, []json.RawMessage, error) {
+	imageNodes, err := requiredArrayField(raw, "imageNodes")
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	promptNodes, err := requiredArrayField(raw, "promptNodes")
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	fusionNodes, err := requiredArrayField(raw, "fusionNodes")
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	connections, err := requiredArrayField(raw, "connections")
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	groups, err := requiredArrayField(raw, "groups")
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	return imageNodes, promptNodes, fusionNodes, connections, groups, nil
+}
+
+func validateBoardStateMetadata(raw map[string]json.RawMessage) ([]BoardStateMediaRef, error) {
+	if _, err := requiredNumberField(raw, "updatedAt"); err != nil {
+		return nil, err
+	}
+	mediaRefs, err := optionalMediaRefsField(raw, "mediaRefs")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := optionalStringField(raw, "previewSnapshotDataUrl"); err != nil {
+		return nil, err
+	}
+	if _, err := optionalNumberField(raw, "previewSnapshotUpdatedAt"); err != nil {
+		return nil, err
+	}
+	if _, err := optionalPositiveIntegerField(raw, "previewSnapshotVersion"); err != nil {
+		return nil, err
+	}
+	return mediaRefs, nil
 }
 
 func requiredIntegerField(raw map[string]json.RawMessage, key string) (int, error) {

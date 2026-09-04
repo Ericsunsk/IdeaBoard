@@ -306,46 +306,58 @@ func (s *Service) RunPaymentCheckoutShutdown(ctx context.Context, shutdownID str
 			return s.configuration.CompletePaymentCheckoutShutdown(ctx, shutdown.ID, s.now().UTC())
 		}
 		if apiKey == "" {
-			configuration, err := s.configuration.GetStripeCredential(ctx, shutdown.StripeCredentialID)
+			apiKey, err = s.shutdownAPIKey(ctx, shutdown)
 			if err != nil {
 				return err
-			}
-			if configuration.AccountID != shutdown.StripeAccountID {
-				return paymentsdomain.ErrPurchasesUnavailable
-			}
-			apiKey, err = secrets.DecryptMaterialString(configuration.APIKeyCiphertext, configuration.SecretMaterialKind)
-			if err != nil {
-				return paymentcontracts.ErrStripeConfigurationInvalid
 			}
 		}
 		for _, order := range orders {
-			if err := s.store.WithUserCheckoutLock(ctx, order.UserID, func(c context.Context) error {
-				current, err := s.store.GetPaymentOrderByID(c, order.ID)
-				if errors.Is(err, sql.ErrNoRows) {
-					return nil
-				}
-				if err != nil {
-					return err
-				}
-				if current.StripeCredentialID != shutdown.StripeCredentialID || current.StripeAccountID != shutdown.StripeAccountID || current.CreatedAt.After(shutdown.CutoffAt) {
-					return nil
-				}
-				switch current.Status {
-				case paymentsdomain.PaymentOrderCreating:
-					_, err = s.lifecycle.ExpireOrder(c, current)
-				case paymentsdomain.PaymentOrderCheckoutOpen:
-					expiration, e := s.gateway.ExpireCheckoutSession(c, paymentports.ExpireCheckoutSessionInput{APIKey: apiKey, SessionID: current.StripeCheckoutSessionID})
-					if e != nil {
-						return e
-					}
-					_, err = s.lifecycle.ConvergeCheckoutExpiration(c, current, expiration)
-				}
-				return err
-			}); err != nil {
+			if err := s.processCheckoutShutdownOrder(ctx, shutdown, apiKey, order); err != nil {
 				return err
 			}
 		}
 	}
+}
+
+func (s *Service) shutdownAPIKey(ctx context.Context, shutdown paymentconfiguration.PaymentCheckoutShutdown) (string, error) {
+	configuration, err := s.configuration.GetStripeCredential(ctx, shutdown.StripeCredentialID)
+	if err != nil {
+		return "", err
+	}
+	if configuration.AccountID != shutdown.StripeAccountID {
+		return "", paymentsdomain.ErrPurchasesUnavailable
+	}
+	apiKey, err := secrets.DecryptMaterialString(configuration.APIKeyCiphertext, configuration.SecretMaterialKind)
+	if err != nil {
+		return "", paymentcontracts.ErrStripeConfigurationInvalid
+	}
+	return apiKey, nil
+}
+
+func (s *Service) processCheckoutShutdownOrder(ctx context.Context, shutdown paymentconfiguration.PaymentCheckoutShutdown, apiKey string, order paymentsdomain.PaymentOrder) error {
+	return s.store.WithUserCheckoutLock(ctx, order.UserID, func(c context.Context) error {
+		current, err := s.store.GetPaymentOrderByID(c, order.ID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if current.StripeCredentialID != shutdown.StripeCredentialID || current.StripeAccountID != shutdown.StripeAccountID || current.CreatedAt.After(shutdown.CutoffAt) {
+			return nil
+		}
+		switch current.Status {
+		case paymentsdomain.PaymentOrderCreating:
+			_, err = s.lifecycle.ExpireOrder(c, current)
+		case paymentsdomain.PaymentOrderCheckoutOpen:
+			expiration, gatewayErr := s.gateway.ExpireCheckoutSession(c, paymentports.ExpireCheckoutSessionInput{APIKey: apiKey, SessionID: current.StripeCheckoutSessionID})
+			if gatewayErr != nil {
+				return gatewayErr
+			}
+			_, err = s.lifecycle.ConvergeCheckoutExpiration(c, current, expiration)
+		}
+		return err
+	})
 }
 
 func (s *Service) RunActivePaymentCheckoutShutdowns(ctx context.Context) error {

@@ -12,7 +12,7 @@ import (
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/boards"
-	"ideaboard/api/internal/identity/users"
+	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
@@ -44,7 +44,7 @@ type appDatabaseOpeners struct {
 
 type appRepositories struct {
 	db                   *sql.DB
-	userRepo             *users.UserRepository
+	userRepo             *identitypostgres.Repository
 	accountRepo          *accounts.AccountRepository
 	taskRepo             *taskstore.Repository
 	taskBillingUsage     *taskbilling.UsageStore
@@ -175,7 +175,7 @@ func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error
 	taskRepo := taskstore.NewRepository(db)
 	repos := appRepositories{
 		db:                   db,
-		userRepo:             users.NewUserRepository(db),
+		userRepo:             identitypostgres.NewRepository(db),
 		accountRepo:          accounts.NewAccountRepository(db, taskRepo),
 		taskRepo:             taskRepo,
 		taskBillingUsage:     taskbilling.NewUsageStore(db),

@@ -8,7 +8,8 @@ import (
 	"time"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
-	"ideaboard/api/internal/identity/users"
+	identitydomain "ideaboard/api/internal/identity/users/domain"
+	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
@@ -29,8 +30,8 @@ func TestStoreSubmitTaskClaimsMediaRefInTaskRiverTransaction(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			db, pool := testdb.OpenWithPool(t)
-			owner := &users.User{DisplayName: "task-media-owner", Status: 1, Role: "user"}
-			if err := users.NewUserRepository(db).Create(t.Context(), owner); err != nil {
+			owner := &identitydomain.User{DisplayName: "task-media-owner", Status: 1, Role: "user"}
+			if err := identitypostgres.NewRepository(db).Create(t.Context(), owner); err != nil {
 				t.Fatal(err)
 			}
 			q := dbsqlc.New(db)
@@ -118,8 +119,8 @@ func (f failingClaimRepository) ClaimTaskInputMediaRef(context.Context, pgx.Tx, 
 
 func TestStoreSubmitTaskRollsBackTaskWhenMediaClaimFails(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	owner := &users.User{DisplayName: "task-media-claim-failure", Status: 1, Role: "user"}
-	if err := users.NewUserRepository(db).Create(t.Context(), owner); err != nil {
+	owner := &identitydomain.User{DisplayName: "task-media-claim-failure", Status: 1, Role: "user"}
+	if err := identitypostgres.NewRepository(db).Create(t.Context(), owner); err != nil {
 		t.Fatal(err)
 	}
 	q := dbsqlc.New(db)

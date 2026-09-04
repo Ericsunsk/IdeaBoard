@@ -284,20 +284,9 @@ func (h *ProviderEndpointHandler) DetectModels(c *gin.Context) {
 		return
 	}
 
-	baseURL := strings.TrimSpace(req.BaseURL)
-	apiKey := strings.TrimSpace(req.APIKey)
-	if baseURL == "" || apiKey == "" {
-		response.Error(c, 400, "base_url 与 api_key 不能为空")
-		return
-	}
-	if strings.TrimSpace(req.Protocol) != "" && !ProtocolSupportsModelDetection(req.Protocol) {
-		response.Error(c, 400, "当前 Protocol 不支持模型检测")
-		return
-	}
-
-	apiType, ok := workflow.ValidateProviderAPIType(req.APIType, baseURL)
-	if !ok {
-		response.Error(c, 400, "接口类型不支持")
+	baseURL, apiKey, apiType, validationMessage := validateModelDetectionRequest(req)
+	if validationMessage != "" {
+		response.Error(c, 400, validationMessage)
 		return
 	}
 	if workflow.IsGoogleCloudAPIType(apiType) {
@@ -309,7 +298,27 @@ func (h *ProviderEndpointHandler) DetectModels(c *gin.Context) {
 		response.SuccessDTO(c, detectedModelsResponse{Models: models, APIType: apiType})
 		return
 	}
+	h.detectStandardModels(c, baseURL, apiKey, apiType)
+}
 
+func validateModelDetectionRequest(req DetectModelsRequest) (baseURL, apiKey, apiType, publicMessage string) {
+	baseURL = strings.TrimSpace(req.BaseURL)
+	apiKey = strings.TrimSpace(req.APIKey)
+	if baseURL == "" || apiKey == "" {
+		return "", "", "", "base_url 与 api_key 不能为空"
+	}
+	if strings.TrimSpace(req.Protocol) != "" && !ProtocolSupportsModelDetection(req.Protocol) {
+		return "", "", "", "当前 Protocol 不支持模型检测"
+	}
+	var ok bool
+	apiType, ok = workflow.ValidateProviderAPIType(req.APIType, baseURL)
+	if !ok {
+		return "", "", "", "接口类型不支持"
+	}
+	return baseURL, apiKey, apiType, ""
+}
+
+func (h *ProviderEndpointHandler) detectStandardModels(c *gin.Context, baseURL, apiKey, apiType string) {
 	detectionURL, err := buildModelDetectionURL(baseURL, apiType)
 	if err != nil {
 		response.Error(c, 400, "Base URL 无效")
@@ -464,8 +473,14 @@ func providerModelDetectionError(apiType string, statusCode int, body []byte) (s
 	if err := json.Unmarshal(body, &payload); err != nil {
 		return "模型检测失败，请检查 Google API Key、权限与 ProviderEndpoint 配置", ""
 	}
-	reason := ""
-	service := ""
+	reason, service := googleAPIErrorFacts(payload)
+	if message, ok := googleAPIReasonMessage(apiType, reason, service); ok {
+		return message, reason
+	}
+	return googleAPIStatusMessage(statusCode, payload.Error.Status)
+}
+
+func googleAPIErrorFacts(payload googleAPIErrorResponse) (reason, service string) {
 	for _, detail := range payload.Error.Details {
 		if reason == "" {
 			reason = strings.ToUpper(strings.TrimSpace(detail.Reason))
@@ -474,26 +489,32 @@ func providerModelDetectionError(apiType string, statusCode int, body []byte) (s
 			service = strings.ToLower(strings.TrimSpace(detail.Metadata["service"]))
 		}
 	}
+	return reason, service
+}
 
+func googleAPIReasonMessage(apiType, reason, service string) (string, bool) {
 	switch reason {
 	case "CREDENTIALS_MISSING":
 		if workflow.IsGoogleCloudAPIType(apiType) {
-			return "模型检测失败：请使用关联 Service Account 的 Google Cloud API Key，并授予模型调用权限", reason
+			return "模型检测失败：请使用关联 Service Account 的 Google Cloud API Key，并授予模型调用权限", true
 		}
 	case "SERVICE_DISABLED":
 		if service == "aiplatform.googleapis.com" || workflow.IsGoogleCloudAPIType(apiType) {
-			return "模型检测失败：请在 Google Cloud 项目中启用 Gemini Enterprise Agent Platform API（原 Vertex AI，aiplatform.googleapis.com）", reason
+			return "模型检测失败：请在 Google Cloud 项目中启用 Gemini Enterprise Agent Platform API（原 Vertex AI，aiplatform.googleapis.com）", true
 		}
-		return "模型检测失败：请在 Google Cloud 项目中启用 Generative Language API", reason
+		return "模型检测失败：请在 Google Cloud 项目中启用 Generative Language API", true
 	case "API_KEY_INVALID", "API_KEY_NOT_FOUND":
-		return "模型检测失败：Google API Key 无效或不属于当前项目", reason
+		return "模型检测失败：Google API Key 无效或不属于当前项目", true
 	case "BILLING_DISABLED", "PROJECT_BILLING_DISABLED":
-		return "模型检测失败：请为 Google Cloud 项目启用 Billing", reason
+		return "模型检测失败：请为 Google Cloud 项目启用 Billing", true
 	case "API_KEY_SERVICE_BLOCKED", "API_KEY_IP_ADDRESS_BLOCKED", "API_KEY_HTTP_REFERRER_BLOCKED", "API_KEY_ANDROID_APP_BLOCKED", "API_KEY_IOS_APP_BLOCKED":
-		return "模型检测失败：Google API Key restrictions 拒绝了当前服务或服务器", reason
+		return "模型检测失败：Google API Key restrictions 拒绝了当前服务或服务器", true
 	}
+	return "", false
+}
 
-	status := strings.ToUpper(strings.TrimSpace(payload.Error.Status))
+func googleAPIStatusMessage(statusCode int, rawStatus string) (string, string) {
+	status := strings.ToUpper(strings.TrimSpace(rawStatus))
 	switch status {
 	case "UNAUTHENTICATED":
 		return "模型检测失败：Google API Key 无效或认证失败", status

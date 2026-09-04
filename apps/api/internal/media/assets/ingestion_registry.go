@@ -212,62 +212,67 @@ func (r *MediaAssetRegistry) BuildTaskInputManifest(ctx context.Context, userID 
 	if media == nil {
 		return tasks.NewTaskInputManifest(nil, nil, nil, nil, nil)
 	}
-	resolve := func(ref tasks.MediaRef) (tasks.TaskInputManifestRef, error) {
-		if ref.AssetID <= 0 {
-			return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeMediaNotFound, "media.manifest.resolve", "invalid asset id", nil)
-		}
-		row, err := r.q.GetProcessingInputManifestObject(ctx, dbsqlc.GetProcessingInputManifestObjectParams{MediaAssetID: ref.AssetID, OwnerUserID: userID})
-		if errors.Is(err, sql.ErrNoRows) {
-			return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeMediaProcessing, "media.manifest.resolve", "processing-input derivative is not ready", err)
-		}
-		if err != nil {
-			return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeStorageTransient, "media.manifest.resolve", "load processing-input derivative failed", err)
-		}
-		if r.integrityVerifier == nil {
-			return tasks.TaskInputManifestRef{}, fmt.Errorf("media integrity verifier is unavailable")
-		}
-		if err := r.integrityVerifier.Verify(ctx, row.StorageProfileID, row.StorageKey, row.ChecksumSha256, row.MimeType, row.SizeBytes); err != nil {
-			return tasks.TaskInputManifestRef{}, err
-		}
-		return tasks.TaskInputManifestRef{
-			AssetID: row.AssetID, DerivativeID: row.DerivativeID, DerivativeTier: row.Tier,
-			StorageProfileID: row.StorageProfileID, ObjectKey: row.StorageKey,
-			ObjectGeneration: row.ObjectGeneration, ChecksumSHA256: row.ChecksumSha256,
-			MIMEType: row.MimeType, SizeBytes: row.SizeBytes, Role: ref.Role, Weight: ref.Weight,
-		}, nil
+	inputs, err := r.resolveManifestRefs(ctx, userID, media.Inputs, "input")
+	if err != nil {
+		return nil, err
 	}
-	inputs := make([]tasks.TaskInputManifestRef, 0, len(media.Inputs))
-	for index, ref := range media.Inputs {
-		resolved, err := resolve(ref)
-		if err != nil {
-			return nil, fmt.Errorf("resolve input media %d: %w", index, err)
-		}
-		inputs = append(inputs, resolved)
-	}
-	references := make([]tasks.TaskInputManifestRef, 0, len(media.References))
-	for index, ref := range media.References {
-		resolved, err := resolve(ref)
-		if err != nil {
-			return nil, fmt.Errorf("resolve reference media %d: %w", index, err)
-		}
-		references = append(references, resolved)
+	references, err := r.resolveManifestRefs(ctx, userID, media.References, "reference")
+	if err != nil {
+		return nil, err
 	}
 	var original, mask *tasks.TaskInputManifestRef
 	if media.Original != nil {
-		resolved, err := resolve(*media.Original)
+		resolved, err := r.resolveManifestRef(ctx, userID, *media.Original)
 		if err != nil {
 			return nil, fmt.Errorf("resolve original media: %w", err)
 		}
 		original = &resolved
 	}
 	if media.Mask != nil {
-		resolved, err := resolve(*media.Mask)
+		resolved, err := r.resolveManifestRef(ctx, userID, *media.Mask)
 		if err != nil {
 			return nil, fmt.Errorf("resolve mask media: %w", err)
 		}
 		mask = &resolved
 	}
 	return tasks.NewTaskInputManifest(inputs, references, original, mask, media.UseMask)
+}
+
+func (r *MediaAssetRegistry) resolveManifestRefs(ctx context.Context, userID int64, refs []tasks.MediaRef, kind string) ([]tasks.TaskInputManifestRef, error) {
+	resolved := make([]tasks.TaskInputManifestRef, 0, len(refs))
+	for index, ref := range refs {
+		item, err := r.resolveManifestRef(ctx, userID, ref)
+		if err != nil {
+			return nil, fmt.Errorf("resolve %s media %d: %w", kind, index, err)
+		}
+		resolved = append(resolved, item)
+	}
+	return resolved, nil
+}
+
+func (r *MediaAssetRegistry) resolveManifestRef(ctx context.Context, userID int64, ref tasks.MediaRef) (tasks.TaskInputManifestRef, error) {
+	if ref.AssetID <= 0 {
+		return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeMediaNotFound, "media.manifest.resolve", "invalid asset id", nil)
+	}
+	row, err := r.q.GetProcessingInputManifestObject(ctx, dbsqlc.GetProcessingInputManifestObjectParams{MediaAssetID: ref.AssetID, OwnerUserID: userID})
+	if errors.Is(err, sql.ErrNoRows) {
+		return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeMediaProcessing, "media.manifest.resolve", "processing-input derivative is not ready", err)
+	}
+	if err != nil {
+		return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeStorageTransient, "media.manifest.resolve", "load processing-input derivative failed", err)
+	}
+	if r.integrityVerifier == nil {
+		return tasks.TaskInputManifestRef{}, fmt.Errorf("media integrity verifier is unavailable")
+	}
+	if err := r.integrityVerifier.Verify(ctx, row.StorageProfileID, row.StorageKey, row.ChecksumSha256, row.MimeType, row.SizeBytes); err != nil {
+		return tasks.TaskInputManifestRef{}, err
+	}
+	return tasks.TaskInputManifestRef{
+		AssetID: row.AssetID, DerivativeID: row.DerivativeID, DerivativeTier: row.Tier,
+		StorageProfileID: row.StorageProfileID, ObjectKey: row.StorageKey,
+		ObjectGeneration: row.ObjectGeneration, ChecksumSHA256: row.ChecksumSha256,
+		MIMEType: row.MimeType, SizeBytes: row.SizeBytes, Role: ref.Role, Weight: ref.Weight,
+	}, nil
 }
 
 func (r *MediaAssetRegistry) GetByAssetID(ctx context.Context, ownerUserID int64, assetID string) (dbsqlc.MediaAsset, error) {

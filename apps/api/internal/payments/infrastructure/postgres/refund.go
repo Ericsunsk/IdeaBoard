@@ -50,16 +50,11 @@ func (r *Repository) CreateExternalPaymentRefund(ctx context.Context, provider p
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	if linked, err := r.findRefundByStripeID(ctx, tx, provider.ID); err == nil {
-		return linked, tx.Commit()
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return paymentsdomain.PaymentRefund{}, err
-	}
 	key := "stripe-dashboard-" + provider.ID
-	if existing, err := r.findRefundByIdempotency(ctx, tx, order.ID, key); err == nil {
-		return existing, tx.Commit()
-	} else if !errors.Is(err, sql.ErrNoRows) {
+	if existing, found, err := r.findExistingExternalRefund(ctx, tx, order.ID, provider.ID, key); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
+	} else if found {
+		return existing, tx.Commit()
 	}
 	if err := validateExternalRefund(order, provider); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
@@ -84,6 +79,20 @@ func (r *Repository) CreateExternalPaymentRefund(ctx context.Context, provider p
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	return refund, nil
+}
+
+func (r *Repository) findExistingExternalRefund(ctx context.Context, tx *sql.Tx, orderID, stripeRefundID, idempotencyKey string) (paymentsdomain.PaymentRefund, bool, error) {
+	if linked, err := r.findRefundByStripeID(ctx, tx, stripeRefundID); err == nil {
+		return linked, true, nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return paymentsdomain.PaymentRefund{}, false, err
+	}
+	if existing, err := r.findRefundByIdempotency(ctx, tx, orderID, idempotencyKey); err == nil {
+		return existing, true, nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return paymentsdomain.PaymentRefund{}, false, err
+	}
+	return paymentsdomain.PaymentRefund{}, false, nil
 }
 
 func (r *Repository) attachExternalProviderRefund(ctx context.Context, tx *sql.Tx, pending paymentsdomain.PaymentRefund, provider paymentports.StripeRefund, now time.Time) error {
@@ -161,7 +170,7 @@ func (r *Repository) RecordPaymentRefundAnomaly(ctx context.Context, provider pa
 // CreatePendingPaymentRefund reserves Ideas and records the provider intent in
 // one SQL transaction. Stripe I/O happens only after this commit.
 func (r *Repository) CreatePendingPaymentRefund(ctx context.Context, input paymentrefund.CreatePendingPaymentRefundInput) (paymentsdomain.PaymentRefund, bool, error) {
-	if r == nil || r.db == nil || input.ActorID <= 0 || input.IdeaQuantity <= 0 {
+	if !validPendingRefundRequest(r, input) {
 		return paymentsdomain.PaymentRefund{}, false, paymentcontracts.ErrRefundAmountInvalid
 	}
 	if strings.TrimSpace(input.Reason) == "" {
@@ -179,12 +188,7 @@ func (r *Repository) CreatePendingPaymentRefund(ctx context.Context, input payme
 	if existing, replayed, err := findPendingRefundReplay(ctx, tx, order, input); err != nil {
 		return paymentsdomain.PaymentRefund{}, false, err
 	} else if replayed {
-		if err := tx.Commit(); err != nil {
-			return paymentsdomain.PaymentRefund{}, false, fmt.Errorf("commit refund replay: %w", err)
-		}
-		existing.PublicOrderNumber = order.PublicOrderNumber
-		existing.StripeChargeID = order.StripeChargeID
-		return existing, true, nil
+		return commitPendingRefundReplay(tx, existing, order)
 	}
 	if err := validatePendingRefundEligibility(order, paidSubtotal, paidTotal, paidAt, input.Now); err != nil {
 		return paymentsdomain.PaymentRefund{}, false, err
@@ -209,6 +213,19 @@ func (r *Repository) CreatePendingPaymentRefund(ctx context.Context, input payme
 		return paymentsdomain.PaymentRefund{}, false, fmt.Errorf("commit payment refund: %w", err)
 	}
 	return refund, false, nil
+}
+
+func validPendingRefundRequest(r *Repository, input paymentrefund.CreatePendingPaymentRefundInput) bool {
+	return r != nil && r.db != nil && input.ActorID > 0 && input.IdeaQuantity > 0
+}
+
+func commitPendingRefundReplay(tx *sql.Tx, existing paymentsdomain.PaymentRefund, order paymentsdomain.PaymentOrder) (paymentsdomain.PaymentRefund, bool, error) {
+	if err := tx.Commit(); err != nil {
+		return paymentsdomain.PaymentRefund{}, false, fmt.Errorf("commit refund replay: %w", err)
+	}
+	existing.PublicOrderNumber = order.PublicOrderNumber
+	existing.StripeChargeID = order.StripeChargeID
+	return existing, true, nil
 }
 
 func (r *Repository) persistPendingRefund(ctx context.Context, tx *sql.Tx, order paymentsdomain.PaymentOrder, currency string, input paymentrefund.CreatePendingPaymentRefundInput, amountMinor int64) (paymentsdomain.PaymentRefund, error) {

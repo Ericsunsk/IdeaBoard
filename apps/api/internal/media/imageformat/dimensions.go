@@ -61,33 +61,16 @@ func Inspect(source io.ReadSeeker, ext string) (facts Facts, err error) {
 	if err = ValidateImageReader(source, normalizedExt); err != nil {
 		return Facts{}, err
 	}
-	if _, err = source.Seek(0, io.SeekStart); err != nil {
-		return Facts{}, fmt.Errorf("读取图片失败: %w", err)
-	}
-	cfg, format, err := image.DecodeConfig(source)
+	cfg, format, err := decodeImageConfig(source)
 	if err != nil {
-		return Facts{}, fmt.Errorf("读取图片尺寸失败: %w", err)
+		return Facts{}, err
 	}
-	if cfg.Width <= 0 || cfg.Height <= 0 || format == "" {
-		return Facts{}, fmt.Errorf("图片尺寸或格式无效")
+	if err := validateImageDimensions(cfg, format); err != nil {
+		return Facts{}, err
 	}
-	if cfg.Width > MaxImageDimensionPixels || cfg.Height > MaxImageDimensionPixels {
-		return Facts{}, fmt.Errorf("图片尺寸超过限制: %dx%d", cfg.Width, cfg.Height)
-	}
-	if int64(cfg.Width)*int64(cfg.Height) > MaxImageTotalPixels {
-		return Facts{}, fmt.Errorf("图片总像素超过限制: %dx%d", cfg.Width, cfg.Height)
-	}
-
-	animated := false
-	if normalizedExt == ".gif" {
-		if _, err = source.Seek(0, io.SeekStart); err != nil {
-			return Facts{}, fmt.Errorf("读取 GIF 动画信息失败: %w", err)
-		}
-		decoded, decodeErr := gif.DecodeAll(source)
-		if decodeErr != nil {
-			return Facts{}, fmt.Errorf("读取 GIF 动画信息失败: %w", decodeErr)
-		}
-		animated = len(decoded.Image) > 1
+	animated, err := inspectGIFAnimation(source, normalizedExt)
+	if err != nil {
+		return Facts{}, err
 	}
 
 	return Facts{
@@ -97,4 +80,42 @@ func Inspect(source io.ReadSeeker, ext string) (facts Facts, err error) {
 		Height:    cfg.Height,
 		Animated:  animated,
 	}, nil
+}
+
+func decodeImageConfig(source io.ReadSeeker) (image.Config, string, error) {
+	if _, err := source.Seek(0, io.SeekStart); err != nil {
+		return image.Config{}, "", fmt.Errorf("读取图片失败: %w", err)
+	}
+	cfg, format, err := image.DecodeConfig(source)
+	if err != nil {
+		return image.Config{}, "", fmt.Errorf("读取图片尺寸失败: %w", err)
+	}
+	return cfg, format, nil
+}
+
+func validateImageDimensions(cfg image.Config, format string) error {
+	if cfg.Width <= 0 || cfg.Height <= 0 || format == "" {
+		return fmt.Errorf("图片尺寸或格式无效")
+	}
+	if cfg.Width > MaxImageDimensionPixels || cfg.Height > MaxImageDimensionPixels {
+		return fmt.Errorf("图片尺寸超过限制: %dx%d", cfg.Width, cfg.Height)
+	}
+	if int64(cfg.Width)*int64(cfg.Height) > MaxImageTotalPixels {
+		return fmt.Errorf("图片总像素超过限制: %dx%d", cfg.Width, cfg.Height)
+	}
+	return nil
+}
+
+func inspectGIFAnimation(source io.ReadSeeker, ext string) (bool, error) {
+	if ext != ".gif" {
+		return false, nil
+	}
+	if _, err := source.Seek(0, io.SeekStart); err != nil {
+		return false, fmt.Errorf("读取 GIF 动画信息失败: %w", err)
+	}
+	decoded, err := gif.DecodeAll(source)
+	if err != nil {
+		return false, fmt.Errorf("读取 GIF 动画信息失败: %w", err)
+	}
+	return len(decoded.Image) > 1, nil
 }

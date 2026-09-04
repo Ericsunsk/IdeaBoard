@@ -1,20 +1,12 @@
-package users
+package tests
 
 import (
 	"context"
-	"database/sql"
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/testdb"
-
 	"github.com/google/uuid"
 )
-
-func newUserRepoTestDB(t *testing.T) *sql.DB {
-	t.Helper()
-	return testdb.Open(t)
-}
 
 func TestCreateAssignsPublicIdentityAndPersistsDisplayName(t *testing.T) {
 	db := newUserRepoTestDB(t)

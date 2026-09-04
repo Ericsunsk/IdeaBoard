@@ -4,7 +4,7 @@ import (
 	"context"
 	credithttp "ideaboard/api/internal/credits/interfaces/http"
 
-	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/rewards"
 
 	"github.com/google/uuid"
@@ -13,7 +13,7 @@ import (
 // creditsUserResolver adapts the identity repository without making the
 // credits package depend on the users lifecycle package.
 type creditsUserResolver struct {
-	repo *users.UserRepository
+	repo ports.UserRepository
 }
 
 func (r creditsUserResolver) ResolvePublicID(ctx context.Context, publicID string) (credithttp.UserIdentity, error) {
@@ -33,11 +33,11 @@ func (r creditsUserResolver) ResolveID(ctx context.Context, id int64) (credithtt
 }
 
 type taskUserResolver struct {
-	repo *users.UserRepository
+	repo ports.UserRepository
 }
 
 type rewardIdentityProjector struct {
-	repo *users.UserRepository
+	repo ports.UserRepository
 }
 
 func (r rewardIdentityProjector) ResolveIdentity(

@@ -11,7 +11,8 @@ import (
 	"ideaboard/api/internal/billingrecords"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/auth"
-	"ideaboard/api/internal/identity/users"
+	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
+	"ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
@@ -41,7 +42,7 @@ type Dependencies struct {
 	Internal            InternalRouteDeps
 }
 
-type InternalRouteDeps struct{ UserHandler *users.InternalHandler }
+type InternalRouteDeps struct{ UserHandler *identityhttp.InternalHandler }
 
 type FrontendRouteOptions struct {
 	WarnMissingIndex bool
@@ -49,14 +50,14 @@ type FrontendRouteOptions struct {
 
 type AuthDeps struct {
 	AuthServiceClient *auth.ServiceClient
-	UserRepo          *users.UserRepository
-	UserLifecycle     *users.LifecycleService
+	UserRepo          ports.UserRepository
+	UserLifecycle     auth.IdentityProvisioner
 }
 
 type UploadDeps struct {
 	StorageService *storage.StorageService
 	MediaAssets    assets.UploadRegistry
-	UserRepo       *users.UserRepository
+	UserRepo       ports.UserRepository
 	BoardService   *boards.BoardService
 	UploadSettings settings.MediaUploadSettingProvider
 }
@@ -97,7 +98,7 @@ type UserRouteDeps struct {
 }
 
 type AdminRouteDeps struct {
-	AdminHandler                *users.AdminHandler
+	AdminHandler                *identityhttp.AdminHandler
 	MailConfigHandler           *auth.MailConfigAdminHandler
 	SocialProviderHandler       *auth.SocialProviderAdminHandler
 	BillingHandler              *billing.Handler

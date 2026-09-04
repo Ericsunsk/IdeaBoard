@@ -9,7 +9,8 @@ import (
 	"time"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
-	"ideaboard/api/internal/identity/users"
+	identitydomain "ideaboard/api/internal/identity/users/domain"
+	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/testdb"
 
 	"github.com/google/uuid"
@@ -268,8 +269,8 @@ func TestReclaimWorkerIgnoresCompletedGenerationAfterUndoAndReschedule(t *testin
 
 func seedDueMediaAsset(t *testing.T, db *sql.DB, q *dbsqlc.Queries) (int64, int64) {
 	t.Helper()
-	owner := &users.User{DisplayName: "reclaim-owner", Status: 1, Role: "user"}
-	if err := users.NewUserRepository(db).Create(context.Background(), owner); err != nil {
+	owner := &identitydomain.User{DisplayName: "reclaim-owner", Status: 1, Role: "user"}
+	if err := identitypostgres.NewRepository(db).Create(context.Background(), owner); err != nil {
 		t.Fatalf("create owner: %v", err)
 	}
 	assetID, err := q.UpsertMediaAsset(context.Background(), dbsqlc.UpsertMediaAssetParams{

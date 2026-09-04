@@ -28,7 +28,6 @@ func (o providerBatchOrchestrator) run(ctx context.Context, request providerRequ
 	maxCalls := requested * 2
 	callCount := 0
 	result := providerCallResult{}
-	var lastErr error
 
 	call := func(current providerRequest) (providerCallResult, error) {
 		if err := ctx.Err(); err != nil {
@@ -50,38 +49,9 @@ func (o providerBatchOrchestrator) run(ctx context.Context, request providerRequ
 	}
 	mergeProviderBatchResult(&result, nativeResult, requested)
 
-	fillAttempts := 0
-	for len(result.ImageURLs) < requested && callCount < maxCalls && fillAttempts < requested {
-		fillAttempts++
-		if err := ctx.Err(); err != nil {
-			return providerCallResult{}, err
-		}
-		single := request.withOutputCount(1)
-		fillResult, fillErr := call(single)
-		if fillErr == nil {
-			mergeProviderBatchResult(&result, fillResult, requested)
-			continue
-		}
-		lastErr = fillErr
-		if !shouldFailoverProviderError(fillErr) {
-			break
-		}
-		if callCount >= maxCalls {
-			break
-		}
-		if waitErr := o.wait(ctx, providerRetryDelay(fillErr)); waitErr != nil {
-			return providerCallResult{}, waitErr
-		}
-		fillResult, fillErr = call(single)
-		if fillErr == nil {
-			mergeProviderBatchResult(&result, fillResult, requested)
-			// This retry belongs to the same missing slot. The outer loop only
-			// advances after this slot has either produced an image or failed.
-			continue
-		}
-		lastErr = fillErr
-		// A slot gets at most one transient retry. Move on so one bad slot
-		// cannot consume the retry budget intended for later outputs.
+	lastErr, err := o.fillProviderBatch(ctx, request, requested, maxCalls, &callCount, &result, call)
+	if err != nil {
+		return providerCallResult{}, err
 	}
 
 	if len(result.ImageURLs) == 0 {
@@ -93,6 +63,48 @@ func (o providerBatchOrchestrator) run(ctx context.Context, request providerRequ
 	result.ImageURL = result.ImageURLs[0]
 	result.ParsedOutputCount = len(result.ImageURLs)
 	return result, nil
+}
+
+func (o providerBatchOrchestrator) fillProviderBatch(
+	ctx context.Context,
+	request providerRequest,
+	requested int,
+	maxCalls int,
+	callCount *int,
+	result *providerCallResult,
+	call func(providerRequest) (providerCallResult, error),
+) (lastErr error, err error) {
+	fillAttempts := 0
+	for len(result.ImageURLs) < requested && *callCount < maxCalls && fillAttempts < requested {
+		fillAttempts++
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		single := request.withOutputCount(1)
+		fillResult, fillErr := call(single)
+		if fillErr == nil {
+			mergeProviderBatchResult(result, fillResult, requested)
+			continue
+		}
+		lastErr = fillErr
+		if !shouldFailoverProviderError(fillErr) || *callCount >= maxCalls {
+			break
+		}
+		if waitErr := o.wait(ctx, providerRetryDelay(fillErr)); waitErr != nil {
+			return nil, waitErr
+		}
+		fillResult, fillErr = call(single)
+		if fillErr == nil {
+			mergeProviderBatchResult(result, fillResult, requested)
+			// This retry belongs to the same missing slot. The outer loop only
+			// advances after this slot has either produced an image or failed.
+			continue
+		}
+		lastErr = fillErr
+		// A slot gets at most one transient retry. Move on so one bad slot
+		// cannot consume the retry budget intended for later outputs.
+	}
+	return lastErr, nil
 }
 
 func mergeProviderBatchResult(target *providerCallResult, current providerCallResult, limit int) {

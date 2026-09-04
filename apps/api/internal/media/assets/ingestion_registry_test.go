@@ -10,7 +10,8 @@ import (
 	"time"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
-	"ideaboard/api/internal/identity/users"
+	identitydomain "ideaboard/api/internal/identity/users/domain"
+	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/testdb"
@@ -31,8 +32,8 @@ func newMediaAssetRegistryForTest(db *sql.DB) *MediaAssetRegistry {
 func TestBoardUploadIngestionTransitionsToReadyWithDerivativeOutbox(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
-	owner := &users.User{DisplayName: "board-ingestion-owner", Status: 1, Role: "user"}
-	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
+	owner := &identitydomain.User{DisplayName: "board-ingestion-owner", Status: 1, Role: "user"}
+	if err := identitypostgres.NewRepository(db).Create(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
 	registry := newMediaAssetRegistryForTest(db)
@@ -89,8 +90,8 @@ func TestBoardUploadIngestionTransitionsToReadyWithDerivativeOutbox(t *testing.T
 func TestDerivativeIsRequeuedWhenSourceGenerationChanges(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
-	owner := &users.User{DisplayName: "derivative-generation-owner", Status: 1, Role: "user"}
-	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
+	owner := &identitydomain.User{DisplayName: "derivative-generation-owner", Status: 1, Role: "user"}
+	if err := identitypostgres.NewRepository(db).Create(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
 	registry := newMediaAssetRegistryForTest(db)
@@ -147,8 +148,8 @@ func TestDerivativeIsRequeuedWhenSourceGenerationChanges(t *testing.T) {
 func TestRegistryContractCompletesBoardIngestionWithDerivativeOutbox(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
-	owner := &users.User{DisplayName: "registry-contract-owner", Status: 1, Role: "user"}
-	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
+	owner := &identitydomain.User{DisplayName: "registry-contract-owner", Status: 1, Role: "user"}
+	if err := identitypostgres.NewRepository(db).Create(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
 
@@ -200,8 +201,8 @@ func TestRegistryContractCompletesBoardIngestionWithDerivativeOutbox(t *testing.
 func TestEnsureDerivativeKeepsOutboxWhenImmediateEnqueueFails(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
-	owner := &users.User{DisplayName: "derivative-enqueue-fallback-owner", Status: 1, Role: "user"}
-	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
+	owner := &identitydomain.User{DisplayName: "derivative-enqueue-fallback-owner", Status: 1, Role: "user"}
+	if err := identitypostgres.NewRepository(db).Create(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
 	registry := newMediaAssetRegistryForTest(db)
@@ -240,8 +241,8 @@ func TestEnsureDerivativeKeepsOutboxWhenImmediateEnqueueFails(t *testing.T) {
 func TestLibraryMaterializationReusesManagedAssetAndQueuesDerivatives(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
-	owner := &users.User{DisplayName: "library-materialization-owner", Status: 1, Role: "user"}
-	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
+	owner := &identitydomain.User{DisplayName: "library-materialization-owner", Status: 1, Role: "user"}
+	if err := identitypostgres.NewRepository(db).Create(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
 	var folderID, libraryAssetID int64
@@ -293,8 +294,8 @@ func TestLibraryMaterializationReusesManagedAssetAndQueuesDerivatives(t *testing
 func TestTaskResultIngestionTransitionsToReadyIdempotently(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
-	owner := &users.User{DisplayName: "task-result-ingestion-owner", Status: 1, Role: "user"}
-	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
+	owner := &identitydomain.User{DisplayName: "task-result-ingestion-owner", Status: 1, Role: "user"}
+	if err := identitypostgres.NewRepository(db).Create(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
 	registry := newMediaAssetRegistryForTest(db)
@@ -367,8 +368,8 @@ func assertDerivativeTiers(t *testing.T, derivatives []dbsqlc.MediaDerivative, w
 func TestGenerationPreparationIngestionCompletesWithTypedMediaRef(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
-	owner := &users.User{DisplayName: "generation-preparation-owner", Status: 1, Role: "user"}
-	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
+	owner := &identitydomain.User{DisplayName: "generation-preparation-owner", Status: 1, Role: "user"}
+	if err := identitypostgres.NewRepository(db).Create(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
 	registry := newMediaAssetRegistryForTest(db)
@@ -400,8 +401,8 @@ func TestGenerationPreparationIngestionCompletesWithTypedMediaRef(t *testing.T) 
 func TestMediaAssetRegistryPersistsFailureForEveryOrigin(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
-	owner := &users.User{DisplayName: "all-origins-failure-owner", Status: 1, Role: "user"}
-	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
+	owner := &identitydomain.User{DisplayName: "all-origins-failure-owner", Status: 1, Role: "user"}
+	if err := identitypostgres.NewRepository(db).Create(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
 	var folderID, libraryAssetID int64
@@ -438,8 +439,8 @@ func TestMediaAssetRegistryPersistsFailureForEveryOrigin(t *testing.T) {
 func TestMediaAssetRegistryRegistersBoardUploadForInitialReclamation(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
-	owner := &users.User{DisplayName: "board-upload-owner", Status: 1, Role: "user"}
-	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
+	owner := &identitydomain.User{DisplayName: "board-upload-owner", Status: 1, Role: "user"}
+	if err := identitypostgres.NewRepository(db).Create(ctx, owner); err != nil {
 		t.Fatalf("create upload owner: %v", err)
 	}
 	now := time.Date(2026, time.July, 29, 12, 0, 0, 0, time.UTC)

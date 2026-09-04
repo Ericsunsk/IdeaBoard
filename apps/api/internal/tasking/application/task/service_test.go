@@ -14,7 +14,8 @@ import (
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/events"
-	"ideaboard/api/internal/identity/users"
+	identitydomain "ideaboard/api/internal/identity/users/domain"
+	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/validation"
@@ -821,7 +822,7 @@ func TestWorkflowTaskParamsFromMapDoesNotPreserveKnownContractKeysInExtra(t *tes
 func TestSubmitTaskCanvasUploadRefsRequireBoardAccess(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)
-	userRepo := users.NewUserRepository(db)
+	userRepo := identitypostgres.NewRepository(db)
 	owner := mustCreateTaskUploadUser(t, userRepo, "owner", "owner-auth", "OWNR1A")
 	member := mustCreateTaskUploadUser(t, userRepo, "member", "member-auth", "MEMB1A")
 	outsider := mustCreateTaskUploadUser(t, userRepo, "outsider", "outsider-auth", "OUTS1A")
@@ -1384,7 +1385,7 @@ func (r testTaskUploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.
 }
 
 type testTaskUploadOwnerStorageUIDResolver struct {
-	repo *users.UserRepository
+	repo *identitypostgres.Repository
 }
 
 func (r testTaskUploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context.Context, userID int64) (string, error) {
@@ -1395,9 +1396,9 @@ func (r testTaskUploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context
 	return user.StorageUID, nil
 }
 
-func mustCreateTaskUploadUser(t *testing.T, repo *users.UserRepository, displayName string, authUserID string, storageUID string) *users.User {
+func mustCreateTaskUploadUser(t *testing.T, repo *identitypostgres.Repository, displayName string, authUserID string, storageUID string) *identitydomain.User {
 	t.Helper()
-	user := &users.User{
+	user := &identitydomain.User{
 		DisplayName: displayName,
 		AuthUserID:  &authUserID,
 		StorageUID:  storageUID,
