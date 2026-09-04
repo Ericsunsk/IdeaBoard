@@ -1,4 +1,4 @@
-package rewards
+package http
 
 import (
 	"container/list"
@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	defaultRedemptionAttemptLimit  = 10
+	DefaultRedemptionAttemptLimit  = 10
+	defaultRedemptionAttemptLimit  = DefaultRedemptionAttemptLimit
 	defaultRedemptionAttemptWindow = 10 * time.Minute
 	maxTrackedRedemptionUsers      = 10_000
 	redemptionLimiterCleanupEvery  = time.Minute

@@ -1,4 +1,4 @@
-package rewards
+package reward_codes
 
 import (
 	"context"
@@ -6,6 +6,11 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+)
+
+const (
+	defaultRedemptionHistoryLimit = 20
+	maxRedemptionHistoryLimit     = 100
 )
 
 func (s *Service) ListAdminRedemptions(
@@ -80,11 +85,11 @@ WHERE reward_code_id = $1 AND id = $2`, input.RewardCodeID, input.RedemptionID).
 		&detail.CreditTransactionID,
 		&detail.MaskedCodeHint,
 	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return AdminRedemptionDetail{}, ErrRedemptionNotFound
-	}
 	if err != nil {
-		return AdminRedemptionDetail{}, fmt.Errorf("get admin RewardCode Redemption: %w", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return AdminRedemptionDetail{}, ErrRedemptionNotFound
+		}
+		return AdminRedemptionDetail{}, fmt.Errorf("load admin RewardCode Redemption: %w", err)
 	}
 	return detail, nil
 }

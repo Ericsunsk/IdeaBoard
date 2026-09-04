@@ -19,6 +19,7 @@ import (
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/rewards"
+	creditsadapter "ideaboard/api/internal/rewards/infrastructure/credits"
 	"ideaboard/api/internal/runtime/billingregistry"
 	"ideaboard/api/internal/runtime/worker"
 	"ideaboard/api/internal/usage"
@@ -80,7 +81,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 	if err != nil {
 		return appDomainServices{}, err
 	}
-	rewardService := rewards.NewService(appPool, creditService, rewardKeys)
+	rewardService := rewards.NewService(appPool, creditsadapter.New(creditService), rewardKeys)
 	if err := rewardService.ValidateActiveCodeKeyVersions(ctx); err != nil {
 		return appDomainServices{}, err
 	}

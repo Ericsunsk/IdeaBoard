@@ -1,10 +1,9 @@
-package rewards
+package http
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"ideaboard/api/internal/credits/domain"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -14,46 +13,39 @@ import (
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
+	rewardsdomain "ideaboard/api/internal/rewards/domain"
+	"ideaboard/api/internal/rewards/ports"
 
 	"github.com/gin-gonic/gin"
 )
 
 const maxRewardRequestBytes int64 = 64 << 10
 
-type UserService interface {
-	UserCommands
-	UserReads
-}
-
-type AdminCommandService interface {
-	AdminCommands
-}
-
 type UserHandler struct {
-	service UserService
+	service ports.UserService
 	limiter *redemptionAttemptLimiter
 	metrics redemptionMetrics
 }
 
 type AdminCommandHandler struct {
-	service AdminCommandService
+	service ports.AdminCommandService
 }
 
 type AdminReadHandler struct {
-	service            AdminReads
-	identityProjection IdentityProjectionReader
+	service            ports.AdminReads
+	identityProjection ports.IdentityProjectionReader
 }
 
-type redemptionHandlerOptions struct {
+type RedemptionHandlerOptions struct {
 	Now             func() time.Time
 	MetricsRecorder redemptionMetricsRecorder
 }
 
-func NewUserHandler(service UserService) *UserHandler {
-	return newUserHandlerWithOptions(service, redemptionHandlerOptions{})
+func NewUserHandler(service ports.UserService) *UserHandler {
+	return NewUserHandlerWithOptions(service, RedemptionHandlerOptions{})
 }
 
-func newUserHandlerWithOptions(service UserService, options redemptionHandlerOptions) *UserHandler {
+func NewUserHandlerWithOptions(service ports.UserService, options RedemptionHandlerOptions) *UserHandler {
 	if options.MetricsRecorder == nil {
 		options.MetricsRecorder = defaultRedemptionMetricsRecorder
 	}
@@ -64,11 +56,11 @@ func newUserHandlerWithOptions(service UserService, options redemptionHandlerOpt
 	}
 }
 
-func NewAdminCommandHandler(service AdminCommandService) *AdminCommandHandler {
+func NewAdminCommandHandler(service ports.AdminCommandService) *AdminCommandHandler {
 	return &AdminCommandHandler{service: service}
 }
 
-func NewAdminReadHandler(service AdminReads, identityProjection IdentityProjectionReader) *AdminReadHandler {
+func NewAdminReadHandler(service ports.AdminReads, identityProjection ports.IdentityProjectionReader) *AdminReadHandler {
 	return &AdminReadHandler{service: service, identityProjection: identityProjection}
 }
 
@@ -94,10 +86,10 @@ type setRewardCodeEnabledRequest struct {
 }
 
 type searchRewardCodesRequest struct {
-	Query    string           `json:"query"`
-	Status   RewardCodeStatus `json:"status"`
-	BeforeID *int64           `json:"before_id"`
-	Limit    *int             `json:"limit"`
+	Query    string                 `json:"query"`
+	Status   ports.RewardCodeStatus `json:"status"`
+	BeforeID *int64                 `json:"before_id"`
+	Limit    *int                   `json:"limit"`
 }
 
 type redeemRequest struct {
@@ -119,10 +111,14 @@ func (h *AdminCommandHandler) CreateRewardCode(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
-	created, err := h.service.CreateRewardCode(c.Request.Context(), CreateRewardCodeCommand{
-		DisplayName: request.DisplayName, Code: request.Code, CreditAmount: request.CreditAmount,
-		MaxRedemptions: request.MaxRedemptions, ExpiresAt: request.ExpiresAt,
-		IdempotencyKey: request.IdempotencyKey, ActorUserID: actorID,
+	created, err := h.service.CreateRewardCode(c.Request.Context(), ports.CreateRewardCodeCommand{
+		DisplayName:    request.DisplayName,
+		Code:           request.Code,
+		CreditAmount:   request.CreditAmount,
+		MaxRedemptions: request.MaxRedemptions,
+		ExpiresAt:      request.ExpiresAt,
+		IdempotencyKey: request.IdempotencyKey,
+		ActorUserID:    actorID,
 	})
 	if err != nil {
 		writeRewardError(c, err)
@@ -146,10 +142,14 @@ func (h *AdminCommandHandler) UpdateRewardCode(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
-	updated, err := h.service.UpdateRewardCode(c.Request.Context(), UpdateRewardCodeCommand{
-		RewardCodeID: rewardCodeID, DisplayName: request.DisplayName,
-		CreditAmount: request.CreditAmount, MaxRedemptions: request.MaxRedemptions,
-		ExpiresAt: request.ExpiresAt, Code: request.Code, ActorUserID: actorID,
+	updated, err := h.service.UpdateRewardCode(c.Request.Context(), ports.UpdateRewardCodeCommand{
+		RewardCodeID:   rewardCodeID,
+		DisplayName:    request.DisplayName,
+		CreditAmount:   request.CreditAmount,
+		MaxRedemptions: request.MaxRedemptions,
+		ExpiresAt:      request.ExpiresAt,
+		Code:           request.Code,
+		ActorUserID:    actorID,
 	})
 	if err != nil {
 		writeRewardError(c, err)
@@ -173,8 +173,10 @@ func (h *AdminCommandHandler) SetRewardCodeEnabled(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
-	updated, err := h.service.SetRewardCodeEnabled(c.Request.Context(), SetRewardCodeEnabledCommand{
-		RewardCodeID: rewardCodeID, Enabled: *request.Enabled, ActorUserID: actorID,
+	updated, err := h.service.SetRewardCodeEnabled(c.Request.Context(), ports.SetRewardCodeEnabledCommand{
+		RewardCodeID: rewardCodeID,
+		Enabled:      *request.Enabled,
+		ActorUserID:  actorID,
 	})
 	if err != nil {
 		writeRewardError(c, err)
@@ -193,8 +195,9 @@ func (h *AdminCommandHandler) DeleteRewardCode(c *gin.Context) {
 	if !ok {
 		return
 	}
-	deleted, err := h.service.DeleteRewardCode(c.Request.Context(), DeleteRewardCodeCommand{
-		RewardCodeID: rewardCodeID, ActorUserID: actorID,
+	deleted, err := h.service.DeleteRewardCode(c.Request.Context(), ports.DeleteRewardCodeCommand{
+		RewardCodeID: rewardCodeID,
+		ActorUserID:  actorID,
 	})
 	if err != nil {
 		writeRewardError(c, err)
@@ -221,7 +224,7 @@ func (h *AdminReadHandler) SearchRewardCodes(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
-	input := SearchRewardCodesInput{Query: request.Query, Status: request.Status, Limit: 20}
+	input := ports.SearchRewardCodesInput{Query: request.Query, Status: request.Status, Limit: 20}
 	if request.BeforeID != nil {
 		if *request.BeforeID <= 0 {
 			response.Error(c, http.StatusBadRequest, "参数错误")
@@ -254,7 +257,10 @@ func (h *AdminReadHandler) ListAdminRedemptions(c *gin.Context) {
 	if !ok {
 		return
 	}
-	input := ListAdminRedemptionsInput{RewardCodeID: rewardCodeID, Limit: defaultRedemptionHistoryLimit}
+	input := ports.ListAdminRedemptionsInput{
+		RewardCodeID: rewardCodeID,
+		Limit:        20,
+	}
 	if raw, exists := c.GetQuery("before_id"); exists {
 		raw = strings.TrimSpace(raw)
 		value, err := strconv.ParseInt(raw, 10, 64)
@@ -267,7 +273,7 @@ func (h *AdminReadHandler) ListAdminRedemptions(c *gin.Context) {
 	if raw, exists := c.GetQuery("limit"); exists {
 		raw = strings.TrimSpace(raw)
 		value, err := strconv.Atoi(raw)
-		if err != nil || value < 1 || value > maxRedemptionHistoryLimit {
+		if err != nil || value < 1 || value > 100 {
 			response.Error(c, http.StatusBadRequest, "limit 无效")
 			return
 		}
@@ -300,7 +306,7 @@ func (h *AdminReadHandler) GetAdminRedemption(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "兑换记录 ID 无效")
 		return
 	}
-	detail, err := h.service.GetAdminRedemption(c.Request.Context(), GetAdminRedemptionInput{
+	detail, err := h.service.GetAdminRedemption(c.Request.Context(), ports.GetAdminRedemptionInput{
 		RewardCodeID: rewardCodeID,
 		RedemptionID: redemptionID,
 	})
@@ -337,7 +343,7 @@ func (h *UserHandler) Redeem(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
-	result, err := h.service.Redeem(c.Request.Context(), RedeemCommand{
+	result, err := h.service.Redeem(c.Request.Context(), ports.RedeemCommand{
 		UserID: identityPrincipal.UserID(), Code: request.Code,
 	})
 	if err != nil {
@@ -357,7 +363,7 @@ func (h *UserHandler) Redeem(c *gin.Context) {
 
 func redemptionOutcomeForError(err error) redemptionOutcome {
 	switch {
-	case errors.Is(err, ErrInvalidCommand), errors.Is(err, ErrCodeUnavailable), errors.Is(err, domain.ErrWalletFrozen):
+	case errors.Is(err, rewardsdomain.ErrInvalidCode), errors.Is(err, rewardsdomain.ErrCodeUnavailable), errors.Is(err, rewardsdomain.ErrWalletFrozen):
 		return redemptionOutcomeInvalid
 	default:
 		return redemptionOutcomeInternalError
@@ -366,9 +372,9 @@ func redemptionOutcomeForError(err error) redemptionOutcome {
 
 func writeRewardRedeemError(c *gin.Context, err error) {
 	switch {
-	case errors.Is(err, ErrInvalidCommand), errors.Is(err, ErrCodeUnavailable):
+	case errors.Is(err, rewardsdomain.ErrInvalidCode), errors.Is(err, rewardsdomain.ErrCodeUnavailable):
 		response.Error(c, http.StatusUnprocessableEntity, "兑换码无效或已失效")
-	case errors.Is(err, domain.ErrWalletFrozen):
+	case errors.Is(err, rewardsdomain.ErrWalletFrozen):
 		response.Error(c, http.StatusLocked, "当前账户无法兑换奖励")
 	default:
 		slog.Warn("reward redemption failed", "outcome", "internal_error", "error_type", fmt.Sprintf("%T", err))
@@ -386,8 +392,9 @@ func (h *UserHandler) ListRedemptions(c *gin.Context) {
 	if !ok {
 		return
 	}
-	input := ListRedemptionsInput{UserID: identityPrincipal.UserID(), Limit: defaultRedemptionHistoryLimit}
-	if raw := strings.TrimSpace(c.Query("before_id")); raw != "" {
+	input := ports.ListRedemptionsInput{UserID: identityPrincipal.UserID(), Limit: 20}
+	if raw, exists := c.GetQuery("before_id"); exists {
+		raw = strings.TrimSpace(raw)
 		value, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || value <= 0 {
 			response.Error(c, http.StatusBadRequest, "before_id 无效")
@@ -395,9 +402,10 @@ func (h *UserHandler) ListRedemptions(c *gin.Context) {
 		}
 		input.BeforeID = value
 	}
-	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+	if raw, exists := c.GetQuery("limit"); exists {
+		raw = strings.TrimSpace(raw)
 		value, err := strconv.Atoi(raw)
-		if err != nil || value < 1 || value > maxRedemptionHistoryLimit {
+		if err != nil || value < 1 || value > 100 {
 			response.Error(c, http.StatusBadRequest, "limit 无效")
 			return
 		}
@@ -419,7 +427,7 @@ func requireAdmin(c *gin.Context) (int64, bool) {
 	return identityPrincipal.UserID(), true
 }
 
-func (h *AdminReadHandler) enrichAdminRedemptionPage(ctx context.Context, page *AdminRedemptionPage) error {
+func (h *AdminReadHandler) enrichAdminRedemptionPage(ctx context.Context, page *ports.AdminRedemptionPage) error {
 	if h == nil || page == nil {
 		return nil
 	}
@@ -445,7 +453,7 @@ func (h *AdminReadHandler) enrichAdminRedemptionPage(ctx context.Context, page *
 	return nil
 }
 
-func (h *AdminReadHandler) enrichAdminRedemption(ctx context.Context, detail *AdminRedemptionDetail) error {
+func (h *AdminReadHandler) enrichAdminRedemption(ctx context.Context, detail *ports.AdminRedemptionDetail) error {
 	if h == nil || detail == nil {
 		return nil
 	}
@@ -480,23 +488,23 @@ func decodeRewardJSON(c *gin.Context, destination any) error {
 
 func writeRewardError(c *gin.Context, err error) {
 	switch {
-	case errors.Is(err, ErrInvalidCommand):
+	case errors.Is(err, rewardsdomain.ErrInvalidCode):
 		response.Error(c, http.StatusBadRequest, "参数错误")
-	case errors.Is(err, ErrRewardCodeConflict):
+	case errors.Is(err, rewardsdomain.ErrRewardCodeConflict):
 		response.Error(c, http.StatusConflict, "幂等请求与原创建参数不一致")
-	case errors.Is(err, ErrCodeCollision):
+	case errors.Is(err, rewardsdomain.ErrCodeCollision):
 		response.Error(c, http.StatusConflict, "兑换码已存在")
-	case errors.Is(err, ErrRewardCodeNotFound):
+	case errors.Is(err, rewardsdomain.ErrRewardCodeNotFound):
 		response.Error(c, http.StatusNotFound, "兑换码不存在")
-	case errors.Is(err, ErrCapBelowRedemptions):
+	case errors.Is(err, rewardsdomain.ErrCapBelowRedemptions):
 		response.Error(c, http.StatusConflict, "兑换上限不能低于已兑换次数")
-	case errors.Is(err, ErrRewardCodeRedeemed):
+	case errors.Is(err, rewardsdomain.ErrRewardCodeRedeemed):
 		response.Error(c, http.StatusConflict, "已有兑换记录，只能停用该兑换码")
-	case errors.Is(err, ErrRedemptionNotFound):
+	case errors.Is(err, rewardsdomain.ErrRedemptionNotFound):
 		response.Error(c, http.StatusNotFound, "兑换记录不存在")
-	case errors.Is(err, ErrCodeUnavailable):
+	case errors.Is(err, rewardsdomain.ErrCodeUnavailable):
 		response.Error(c, http.StatusUnprocessableEntity, "兑换码无效或已失效")
-	case errors.Is(err, domain.ErrWalletFrozen):
+	case errors.Is(err, rewardsdomain.ErrWalletFrozen):
 		response.Error(c, http.StatusLocked, "当前账户无法兑换奖励")
 	default:
 		slog.Warn("reward admin operation failed", "error_type", fmt.Sprintf("%T", err))

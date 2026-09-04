@@ -1,18 +1,18 @@
-package rewards
+package tests
 
 import (
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"ideaboard/api/internal/credits/domain"
-	"ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/rewards/application/redemptions"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/credits"
+	"ideaboard/api/internal/rewards"
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5"
@@ -258,7 +258,7 @@ func TestRewardCodeGrantFailureRollsBackCapacityAndRedemption(t *testing.T) {
 		t.Fatal(err)
 	}
 	provisionRewardWallet(t, pool, realCredits, 3)
-	service.credits = failingGrantCreditService{reader: realCredits}
+	service = rewards.NewServiceWithOptions(pool, failingGrantCreditService{reader: realCredits}, newTestRewardKeyring(t), ServiceOptions{})
 	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "ROLLBACK-2026"}); err == nil {
 		t.Fatal("Redeem() succeeded with injected Credit Grant failure")
 	}
@@ -1113,49 +1113,14 @@ func rewardCodeString(value string) *string {
 	return &value
 }
 
-func (service failingGrantCreditService) InTx(pgx.Tx) ports.Commands {
-	return failingCreditCommands{}
+func (service failingGrantCreditService) Grant(context.Context, pgx.Tx, redemptions.CreditGrantRequest) (redemptions.CreditGrantResult, error) {
+	return redemptions.CreditGrantResult{}, fmt.Errorf("injected Credit Grant failure")
 }
 
-func (service failingGrantCreditService) GetWallet(ctx context.Context, userID int64) (domain.WalletDetails, error) {
-	return service.reader.GetWallet(ctx, userID)
-}
-
-type failingCreditCommands struct{}
-
-func (failingCreditCommands) Grant(context.Context, ports.GrantCommand) (ports.CommandResult, error) {
-	return ports.CommandResult{}, fmt.Errorf("injected Credit Grant failure")
-}
-func (failingCreditCommands) Deduct(context.Context, ports.DeductionCommand) (ports.CommandResult, error) {
-	return ports.CommandResult{}, fmt.Errorf("unexpected Deduct")
-}
-func (failingCreditCommands) Correct(context.Context, ports.CorrectionCommand) (ports.CommandResult, error) {
-	return ports.CommandResult{}, fmt.Errorf("unexpected Correct")
-}
-func (failingCreditCommands) Hold(context.Context, ports.HoldCommand) (ports.CommandResult, error) {
-	return ports.CommandResult{}, fmt.Errorf("unexpected Hold")
-}
-func (failingCreditCommands) Capture(context.Context, ports.CaptureCommand) (ports.CommandResult, error) {
-	return ports.CommandResult{}, fmt.Errorf("unexpected Capture")
-}
-func (failingCreditCommands) Release(context.Context, ports.ReleaseCommand) (ports.CommandResult, error) {
-	return ports.CommandResult{}, fmt.Errorf("unexpected Release")
-}
-func (failingCreditCommands) Refund(context.Context, ports.RefundCommand) (ports.CommandResult, error) {
-	return ports.CommandResult{}, fmt.Errorf("unexpected Refund")
-}
-func (failingCreditCommands) Purchase(context.Context, ports.PurchaseCommand) (ports.CommandResult, error) {
-	return ports.CommandResult{}, fmt.Errorf("unexpected Purchase")
-}
-func (failingCreditCommands) PurchaseRefundHold(context.Context, ports.PurchaseRefundHoldCommand) (ports.CommandResult, error) {
-	return ports.CommandResult{}, fmt.Errorf("unexpected PurchaseRefundHold")
-}
-func (failingCreditCommands) PurchaseRefund(context.Context, ports.PurchaseRefundCommand) (ports.CommandResult, error) {
-	return ports.CommandResult{}, fmt.Errorf("unexpected PurchaseRefund")
-}
-func (failingCreditCommands) PaymentDisputeDebit(context.Context, ports.PaymentDisputeDebitCommand) (ports.PaymentDisputeDebitResult, error) {
-	return ports.PaymentDisputeDebitResult{}, fmt.Errorf("unexpected PaymentDisputeDebit")
-}
-func (failingCreditCommands) PaymentDisputeRestore(context.Context, ports.PaymentDisputeRestoreCommand) (ports.CommandResult, error) {
-	return ports.CommandResult{}, fmt.Errorf("unexpected PaymentDisputeRestore")
+func (service failingGrantCreditService) ReadWallet(ctx context.Context, userID int64) (redemptions.WalletSnapshot, error) {
+	wallet, err := service.reader.GetWallet(ctx, userID)
+	if err != nil {
+		return redemptions.WalletSnapshot{}, err
+	}
+	return redemptions.WalletSnapshot{Available: wallet.Available}, nil
 }

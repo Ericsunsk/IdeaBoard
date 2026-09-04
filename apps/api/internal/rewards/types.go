@@ -1,219 +1,57 @@
 package rewards
 
 import (
-	"context"
-	"errors"
-	"time"
-
-	"github.com/google/uuid"
+	"ideaboard/api/internal/rewards/domain"
+	"ideaboard/api/internal/rewards/ports"
 )
 
 var (
-	ErrInvalidCommand      = errors.New("invalid reward command")
-	ErrCodeCollision       = errors.New("reward Code is not unique")
-	ErrRewardCodeConflict  = errors.New("reward Code idempotency key conflicts with another payload")
-	ErrCodeUnavailable     = errors.New("reward Code is invalid or unavailable")
-	ErrRewardCodeNotFound  = errors.New("reward Code not found")
-	ErrCapBelowRedemptions = errors.New("reward Code cap is below its redemption count")
-	ErrRewardCodeRedeemed  = errors.New("redeemed reward Code cannot be deleted")
-	ErrRedemptionNotFound  = errors.New("reward Redemption not found")
+	ErrInvalidCommand      = domain.ErrInvalidCode
+	ErrCodeCollision       = domain.ErrCodeCollision
+	ErrRewardCodeConflict  = domain.ErrRewardCodeConflict
+	ErrCodeUnavailable     = domain.ErrCodeUnavailable
+	ErrRewardCodeNotFound  = domain.ErrRewardCodeNotFound
+	ErrCapBelowRedemptions = domain.ErrCapBelowRedemptions
+	ErrRewardCodeRedeemed  = domain.ErrRewardCodeRedeemed
+	ErrRedemptionNotFound  = domain.ErrRedemptionNotFound
+	ErrWalletFrozen        = domain.ErrWalletFrozen
 )
 
-type RewardCodeStatus string
+type RewardCodeStatus = ports.RewardCodeStatus
 
 const (
-	RewardCodeStatusExpired   RewardCodeStatus = "expired"
-	RewardCodeStatusExhausted RewardCodeStatus = "exhausted"
-	RewardCodeStatusDisabled  RewardCodeStatus = "disabled"
-	RewardCodeStatusEnabled   RewardCodeStatus = "enabled"
+	RewardCodeStatusExpired   = ports.RewardCodeStatusExpired
+	RewardCodeStatusExhausted = ports.RewardCodeStatusExhausted
+	RewardCodeStatusDisabled  = ports.RewardCodeStatusDisabled
+	RewardCodeStatusEnabled   = ports.RewardCodeStatusEnabled
 )
 
-type RewardCode struct {
-	ID              int64            `json:"id"`
-	DisplayName     string           `json:"display_name"`
-	MaskedCodeHint  string           `json:"masked_code_hint"`
-	CreditAmount    int64            `json:"credit_amount"`
-	MaxRedemptions  int64            `json:"max_redemptions"`
-	RedemptionCount int64            `json:"redemption_count"`
-	ExpiresAt       *time.Time       `json:"expires_at,omitempty"`
-	Enabled         bool             `json:"enabled"`
-	Status          RewardCodeStatus `json:"status"`
-	CreatedBy       int64            `json:"-"`
-	CreatedAt       time.Time        `json:"created_at"`
-	UpdatedAt       time.Time        `json:"updated_at"`
-}
+type RewardCode = ports.RewardCode
+type CreatedRewardCode = ports.CreatedRewardCode
+type CreateRewardCodeCommand = ports.CreateRewardCodeCommand
+type UpdateRewardCodeCommand = ports.UpdateRewardCodeCommand
+type UpdatedRewardCode = ports.UpdatedRewardCode
+type SetRewardCodeEnabledCommand = ports.SetRewardCodeEnabledCommand
+type DeleteRewardCodeCommand = ports.DeleteRewardCodeCommand
+type DeletedRewardCode = ports.DeletedRewardCode
+type SearchRewardCodesInput = ports.SearchRewardCodesInput
+type RewardCodePage = ports.RewardCodePage
+type AdminRedemptionSummary = ports.AdminRedemptionSummary
+type ListAdminRedemptionsInput = ports.ListAdminRedemptionsInput
+type AdminRedemptionPage = ports.AdminRedemptionPage
+type GetAdminRedemptionInput = ports.GetAdminRedemptionInput
+type AdminRedemptionDetail = ports.AdminRedemptionDetail
+type RedeemCommand = ports.RedeemCommand
+type Redemption = ports.Redemption
+type RedeemResult = ports.RedeemResult
+type RedemptionHistoryItem = ports.RedemptionHistoryItem
+type ListRedemptionsInput = ports.ListRedemptionsInput
+type RedemptionHistoryPage = ports.RedemptionHistoryPage
 
-type CreatedRewardCode struct {
-	RewardCode RewardCode `json:"reward_code"`
-	Plaintext  string     `json:"plaintext"`
-	Replayed   bool       `json:"replayed"`
-}
-
-type CreateRewardCodeCommand struct {
-	DisplayName    string
-	Code           string
-	CreditAmount   int64
-	MaxRedemptions int64
-	ExpiresAt      *time.Time
-	IdempotencyKey string
-	ActorUserID    int64
-}
-
-type UpdateRewardCodeCommand struct {
-	RewardCodeID   int64
-	DisplayName    string
-	CreditAmount   int64
-	MaxRedemptions int64
-	ExpiresAt      *time.Time
-	Code           *string
-	ActorUserID    int64
-}
-
-type UpdatedRewardCode struct {
-	RewardCode RewardCode `json:"reward_code"`
-	Plaintext  string     `json:"plaintext,omitempty"`
-	Replayed   *bool      `json:"replayed,omitempty"`
-}
-
-type SetRewardCodeEnabledCommand struct {
-	RewardCodeID int64
-	Enabled      bool
-	ActorUserID  int64
-}
-
-type DeleteRewardCodeCommand struct {
-	RewardCodeID int64
-	ActorUserID  int64
-}
-
-type DeletedRewardCode struct {
-	RewardCodeID int64 `json:"reward_code_id"`
-}
-
-type SearchRewardCodesInput struct {
-	Query    string
-	Status   RewardCodeStatus
-	BeforeID int64
-	Limit    int
-}
-
-type RewardCodePage struct {
-	RewardCodes  []RewardCode `json:"reward_codes"`
-	Total        int64        `json:"total"`
-	NextBeforeID int64        `json:"next_before_id,omitempty"`
-}
-
-type AdminRedemptionSummary struct {
-	ID             int64     `json:"id"`
-	RewardCodeID   int64     `json:"reward_code_id"`
-	UserID         int64     `json:"-"`
-	UserPublicID   uuid.UUID `json:"user_public_id"`
-	DisplayName    string    `json:"display_name"`
-	CreditedAmount int64     `json:"credited_amount"`
-	RedeemedAt     time.Time `json:"redeemed_at"`
-}
-
-type ListAdminRedemptionsInput struct {
-	RewardCodeID int64
-	BeforeID     int64
-	Limit        int
-}
-
-type AdminRedemptionPage struct {
-	Redemptions  []AdminRedemptionSummary `json:"redemptions"`
-	NextBeforeID int64                    `json:"next_before_id,omitempty"`
-}
-
-type GetAdminRedemptionInput struct {
-	RewardCodeID int64
-	RedemptionID int64
-}
-
-type AdminRedemptionDetail struct {
-	ID                  int64     `json:"id"`
-	RewardCodeID        int64     `json:"reward_code_id"`
-	UserID              int64     `json:"-"`
-	UserPublicID        uuid.UUID `json:"user_public_id"`
-	DisplayName         string    `json:"display_name"`
-	CreditedAmount      int64     `json:"credited_amount"`
-	RedeemedAt          time.Time `json:"redeemed_at"`
-	CreditTransactionID string    `json:"credit_transaction_id"`
-	MaskedCodeHint      string    `json:"masked_code_hint"`
-}
-
-type IdentityProjection struct {
-	PublicID    uuid.UUID
-	DisplayName string
-}
-
-type IdentityProjectionReader interface {
-	ResolveIdentity(context.Context, int64) (IdentityProjection, error)
-	ResolveIdentities(context.Context, []int64) (map[int64]IdentityProjection, error)
-}
-
-type Redemption struct {
-	ID                    int64     `json:"id"`
-	RewardCodeID          int64     `json:"reward_code_id"`
-	UserID                int64     `json:"-"`
-	UserPublicID          uuid.UUID `json:"user_public_id"`
-	DisplayName           string    `json:"display_name"`
-	RewardCodeDisplayName string    `json:"-"`
-	MaskedCodeHint        string    `json:"-"`
-	CreditAmount          int64     `json:"credit_amount"`
-	CreditTransactionID   string    `json:"credit_transaction_id"`
-	AvailableBalanceAfter int64     `json:"available_balance_after"`
-	RedeemedAt            time.Time `json:"redeemed_at"`
-}
-
-type RedeemResult struct {
-	Redemption       Redemption            `json:"redemption"`
-	HistoryItem      RedemptionHistoryItem `json:"history_item"`
-	CreditedAmount   int64                 `json:"credited_amount"`
-	AvailableBalance int64                 `json:"available_balance"`
-	Replayed         bool                  `json:"replayed"`
-}
-
-type RedemptionHistoryItem struct {
-	ID                    int64     `json:"id"`
-	RewardCodeDisplayName string    `json:"reward_code_display_name"`
-	CreditedAmount        int64     `json:"credited_amount"`
-	MaskedCodeHint        string    `json:"masked_code_hint"`
-	RedeemedAt            time.Time `json:"redeemed_at"`
-}
-
-type ListRedemptionsInput struct {
-	UserID   int64
-	BeforeID int64
-	Limit    int
-}
-
-type RedemptionHistoryPage struct {
-	Redemptions  []RedemptionHistoryItem `json:"redemptions"`
-	NextBeforeID int64                   `json:"next_before_id,omitempty"`
-}
-
-type RedeemCommand struct {
-	UserID int64
-	Code   string
-}
-
-type AdminCommands interface {
-	CreateRewardCode(context.Context, CreateRewardCodeCommand) (CreatedRewardCode, error)
-	UpdateRewardCode(context.Context, UpdateRewardCodeCommand) (UpdatedRewardCode, error)
-	SetRewardCodeEnabled(context.Context, SetRewardCodeEnabledCommand) (RewardCode, error)
-	DeleteRewardCode(context.Context, DeleteRewardCodeCommand) (DeletedRewardCode, error)
-}
-
-type AdminReads interface {
-	SearchRewardCodes(context.Context, SearchRewardCodesInput) (RewardCodePage, error)
-	ListAdminRedemptions(context.Context, ListAdminRedemptionsInput) (AdminRedemptionPage, error)
-	GetAdminRedemption(context.Context, GetAdminRedemptionInput) (AdminRedemptionDetail, error)
-}
-
-type UserCommands interface {
-	Redeem(context.Context, RedeemCommand) (RedeemResult, error)
-}
-
-type UserReads interface {
-	ListRedemptions(context.Context, ListRedemptionsInput) (RedemptionHistoryPage, error)
-}
+type AdminCommands = ports.AdminCommands
+type AdminReads = ports.AdminReads
+type UserCommands = ports.UserCommands
+type UserReads = ports.UserReads
+type UserService = ports.UserService
+type AdminCommandService = ports.AdminCommandService
+type AdminReadService = ports.AdminReadService

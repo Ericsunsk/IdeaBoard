@@ -1,4 +1,4 @@
-package rewards
+package http
 
 import (
 	"errors"
@@ -9,32 +9,42 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-type redemptionOutcome string
+type RedemptionOutcome string
 
 const (
-	redemptionOutcomeSuccess         redemptionOutcome = "success"
-	redemptionOutcomeReplayed        redemptionOutcome = "replayed"
-	redemptionOutcomeInvalid         redemptionOutcome = "invalid"
-	redemptionOutcomeAlreadyRedeemed redemptionOutcome = "already_redeemed"
-	redemptionOutcomeExhausted       redemptionOutcome = "exhausted"
-	redemptionOutcomeRateLimited     redemptionOutcome = "rate_limited"
-	redemptionOutcomeInternalError   redemptionOutcome = "internal_error"
+	RedemptionOutcomeSuccess       RedemptionOutcome = "success"
+	RedemptionOutcomeReplayed      RedemptionOutcome = "replayed"
+	RedemptionOutcomeInvalid       RedemptionOutcome = "invalid"
+	RedemptionOutcomeRateLimited   RedemptionOutcome = "rate_limited"
+	RedemptionOutcomeInternalError RedemptionOutcome = "internal_error"
+
+	redemptionOutcomeSuccess       = RedemptionOutcomeSuccess
+	redemptionOutcomeReplayed      = RedemptionOutcomeReplayed
+	redemptionOutcomeInvalid       = RedemptionOutcomeInvalid
+	redemptionOutcomeRateLimited   = RedemptionOutcomeRateLimited
+	redemptionOutcomeInternalError = RedemptionOutcomeInternalError
 
 	uniqueViolationSQLState      = "23505"
 	serializationFailureSQLState = "40001"
 	deadlockDetectedSQLState     = "40P01"
 )
 
-type redemptionMetricObservation struct {
-	Outcome          redemptionOutcome
+type RedemptionMetricObservation struct {
+	Outcome          RedemptionOutcome
 	CreditedCredits  int64
 	Latency          time.Duration
 	DatabaseConflict bool
 }
 
-type redemptionMetricsRecorder interface {
-	RecordRedemption(redemptionMetricObservation)
+type RedemptionMetricsRecorder interface {
+	RecordRedemption(RedemptionMetricObservation)
 }
+
+type (
+	redemptionOutcome           = RedemptionOutcome
+	redemptionMetricObservation = RedemptionMetricObservation
+	redemptionMetricsRecorder   = RedemptionMetricsRecorder
+)
 
 type noopRedemptionMetricsRecorder struct{}
 
@@ -181,8 +191,6 @@ func normalizeRedemptionOutcome(outcome redemptionOutcome) redemptionOutcome {
 	case redemptionOutcomeSuccess,
 		redemptionOutcomeReplayed,
 		redemptionOutcomeInvalid,
-		redemptionOutcomeAlreadyRedeemed,
-		redemptionOutcomeExhausted,
 		redemptionOutcomeRateLimited,
 		redemptionOutcomeInternalError:
 		return outcome

@@ -8,7 +8,7 @@
 | ------- | ----------- | -------------- | --------------- |
 | Runtime | `cmd`, `internal/runtime` | 启动 API 进程、注册 HTTP routes、装配 worker adapters、服务 embedded frontend dist | `bootstrap`, `httpapi.RegisterRoutes`, `worker.RiverTaskWorker` |
 | Platform | `internal/platform`, `internal/db`, `internal/events` | config、database pools、response helpers、safe HTTP、settings、event bus、generated SQL | `config.Config`, sqlc queries, event publishers |
-| Tasking | `internal/tasking` | Task model、submission、queueing、Task Billing orchestration、media validation、execution lifecycle、persistence、statistics | `application/task.Service`, `application/submission.Store`, `application/billing.Service`, `ports/queue.TaskAssigner`, `application/execution.Service`, `application/statistics.Service`, `infrastructure/postgres.Repository` |
+| Tasking | `internal/tasking` | Task model、submission、queueing、taskbilling 编排、media validation、execution lifecycle、persistence、statistics | `application/task.Service`, `application/submission.Store`, `application/billing.Service`, `ports/queue.TaskAssigner`, `application/execution.Service`, `application/statistics.Service`, `infrastructure/postgres.Repository` |
 | Identity | `internal/identity/auth`, `internal/identity/autherrors`, `internal/identity/users` | Auth middleware/client、user persistence、user/admin management | Auth handlers/middleware, `users.UserRepository`, `users.UserService` |
 | AccountPool | `internal/accountpool/accounts`, `internal/accountpool/channels` | Account pool、channel config、account load、task scheduling visibility | `accounts.AccountService`, account/channel handlers and repositories |
 | Boards | `internal/boards` | Board ownership、access checks、board management API | `boards.BoardService`, board handler/repository |
@@ -18,7 +18,7 @@
 | Billing | `internal/billing` | 全局 SKU Catalog、versioned Credit pricing、server-side Quote snapshot | `billing.Service.Quote`, `billing.PriceSnapshot`, Admin billing handler |
 | Billing Records | `internal/billingrecords` | 用户侧最终 Idea 收支 Read Model；组合 Credits Ledger 与 immutable Task Billing Snapshot，不拥有账务写入 | `billingrecords.Service.List`, authenticated billing records handler |
 | Credits | `internal/credits` | 平台 Credit Wallet（用户展示为 Idea）、Double-entry Ledger、余额 projection、幂等 Commands | `credits.Commands`, `credits.WalletReader`, `credits.Service.InTx`, `credits.CommandsInSQLTx` |
-| Rewards | `internal/rewards` | RewardCode、Redemption、用户 history 与 Credits Grant 编排 | `rewards.AdminCommands`, `rewards.AdminReads`, `rewards.UserCommands`, `rewards.UserReads` |
+| [Rewards](./internal/rewards/CONTEXT.md) | `internal/rewards` | RewardCode、Redemption、用户 history 与 Credits Grant 编排 | `ports.AdminCommands`, `ports.AdminReads`, `ports.UserCommands`, `ports.UserReads` |
 | [Payments](./internal/payments/CONTEXT.md) | `internal/payments` | Stripe 配置、签名 Webhook Inbox 与支付生命周期；不拥有 Idea 余额或 Ledger | `payments.Service`, `payments.StripeGateway`, `payments.StripeWebhookVerifier` |
 | Usage | `internal/usage` | 用户侧 Idea 消耗的 Lifetime 摘要、每日 Capture Trend 与 durable logical AI Task submission 只读聚合 | `usage.Service`, caller-owned `CaptureUsageReader`, caller-owned `LogicalTaskUsageReader` |
 

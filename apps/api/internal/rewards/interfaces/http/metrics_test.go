@@ -1,4 +1,4 @@
-package rewards
+package http
 
 import (
 	"errors"
@@ -21,8 +21,6 @@ func TestRedemptionMetricsRecordsLowCardinalityOutcomes(t *testing.T) {
 		redemptionOutcomeSuccess,
 		redemptionOutcomeReplayed,
 		redemptionOutcomeInvalid,
-		redemptionOutcomeAlreadyRedeemed,
-		redemptionOutcomeExhausted,
 		redemptionOutcomeRateLimited,
 		redemptionOutcomeInternalError,
 	}

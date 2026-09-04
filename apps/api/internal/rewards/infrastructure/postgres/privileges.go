@@ -1,7 +1,10 @@
-package rewards
+package postgres
 
-import dbprivileges "ideaboard/api/internal/platform/database/privileges"
+import (
+	dbprivileges "ideaboard/api/internal/platform/database/privileges"
+)
 
+// RuntimePrivilegePolicy returns the runtime privilege policy for Rewards.
 func RuntimePrivilegePolicy() dbprivileges.Policy {
 	allTablePrivileges := []dbprivileges.Privilege{
 		dbprivileges.PrivilegeSelect, dbprivileges.PrivilegeInsert,

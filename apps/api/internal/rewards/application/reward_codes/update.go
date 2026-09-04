@@ -1,10 +1,11 @@
-package rewards
+package reward_codes
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"ideaboard/api/internal/credits/domain"
+	rewardlocks "ideaboard/api/internal/rewards/application/locks"
+	"ideaboard/api/internal/rewards/domain"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -13,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// UpdateRewardCode updates a reward code and optionally rotates its bearer code.
 func (s *Service) UpdateRewardCode(ctx context.Context, command UpdateRewardCodeCommand) (UpdatedRewardCode, error) {
 	input, err := s.prepareRewardCodeUpdate(command)
 	if err != nil {
@@ -24,6 +26,7 @@ func (s *Service) UpdateRewardCode(ctx context.Context, command UpdateRewardCode
 		return UpdatedRewardCode{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+
 	rotationReplayed, err := s.lockRewardCodeUpdate(ctx, tx, input)
 	if err != nil {
 		return UpdatedRewardCode{}, err
@@ -67,30 +70,27 @@ func (s *Service) prepareRewardCodeUpdate(command UpdateRewardCodeCommand) (rewa
 		displayName == "" || utf8.RuneCountInString(displayName) > 120 || command.MaxRedemptions < 0 {
 		return rewardCodeUpdateInput{}, ErrInvalidCommand
 	}
-	if _, err := domain.NewCreditAmount(command.CreditAmount); err != nil {
-		return rewardCodeUpdateInput{}, errors.Join(ErrInvalidCommand, err)
-	}
 	input := rewardCodeUpdateInput{command: command, displayName: displayName, expiresAt: cloneOptionalTime(command.ExpiresAt)}
 	if command.Code == nil {
 		return input, nil
 	}
-	normalized, err := normalizeCode(*command.Code)
+	normalized, err := domain.NormalizeCode(*command.Code)
 	if err != nil {
 		return rewardCodeUpdateInput{}, ErrInvalidCommand
 	}
 	input.normalized = normalized
-	input.currentDigest, input.previousDigest = splitCodeDigestCandidates(s.keyring.lookupDigests(normalized))
+	input.currentDigest, input.previousDigest = splitCodeDigestCandidates(s.keyring.LookupDigests(normalized))
 	input.hasCode = true
 	return input, nil
 }
 
 func (s *Service) lockRewardCodeUpdate(ctx context.Context, tx pgx.Tx, input rewardCodeUpdateInput) (bool, error) {
 	if input.hasCode {
-		if err := lockRewardCodeIdentity(ctx, tx, input.normalized); err != nil {
+		if err := rewardlocks.LockRewardCodeIdentity(ctx, tx, input.normalized); err != nil {
 			return false, err
 		}
 	}
-	if err := lockRewardCodeID(ctx, tx, input.command.RewardCodeID); err != nil {
+	if err := rewardlocks.LockRewardCodeID(ctx, tx, input.command.RewardCodeID); err != nil {
 		return false, err
 	}
 	if !input.hasCode {
@@ -126,13 +126,13 @@ func (s *Service) rotateRewardCode(ctx context.Context, tx pgx.Tx, input rewardC
 	}
 	var previousVersion any
 	var previousCodeDigest any
-	if input.previousDigest.version != "" {
-		previousVersion = input.previousDigest.version
-		previousCodeDigest = input.previousDigest.digest
+	if input.previousDigest.Version != "" {
+		previousVersion = input.previousDigest.Version
+		previousCodeDigest = input.previousDigest.Digest
 	}
 	var found bool
 	if err := tx.QueryRow(ctx, `SELECT rotate_reward_code_v1($1, $2, $3, $4, $5, $6, $7)`,
-		input.command.RewardCodeID, input.currentDigest.version, input.currentDigest.digest,
+		input.command.RewardCodeID, input.currentDigest.Version, input.currentDigest.Digest,
 		input.normalized[len(input.normalized)-4:], previousVersion, previousCodeDigest, input.command.ActorUserID,
 	).Scan(&found); err != nil {
 		return mapRewardManagementError("rotate reward Code", err)
@@ -143,6 +143,7 @@ func (s *Service) rotateRewardCode(ctx context.Context, tx pgx.Tx, input rewardC
 	return nil
 }
 
+// SetRewardCodeEnabled toggles the enabled intent of a reward code.
 func (s *Service) SetRewardCodeEnabled(ctx context.Context, command SetRewardCodeEnabledCommand) (RewardCode, error) {
 	if !s.validAdminMutation(command.RewardCodeID, command.ActorUserID) {
 		return RewardCode{}, ErrInvalidCommand
@@ -152,7 +153,7 @@ func (s *Service) SetRewardCodeEnabled(ctx context.Context, command SetRewardCod
 		return RewardCode{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if err := lockRewardCodeID(ctx, tx, command.RewardCodeID); err != nil {
+	if err := rewardlocks.LockRewardCodeID(ctx, tx, command.RewardCodeID); err != nil {
 		return RewardCode{}, err
 	}
 	var found bool
@@ -174,6 +175,7 @@ func (s *Service) SetRewardCodeEnabled(ctx context.Context, command SetRewardCod
 	return updated, nil
 }
 
+// DeleteRewardCode hard-deletes a reward code with zero redemptions.
 func (s *Service) DeleteRewardCode(ctx context.Context, command DeleteRewardCodeCommand) (DeletedRewardCode, error) {
 	if !s.validAdminMutation(command.RewardCodeID, command.ActorUserID) {
 		return DeletedRewardCode{}, ErrInvalidCommand
@@ -183,7 +185,7 @@ func (s *Service) DeleteRewardCode(ctx context.Context, command DeleteRewardCode
 		return DeletedRewardCode{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if err := lockRewardCodeID(ctx, tx, command.RewardCodeID); err != nil {
+	if err := rewardlocks.LockRewardCodeID(ctx, tx, command.RewardCodeID); err != nil {
 		return DeletedRewardCode{}, err
 	}
 	var deleted bool
@@ -230,7 +232,7 @@ FROM reward_code_digest_aliases
 WHERE (key_version = $1 AND code_digest = $2)
    OR ($3 <> '' AND key_version = $3 AND code_digest = $4)
 ORDER BY CASE WHEN key_version = $1 THEN 0 ELSE 1 END
-LIMIT 1`, current.version, current.digest, previous.version, previous.digest).Scan(&rewardCodeID)
+LIMIT 1`, current.Version, current.Digest, previous.Version, previous.Digest).Scan(&rewardCodeID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return 0, false, nil
 	}

@@ -1,4 +1,4 @@
-package rewards
+package http
 
 import (
 	"sync"
@@ -90,4 +90,13 @@ func TestRedemptionAttemptLimiterBoundsTrackedUsers(t *testing.T) {
 	if limiter.Allow(1) {
 		t.Fatal("evicted user's fresh bucket exceeded the default burst")
 	}
+}
+
+func (l *redemptionAttemptLimiter) trackedUserCount() int {
+	if l == nil {
+		return 0
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.entries)
 }

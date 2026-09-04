@@ -1,4 +1,4 @@
-package rewards
+package domain
 
 import (
 	"crypto/hmac"
@@ -14,26 +14,29 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-const maxRawCodeBytes = 128
+const MaxRawCodeBytes = 128
 
 var (
 	codeVersionPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,32}$`)
 	publicCodePattern  = regexp.MustCompile(`^[A-Z0-9]{8,32}$`)
 )
 
+// CodeKey is a single HMAC key used for reward code digest issuance or lookup.
 type CodeKey struct {
 	Version string
 	Secret  []byte
 }
 
+// CodeKeyring holds the current and optional previous HMAC key versions.
 type CodeKeyring struct {
 	current  CodeKey
 	previous *CodeKey
 }
 
-type codeDigest struct {
-	version string
-	digest  []byte
+// CodeDigest is the HMAC-SHA256 digest of a normalized code bound to a key version.
+type CodeDigest struct {
+	Version string
+	Digest  []byte
 }
 
 type encodedKeyring struct {
@@ -46,6 +49,7 @@ type encodedCodeKey struct {
 	Key     string `json:"key"`
 }
 
+// ParseCodeKeyring decodes the REWARDS_CODE_HMAC_KEYS configuration into a validated keyring.
 func ParseCodeKeyring(raw string) (CodeKeyring, error) {
 	var encoded encodedKeyring
 	decoder := json.NewDecoder(strings.NewReader(raw))
@@ -82,6 +86,8 @@ func decodeCodeKey(encoded encodedCodeKey) (CodeKey, error) {
 	return CodeKey{Version: encoded.Version, Secret: secret}, nil
 }
 
+// NewCodeKeyring validates and returns a CodeKeyring, failing when the current key
+// is missing or the previous key version collides with the current one.
 func NewCodeKeyring(current CodeKey, previous *CodeKey) (CodeKeyring, error) {
 	validatedCurrent, err := validateCodeKey(current)
 	if err != nil {
@@ -110,9 +116,11 @@ func validateCodeKey(key CodeKey) (CodeKey, error) {
 	return key, nil
 }
 
-func normalizeCode(raw string) (string, error) {
-	if len(raw) > maxRawCodeBytes {
-		return "", ErrInvalidCommand
+// NormalizeCode applies raw bound, NFKC, uppercase, and Unicode whitespace/hyphen removal.
+// It enforces that the final payload is 8–32 characters of [A-Z0-9].
+func NormalizeCode(raw string) (string, error) {
+	if len(raw) > MaxRawCodeBytes {
+		return "", ErrInvalidCode
 	}
 	normalized := strings.ToUpper(norm.NFKC.String(strings.TrimSpace(raw)))
 	normalized = strings.Map(func(r rune) rune {
@@ -122,24 +130,40 @@ func normalizeCode(raw string) (string, error) {
 		return r
 	}, normalized)
 	if !publicCodePattern.MatchString(normalized) {
-		return "", ErrInvalidCommand
+		return "", ErrInvalidCode
 	}
 	return normalized, nil
 }
 
-func (k CodeKeyring) issueDigest(normalized string) codeDigest {
-	return codeDigest{version: k.current.Version, digest: calculateCodeDigest(k.current.Secret, normalized)}
+// IssueDigest creates a digest using the current key version.
+func (k CodeKeyring) IssueDigest(normalized string) CodeDigest {
+	return CodeDigest{Version: k.current.Version, Digest: calculateCodeDigest(k.current.Secret, normalized)}
 }
 
-func (k CodeKeyring) lookupDigests(normalized string) []codeDigest {
-	candidates := []codeDigest{k.issueDigest(normalized)}
+// LookupDigests returns digest candidates for current and previous keys,
+// so rotation overlap still resolves persisted codes.
+func (k CodeKeyring) LookupDigests(normalized string) []CodeDigest {
+	candidates := []CodeDigest{k.IssueDigest(normalized)}
 	if k.previous != nil {
-		candidates = append(candidates, codeDigest{
-			version: k.previous.Version,
-			digest:  calculateCodeDigest(k.previous.Secret, normalized),
+		candidates = append(candidates, CodeDigest{
+			Version: k.previous.Version,
+			Digest:  calculateCodeDigest(k.previous.Secret, normalized),
 		})
 	}
 	return candidates
+}
+
+// CurrentVersion returns the current key version, useful for persistence.
+func (k CodeKeyring) CurrentVersion() string {
+	return k.current.Version
+}
+
+// PreviousVersion returns the previous key version, or empty string if absent.
+func (k CodeKeyring) PreviousVersion() string {
+	if k.previous == nil {
+		return ""
+	}
+	return k.previous.Version
 }
 
 func calculateCodeDigest(secret []byte, normalized string) []byte {
