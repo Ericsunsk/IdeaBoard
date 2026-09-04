@@ -1,0 +1,43 @@
+package tests
+
+import (
+	"testing"
+	"time"
+)
+
+func TestReconcilerResultCounters(t *testing.T) {
+	got := Result{Inspected: 10, Missing: 2, Invalid: 1, Errors: 1}
+	if got.Inspected != 10 || got.Missing != 2 || got.Invalid != 1 || got.Errors != 1 {
+		t.Fatalf("counters not preserved: %+v", got)
+	}
+}
+
+func TestReconcilerConfigDefaultsAreStable(t *testing.T) {
+	if DefaultReconcilerProbeTimeout <= 0 {
+		t.Fatal("default probe timeout must be positive")
+	}
+	if DefaultReconcilerBatchSize <= 0 {
+		t.Fatal("default batch size must be positive")
+	}
+	if DefaultReconcilerLease <= 0 {
+		t.Fatal("default lease must be positive")
+	}
+	if DefaultReconcilerProbeTimeout > time.Minute {
+		t.Errorf("probe timeout %v exceeds the 60s SLO", DefaultReconcilerProbeTimeout)
+	}
+}
+
+// TestReconcilerOutcomeClassification guards the per-row outcome
+// values. The Worker uses these in its metrics so a regression here
+// silently breaks the dashboard.
+func TestReconcilerOutcomeClassification(t *testing.T) {
+	if OutcomeReady != 0 {
+		t.Errorf("outcomeReady must be 0, got %d", OutcomeReady)
+	}
+	if OutcomeMissing != 1 {
+		t.Errorf("outcomeMissing must be 1, got %d", OutcomeMissing)
+	}
+	if OutcomeInvalid != 2 {
+		t.Errorf("outcomeInvalid must be 2, got %d", OutcomeInvalid)
+	}
+}

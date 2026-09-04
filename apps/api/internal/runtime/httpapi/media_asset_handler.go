@@ -11,7 +11,7 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/media/assets"
-	"ideaboard/api/internal/media/derivatives"
+	derivativedomain "ideaboard/api/internal/media/derivatives/domain"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/response"
 
@@ -89,7 +89,7 @@ func (h *mediaAssetHandler) Metadata(c *gin.Context) {
 	}
 	ensureTier := strings.TrimSpace(c.Query("ensure_tier"))
 	if ensureTier != "" {
-		if ensureTier != derivatives.TierLargePreview && ensureTier != derivatives.TierProcessing && ensureTier != derivatives.TierProcessingInput {
+		if ensureTier != derivativedomain.TierLargePreview && ensureTier != derivativedomain.TierProcessing && ensureTier != derivativedomain.TierProcessingInput {
 			response.Error(c, http.StatusBadRequest, "请求的媒体派生规格无效")
 			return
 		}
@@ -151,7 +151,7 @@ func parseMetadataBatchRequest(c *gin.Context) (mediaAssetBatchRequest, string, 
 }
 
 func isMetadataBatchTier(ensureTier string) bool {
-	return ensureTier == "" || ensureTier == derivatives.TierLargePreview || ensureTier == derivatives.TierProcessing || ensureTier == derivatives.TierProcessingInput
+	return ensureTier == "" || ensureTier == derivativedomain.TierLargePreview || ensureTier == derivativedomain.TierProcessing || ensureTier == derivativedomain.TierProcessingInput
 }
 
 func respondMetadataBatchFailure(c *gin.Context, failure *metadataBatchFailure) {
@@ -220,7 +220,7 @@ func (h *mediaAssetHandler) buildMetadata(c *gin.Context, ownerUserID int64, ass
 			Status: asset.Status, MIMEType: asset.MimeType, Width: asset.Width,
 			Height: asset.Height, SizeBytes: asset.SizeBytes,
 		},
-		Derivatives: make(map[string]mediaAssetDerivativeDTO, len(derivatives.TierSpecs)),
+		Derivatives: make(map[string]mediaAssetDerivativeDTO, len(derivativedomain.TierSpecs)),
 	}
 	if asset.Status == "ready" {
 		// Keep media URLs on the same-origin gateway. In particular, do not
@@ -228,7 +228,7 @@ func (h *mediaAssetHandler) buildMetadata(c *gin.Context, ownerUserID int64, ass
 		// the owning storage profile and preserves the gateway security boundary.
 		result.Original.URL = "/api/user/media-assets/" + asset.AssetID + "/original/content"
 	}
-	for tier := range derivatives.TierSpecs {
+	for tier := range derivativedomain.TierSpecs {
 		result.Derivatives[tier] = mediaAssetDerivativeDTO{Status: "pending"}
 	}
 	for _, row := range rows {
@@ -249,11 +249,11 @@ func (h *mediaAssetHandler) Content(c *gin.Context) {
 	assetID := strings.TrimSpace(c.Param("asset_id"))
 	tier := strings.TrimSpace(c.Param("tier"))
 	format := strings.TrimSpace(c.Param("format"))
-	if _, exists := derivatives.TierSpecs[tier]; !exists {
+	if _, exists := derivativedomain.TierSpecs[tier]; !exists {
 		response.Error(c, http.StatusBadRequest, "图片派生规格无效")
 		return
 	}
-	if format != derivatives.FormatWebP && format != derivatives.FormatJPEG && format != derivatives.FormatPNG {
+	if format != derivativedomain.FormatWebP && format != derivativedomain.FormatJPEG && format != derivativedomain.FormatPNG {
 		response.Error(c, http.StatusBadRequest, "图片派生格式无效")
 		return
 	}

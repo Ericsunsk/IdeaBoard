@@ -1,10 +1,4 @@
-package derivatives
-
-import (
-	"encoding/json"
-
-	"ideaboard/api/internal/events"
-)
+package domain
 
 // Versioned media.derivative.* event types. The wire format is fixed at
 // the outer UserEvent level (the events package owns the
@@ -64,30 +58,4 @@ type Event struct {
 	ProviderAttempt string `json:"provider_attempt_id,omitempty"`
 	CorrelationID   string `json:"correlation_id,omitempty"`
 	StorageProfile  string `json:"storage_profile_id,omitempty"`
-}
-
-type UserEventPublisher struct {
-	userHub *events.UserEventHub
-}
-
-func NewUserEventPublisher(userHub *events.UserEventHub) *UserEventPublisher {
-	return &UserEventPublisher{userHub: userHub}
-}
-
-func (p *UserEventPublisher) Publish(userID int64, event Event) {
-	if p == nil || p.userHub == nil {
-		return
-	}
-	if event.Type == "" {
-		event.Type = EventTypeUpdated
-	}
-	if event.SchemaVersion == 0 {
-		event.SchemaVersion = EventSchemaVersion
-	}
-	payload, err := json.Marshal(event)
-	if err != nil {
-		return
-	}
-	userEvent := events.UserEvent{UserID: userID, Type: events.EventTypeMediaDerivativeUpdated, Data: payload}
-	p.userHub.Publish(userEvent)
 }

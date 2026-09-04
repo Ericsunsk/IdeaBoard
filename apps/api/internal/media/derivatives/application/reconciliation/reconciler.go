@@ -1,4 +1,4 @@
-package derivatives
+package reconciliation
 
 import (
 	"context"
@@ -8,21 +8,21 @@ import (
 	"time"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/media/derivatives/domain"
+	"ideaboard/api/internal/media/derivatives/ports"
 	mediaerrors "ideaboard/api/internal/media/errors"
-	"ideaboard/api/internal/media/storage"
-	"ideaboard/api/internal/media/storage/application/integrity"
 )
 
 const (
-	defaultReconcilerProbeTimeout = 30 * time.Second
-	defaultReconcilerBatchSize    = int32(100)
-	defaultReconcilerLease        = 24 * time.Hour
+	DefaultReconcilerProbeTimeout = 30 * time.Second
+	DefaultReconcilerBatchSize    = int32(100)
+	DefaultReconcilerLease        = 24 * time.Hour
 )
 
 type Reconciler struct {
 	q            *dbsqlc.Queries
-	verifier     *integrity.IntegrityVerifier
-	events       EventPublisher
+	verifier     ports.Verifier
+	events       ports.EventPublisher
 	probeTimeout time.Duration
 	batchSize    int32
 	lease        time.Duration
@@ -43,29 +43,27 @@ type Result struct {
 	Errors    int
 }
 
-type reconcileOutcome uint8
+type ReconcileOutcome uint8
 
 const (
-	outcomeReady reconcileOutcome = iota
-	outcomeMissing
-	outcomeInvalid
+	OutcomeReady ReconcileOutcome = iota
+	OutcomeMissing
+	OutcomeInvalid
 )
 
-func NewReconciler(q *dbsqlc.Queries, storageService *storage.StorageService, events EventPublisher, cfg ReconcilerConfig) *Reconciler {
+func NewReconciler(q *dbsqlc.Queries, verifier ports.Verifier, events ports.EventPublisher, cfg ReconcilerConfig) *Reconciler {
 	if cfg.ProbeTimeout <= 0 {
-		cfg.ProbeTimeout = defaultReconcilerProbeTimeout
+		cfg.ProbeTimeout = DefaultReconcilerProbeTimeout
 	}
 	if cfg.BatchSize <= 0 {
-		cfg.BatchSize = defaultReconcilerBatchSize
+		cfg.BatchSize = DefaultReconcilerBatchSize
 	}
 	if cfg.Lease <= 0 {
-		cfg.Lease = defaultReconcilerLease
+		cfg.Lease = DefaultReconcilerLease
 	}
 	return &Reconciler{
-		q: q,
-		verifier: integrity.NewIntegrityVerifier(storageService, integrity.IntegrityConfig{
-			Timeout: cfg.ProbeTimeout,
-		}),
+		q:            q,
+		verifier:     verifier,
 		events:       events,
 		probeTimeout: cfg.ProbeTimeout,
 		batchSize:    cfg.BatchSize,
@@ -158,9 +156,9 @@ func (r *Reconciler) publishInvalidated(row dbsqlc.MediaDerivative, status strin
 	if r.events == nil {
 		return
 	}
-	r.events.Publish(row.OwnerUserID, Event{
-		SchemaVersion:  EventSchemaVersion,
-		Type:           EventTypeInvalidated,
+	r.events.Publish(row.OwnerUserID, domain.Event{
+		SchemaVersion:  domain.EventSchemaVersion,
+		Type:           domain.EventTypeInvalidated,
 		MediaAssetID:   row.MediaAssetID,
 		DerivativeID:   row.DerivativeID,
 		Tier:           row.Tier,

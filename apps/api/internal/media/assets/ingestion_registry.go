@@ -14,7 +14,7 @@ import (
 	"time"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
-	"ideaboard/api/internal/media/derivatives"
+	derivativeprocessing "ideaboard/api/internal/media/derivatives/application/processing"
 	mediaerrors "ideaboard/api/internal/media/errors"
 	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/media/reclamation"
@@ -78,7 +78,7 @@ func (r *MediaAssetRegistry) Complete(ctx context.Context, handle ingestion.Hand
 	}); err != nil {
 		return fmt.Errorf("complete media asset: %w", err)
 	}
-	derivativeIDs, err := derivatives.ScheduleDefault(ctx, q, handle.AssetID, handle.OwnerUserID)
+	derivativeIDs, err := derivativeprocessing.ScheduleDefault(ctx, q, handle.AssetID, handle.OwnerUserID)
 	if err != nil {
 		return fmt.Errorf("queue media asset derivatives: %w", err)
 	}
@@ -345,7 +345,7 @@ func (r *MediaAssetRegistry) EnsureDerivative(ctx context.Context, ownerUserID, 
 	if r == nil || r.q == nil || ownerUserID <= 0 || assetID <= 0 {
 		return fmt.Errorf("invalid media derivative request")
 	}
-	derivativeID, needsEnqueue, err := derivatives.EnsureOnDemand(ctx, r.q, assetID, ownerUserID, tier)
+	derivativeID, needsEnqueue, err := derivativeprocessing.EnsureOnDemand(ctx, r.q, assetID, ownerUserID, tier)
 	if err != nil {
 		return err
 	}

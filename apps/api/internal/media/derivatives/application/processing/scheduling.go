@@ -1,48 +1,30 @@
-package derivatives
+package processing
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"strings"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/media/derivatives/domain"
 )
-
-type TierPolicy struct {
-	Tier   string
-	Format string
-}
-
-var defaultTierPolicies = []TierPolicy{
-	{Tier: TierThumb, Format: FormatWebP},
-	{Tier: TierPreview, Format: FormatWebP},
-	{Tier: TierProcessingInput, Format: FormatWebP},
-}
-
-var onDemandTierPolicies = map[string]TierPolicy{
-	TierLargePreview:    {Tier: TierLargePreview, Format: FormatWebP},
-	TierProcessing:      {Tier: TierProcessing, Format: FormatWebP},
-	TierProcessingInput: {Tier: TierProcessingInput, Format: FormatWebP},
-}
 
 func ScheduleDefault(ctx context.Context, q *dbsqlc.Queries, assetID, ownerUserID int64) ([]int64, error) {
 	if q == nil || assetID <= 0 || ownerUserID <= 0 {
 		return nil, fmt.Errorf("invalid default derivative scheduling request")
 	}
-	return schedulePolicies(ctx, q, assetID, ownerUserID, defaultTierPolicies)
+	return schedulePolicies(ctx, q, assetID, ownerUserID, domain.DefaultTierPolicies)
 }
 
 func EnsureOnDemand(ctx context.Context, q *dbsqlc.Queries, assetID, ownerUserID int64, tier string) (int64, bool, error) {
 	if q == nil || assetID <= 0 || ownerUserID <= 0 {
 		return 0, false, fmt.Errorf("invalid on-demand derivative request")
 	}
-	policy, ok := onDemandTierPolicies[strings.TrimSpace(tier)]
+	policy, ok := domain.OnDemandTierPolicies[strings.TrimSpace(tier)]
 	if !ok {
 		return 0, false, fmt.Errorf("unsupported on-demand derivative tier %q", tier)
 	}
-	derivativeID, err := newDerivativeID()
+	derivativeID, err := domain.NewDerivativeID()
 	if err != nil {
 		return 0, false, err
 	}
@@ -61,10 +43,10 @@ func EnsureOnDemand(ctx context.Context, q *dbsqlc.Queries, assetID, ownerUserID
 	return derivative.ID, true, nil
 }
 
-func schedulePolicies(ctx context.Context, q *dbsqlc.Queries, assetID, ownerUserID int64, policies []TierPolicy) ([]int64, error) {
+func schedulePolicies(ctx context.Context, q *dbsqlc.Queries, assetID, ownerUserID int64, policies []domain.TierPolicy) ([]int64, error) {
 	ids := make([]int64, 0, len(policies))
 	for _, policy := range policies {
-		derivativeID, err := newDerivativeID()
+		derivativeID, err := domain.NewDerivativeID()
 		if err != nil {
 			return nil, err
 		}
@@ -83,12 +65,4 @@ func schedulePolicies(ctx context.Context, q *dbsqlc.Queries, assetID, ownerUser
 		ids = append(ids, derivative.ID)
 	}
 	return ids, nil
-}
-
-func newDerivativeID() (string, error) {
-	var value [12]byte
-	if _, err := rand.Read(value[:]); err != nil {
-		return "", fmt.Errorf("generate media derivative id: %w", err)
-	}
-	return "derivative_" + hex.EncodeToString(value[:]), nil
 }

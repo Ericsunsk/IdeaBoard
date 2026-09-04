@@ -1,4 +1,4 @@
-package derivatives
+package tests
 
 import (
 	"context"
@@ -35,7 +35,7 @@ func TestScanDerivativeOrphanObjectsContinuesAfterProfileFailure(t *testing.T) {
 		{ID: "profile-ready", Enabled: true},
 	}
 	calledProfiles := make([]string, 0, 2)
-	result := scanDerivativeOrphanObjects(
+	result := ScanDerivativeOrphanObjects(
 		context.Background(),
 		profiles,
 		map[string]map[string]struct{}{
@@ -56,13 +56,13 @@ func TestScanDerivativeOrphanObjectsContinuesAfterProfileFailure(t *testing.T) {
 	if !reflect.DeepEqual(calledProfiles, []string{"profile-failed", "profile-ready"}) {
 		t.Fatalf("called profiles=%v", calledProfiles)
 	}
-	if len(result.failures) != 1 || result.failures[0].storageProfileID != "profile-failed" {
-		t.Fatalf("failures=%+v", result.failures)
+	if len(result.Failures) != 1 || result.Failures[0].StorageProfileID != "profile-failed" {
+		t.Fatalf("failures=%+v", result.Failures)
 	}
-	if len(result.findings) != 1 {
-		t.Fatalf("findings=%+v", result.findings)
+	if len(result.Findings) != 1 {
+		t.Fatalf("findings=%+v", result.Findings)
 	}
-	if finding := result.findings[0]; finding.storageProfileID != "profile-ready" || finding.count != 1 {
+	if finding := result.Findings[0]; finding.StorageProfileID != "profile-ready" || finding.Count != 1 {
 		t.Fatalf("finding=%+v", finding)
 	}
 }
@@ -78,7 +78,7 @@ func TestScanDerivativeOrphanObjectsReportsNoFailureForExpectedObjects(t *testin
 		t.Fatal(err)
 	}
 
-	result := scanDerivativeOrphanObjects(
+	result := ScanDerivativeOrphanObjects(
 		context.Background(),
 		[]domain.StorageProfile{{ID: "profile-ready", Enabled: true}},
 		map[string]map[string]struct{}{
@@ -89,7 +89,7 @@ func TestScanDerivativeOrphanObjectsReportsNoFailureForExpectedObjects(t *testin
 		},
 	)
 
-	if len(result.failures) != 0 || len(result.findings) != 0 {
+	if len(result.Failures) != 0 || len(result.Findings) != 0 {
 		t.Fatalf("result=%+v", result)
 	}
 }

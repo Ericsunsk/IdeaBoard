@@ -1,9 +1,8 @@
-package derivatives
+package worker
 
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -14,12 +13,13 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/media/derivatives/application/processing"
+	"ideaboard/api/internal/media/derivatives/application/reconciliation"
+	"ideaboard/api/internal/media/derivatives/application/repair"
+	"ideaboard/api/internal/media/derivatives/domain"
+	"ideaboard/api/internal/media/derivatives/ports"
 	"ideaboard/api/internal/media/maintenance"
-	"ideaboard/api/internal/media/storage"
-	"ideaboard/api/internal/media/storage/domain"
 )
-
-const QueueName = "media_derivatives"
 
 const (
 	reconcileBatchSize = maintenance.BatchSize
@@ -41,7 +41,6 @@ var (
 		Name: "ideaboard_media_derivative_orphan_scan_failures_total",
 		Help: "Total storage profile failures encountered while scanning for orphan media derivatives.",
 	})
-	// ready-object existence reconciler (issue #661/#663).
 	mediaDerivativeReconcileMissing = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ideaboard_media_derivative_reconcile_missing_total",
 		Help: "Total media derivatives the reconciler flipped ready → missing.",
@@ -54,7 +53,6 @@ var (
 		Name: "ideaboard_media_derivative_reconcile_errors_total",
 		Help: "Total per-row reconcile probe errors. Persistent growth means storage is degraded.",
 	})
-	// bounded repair (issue #663).
 	mediaDerivativeRepairTerminals = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ideaboard_media_derivative_repair_terminals_total",
 		Help: "Total media derivatives that hit the bounded repair attempt cap and were marked repair_not_possible.",
@@ -73,68 +71,40 @@ func init() {
 	)
 }
 
-type JobArgs struct {
-	DerivativeID int64 `json:"derivative_id"`
-}
+type DispatchScheduleArgs struct{}
 
-func (JobArgs) Kind() string { return "media_derivative" }
-
-type Worker struct {
-	river.WorkerDefaults[JobArgs]
-	service *Service
-}
+func (DispatchScheduleArgs) Kind() string { return "media_derivative_outbox_schedule" }
 
 type OutboxDispatcher struct {
 	river.WorkerDefaults[DispatchScheduleArgs]
 	db             *sql.DB
 	q              *dbsqlc.Queries
-	storage        *storage.StorageService
+	storage        ports.Storage
+	verifier       ports.Verifier
 	orphanScanMu   sync.Mutex
 	lastOrphanScan time.Time
-	// reconciler is the canonical media derivative ready-object
-	// reconciler (issue #661/#663). nil until NewOutboxDispatcher
-	// is called; tests can override it via SetReconciler.
-	reconciler *Reconciler
-	// repair is the bounded retry target for missing/invalid
-	// derivatives (issue #663). nil until SetRepair is called.
-	repair *Repair
+	reconciler     *reconciliation.Reconciler
+	repair         *repair.Repair
 }
 
-func NewOutboxDispatcher(db *sql.DB, storageService *storage.StorageService) *OutboxDispatcher {
-	d := &OutboxDispatcher{db: db, q: dbsqlc.New(db), storage: storageService}
-	d.reconciler = NewReconciler(d.q, storageService, nil, ReconcilerConfig{})
-	d.repair = NewRepair(db, nil, RepairConfig{})
+func NewOutboxDispatcher(db *sql.DB, storage ports.Storage, verifier ports.Verifier) *OutboxDispatcher {
+	d := &OutboxDispatcher{
+		db:       db,
+		q:        dbsqlc.New(db),
+		storage:  storage,
+		verifier: verifier,
+	}
+	d.reconciler = reconciliation.NewReconciler(d.q, verifier, nil, reconciliation.ReconcilerConfig{})
+	d.repair = repair.NewRepair(db, nil, repair.RepairConfig{})
 	return d
 }
 
-// SetReconciler overrides the default reconciler. The publisher is
-// passed through here so the dispatcher can fan the canonical event
-// types to the same UserEventHub that publishes updated/ready.
-func (d *OutboxDispatcher) SetReconciler(events EventPublisher) {
+func (d *OutboxDispatcher) SetReconciler(events ports.EventPublisher) {
 	if d == nil {
 		return
 	}
-	d.reconciler = NewReconciler(d.q, d.storage, events, ReconcilerConfig{})
-	d.repair = NewRepair(d.db, events, RepairConfig{})
-}
-
-type DispatchScheduleArgs struct{}
-
-func (DispatchScheduleArgs) Kind() string { return "media_derivative_outbox_schedule" }
-
-type derivativeOrphanFinding struct {
-	storageProfileID string
-	count            int
-}
-
-type derivativeOrphanScanFailure struct {
-	storageProfileID string
-	err              error
-}
-
-type derivativeOrphanScanResult struct {
-	findings []derivativeOrphanFinding
-	failures []derivativeOrphanScanFailure
+	d.reconciler = reconciliation.NewReconciler(d.q, d.verifier, events, reconciliation.ReconcilerConfig{})
+	d.repair = repair.NewRepair(d.db, events, repair.RepairConfig{})
 }
 
 func (d *OutboxDispatcher) Work(ctx context.Context, job *river.Job[DispatchScheduleArgs]) error {
@@ -148,7 +118,10 @@ func (d *OutboxDispatcher) Work(ctx context.Context, job *river.Job[DispatchSche
 	if err := d.reconcile(ctx); err != nil {
 		return err
 	}
-	ids, err := d.q.ListPendingMediaDerivativeIDs(ctx, dbsqlc.ListPendingMediaDerivativeIDsParams{MaxAttemptCount: MaxAttempts, LimitCount: reconcileBatchSize})
+	ids, err := d.q.ListPendingMediaDerivativeIDs(ctx, dbsqlc.ListPendingMediaDerivativeIDsParams{
+		MaxAttemptCount: domain.MaxAttempts,
+		LimitCount:      reconcileBatchSize,
+	})
 	if err != nil {
 		return err
 	}
@@ -160,8 +133,6 @@ func (d *OutboxDispatcher) Work(ctx context.Context, job *river.Job[DispatchSche
 	return nil
 }
 
-// Completed jobs are historical facts, not active work. They must not block
-// a retry after a derivative is reset from failed/obsolete to pending.
 func DerivativeJobUniqueOpts() river.UniqueOpts {
 	return river.UniqueOpts{
 		ByArgs: true,
@@ -178,7 +149,7 @@ func DerivativeJobUniqueOpts() river.UniqueOpts {
 func DerivativeJobInsertOpts() *river.InsertOpts {
 	return &river.InsertOpts{
 		Queue:       QueueName,
-		MaxAttempts: MaxAttempts,
+		MaxAttempts: domain.MaxAttempts,
 		Priority:    4,
 		UniqueOpts:  DerivativeJobUniqueOpts(),
 	}
@@ -206,13 +177,7 @@ func (d *OutboxDispatcher) reconcile(ctx context.Context) error {
 	return nil
 }
 
-// reconcileReadyObjects observes ready derivatives without stopping the
-// scheduler when object storage is transiently unavailable.
 func (d *OutboxDispatcher) reconcileReadyObjects(ctx context.Context) {
-	// Reconcile ready-but-object-missing or invalid derivatives
-	// (issue #661/#663). Errors are logged but do not abort the
-	// rest of the reconcile cycle; the runbook triages a slow
-	// reconciler via the metrics counters below.
 	if d.reconciler == nil {
 		return
 	}
@@ -232,13 +197,7 @@ func (d *OutboxDispatcher) reconcileReadyObjects(ctx context.Context) {
 	}
 }
 
-// repairMissingObjects has the same best-effort policy as ready-object
-// reconciliation: a repair outage must not block queue recovery.
 func (d *OutboxDispatcher) repairMissingObjects(ctx context.Context) {
-	// Bounded repair for missing/invalid derivatives (issue
-	// #663). Errors are logged but do not abort the cycle; the
-	// runbook triages a stalled repair via the metrics
-	// counters below.
 	if d.repair == nil {
 		return
 	}
@@ -265,7 +224,7 @@ func (d *OutboxDispatcher) restoreStaleProcessing(ctx context.Context) error {
 		if _, err := d.q.ResetStaleProcessingMediaDerivatives(ctx, dbsqlc.ResetStaleProcessingMediaDerivativesParams{
 			Ids:             staleIDs,
 			StaleBefore:     staleBefore,
-			MaxAttemptCount: MaxAttempts,
+			MaxAttemptCount: domain.MaxAttempts,
 		}); err != nil {
 			return fmt.Errorf("reset stale media derivatives: %w", err)
 		}
@@ -275,7 +234,7 @@ func (d *OutboxDispatcher) restoreStaleProcessing(ctx context.Context) error {
 
 func (d *OutboxDispatcher) restoreMissingOutbox(ctx context.Context) error {
 	missingIDs, err := d.q.ListMediaDerivativeIDsMissingOutbox(ctx, dbsqlc.ListMediaDerivativeIDsMissingOutboxParams{
-		MaxAttemptCount: MaxAttempts,
+		MaxAttemptCount: domain.MaxAttempts,
 		RowLimit:        reconcileBatchSize,
 	})
 	if err != nil {
@@ -295,7 +254,7 @@ func (d *OutboxDispatcher) reconcileReadyAssets(ctx context.Context) error {
 		return fmt.Errorf("list ready assets missing derivatives: %w", err)
 	}
 	for _, asset := range assets {
-		if _, err := ScheduleDefault(ctx, d.q, asset.ID, asset.OwnerUserID); err != nil {
+		if _, err := processing.ScheduleDefault(ctx, d.q, asset.ID, asset.OwnerUserID); err != nil {
 			return fmt.Errorf("restore default derivatives for asset %d: %w", asset.ID, err)
 		}
 	}
@@ -330,74 +289,36 @@ func (d *OutboxDispatcher) reconcileOrphanObjects(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("list storage profiles for derivative scan: %w", err)
 	}
-	result := scanDerivativeOrphanObjects(
+	result := reconciliation.ScanDerivativeOrphanObjects(
 		ctx,
 		profiles,
 		expected,
 		d.storage.ListObjectKeysByStorageProfile,
 	)
-	for _, failure := range result.failures {
+	for _, failure := range result.Failures {
 		mediaDerivativeOrphanScanFailures.Inc()
 		slog.Warn(
 			"storage profile derivative orphan scan failed",
-			"storage_profile_id", failure.storageProfileID,
-			"err", failure.err,
+			"storage_profile_id", failure.StorageProfileID,
+			"err", failure.Err,
 		)
 	}
-	for _, finding := range result.findings {
-		mediaDerivativeOrphanObjects.Add(float64(finding.count))
+	for _, finding := range result.Findings {
+		mediaDerivativeOrphanObjects.Add(float64(finding.Count))
 		slog.Warn(
 			"orphan media derivative objects detected",
-			"storage_profile_id", finding.storageProfileID,
-			"count", finding.count,
+			"storage_profile_id", finding.StorageProfileID,
+			"count", finding.Count,
 		)
 	}
 	return nil
 }
 
-func scanDerivativeOrphanObjects(
-	ctx context.Context,
-	profiles []domain.StorageProfile,
-	expected map[string]map[string]struct{},
-	listObjectKeys func(context.Context, string, string) ([]string, error),
-) derivativeOrphanScanResult {
-	result := derivativeOrphanScanResult{}
-	for _, profile := range profiles {
-		if !profile.Enabled {
-			continue
-		}
-		keys, err := listObjectKeys(ctx, profile.ID, "uploads/")
-		if err != nil {
-			result.failures = append(result.failures, derivativeOrphanScanFailure{
-				storageProfileID: profile.ID,
-				err:              err,
-			})
-			continue
-		}
-		orphanCount := 0
-		for _, key := range keys {
-			if !domain.IsImageDerivativeObjectKey(key) {
-				continue
-			}
-			if _, ok := expected[profile.ID][key]; ok {
-				continue
-			}
-			orphanCount++
-		}
-		if orphanCount > 0 {
-			result.findings = append(result.findings, derivativeOrphanFinding{
-				storageProfileID: profile.ID,
-				count:            orphanCount,
-			})
-		}
-	}
-	return result
-}
-
 func (d *OutboxDispatcher) reconcileStaleMediaUploads(ctx context.Context) error {
 	staleBefore := time.Now().Add(-uploadingLease)
 	ids, err := d.q.ListStaleUploadingMediaAssetIDs(ctx, dbsqlc.ListStaleUploadingMediaAssetIDsParams{
-		StaleBefore: staleBefore, RowLimit: reconcileBatchSize,
+		StaleBefore: staleBefore,
+		RowLimit:    reconcileBatchSize,
 	})
 	if err != nil {
 		return fmt.Errorf("list stale media uploads: %w", err)
@@ -415,25 +336,12 @@ func PeriodicJobs() []*river.PeriodicJob {
 	return []*river.PeriodicJob{river.NewPeriodicJob(
 		river.PeriodicInterval(30*time.Second),
 		func() (river.JobArgs, *river.InsertOpts) {
-			return DispatchScheduleArgs{}, &river.InsertOpts{Queue: QueueName, MaxAttempts: 5, Priority: 4}
+			return DispatchScheduleArgs{}, &river.InsertOpts{
+				Queue:       QueueName,
+				MaxAttempts: domain.MaxAttempts,
+				Priority:    4,
+			}
 		},
 		&river.PeriodicJobOpts{ID: "media-derivative-outbox-schedule", RunOnStart: true},
 	)}
-}
-
-func NewWorker(service *Service) *Worker { return &Worker{service: service} }
-
-func (*Worker) Timeout(*river.Job[JobArgs]) time.Duration { return 5 * time.Minute }
-
-func (w *Worker) Work(ctx context.Context, job *river.Job[JobArgs]) error {
-	if w == nil || w.service == nil || job == nil || job.Args.DerivativeID <= 0 {
-		return context.Canceled
-	}
-	err := w.service.Process(ctx, job.Args.DerivativeID)
-	var recorded *failureRecordedError
-	if errors.As(err, &recorded) {
-		slog.Warn("media derivative processing failed", "derivative_id", job.Args.DerivativeID, "err", err)
-		return nil
-	}
-	return err
 }

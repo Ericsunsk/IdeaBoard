@@ -10,10 +10,15 @@ import (
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/users/ports"
-	"ideaboard/api/internal/media/derivatives"
+	derivativeprocessing "ideaboard/api/internal/media/derivatives/application/processing"
+	derivativedomain "ideaboard/api/internal/media/derivatives/domain"
+	derivativeevents "ideaboard/api/internal/media/derivatives/infrastructure/events"
+	derivativerendering "ideaboard/api/internal/media/derivatives/infrastructure/rendering"
+	derivativeworker "ideaboard/api/internal/media/derivatives/infrastructure/worker"
 	"ideaboard/api/internal/media/preparation"
 	"ideaboard/api/internal/media/reclamation"
 	storageauth "ideaboard/api/internal/media/storage/application/authorization"
+	"ideaboard/api/internal/media/storage/application/integrity"
 	storagetaskmedia "ideaboard/api/internal/media/storage/application/taskmedia"
 	"ideaboard/api/internal/payments"
 	"ideaboard/api/internal/platform/config"
@@ -117,15 +122,21 @@ func newAppTaskRuntime(
 	reclamationPeriodicJobs := reclamation.PeriodicJobs()
 	paymentPeriodicJobs := worker.PaymentReconciliationPeriodicJobs()
 	checkoutShutdownPeriodicJobs := worker.PaymentCheckoutShutdownPeriodicJobs()
-	mediaDerivativeEvents := derivatives.NewUserEventPublisher(userEventHub)
-	mediaDerivativeService := derivatives.NewService(dbs.db, services.storageService, mediaDerivativeEvents)
+	mediaDerivativeEvents := derivativeevents.NewUserEventPublisher(userEventHub)
+	mediaDerivativeService := derivativeprocessing.NewService(
+		dbs.db,
+		services.storageService,
+		integrity.NewIntegrityVerifier(services.storageService, integrity.IntegrityConfig{MaxBytes: derivativedomain.MaxOutputBytes + 1}),
+		derivativerendering.NewRenderer(),
+		mediaDerivativeEvents,
+	)
 	if err := configureUserEventFanout(ctx, eventBus, userEventHub, services.paymentService); err != nil {
 		if eventBus != nil {
 			_ = eventBus.Close()
 		}
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize user event fanout: %w", err)
 	}
-	mediaDerivativePeriodicJobs := derivatives.PeriodicJobs()
+	mediaDerivativePeriodicJobs := derivativeworker.PeriodicJobs()
 	visionBillingService := searchcatalog.NewVisionBillingService(services.dbPool, services.billingCatalog, services.creditService, nil)
 	visionBillingPeriodicJobs := searchcatalog.VisionBillingPeriodicJobs()
 	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(reclamationPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(mediaDerivativePeriodicJobs)+len(visionBillingPeriodicJobs))
@@ -135,7 +146,11 @@ func newAppTaskRuntime(
 	periodicJobs = append(periodicJobs, checkoutShutdownPeriodicJobs...)
 	periodicJobs = append(periodicJobs, mediaDerivativePeriodicJobs...)
 	periodicJobs = append(periodicJobs, visionBillingPeriodicJobs...)
-	derivativeOutboxDispatcher := derivatives.NewOutboxDispatcher(dbs.db, services.storageService)
+	derivativeOutboxDispatcher := derivativeworker.NewOutboxDispatcher(
+		dbs.db,
+		services.storageService,
+		integrity.NewIntegrityVerifier(services.storageService, integrity.IntegrityConfig{}),
+	)
 	derivativeOutboxDispatcher.SetReconciler(mediaDerivativeEvents)
 	riverClient, err := worker.NewRiverClient(dbs.riverPool, riverTaskWorker, worker.RiverServerOptions{
 		QueueName:   taskqueue.RiverQueueDefault,
@@ -145,7 +160,7 @@ func newAppTaskRuntime(
 			reclamation.QueueName:               {MaxWorkers: 1},
 			worker.PaymentReconciliationQueue:   {MaxWorkers: 1},
 			worker.PaymentCheckoutShutdownQueue: {MaxWorkers: 1},
-			derivatives.QueueName:               {MaxWorkers: 2},
+			derivativeworker.QueueName:          {MaxWorkers: 2},
 			searchcatalog.VisionBillingQueue:    {MaxWorkers: 1},
 		},
 		RegisterWorkers: func(workers *river.Workers) {
@@ -156,7 +171,7 @@ func newAppTaskRuntime(
 			river.AddWorker(workers, worker.NewPaymentReconciliationWorker(services.paymentService))
 			river.AddWorker(workers, worker.NewPaymentCheckoutShutdownWorker(services.paymentService))
 			river.AddWorker(workers, worker.NewPaymentCheckoutShutdownScheduleWorker(services.paymentService))
-			river.AddWorker(workers, derivatives.NewWorker(mediaDerivativeService))
+			river.AddWorker(workers, derivativeworker.NewWorker(mediaDerivativeService))
 			river.AddWorker(workers, derivativeOutboxDispatcher)
 			river.AddWorker(workers, searchcatalog.NewVisionBillingReconciliationWorker(visionBillingService))
 		},
@@ -169,7 +184,7 @@ func newAppTaskRuntime(
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize River client: %w", err)
 	}
 	repos.mediaAssetRegistry.SetDerivativeEnqueuer(func(ctx context.Context, derivativeID int64) error {
-		_, err := riverClient.Insert(ctx, derivatives.JobArgs{DerivativeID: derivativeID}, derivatives.DerivativeJobInsertOpts())
+		_, err := riverClient.Insert(ctx, derivativeworker.JobArgs{DerivativeID: derivativeID}, derivativeworker.DerivativeJobInsertOpts())
 		return err
 	})
 	if _, err := recoverRunningTasksAfterStartup(ctx, repos.taskRepo, riverTaskWorker, riverStartupJobCanceller{client: riverClient}); err != nil {

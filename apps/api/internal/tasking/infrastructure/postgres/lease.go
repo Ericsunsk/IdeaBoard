@@ -10,7 +10,7 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
-	"ideaboard/api/internal/media/derivatives"
+	derivativeprocessing "ideaboard/api/internal/media/derivatives/application/processing"
 	tasks "ideaboard/api/internal/tasking/domain"
 	runtimecontracts "ideaboard/api/internal/tasking/ports/runtime"
 )
@@ -242,7 +242,7 @@ func upsertTaskOutputMediaAsset(ctx context.Context, q *dbsqlc.Queries, ownerUse
 	if err != nil {
 		return nil, err
 	}
-	if _, err := derivatives.ScheduleDefault(ctx, q, id, ownerUserID); err != nil {
+	if _, err := derivativeprocessing.ScheduleDefault(ctx, q, id, ownerUserID); err != nil {
 		return nil, fmt.Errorf("schedule task output derivatives: %w", err)
 	}
 	return &id, nil

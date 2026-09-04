@@ -1,4 +1,4 @@
-package derivatives
+package tests
 
 import (
 	"encoding/json"

@@ -35,15 +35,7 @@ type StorageService struct {
 	runtimeService  *runtime.Service
 }
 
-func NewStorageService(profileRepo ports.StorageProfileRepository, assetLocator ports.StoredUploadLocator, publicAPIOrigin ...string) *StorageService {
-	origin := ""
-	if len(publicAPIOrigin) > 0 {
-		origin = publicAPIOrigin[0]
-	}
-	return newStorageService(profileRepo, assetLocator, origin)
-}
-
-func newStorageService(profileRepo ports.StorageProfileRepository, assetLocator ports.StoredUploadLocator, publicAPIOrigin string) *StorageService {
+func NewStorageService(profileRepo ports.StorageProfileRepository, assetLocator ports.StoredUploadLocator, publicAPIOrigin string) *StorageService {
 	origin := strings.TrimRight(strings.TrimSpace(publicAPIOrigin), "/")
 	s3Svc := s3.NewS3CompatibleService()
 	localDriver := local.NewLocalStorageDriver(origin)

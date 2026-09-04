@@ -1,23 +1,21 @@
-package derivatives
+package tests
 
 import (
-	"context"
 	"errors"
 	"testing"
-	"time"
 
-	"ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/media/derivatives/application/repair"
 	mediaerrors "ideaboard/api/internal/media/errors"
 )
 
 func TestRepairDefaultsAreStable(t *testing.T) {
-	if defaultRepairMaxAttempts <= 0 {
+	if DefaultRepairMaxAttempts <= 0 {
 		t.Fatal("default repair attempt cap must be positive")
 	}
-	if defaultRepairMaxAttempts > 5 {
-		t.Errorf("default repair attempt cap %d is excessive; runbook pins 3 as the cap", defaultRepairMaxAttempts)
+	if DefaultRepairMaxAttempts > 5 {
+		t.Errorf("default repair attempt cap %d is excessive; runbook pins 3 as the cap", DefaultRepairMaxAttempts)
 	}
-	if defaultRepairLease <= 0 {
+	if DefaultRepairLease <= 0 {
 		t.Fatal("default repair lease must be positive")
 	}
 }
@@ -31,12 +29,10 @@ func TestRepairErrRepairNotPossibleIsTyped(t *testing.T) {
 func TestRepairPublishRepairedStampsEventType(t *testing.T) {
 	called := false
 	var got Event
-	r := &Repair{
-		events: stubPublisher{fn: func(userID int64, event Event) {
-			called = true
-			got = event
-		}},
-	}
+	r := repair.NewRepair(nil, stubPublisher{fn: func(userID int64, event Event) {
+		called = true
+		got = event
+	}}, RepairConfig{})
 	r.PublishRepaired(7, Event{
 		MediaAssetID: 42,
 		DerivativeID: "derivative_99",
@@ -76,7 +72,7 @@ func TestRepairConfigDefaultsAreApplied(t *testing.T) {
 	// defaults. We only need to check the constants the runbook
 	// pins; the constructor itself is exercised by the worker
 	// integration test.
-	if defaultRepairMaxAttempts == 0 || defaultRepairLease == 0 {
+	if DefaultRepairMaxAttempts == 0 || DefaultRepairLease == 0 {
 		t.Fatal("defaults must be non-zero")
 	}
 }
@@ -90,10 +86,3 @@ func (s stubPublisher) Publish(userID int64, event Event) {
 		s.fn(userID, event)
 	}
 }
-
-// _ ensures imports are not stripped when the test file
-// evolves; the dbsqlc import guards the future repair path
-// that takes a real query dependency.
-var _ = dbsqlc.MarkMediaDerivativeRepairTerminalParams{}
-var _ = context.Background
-var _ = time.Now

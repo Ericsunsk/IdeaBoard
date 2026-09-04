@@ -133,7 +133,7 @@ func newStorageServiceTest(t *testing.T) (*StorageService, *StorageProfileReposi
 
 	db := testdb.Open(t)
 	repo := NewStorageProfileRepository(db)
-	service := NewStorageService(repo, nil)
+	service := NewStorageService(repo, nil, "")
 	service.SetCapabilityProbe(func(context.Context, *S3CompatibleConfig) error { return nil })
 	if err := service.EnsureDefaultProfiles(context.Background()); err != nil {
 		t.Fatalf("EnsureDefaultProfiles returned error: %v", err)
@@ -147,7 +147,7 @@ func newStorageServiceTestWithoutDefault(t *testing.T) (*StorageService, *Storag
 
 	db := testdb.Open(t)
 	repo := NewStorageProfileRepository(db)
-	service := NewStorageService(repo, nil)
+	service := NewStorageService(repo, nil, "")
 	service.SetCapabilityProbe(func(context.Context, *S3CompatibleConfig) error { return nil })
 	return service, repo
 }
