@@ -10,8 +10,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	rewardlocks "ideaboard/api/internal/rewards/application/locks"
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
+	rewardsports "ideaboard/api/internal/rewards/ports"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -31,12 +31,14 @@ type PoolInterface interface {
 type Service struct {
 	pool    PoolInterface
 	keyring rewardsdomain.CodeKeyring
+	locker  rewardsports.CodeLocker
 	now     func() time.Time
 }
 
 // ServiceOptions configures the service.
 type ServiceOptions struct {
-	Now func() time.Time
+	Now    func() time.Time
+	Locker rewardsports.CodeLocker
 }
 
 // NewServiceWithOptions creates a service with custom options.
@@ -45,7 +47,21 @@ func NewServiceWithOptions(pool PoolInterface, keyring rewardsdomain.CodeKeyring
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{pool: pool, keyring: keyring, now: now}
+	return &Service{pool: pool, keyring: keyring, locker: opts.Locker, now: now}
+}
+
+func (s *Service) lockRewardCodeIdentity(ctx context.Context, tx pgx.Tx, normalized string) error {
+	if s == nil || s.locker == nil {
+		return fmt.Errorf("reward code locker unavailable")
+	}
+	return s.locker.LockRewardCodeIdentity(ctx, tx, normalized)
+}
+
+func (s *Service) lockRewardCodeID(ctx context.Context, tx pgx.Tx, rewardCodeID int64) error {
+	if s == nil || s.locker == nil {
+		return fmt.Errorf("reward code locker unavailable")
+	}
+	return s.locker.LockRewardCodeID(ctx, tx, rewardCodeID)
 }
 
 func (s *Service) currentTime() time.Time {
@@ -89,7 +105,7 @@ func (s *Service) CreateRewardCode(ctx context.Context, command CreateRewardCode
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if err := rewardlocks.LockRewardCodeIdentity(ctx, tx, input.normalized); err != nil {
+	if err := s.lockRewardCodeIdentity(ctx, tx, input.normalized); err != nil {
 		return CreatedRewardCode{}, err
 	}
 

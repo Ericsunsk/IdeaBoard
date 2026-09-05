@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	rewardlocks "ideaboard/api/internal/rewards/application/locks"
 	"ideaboard/api/internal/rewards/domain"
 	"strings"
 	"time"
@@ -86,11 +85,11 @@ func (s *Service) prepareRewardCodeUpdate(command UpdateRewardCodeCommand) (rewa
 
 func (s *Service) lockRewardCodeUpdate(ctx context.Context, tx pgx.Tx, input rewardCodeUpdateInput) (bool, error) {
 	if input.hasCode {
-		if err := rewardlocks.LockRewardCodeIdentity(ctx, tx, input.normalized); err != nil {
+		if err := s.lockRewardCodeIdentity(ctx, tx, input.normalized); err != nil {
 			return false, err
 		}
 	}
-	if err := rewardlocks.LockRewardCodeID(ctx, tx, input.command.RewardCodeID); err != nil {
+	if err := s.lockRewardCodeID(ctx, tx, input.command.RewardCodeID); err != nil {
 		return false, err
 	}
 	if !input.hasCode {
@@ -153,7 +152,7 @@ func (s *Service) SetRewardCodeEnabled(ctx context.Context, command SetRewardCod
 		return RewardCode{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if err := rewardlocks.LockRewardCodeID(ctx, tx, command.RewardCodeID); err != nil {
+	if err := s.lockRewardCodeID(ctx, tx, command.RewardCodeID); err != nil {
 		return RewardCode{}, err
 	}
 	var found bool
@@ -185,7 +184,7 @@ func (s *Service) DeleteRewardCode(ctx context.Context, command DeleteRewardCode
 		return DeletedRewardCode{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if err := rewardlocks.LockRewardCodeID(ctx, tx, command.RewardCodeID); err != nil {
+	if err := s.lockRewardCodeID(ctx, tx, command.RewardCodeID); err != nil {
 		return DeletedRewardCode{}, err
 	}
 	var deleted bool

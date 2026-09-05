@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	rewardlocks "ideaboard/api/internal/rewards/application/locks"
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
 	"ideaboard/api/internal/rewards/ports"
 	"strconv"
@@ -43,12 +42,14 @@ type Service struct {
 	pool    *pgxpool.Pool
 	credits CreditGateway
 	keyring rewardsdomain.CodeKeyring
+	locker  ports.CodeLocker
 	now     func() time.Time
 }
 
 // ServiceOptions configures the service.
 type ServiceOptions struct {
-	Now func() time.Time
+	Now    func() time.Time
+	Locker ports.CodeLocker
 }
 
 // NewServiceWithOptions creates a service with custom options.
@@ -57,7 +58,7 @@ func NewServiceWithOptions(pool *pgxpool.Pool, credits CreditGateway, keyring re
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{pool: pool, credits: credits, keyring: keyring, now: now}
+	return &Service{pool: pool, credits: credits, keyring: keyring, locker: options.Locker, now: now}
 }
 
 func (s *Service) currentTime() time.Time {
@@ -125,7 +126,7 @@ func (s *Service) redeemRewardCode(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	rewardCodeID, found, err := lockRewardCodeForRedemption(ctx, tx, current, previous)
+	rewardCodeID, found, err := lockRewardCodeForRedemption(ctx, tx, s.locker, current, previous)
 	if err != nil {
 		return RedeemResult{}, true, err
 	}
@@ -348,12 +349,15 @@ func deriveStatus(rc RewardCode, now time.Time) Status {
 
 // --- Lock and lookup helpers ---
 
-func lockRewardCodeForRedemption(ctx context.Context, tx pgx.Tx, current, previous CodeDigest) (int64, bool, error) {
+func lockRewardCodeForRedemption(ctx context.Context, tx pgx.Tx, locker ports.CodeLocker, current, previous CodeDigest) (int64, bool, error) {
 	rewardCodeID, found, err := findRewardCodeAliasOwner(ctx, tx, current, previous)
 	if err != nil || !found {
 		return rewardCodeID, found, err
 	}
-	if err := rewardlocks.LockRewardCodeID(ctx, tx, rewardCodeID); err != nil {
+	if locker == nil {
+		return 0, true, fmt.Errorf("reward code locker unavailable")
+	}
+	if err := locker.LockRewardCodeID(ctx, tx, rewardCodeID); err != nil {
 		return 0, true, err
 	}
 	lockedOwnerID, stillExists, err := findRewardCodeAliasOwner(ctx, tx, current, previous)

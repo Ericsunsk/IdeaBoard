@@ -3,7 +3,14 @@ package domain
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"time"
+)
+
+var (
+	ErrAccountNotFound      = errors.New("account not found")
+	ErrAccountNameConflict  = errors.New("account name conflict")
+	ErrAccountModelNotFound = errors.New("account model not found")
 )
 
 type ApiAccount struct {

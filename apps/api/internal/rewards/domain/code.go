@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,7 +15,23 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-const MaxRawCodeBytes = 128
+const (
+	MaxRawCodeBytes       = 128
+	MaxCreditAmount int64 = 9_000_000_000_000_000
+)
+
+func ValidateCreditAmount(value int64) error {
+	if value <= 0 || value > MaxCreditAmount {
+		return fmt.Errorf("credit amount must be between 1 and %d", MaxCreditAmount)
+	}
+	return nil
+}
+
+// DeriveAdvisoryLockKey derives a deterministic 64-bit advisory lock key from scope and value.
+func DeriveAdvisoryLockKey(scope, value string) int64 {
+	digest := sha256.Sum256([]byte(scope + "\x00" + value))
+	return int64(binary.BigEndian.Uint64(digest[:8]))
+}
 
 var (
 	codeVersionPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,32}$`)

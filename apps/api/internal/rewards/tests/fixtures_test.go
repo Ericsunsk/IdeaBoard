@@ -8,36 +8,38 @@ import (
 
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/rewards"
-	rewardlocks "ideaboard/api/internal/rewards/application/locks"
+	"ideaboard/api/internal/rewards/domain"
 	creditsadapter "ideaboard/api/internal/rewards/infrastructure/credits"
+	"ideaboard/api/internal/rewards/infrastructure/postgres"
+	"ideaboard/api/internal/rewards/ports"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type (
-	CreateRewardCodeCommand     = rewards.CreateRewardCodeCommand
-	CreatedRewardCode           = rewards.CreatedRewardCode
-	UpdateRewardCodeCommand     = rewards.UpdateRewardCodeCommand
-	UpdatedRewardCode           = rewards.UpdatedRewardCode
-	SetRewardCodeEnabledCommand = rewards.SetRewardCodeEnabledCommand
-	DeleteRewardCodeCommand     = rewards.DeleteRewardCodeCommand
-	DeletedRewardCode           = rewards.DeletedRewardCode
-	SearchRewardCodesInput      = rewards.SearchRewardCodesInput
-	RewardCodePage              = rewards.RewardCodePage
-	ListAdminRedemptionsInput   = rewards.ListAdminRedemptionsInput
-	AdminRedemptionPage         = rewards.AdminRedemptionPage
-	AdminRedemptionSummary      = rewards.AdminRedemptionSummary
-	GetAdminRedemptionInput     = rewards.GetAdminRedemptionInput
-	AdminRedemptionDetail       = rewards.AdminRedemptionDetail
-	RedeemCommand               = rewards.RedeemCommand
-	Redemption                  = rewards.Redemption
-	RedeemResult                = rewards.RedeemResult
-	RedemptionHistoryItem       = rewards.RedemptionHistoryItem
-	ListRedemptionsInput        = rewards.ListRedemptionsInput
-	RedemptionHistoryPage       = rewards.RedemptionHistoryPage
-	RewardCode                  = rewards.RewardCode
-	RewardCodeStatus            = rewards.RewardCodeStatus
+	CreateRewardCodeCommand     = ports.CreateRewardCodeCommand
+	CreatedRewardCode           = ports.CreatedRewardCode
+	UpdateRewardCodeCommand     = ports.UpdateRewardCodeCommand
+	UpdatedRewardCode           = ports.UpdatedRewardCode
+	SetRewardCodeEnabledCommand = ports.SetRewardCodeEnabledCommand
+	DeleteRewardCodeCommand     = ports.DeleteRewardCodeCommand
+	DeletedRewardCode           = ports.DeletedRewardCode
+	SearchRewardCodesInput      = ports.SearchRewardCodesInput
+	RewardCodePage              = ports.RewardCodePage
+	ListAdminRedemptionsInput   = ports.ListAdminRedemptionsInput
+	AdminRedemptionPage         = ports.AdminRedemptionPage
+	AdminRedemptionSummary      = ports.AdminRedemptionSummary
+	GetAdminRedemptionInput     = ports.GetAdminRedemptionInput
+	AdminRedemptionDetail       = ports.AdminRedemptionDetail
+	RedeemCommand               = ports.RedeemCommand
+	Redemption                  = ports.Redemption
+	RedeemResult                = ports.RedeemResult
+	RedemptionHistoryItem       = ports.RedemptionHistoryItem
+	ListRedemptionsInput        = ports.ListRedemptionsInput
+	RedemptionHistoryPage       = ports.RedemptionHistoryPage
+	RewardCode                  = ports.RewardCode
+	RewardCodeStatus            = ports.RewardCodeStatus
 	Service                     = rewards.Service
 	UserHandler                 = rewards.UserHandler
 	AdminCommandHandler         = rewards.AdminCommandHandler
@@ -53,21 +55,21 @@ type (
 )
 
 var (
-	ErrInvalidCommand      = rewards.ErrInvalidCommand
-	ErrCodeCollision       = rewards.ErrCodeCollision
-	ErrRewardCodeConflict  = rewards.ErrRewardCodeConflict
-	ErrCodeUnavailable     = rewards.ErrCodeUnavailable
-	ErrRewardCodeNotFound  = rewards.ErrRewardCodeNotFound
-	ErrCapBelowRedemptions = rewards.ErrCapBelowRedemptions
-	ErrRewardCodeRedeemed  = rewards.ErrRewardCodeRedeemed
-	ErrRedemptionNotFound  = rewards.ErrRedemptionNotFound
+	ErrInvalidCommand      = domain.ErrInvalidCode
+	ErrCodeCollision       = domain.ErrCodeCollision
+	ErrRewardCodeConflict  = domain.ErrRewardCodeConflict
+	ErrCodeUnavailable     = domain.ErrCodeUnavailable
+	ErrRewardCodeNotFound  = domain.ErrRewardCodeNotFound
+	ErrCapBelowRedemptions = domain.ErrCapBelowRedemptions
+	ErrRewardCodeRedeemed  = domain.ErrRewardCodeRedeemed
+	ErrRedemptionNotFound  = domain.ErrRedemptionNotFound
 )
 
 const (
-	RewardCodeStatusExpired   = rewards.RewardCodeStatusExpired
-	RewardCodeStatusExhausted = rewards.RewardCodeStatusExhausted
-	RewardCodeStatusDisabled  = rewards.RewardCodeStatusDisabled
-	RewardCodeStatusEnabled   = rewards.RewardCodeStatusEnabled
+	RewardCodeStatusExpired   = ports.RewardCodeStatusExpired
+	RewardCodeStatusExhausted = ports.RewardCodeStatusExhausted
+	RewardCodeStatusDisabled  = ports.RewardCodeStatusDisabled
+	RewardCodeStatusEnabled   = ports.RewardCodeStatusEnabled
 
 	defaultRedemptionAttemptLimit  = rewards.DefaultRedemptionAttemptLimit
 	redemptionOutcomeRateLimited   = rewards.RedemptionOutcomeRateLimited
@@ -141,5 +143,5 @@ func provisionRewardWallet(t *testing.T, pool *pgxpool.Pool, creditService *cred
 }
 
 func lockRewardCodeID(ctx context.Context, tx pgx.Tx, rewardCodeID int64) error {
-	return rewardlocks.LockRewardCodeID(ctx, tx, rewardCodeID)
+	return postgres.LockRewardCodeID(ctx, tx, rewardCodeID)
 }

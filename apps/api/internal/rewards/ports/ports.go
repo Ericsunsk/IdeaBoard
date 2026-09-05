@@ -9,9 +9,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 var ErrWalletNotFound = errors.New("rewards credit wallet not found")
+
+// CodeLocker defines transaction-scoped advisory lock operations for reward codes.
+type CodeLocker interface {
+	LockRewardCodeID(ctx context.Context, tx pgx.Tx, rewardCodeID int64) error
+	LockRewardCodeIdentity(ctx context.Context, tx pgx.Tx, normalized string) error
+}
 
 type RewardCodeStatus string
 

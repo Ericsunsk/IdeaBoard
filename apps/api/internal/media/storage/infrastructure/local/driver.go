@@ -27,6 +27,12 @@ var localCopyBufferPool = sync.Pool{
 	},
 }
 
+type LocalStorageProfileConfig struct{}
+
+func (LocalStorageProfileConfig) Map() map[string]interface{} {
+	return map[string]interface{}{}
+}
+
 type LocalStorageDriver struct {
 	publicAPIOrigin string
 }

@@ -39,11 +39,12 @@ func NewService(pool *pgxpool.Pool, credits redemptions.CreditGateway, keyring d
 // NewServiceWithOptions constructs a new Rewards composition root with custom options.
 
 func NewServiceWithOptions(pool *pgxpool.Pool, credits redemptions.CreditGateway, keyring domain.CodeKeyring, opts ServiceOptions) *Service {
+	locker := postgres.NewLocker()
 	return &Service{
 		pool:        pool,
 		keyring:     keyring,
-		rewardCodes: reward_codes.NewServiceWithOptions(pool, keyring, reward_codes.ServiceOptions{Now: opts.Now}),
-		redemptions: redemptions.NewServiceWithOptions(pool, credits, keyring, redemptions.ServiceOptions{Now: opts.Now}),
+		rewardCodes: reward_codes.NewServiceWithOptions(pool, keyring, reward_codes.ServiceOptions{Now: opts.Now, Locker: locker}),
+		redemptions: redemptions.NewServiceWithOptions(pool, credits, keyring, redemptions.ServiceOptions{Now: opts.Now, Locker: locker}),
 		now:         opts.Now,
 	}
 }

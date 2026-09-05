@@ -148,3 +148,31 @@ func TestNormalizeCodeEnforcesPublicPayloadAlphabetAndLength(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateCreditAmount(t *testing.T) {
+	for _, value := range []int64{0, -1, domain.MaxCreditAmount + 1} {
+		if err := domain.ValidateCreditAmount(value); err == nil {
+			t.Errorf("ValidateCreditAmount(%d) succeeded", value)
+		}
+	}
+	for _, value := range []int64{1, domain.MaxCreditAmount} {
+		if err := domain.ValidateCreditAmount(value); err != nil {
+			t.Errorf("ValidateCreditAmount(%d) error = %v", value, err)
+		}
+	}
+}
+
+func TestDeriveAdvisoryLockKey(t *testing.T) {
+	key1 := domain.DeriveAdvisoryLockKey("id", "123")
+	key2 := domain.DeriveAdvisoryLockKey("id", "123")
+	key3 := domain.DeriveAdvisoryLockKey("identity", "123")
+	if key1 == 0 {
+		t.Fatal("DeriveAdvisoryLockKey returned zero")
+	}
+	if key1 != key2 {
+		t.Fatalf("DeriveAdvisoryLockKey not deterministic: %d != %d", key1, key2)
+	}
+	if key1 == key3 {
+		t.Fatalf("DeriveAdvisoryLockKey collided across scopes: %d == %d", key1, key3)
+	}
+}
