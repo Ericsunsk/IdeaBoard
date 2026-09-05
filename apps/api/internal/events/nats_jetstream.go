@@ -332,6 +332,14 @@ func (b *NATSJetStreamEventBus) Close() error {
 	return nil
 }
 
+// IsConnected reports whether the underlying NATS connection is currently connected.
+func (b *NATSJetStreamEventBus) IsConnected() bool {
+	if b == nil || b.nc == nil {
+		return false
+	}
+	return b.nc.IsConnected()
+}
+
 func normalizeNATSJetStreamConfig(cfg NATSJetStreamConfig) NATSJetStreamConfig {
 	cfg.URL = strings.TrimSpace(cfg.URL)
 	cfg.StreamName = sanitizeJetStreamName(cfg.StreamName, defaultNATSStreamName)

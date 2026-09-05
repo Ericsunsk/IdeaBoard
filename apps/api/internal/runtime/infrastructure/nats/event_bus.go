@@ -39,6 +39,11 @@ func NewEventBus(ctx context.Context, cfg config.EventBusConfig) (*EventBus, err
 	return &EventBus{bus: natsBus}, nil
 }
 
+// NewEventBusFromUnderlying wraps an existing NATSJetStreamEventBus into an EventBus adapter.
+func NewEventBusFromUnderlying(bus *events.NATSJetStreamEventBus) *EventBus {
+	return &EventBus{bus: bus}
+}
+
 // UnderlyingBus returns the wrapped NATSJetStreamEventBus.
 func (b *EventBus) UnderlyingBus() *events.NATSJetStreamEventBus {
 	if b == nil {
@@ -57,11 +62,17 @@ func (b *EventBus) CheckHealth(ctx context.Context) domain.ComponentStatus {
 			Required: false,
 		}
 	}
+	ready := b.bus.IsConnected()
+	detail := ""
+	if !ready {
+		detail = "nats connection is disconnected"
+	}
 	return domain.ComponentStatus{
 		Name:     "nats",
 		Kind:     domain.ComponentKindNATS,
-		Ready:    true,
+		Ready:    ready,
 		Required: true,
+		Detail:   detail,
 	}
 }
 

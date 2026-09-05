@@ -15,6 +15,7 @@ import (
 	configinfra "ideaboard/api/internal/runtime/infrastructure/config"
 	databaseinfra "ideaboard/api/internal/runtime/infrastructure/database"
 	httpinfra "ideaboard/api/internal/runtime/infrastructure/http"
+	natsinfra "ideaboard/api/internal/runtime/infrastructure/nats"
 	"ideaboard/api/internal/runtime/ports"
 
 	"github.com/gin-gonic/gin"
@@ -68,6 +69,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		return nil, err
 	}
 	router := newAppRouter(cfg, repos, services, taskServices)
+	natsHealthChecker := natsinfra.NewEventBusFromUnderlying(workerRuntime.eventBus)
 
 	return &appContainer{
 		router:        router,
@@ -77,6 +79,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		healthCheckers: []ports.HealthChecker{
 			databaseinfra.NewHealthChecker(&databaseinfra.Pools{DB: dbs.db, RiverPool: dbs.riverPool}),
 			workerRuntime,
+			natsHealthChecker,
 			// HTTP runners are added after construction in BuildApp, once their
 			// concrete listeners are available.
 		},
@@ -93,8 +96,8 @@ func BuildApp(cfg *config.Config) (*App, error) {
 	metricsServer := httpinfra.NewMetricsServerRunner(cfg)
 	return &App{
 		coordinator:    lifecycle.NewCoordinator(lifecycle.DefaultShutdownBudget),
-		httpServer:     httpinfra.NewHTTPServerRunner(cfg, container.router),
-		metricsServer:  httpinfra.NewMetricsServerRunner(cfg),
+		httpServer:     httpServer,
+		metricsServer:  metricsServer,
 		workerRuntime:  container.workerRuntime,
 		healthCheckers: append(container.healthCheckers, httpServer, metricsServer),
 		closer:         container,
