@@ -826,17 +826,17 @@ func TestSubmitTaskCanvasUploadRefsRequireBoardAccess(t *testing.T) {
 	owner := mustCreateTaskUploadUser(t, userRepo, "owner", "owner-auth", "OWNR1A")
 	member := mustCreateTaskUploadUser(t, userRepo, "member", "member-auth", "MEMB1A")
 	outsider := mustCreateTaskUploadUser(t, userRepo, "outsider", "outsider-auth", "OUTS1A")
-	boardRepo := boards.NewBoardRepository(db)
+	boardRepo := boards.NewRepository(db)
 	now := time.Now()
-	if err := boardRepo.Upsert(ctx, &boards.UserBoard{BoardID: "board-1", OwnerUserID: owner.ID, CreatedBy: owner.ID, Name: "Demo", State: "{}", CreatedAt: now, UpdatedAt: now}); err != nil {
+	if err := boardRepo.Upsert(ctx, &boards.Board{BoardID: "board-1", OwnerUserID: owner.ID, CreatedBy: owner.ID, Name: "Demo", State: "{}", CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatalf("create board failed: %v", err)
 	}
-	if err := boardRepo.UpsertMember(ctx, owner.ID, "board-1", member.ID, boards.BoardAccessRoleViewer); err != nil {
+	if err := boardRepo.UpsertMember(ctx, owner.ID, "board-1", member.ID, boards.RoleViewer); err != nil {
 		t.Fatalf("create board member failed: %v", err)
 	}
 
 	mediaAuthorizer := authorization.NewTaskMediaAuthorizer(
-		testTaskUploadBoardAccessResolver{service: boards.NewBoardService(boardRepo, userRepo)},
+		testTaskUploadBoardAccessResolver{service: boards.NewService(boardRepo, userRepo)},
 		testTaskUploadOwnerStorageUIDResolver{repo: userRepo},
 	)
 	intake := NewTaskIntake(TaskIntakeDeps{
@@ -1373,7 +1373,7 @@ func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 }
 
 type testTaskUploadBoardAccessResolver struct {
-	service *boards.BoardService
+	service *boards.Service
 }
 
 func (r testTaskUploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context, userID int64, boardID string) (int64, error) {

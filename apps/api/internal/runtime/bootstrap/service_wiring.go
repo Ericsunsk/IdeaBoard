@@ -33,9 +33,9 @@ type appDomainServices struct {
 	dbPool               *pgxpool.Pool
 	authServiceClient    *auth.ServiceClient
 	runtimeSettings      *settings.RuntimeSettingsService
-	storageService       *storage.StorageService
+	storageService       *storage.Service
 	userService          *administration.Service
-	boardService         *boards.BoardService
+	boardService         *boards.Service
 	billingService       *billing.Service
 	billingCatalog       *billing.BillableItemCatalog
 	billableItemRegistry *billing.BillableItemRegistry
@@ -50,7 +50,7 @@ type appDomainServices struct {
 func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepositories, appPool *pgxpool.Pool) (appDomainServices, error) {
 	runtimeSettings := settings.NewRuntimeSettingsService(repos.systemConfigRepo)
 	outbound.ConfigurePolicyProvider(runtimeSettings)
-	storageService := storage.NewStorageService(
+	storageService := storage.NewService(
 		repos.storageProfileRepo,
 		repos.mediaAssetRegistry,
 		// Browser-visible upload references must resolve through the same-origin
@@ -136,7 +136,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		runtimeSettings:      runtimeSettings,
 		storageService:       storageService,
 		userService:          userService,
-		boardService:         boards.NewBoardService(repos.boardRepo, repos.userRepo, storageService),
+		boardService:         boards.NewService(repos.boardRepo, repos.userRepo, storageService),
 		billingService:       billingService,
 		billingCatalog:       billingCatalog,
 		billableItemRegistry: billableItemRegistry,

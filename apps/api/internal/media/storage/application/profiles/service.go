@@ -27,12 +27,12 @@ func (f DriverResolverFunc) GetDriver(provider domain.StorageProvider) (ports.St
 }
 
 type Service struct {
-	repo    ports.StorageProfileRepository
+	repo    ports.ProfileRepository
 	drivers DriverResolver
 	meta    map[domain.StorageProvider]domain.StorageProviderMeta
 }
 
-func NewService(repo ports.StorageProfileRepository, drivers DriverResolver) *Service {
+func NewService(repo ports.ProfileRepository, drivers DriverResolver) *Service {
 	return &Service{
 		repo:    repo,
 		drivers: drivers,

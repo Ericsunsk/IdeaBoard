@@ -16,8 +16,8 @@ import (
 func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {
 	db := testdb.Open(t)
 	userRepo := identitypostgres.NewRepository(db)
-	repo := NewBoardRepository(db)
-	service := NewBoardService(repo, userRepo)
+	repo := NewRepository(db)
+	service := NewService(repo, userRepo)
 	ctx := context.Background()
 
 	ownerA := createBoardTestUser(t, userRepo, "owner-a")
@@ -25,16 +25,16 @@ func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {
 	memberC := createBoardTestUser(t, userRepo, "member-c")
 
 	boardID := "shared-board"
-	boardA, err := service.UpsertBoard(ctx, ownerA.ID, boardID, &UpsertBoardRequest{Name: "Alpha Board", State: validBoardState(CurrentBoardStateSchemaVersion, 101)})
+	boardA, err := service.UpsertBoard(ctx, ownerA.ID, boardID, &UpsertRequest{Name: "Alpha Board", State: validBoardState(CurrentBoardStateSchemaVersion, 101)})
 	if err != nil {
 		t.Fatalf("create board A failed: %v", err)
 	}
-	if _, err := service.UpsertBoard(ctx, ownerB.ID, boardID, &UpsertBoardRequest{Name: "Beta Board", State: validBoardState(CurrentBoardStateSchemaVersion, 102)}); !errors.Is(err, ErrBoardIDConflict) {
-		t.Fatalf("duplicate board id err = %v, want ErrBoardIDConflict", err)
+	if _, err := service.UpsertBoard(ctx, ownerB.ID, boardID, &UpsertRequest{Name: "Beta Board", State: validBoardState(CurrentBoardStateSchemaVersion, 102)}); !errors.Is(err, ErrIDConflict) {
+		t.Fatalf("duplicate board id err = %v, want ErrIDConflict", err)
 	}
 
 	boardBID := "owner-b-board"
-	boardB, err := service.UpsertBoard(ctx, ownerB.ID, boardBID, &UpsertBoardRequest{Name: "Beta Board", State: validBoardState(CurrentBoardStateSchemaVersion, 102)})
+	boardB, err := service.UpsertBoard(ctx, ownerB.ID, boardBID, &UpsertRequest{Name: "Beta Board", State: validBoardState(CurrentBoardStateSchemaVersion, 102)})
 	if err != nil {
 		t.Fatalf("create board B failed: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve owner A access failed: %v", err)
 	}
-	if accessA.OwnerUserID != ownerA.ID || roleA != BoardAccessRoleOwner {
+	if accessA.OwnerUserID != ownerA.ID || roleA != RoleOwner {
 		t.Fatalf("owner A access = (%d, %s), want (%d, owner)", accessA.OwnerUserID, roleA, ownerA.ID)
 	}
 
@@ -57,19 +57,19 @@ func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve owner B access failed: %v", err)
 	}
-	if accessB.OwnerUserID != ownerB.ID || roleB != BoardAccessRoleOwner {
+	if accessB.OwnerUserID != ownerB.ID || roleB != RoleOwner {
 		t.Fatalf("owner B access = (%d, %s), want (%d, owner)", accessB.OwnerUserID, roleB, ownerB.ID)
 	}
 
-	if _, _, err := service.ResolveBoardAccess(ctx, memberC.ID, boardID); !errors.Is(err, ErrBoardNotFound) {
-		t.Fatalf("uninvited access err = %v, want ErrBoardNotFound", err)
+	if _, _, err := service.ResolveBoardAccess(ctx, memberC.ID, boardID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("uninvited access err = %v, want ErrNotFound", err)
 	}
 
-	invited, err := service.InviteMember(ctx, ownerA.ID, boardID, memberC.PublicID.String(), string(BoardAccessRoleViewer))
+	invited, err := service.InviteMember(ctx, ownerA.ID, boardID, memberC.PublicID.String(), string(RoleViewer))
 	if err != nil {
 		t.Fatalf("invite member failed: %v", err)
 	}
-	if invited.PublicID != memberC.PublicID || invited.DisplayName != memberC.DisplayName || invited.Role != BoardAccessRoleViewer {
+	if invited.PublicID != memberC.PublicID || invited.DisplayName != memberC.DisplayName || invited.Role != RoleViewer {
 		t.Fatalf("invited member = %+v, want public identity for %s", invited, memberC.PublicID)
 	}
 
@@ -80,7 +80,7 @@ func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {
 	if memberAccess.OwnerUserID != ownerA.ID {
 		t.Fatalf("member access owner id = %d, want %d", memberAccess.OwnerUserID, ownerA.ID)
 	}
-	if memberRole != BoardAccessRoleViewer {
+	if memberRole != RoleViewer {
 		t.Fatalf("member role = %s, want viewer", memberRole)
 	}
 
@@ -105,26 +105,26 @@ func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {
 func TestBoardServiceEditorCanUpdateStateButNotRename(t *testing.T) {
 	db := testdb.Open(t)
 	userRepo := identitypostgres.NewRepository(db)
-	repo := NewBoardRepository(db)
-	service := NewBoardService(repo, userRepo)
+	repo := NewRepository(db)
+	service := NewService(repo, userRepo)
 	ctx := context.Background()
 
 	owner := createBoardTestUser(t, userRepo, "editor-owner")
 	editor := createBoardTestUser(t, userRepo, "editor-member")
 
 	boardID := "editable-board"
-	if _, err := service.UpsertBoard(ctx, owner.ID, boardID, &UpsertBoardRequest{Name: "Design Board", State: validBoardState(CurrentBoardStateSchemaVersion, 100)}); err != nil {
+	if _, err := service.UpsertBoard(ctx, owner.ID, boardID, &UpsertRequest{Name: "Design Board", State: validBoardState(CurrentBoardStateSchemaVersion, 100)}); err != nil {
 		t.Fatalf("create board failed: %v", err)
 	}
-	if _, err := service.InviteMember(ctx, owner.ID, boardID, editor.PublicID.String(), string(BoardAccessRoleEditor)); err != nil {
+	if _, err := service.InviteMember(ctx, owner.ID, boardID, editor.PublicID.String(), string(RoleEditor)); err != nil {
 		t.Fatalf("invite editor failed: %v", err)
 	}
 
-	updated, err := service.UpsertBoard(ctx, editor.ID, boardID, &UpsertBoardRequest{Name: "Design Board", State: validBoardState(CurrentBoardStateSchemaVersion, 250)})
+	updated, err := service.UpsertBoard(ctx, editor.ID, boardID, &UpsertRequest{Name: "Design Board", State: validBoardState(CurrentBoardStateSchemaVersion, 250)})
 	if err != nil {
 		t.Fatalf("editor update failed: %v", err)
 	}
-	if updated.Role != BoardAccessRoleEditor {
+	if updated.Role != RoleEditor {
 		t.Fatalf("updated role = %s, want editor", updated.Role)
 	}
 	if updated.Board.OwnerUserID != owner.ID {
@@ -150,16 +150,16 @@ func TestBoardServiceEditorCanUpdateStateButNotRename(t *testing.T) {
 		t.Fatalf("updated prompt marker = %+v, want 250", state.PromptNodes)
 	}
 
-	if _, err := service.UpsertBoard(ctx, editor.ID, boardID, &UpsertBoardRequest{Name: "Renamed Board", State: validBoardState(CurrentBoardStateSchemaVersion, 300)}); !errors.Is(err, ErrBoardPermissionDenied) {
-		t.Fatalf("editor rename err = %v, want ErrBoardPermissionDenied", err)
+	if _, err := service.UpsertBoard(ctx, editor.ID, boardID, &UpsertRequest{Name: "Renamed Board", State: validBoardState(CurrentBoardStateSchemaVersion, 300)}); !errors.Is(err, ErrPermissionDenied) {
+		t.Fatalf("editor rename err = %v, want ErrPermissionDenied", err)
 	}
 }
 
 func TestBoardServiceShareJoinReadsTypedMediaRefs(t *testing.T) {
 	db := testdb.Open(t)
 	userRepo := identitypostgres.NewRepository(db)
-	repo := NewBoardRepository(db)
-	service := NewBoardService(repo, userRepo)
+	repo := NewRepository(db)
+	service := NewService(repo, userRepo)
 	q := dbsqlc.New(db)
 	ctx := context.Background()
 
@@ -167,7 +167,7 @@ func TestBoardServiceShareJoinReadsTypedMediaRefs(t *testing.T) {
 	joiner := createBoardTestUser(t, userRepo, "share-media-joiner")
 	assetID := seedBoardMediaAsset(t, q, owner.ID, "share-board-media", "uploads/tasks/42/share-output.png")
 	state := validBoardState(CurrentBoardStateSchemaVersion, 100)
-	state["mediaRefs"] = []BoardStateMediaRef{{
+	state["mediaRefs"] = []StateMediaRef{{
 		MediaAssetID: assetID,
 		RefType:      "board_node",
 		RefID:        "image-1",
@@ -175,10 +175,10 @@ func TestBoardServiceShareJoinReadsTypedMediaRefs(t *testing.T) {
 	}}
 
 	const boardID = "share-media-board"
-	if _, err := service.UpsertBoard(ctx, owner.ID, boardID, &UpsertBoardRequest{Name: "Share Media Board", State: state}); err != nil {
+	if _, err := service.UpsertBoard(ctx, owner.ID, boardID, &UpsertRequest{Name: "Share Media Board", State: state}); err != nil {
 		t.Fatalf("create board failed: %v", err)
 	}
-	token, err := service.CreateShareToken(ctx, owner.ID, boardID, string(BoardAccessRoleViewer), nil)
+	token, err := service.CreateShareToken(ctx, owner.ID, boardID, string(RoleViewer), nil)
 	if err != nil {
 		t.Fatalf("create share token failed: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestBoardServiceShareJoinReadsTypedMediaRefs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("join board failed: %v", err)
 	}
-	if joined.Role != BoardAccessRoleViewer {
+	if joined.Role != RoleViewer {
 		t.Fatalf("joined role = %s, want viewer", joined.Role)
 	}
 	var envelope BoardStateEnvelope
@@ -201,8 +201,8 @@ func TestBoardServiceShareJoinReadsTypedMediaRefs(t *testing.T) {
 func TestBoardServiceShareTokenUsesBoardIdentityForPermissions(t *testing.T) {
 	db := testdb.Open(t)
 	userRepo := identitypostgres.NewRepository(db)
-	repo := NewBoardRepository(db)
-	service := NewBoardService(repo, userRepo)
+	repo := NewRepository(db)
+	service := NewService(repo, userRepo)
 	ctx := context.Background()
 
 	owner := createBoardTestUser(t, userRepo, "share-owner")
@@ -210,7 +210,7 @@ func TestBoardServiceShareTokenUsesBoardIdentityForPermissions(t *testing.T) {
 	outsider := createBoardTestUser(t, userRepo, "share-outsider")
 
 	const boardID = "share-permission-board"
-	created, err := service.UpsertBoard(ctx, owner.ID, boardID, &UpsertBoardRequest{Name: "Share Permission Board", State: validBoardState(CurrentBoardStateSchemaVersion, 100)})
+	created, err := service.UpsertBoard(ctx, owner.ID, boardID, &UpsertRequest{Name: "Share Permission Board", State: validBoardState(CurrentBoardStateSchemaVersion, 100)})
 	if err != nil {
 		t.Fatalf("create board failed: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestBoardServiceShareTokenUsesBoardIdentityForPermissions(t *testing.T) {
 		t.Fatalf("board identity = owner:%d created:%d saved:%v, want owner/created/saved %d", created.Board.OwnerUserID, created.Board.CreatedBy, created.Board.LastSavedBy, owner.ID)
 	}
 
-	token, err := service.CreateShareToken(ctx, owner.ID, boardID, string(BoardAccessRoleEditor), nil)
+	token, err := service.CreateShareToken(ctx, owner.ID, boardID, string(RoleEditor), nil)
 	if err != nil {
 		t.Fatalf("create share token failed: %v", err)
 	}
@@ -232,25 +232,25 @@ func TestBoardServiceShareTokenUsesBoardIdentityForPermissions(t *testing.T) {
 	if len(ownerTokens) != 1 || ownerTokens[0].ID != token.ID {
 		t.Fatalf("owner share tokens = %+v, want token %d", ownerTokens, token.ID)
 	}
-	if _, err := service.ListShareTokens(ctx, outsider.ID, boardID); !errors.Is(err, ErrBoardNotFound) {
-		t.Fatalf("outsider list share tokens err = %v, want ErrBoardNotFound", err)
+	if _, err := service.ListShareTokens(ctx, outsider.ID, boardID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("outsider list share tokens err = %v, want ErrNotFound", err)
 	}
-	if err := service.RevokeShareToken(ctx, outsider.ID, boardID, token.ID); !errors.Is(err, ErrBoardNotFound) {
-		t.Fatalf("outsider revoke share token err = %v, want ErrBoardNotFound", err)
+	if err := service.RevokeShareToken(ctx, outsider.ID, boardID, token.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("outsider revoke share token err = %v, want ErrNotFound", err)
 	}
 
 	joined, err := service.JoinBoardByShareToken(ctx, joiner.ID, token.Token)
 	if err != nil {
 		t.Fatalf("join board failed: %v", err)
 	}
-	if joined.Board.OwnerUserID != owner.ID || joined.Role != BoardAccessRoleEditor {
+	if joined.Board.OwnerUserID != owner.ID || joined.Role != RoleEditor {
 		t.Fatalf("joined access = owner:%d role:%s, want owner:%d role:editor", joined.Board.OwnerUserID, joined.Role, owner.ID)
 	}
-	if _, err := service.ListShareTokens(ctx, joiner.ID, boardID); !errors.Is(err, ErrBoardPermissionDenied) {
-		t.Fatalf("member list share tokens err = %v, want ErrBoardPermissionDenied", err)
+	if _, err := service.ListShareTokens(ctx, joiner.ID, boardID); !errors.Is(err, ErrPermissionDenied) {
+		t.Fatalf("member list share tokens err = %v, want ErrPermissionDenied", err)
 	}
-	if err := service.RevokeShareToken(ctx, joiner.ID, boardID, token.ID); !errors.Is(err, ErrBoardPermissionDenied) {
-		t.Fatalf("member revoke share token err = %v, want ErrBoardPermissionDenied", err)
+	if err := service.RevokeShareToken(ctx, joiner.ID, boardID, token.ID); !errors.Is(err, ErrPermissionDenied) {
+		t.Fatalf("member revoke share token err = %v, want ErrPermissionDenied", err)
 	}
 	if err := service.RevokeShareToken(ctx, owner.ID, boardID, token.ID); err != nil {
 		t.Fatalf("owner revoke share token failed: %v", err)

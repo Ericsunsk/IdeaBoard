@@ -31,26 +31,26 @@ type storageProfileSaveOptions struct {
 	rotateSecret bool
 }
 
-type StorageProfileRepository struct {
+type Repository struct {
 	db *sql.DB
 	q  *dbsqlc.Queries
 }
 
-var _ ports.StorageProfileRepository = (*StorageProfileRepository)(nil)
+var _ ports.ProfileRepository = (*Repository)(nil)
 
-func NewStorageProfileRepository(db *sql.DB) *StorageProfileRepository {
-	return &StorageProfileRepository{db: db, q: dbsqlc.New(db)}
+func NewRepository(db *sql.DB) *Repository {
+	return &Repository{db: db, q: dbsqlc.New(db)}
 }
 
-func (r *StorageProfileRepository) ListProfiles(ctx context.Context, includeDeleted bool) ([]domain.StorageProfile, error) {
+func (r *Repository) ListProfiles(ctx context.Context, includeDeleted bool) ([]domain.StorageProfile, error) {
 	return r.listProfiles(ctx, includeDeleted, storageProfileSecretMetadataOnly)
 }
 
-func (r *StorageProfileRepository) ListProfilesWithSecrets(ctx context.Context, includeDeleted bool) ([]domain.StorageProfile, error) {
+func (r *Repository) ListProfilesWithSecrets(ctx context.Context, includeDeleted bool) ([]domain.StorageProfile, error) {
 	return r.listProfiles(ctx, includeDeleted, storageProfileSecretPlaintext)
 }
 
-func (r *StorageProfileRepository) listProfiles(ctx context.Context, includeDeleted bool, secretPolicy storageProfileSecretPolicy) ([]domain.StorageProfile, error) {
+func (r *Repository) listProfiles(ctx context.Context, includeDeleted bool, secretPolicy storageProfileSecretPolicy) ([]domain.StorageProfile, error) {
 	rows, err := r.q.ListStorageProfiles(ctx, includeDeleted)
 	if err != nil {
 		return nil, err
@@ -66,37 +66,37 @@ func (r *StorageProfileRepository) listProfiles(ctx context.Context, includeDele
 	return profiles, nil
 }
 
-func (r *StorageProfileRepository) SaveProfile(ctx context.Context, profile domain.StorageProfile) error {
+func (r *Repository) SaveProfile(ctx context.Context, profile domain.StorageProfile) error {
 	return r.saveProfile(ctx, profile, storageProfileSaveOptions{
 		rotateSecret: storageProfileHasRealSecret(profile),
 	})
 }
 
-func (r *StorageProfileRepository) SaveProfileWithOptions(ctx context.Context, profile domain.StorageProfile, rotateSecret bool) error {
+func (r *Repository) SaveProfileWithOptions(ctx context.Context, profile domain.StorageProfile, rotateSecret bool) error {
 	return r.saveProfile(ctx, profile, storageProfileSaveOptions{
 		rotateSecret: rotateSecret,
 	})
 }
 
-func (r *StorageProfileRepository) saveProfile(ctx context.Context, profile domain.StorageProfile, options storageProfileSaveOptions) error {
+func (r *Repository) saveProfile(ctx context.Context, profile domain.StorageProfile, options storageProfileSaveOptions) error {
 	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		return saveProfileTx(ctx, q, profile, options)
 	})
 }
 
-func (r *StorageProfileRepository) SaveAndApplyProfile(ctx context.Context, profile domain.StorageProfile) error {
+func (r *Repository) SaveAndApplyProfile(ctx context.Context, profile domain.StorageProfile) error {
 	return r.saveAndApplyProfile(ctx, profile, storageProfileSaveOptions{
 		rotateSecret: storageProfileHasRealSecret(profile),
 	})
 }
 
-func (r *StorageProfileRepository) SaveAndApplyProfileWithOptions(ctx context.Context, profile domain.StorageProfile, rotateSecret bool) error {
+func (r *Repository) SaveAndApplyProfileWithOptions(ctx context.Context, profile domain.StorageProfile, rotateSecret bool) error {
 	return r.saveAndApplyProfile(ctx, profile, storageProfileSaveOptions{
 		rotateSecret: rotateSecret,
 	})
 }
 
-func (r *StorageProfileRepository) saveAndApplyProfile(ctx context.Context, profile domain.StorageProfile, options storageProfileSaveOptions) error {
+func (r *Repository) saveAndApplyProfile(ctx context.Context, profile domain.StorageProfile, options storageProfileSaveOptions) error {
 	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		saved := profile
 		saved.IsCurrent = false
@@ -107,7 +107,7 @@ func (r *StorageProfileRepository) saveAndApplyProfile(ctx context.Context, prof
 	})
 }
 
-func (r *StorageProfileRepository) DeleteProfile(ctx context.Context, id string) error {
+func (r *Repository) DeleteProfile(ctx context.Context, id string) error {
 	rows, err := r.q.MarkStorageProfileDeleted(ctx, strings.TrimSpace(id))
 	if err != nil {
 		return err
@@ -118,7 +118,7 @@ func (r *StorageProfileRepository) DeleteProfile(ctx context.Context, id string)
 	return nil
 }
 
-func (r *StorageProfileRepository) ApplyProfile(ctx context.Context, id string) error {
+func (r *Repository) ApplyProfile(ctx context.Context, id string) error {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return database.ErrNotFound
@@ -242,7 +242,7 @@ func lockStorageProfileSecretVersionRotation(ctx context.Context, q *dbsqlc.Quer
 	return nil
 }
 
-func (r *StorageProfileRepository) profileFromRow(ctx context.Context, row dbsqlc.StorageProfile, secretPolicy storageProfileSecretPolicy) (domain.StorageProfile, error) {
+func (r *Repository) profileFromRow(ctx context.Context, row dbsqlc.StorageProfile, secretPolicy storageProfileSecretPolicy) (domain.StorageProfile, error) {
 	var config map[string]interface{}
 	if len(row.Config) > 0 {
 		if err := json.Unmarshal(row.Config, &config); err != nil {

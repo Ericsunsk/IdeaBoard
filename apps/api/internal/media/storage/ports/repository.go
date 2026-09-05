@@ -6,7 +6,7 @@ import (
 	"ideaboard/api/internal/media/storage/domain"
 )
 
-type StorageProfileRepository interface {
+type ProfileRepository interface {
 	ListProfiles(ctx context.Context, includeDeleted bool) ([]domain.StorageProfile, error)
 	ListProfilesWithSecrets(ctx context.Context, includeDeleted bool) ([]domain.StorageProfile, error)
 	SaveProfile(ctx context.Context, profile domain.StorageProfile) error

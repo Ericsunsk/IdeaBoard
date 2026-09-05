@@ -20,7 +20,7 @@ func newProviderEndpointRepositoryTestDB(t *testing.T) *sql.DB {
 	return testdb.Open(t)
 }
 
-func seedProviderEndpoint(t testing.TB, ctx context.Context, repo *ProviderEndpointRepository, endpoint *ProviderEndpoint) *ProviderEndpoint {
+func seedProviderEndpoint(t testing.TB, ctx context.Context, repo *Repository, endpoint *Endpoint) *Endpoint {
 	t.Helper()
 	if endpoint.Protocol == "" {
 		endpoint.Protocol = ProtocolModelAPI
@@ -40,22 +40,22 @@ func TestProviderEndpointConflictErrorMapsUniqueConstraintNames(t *testing.T) {
 		{
 			name: "pgx duplicate name",
 			err:  &pgconn.PgError{Code: "23505", ConstraintName: providerEndpointNameUniqueIndex},
-			want: ErrProviderEndpointNameConflict,
+			want: ErrNameConflict,
 		},
 		{
 			name: "pgx duplicate api type and base url",
 			err:  &pgconn.PgError{Code: "23505", ConstraintName: providerEndpointAPITypeBaseURLUniqIdx},
-			want: ErrProviderEndpointURLConflict,
+			want: ErrURLConflict,
 		},
 		{
 			name: "pq duplicate name",
 			err:  &pq.Error{Code: "23505", Constraint: providerEndpointNameUniqueIndex},
-			want: ErrProviderEndpointNameConflict,
+			want: ErrNameConflict,
 		},
 		{
 			name: "pq duplicate api type and base url",
 			err:  &pq.Error{Code: "23505", Constraint: providerEndpointAPITypeBaseURLUniqIdx},
-			want: ErrProviderEndpointURLConflict,
+			want: ErrURLConflict,
 		},
 	}
 
@@ -71,23 +71,23 @@ func TestProviderEndpointConflictErrorMapsUniqueConstraintNames(t *testing.T) {
 func TestCreateProviderEndpointReturnsNameConflict(t *testing.T) {
 	ctx := context.Background()
 	db := newProviderEndpointRepositoryTestDB(t)
-	repo := NewProviderEndpointRepository(db)
-	seedProviderEndpoint(t, ctx, repo, &ProviderEndpoint{
+	repo := NewRepository(db)
+	seedProviderEndpoint(t, ctx, repo, &Endpoint{
 		APIType: "openai-compatible",
 		Name:    "Duplicate Endpoint",
 		BaseURL: "https://example.com/provider-endpoint-name-a",
 		Status:  1,
 	})
 
-	err := repo.Create(ctx, &ProviderEndpoint{
+	err := repo.Create(ctx, &Endpoint{
 		APIType:  "openai-compatible",
 		Protocol: ProtocolModelAPI,
 		Name:     "duplicate endpoint",
 		BaseURL:  "https://example.com/provider-endpoint-name-b",
 		Status:   1,
 	})
-	if !errors.Is(err, ErrProviderEndpointNameConflict) {
-		t.Fatalf("duplicate provider endpoint name error = %v, want ErrProviderEndpointNameConflict", err)
+	if !errors.Is(err, ErrNameConflict) {
+		t.Fatalf("duplicate provider endpoint name error = %v, want ErrNameConflict", err)
 	}
 }
 
@@ -104,8 +104,8 @@ func TestCreateImageEndpointStoresManagedAPIKeyInSameTransaction(t *testing.T) {
 			secretstest.EnableEncryption(t)
 			ctx := context.Background()
 			db := newProviderEndpointRepositoryTestDB(t)
-			repo := NewProviderEndpointRepository(db)
-			endpoint := &ProviderEndpoint{
+			repo := NewRepository(db)
+			endpoint := &Endpoint{
 				APIType:      "openai-compatible",
 				Protocol:     test.protocol,
 				Capabilities: []string{test.capability},
@@ -164,8 +164,8 @@ func TestUpdateProviderEndpointStatusPreservesEndpointConfigurationAndSecret(t *
 			}
 			ctx := context.Background()
 			db := newProviderEndpointRepositoryTestDB(t)
-			repo := NewProviderEndpointRepository(db)
-			endpoint := seedProviderEndpoint(t, ctx, repo, &ProviderEndpoint{
+			repo := NewRepository(db)
+			endpoint := seedProviderEndpoint(t, ctx, repo, &Endpoint{
 				APIType:      "openai-compatible",
 				Protocol:     test.protocol,
 				Capabilities: []string{test.capability},
@@ -224,31 +224,31 @@ WHERE account.provider_endpoint_id = $1`, endpoint.ID).Scan(&accountStatus, &cur
 func TestCreateProviderEndpointReturnsURLConflict(t *testing.T) {
 	ctx := context.Background()
 	db := newProviderEndpointRepositoryTestDB(t)
-	repo := NewProviderEndpointRepository(db)
-	seedProviderEndpoint(t, ctx, repo, &ProviderEndpoint{
+	repo := NewRepository(db)
+	seedProviderEndpoint(t, ctx, repo, &Endpoint{
 		APIType: "openai-compatible",
 		Name:    "URL A",
 		BaseURL: "https://example.com/provider-endpoint-url",
 		Status:  1,
 	})
 
-	err := repo.Create(ctx, &ProviderEndpoint{
+	err := repo.Create(ctx, &Endpoint{
 		APIType:  "openai-compatible",
 		Protocol: ProtocolModelAPI,
 		Name:     "URL B",
 		BaseURL:  "https://example.com/provider-endpoint-url",
 		Status:   1,
 	})
-	if !errors.Is(err, ErrProviderEndpointURLConflict) {
-		t.Fatalf("duplicate provider endpoint url error = %v, want ErrProviderEndpointURLConflict", err)
+	if !errors.Is(err, ErrURLConflict) {
+		t.Fatalf("duplicate provider endpoint url error = %v, want ErrURLConflict", err)
 	}
 }
 
 func TestDeleteProviderEndpointCascadesBoundAccounts(t *testing.T) {
 	ctx := context.Background()
 	db := newProviderEndpointRepositoryTestDB(t)
-	repo := NewProviderEndpointRepository(db)
-	endpoint := seedProviderEndpoint(t, ctx, repo, &ProviderEndpoint{
+	repo := NewRepository(db)
+	endpoint := seedProviderEndpoint(t, ctx, repo, &Endpoint{
 		APIType: "openai-compatible",
 		Name:    "Endpoint with API key",
 		BaseURL: "https://example.com/provider-endpoint-delete",
@@ -279,14 +279,14 @@ RETURNING id`, endpoint.ID).Scan(&accountID); err != nil {
 func TestUpdateProviderEndpointReturnsNameConflict(t *testing.T) {
 	ctx := context.Background()
 	db := newProviderEndpointRepositoryTestDB(t)
-	repo := NewProviderEndpointRepository(db)
-	first := seedProviderEndpoint(t, ctx, repo, &ProviderEndpoint{
+	repo := NewRepository(db)
+	first := seedProviderEndpoint(t, ctx, repo, &Endpoint{
 		APIType: "openai-compatible",
 		Name:    "Primary Endpoint",
 		BaseURL: "https://example.com/provider-endpoint-update-name-a",
 		Status:  1,
 	})
-	second := seedProviderEndpoint(t, ctx, repo, &ProviderEndpoint{
+	second := seedProviderEndpoint(t, ctx, repo, &Endpoint{
 		APIType: "openai-compatible",
 		Name:    "Secondary Endpoint",
 		BaseURL: "https://example.com/provider-endpoint-update-name-b",
@@ -294,22 +294,22 @@ func TestUpdateProviderEndpointReturnsNameConflict(t *testing.T) {
 	})
 
 	second.Name = first.Name
-	if err := repo.Update(ctx, second); !errors.Is(err, ErrProviderEndpointNameConflict) {
-		t.Fatalf("duplicate provider endpoint update name error = %v, want ErrProviderEndpointNameConflict", err)
+	if err := repo.Update(ctx, second); !errors.Is(err, ErrNameConflict) {
+		t.Fatalf("duplicate provider endpoint update name error = %v, want ErrNameConflict", err)
 	}
 }
 
 func TestUpdateProviderEndpointReturnsURLConflict(t *testing.T) {
 	ctx := context.Background()
 	db := newProviderEndpointRepositoryTestDB(t)
-	repo := NewProviderEndpointRepository(db)
-	first := seedProviderEndpoint(t, ctx, repo, &ProviderEndpoint{
+	repo := NewRepository(db)
+	first := seedProviderEndpoint(t, ctx, repo, &Endpoint{
 		APIType: "openai-compatible",
 		Name:    "Primary URL",
 		BaseURL: "https://example.com/provider-endpoint-update-url-a",
 		Status:  1,
 	})
-	second := seedProviderEndpoint(t, ctx, repo, &ProviderEndpoint{
+	second := seedProviderEndpoint(t, ctx, repo, &Endpoint{
 		APIType: "openai-compatible",
 		Name:    "Secondary URL",
 		BaseURL: "https://example.com/provider-endpoint-update-url-b",
@@ -317,7 +317,7 @@ func TestUpdateProviderEndpointReturnsURLConflict(t *testing.T) {
 	})
 
 	second.BaseURL = first.BaseURL
-	if err := repo.Update(ctx, second); !errors.Is(err, ErrProviderEndpointURLConflict) {
-		t.Fatalf("duplicate provider endpoint update url error = %v, want ErrProviderEndpointURLConflict", err)
+	if err := repo.Update(ctx, second); !errors.Is(err, ErrURLConflict) {
+		t.Fatalf("duplicate provider endpoint update url error = %v, want ErrURLConflict", err)
 	}
 }

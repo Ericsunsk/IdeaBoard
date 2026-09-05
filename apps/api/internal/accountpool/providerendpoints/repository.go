@@ -17,8 +17,10 @@ import (
 	"github.com/lib/pq"
 )
 
-var ErrProviderEndpointNameConflict = errors.New("provider endpoint name conflict")
-var ErrProviderEndpointURLConflict = errors.New("provider endpoint api type/base url conflict")
+var (
+	ErrNameConflict = errors.New("provider endpoint name conflict")
+	ErrURLConflict  = errors.New("provider endpoint api type/base url conflict")
+)
 
 const (
 	providerEndpointNameUniqueIndex       = "uq_provider_endpoints_name_lower"
@@ -26,16 +28,16 @@ const (
 	managedImageEndpointExtraConfig       = `{"managed_by":"image-processing-endpoint"}`
 )
 
-type ProviderEndpointRepository struct {
+type Repository struct {
 	db *sql.DB
 	q  *dbsqlc.Queries
 }
 
-func NewProviderEndpointRepository(db *sql.DB) *ProviderEndpointRepository {
-	return &ProviderEndpointRepository{db: db, q: dbsqlc.New(db)}
+func NewRepository(db *sql.DB) *Repository {
+	return &Repository{db: db, q: dbsqlc.New(db)}
 }
 
-func (r *ProviderEndpointRepository) Create(ctx context.Context, endpoint *ProviderEndpoint) error {
+func (r *Repository) Create(ctx context.Context, endpoint *Endpoint) error {
 	protocol, capabilities, err := NormalizeProtocolCapabilities(endpoint.Protocol, endpoint.Capabilities)
 	if err != nil {
 		return err
@@ -74,12 +76,12 @@ func (r *ProviderEndpointRepository) Create(ctx context.Context, endpoint *Provi
 	return nil
 }
 
-func (r *ProviderEndpointRepository) GetByID(ctx context.Context, id int64) (*ProviderEndpoint, error) {
+func (r *Repository) GetByID(ctx context.Context, id int64) (*Endpoint, error) {
 	row, err := r.q.GetProviderEndpointByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	endpoint := ProviderEndpoint{
+	endpoint := Endpoint{
 		ID:               row.ID,
 		APIType:          row.ApiType,
 		Protocol:         row.Protocol,
@@ -98,15 +100,15 @@ func (r *ProviderEndpointRepository) GetByID(ctx context.Context, id int64) (*Pr
 	return &endpoint, nil
 }
 
-func (r *ProviderEndpointRepository) List(ctx context.Context) ([]*ProviderEndpoint, error) {
+func (r *Repository) List(ctx context.Context) ([]*Endpoint, error) {
 	rows, err := r.q.ListProviderEndpoints(ctx)
 	if err != nil {
 		return nil, err
 	}
-	endpoints := make([]*ProviderEndpoint, 0, len(rows))
+	endpoints := make([]*Endpoint, 0, len(rows))
 	ids := make([]int64, 0, len(rows))
 	for _, row := range rows {
-		endpoint := ProviderEndpoint{
+		endpoint := Endpoint{
 			ID:               row.ID,
 			APIType:          row.ApiType,
 			Protocol:         row.Protocol,
@@ -130,7 +132,7 @@ func (r *ProviderEndpointRepository) List(ctx context.Context) ([]*ProviderEndpo
 	return endpoints, nil
 }
 
-func (r *ProviderEndpointRepository) Update(ctx context.Context, endpoint *ProviderEndpoint) error {
+func (r *Repository) Update(ctx context.Context, endpoint *Endpoint) error {
 	protocol, capabilities, err := NormalizeProtocolCapabilities(endpoint.Protocol, endpoint.Capabilities)
 	if err != nil {
 		return err
@@ -174,7 +176,7 @@ func (r *ProviderEndpointRepository) Update(ctx context.Context, endpoint *Provi
 
 // UpdateStatus updates the scheduling state without touching endpoint configuration,
 // capabilities, or managed account secrets.
-func (r *ProviderEndpointRepository) UpdateStatus(ctx context.Context, id int64, status int16) (*ProviderEndpoint, error) {
+func (r *Repository) UpdateStatus(ctx context.Context, id int64, status int16) (*Endpoint, error) {
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		updated, err := q.UpdateProviderEndpointStatus(ctx, dbsqlc.UpdateProviderEndpointStatusParams{
 			ID:     id,
@@ -197,7 +199,7 @@ func (r *ProviderEndpointRepository) UpdateStatus(ctx context.Context, id int64,
 	return r.GetByID(ctx, id)
 }
 
-func (r *ProviderEndpointRepository) capabilities(ctx context.Context, ids []int64) (map[int64][]string, error) {
+func (r *Repository) capabilities(ctx context.Context, ids []int64) (map[int64][]string, error) {
 	result := make(map[int64][]string, len(ids))
 	if len(ids) == 0 {
 		return result, nil
@@ -227,7 +229,7 @@ func replaceProviderEndpointCapabilities(ctx context.Context, q *dbsqlc.Queries,
 	return nil
 }
 
-func (r *ProviderEndpointRepository) Delete(ctx context.Context, id int64) error {
+func (r *Repository) Delete(ctx context.Context, id int64) error {
 	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		if _, err := q.DeleteManagedProviderEndpointAccounts(ctx, id); err != nil {
 			return err
@@ -250,7 +252,7 @@ func validateManagedEndpointAPIKey(protocol, apiKey string) error {
 	return nil
 }
 
-func syncManagedEndpointAccount(ctx context.Context, q *dbsqlc.Queries, endpoint *ProviderEndpoint) error {
+func syncManagedEndpointAccount(ctx context.Context, q *dbsqlc.Queries, endpoint *Endpoint) error {
 	if !isManagedImageEndpointProtocol(endpoint.Protocol) {
 		_, err := q.DeleteManagedProviderEndpointAccounts(ctx, endpoint.ID)
 		return err
@@ -310,9 +312,9 @@ func providerEndpointConflictError(err error) error {
 	constraintName := providerEndpointUniqueConstraintName(err)
 	switch constraintName {
 	case providerEndpointNameUniqueIndex:
-		return fmt.Errorf("%w: %v", ErrProviderEndpointNameConflict, err)
+		return fmt.Errorf("%w: %v", ErrNameConflict, err)
 	case providerEndpointAPITypeBaseURLUniqIdx:
-		return fmt.Errorf("%w: %v", ErrProviderEndpointURLConflict, err)
+		return fmt.Errorf("%w: %v", ErrURLConflict, err)
 	default:
 		return err
 	}

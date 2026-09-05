@@ -178,7 +178,7 @@ func TestDetectModelsProbesSupportedGoogleCloudImageModels(t *testing.T) {
 	}
 	setProviderEndpointTestAllowHosts(t, parsed.Hostname())
 
-	handler := NewProviderEndpointHandler(nil, "production")
+	handler := NewHandler(nil, "production")
 	router := gin.New()
 	router.POST("/provider-endpoints/detect-models", handler.DetectModels)
 	rec := serveProviderEndpointJSON(t, router, http.MethodPost, "/provider-endpoints/detect-models", DetectModelsRequest{
@@ -237,7 +237,7 @@ func TestDetectModelsExplainsGoogleCloudServiceAccountKeyRequirement(t *testing.
 	}
 	setProviderEndpointTestAllowHosts(t, parsed.Hostname())
 
-	handler := NewProviderEndpointHandler(nil, "production")
+	handler := NewHandler(nil, "production")
 	router := gin.New()
 	router.POST("/provider-endpoints/detect-models", handler.DetectModels)
 	rec := serveProviderEndpointJSON(t, router, http.MethodPost, "/provider-endpoints/detect-models", DetectModelsRequest{
@@ -275,12 +275,12 @@ func TestRespondProviderEndpointConflict(t *testing.T) {
 	}{
 		{
 			name:    "duplicate name",
-			err:     fmt.Errorf("wrapped: %w", ErrProviderEndpointNameConflict),
+			err:     fmt.Errorf("wrapped: %w", ErrNameConflict),
 			wantMsg: "ProviderEndpoint 名称已存在，请使用其他名称",
 		},
 		{
 			name:    "duplicate api type and base url",
-			err:     fmt.Errorf("wrapped: %w", ErrProviderEndpointURLConflict),
+			err:     fmt.Errorf("wrapped: %w", ErrURLConflict),
 			wantMsg: "同一接口类型下已存在相同 Base URL 的 ProviderEndpoint",
 		},
 	}
@@ -300,19 +300,19 @@ func TestRespondProviderEndpointConflict(t *testing.T) {
 func TestProviderEndpointHandlerCreateDuplicateReturnsConflict(t *testing.T) {
 	tests := []struct {
 		name    string
-		seed    *ProviderEndpoint
-		request CreateProviderEndpointRequest
+		seed    *Endpoint
+		request CreateEndpointRequest
 		wantMsg string
 	}{
 		{
 			name: "duplicate name",
-			seed: &ProviderEndpoint{
+			seed: &Endpoint{
 				APIType: "openai-compatible",
 				Name:    "Duplicate Create",
 				BaseURL: "http://127.0.0.1:19081/v1",
 				Status:  1,
 			},
-			request: CreateProviderEndpointRequest{
+			request: CreateEndpointRequest{
 				APIType:  "openai-compatible",
 				Protocol: ProtocolModelAPI,
 				Name:     "duplicate create",
@@ -323,13 +323,13 @@ func TestProviderEndpointHandlerCreateDuplicateReturnsConflict(t *testing.T) {
 		},
 		{
 			name: "duplicate api type and base url",
-			seed: &ProviderEndpoint{
+			seed: &Endpoint{
 				APIType: "openai-compatible",
 				Name:    "Duplicate URL A",
 				BaseURL: "http://127.0.0.1:19083/v1",
 				Status:  1,
 			},
-			request: CreateProviderEndpointRequest{
+			request: CreateEndpointRequest{
 				APIType:  "openai-compatible",
 				Protocol: ProtocolModelAPI,
 				Name:     "Duplicate URL B",
@@ -354,15 +354,15 @@ func TestProviderEndpointHandlerCreateDuplicateReturnsConflict(t *testing.T) {
 func TestProviderEndpointHandlerUpdateDuplicateReturnsConflict(t *testing.T) {
 	tests := []struct {
 		name      string
-		mutate    func(first *ProviderEndpoint, second *ProviderEndpoint) UpdateProviderEndpointRequest
+		mutate    func(first *Endpoint, second *Endpoint) UpdateEndpointRequest
 		wantMsg   string
 		firstURL  string
 		secondURL string
 	}{
 		{
 			name: "duplicate name",
-			mutate: func(first *ProviderEndpoint, second *ProviderEndpoint) UpdateProviderEndpointRequest {
-				return UpdateProviderEndpointRequest{
+			mutate: func(first *Endpoint, second *Endpoint) UpdateEndpointRequest {
+				return UpdateEndpointRequest{
 					APIType:  second.APIType,
 					Protocol: second.Protocol,
 					Name:     first.Name,
@@ -376,8 +376,8 @@ func TestProviderEndpointHandlerUpdateDuplicateReturnsConflict(t *testing.T) {
 		},
 		{
 			name: "duplicate api type and base url",
-			mutate: func(first *ProviderEndpoint, second *ProviderEndpoint) UpdateProviderEndpointRequest {
-				return UpdateProviderEndpointRequest{
+			mutate: func(first *Endpoint, second *Endpoint) UpdateEndpointRequest {
+				return UpdateEndpointRequest{
 					APIType:  second.APIType,
 					Protocol: second.Protocol,
 					Name:     second.Name,
@@ -394,13 +394,13 @@ func TestProviderEndpointHandlerUpdateDuplicateReturnsConflict(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			router, repo := newProviderEndpointHandlerTestRouter(t)
-			first := seedProviderEndpoint(t, context.Background(), repo, &ProviderEndpoint{
+			first := seedProviderEndpoint(t, context.Background(), repo, &Endpoint{
 				APIType: "openai-compatible",
 				Name:    "Update First " + tt.name,
 				BaseURL: tt.firstURL,
 				Status:  1,
 			})
-			second := seedProviderEndpoint(t, context.Background(), repo, &ProviderEndpoint{
+			second := seedProviderEndpoint(t, context.Background(), repo, &Endpoint{
 				APIType: "openai-compatible",
 				Name:    "Update Second " + tt.name,
 				BaseURL: tt.secondURL,
@@ -416,7 +416,7 @@ func TestProviderEndpointHandlerUpdateDuplicateReturnsConflict(t *testing.T) {
 
 func TestProviderEndpointHandlerUpdateStatusValidatesInput(t *testing.T) {
 	router, repo := newProviderEndpointHandlerTestRouter(t)
-	endpoint := seedProviderEndpoint(t, context.Background(), repo, &ProviderEndpoint{
+	endpoint := seedProviderEndpoint(t, context.Background(), repo, &Endpoint{
 		APIType: "openai-compatible",
 		Name:    "Status validation",
 		BaseURL: "http://127.0.0.1:19088/v1",
@@ -477,12 +477,12 @@ func TestParseModelIDs(t *testing.T) {
 	}
 }
 
-func newProviderEndpointHandlerTestRouter(t *testing.T) (*gin.Engine, *ProviderEndpointRepository) {
+func newProviderEndpointHandlerTestRouter(t *testing.T) (*gin.Engine, *Repository) {
 	t.Helper()
 	setProviderEndpointTestAllowHosts(t, "127.0.0.1")
 	db := newProviderEndpointRepositoryTestDB(t)
-	repo := NewProviderEndpointRepository(db)
-	handler := NewProviderEndpointHandler(repo, "production")
+	repo := NewRepository(db)
+	handler := NewHandler(repo, "production")
 	router := gin.New()
 	router.POST("/provider-endpoints", handler.Create)
 	router.PUT("/provider-endpoints/:id", handler.Update)
@@ -544,7 +544,7 @@ func TestIsDevLikeEnvironment(t *testing.T) {
 		gin.SetMode(prevMode)
 	})
 
-	handler := NewProviderEndpointHandler(nil)
+	handler := NewHandler(nil)
 
 	gin.SetMode(gin.ReleaseMode)
 	handler.appEnv = "development"
@@ -573,12 +573,12 @@ func TestDetectModelsAllowHostsMergesEnvironmentAndDevDefaults(t *testing.T) {
 
 	setProviderEndpointTestAllowHosts(t, "models.internal")
 	gin.SetMode(gin.ReleaseMode)
-	prodHandler := NewProviderEndpointHandler(nil, "production")
+	prodHandler := NewHandler(nil, "production")
 	if got := strings.Join(prodHandler.detectModelsAllowHosts(context.Background()), ","); got != "models.internal" {
 		t.Fatalf("production allow hosts = %q, want models.internal", got)
 	}
 
-	devHandler := NewProviderEndpointHandler(nil, "development")
+	devHandler := NewHandler(nil, "development")
 	got := strings.Join(devHandler.detectModelsAllowHosts(context.Background()), ",")
 	for _, want := range []string{"models.internal", "localhost", "127.0.0.1", "::1"} {
 		if !strings.Contains(got, want) {

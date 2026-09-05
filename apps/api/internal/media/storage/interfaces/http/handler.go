@@ -21,15 +21,15 @@ type StorageProfilesService interface {
 	GetBucketInfo(ctx context.Context, id string) (map[string]interface{}, error)
 }
 
-type StorageHandler struct {
+type Handler struct {
 	service StorageProfilesService
 }
 
-func NewStorageHandler(service StorageProfilesService) *StorageHandler {
-	return &StorageHandler{service: service}
+func NewHandler(service StorageProfilesService) *Handler {
+	return &Handler{service: service}
 }
 
-func (h *StorageHandler) ListProviders(c *gin.Context) {
+func (h *Handler) ListProviders(c *gin.Context) {
 	if h.service == nil {
 		response.Error(c, 500, "存储服务未初始化")
 		return
@@ -37,7 +37,7 @@ func (h *StorageHandler) ListProviders(c *gin.Context) {
 	response.SuccessDTO(c, storageProvidersResponse{Providers: h.service.ListProviderMeta()})
 }
 
-func (h *StorageHandler) ListProfiles(c *gin.Context) {
+func (h *Handler) ListProfiles(c *gin.Context) {
 	if h.service == nil {
 		response.Error(c, 500, "存储服务未初始化")
 		return
@@ -50,7 +50,7 @@ func (h *StorageHandler) ListProfiles(c *gin.Context) {
 	response.SuccessDTO(c, storageProfilesResponse{Profiles: profiles})
 }
 
-func (h *StorageHandler) CreateProfile(c *gin.Context) {
+func (h *Handler) CreateProfile(c *gin.Context) {
 	var req domain.StorageProfile
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
@@ -68,7 +68,7 @@ func (h *StorageHandler) CreateProfile(c *gin.Context) {
 	})
 }
 
-func (h *StorageHandler) UpdateProfile(c *gin.Context) {
+func (h *Handler) UpdateProfile(c *gin.Context) {
 	var req domain.StorageProfile
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
@@ -87,7 +87,7 @@ func (h *StorageHandler) UpdateProfile(c *gin.Context) {
 	})
 }
 
-func (h *StorageHandler) DeleteProfile(c *gin.Context) {
+func (h *Handler) DeleteProfile(c *gin.Context) {
 	if h.service == nil {
 		response.Error(c, 500, "存储服务未初始化")
 		return
@@ -99,7 +99,7 @@ func (h *StorageHandler) DeleteProfile(c *gin.Context) {
 	response.SuccessDTO(c, storageMessageResponse{Message: "删除成功"})
 }
 
-func (h *StorageHandler) ApplyProfile(c *gin.Context) {
+func (h *Handler) ApplyProfile(c *gin.Context) {
 	if h.service == nil {
 		response.Error(c, 500, "存储服务未初始化")
 		return
@@ -115,7 +115,7 @@ func (h *StorageHandler) ApplyProfile(c *gin.Context) {
 	})
 }
 
-func (h *StorageHandler) TestProfile(c *gin.Context) {
+func (h *Handler) TestProfile(c *gin.Context) {
 	if h.service == nil {
 		response.Error(c, 500, "存储服务未初始化")
 		return
@@ -127,7 +127,7 @@ func (h *StorageHandler) TestProfile(c *gin.Context) {
 	response.SuccessDTO(c, storageMessageResponse{Message: "连接成功"})
 }
 
-func (h *StorageHandler) GetBucketInfo(c *gin.Context) {
+func (h *Handler) GetBucketInfo(c *gin.Context) {
 	if h.service == nil {
 		response.Error(c, 500, "存储服务未初始化")
 		return
@@ -174,7 +174,7 @@ func writeStorageCommandError(c *gin.Context, fallback string, err error) {
 	response.InternalError(c, 400, fallback, err)
 }
 
-func (h *StorageHandler) saveProfile(c *gin.Context, req *domain.StorageProfile) (*domain.StorageProfile, error) {
+func (h *Handler) saveProfile(c *gin.Context, req *domain.StorageProfile) (*domain.StorageProfile, error) {
 	if h.service == nil {
 		return nil, errors.New("存储服务未初始化")
 	}

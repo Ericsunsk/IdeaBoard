@@ -359,7 +359,7 @@ func newTaskStatusEventPublisherWithResolver(
 }
 
 type uploadBoardAccessResolver struct {
-	service *boards.BoardService
+	service *boards.Service
 }
 
 func (r uploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context, userID int64, boardID string) (int64, error) {

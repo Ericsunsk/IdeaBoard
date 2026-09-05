@@ -1,26 +1,26 @@
 package boards
 
-type UpsertBoardRequest struct {
+type UpsertRequest struct {
 	Name      string      `json:"name" binding:"required"`
 	State     interface{} `json:"state"`
 	CreatedAt *int64      `json:"created_at"`
 	UpdatedAt *int64      `json:"updated_at"`
 }
 
-type InviteBoardMemberRequest struct {
+type InviteMemberRequest struct {
 	MemberPublicID string `json:"member_public_id" binding:"required,uuid"`
 	Role           string `json:"role" binding:"required"`
 }
 
-type UpdateBoardMemberRoleRequest struct {
+type UpdateMemberRoleRequest struct {
 	Role string `json:"role" binding:"required"`
 }
 
-type CreateBoardShareTokenRequest struct {
+type CreateShareTokenRequest struct {
 	Role      string `json:"role" binding:"required"`
 	ExpiresAt *int64 `json:"expires_at"`
 }
 
-type JoinBoardByShareTokenRequest struct {
+type JoinByShareTokenRequest struct {
 	Token string `json:"token" binding:"required"`
 }

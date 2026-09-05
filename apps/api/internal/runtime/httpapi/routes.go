@@ -57,10 +57,10 @@ type AuthDeps struct {
 }
 
 type UploadDeps struct {
-	StorageService *storage.StorageService
+	StorageService *storage.Service
 	MediaAssets    assets.UploadRegistry
 	UserRepo       identityports.UserRepository
-	BoardService   *boards.BoardService
+	BoardService   *boards.Service
 	UploadSettings settings.MediaUploadSettingProvider
 }
 
@@ -75,14 +75,14 @@ type UploadDownloadDeps struct {
 
 type StaticUploadDeps struct {
 	Auth         AuthDeps
-	BoardService *boards.BoardService
+	BoardService *boards.Service
 	ReadAccess   storageports.ReadableUploadAccess
 }
 
 type UserRouteDeps struct {
 	AuthHandler            *auth.AuthHandler
 	TaskHandler            *taskhttp.Handler
-	BoardHandler           *boards.BoardHandler
+	BoardHandler           *boards.Handler
 	BillingHandler         *billing.Handler
 	BillingRecords         *billingrecords.Handler
 	CreditUserHandler      *credithttp.UserHandler
@@ -91,7 +91,7 @@ type UserRouteDeps struct {
 	PaymentUserHandler     *paymenthttp.UserCheckoutHandler
 	UserEventStreamHandler *UserEventStreamHandler
 	MediaAssetRegistry     assets.ReadRegistry
-	MediaStorageService    *storage.StorageService
+	MediaStorageService    *storage.Service
 	Uploads                UploadDeps
 	UploadDownloads        UploadDownloadDeps
 	VisionHandler          *searchcatalog.VisionHandler
@@ -110,10 +110,10 @@ type AdminRouteDeps struct {
 	AccountHandler              *accounthttp.Handler
 	TaskHandler                 *taskhttp.Handler
 	TaskStatsHandler            *statisticshttp.Handler
-	ProviderEndpointHandler     *providerendpoints.ProviderEndpointHandler
-	StorageHandler              *storagehttp.StorageHandler
+	ProviderEndpointHandler     *providerendpoints.Handler
+	StorageHandler              *storagehttp.Handler
 	FeaturePromptHandler        *prompts.FeaturePromptHandler
-	StorageService              *storage.StorageService
+	StorageService              *storage.Service
 	UploadSettings              settings.MediaUploadSettingProvider
 	RewardAdminCommandHandler   *rewards.AdminCommandHandler
 	RewardAdminReadHandler      *rewards.AdminReadHandler

@@ -224,12 +224,12 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 	taskOutputURL := "/uploads/tasks/" + ownerIDPath + "/task-demo/output.png"
 	mustWriteTestFile(t, filepath.Join("uploads", "tasks", ownerIDPath, "task-demo", "output.png"), "task output")
 
-	boardRepo := boards.NewBoardRepository(db)
+	boardRepo := boards.NewRepository(db)
 	now := time.Now()
-	if err := boardRepo.Upsert(context.Background(), &boards.UserBoard{BoardID: "board-1", OwnerUserID: owner.ID, CreatedBy: owner.ID, Name: "Demo", State: "{}", CreatedAt: now, UpdatedAt: now}); err != nil {
+	if err := boardRepo.Upsert(context.Background(), &boards.Board{BoardID: "board-1", OwnerUserID: owner.ID, CreatedBy: owner.ID, Name: "Demo", State: "{}", CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatalf("create board failed: %v", err)
 	}
-	if err := boardRepo.UpsertMember(context.Background(), owner.ID, "board-1", member.ID, boards.BoardAccessRoleViewer); err != nil {
+	if err := boardRepo.UpsertMember(context.Background(), owner.ID, "board-1", member.ID, boards.RoleViewer); err != nil {
 		t.Fatalf("create board member failed: %v", err)
 	}
 
@@ -245,7 +245,7 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 			}),
 			UserRepo: userRepo,
 		},
-		BoardService: boards.NewBoardService(boardRepo, userRepo),
+		BoardService: boards.NewService(boardRepo, userRepo),
 	}
 	deps.ReadAccess = authorization.NewReadableUploadAccess(
 		staticUploadBoardAccessResolver{service: deps.BoardService},

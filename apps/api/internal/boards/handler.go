@@ -13,8 +13,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type BoardHandler struct {
-	service       *BoardService
+type Handler struct {
+	service       *Service
 	publicOrigins config.PublicOriginsConfig
 }
 
@@ -58,11 +58,11 @@ type boardDeleteResponse struct {
 }
 
 type boardMemberListResponse struct {
-	List []BoardMemberWithUser `json:"list"`
+	List []MemberWithUser `json:"list"`
 }
 
 type boardMemberResponse struct {
-	Member *BoardMemberWithUser `json:"member"`
+	Member *MemberWithUser `json:"member"`
 }
 
 type boardShareTokenResponse struct {
@@ -77,8 +77,8 @@ type boardShareTokenRevokeResponse struct {
 	Revoked bool `json:"revoked"`
 }
 
-func NewBoardHandler(service *BoardService, publicOrigins config.PublicOriginsConfig) *BoardHandler {
-	return &BoardHandler{service: service, publicOrigins: publicOrigins}
+func NewHandler(service *Service, publicOrigins config.PublicOriginsConfig) *Handler {
+	return &Handler{service: service, publicOrigins: publicOrigins}
 }
 
 func requireBoardUserID(c *gin.Context) (int64, bool) {
@@ -89,7 +89,7 @@ func requireBoardUserID(c *gin.Context) (int64, bool) {
 	return identityPrincipal.UserID(), true
 }
 
-func (h *BoardHandler) ListBoards(c *gin.Context) {
+func (h *Handler) ListBoards(c *gin.Context) {
 	userID, ok := requireBoardUserID(c)
 	if !ok {
 		return
@@ -106,7 +106,7 @@ func (h *BoardHandler) ListBoards(c *gin.Context) {
 	response.SuccessDTO(c, boardListResponse{List: result})
 }
 
-func (h *BoardHandler) UpsertBoard(c *gin.Context) {
+func (h *Handler) UpsertBoard(c *gin.Context) {
 	userID, ok := requireBoardUserID(c)
 	if !ok {
 		return
@@ -116,26 +116,26 @@ func (h *BoardHandler) UpsertBoard(c *gin.Context) {
 		response.Error(c, 400, "缺少画布ID")
 		return
 	}
-	var req UpsertBoardRequest
+	var req UpsertRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
 	}
 	board, err := h.service.UpsertBoard(c.Request.Context(), userID, boardID, &req)
 	if err != nil {
-		if errors.Is(err, ErrInvalidBoardInput) {
+		if errors.Is(err, ErrInvalidInput) {
 			response.Error(c, 400, "参数错误")
 			return
 		}
-		if errors.Is(err, ErrBoardPermissionDenied) {
+		if errors.Is(err, ErrPermissionDenied) {
 			response.Error(c, 403, "无权修改该画布")
 			return
 		}
-		if errors.Is(err, ErrBoardNameConflict) {
+		if errors.Is(err, ErrNameConflict) {
 			response.Error(c, 409, "画布名称已存在，请使用其他名称")
 			return
 		}
-		if errors.Is(err, ErrBoardIDConflict) {
+		if errors.Is(err, ErrIDConflict) {
 			response.Error(c, 409, "画布ID已存在，请刷新后重试")
 			return
 		}
@@ -145,7 +145,7 @@ func (h *BoardHandler) UpsertBoard(c *gin.Context) {
 	response.SuccessDTO(c, boardResponse{Board: toBoardDTO(board.Board, board.Role)})
 }
 
-func (h *BoardHandler) DeleteBoard(c *gin.Context) {
+func (h *Handler) DeleteBoard(c *gin.Context) {
 	userID, ok := requireBoardUserID(c)
 	if !ok {
 		return
@@ -156,19 +156,19 @@ func (h *BoardHandler) DeleteBoard(c *gin.Context) {
 		return
 	}
 	if err := h.service.DeleteBoard(c.Request.Context(), userID, boardID); err != nil {
-		if errors.Is(err, ErrInvalidBoardInput) {
+		if errors.Is(err, ErrInvalidInput) {
 			response.Error(c, 400, "参数错误")
 			return
 		}
-		if errors.Is(err, ErrBoardNotFound) {
+		if errors.Is(err, ErrNotFound) {
 			response.Error(c, 404, "画布不存在")
 			return
 		}
-		if errors.Is(err, ErrBoardPermissionDenied) {
+		if errors.Is(err, ErrPermissionDenied) {
 			response.Error(c, 403, "无权删除该画布")
 			return
 		}
-		if errors.Is(err, ErrBoardCanvasCleanupFailed) {
+		if errors.Is(err, ErrCanvasCleanupFailed) {
 			response.InternalError(c, 500, "删除画布失败：文件清理失败", err)
 			return
 		}
@@ -178,7 +178,7 @@ func (h *BoardHandler) DeleteBoard(c *gin.Context) {
 	response.SuccessDTO(c, boardDeleteResponse{Deleted: true})
 }
 
-func (h *BoardHandler) ListMembers(c *gin.Context) {
+func (h *Handler) ListMembers(c *gin.Context) {
 	userID, ok := requireBoardUserID(c)
 	boardID := strings.TrimSpace(c.Param("board_id"))
 	if !ok {
@@ -192,13 +192,13 @@ func (h *BoardHandler) ListMembers(c *gin.Context) {
 	response.SuccessDTO(c, boardMemberListResponse{List: members})
 }
 
-func (h *BoardHandler) InviteMember(c *gin.Context) {
+func (h *Handler) InviteMember(c *gin.Context) {
 	userID, ok := requireBoardUserID(c)
 	boardID := strings.TrimSpace(c.Param("board_id"))
 	if !ok {
 		return
 	}
-	var req InviteBoardMemberRequest
+	var req InviteMemberRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
@@ -211,7 +211,7 @@ func (h *BoardHandler) InviteMember(c *gin.Context) {
 	response.SuccessDTO(c, boardMemberResponse{Member: member})
 }
 
-func (h *BoardHandler) UpdateMemberRole(c *gin.Context) {
+func (h *Handler) UpdateMemberRole(c *gin.Context) {
 	userID, ok := requireBoardUserID(c)
 	boardID := strings.TrimSpace(c.Param("board_id"))
 	memberPublicID := strings.TrimSpace(c.Param("member_public_id"))
@@ -222,7 +222,7 @@ func (h *BoardHandler) UpdateMemberRole(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	var req UpdateBoardMemberRoleRequest
+	var req UpdateMemberRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
@@ -235,7 +235,7 @@ func (h *BoardHandler) UpdateMemberRole(c *gin.Context) {
 	response.SuccessDTO(c, boardMemberResponse{Member: member})
 }
 
-func (h *BoardHandler) RemoveMember(c *gin.Context) {
+func (h *Handler) RemoveMember(c *gin.Context) {
 	userID, ok := requireBoardUserID(c)
 	boardID := strings.TrimSpace(c.Param("board_id"))
 	memberPublicID := strings.TrimSpace(c.Param("member_public_id"))
@@ -253,13 +253,13 @@ func (h *BoardHandler) RemoveMember(c *gin.Context) {
 	response.SuccessDTO(c, boardDeleteResponse{Deleted: true})
 }
 
-func (h *BoardHandler) CreateShareToken(c *gin.Context) {
+func (h *Handler) CreateShareToken(c *gin.Context) {
 	userID, ok := requireBoardUserID(c)
 	boardID := strings.TrimSpace(c.Param("board_id"))
 	if !ok {
 		return
 	}
-	var req CreateBoardShareTokenRequest
+	var req CreateShareTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
@@ -273,7 +273,7 @@ func (h *BoardHandler) CreateShareToken(c *gin.Context) {
 	response.SuccessDTO(c, boardShareTokenResponse{Token: toBoardShareTokenDTO(*shareToken, baseURL)})
 }
 
-func (h *BoardHandler) ListShareTokens(c *gin.Context) {
+func (h *Handler) ListShareTokens(c *gin.Context) {
 	userID, ok := requireBoardUserID(c)
 	boardID := strings.TrimSpace(c.Param("board_id"))
 	if !ok {
@@ -292,7 +292,7 @@ func (h *BoardHandler) ListShareTokens(c *gin.Context) {
 	response.SuccessDTO(c, boardShareTokenListResponse{List: result})
 }
 
-func (h *BoardHandler) RevokeShareToken(c *gin.Context) {
+func (h *Handler) RevokeShareToken(c *gin.Context) {
 	userID, ok := requireBoardUserID(c)
 	boardID := strings.TrimSpace(c.Param("board_id"))
 	tokenID, err := strconv.ParseInt(strings.TrimSpace(c.Param("token_id")), 10, 64)
@@ -310,12 +310,12 @@ func (h *BoardHandler) RevokeShareToken(c *gin.Context) {
 	response.SuccessDTO(c, boardShareTokenRevokeResponse{Revoked: true})
 }
 
-func (h *BoardHandler) JoinByShareToken(c *gin.Context) {
+func (h *Handler) JoinByShareToken(c *gin.Context) {
 	userID, ok := requireBoardUserID(c)
 	if !ok {
 		return
 	}
-	var req JoinBoardByShareTokenRequest
+	var req JoinByShareTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
@@ -328,34 +328,34 @@ func (h *BoardHandler) JoinByShareToken(c *gin.Context) {
 	response.SuccessDTO(c, boardResponse{Board: toBoardDTO(board.Board, board.Role)})
 }
 
-func (h *BoardHandler) respondBoardMemberError(c *gin.Context, err error, internalMessage string) {
+func (h *Handler) respondBoardMemberError(c *gin.Context, err error, internalMessage string) {
 	switch {
-	case errors.Is(err, ErrInvalidBoardInput):
+	case errors.Is(err, ErrInvalidInput):
 		response.Error(c, 400, "参数错误")
-	case errors.Is(err, ErrBoardNotFound):
+	case errors.Is(err, ErrNotFound):
 		response.Error(c, 404, "画布不存在")
-	case errors.Is(err, ErrBoardPermissionDenied):
+	case errors.Is(err, ErrPermissionDenied):
 		response.Error(c, 403, "仅 owner 可管理成员")
-	case errors.Is(err, ErrBoardMemberNotFound):
+	case errors.Is(err, ErrMemberNotFound):
 		response.Error(c, 404, "成员不存在")
-	case errors.Is(err, ErrBoardMemberInvalidRole):
+	case errors.Is(err, ErrMemberInvalidRole):
 		response.Error(c, 400, "角色无效，仅支持 editor/viewer")
-	case errors.Is(err, ErrBoardMemberInviteSelf):
+	case errors.Is(err, ErrMemberInviteSelf):
 		response.Error(c, 400, "不能邀请或移除 owner 自己")
 	default:
 		response.InternalError(c, 500, internalMessage, err)
 	}
 }
 
-func (h *BoardHandler) respondShareTokenError(c *gin.Context, err error, internalMessage string) {
+func (h *Handler) respondShareTokenError(c *gin.Context, err error, internalMessage string) {
 	switch {
-	case errors.Is(err, ErrInvalidBoardInput):
+	case errors.Is(err, ErrInvalidInput):
 		response.Error(c, 400, "参数错误")
-	case errors.Is(err, ErrBoardNotFound):
+	case errors.Is(err, ErrNotFound):
 		response.Error(c, 404, "画布不存在")
-	case errors.Is(err, ErrBoardPermissionDenied):
+	case errors.Is(err, ErrPermissionDenied):
 		response.Error(c, 403, "仅 owner 可管理分享链接")
-	case errors.Is(err, ErrBoardMemberInvalidRole):
+	case errors.Is(err, ErrMemberInvalidRole):
 		response.Error(c, 400, "角色无效，仅支持 editor/viewer")
 	case errors.Is(err, ErrShareTokenNotFound):
 		response.Error(c, 404, "分享链接不存在")
@@ -370,7 +370,7 @@ func (h *BoardHandler) respondShareTokenError(c *gin.Context, err error, interna
 	}
 }
 
-func toBoardDTO(board UserBoard, role BoardAccessRole) boardDTO {
+func toBoardDTO(board Board, role AccessRole) boardDTO {
 	return boardDTO{
 		BoardID:            board.BoardID,
 		Name:               board.Name,
@@ -383,7 +383,7 @@ func toBoardDTO(board UserBoard, role BoardAccessRole) boardDTO {
 	}
 }
 
-func toBoardShareTokenDTO(token BoardShareToken, baseURL string) boardShareTokenDTO {
+func toBoardShareTokenDTO(token ShareToken, baseURL string) boardShareTokenDTO {
 	var lastUsedAt *int64
 	if token.LastUsedAt != nil {
 		v := token.LastUsedAt.UnixMilli()

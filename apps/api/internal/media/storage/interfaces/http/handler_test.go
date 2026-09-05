@@ -58,7 +58,7 @@ func TestStorageHandlerListProviders(t *testing.T) {
 	svc := &stubStorageProfilesService{
 		meta: []domain.StorageProviderMeta{{Provider: domain.StorageProviderLocal, Label: "本地存储"}},
 	}
-	h := NewStorageHandler(svc)
+	h := NewHandler(svc)
 	h.ListProviders(c)
 
 	if w.Code != http.StatusOK {
@@ -76,7 +76,7 @@ func TestStorageHandlerListProfiles(t *testing.T) {
 	svc := &stubStorageProfilesService{
 		profiles: []domain.StorageProfile{{ID: "p1", Name: "Profile 1"}},
 	}
-	h := NewStorageHandler(svc)
+	h := NewHandler(svc)
 	h.ListProfiles(c)
 
 	if w.Code != http.StatusOK {

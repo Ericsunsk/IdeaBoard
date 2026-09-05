@@ -221,7 +221,7 @@ func parseBoardUploadFile(c *gin.Context) (*multipart.FileHeader, bool) {
 	return file, true
 }
 
-func resolveBoardUploadTarget(c *gin.Context, h UploadDeps, userID int64) (*boards.UserBoard, ports.StorageStoreOptions, bool) {
+func resolveBoardUploadTarget(c *gin.Context, h UploadDeps, userID int64) (*boards.Board, ports.StorageStoreOptions, bool) {
 	if h.BoardService == nil || h.UserRepo == nil || h.StorageService == nil || h.MediaAssets == nil {
 		response.InternalError(c, 500, "上传失败", fmt.Errorf("board upload dependencies not configured"))
 		return nil, ports.StorageStoreOptions{}, false
@@ -230,11 +230,11 @@ func resolveBoardUploadTarget(c *gin.Context, h UploadDeps, userID int64) (*boar
 	board, _, err := h.BoardService.ResolveBoardWriteAccess(c.Request.Context(), userID, boardID)
 	if err != nil {
 		switch {
-		case errors.Is(err, boards.ErrInvalidBoardInput):
+		case errors.Is(err, boards.ErrInvalidInput):
 			response.Error(c, 400, "缺少画布ID")
-		case errors.Is(err, boards.ErrBoardNotFound):
+		case errors.Is(err, boards.ErrNotFound):
 			response.Error(c, 404, "画布不存在")
-		case errors.Is(err, boards.ErrBoardPermissionDenied):
+		case errors.Is(err, boards.ErrPermissionDenied):
 			response.Error(c, 403, "无权编辑该画布")
 		default:
 			response.InternalError(c, 500, "上传失败", err)
@@ -280,7 +280,7 @@ func findExistingBoardAsset(c *gin.Context, h UploadDeps, ownerUserID int64, pre
 	return existing, found, true
 }
 
-func persistBoardAsset(c *gin.Context, h UploadDeps, board *boards.UserBoard, file *multipart.FileHeader, storeOpts ports.StorageStoreOptions, prepared *ports.StoredUploadRef) (uploadImageResponse, bool) {
+func persistBoardAsset(c *gin.Context, h UploadDeps, board *boards.Board, file *multipart.FileHeader, storeOpts ports.StorageStoreOptions, prepared *ports.StoredUploadRef) (uploadImageResponse, bool) {
 	handle, err := h.MediaAssets.Begin(c.Request.Context(), ingestion.Request{
 		OwnerUserID: board.OwnerUserID, StorageProfile: prepared.StorageProfile,
 		StorageKey: prepared.StorageKey, URL: prepared.URL,
@@ -378,7 +378,7 @@ func mediaAssetOriginalDeliveryURL(assetID string) string {
 	return fmt.Sprintf("/api/user/media-assets/%s/original/content", assetID)
 }
 
-func adminUploadHandler(storageService *storage.StorageService, uploadSettings settings.MediaUploadSettingProvider) gin.HandlerFunc {
+func adminUploadHandler(storageService *storage.Service, uploadSettings settings.MediaUploadSettingProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		release, ok := acquireUploadSlot(c.Request.Context(), uploadSettings)
 		if !ok {

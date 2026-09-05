@@ -38,7 +38,7 @@ var googleCloudImageModelCandidates = []string{
 }
 
 type providerEndpointListResponse struct {
-	List []*ProviderEndpoint `json:"list"`
+	List []*Endpoint `json:"list"`
 }
 
 type providerEndpointRegistryResponse struct {
@@ -46,7 +46,7 @@ type providerEndpointRegistryResponse struct {
 }
 
 type providerEndpointResponse struct {
-	ProviderEndpoint *ProviderEndpoint `json:"provider_endpoint"`
+	ProviderEndpoint *Endpoint `json:"provider_endpoint"`
 }
 
 type detectedModelsResponse struct {
@@ -74,20 +74,20 @@ type googleCloudModelProbeResult struct {
 	err          error
 }
 
-type ProviderEndpointHandler struct {
-	endpointRepo *ProviderEndpointRepository
+type Handler struct {
+	endpointRepo *Repository
 	appEnv       string
 }
 
-func NewProviderEndpointHandler(endpointRepo *ProviderEndpointRepository, appEnv ...string) *ProviderEndpointHandler {
+func NewHandler(endpointRepo *Repository, appEnv ...string) *Handler {
 	env := ""
 	if len(appEnv) > 0 {
 		env = strings.TrimSpace(appEnv[0])
 	}
-	return &ProviderEndpointHandler{endpointRepo: endpointRepo, appEnv: env}
+	return &Handler{endpointRepo: endpointRepo, appEnv: env}
 }
 
-func (h *ProviderEndpointHandler) List(c *gin.Context) {
+func (h *Handler) List(c *gin.Context) {
 	endpoints, err := h.endpointRepo.List(c.Request.Context())
 	if err != nil {
 		response.Error(c, 500, "获取 ProviderEndpoint 列表失败")
@@ -96,12 +96,12 @@ func (h *ProviderEndpointHandler) List(c *gin.Context) {
 	response.SuccessDTO(c, providerEndpointListResponse{List: endpoints})
 }
 
-func (h *ProviderEndpointHandler) Registry(c *gin.Context) {
+func (h *Handler) Registry(c *gin.Context) {
 	response.SuccessDTO(c, providerEndpointRegistryResponse{Protocols: ProtocolRegistry()})
 }
 
-func (h *ProviderEndpointHandler) Create(c *gin.Context) {
-	var req CreateProviderEndpointRequest
+func (h *Handler) Create(c *gin.Context) {
+	var req CreateEndpointRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
@@ -136,7 +136,7 @@ func (h *ProviderEndpointHandler) Create(c *gin.Context) {
 		return
 	}
 
-	endpoint := &ProviderEndpoint{
+	endpoint := &Endpoint{
 		APIType:      apiType,
 		Protocol:     protocol,
 		Capabilities: capabilities,
@@ -157,14 +157,14 @@ func (h *ProviderEndpointHandler) Create(c *gin.Context) {
 	response.SuccessDTO(c, providerEndpointResponse{ProviderEndpoint: endpoint})
 }
 
-func (h *ProviderEndpointHandler) Update(c *gin.Context) {
+func (h *Handler) Update(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, 400, "无效的ID")
 		return
 	}
 
-	var req UpdateProviderEndpointRequest
+	var req UpdateEndpointRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
@@ -228,14 +228,14 @@ func (h *ProviderEndpointHandler) Update(c *gin.Context) {
 	response.SuccessDTO(c, providerEndpointResponse{ProviderEndpoint: endpoint})
 }
 
-func (h *ProviderEndpointHandler) UpdateStatus(c *gin.Context) {
+func (h *Handler) UpdateStatus(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, 400, "无效的ID")
 		return
 	}
 
-	var req UpdateProviderEndpointStatusRequest
+	var req UpdateEndpointStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil || req.Status == nil {
 		response.Error(c, 400, "参数错误")
 		return
@@ -258,7 +258,7 @@ func (h *ProviderEndpointHandler) UpdateStatus(c *gin.Context) {
 	response.SuccessDTO(c, providerEndpointResponse{ProviderEndpoint: endpoint})
 }
 
-func (h *ProviderEndpointHandler) Delete(c *gin.Context) {
+func (h *Handler) Delete(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, 400, "无效的ID")
@@ -277,7 +277,7 @@ func (h *ProviderEndpointHandler) Delete(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-func (h *ProviderEndpointHandler) DetectModels(c *gin.Context) {
+func (h *Handler) DetectModels(c *gin.Context) {
 	var req DetectModelsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
@@ -318,7 +318,7 @@ func validateModelDetectionRequest(req DetectModelsRequest) (baseURL, apiKey, ap
 	return baseURL, apiKey, apiType, ""
 }
 
-func (h *ProviderEndpointHandler) detectStandardModels(c *gin.Context, baseURL, apiKey, apiType string) {
+func (h *Handler) detectStandardModels(c *gin.Context, baseURL, apiKey, apiType string) {
 	detectionURL, err := buildModelDetectionURL(baseURL, apiType)
 	if err != nil {
 		response.Error(c, 400, "Base URL 无效")
@@ -375,7 +375,7 @@ type providerModelDetectionFailure struct {
 	publicMessage string
 }
 
-func (h *ProviderEndpointHandler) detectGoogleCloudImageModels(ctx context.Context, baseURL, apiKey string) ([]string, *providerModelDetectionFailure) {
+func (h *Handler) detectGoogleCloudImageModels(ctx context.Context, baseURL, apiKey string) ([]string, *providerModelDetectionFailure) {
 	probeCtx, cancel := context.WithTimeout(ctx, detectModelsTimeout)
 	defer cancel()
 
@@ -529,7 +529,7 @@ func googleAPIStatusMessage(statusCode int, rawStatus string) (string, string) {
 	return "模型检测失败，请检查 Google API Key、Billing、IAM 与 ProviderEndpoint 配置", status
 }
 
-func (h *ProviderEndpointHandler) detectModelsAllowHosts(ctx context.Context) []string {
+func (h *Handler) detectModelsAllowHosts(ctx context.Context) []string {
 	allowHosts := outbound.AllowHosts(ctx)
 	if h.isDevLikeEnvironment() {
 		allowHosts = append(allowHosts, "localhost", "127.0.0.1", "::1")
@@ -537,7 +537,7 @@ func (h *ProviderEndpointHandler) detectModelsAllowHosts(ctx context.Context) []
 	return allowHosts
 }
 
-func (h *ProviderEndpointHandler) isDevLikeEnvironment() bool {
+func (h *Handler) isDevLikeEnvironment() bool {
 	env := strings.ToLower(strings.TrimSpace(h.appEnv))
 	switch env {
 	case "prod", "production", "release":
@@ -558,11 +558,11 @@ func isValidProviderEndpointStatus(status int16) bool {
 }
 
 func respondProviderEndpointConflict(c *gin.Context, err error) bool {
-	if errors.Is(err, ErrProviderEndpointNameConflict) {
+	if errors.Is(err, ErrNameConflict) {
 		response.Error(c, 409, "ProviderEndpoint 名称已存在，请使用其他名称")
 		return true
 	}
-	if errors.Is(err, ErrProviderEndpointURLConflict) {
+	if errors.Is(err, ErrURLConflict) {
 		response.Error(c, 409, "同一接口类型下已存在相同 Base URL 的 ProviderEndpoint")
 		return true
 	}

@@ -27,7 +27,7 @@ func newBoardRepoTestDB(t *testing.T) *sql.DB {
 
 func TestBoardRepositoryOwnerAndAccessibleLookup(t *testing.T) {
 	db := newBoardRepoTestDB(t)
-	repo := NewBoardRepository(db)
+	repo := NewRepository(db)
 	userRepo := identitypostgres.NewRepository(db)
 
 	owner := &identitydomain.User{DisplayName: "owner", Status: 1, Role: "user"}
@@ -51,7 +51,7 @@ func TestBoardRepositoryOwnerAndAccessibleLookup(t *testing.T) {
 
 	t.Run("existing board returns owner board", func(t *testing.T) {
 		const boardID = "board-1"
-		seed := &UserBoard{
+		seed := &Board{
 			BoardID:     boardID,
 			OwnerUserID: owner.ID,
 			CreatedBy:   owner.ID,
@@ -76,7 +76,7 @@ func TestBoardRepositoryOwnerAndAccessibleLookup(t *testing.T) {
 			t.Fatalf("board.BoardID = %q, want %q", board.BoardID, boardID)
 		}
 
-		if err := repo.UpsertMember(context.Background(), owner.ID, boardID, member.ID, BoardAccessRoleViewer); err != nil {
+		if err := repo.UpsertMember(context.Background(), owner.ID, boardID, member.ID, RoleViewer); err != nil {
 			t.Fatalf("seed board member failed: %v", err)
 		}
 		accessible, err := repo.GetAccessibleByBoardID(context.Background(), member.ID, boardID)
@@ -90,7 +90,7 @@ func TestBoardRepositoryOwnerAndAccessibleLookup(t *testing.T) {
 		if accessible.Board.OwnerUserID != owner.ID {
 			t.Fatalf("accessible owner id = %d, want %d", accessible.Board.OwnerUserID, owner.ID)
 		}
-		if accessible.Role != BoardAccessRoleViewer {
+		if accessible.Role != RoleViewer {
 			t.Fatalf("accessible role = %s, want viewer", accessible.Role)
 		}
 	})
@@ -99,7 +99,7 @@ func TestBoardRepositoryOwnerAndAccessibleLookup(t *testing.T) {
 func TestBoardRepositoryUpsertReconcilesBoardMediaRefs(t *testing.T) {
 	ctx := context.Background()
 	db := newBoardRepoTestDB(t)
-	repo := NewBoardRepository(db)
+	repo := NewRepository(db)
 	userRepo := identitypostgres.NewRepository(db)
 	q := dbsqlc.New(db)
 
@@ -123,12 +123,12 @@ func TestBoardRepositoryUpsertReconcilesBoardMediaRefs(t *testing.T) {
 	}
 
 	now := time.Now()
-	board := &UserBoard{
+	board := &Board{
 		BoardID:            "media-board",
 		OwnerUserID:        owner.ID,
 		CreatedBy:          owner.ID,
 		Name:               "Media Board",
-		State:              boardStateWithMediaRefs(t, []BoardStateMediaRef{{MediaAssetID: assetAID, RefType: "board_node", RefID: "image-1", Role: "source"}}),
+		State:              boardStateWithMediaRefs(t, []StateMediaRef{{MediaAssetID: assetAID, RefType: "board_node", RefID: "image-1", Role: "source"}}),
 		StateSchemaVersion: 1,
 		CreatedAt:          now,
 		UpdatedAt:          now,
@@ -145,7 +145,7 @@ func TestBoardRepositoryUpsertReconcilesBoardMediaRefs(t *testing.T) {
 		t.Fatalf("board refs after add = %#v, want asset A board_node image-1", refs)
 	}
 
-	board.State = boardStateWithMediaRefs(t, []BoardStateMediaRef{{MediaAssetID: assetBID, RefType: "board_node", RefID: "image-2", Role: "result"}})
+	board.State = boardStateWithMediaRefs(t, []StateMediaRef{{MediaAssetID: assetBID, RefType: "board_node", RefID: "image-2", Role: "result"}})
 	board.UpdatedAt = now.Add(time.Second)
 	if err := repo.Upsert(ctx, board); err != nil {
 		t.Fatalf("second Upsert returned error: %v", err)
@@ -207,7 +207,7 @@ func TestBoardRepositoryUpsertReconcilesBoardMediaRefs(t *testing.T) {
 func TestBoardRepositoryMediaReclamationWaitsForLastBoardReferenceAndCancelsOnUndo(t *testing.T) {
 	ctx := context.Background()
 	db := newBoardRepoTestDB(t)
-	repo := NewBoardRepository(db)
+	repo := NewRepository(db)
 	userRepo := identitypostgres.NewRepository(db)
 	q := dbsqlc.New(db)
 
@@ -217,9 +217,9 @@ func TestBoardRepositoryMediaReclamationWaitsForLastBoardReferenceAndCancelsOnUn
 	}
 	assetID := seedBoardMediaAsset(t, q, owner.ID, "shared-board-asset", "uploads/tasks/42/shared/output.png")
 	now := time.Now()
-	boardA := &UserBoard{BoardID: "shared-a", OwnerUserID: owner.ID, CreatedBy: owner.ID, Name: "Shared A", State: boardStateWithMediaRefs(t, []BoardStateMediaRef{{MediaAssetID: assetID, RefType: "board_node", RefID: "image-1", Role: "source"}}), StateSchemaVersion: 1, CreatedAt: now, UpdatedAt: now}
-	boardB := &UserBoard{BoardID: "shared-b", OwnerUserID: owner.ID, CreatedBy: owner.ID, Name: "Shared B", State: boardStateWithMediaRefs(t, []BoardStateMediaRef{{MediaAssetID: assetID, RefType: "board_node", RefID: "image-1", Role: "source"}}), StateSchemaVersion: 1, CreatedAt: now, UpdatedAt: now}
-	for _, board := range []*UserBoard{boardA, boardB} {
+	boardA := &Board{BoardID: "shared-a", OwnerUserID: owner.ID, CreatedBy: owner.ID, Name: "Shared A", State: boardStateWithMediaRefs(t, []StateMediaRef{{MediaAssetID: assetID, RefType: "board_node", RefID: "image-1", Role: "source"}}), StateSchemaVersion: 1, CreatedAt: now, UpdatedAt: now}
+	boardB := &Board{BoardID: "shared-b", OwnerUserID: owner.ID, CreatedBy: owner.ID, Name: "Shared B", State: boardStateWithMediaRefs(t, []StateMediaRef{{MediaAssetID: assetID, RefType: "board_node", RefID: "image-1", Role: "source"}}), StateSchemaVersion: 1, CreatedAt: now, UpdatedAt: now}
+	for _, board := range []*Board{boardA, boardB} {
 		if err := repo.Upsert(ctx, board); err != nil {
 			t.Fatalf("seed board %s failed: %v", board.BoardID, err)
 		}
@@ -266,7 +266,7 @@ func TestBoardRepositoryMediaReclamationWaitsForLastBoardReferenceAndCancelsOnUn
 	}); err != nil {
 		t.Fatalf("claim scheduled asset failed: %v", err)
 	}
-	boardA.State = boardStateWithMediaRefs(t, []BoardStateMediaRef{{MediaAssetID: assetID, RefType: "board_node", RefID: "image-1", Role: "source"}})
+	boardA.State = boardStateWithMediaRefs(t, []StateMediaRef{{MediaAssetID: assetID, RefType: "board_node", RefID: "image-1", Role: "source"}})
 	boardA.UpdatedAt = now.Add(3 * time.Second)
 	if err := repo.Upsert(ctx, boardA); !errors.Is(err, ErrMediaAssetNoLongerAvailable) {
 		t.Fatalf("undo after reclamation claim error=%v, want ErrMediaAssetNoLongerAvailable", err)
@@ -290,7 +290,7 @@ func TestBoardRepositoryMediaReclamationWaitsForLastBoardReferenceAndCancelsOnUn
 func TestBoardUploadRegistrationConvergesThroughSaveDeleteAndGraceScheduling(t *testing.T) {
 	ctx := context.Background()
 	db := newBoardRepoTestDB(t)
-	repo := NewBoardRepository(db)
+	repo := NewRepository(db)
 	owner := &identitydomain.User{DisplayName: "upload-reclamation-owner", Status: 1, Role: "user"}
 	if err := identitypostgres.NewRepository(db).Create(ctx, owner); err != nil {
 		t.Fatalf("create owner: %v", err)
@@ -321,12 +321,12 @@ func TestBoardUploadRegistrationConvergesThroughSaveDeleteAndGraceScheduling(t *
 	}
 
 	now := time.Now()
-	board := &UserBoard{
+	board := &Board{
 		BoardID:            "upload-reclamation-board",
 		OwnerUserID:        owner.ID,
 		CreatedBy:          owner.ID,
 		Name:               "Upload Reclamation",
-		State:              boardStateWithMediaRefs(t, []BoardStateMediaRef{{MediaAssetID: assetID, RefType: "board_node", RefID: "image-1", Role: "source"}}),
+		State:              boardStateWithMediaRefs(t, []StateMediaRef{{MediaAssetID: assetID, RefType: "board_node", RefID: "image-1", Role: "source"}}),
 		StateSchemaVersion: CurrentBoardStateSchemaVersion,
 		CreatedAt:          now,
 		UpdatedAt:          now,
@@ -353,7 +353,7 @@ func TestBoardUploadRegistrationConvergesThroughSaveDeleteAndGraceScheduling(t *
 func TestBoardRepositoryStableBoardIdentityConstraints(t *testing.T) {
 	ctx := context.Background()
 	db := newBoardRepoTestDB(t)
-	repo := NewBoardRepository(db)
+	repo := NewRepository(db)
 	userRepo := identitypostgres.NewRepository(db)
 
 	owner := &identitydomain.User{DisplayName: "identity-owner", Status: 1, Role: "user"}
@@ -370,7 +370,7 @@ func TestBoardRepositoryStableBoardIdentityConstraints(t *testing.T) {
 	}
 
 	now := time.Now()
-	board := &UserBoard{
+	board := &Board{
 		BoardID:            "stable-identity-board",
 		OwnerUserID:        owner.ID,
 		CreatedBy:          creator.ID,
@@ -401,14 +401,14 @@ func TestBoardRepositoryStableBoardIdentityConstraints(t *testing.T) {
 	conflicting.OwnerUserID = otherOwner.ID
 	conflicting.CreatedBy = otherOwner.ID
 	conflicting.Name = "Should Not Replace"
-	if err := repo.Upsert(ctx, &conflicting); !errors.Is(err, ErrBoardIDConflict) {
-		t.Fatalf("conflicting Upsert err = %v, want ErrBoardIDConflict", err)
+	if err := repo.Upsert(ctx, &conflicting); !errors.Is(err, ErrIDConflict) {
+		t.Fatalf("conflicting Upsert err = %v, want ErrIDConflict", err)
 	}
 
-	if err := repo.UpsertMember(ctx, owner.ID, board.BoardID, member.ID, BoardAccessRoleViewer); err != nil {
+	if err := repo.UpsertMember(ctx, owner.ID, board.BoardID, member.ID, RoleViewer); err != nil {
 		t.Fatalf("UpsertMember viewer returned error: %v", err)
 	}
-	if err := repo.UpsertMember(ctx, otherOwner.ID, board.BoardID, member.ID, BoardAccessRoleEditor); err != nil {
+	if err := repo.UpsertMember(ctx, otherOwner.ID, board.BoardID, member.ID, RoleEditor); err != nil {
 		t.Fatalf("UpsertMember editor returned error: %v", err)
 	}
 	var memberRows int
@@ -422,15 +422,15 @@ func TestBoardRepositoryStableBoardIdentityConstraints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetMemberRole returned error: %v", err)
 	}
-	if role != BoardAccessRoleEditor {
+	if role != RoleEditor {
 		t.Fatalf("member role = %s, want editor", role)
 	}
 
-	token := &BoardShareToken{
+	token := &ShareToken{
 		BoardID:     board.BoardID,
 		TokenHash:   boardShareTokenHash("stable-token"),
 		TokenPrefix: "stable-t",
-		Role:        string(BoardAccessRoleViewer),
+		Role:        string(RoleViewer),
 		CreatedBy:   creator.ID,
 	}
 	if err := repo.CreateShareToken(ctx, token); err != nil {
@@ -475,10 +475,10 @@ func seedBoardMediaAsset(t *testing.T, q *dbsqlc.Queries, ownerID int64, assetID
 	return id
 }
 
-func boardStateWithMediaRefs(t *testing.T, refs []BoardStateMediaRef) string {
+func boardStateWithMediaRefs(t *testing.T, refs []StateMediaRef) string {
 	t.Helper()
 	if refs == nil {
-		refs = []BoardStateMediaRef{}
+		refs = []StateMediaRef{}
 	}
 	state := validBoardState(CurrentBoardStateSchemaVersion, 100)
 	state["mediaRefs"] = refs

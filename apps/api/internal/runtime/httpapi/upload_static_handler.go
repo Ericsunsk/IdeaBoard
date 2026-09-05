@@ -69,7 +69,7 @@ func authorizeUploadRead(c *gin.Context, deps AuthDeps) bool {
 }
 
 type staticUploadBoardAccessResolver struct {
-	service *boards.BoardService
+	service *boards.Service
 }
 
 func (r staticUploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context, userID int64, boardID string) (int64, error) {
@@ -145,11 +145,11 @@ func writeCanvasUploadReadError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, domain.ErrUploadAccessInvalidPath):
 		response.Error(c, http.StatusNotFound, "资源不存在")
-	case errors.Is(err, boards.ErrInvalidBoardInput):
+	case errors.Is(err, boards.ErrInvalidInput):
 		response.Error(c, http.StatusNotFound, "资源不存在")
-	case errors.Is(err, boards.ErrBoardNotFound):
+	case errors.Is(err, boards.ErrNotFound):
 		response.Error(c, http.StatusNotFound, "资源不存在")
-	case errors.Is(err, boards.ErrBoardPermissionDenied), errors.Is(err, domain.ErrUploadAccessDenied):
+	case errors.Is(err, boards.ErrPermissionDenied), errors.Is(err, domain.ErrUploadAccessDenied):
 		response.Error(c, http.StatusForbidden, "无权访问该资源")
 	case errors.Is(err, domain.ErrUploadAccessOwnerMismatch):
 		response.Error(c, http.StatusNotFound, "资源不存在")

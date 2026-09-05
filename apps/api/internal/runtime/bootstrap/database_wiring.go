@@ -48,12 +48,12 @@ type appRepositories struct {
 	accountRepo          *accountrepo.Repository
 	taskRepo             *taskstore.Repository
 	taskBillingUsage     *taskbilling.UsageStore
-	providerEndpointRepo *providerendpoints.ProviderEndpointRepository
+	providerEndpointRepo *providerendpoints.Repository
 	systemConfigRepo     *settings.SystemConfigRepository
 	featurePromptRepo    *prompts.FeaturePromptRepository
-	storageProfileRepo   *storagepostgres.StorageProfileRepository
+	storageProfileRepo   *storagepostgres.Repository
 	mediaAssetRegistry   *assets.MediaAssetRegistry
-	boardRepo            *boards.BoardRepository
+	boardRepo            *boards.Repository
 	paymentRepo          *paymentpostgres.Repository
 	libraryRepo          *library.Repository
 	adminBrandLogoRepo   *adminbranding.Repository
@@ -179,12 +179,12 @@ func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error
 		accountRepo:          accountrepo.NewRepository(db, taskRepo),
 		taskRepo:             taskRepo,
 		taskBillingUsage:     taskbilling.NewUsageStore(db),
-		providerEndpointRepo: providerendpoints.NewProviderEndpointRepository(db),
+		providerEndpointRepo: providerendpoints.NewRepository(db),
 		systemConfigRepo:     settings.NewSystemConfigRepository(db),
 		featurePromptRepo:    prompts.NewFeaturePromptRepository(db),
-		storageProfileRepo:   storagepostgres.NewStorageProfileRepository(db),
+		storageProfileRepo:   storagepostgres.NewRepository(db),
 		mediaAssetRegistry:   assets.NewMediaAssetRegistry(db),
-		boardRepo:            boards.NewBoardRepository(db),
+		boardRepo:            boards.NewRepository(db),
 		paymentRepo:          paymentpostgres.NewRepository(db),
 		libraryRepo:          library.NewRepository(db),
 		adminBrandLogoRepo:   adminbranding.NewRepository(db),

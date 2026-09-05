@@ -26,7 +26,7 @@ import (
 )
 
 type (
-	StorageService                = storage.StorageService
+	StorageService                = storage.Service
 	StorageProfile                = domain.StorageProfile
 	StorageProvider               = domain.StorageProvider
 	StorageFieldType              = domain.StorageFieldType
@@ -65,7 +65,7 @@ type (
 	S3CompatibleProfileConfig     = s3.S3CompatibleProfileConfig
 	LocalStorageProfileConfig     = local.LocalStorageProfileConfig
 	StorageProfileRepository      struct {
-		*postgres.StorageProfileRepository
+		*postgres.Repository
 		DB *sql.DB
 	}
 )
@@ -103,7 +103,7 @@ var (
 	ErrUploadAccessDependencyMissing  = domain.ErrUploadAccessDependencyMissing
 	ErrProviderHTTPSUnavailable       = domain.ErrProviderHTTPSUnavailable
 
-	NewStorageService                 = storage.NewStorageService
+	NewStorageService                 = storage.NewService
 	NewStorageProfileRepository       = newStorageProfileRepository
 	NewTaskMediaAuthorizer            = authorization.NewTaskMediaAuthorizer
 	NewReadableUploadAccess           = authorization.NewReadableUploadAccess
@@ -124,7 +124,7 @@ func publicUploadURL(objectKey string) string {
 }
 
 func newStorageProfileRepository(db *sql.DB) *StorageProfileRepository {
-	return &StorageProfileRepository{StorageProfileRepository: postgres.NewStorageProfileRepository(db), DB: db}
+	return &StorageProfileRepository{Repository: postgres.NewRepository(db), DB: db}
 }
 
 func newStorageServiceTest(t *testing.T) (*StorageService, *StorageProfileRepository) {

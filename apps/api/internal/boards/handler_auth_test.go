@@ -15,7 +15,7 @@ import (
 
 func TestBoardHandlersRequireTypedPrincipal(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	handler := NewBoardHandler(nil, config.PublicOriginsConfig{})
+	handler := NewHandler(nil, config.PublicOriginsConfig{})
 	handlers := []struct {
 		name   string
 		method string

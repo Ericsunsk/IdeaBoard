@@ -17,7 +17,7 @@ import (
 )
 
 type dynamicAssetLocator struct {
-	svc *StorageService
+	svc *Service
 }
 
 func (d dynamicAssetLocator) LocateStoredUpload(ctx context.Context, lookup ports.StoredUploadLookup) (ports.StoredUploadLocation, bool, error) {
@@ -27,7 +27,7 @@ func (d dynamicAssetLocator) LocateStoredUpload(ctx context.Context, lookup port
 	return d.svc.assetLocator.LocateStoredUpload(ctx, lookup)
 }
 
-type StorageService struct {
+type Service struct {
 	assetLocator        ports.StoredUploadLocator
 	s3CompatibleService *s3.S3CompatibleService
 
@@ -35,7 +35,7 @@ type StorageService struct {
 	runtimeService  *runtime.Service
 }
 
-func NewStorageService(profileRepo ports.StorageProfileRepository, assetLocator ports.StoredUploadLocator, publicAPIOrigin string) *StorageService {
+func NewService(profileRepo ports.ProfileRepository, assetLocator ports.StoredUploadLocator, publicAPIOrigin string) *Service {
 	origin := strings.TrimRight(strings.TrimSpace(publicAPIOrigin), "/")
 	s3Svc := s3.NewS3CompatibleService()
 	localDriver := local.NewLocalStorageDriver(origin)
@@ -54,7 +54,7 @@ func NewStorageService(profileRepo ports.StorageProfileRepository, assetLocator 
 
 	profilesSvc := profiles.NewService(profileRepo, drivers)
 
-	service := &StorageService{
+	service := &Service{
 		assetLocator:        assetLocator,
 		s3CompatibleService: s3Svc,
 		profilesService:     profilesSvc,
@@ -66,215 +66,215 @@ func NewStorageService(profileRepo ports.StorageProfileRepository, assetLocator 
 	return service
 }
 
-func (s *StorageService) SetAssetLocator(locator ports.StoredUploadLocator) {
+func (s *Service) SetAssetLocator(locator ports.StoredUploadLocator) {
 	s.assetLocator = locator
 	if s.runtimeService != nil {
 		s.runtimeService.SetAssetLocator(locator)
 	}
 }
 
-func (s *StorageService) SetCapabilityProbe(fn func(context.Context, *s3.S3CompatibleConfig) error) {
+func (s *Service) SetCapabilityProbe(fn func(context.Context, *s3.S3CompatibleConfig) error) {
 	if s != nil && s.s3CompatibleService != nil {
 		s.s3CompatibleService.SetCapabilityProbe(fn)
 	}
 }
 
-func (s *StorageService) ListProviderMeta() []domain.StorageProviderMeta {
+func (s *Service) ListProviderMeta() []domain.StorageProviderMeta {
 	return s.profilesService.ListProviderMeta()
 }
 
-func (s *StorageService) ListProfiles(ctx context.Context) ([]domain.StorageProfile, error) {
+func (s *Service) ListProfiles(ctx context.Context) ([]domain.StorageProfile, error) {
 	return s.profilesService.ListProfiles(ctx)
 }
 
-func (s *StorageService) GetProfile(ctx context.Context, id string) (*domain.StorageProfile, error) {
+func (s *Service) GetProfile(ctx context.Context, id string) (*domain.StorageProfile, error) {
 	return s.profilesService.GetProfile(ctx, id)
 }
 
-func (s *StorageService) SaveProfile(ctx context.Context, profile *domain.StorageProfile) (*domain.StorageProfile, error) {
+func (s *Service) SaveProfile(ctx context.Context, profile *domain.StorageProfile) (*domain.StorageProfile, error) {
 	return s.profilesService.SaveProfile(ctx, profile)
 }
 
-func (s *StorageService) SaveAndApplyProfile(ctx context.Context, profile *domain.StorageProfile) (*domain.StorageProfile, error) {
+func (s *Service) SaveAndApplyProfile(ctx context.Context, profile *domain.StorageProfile) (*domain.StorageProfile, error) {
 	return s.profilesService.SaveAndApplyProfile(ctx, profile)
 }
 
-func (s *StorageService) DeleteProfile(ctx context.Context, id string) error {
+func (s *Service) DeleteProfile(ctx context.Context, id string) error {
 	return s.profilesService.DeleteProfile(ctx, id)
 }
 
-func (s *StorageService) ApplyProfile(ctx context.Context, id string) (*domain.StorageProfile, error) {
+func (s *Service) ApplyProfile(ctx context.Context, id string) (*domain.StorageProfile, error) {
 	return s.profilesService.ApplyProfile(ctx, id)
 }
 
-func (s *StorageService) TestProfile(ctx context.Context, id string) error {
+func (s *Service) TestProfile(ctx context.Context, id string) error {
 	return s.profilesService.TestProfile(ctx, id)
 }
 
-func (s *StorageService) GetBucketInfo(ctx context.Context, id string) (map[string]interface{}, error) {
+func (s *Service) GetBucketInfo(ctx context.Context, id string) (map[string]interface{}, error) {
 	return s.profilesService.GetBucketInfo(ctx, id)
 }
 
-func (s *StorageService) EnsureProfileReadyForRuntime(ctx context.Context, profile domain.StorageProfile) error {
+func (s *Service) EnsureProfileReadyForRuntime(ctx context.Context, profile domain.StorageProfile) error {
 	return s.profilesService.EnsureProfileReadyForRuntime(ctx, profile)
 }
 
-func (s *StorageService) ResolveProfileByID(ctx context.Context, id string) (*domain.StorageProfile, error) {
+func (s *Service) ResolveProfileByID(ctx context.Context, id string) (*domain.StorageProfile, error) {
 	return s.profilesService.ResolveProfileByID(ctx, id)
 }
 
-func (s *StorageService) ResolveActiveProfile(ctx context.Context) (*domain.StorageProfile, error) {
+func (s *Service) ResolveActiveProfile(ctx context.Context) (*domain.StorageProfile, error) {
 	return s.profilesService.ResolveActiveProfile(ctx)
 }
 
-func (s *StorageService) EnsureDefaultProfiles(ctx context.Context) error {
+func (s *Service) EnsureDefaultProfiles(ctx context.Context) error {
 	return s.profilesService.EnsureDefaultProfiles(ctx)
 }
 
-func (s *StorageService) DefaultLocalStorageProfile(isCurrent bool) domain.StorageProfile {
+func (s *Service) DefaultLocalStorageProfile(isCurrent bool) domain.StorageProfile {
 	return s.profilesService.DefaultLocalStorageProfile(isCurrent)
 }
 
-func (s *StorageService) LoadProfilesWithSecrets(ctx context.Context) ([]domain.StorageProfile, error) {
+func (s *Service) LoadProfilesWithSecrets(ctx context.Context) ([]domain.StorageProfile, error) {
 	return s.profilesService.LoadProfilesWithSecrets(ctx)
 }
 
-func (s *StorageService) LoadProfileForReclamation(ctx context.Context, id string) (*domain.StorageProfile, error) {
+func (s *Service) LoadProfileForReclamation(ctx context.Context, id string) (*domain.StorageProfile, error) {
 	return s.profilesService.LoadProfileForReclamation(ctx, id)
 }
 
-func (s *StorageService) Upload(ctx context.Context, file *multipart.FileHeader) (string, error) {
+func (s *Service) Upload(ctx context.Context, file *multipart.FileHeader) (string, error) {
 	return s.runtimeService.Upload(ctx, file)
 }
 
-func (s *StorageService) UploadWithOptions(ctx context.Context, file *multipart.FileHeader, opts ports.StorageStoreOptions) (string, error) {
+func (s *Service) UploadWithOptions(ctx context.Context, file *multipart.FileHeader, opts ports.StorageStoreOptions) (string, error) {
 	return s.runtimeService.UploadWithOptions(ctx, file, opts)
 }
 
-func (s *StorageService) UploadRefWithOptions(ctx context.Context, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+func (s *Service) UploadRefWithOptions(ctx context.Context, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	return s.runtimeService.UploadRefWithOptions(ctx, file, opts)
 }
 
-func (s *StorageService) UploadRefAtProfile(ctx context.Context, profileID string, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+func (s *Service) UploadRefAtProfile(ctx context.Context, profileID string, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	return s.runtimeService.UploadRefAtProfile(ctx, profileID, file, opts)
 }
 
-func (s *StorageService) PrepareUploadRefFromFile(ctx context.Context, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+func (s *Service) PrepareUploadRefFromFile(ctx context.Context, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	return s.runtimeService.PrepareUploadRefFromFile(ctx, file, opts)
 }
 
-func (s *StorageService) PrepareUploadRef(ctx context.Context, filename string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+func (s *Service) PrepareUploadRef(ctx context.Context, filename string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	return s.runtimeService.PrepareUploadRef(ctx, filename, opts)
 }
 
-func (s *StorageService) StoreRemoteRef(ctx context.Context, remoteURL string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+func (s *Service) StoreRemoteRef(ctx context.Context, remoteURL string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	return s.runtimeService.StoreRemoteRef(ctx, remoteURL, opts)
 }
 
-func (s *StorageService) StoreMediaRef(ctx context.Context, sourceRef string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+func (s *Service) StoreMediaRef(ctx context.Context, sourceRef string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	return s.runtimeService.StoreMediaRef(ctx, sourceRef, opts)
 }
 
-func (s *StorageService) StoreMediaRefAtProfile(ctx context.Context, profileID, sourceRef string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+func (s *Service) StoreMediaRefAtProfile(ctx context.Context, profileID, sourceRef string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	return s.runtimeService.StoreMediaRefAtProfile(ctx, profileID, sourceRef, opts)
 }
 
-func (s *StorageService) StoreMediaRefWithProfile(ctx context.Context, profile domain.StorageProfile, sourceRef string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+func (s *Service) StoreMediaRefWithProfile(ctx context.Context, profile domain.StorageProfile, sourceRef string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	return s.runtimeService.StoreMediaRefWithProfile(ctx, profile, sourceRef, opts)
 }
 
-func (s *StorageService) StoreBytesRef(ctx context.Context, filename string, data []byte, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+func (s *Service) StoreBytesRef(ctx context.Context, filename string, data []byte, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	return s.runtimeService.StoreBytesRef(ctx, filename, data, opts)
 }
 
-func (s *StorageService) StoreBytesRefAtProfile(ctx context.Context, profileID, filename string, data []byte, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+func (s *Service) StoreBytesRefAtProfile(ctx context.Context, profileID, filename string, data []byte, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	return s.runtimeService.StoreBytesRefAtProfile(ctx, profileID, filename, data, opts)
 }
 
-func (s *StorageService) StoreBytesRefWithProfile(ctx context.Context, profile domain.StorageProfile, filename string, data []byte, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+func (s *Service) StoreBytesRefWithProfile(ctx context.Context, profile domain.StorageProfile, filename string, data []byte, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	return s.runtimeService.StoreBytesRefWithProfile(ctx, profile, filename, data, opts)
 }
 
-func (s *StorageService) StoreRemoteRefAtProfile(ctx context.Context, profileID, remoteURL string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+func (s *Service) StoreRemoteRefAtProfile(ctx context.Context, profileID, remoteURL string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	return s.runtimeService.StoreRemoteRefAtProfile(ctx, profileID, remoteURL, opts)
 }
 
-func (s *StorageService) StoreRemoteRefWithProfile(ctx context.Context, profile domain.StorageProfile, remoteURL string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+func (s *Service) StoreRemoteRefWithProfile(ctx context.Context, profile domain.StorageProfile, remoteURL string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	return s.runtimeService.StoreRemoteRefWithProfile(ctx, profile, remoteURL, opts)
 }
 
-func (s *StorageService) UploadRefWithProfile(ctx context.Context, profile domain.StorageProfile, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+func (s *Service) UploadRefWithProfile(ctx context.Context, profile domain.StorageProfile, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	return s.runtimeService.UploadRefWithProfile(ctx, profile, file, opts)
 }
 
-func (s *StorageService) ReadUploadResourceByURL(ctx context.Context, rawURL string, maxBytes int64) (*ports.StoredUploadObject, error) {
+func (s *Service) ReadUploadResourceByURL(ctx context.Context, rawURL string, maxBytes int64) (*ports.StoredUploadObject, error) {
 	return s.runtimeService.ReadUploadResourceByURL(ctx, rawURL, maxBytes)
 }
 
-func (s *StorageService) PutObjectAtProfile(ctx context.Context, profileID, objectKey string, data []byte, contentType string) error {
+func (s *Service) PutObjectAtProfile(ctx context.Context, profileID, objectKey string, data []byte, contentType string) error {
 	return s.runtimeService.PutObjectAtProfile(ctx, profileID, objectKey, data, contentType)
 }
 
-func (s *StorageService) ReadObjectAtProfile(ctx context.Context, profileID, objectKey string, maxBytes int64) (*ports.StoredUploadObject, error) {
+func (s *Service) ReadObjectAtProfile(ctx context.Context, profileID, objectKey string, maxBytes int64) (*ports.StoredUploadObject, error) {
 	return s.runtimeService.ReadObjectAtProfile(ctx, profileID, objectKey, maxBytes)
 }
 
-func (s *StorageService) ResolveProviderDerivativeURL(ctx context.Context, assetID int64, tier string) (string, error) {
+func (s *Service) ResolveProviderDerivativeURL(ctx context.Context, assetID int64, tier string) (string, error) {
 	return s.runtimeService.ResolveProviderDerivativeURL(ctx, assetID, tier)
 }
 
-func (s *StorageService) DeleteProfileAvatarByURL(ctx context.Context, storageUID string, rawURL string) error {
+func (s *Service) DeleteProfileAvatarByURL(ctx context.Context, storageUID string, rawURL string) error {
 	return s.runtimeService.DeleteProfileAvatarByURL(ctx, storageUID, rawURL)
 }
 
-func (s *StorageService) DeleteCanvasByStorageUID(ctx context.Context, storageUID string) error {
+func (s *Service) DeleteCanvasByStorageUID(ctx context.Context, storageUID string) error {
 	return s.runtimeService.DeleteCanvasByStorageUID(ctx, storageUID)
 }
 
-func (s *StorageService) DeleteUserUploads(ctx context.Context, userID int64, storageUID string) error {
+func (s *Service) DeleteUserUploads(ctx context.Context, userID int64, storageUID string) error {
 	return s.runtimeService.DeleteUserUploads(ctx, userID, storageUID)
 }
 
-func (s *StorageService) DeleteObjectByKey(ctx context.Context, objectKey string) error {
+func (s *Service) DeleteObjectByKey(ctx context.Context, objectKey string) error {
 	return s.runtimeService.DeleteObjectByKey(ctx, objectKey)
 }
 
-func (s *StorageService) DeleteObjectByStorageProfile(ctx context.Context, storageProfileID string, objectKey string) error {
+func (s *Service) DeleteObjectByStorageProfile(ctx context.Context, storageProfileID string, objectKey string) error {
 	return s.runtimeService.DeleteObjectByStorageProfile(ctx, storageProfileID, objectKey)
 }
 
-func (s *StorageService) ListObjectKeysByStorageProfile(ctx context.Context, storageProfileID string, objectKeyPrefix string) ([]string, error) {
+func (s *Service) ListObjectKeysByStorageProfile(ctx context.Context, storageProfileID string, objectKeyPrefix string) ([]string, error) {
 	return s.runtimeService.ListObjectKeysByStorageProfile(ctx, storageProfileID, objectKeyPrefix)
 }
 
-func (s *StorageService) DeleteUploadObjectPrefix(ctx context.Context, prefix string) error {
+func (s *Service) DeleteUploadObjectPrefix(ctx context.Context, prefix string) error {
 	return s.runtimeService.DeleteUploadObjectPrefix(ctx, prefix)
 }
 
-func (s *StorageService) DeleteUploadObjectPrefixes(ctx context.Context, prefixes []string) error {
+func (s *Service) DeleteUploadObjectPrefixes(ctx context.Context, prefixes []string) error {
 	return s.runtimeService.DeleteUploadObjectPrefixes(ctx, prefixes)
 }
 
-func (s *StorageService) DeleteCanvasBoardByStorageUID(ctx context.Context, storageUID string, boardID string) error {
+func (s *Service) DeleteCanvasBoardByStorageUID(ctx context.Context, storageUID string, boardID string) error {
 	return s.runtimeService.DeleteCanvasBoardByStorageUID(ctx, storageUID, boardID)
 }
 
-func (s *StorageService) UsesObjectStorage(ctx context.Context) bool {
+func (s *Service) UsesObjectStorage(ctx context.Context) bool {
 	return s.runtimeService.UsesObjectStorage(ctx)
 }
 
-func (s *StorageService) ResolveStoredUploadTarget(ctx context.Context, rawURL string) (*domain.StorageProfile, string, error) {
+func (s *Service) ResolveStoredUploadTarget(ctx context.Context, rawURL string) (*domain.StorageProfile, string, error) {
 	return s.runtimeService.ResolveStoredUploadTarget(ctx, rawURL)
 }
 
-func (s *StorageService) PublicUploadURL(objectKey string) string {
+func (s *Service) PublicUploadURL(objectKey string) string {
 	if s != nil && s.runtimeService != nil {
 		return s.runtimeService.PublicUploadURL(objectKey)
 	}
 	return publicUploadURL(objectKey)
 }
 
-func (s *StorageService) Presign(ctx context.Context, req ports.PresignRequest) (ports.PresignedURL, error) {
+func (s *Service) Presign(ctx context.Context, req ports.PresignRequest) (ports.PresignedURL, error) {
 	return s.runtimeService.Presign(ctx, req)
 }
 

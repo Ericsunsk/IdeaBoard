@@ -206,7 +206,7 @@ func newTestProviderExecutorWithLocalStorage(t *testing.T) *ProviderExecutor {
 	})
 
 	db := testdb.Open(t)
-	storageService := storage.NewStorageService(postgres.NewStorageProfileRepository(db), nil, "")
+	storageService := storage.NewService(postgres.NewRepository(db), nil, "")
 	if err := storageService.EnsureDefaultProfiles(context.Background()); err != nil {
 		t.Fatalf("ensure default storage profiles: %v", err)
 	}

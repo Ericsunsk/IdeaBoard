@@ -60,16 +60,16 @@ func TestMarshalStateLimits(t *testing.T) {
 			"connections": []interface{}{},
 			"updatedAt":   1,
 		})
-		if !errors.Is(err, ErrInvalidBoardInput) {
-			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		if !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("err = %v, want ErrInvalidInput", err)
 		}
 	})
 
 	t.Run("reject old schema version", func(t *testing.T) {
 		state := validBoardState(CurrentBoardStateSchemaVersion-1, 100)
 		_, _, err := marshalState(state)
-		if !errors.Is(err, ErrInvalidBoardInput) {
-			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		if !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("err = %v, want ErrInvalidInput", err)
 		}
 	})
 
@@ -77,8 +77,8 @@ func TestMarshalStateLimits(t *testing.T) {
 		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
 		state["unexpected"] = true
 		_, _, err := marshalState(state)
-		if !errors.Is(err, ErrInvalidBoardInput) {
-			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		if !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("err = %v, want ErrInvalidInput", err)
 		}
 	})
 
@@ -86,8 +86,8 @@ func TestMarshalStateLimits(t *testing.T) {
 		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
 		state["viewport"] = map[string]interface{}{"x": 1, "y": 2, "zoom": 1}
 		_, _, err := marshalState(state)
-		if !errors.Is(err, ErrInvalidBoardInput) {
-			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		if !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("err = %v, want ErrInvalidInput", err)
 		}
 	})
 
@@ -110,8 +110,8 @@ func TestMarshalStateLimits(t *testing.T) {
 			map[string]interface{}{"mediaAssetId": 12, "refType": "board_node", "refId": "image-1", "unexpected": true},
 		}
 		_, _, err := marshalState(state)
-		if !errors.Is(err, ErrInvalidBoardInput) {
-			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		if !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("err = %v, want ErrInvalidInput", err)
 		}
 	})
 
@@ -121,8 +121,8 @@ func TestMarshalStateLimits(t *testing.T) {
 			map[string]interface{}{"mediaAssetId": 12, "refType": "board_node", "refId": "image-1", "role": ""},
 		}
 		_, _, err := marshalState(state)
-		if !errors.Is(err, ErrInvalidBoardInput) {
-			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		if !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("err = %v, want ErrInvalidInput", err)
 		}
 	})
 
@@ -132,8 +132,8 @@ func TestMarshalStateLimits(t *testing.T) {
 			map[string]interface{}{"mediaAssetId": 12, "refType": "task_output", "refId": "output-1", "role": "image"},
 		}
 		_, _, err := marshalState(state)
-		if !errors.Is(err, ErrInvalidBoardInput) {
-			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		if !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("err = %v, want ErrInvalidInput", err)
 		}
 	})
 
@@ -141,8 +141,8 @@ func TestMarshalStateLimits(t *testing.T) {
 		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
 		state["previewSnapshotVersion"] = 1.25
 		_, _, err := marshalState(state)
-		if !errors.Is(err, ErrInvalidBoardInput) {
-			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		if !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("err = %v, want ErrInvalidInput", err)
 		}
 	})
 
@@ -152,8 +152,8 @@ func TestMarshalStateLimits(t *testing.T) {
 			map[string]interface{}{"id": "group-1", "nodeIds": []interface{}{"image-1", "prompt-1"}},
 		}
 		_, _, err := marshalState(state)
-		if !errors.Is(err, ErrInvalidBoardInput) {
-			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		if !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("err = %v, want ErrInvalidInput", err)
 		}
 	})
 
@@ -161,8 +161,8 @@ func TestMarshalStateLimits(t *testing.T) {
 		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
 		state["groups"] = []interface{}{validBoardStateGroup(map[string]interface{}{"width": 0})}
 		_, _, err := marshalState(state)
-		if !errors.Is(err, ErrInvalidBoardInput) {
-			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		if !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("err = %v, want ErrInvalidInput", err)
 		}
 	})
 
@@ -176,8 +176,8 @@ func TestMarshalStateLimits(t *testing.T) {
 			},
 		}
 		_, _, err := marshalState(state)
-		if !errors.Is(err, ErrInvalidBoardInput) {
-			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		if !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("err = %v, want ErrInvalidInput", err)
 		}
 	})
 
@@ -185,8 +185,8 @@ func TestMarshalStateLimits(t *testing.T) {
 		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
 		state["previewSnapshotVersion"] = 0
 		_, _, err := marshalState(state)
-		if !errors.Is(err, ErrInvalidBoardInput) {
-			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		if !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("err = %v, want ErrInvalidInput", err)
 		}
 	})
 
@@ -194,8 +194,8 @@ func TestMarshalStateLimits(t *testing.T) {
 		_, _, err := marshalState(map[string]interface{}{
 			"payload": strings.Repeat("x", maxBoardStateBytes+1),
 		})
-		if !errors.Is(err, ErrInvalidBoardInput) {
-			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		if !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("err = %v, want ErrInvalidInput", err)
 		}
 	})
 
@@ -205,8 +205,8 @@ func TestMarshalStateLimits(t *testing.T) {
 			current = map[string]interface{}{"next": current}
 		}
 		_, _, err := marshalState(map[string]interface{}{"root": current})
-		if !errors.Is(err, ErrInvalidBoardInput) {
-			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		if !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("err = %v, want ErrInvalidInput", err)
 		}
 	})
 }

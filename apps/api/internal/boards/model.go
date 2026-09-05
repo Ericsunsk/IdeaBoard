@@ -6,15 +6,15 @@ import (
 	"github.com/google/uuid"
 )
 
-type BoardAccessRole string
+type AccessRole string
 
 const (
-	BoardAccessRoleOwner  BoardAccessRole = "owner"
-	BoardAccessRoleEditor BoardAccessRole = "editor"
-	BoardAccessRoleViewer BoardAccessRole = "viewer"
+	RoleOwner  AccessRole = "owner"
+	RoleEditor AccessRole = "editor"
+	RoleViewer AccessRole = "viewer"
 )
 
-type UserBoard struct {
+type Board struct {
 	ID                 int64     `json:"id"`
 	BoardID            string    `json:"board_id"`
 	OwnerUserID        int64     `json:"owner_user_id"`
@@ -28,7 +28,7 @@ type UserBoard struct {
 	UpdatedAt          time.Time `json:"updated_at"`
 }
 
-type BoardMember struct {
+type Member struct {
 	ID        int64     `json:"id"`
 	BoardID   string    `json:"board_id"`
 	UserID    int64     `json:"user_id"`
@@ -37,7 +37,7 @@ type BoardMember struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-type BoardShareToken struct {
+type ShareToken struct {
 	ID          int64      `json:"id"`
 	BoardID     string     `json:"board_id"`
 	Token       string     `json:"token,omitempty"`
@@ -56,18 +56,18 @@ type BoardShareToken struct {
 	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
-type BoardWithRole struct {
-	Board UserBoard
-	Role  BoardAccessRole
+type WithRole struct {
+	Board Board
+	Role  AccessRole
 }
 
-func (b BoardWithRole) CanWrite() bool {
-	return b.Role == BoardAccessRoleOwner || b.Role == BoardAccessRoleEditor
+func (b WithRole) CanWrite() bool {
+	return b.Role == RoleOwner || b.Role == RoleEditor
 }
 
-type BoardMemberWithUser struct {
-	UserID      int64           `json:"-"`
-	PublicID    uuid.UUID       `json:"public_id"`
-	DisplayName string          `json:"display_name"`
-	Role        BoardAccessRole `json:"role"`
+type MemberWithUser struct {
+	UserID      int64      `json:"-"`
+	PublicID    uuid.UUID  `json:"public_id"`
+	DisplayName string     `json:"display_name"`
+	Role        AccessRole `json:"role"`
 }

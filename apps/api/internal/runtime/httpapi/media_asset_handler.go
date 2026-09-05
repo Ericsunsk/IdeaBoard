@@ -20,10 +20,10 @@ import (
 
 type mediaAssetHandler struct {
 	assets  assets.ReadRegistry
-	storage *storage.StorageService
+	storage *storage.Service
 }
 
-func newMediaAssetHandler(registry assets.ReadRegistry, storageService *storage.StorageService) *mediaAssetHandler {
+func newMediaAssetHandler(registry assets.ReadRegistry, storageService *storage.Service) *mediaAssetHandler {
 	return &mediaAssetHandler{assets: registry, storage: storageService}
 }
 

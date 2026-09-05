@@ -2,7 +2,7 @@ package providerendpoints
 
 import "time"
 
-type ProviderEndpoint struct {
+type Endpoint struct {
 	ID               int64     `json:"id"`
 	APIType          string    `json:"api_type"`
 	Protocol         string    `json:"protocol"`
@@ -16,7 +16,7 @@ type ProviderEndpoint struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
-type CreateProviderEndpointRequest struct {
+type CreateEndpointRequest struct {
 	APIType    string `json:"api_type" binding:"required"`
 	Protocol   string `json:"protocol" binding:"required"`
 	Capability string `json:"capability"`
@@ -26,7 +26,7 @@ type CreateProviderEndpointRequest struct {
 	Status     int16  `json:"status"`
 }
 
-type UpdateProviderEndpointRequest struct {
+type UpdateEndpointRequest struct {
 	APIType    string `json:"api_type" binding:"required"`
 	Protocol   string `json:"protocol" binding:"required"`
 	Capability string `json:"capability"`
@@ -36,7 +36,7 @@ type UpdateProviderEndpointRequest struct {
 	Status     int16  `json:"status"`
 }
 
-type UpdateProviderEndpointStatusRequest struct {
+type UpdateEndpointStatusRequest struct {
 	Status *int16 `json:"status"`
 }
 
