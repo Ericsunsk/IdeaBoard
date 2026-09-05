@@ -3,9 +3,9 @@ package main
 import (
 	"os"
 
-	"ideaboard/api/internal/runtime/bootstrap"
+	"ideaboard/api/internal/runtime/composition"
 )
 
 func main() {
-	bootstrap.Run(os.Args)
+	composition.Run(os.Args)
 }

@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	"ideaboard/api/internal/platform/config"
-	"ideaboard/api/internal/runtime/bootstrap"
+	"ideaboard/api/internal/runtime/composition"
 )
 
 const (
@@ -24,7 +24,7 @@ func main() {
 	if err != nil {
 		fatal(err)
 	}
-	if err := bootstrap.Migrate(ctx, cfg, atlasBinary, migrationsDir); err != nil {
+	if err := composition.Migrate(ctx, cfg, atlasBinary, migrationsDir); err != nil {
 		fatal(err)
 	}
 }

@@ -6,7 +6,7 @@
 
 | Context | Directories | Responsibility | Main Interfaces |
 | ------- | ----------- | -------------- | --------------- |
-| Runtime | `cmd`, `internal/runtime` | 启动 API 进程、注册 HTTP routes、装配 worker adapters、服务 embedded frontend dist | `bootstrap`, `httpapi.RegisterRoutes`, `worker.RiverTaskWorker` |
+| [Runtime](./internal/runtime/CONTEXT.md) | `cmd`, `internal/runtime` | Platform Runtime Context：显式生命周期状态机驱动、启动恢复、唯一依赖装配根 (Composition Root)、HTTP/Worker 接口适配与平台 adapters | `composition.Run`, `composition.BuildApp`, `interfaces/http`, `interfaces/worker` |
 | Platform | `internal/platform`, `internal/db`, `internal/events` | config、database pools、response helpers、safe HTTP、settings、event bus、generated SQL | `config.Config`, sqlc queries, event publishers |
 | Tasking | `internal/tasking` | Task model、submission、queueing、taskbilling 编排、media validation、execution lifecycle、persistence、statistics | `application/task.Service`, `application/submission.Store`, `application/billing.Service`, `ports/queue.TaskAssigner`, `application/execution.Service`, `application/statistics.Service`, `infrastructure/postgres.Repository` |
 | Identity | `internal/identity/auth`, `internal/identity/autherrors`, `internal/identity/users` | Auth middleware/client、user persistence、user/admin management | Auth handlers/middleware, `users.UserRepository`, `users.UserService` |
@@ -24,9 +24,9 @@
 
 ## Dependency Direction
 
-- `cmd` stays lightweight and delegates process wiring to `internal/runtime/bootstrap`.
-- `internal/runtime` may compose platform modules and business contexts.
-- Runtime adapters may depend on Tasking interfaces, but business contexts must not depend on `internal/runtime/worker` implementation details.
+- `cmd` stays lightweight and delegates process wiring to `internal/runtime/composition`.
+- `internal/runtime` is a Platform Runtime Context using DDD + Clean Architecture: `domain` owns explicit lifecycle state and invariants, `application` coordinates startup recovery and draining budgets, and `composition` is the sole assembly root.
+- Runtime interfaces (`interfaces/http`, `interfaces/worker`) and adapters (`adapters/*`) stay isolated; business contexts must never depend on `internal/runtime`.
 - Business contexts may depend on `internal/platform` and `internal/db/sqlc` through their own repositories or adapters.
 - Business contexts should avoid importing each other's implementation details. Prefer a small service/repository interface at the caller boundary.
 - `internal/platform` must not import business contexts.
@@ -43,7 +43,7 @@
 - NATS JetStream is an event layer for task status, audit and realtime fanout; it is not a task queue.
 - Worker concurrency 只读取部署级 `RIVER_WORKER_CONCURRENCY`；retry/timeout policy 由 Worker implementation 持有，NATS retention 由 Events implementation 固定为 7 天。
 - Admin 只管理 typed `OutboundPolicySetting`。Egress allowlist 在每次 outbound operation 前从 DB 读取，动态生效且读取失败时 fail closed；写入必须在同一 PostgreSQL transaction 内更新 `system_configs` 与 append-only actor audit。
-- Worker implementation stays in `internal/runtime/worker` as an execution adapter.
+- Worker implementation stays in `internal/runtime/interfaces/worker` as the Runtime execution adapter. Its internal architecture is split into 4 isolated subpackages (`execution`, `providers`, `river`, `billing`) with a unified root facade (`worker.go`); `execution` and `providers` decouple strictly through `runtime/ports`, while subpackage boundaries are enforced by architecture tests.
 - Workflow owns executable feature contracts; Feature Prompt configuration only owns the current prompt template and is updated in place without version or revision history. Billing availability gates submission, while the worker resolves the current enabled Provider Account and Model at execution time.
 - `tasks.result` may hold a durable result envelope. Successful image tasks keep top-level `image_url`/`image_urls` for Canvas compatibility; workflow-specific parse failures may store `parsed_output_status`, `parsed_output` and a bounded `raw_provider_output_preview` so Admin/Canvas can diagnose retry or failed states without treating them as successful outputs.
 - Unless schema or query contracts change, do not edit migrations or generated sqlc code.

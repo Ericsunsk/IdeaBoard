@@ -23,6 +23,6 @@ var taskLifecycleWrites = []string{
 }
 
 func TestTaskstatsDoesNotDependOnConcreteRepositoryOrWorker(t *testing.T) {
-	archtest.AssertNoForbiddenImports(t, ".", []string{"ideaboard/api/internal/runtime/worker"})
+	archtest.AssertNoForbiddenImports(t, ".", []string{"ideaboard/api/internal/runtime"})
 	archtest.AssertNoForbiddenText(t, ".", append([]string{"taskstore.Repository"}, taskLifecycleWrites...))
 }

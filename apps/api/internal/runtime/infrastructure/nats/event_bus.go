@@ -1,0 +1,74 @@
+package natsinfra
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/platform/config"
+	"ideaboard/api/internal/runtime/domain"
+	"ideaboard/api/internal/runtime/ports"
+)
+
+var _ ports.ResourceCloser = (*EventBus)(nil)
+var _ ports.HealthChecker = (*EventBus)(nil)
+
+// EventBus wraps NATS JetStream event bus for the runtime platform.
+type EventBus struct {
+	bus *events.NATSJetStreamEventBus
+}
+
+// NewEventBus connects to NATS JetStream using the provided configuration.
+func NewEventBus(ctx context.Context, cfg config.EventBusConfig) (*EventBus, error) {
+	if !cfg.Enabled {
+		return nil, nil
+	}
+	natsBus, err := events.NewNATSJetStreamEventBus(ctx, events.NATSJetStreamConfig{
+		URL:            cfg.NATSURL,
+		StreamName:     cfg.NATSStreamName,
+		SubjectPrefix:  cfg.NATSSubjectPrefix,
+		ConsumerName:   cfg.NATSConsumerName,
+		ConnectTimeout: time.Duration(cfg.NATSConnectTimeout) * time.Second,
+		RequestTimeout: time.Duration(cfg.NATSRequestTimeout) * time.Second,
+		DrainTimeout:   time.Duration(cfg.NATSDrainTimeout) * time.Second,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize NATS JetStream event bus: %w", err)
+	}
+	return &EventBus{bus: natsBus}, nil
+}
+
+// UnderlyingBus returns the wrapped NATSJetStreamEventBus.
+func (b *EventBus) UnderlyingBus() *events.NATSJetStreamEventBus {
+	if b == nil {
+		return nil
+	}
+	return b.bus
+}
+
+// CheckHealth evaluates the health of the NATS JetStream connection.
+func (b *EventBus) CheckHealth(ctx context.Context) domain.ComponentStatus {
+	if b == nil || b.bus == nil {
+		return domain.ComponentStatus{
+			Name:     "nats",
+			Kind:     domain.ComponentKindNATS,
+			Ready:    true,
+			Required: false,
+		}
+	}
+	return domain.ComponentStatus{
+		Name:     "nats",
+		Kind:     domain.ComponentKindNATS,
+		Ready:    true,
+		Required: true,
+	}
+}
+
+// Close gracefully drains and shuts down the NATS JetStream connection.
+func (b *EventBus) Close() error {
+	if b == nil || b.bus == nil {
+		return nil
+	}
+	return b.bus.Close()
+}
