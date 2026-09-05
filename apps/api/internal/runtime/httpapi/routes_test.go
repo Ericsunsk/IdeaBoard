@@ -14,7 +14,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounthttp "ideaboard/api/internal/accountpool/accounts/interfaces/http"
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/billingrecords"
@@ -336,7 +336,7 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 			CreditAdminCommandHandler:   credithttp.NewAdminCommandHandler(nil, nil),
 			CreditAdminReadHandler:      credithttp.NewAdminReadHandler(nil, nil),
 			CreditReconciliationHandler: credithttp.NewReconciliationHandler(nil, nil),
-			AccountHandler:              accounts.NewAccountHandler(nil),
+			AccountHandler:              accounthttp.NewHandler(nil),
 			TaskHandler:                 taskhttp.NewHandler(taskhttp.HandlerDeps{}),
 			TaskStatsHandler:            statisticshttp.NewHandler(nil, nil),
 			ProviderEndpointHandler:     providerendpoints.NewProviderEndpointHandler(nil),

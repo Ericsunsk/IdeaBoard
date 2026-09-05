@@ -1,4 +1,4 @@
-package accounts
+package postgres
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/accountpool/accounts/domain"
+	"ideaboard/api/internal/accountpool/accounts/ports"
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/accountlimits"
@@ -16,15 +18,15 @@ import (
 	"ideaboard/api/internal/platform/secrets"
 )
 
-var errRunningTaskFinalizerNotConfigured = errors.New("running task finalizer is not configured")
-
-type AccountRepository struct {
+type Repository struct {
 	db                   *sql.DB
 	q                    *dbsqlc.Queries
-	runningTaskFinalizer RunningTaskFinalizer
+	runningTaskFinalizer ports.RunningTaskFinalizer
 }
 
-func (r *AccountRepository) ProviderEndpointConfig(ctx context.Context, endpointID int64) (string, []string, error) {
+var _ ports.AccountRepository = (*Repository)(nil)
+
+func (r *Repository) ProviderEndpointConfig(ctx context.Context, endpointID int64) (string, []string, error) {
 	row, err := r.q.GetProviderEndpointByID(ctx, endpointID)
 	if err != nil {
 		return "", nil, err
@@ -40,19 +42,15 @@ func (r *AccountRepository) ProviderEndpointConfig(ctx context.Context, endpoint
 	return row.Protocol, capabilities, nil
 }
 
-type RunningTaskFinalizer interface {
-	FailRunningByAccountIDWithTx(ctx context.Context, tx *sql.Tx, accountID int64, errMsg string, completedAt time.Time) ([]string, error)
-}
-
-func NewAccountRepository(db *sql.DB, finalizer ...RunningTaskFinalizer) *AccountRepository {
-	var taskFinalizer RunningTaskFinalizer
+func NewRepository(db *sql.DB, finalizer ...ports.RunningTaskFinalizer) *Repository {
+	var taskFinalizer ports.RunningTaskFinalizer
 	if len(finalizer) > 0 {
 		taskFinalizer = finalizer[0]
 	}
-	return &AccountRepository{db: db, q: dbsqlc.New(db), runningTaskFinalizer: taskFinalizer}
+	return &Repository{db: db, q: dbsqlc.New(db), runningTaskFinalizer: taskFinalizer}
 }
 
-func (r *AccountRepository) Create(ctx context.Context, account *ApiAccount) error {
+func (r *Repository) Create(ctx context.Context, account *domain.ApiAccount) error {
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		writeAccount := accountForWrite(account)
 		id, err := q.CreateAccount(ctx, dbsqlc.CreateAccountParams{
@@ -78,24 +76,24 @@ func (r *AccountRepository) Create(ctx context.Context, account *ApiAccount) err
 		return rotateAccountSecret(ctx, q, writeAccount.ID, writeAccount.ApiKey)
 	})
 	if database.IsDuplicateConstraintError(err) {
-		return ErrAccountNameConflict
+		return domain.ErrAccountNameConflict
 	}
 	return err
 }
 
-func (r *AccountRepository) GetByID(ctx context.Context, id int64) (*ApiAccount, error) {
+func (r *Repository) GetByID(ctx context.Context, id int64) (*domain.ApiAccount, error) {
 	row, err := r.q.GetAccountByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	account := accountFromSQLC(row.ApiAccount, row.ApiType, row.Protocol, row.Capabilities, row.ApiKey, row.SecretConfigured, row.ProxyUrl)
-	if err := r.attachAccountModels(ctx, []*ApiAccount{&account}); err != nil {
+	if err := r.attachAccountModels(ctx, []*domain.ApiAccount{&account}); err != nil {
 		return nil, err
 	}
 	return &account, nil
 }
 
-func (r *AccountRepository) GetRuntimeByIDWithSecret(ctx context.Context, id int64) (*ApiAccount, error) {
+func (r *Repository) GetRuntimeByIDWithSecret(ctx context.Context, id int64) (*domain.ApiAccount, error) {
 	row, err := r.q.GetRuntimeAccountByIDWithSecret(ctx, id)
 	if err != nil {
 		return nil, err
@@ -105,13 +103,13 @@ func (r *AccountRepository) GetRuntimeByIDWithSecret(ctx context.Context, id int
 		return nil, err
 	}
 	account := accountFromSQLC(row.ApiAccount, row.ApiType, row.Protocol, row.Capabilities, apiKey, row.SecretConfigured, row.ProxyUrl)
-	if err := r.attachAccountModels(ctx, []*ApiAccount{&account}); err != nil {
+	if err := r.attachAccountModels(ctx, []*domain.ApiAccount{&account}); err != nil {
 		return nil, err
 	}
 	return &account, nil
 }
 
-func (r *AccountRepository) GetRuntimeAccountForAssignment(ctx context.Context, accountID int64, providerEndpointID int64, credentialID int64) (*RuntimeAccountAccess, error) {
+func (r *Repository) GetRuntimeAccountForAssignment(ctx context.Context, accountID int64, providerEndpointID int64, credentialID int64) (*domain.RuntimeAccountAccess, error) {
 	row, err := r.q.GetRuntimeAccountForAssignment(ctx, dbsqlc.GetRuntimeAccountForAssignmentParams{
 		AccountID:          accountID,
 		ProviderEndpointID: providerEndpointID,
@@ -124,7 +122,7 @@ func (r *AccountRepository) GetRuntimeAccountForAssignment(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	return &RuntimeAccountAccess{
+	return &domain.RuntimeAccountAccess{
 		ID:      int64(row.ApiAccount.ID),
 		Name:    row.ApiAccount.Name,
 		APIKey:  apiKey,
@@ -132,7 +130,7 @@ func (r *AccountRepository) GetRuntimeAccountForAssignment(ctx context.Context, 
 	}, nil
 }
 
-func (r *AccountRepository) GetRuntimeCredentialByID(ctx context.Context, accountID int64, credentialID int64) (*RuntimeCredential, error) {
+func (r *Repository) GetRuntimeCredentialByID(ctx context.Context, accountID int64, credentialID int64) (*domain.RuntimeCredential, error) {
 	row, err := r.q.GetRuntimeCredentialByID(ctx, dbsqlc.GetRuntimeCredentialByIDParams{
 		ID:        credentialID,
 		AccountID: accountID,
@@ -144,7 +142,7 @@ func (r *AccountRepository) GetRuntimeCredentialByID(ctx context.Context, accoun
 	if err != nil {
 		return nil, err
 	}
-	return &RuntimeCredential{
+	return &domain.RuntimeCredential{
 		ID:                 row.ID,
 		AccountID:          row.AccountID,
 		APIKey:             apiKey,
@@ -155,7 +153,7 @@ func (r *AccountRepository) GetRuntimeCredentialByID(ctx context.Context, accoun
 	}, nil
 }
 
-func (r *AccountRepository) List(ctx context.Context, keyword, apiType string, page, pageSize int) ([]*ApiAccount, int64, error) {
+func (r *Repository) List(ctx context.Context, keyword, apiType string, page, pageSize int) ([]*domain.ApiAccount, int64, error) {
 	keyword = strings.TrimSpace(keyword)
 	apiType = strings.TrimSpace(apiType)
 	keywordLike := "%" + keyword + "%"
@@ -190,7 +188,7 @@ func (r *AccountRepository) List(ctx context.Context, keyword, apiType string, p
 	return accounts, total, nil
 }
 
-func (r *AccountRepository) GetAllEnabled(ctx context.Context) ([]*ApiAccount, error) {
+func (r *Repository) GetAllEnabled(ctx context.Context) ([]*domain.ApiAccount, error) {
 	rows, err := r.q.ListEnabledAccounts(ctx)
 	if err != nil {
 		return nil, err
@@ -202,11 +200,11 @@ func (r *AccountRepository) GetAllEnabled(ctx context.Context) ([]*ApiAccount, e
 	return accounts, nil
 }
 
-func (r *AccountRepository) ListAccountIDs(ctx context.Context) ([]int64, error) {
+func (r *Repository) ListAccountIDs(ctx context.Context) ([]int64, error) {
 	return r.q.ListAccountIDs(ctx)
 }
 
-func (r *AccountRepository) Update(ctx context.Context, account *ApiAccount) error {
+func (r *Repository) Update(ctx context.Context, account *domain.ApiAccount) error {
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		writeAccount := accountForWrite(account)
 		updated, err := q.UpdateAccount(ctx, dbsqlc.UpdateAccountParams{
@@ -233,12 +231,12 @@ func (r *AccountRepository) Update(ctx context.Context, account *ApiAccount) err
 		return rotateAccountSecret(ctx, q, writeAccount.ID, writeAccount.ApiKey)
 	})
 	if database.IsDuplicateConstraintError(err) {
-		return ErrAccountNameConflict
+		return domain.ErrAccountNameConflict
 	}
 	return err
 }
 
-func (r *AccountRepository) UpdateFields(ctx context.Context, account *ApiAccount) error {
+func (r *Repository) UpdateFields(ctx context.Context, account *domain.ApiAccount) error {
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		writeAccount := accountForWrite(account)
 		updated, err := q.UpdateAccount(ctx, dbsqlc.UpdateAccountParams{
@@ -262,12 +260,12 @@ func (r *AccountRepository) UpdateFields(ctx context.Context, account *ApiAccoun
 		return rotateAccountSecret(ctx, q, writeAccount.ID, writeAccount.ApiKey)
 	})
 	if database.IsDuplicateConstraintError(err) {
-		return ErrAccountNameConflict
+		return domain.ErrAccountNameConflict
 	}
 	return err
 }
 
-func (r *AccountRepository) UpsertModel(ctx context.Context, accountID int64, model AccountModel) error {
+func (r *Repository) UpsertModel(ctx context.Context, accountID int64, model domain.AccountModel) error {
 	params, err := accountModelUpsertParams(accountID, model, 0)
 	if err != nil {
 		return err
@@ -296,7 +294,7 @@ func (r *AccountRepository) UpsertModel(ctx context.Context, accountID int64, mo
 	})
 }
 
-func (r *AccountRepository) UpdateModelEnabled(ctx context.Context, accountID int64, modelName string, enabled bool) error {
+func (r *Repository) UpdateModelEnabled(ctx context.Context, accountID int64, modelName string, enabled bool) error {
 	updated, err := r.q.UpdateAccountModelEnabled(ctx, dbsqlc.UpdateAccountModelEnabledParams{
 		AccountID: accountID,
 		ModelName: modelName,
@@ -311,7 +309,7 @@ func (r *AccountRepository) UpdateModelEnabled(ctx context.Context, accountID in
 	return nil
 }
 
-func (r *AccountRepository) DeleteModel(ctx context.Context, accountID int64, modelName string) error {
+func (r *Repository) DeleteModel(ctx context.Context, accountID int64, modelName string) error {
 	updated, err := r.q.DeleteAccountModel(ctx, dbsqlc.DeleteAccountModelParams{
 		AccountID: accountID,
 		ModelName: modelName,
@@ -325,7 +323,7 @@ func (r *AccountRepository) DeleteModel(ctx context.Context, accountID int64, mo
 	return nil
 }
 
-func (r *AccountRepository) Delete(ctx context.Context, id int64) error {
+func (r *Repository) Delete(ctx context.Context, id int64) error {
 	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		updated, err := q.ArchiveAccount(ctx, id)
 		if err != nil {
@@ -338,7 +336,7 @@ func (r *AccountRepository) Delete(ctx context.Context, id int64) error {
 	})
 }
 
-func (r *AccountRepository) ArchiveAccountAndFinalizeRunningTasks(ctx context.Context, id int64, reason string) ([]string, error) {
+func (r *Repository) ArchiveAndFinalizeTasks(ctx context.Context, id int64, reason string) ([]string, error) {
 	var failedTaskIDs []string
 	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx *sql.Tx) error {
 		updated, err := q.ArchiveAccount(ctx, id)
@@ -352,7 +350,7 @@ func (r *AccountRepository) ArchiveAccountAndFinalizeRunningTasks(ctx context.Co
 			return err
 		}
 		if r.runningTaskFinalizer == nil {
-			return errRunningTaskFinalizerNotConfigured
+			return ports.ErrFinalizerNotConfigured
 		}
 		failedTaskIDs, err = r.runningTaskFinalizer.FailRunningByAccountIDWithTx(ctx, tx, id, reason, time.Now())
 		return err
@@ -360,7 +358,7 @@ func (r *AccountRepository) ArchiveAccountAndFinalizeRunningTasks(ctx context.Co
 	return failedTaskIDs, err
 }
 
-func (r *AccountRepository) UpdateStatus(ctx context.Context, id int64, status int16) error {
+func (r *Repository) UpdateStatus(ctx context.Context, id int64, status int16) error {
 	updated, err := r.q.UpdateAccountStatus(ctx, dbsqlc.UpdateAccountStatusParams{Status: status, ID: id})
 	if err != nil {
 		return err
@@ -371,7 +369,7 @@ func (r *AccountRepository) UpdateStatus(ctx context.Context, id int64, status i
 	return nil
 }
 
-func (r *AccountRepository) StopAccountAndFinalizeRunningTasks(ctx context.Context, id int64, reason string) ([]string, error) {
+func (r *Repository) StopAndFinalizeTasks(ctx context.Context, id int64, reason string) ([]string, error) {
 	var failedTaskIDs []string
 	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx *sql.Tx) error {
 		updated, err := q.UpdateAccountStatus(ctx, dbsqlc.UpdateAccountStatusParams{Status: 0, ID: id})
@@ -382,7 +380,7 @@ func (r *AccountRepository) StopAccountAndFinalizeRunningTasks(ctx context.Conte
 			return database.ErrNotFound
 		}
 		if r.runningTaskFinalizer == nil {
-			return errRunningTaskFinalizerNotConfigured
+			return ports.ErrFinalizerNotConfigured
 		}
 		failedTaskIDs, err = r.runningTaskFinalizer.FailRunningByAccountIDWithTx(ctx, tx, id, reason, time.Now())
 		return err
@@ -390,7 +388,7 @@ func (r *AccountRepository) StopAccountAndFinalizeRunningTasks(ctx context.Conte
 	return failedTaskIDs, err
 }
 
-func (r *AccountRepository) IncrementFailCount(ctx context.Context, id int64) error {
+func (r *Repository) IncrementFailCount(ctx context.Context, id int64) error {
 	updated, err := r.q.IncrementAccountFailCount(ctx, id)
 	if err != nil {
 		return err
@@ -401,7 +399,7 @@ func (r *AccountRepository) IncrementFailCount(ctx context.Context, id int64) er
 	return nil
 }
 
-func (r *AccountRepository) ResetFailCount(ctx context.Context, id int64) error {
+func (r *Repository) ResetFailCount(ctx context.Context, id int64) error {
 	updated, err := r.q.ResetAccountFailCount(ctx, id)
 	if err != nil {
 		return err
@@ -412,8 +410,8 @@ func (r *AccountRepository) ResetFailCount(ctx context.Context, id int64) error 
 	return nil
 }
 
-func accountFromSQLC(row dbsqlc.ApiAccount, apiType, protocol, capabilityCSV, apiKey string, secretConfigured bool, proxyURL string) ApiAccount {
-	return ApiAccount{
+func accountFromSQLC(row dbsqlc.ApiAccount, apiType, protocol, capabilityCSV, apiKey string, secretConfigured bool, proxyURL string) domain.ApiAccount {
+	return domain.ApiAccount{
 		ID:                 row.ID,
 		Name:               row.Name,
 		ProviderEndpointID: row.ProviderEndpointID,
@@ -434,11 +432,11 @@ func accountFromSQLC(row dbsqlc.ApiAccount, apiType, protocol, capabilityCSV, ap
 	}
 }
 
-func accountFromListRow(row dbsqlc.ListAccountsRow) ApiAccount {
+func accountFromListRow(row dbsqlc.ListAccountsRow) domain.ApiAccount {
 	return accountFromSQLC(row.ApiAccount, row.ApiType, row.Protocol, row.Capabilities, row.ApiKey, row.SecretConfigured, row.ProxyUrl)
 }
 
-func accountFromEnabledRow(row dbsqlc.ListEnabledAccountsRow) ApiAccount {
+func accountFromEnabledRow(row dbsqlc.ListEnabledAccountsRow) domain.ApiAccount {
 	return accountFromSQLC(row.ApiAccount, row.ApiType, row.Protocol, row.Capabilities, row.ApiKey, row.SecretConfigured, row.ProxyUrl)
 }
 
@@ -456,16 +454,16 @@ func splitCapabilities(value string) []string {
 	return capabilities
 }
 
-func accountsFromListRows(rows []dbsqlc.ListAccountsRow) []*ApiAccount {
+func accountsFromListRows(rows []dbsqlc.ListAccountsRow) []*domain.ApiAccount {
 	return accountsFromRows(rows, accountFromListRow)
 }
 
-func accountsFromEnabledRows(rows []dbsqlc.ListEnabledAccountsRow) []*ApiAccount {
+func accountsFromEnabledRows(rows []dbsqlc.ListEnabledAccountsRow) []*domain.ApiAccount {
 	return accountsFromRows(rows, accountFromEnabledRow)
 }
 
-func accountsFromRows[T any](rows []T, convert func(T) ApiAccount) []*ApiAccount {
-	result := make([]*ApiAccount, 0, len(rows))
+func accountsFromRows[T any](rows []T, convert func(T) domain.ApiAccount) []*domain.ApiAccount {
+	result := make([]*domain.ApiAccount, 0, len(rows))
 	for _, row := range rows {
 		account := convert(row)
 		result = append(result, &account)
@@ -473,7 +471,7 @@ func accountsFromRows[T any](rows []T, convert func(T) ApiAccount) []*ApiAccount
 	return result
 }
 
-func (r *AccountRepository) attachAccountModels(ctx context.Context, accounts []*ApiAccount) error {
+func (r *Repository) attachAccountModels(ctx context.Context, accounts []*domain.ApiAccount) error {
 	accountIDs := make([]int64, 0, len(accounts))
 	for _, account := range accounts {
 		if account != nil {
@@ -487,9 +485,9 @@ func (r *AccountRepository) attachAccountModels(ctx context.Context, accounts []
 	if err != nil {
 		return err
 	}
-	modelsByAccountID := make(map[int64][]AccountModel, len(accountIDs))
+	modelsByAccountID := make(map[int64][]domain.AccountModel, len(accountIDs))
 	for _, accountID := range accountIDs {
-		modelsByAccountID[accountID] = make([]AccountModel, 0)
+		modelsByAccountID[accountID] = make([]domain.AccountModel, 0)
 	}
 	for _, row := range rows {
 		model, err := accountModelFromSQLC(row)
@@ -506,8 +504,8 @@ func (r *AccountRepository) attachAccountModels(ctx context.Context, accounts []
 	return nil
 }
 
-func accountModelFromSQLC(row dbsqlc.ListAccountModelsByAccountIDsRow) (AccountModel, error) {
-	return AccountModel{
+func accountModelFromSQLC(row dbsqlc.ListAccountModelsByAccountIDsRow) (domain.AccountModel, error) {
+	return domain.AccountModel{
 		ID:            row.ID,
 		Name:          row.ModelName,
 		Enabled:       row.Enabled,
@@ -519,16 +517,16 @@ func accountModelFromSQLC(row dbsqlc.ListAccountModelsByAccountIDsRow) (AccountM
 	}, nil
 }
 
-func accountModelsForWrite(account *ApiAccount) []AccountModel {
+func accountModelsForWrite(account *domain.ApiAccount) []domain.AccountModel {
 	if account == nil {
 		return nil
 	}
 	return account.Models
 }
 
-func accountForWrite(account *ApiAccount) *ApiAccount {
+func accountForWrite(account *domain.ApiAccount) *domain.ApiAccount {
 	if account == nil {
-		return &ApiAccount{}
+		return &domain.ApiAccount{}
 	}
 	normalized := *account
 	normalized.MaxConcurrent = accountlimits.NormalizeMaxConcurrent(normalized.MaxConcurrent)
@@ -545,7 +543,7 @@ func accountForWrite(account *ApiAccount) *ApiAccount {
 	return &normalized
 }
 
-func replaceAccountModels(ctx context.Context, q *dbsqlc.Queries, accountID, providerEndpointID int64, models []AccountModel) error {
+func replaceAccountModels(ctx context.Context, q *dbsqlc.Queries, accountID, providerEndpointID int64, models []domain.AccountModel) error {
 	if err := q.DeleteAccountModelsByAccountID(ctx, accountID); err != nil {
 		return err
 	}
@@ -572,7 +570,7 @@ func replaceAccountModels(ctx context.Context, q *dbsqlc.Queries, accountID, pro
 	return nil
 }
 
-func accountModelUpsertParams(accountID int64, model AccountModel, fallbackSortOrder int) (dbsqlc.UpsertAccountModelParams, error) {
+func accountModelUpsertParams(accountID int64, model domain.AccountModel, fallbackSortOrder int) (dbsqlc.UpsertAccountModelParams, error) {
 	name := strings.TrimSpace(model.Name)
 	if name == "" {
 		return dbsqlc.UpsertAccountModelParams{}, nil

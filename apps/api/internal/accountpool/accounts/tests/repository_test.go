@@ -1,4 +1,4 @@
-package accounts
+package tests
 
 import (
 	"context"
@@ -6,6 +6,9 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"ideaboard/api/internal/accountpool/accounts/domain"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -18,7 +21,7 @@ func (f stubRunningTaskFinalizer) FailRunningByAccountIDWithTx(context.Context, 
 	return nil, f.err
 }
 
-func seedRepositoryTestAccount(t *testing.T, ctx context.Context, repo *AccountRepository, db *sql.DB, suffix string) *ApiAccount {
+func seedRepositoryTestAccount(t *testing.T, ctx context.Context, repo *Repository, db *sql.DB, suffix string) *ApiAccount {
 	t.Helper()
 	channelID := createAccountTestChannel(t, db, suffix)
 	account := &ApiAccount{
@@ -42,7 +45,7 @@ func seedRepositoryTestAccount(t *testing.T, ctx context.Context, repo *AccountR
 func TestCreateAccountReturnsNameConflictWithinProviderEndpoint(t *testing.T) {
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
-	repo := NewAccountRepository(db)
+	repo := NewRepository(db)
 	providerEndpointID := createAccountTestChannel(t, db, "duplicate-name")
 
 	first := &ApiAccount{
@@ -77,7 +80,7 @@ func TestCreateAccountReturnsNameConflictWithinProviderEndpoint(t *testing.T) {
 func TestAccountSecretBoundarySeparatesAdminAndRuntimeReads(t *testing.T) {
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
-	repo := NewAccountRepository(db)
+	repo := NewRepository(db)
 	channelID := createAccountTestChannel(t, db, "secret-boundary")
 
 	account := &ApiAccount{
@@ -95,7 +98,7 @@ func TestAccountSecretBoundarySeparatesAdminAndRuntimeReads(t *testing.T) {
 	if err := repo.Create(ctx, account); err != nil {
 		t.Fatalf("create account failed: %v", err)
 	}
-	secretRow, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID)
+	secretRow, err := dbsqlc.New(db).GetActiveAccountSecretByAccountID(ctx, account.ID)
 	if err != nil {
 		t.Fatalf("load active account secret failed: %v", err)
 	}
@@ -142,7 +145,7 @@ func TestAccountSecretBoundarySeparatesAdminAndRuntimeReads(t *testing.T) {
 func TestAccountSecretRejectsExternalRefMaterial(t *testing.T) {
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
-	repo := NewAccountRepository(db)
+	repo := NewRepository(db)
 	channelID := createAccountTestChannel(t, db, "unsupported-secret-kind")
 
 	account := &ApiAccount{
@@ -177,8 +180,8 @@ SET secret_material_kind = 'external_ref',
 func TestUpdateAccountWithoutModelsPreservesModelSettings(t *testing.T) {
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
-	repo := NewAccountRepository(db)
-	service := &AccountService{accountRepo: repo}
+	repo := NewRepository(db)
+	service := NewService(ServiceDeps{AccountRepo: repo}, ServiceOptions{})
 	account := seedAdminAccountWithTwoModelFixture(t, ctx, repo, db, "metadata-only-update", nil)
 	before, err := repo.GetByID(ctx, account.ID)
 	if err != nil {
@@ -208,8 +211,8 @@ func TestUpdateAccountWithoutModelsPreservesModelSettings(t *testing.T) {
 func TestUpdateAccountPartialRequestPreservesUnspecifiedFields(t *testing.T) {
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
-	repo := NewAccountRepository(db)
-	service := &AccountService{accountRepo: repo}
+	repo := NewRepository(db)
+	service := NewService(ServiceDeps{AccountRepo: repo}, ServiceOptions{})
 	account := seedAdminAccountWithTwoModelFixture(t, ctx, repo, db, "partial-update", func(account *ApiAccount) {
 		account.ApiKey = "original-secret"
 		account.MaxConcurrent = 4
@@ -232,7 +235,7 @@ func TestUpdateAccountPartialRequestPreservesUnspecifiedFields(t *testing.T) {
 		t.Fatalf("account fields after partial update = %+v, want original scalar fields preserved", after)
 	}
 	assertSameModelSettings(t, account.Models, after.Models)
-	secretRow, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID)
+	secretRow, err := dbsqlc.New(db).GetActiveAccountSecretByAccountID(ctx, account.ID)
 	if err != nil {
 		t.Fatalf("load active secret after update failed: %v", err)
 	}
@@ -248,11 +251,11 @@ func TestUpdateAccountPartialRequestPreservesUnspecifiedFields(t *testing.T) {
 func TestRuntimeCredentialReadRequiresActiveAccountEndpointAndCredential(t *testing.T) {
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
-	repo := NewAccountRepository(db)
+	repo := NewRepository(db)
 
 	t.Run("retired credential", func(t *testing.T) {
 		account := seedRepositoryTestAccount(t, ctx, repo, db, "runtime-retired-credential")
-		secretRow, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID)
+		secretRow, err := dbsqlc.New(db).GetActiveAccountSecretByAccountID(ctx, account.ID)
 		if err != nil {
 			t.Fatalf("load active secret failed: %v", err)
 		}
@@ -266,7 +269,7 @@ func TestRuntimeCredentialReadRequiresActiveAccountEndpointAndCredential(t *test
 
 	t.Run("disabled account", func(t *testing.T) {
 		account := seedRepositoryTestAccount(t, ctx, repo, db, "runtime-disabled-account")
-		secretRow, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID)
+		secretRow, err := dbsqlc.New(db).GetActiveAccountSecretByAccountID(ctx, account.ID)
 		if err != nil {
 			t.Fatalf("load active secret failed: %v", err)
 		}
@@ -280,7 +283,7 @@ func TestRuntimeCredentialReadRequiresActiveAccountEndpointAndCredential(t *test
 
 	t.Run("disabled provider endpoint", func(t *testing.T) {
 		account := seedRepositoryTestAccount(t, ctx, repo, db, "runtime-disabled-endpoint")
-		secretRow, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID)
+		secretRow, err := dbsqlc.New(db).GetActiveAccountSecretByAccountID(ctx, account.ID)
 		if err != nil {
 			t.Fatalf("load active secret failed: %v", err)
 		}
@@ -296,11 +299,11 @@ func TestRuntimeCredentialReadRequiresActiveAccountEndpointAndCredential(t *test
 func TestRuntimeAccountForAssignmentRequiresActiveAccountEndpointAndCredential(t *testing.T) {
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
-	repo := NewAccountRepository(db)
+	repo := NewRepository(db)
 
 	t.Run("active assignment", func(t *testing.T) {
 		account := seedRepositoryTestAccount(t, ctx, repo, db, "runtime-assignment-active")
-		secretRow, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID)
+		secretRow, err := dbsqlc.New(db).GetActiveAccountSecretByAccountID(ctx, account.ID)
 		if err != nil {
 			t.Fatalf("load active secret failed: %v", err)
 		}
@@ -318,7 +321,7 @@ func TestRuntimeAccountForAssignmentRequiresActiveAccountEndpointAndCredential(t
 
 	t.Run("provider endpoint mismatch", func(t *testing.T) {
 		account := seedRepositoryTestAccount(t, ctx, repo, db, "runtime-assignment-endpoint-mismatch")
-		secretRow, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID)
+		secretRow, err := dbsqlc.New(db).GetActiveAccountSecretByAccountID(ctx, account.ID)
 		if err != nil {
 			t.Fatalf("load active secret failed: %v", err)
 		}
@@ -329,7 +332,7 @@ func TestRuntimeAccountForAssignmentRequiresActiveAccountEndpointAndCredential(t
 
 	t.Run("retired credential", func(t *testing.T) {
 		account := seedRepositoryTestAccount(t, ctx, repo, db, "runtime-assignment-retired-credential")
-		secretRow, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID)
+		secretRow, err := dbsqlc.New(db).GetActiveAccountSecretByAccountID(ctx, account.ID)
 		if err != nil {
 			t.Fatalf("load active secret failed: %v", err)
 		}
@@ -343,7 +346,7 @@ func TestRuntimeAccountForAssignmentRequiresActiveAccountEndpointAndCredential(t
 
 	t.Run("disabled account", func(t *testing.T) {
 		account := seedRepositoryTestAccount(t, ctx, repo, db, "runtime-assignment-disabled-account")
-		secretRow, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID)
+		secretRow, err := dbsqlc.New(db).GetActiveAccountSecretByAccountID(ctx, account.ID)
 		if err != nil {
 			t.Fatalf("load active secret failed: %v", err)
 		}
@@ -357,7 +360,7 @@ func TestRuntimeAccountForAssignmentRequiresActiveAccountEndpointAndCredential(t
 
 	t.Run("disabled provider endpoint", func(t *testing.T) {
 		account := seedRepositoryTestAccount(t, ctx, repo, db, "runtime-assignment-disabled-endpoint")
-		secretRow, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID)
+		secretRow, err := dbsqlc.New(db).GetActiveAccountSecretByAccountID(ctx, account.ID)
 		if err != nil {
 			t.Fatalf("load active secret failed: %v", err)
 		}
@@ -373,8 +376,8 @@ func TestRuntimeAccountForAssignmentRequiresActiveAccountEndpointAndCredential(t
 func TestPatchAccountModelTogglesSingleModelWithoutReplacingSiblings(t *testing.T) {
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
-	repo := NewAccountRepository(db)
-	service := &AccountService{accountRepo: repo}
+	repo := NewRepository(db)
+	service := NewService(ServiceDeps{AccountRepo: repo}, ServiceOptions{})
 	account := seedAdminAccountWithTwoModelFixture(t, ctx, repo, db, "single-model-patch", nil)
 	before, err := repo.GetByID(ctx, account.ID)
 	if err != nil {
@@ -389,19 +392,19 @@ func TestPatchAccountModelTogglesSingleModelWithoutReplacingSiblings(t *testing.
 		t.Fatalf("PatchAccountModel failed: %v", err)
 	}
 
-	patchedModel, ok := findAccountModelByName(after.Models, "gpt-image-1")
+	patchedModel, ok := domain.FindModelByName(after.Models, "gpt-image-1")
 	if !ok {
 		t.Fatalf("patched model missing from %+v", after.Models)
 	}
 	if patchedModel.Enabled {
 		t.Fatalf("patched model enabled=%v, want false", patchedModel.Enabled)
 	}
-	beforePatchedModel, _ := findAccountModelByName(before.Models, "gpt-image-1")
+	beforePatchedModel, _ := domain.FindModelByName(before.Models, "gpt-image-1")
 	if patchedModel.ID != beforePatchedModel.ID || patchedModel.Weight != beforePatchedModel.Weight {
 		t.Fatalf("patched model changed id/weight: before=%+v after=%+v", beforePatchedModel, patchedModel)
 	}
-	beforeSibling, _ := findAccountModelByName(before.Models, "imagen-4")
-	afterSibling, ok := findAccountModelByName(after.Models, "imagen-4")
+	beforeSibling, _ := domain.FindModelByName(before.Models, "imagen-4")
+	afterSibling, ok := domain.FindModelByName(after.Models, "imagen-4")
 	if !ok {
 		t.Fatalf("sibling model missing from %+v", after.Models)
 	}
@@ -411,7 +414,7 @@ func TestPatchAccountModelTogglesSingleModelWithoutReplacingSiblings(t *testing.
 func TestRuntimeAccountReadRequiresActiveNonArchivedAccount(t *testing.T) {
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
-	repo := NewAccountRepository(db)
+	repo := NewRepository(db)
 	channelID := createAccountTestChannel(t, db, "runtime-active")
 
 	account := &ApiAccount{
@@ -445,11 +448,11 @@ func TestRuntimeAccountReadRequiresActiveNonArchivedAccount(t *testing.T) {
 	}
 }
 
-func TestStopAccountAndFinalizeRunningTasksRollsBackAccountStatusWhenFinalizerFails(t *testing.T) {
+func TestStopAndFinalizeTasksRollsBackAccountStatusWhenFinalizerFails(t *testing.T) {
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
 	sentinel := errors.New("finalizer failed")
-	repo := NewAccountRepository(db, stubRunningTaskFinalizer{err: sentinel})
+	repo := NewRepository(db, stubRunningTaskFinalizer{err: sentinel})
 	channelID := createAccountTestChannel(t, db, "stop-rollback")
 	account := &ApiAccount{
 		Name:               "stop-rollback",
@@ -467,9 +470,9 @@ func TestStopAccountAndFinalizeRunningTasksRollsBackAccountStatusWhenFinalizerFa
 		t.Fatalf("create account failed: %v", err)
 	}
 
-	_, err := repo.StopAccountAndFinalizeRunningTasks(ctx, account.ID, "账号已停用")
+	_, err := repo.StopAndFinalizeTasks(ctx, account.ID, "账号已停用")
 	if !errors.Is(err, sentinel) {
-		t.Fatalf("StopAccountAndFinalizeRunningTasks err=%v, want sentinel", err)
+		t.Fatalf("StopAndFinalizeTasks err=%v, want sentinel", err)
 	}
 
 	got, err := repo.GetByID(ctx, account.ID)
@@ -481,11 +484,11 @@ func TestStopAccountAndFinalizeRunningTasksRollsBackAccountStatusWhenFinalizerFa
 	}
 }
 
-func TestArchiveAccountAndFinalizeRunningTasksRollsBackArchiveAndSecretWhenFinalizerFails(t *testing.T) {
+func TestArchiveAndFinalizeTasksRollsBackArchiveAndSecretWhenFinalizerFails(t *testing.T) {
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
 	sentinel := errors.New("finalizer failed")
-	repo := NewAccountRepository(db, stubRunningTaskFinalizer{err: sentinel})
+	repo := NewRepository(db, stubRunningTaskFinalizer{err: sentinel})
 	channelID := createAccountTestChannel(t, db, "archive-rollback")
 	account := &ApiAccount{
 		Name:               "archive-rollback",
@@ -503,9 +506,9 @@ func TestArchiveAccountAndFinalizeRunningTasksRollsBackArchiveAndSecretWhenFinal
 		t.Fatalf("create account failed: %v", err)
 	}
 
-	_, err := repo.ArchiveAccountAndFinalizeRunningTasks(ctx, account.ID, "账号已删除")
+	_, err := repo.ArchiveAndFinalizeTasks(ctx, account.ID, "账号已删除")
 	if !errors.Is(err, sentinel) {
-		t.Fatalf("ArchiveAccountAndFinalizeRunningTasks err=%v, want sentinel", err)
+		t.Fatalf("ArchiveAndFinalizeTasks err=%v, want sentinel", err)
 	}
 
 	got, err := repo.GetByID(ctx, account.ID)
@@ -515,7 +518,7 @@ func TestArchiveAccountAndFinalizeRunningTasksRollsBackArchiveAndSecretWhenFinal
 	if got.Status != 1 {
 		t.Fatalf("account status after rollback=%d, want active", got.Status)
 	}
-	if _, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID); err != nil {
+	if _, err := dbsqlc.New(db).GetActiveAccountSecretByAccountID(ctx, account.ID); err != nil {
 		t.Fatalf("active secret should survive rolled-back archive: %v", err)
 	}
 }
@@ -525,12 +528,12 @@ func TestFinalizeRunningTasksMethodsRequireFinalizer(t *testing.T) {
 
 	t.Run("stop", func(t *testing.T) {
 		db := newAccountServiceTestDB(t)
-		repo := NewAccountRepository(db)
+		repo := NewRepository(db)
 		account := seedRepositoryTestAccount(t, ctx, repo, db, "stop-missing-finalizer")
 
-		_, err := repo.StopAccountAndFinalizeRunningTasks(ctx, account.ID, "账号已停用")
-		if !errors.Is(err, errRunningTaskFinalizerNotConfigured) {
-			t.Fatalf("StopAccountAndFinalizeRunningTasks err=%v, want missing finalizer", err)
+		_, err := repo.StopAndFinalizeTasks(ctx, account.ID, "账号已停用")
+		if !errors.Is(err, ErrRunningTaskFinalizerNotConfigured) {
+			t.Fatalf("StopAndFinalizeTasks err=%v, want missing finalizer", err)
 		}
 		got, err := repo.GetByID(ctx, account.ID)
 		if err != nil {
@@ -543,12 +546,12 @@ func TestFinalizeRunningTasksMethodsRequireFinalizer(t *testing.T) {
 
 	t.Run("archive", func(t *testing.T) {
 		db := newAccountServiceTestDB(t)
-		repo := NewAccountRepository(db)
+		repo := NewRepository(db)
 		account := seedRepositoryTestAccount(t, ctx, repo, db, "archive-missing-finalizer")
 
-		_, err := repo.ArchiveAccountAndFinalizeRunningTasks(ctx, account.ID, "账号已删除")
-		if !errors.Is(err, errRunningTaskFinalizerNotConfigured) {
-			t.Fatalf("ArchiveAccountAndFinalizeRunningTasks err=%v, want missing finalizer", err)
+		_, err := repo.ArchiveAndFinalizeTasks(ctx, account.ID, "账号已删除")
+		if !errors.Is(err, ErrRunningTaskFinalizerNotConfigured) {
+			t.Fatalf("ArchiveAndFinalizeTasks err=%v, want missing finalizer", err)
 		}
 		got, err := repo.GetByID(ctx, account.ID)
 		if err != nil {
@@ -557,7 +560,7 @@ func TestFinalizeRunningTasksMethodsRequireFinalizer(t *testing.T) {
 		if got.Status != 1 {
 			t.Fatalf("account status after rollback=%d, want active", got.Status)
 		}
-		if _, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID); err != nil {
+		if _, err := dbsqlc.New(db).GetActiveAccountSecretByAccountID(ctx, account.ID); err != nil {
 			t.Fatalf("active secret should survive rolled-back archive: %v", err)
 		}
 	})
@@ -569,7 +572,7 @@ func assertSameModelSettings(t *testing.T, before []AccountModel, after []Accoun
 		t.Fatalf("model count after update=%d, want %d; after=%+v", len(after), len(before), after)
 	}
 	for _, beforeModel := range before {
-		afterModel, ok := findAccountModelByName(after, beforeModel.Name)
+		afterModel, ok := domain.FindModelByName(after, beforeModel.Name)
 		if !ok {
 			t.Fatalf("model %q missing after update; after=%+v", beforeModel.Name, after)
 		}

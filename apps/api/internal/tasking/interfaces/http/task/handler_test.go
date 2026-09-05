@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/prompts"

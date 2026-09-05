@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow"
 )

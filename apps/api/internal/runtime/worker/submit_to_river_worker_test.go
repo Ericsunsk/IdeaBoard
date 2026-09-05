@@ -12,7 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounts "ideaboard/api/internal/accountpool/accounts/domain"
+	accountrepo "ideaboard/api/internal/accountpool/accounts/infrastructure/postgres"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits"
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
@@ -57,7 +58,7 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 	}
 	seedRiverBillingWallet(t, pool, creditService, 42, 20)
 
-	accountRepo := accounts.NewAccountRepository(db)
+	accountRepo := accountrepo.NewRepository(db)
 	taskRepo := taskstore.NewRepository(db)
 	account := createRiverTestAccount(t, db, accountRepo, "submit-worker-convergence")
 	assigner := taskqueue.NewPostgresTaskAssigner(db)
@@ -173,7 +174,7 @@ func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t 
 	}
 	seedRiverBillingWallet(t, pool, creditService, 42, 100)
 
-	accountRepo := accounts.NewAccountRepository(db)
+	accountRepo := accountrepo.NewRepository(db)
 	taskRepo := taskstore.NewRepository(db)
 	createRiverTestAccount(t, db, accountRepo, "settlement-restart")
 	assigner := taskqueue.NewPostgresTaskAssigner(db)
@@ -291,7 +292,7 @@ func workerPriceInput(sku billing.SKU, displayName string, unitCredits int64) bi
 
 func TestFinalAttemptMarkerFailureResetsLeaseBeforeProviderRetry(t *testing.T) {
 	db, _ := testdb.OpenWithPool(t)
-	accountRepo := accounts.NewAccountRepository(db)
+	accountRepo := accountrepo.NewRepository(db)
 	taskRepo := taskstore.NewRepository(db)
 	createRiverTestAccount(t, db, accountRepo, "marker-reset")
 	assigner := taskqueue.NewPostgresTaskAssigner(db)

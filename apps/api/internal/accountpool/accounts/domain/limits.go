@@ -1,4 +1,4 @@
-package accounts
+package domain
 
 import "ideaboard/api/internal/platform/accountlimits"
 

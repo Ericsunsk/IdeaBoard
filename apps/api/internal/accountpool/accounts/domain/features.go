@@ -1,4 +1,4 @@
-package accounts
+package domain
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
-func ParseFeatureSlugFromParamsJSON(paramsJSON string) string {
+func ParseFeatureSlug(paramsJSON string) string {
 	paramsJSON = strings.TrimSpace(paramsJSON)
 	if paramsJSON == "" {
 		return ""

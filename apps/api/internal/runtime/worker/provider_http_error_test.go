@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 )
 
 func TestUpstreamHTTPErrorParsesRetryAfter(t *testing.T) {

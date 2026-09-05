@@ -5,7 +5,7 @@ import (
 	credithttp "ideaboard/api/internal/credits/interfaces/http"
 	iofs "io/fs"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounthttp "ideaboard/api/internal/accountpool/accounts/interfaces/http"
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/billingrecords"
@@ -107,7 +107,7 @@ type AdminRouteDeps struct {
 	CreditAdminCommandHandler   *credithttp.AdminCommandHandler
 	CreditAdminReadHandler      *credithttp.AdminReadHandler
 	CreditReconciliationHandler *credithttp.ReconciliationHandler
-	AccountHandler              *accounts.AccountHandler
+	AccountHandler              *accounthttp.Handler
 	TaskHandler                 *taskhttp.Handler
 	TaskStatsHandler            *statisticshttp.Handler
 	ProviderEndpointHandler     *providerendpoints.ProviderEndpointHandler

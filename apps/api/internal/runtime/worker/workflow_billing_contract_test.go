@@ -14,7 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounts "ideaboard/api/internal/accountpool/accounts/domain"
+	accountrepo "ideaboard/api/internal/accountpool/accounts/infrastructure/postgres"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/prompts"
@@ -58,7 +59,7 @@ func TestAIImageWorkflowBillingContractUsesCurrentProviderPoolAndConvergesFacts(
 	}
 	seedWorkflowContractWallet(t, pool, creditService, 42, 20, runID)
 
-	accountRepo := accounts.NewAccountRepository(db)
+	accountRepo := accountrepo.NewRepository(db)
 	taskRepo := taskstore.NewRepository(db)
 
 	assigner := taskqueue.NewPostgresTaskAssigner(db)

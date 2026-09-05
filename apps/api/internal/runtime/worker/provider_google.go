@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/mediarefs"
 	"ideaboard/api/internal/platform/outbound"

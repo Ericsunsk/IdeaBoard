@@ -1,4 +1,4 @@
-package accounts
+package tests
 
 import (
 	"strings"
@@ -78,5 +78,27 @@ func TestFeatureSystemPromptDoesNotContainHiddenConstraintSnippet(t *testing.T) 
 	}
 	if strings.Contains(got, "【执行语义】") {
 		t.Fatalf("expected no hidden constraint text, got %q", got)
+	}
+}
+
+func TestResolveRunningStatus(t *testing.T) {
+	tests := []struct {
+		name      string
+		status    int16
+		failCount int
+		want      string
+	}{
+		{name: "disabled account is stopped", status: 0, failCount: 0, want: RunningStatusStopped},
+		{name: "high fail count is faulted", status: 1, failCount: 5, want: RunningStatusFaulted},
+		{name: "active normal account is running", status: 1, failCount: 0, want: RunningStatusRunning},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ResolveRunningStatus(tt.status, tt.failCount)
+			if got != tt.want {
+				t.Fatalf("status=%d failCount=%d got=%q want=%q", tt.status, tt.failCount, got, tt.want)
+			}
+		})
 	}
 }

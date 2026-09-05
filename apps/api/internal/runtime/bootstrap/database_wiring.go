@@ -8,7 +8,7 @@ import (
 	creditpostgres "ideaboard/api/internal/credits/infrastructure/postgres"
 	"strings"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accountrepo "ideaboard/api/internal/accountpool/accounts/infrastructure/postgres"
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/boards"
@@ -45,7 +45,7 @@ type appDatabaseOpeners struct {
 type appRepositories struct {
 	db                   *sql.DB
 	userRepo             *identitypostgres.Repository
-	accountRepo          *accounts.AccountRepository
+	accountRepo          *accountrepo.Repository
 	taskRepo             *taskstore.Repository
 	taskBillingUsage     *taskbilling.UsageStore
 	providerEndpointRepo *providerendpoints.ProviderEndpointRepository
@@ -176,7 +176,7 @@ func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error
 	repos := appRepositories{
 		db:                   db,
 		userRepo:             identitypostgres.NewRepository(db),
-		accountRepo:          accounts.NewAccountRepository(db, taskRepo),
+		accountRepo:          accountrepo.NewRepository(db, taskRepo),
 		taskRepo:             taskRepo,
 		taskBillingUsage:     taskbilling.NewUsageStore(db),
 		providerEndpointRepo: providerendpoints.NewProviderEndpointRepository(db),

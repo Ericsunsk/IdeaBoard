@@ -3,7 +3,7 @@ package bootstrap
 import (
 	"log/slog"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounthttp "ideaboard/api/internal/accountpool/accounts/interfaces/http"
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/billingrecords"
@@ -38,7 +38,7 @@ func newAppRouter(
 	services appDomainServices,
 	taskServices appTaskServices,
 ) *gin.Engine {
-	accountHandler := accounts.NewAccountHandler(taskServices.accountService)
+	accountHandler := accounthttp.NewHandler(taskServices.accountService)
 	taskHandler := taskhttp.NewHandler(taskhttp.HandlerDeps{
 		Commands: taskServices.taskService, AdminQueries: taskServices.taskService, UserQueries: taskServices.taskService,
 	})

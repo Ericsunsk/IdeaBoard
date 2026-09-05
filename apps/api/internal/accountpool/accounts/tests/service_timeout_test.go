@@ -1,36 +1,19 @@
-package accounts
+package tests
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
 	"ideaboard/api/internal/platform/accountlimits"
-	"ideaboard/api/internal/testdb"
-	"ideaboard/api/internal/testsupport/secretstest"
 )
-
-func newAccountServiceTestDB(t *testing.T) *sql.DB {
-	t.Helper()
-	secretstest.EnableEncryption(t)
-	return testdb.Open(t)
-}
-
-func testStringPtr(value string) *string {
-	return &value
-}
-
-func testIntPtr(value int) *int {
-	return &value
-}
 
 func TestUpdateAccountNormalizesTimeout(t *testing.T) {
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
-	repo := NewAccountRepository(db)
-	service := &AccountService{
-		accountRepo: repo,
-	}
+	repo := NewRepository(db)
+	service := NewService(ServiceDeps{
+		AccountRepo: repo,
+	}, ServiceOptions{})
 	account := seedAdminAccountWithTwoModelFixture(t, ctx, repo, db, "timeout", func(account *ApiAccount) {
 		account.Name = "demo"
 		account.ApiKey = "test-key"

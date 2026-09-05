@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	taskexecution "ideaboard/api/internal/tasking/application/execution"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow"
@@ -700,7 +700,7 @@ func taskExecutionSnapshot(task *tasks.TaskPayload, account *accounts.RuntimeAcc
 		return snapshot
 	}
 	snapshot.TaskID = task.TaskID
-	snapshot.FeatureSlug = accounts.ParseFeatureSlugFromParamsJSON(task.Params)
+	snapshot.FeatureSlug = accounts.ParseFeatureSlug(task.Params)
 	if account == nil {
 		return snapshot
 	}

@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	mediaassets "ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"

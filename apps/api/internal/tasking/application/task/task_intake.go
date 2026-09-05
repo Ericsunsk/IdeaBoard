@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/prompts"
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
@@ -470,9 +470,9 @@ func (i *taskIntake) ensureProviderAvailable(ctx context.Context, requirement wo
 	if err != nil {
 		return newSubmissionError("provider_unavailable", providerUnavailableMessage, err)
 	}
-	apiAccounts = accounts.FilterAccountsWithCapability(apiAccounts, string(requirement.Capability()))
+	apiAccounts = accounts.FilterByCapability(apiAccounts, string(requirement.Capability()))
 	if requirement.ModelRequirement() == workflow.RoutingModelRequired {
-		apiAccounts = accounts.FilterAccountsWithOutputResolution(apiAccounts, requirement.OutputResolution())
+		apiAccounts = accounts.FilterByResolution(apiAccounts, requirement.OutputResolution())
 	}
 	if len(apiAccounts) == 0 {
 		return newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)

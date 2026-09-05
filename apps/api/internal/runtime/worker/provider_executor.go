@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/config"

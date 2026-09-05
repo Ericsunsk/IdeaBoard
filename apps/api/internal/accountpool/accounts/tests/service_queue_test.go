@@ -1,4 +1,4 @@
-package accounts
+package tests
 
 import (
 	"context"
@@ -95,10 +95,10 @@ func newQueueServiceTestDB(t *testing.T) *sql.DB {
 	return testdb.Open(t)
 }
 
-func createTestAccount(t *testing.T, repo *AccountRepository, name string, status int16) *ApiAccount {
+func createTestAccount(t *testing.T, db *sql.DB, repo *Repository, name string, status int16) *ApiAccount {
 	t.Helper()
 	ctx := context.Background()
-	channelID := createAccountTestChannel(t, repo.db, name)
+	channelID := createAccountTestChannel(t, db, name)
 	acc := &ApiAccount{
 		Name:               name,
 		ProviderEndpointID: channelID,
@@ -174,34 +174,13 @@ INSERT INTO task_leases (
 	return task
 }
 
-func createAccountTestChannel(t testing.TB, db *sql.DB, suffix string) int64 {
-	t.Helper()
-	var id int64
-	err := db.QueryRowContext(context.Background(), `
-INSERT INTO provider_endpoints (api_type, protocol, name, base_url, status)
-VALUES ('openai-compatible', 'model-api', $1, $2, 1)
-RETURNING id`,
-		"test-channel-"+suffix,
-		"https://example.com/"+suffix,
-	).Scan(&id)
-	if err != nil {
-		t.Fatalf("create test channel failed: %v", err)
-	}
-	if _, err := db.ExecContext(context.Background(), `
-INSERT INTO provider_endpoint_capabilities (provider_endpoint_id, capability)
-VALUES ($1, 'generation')`, id); err != nil {
-		t.Fatalf("create test channel capability failed: %v", err)
-	}
-	return id
-}
-
 func TestListAccountsUsesQueueAndLoadInfo(t *testing.T) {
 	db := newQueueServiceTestDB(t)
-	accountRepo := NewAccountRepository(db)
+	accountRepo := NewRepository(db)
 	taskRepo := taskstore.NewRepository(db)
-	acc := createTestAccount(t, accountRepo, "a1", 1)
+	acc := createTestAccount(t, db, accountRepo, "a1", 1)
 
-	svc := NewAccountService(AccountServiceDeps{
+	svc := NewService(ServiceDeps{
 		AccountRepo: accountRepo,
 		TaskRepo:    taskRepo,
 		QueueStats:  &fakeQueueForService{queuedLen: 7},
@@ -213,7 +192,7 @@ func TestListAccountsUsesQueueAndLoadInfo(t *testing.T) {
 		ConcurrencyStore: &fakeConcurrencyStore{},
 		CancelStore:      &fakeCancelStore{},
 		MonitorStore:     &fakeMonitorStore{},
-	}, AccountServiceOptions{})
+	}, ServiceOptions{})
 
 	items, total, err := svc.ListAccounts(context.Background(), &AccountListRequest{Page: 1, PageSize: 20})
 	if err != nil {
@@ -230,16 +209,16 @@ func TestListAccountsUsesQueueAndLoadInfo(t *testing.T) {
 	}
 }
 
-func TestGetAccountQueueInfoUsesConcurrencyStore(t *testing.T) {
+func TestGetQueueInfoUsesConcurrencyStore(t *testing.T) {
 	db := newQueueServiceTestDB(t)
-	accountRepo := NewAccountRepository(db)
+	accountRepo := NewRepository(db)
 	taskRepo := taskstore.NewRepository(db)
-	acc := createTestAccount(t, accountRepo, "a1", 1)
+	acc := createTestAccount(t, db, accountRepo, "a1", 1)
 	concurrency := &fakeConcurrencyStore{
 		concurrent: map[int64]int{acc.ID: 1},
 		max:        map[int64]int{acc.ID: 4},
 	}
-	svc := NewAccountService(AccountServiceDeps{
+	svc := NewService(ServiceDeps{
 		AccountRepo:      accountRepo,
 		TaskRepo:         taskRepo,
 		QueueStats:       &fakeQueueForService{},
@@ -247,11 +226,11 @@ func TestGetAccountQueueInfoUsesConcurrencyStore(t *testing.T) {
 		ConcurrencyStore: concurrency,
 		CancelStore:      &fakeCancelStore{},
 		MonitorStore:     &fakeMonitorStore{},
-	}, AccountServiceOptions{})
+	}, ServiceOptions{})
 
-	current, max, err := svc.GetAccountQueueInfo(context.Background(), acc.ID)
+	current, max, err := svc.GetQueueInfo(context.Background(), acc.ID)
 	if err != nil {
-		t.Fatalf("GetAccountQueueInfo failed: %v", err)
+		t.Fatalf("GetQueueInfo failed: %v", err)
 	}
 	if current != 1 || max != 4 {
 		t.Fatalf("unexpected queue info current=%d max=%d", current, max)
@@ -261,14 +240,14 @@ func TestGetAccountQueueInfoUsesConcurrencyStore(t *testing.T) {
 func TestUpdateAccountNormalizesZeroWeight(t *testing.T) {
 	ctx := context.Background()
 	db := newQueueServiceTestDB(t)
-	accountRepo := NewAccountRepository(db)
+	accountRepo := NewRepository(db)
 	taskRepo := taskstore.NewRepository(db)
 	acc := seedAdminAccountWithTwoModelFixture(t, ctx, accountRepo, db, "update-zero-weight", func(account *ApiAccount) {
 		account.ApiKey = "k"
 		account.MaxConcurrent = 3
 		account.Timeout = 120
 	})
-	svc := NewAccountService(AccountServiceDeps{
+	svc := NewService(ServiceDeps{
 		AccountRepo:      accountRepo,
 		TaskRepo:         taskRepo,
 		QueueStats:       &fakeQueueForService{},
@@ -276,7 +255,7 @@ func TestUpdateAccountNormalizesZeroWeight(t *testing.T) {
 		ConcurrencyStore: &fakeConcurrencyStore{},
 		CancelStore:      &fakeCancelStore{},
 		MonitorStore:     &fakeMonitorStore{},
-	}, AccountServiceOptions{})
+	}, ServiceOptions{})
 
 	models := adminAccountModelInputsForFullUpdate(acc.Models)
 	err := svc.UpdateAccount(ctx, acc.ID, &UpdateAccountRequest{
@@ -302,9 +281,9 @@ func TestUpdateAccountNormalizesZeroWeight(t *testing.T) {
 func TestDeleteAccountDeletesStoppedAccount(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	accountRepo := NewAccountRepository(db, taskRepo)
-	acc := createTestAccount(t, accountRepo, "a1", 0)
-	svc := NewAccountService(AccountServiceDeps{
+	accountRepo := NewRepository(db, taskRepo)
+	acc := createTestAccount(t, db, accountRepo, "a1", 0)
+	svc := NewService(ServiceDeps{
 		AccountRepo:      accountRepo,
 		TaskRepo:         taskRepo,
 		QueueStats:       &fakeQueueForService{},
@@ -312,7 +291,7 @@ func TestDeleteAccountDeletesStoppedAccount(t *testing.T) {
 		ConcurrencyStore: &fakeConcurrencyStore{},
 		CancelStore:      &fakeCancelStore{},
 		MonitorStore:     &fakeMonitorStore{},
-	}, AccountServiceOptions{})
+	}, ServiceOptions{})
 
 	if err := svc.DeleteAccount(context.Background(), acc.ID); err != nil {
 		t.Fatalf("DeleteAccount failed: %v", err)
@@ -328,7 +307,7 @@ func TestDeleteAccountDeletesStoppedAccount(t *testing.T) {
 	if status != 0 || !deletedAt.Valid {
 		t.Fatalf("archived account status=%d deleted_at_valid=%v, want status=0 and deleted_at", status, deletedAt.Valid)
 	}
-	if _, err := accountRepo.q.GetActiveAccountSecretByAccountID(context.Background(), acc.ID); err == nil {
+	if _, err := dbsqlc.New(db).GetActiveAccountSecretByAccountID(context.Background(), acc.ID); err == nil {
 		t.Fatalf("archived account %d should not keep an active secret", acc.ID)
 	}
 	var secretStatus, secretPayload string
@@ -345,7 +324,7 @@ func TestDeleteAccountDeletesStoppedAccount(t *testing.T) {
 	if modelCount == 0 {
 		t.Fatalf("archived account should retain model snapshot")
 	}
-	if _, err := accountRepo.q.UpsertAccountModel(context.Background(), dbsqlc.UpsertAccountModelParams{
+	if _, err := dbsqlc.New(db).UpsertAccountModel(context.Background(), dbsqlc.UpsertAccountModelParams{
 		AccountID: acc.ID,
 		ModelName: "blocked-model",
 		Enabled:   true,
@@ -355,7 +334,7 @@ func TestDeleteAccountDeletesStoppedAccount(t *testing.T) {
 	}); err == nil {
 		t.Fatalf("archived account should reject model mutation")
 	}
-	if _, err := accountRepo.q.CreateAccountSecret(context.Background(), dbsqlc.CreateAccountSecretParams{
+	if _, err := dbsqlc.New(db).CreateAccountSecret(context.Background(), dbsqlc.CreateAccountSecretParams{
 		AccountID:          acc.ID,
 		SecretMaterialKind: "encrypted",
 		SecretPayload:      "should-not-write",
@@ -392,9 +371,9 @@ func TestDeleteAccountDeletesStoppedAccount(t *testing.T) {
 func TestDeleteAccountArchivesRunningAccount(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	accountRepo := NewAccountRepository(db, taskRepo)
-	acc := createTestAccount(t, accountRepo, "running", 1)
-	svc := NewAccountService(AccountServiceDeps{
+	accountRepo := NewRepository(db, taskRepo)
+	acc := createTestAccount(t, db, accountRepo, "running", 1)
+	svc := NewService(ServiceDeps{
 		AccountRepo:      accountRepo,
 		TaskRepo:         taskRepo,
 		QueueStats:       &fakeQueueForService{},
@@ -402,7 +381,7 @@ func TestDeleteAccountArchivesRunningAccount(t *testing.T) {
 		ConcurrencyStore: &fakeConcurrencyStore{},
 		CancelStore:      &fakeCancelStore{},
 		MonitorStore:     &fakeMonitorStore{},
-	}, AccountServiceOptions{})
+	}, ServiceOptions{})
 
 	if err := svc.DeleteAccount(context.Background(), acc.ID); err != nil {
 		t.Fatalf("DeleteAccount failed: %v", err)
@@ -415,12 +394,12 @@ func TestDeleteAccountArchivesRunningAccount(t *testing.T) {
 func TestDeleteAccountReturnsErrorAndSkipsSideEffectsWhenTaskFinalizerFails(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	sentinel := errors.New("finalizer failed")
-	accountRepo := NewAccountRepository(db, failingRunningTaskFinalizer{err: sentinel})
-	acc := createTestAccount(t, accountRepo, "delete-finalizer-fail", 1)
+	accountRepo := NewRepository(db, failingRunningTaskFinalizer{err: sentinel})
+	acc := createTestAccount(t, db, accountRepo, "delete-finalizer-fail", 1)
 	taskRepo := &failingAccountTaskStore{listed: []string{"should-not-mark"}}
 	cancelStore := &fakeCancelStore{}
 	taskEvents := &recordingTaskStatusPublisher{}
-	svc := NewAccountService(AccountServiceDeps{
+	svc := NewService(ServiceDeps{
 		AccountRepo:      accountRepo,
 		TaskRepo:         taskRepo,
 		QueueStats:       &fakeQueueForService{},
@@ -428,7 +407,7 @@ func TestDeleteAccountReturnsErrorAndSkipsSideEffectsWhenTaskFinalizerFails(t *t
 		ConcurrencyStore: &fakeConcurrencyStore{},
 		CancelStore:      cancelStore,
 		MonitorStore:     &fakeMonitorStore{},
-	}, AccountServiceOptions{TaskEvents: taskEvents})
+	}, ServiceOptions{TaskEvents: taskEvents})
 
 	err := svc.DeleteAccount(context.Background(), acc.ID)
 	if !errors.Is(err, sentinel) {
@@ -441,7 +420,7 @@ func TestDeleteAccountReturnsErrorAndSkipsSideEffectsWhenTaskFinalizerFails(t *t
 	if got.Status != 1 {
 		t.Fatalf("account status=%d, want active after rollback", got.Status)
 	}
-	if _, err := accountRepo.q.GetActiveAccountSecretByAccountID(context.Background(), acc.ID); err != nil {
+	if _, err := dbsqlc.New(db).GetActiveAccountSecretByAccountID(context.Background(), acc.ID); err != nil {
 		t.Fatalf("active secret should survive rollback: %v", err)
 	}
 	if len(cancelStore.marked) != 0 {
@@ -458,15 +437,15 @@ func TestDeleteAccountReturnsErrorAndSkipsSideEffectsWhenTaskFinalizerFails(t *t
 func TestDeleteAccountFailsResidualInFlightTasks(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	accountRepo := NewAccountRepository(db, taskRepo)
-	acc := createTestAccount(t, accountRepo, "delete-residual", 0)
+	accountRepo := NewRepository(db, taskRepo)
+	acc := createTestAccount(t, db, accountRepo, "delete-residual", 0)
 
 	first := createRunningTaskFixture(t, db, taskRepo, acc, "delete-residual-running-1")
 	second := createRunningTaskFixture(t, db, taskRepo, acc, "delete-residual-running-2")
 
 	cancelStore := &fakeCancelStore{}
 	taskEvents := &recordingTaskStatusPublisher{}
-	svc := NewAccountService(AccountServiceDeps{
+	svc := NewService(ServiceDeps{
 		AccountRepo:      accountRepo,
 		TaskRepo:         taskRepo,
 		QueueStats:       &fakeQueueForService{},
@@ -474,7 +453,7 @@ func TestDeleteAccountFailsResidualInFlightTasks(t *testing.T) {
 		ConcurrencyStore: &fakeConcurrencyStore{},
 		CancelStore:      cancelStore,
 		MonitorStore:     &fakeMonitorStore{},
-	}, AccountServiceOptions{TaskEvents: taskEvents})
+	}, ServiceOptions{TaskEvents: taskEvents})
 
 	if err := svc.DeleteAccount(context.Background(), acc.ID); err != nil {
 		t.Fatalf("DeleteAccount failed: %v", err)
@@ -506,15 +485,15 @@ func TestDeleteAccountFailsResidualInFlightTasks(t *testing.T) {
 func TestStopAccountMarksCancelAndFailsInFlightTasks(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	accountRepo := NewAccountRepository(db, taskRepo)
-	acc := createTestAccount(t, accountRepo, "a1", 1)
+	accountRepo := NewRepository(db, taskRepo)
+	acc := createTestAccount(t, db, accountRepo, "a1", 1)
 
 	first := createRunningTaskFixture(t, db, taskRepo, acc, "t-running-1")
 	second := createRunningTaskFixture(t, db, taskRepo, acc, "t-running-2")
 
 	cancelStore := &fakeCancelStore{}
 	taskEvents := &recordingTaskStatusPublisher{}
-	svc := NewAccountService(AccountServiceDeps{
+	svc := NewService(ServiceDeps{
 		AccountRepo:      accountRepo,
 		TaskRepo:         taskRepo,
 		QueueStats:       &fakeQueueForService{},
@@ -522,7 +501,7 @@ func TestStopAccountMarksCancelAndFailsInFlightTasks(t *testing.T) {
 		ConcurrencyStore: &fakeConcurrencyStore{},
 		CancelStore:      cancelStore,
 		MonitorStore:     &fakeMonitorStore{},
-	}, AccountServiceOptions{TaskEvents: taskEvents})
+	}, ServiceOptions{TaskEvents: taskEvents})
 
 	if err := svc.StopAccount(context.Background(), acc.ID); err != nil {
 		t.Fatalf("StopAccount failed: %v", err)
@@ -556,12 +535,12 @@ func TestStopAccountMarksCancelAndFailsInFlightTasks(t *testing.T) {
 func TestStopAccountReturnsErrorAndSkipsSideEffectsWhenTaskFinalizerFails(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	sentinel := errors.New("finalizer failed")
-	accountRepo := NewAccountRepository(db, failingRunningTaskFinalizer{err: sentinel})
-	acc := createTestAccount(t, accountRepo, "stop-finalizer-fail", 1)
+	accountRepo := NewRepository(db, failingRunningTaskFinalizer{err: sentinel})
+	acc := createTestAccount(t, db, accountRepo, "stop-finalizer-fail", 1)
 	taskRepo := &failingAccountTaskStore{listed: []string{"should-not-mark"}}
 	cancelStore := &fakeCancelStore{}
 	taskEvents := &recordingTaskStatusPublisher{}
-	svc := NewAccountService(AccountServiceDeps{
+	svc := NewService(ServiceDeps{
 		AccountRepo:      accountRepo,
 		TaskRepo:         taskRepo,
 		QueueStats:       &fakeQueueForService{},
@@ -569,7 +548,7 @@ func TestStopAccountReturnsErrorAndSkipsSideEffectsWhenTaskFinalizerFails(t *tes
 		ConcurrencyStore: &fakeConcurrencyStore{},
 		CancelStore:      cancelStore,
 		MonitorStore:     &fakeMonitorStore{},
-	}, AccountServiceOptions{TaskEvents: taskEvents})
+	}, ServiceOptions{TaskEvents: taskEvents})
 
 	err := svc.StopAccount(context.Background(), acc.ID)
 	if !errors.Is(err, sentinel) {

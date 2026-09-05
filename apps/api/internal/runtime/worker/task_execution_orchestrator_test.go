@@ -11,7 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounts "ideaboard/api/internal/accountpool/accounts/domain"
+	accountrepo "ideaboard/api/internal/accountpool/accounts/infrastructure/postgres"
 	taskexecution "ideaboard/api/internal/tasking/application/execution"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
@@ -53,7 +54,7 @@ func TestUserFacingProviderErrorPreservesInputInvalidDetails(t *testing.T) {
 
 func TestExecuteRequeuesTaskWhenLeaseConfirmationFails(t *testing.T) {
 	db := newTaskExecutionOrchestratorTestDB(t)
-	accountRepo := accounts.NewAccountRepository(db)
+	accountRepo := accountrepo.NewRepository(db)
 	taskRepo := taskstore.NewRepository(db)
 	account := createRiverTestAccount(t, db, accountRepo, "confirm-fail-account")
 
@@ -107,7 +108,7 @@ func TestExecuteRequeuesTaskWhenLeaseConfirmationFails(t *testing.T) {
 
 func TestExecuteDropsTaskWhenLeaseConfirmationAlreadyConverged(t *testing.T) {
 	db := newTaskExecutionOrchestratorTestDB(t)
-	accountRepo := accounts.NewAccountRepository(db)
+	accountRepo := accountrepo.NewRepository(db)
 	taskRepo := taskstore.NewRepository(db)
 	account := createRiverTestAccount(t, db, accountRepo, "confirm-converged-account")
 
@@ -157,7 +158,7 @@ func TestExecuteDropsTaskWhenLeaseConfirmationAlreadyConverged(t *testing.T) {
 
 func TestExecuteRequeuesWhenAssignmentProviderEndpointNoLongerMatchesAccount(t *testing.T) {
 	db := newTaskExecutionOrchestratorTestDB(t)
-	accountRepo := accounts.NewAccountRepository(db)
+	accountRepo := accountrepo.NewRepository(db)
 	taskRepo := taskstore.NewRepository(db)
 	account := createRiverTestAccount(t, db, accountRepo, "endpoint-mismatch-account")
 
@@ -200,7 +201,7 @@ func TestExecuteRequeuesWhenAssignmentProviderEndpointNoLongerMatchesAccount(t *
 
 func TestExecuteReturnsErrorWhenMarkCompletedPersistenceFails(t *testing.T) {
 	db := newTaskExecutionOrchestratorTestDB(t)
-	accountRepo := accounts.NewAccountRepository(db)
+	accountRepo := accountrepo.NewRepository(db)
 	taskRepo := taskstore.NewRepository(db)
 	account := createRiverTestAccount(t, db, accountRepo, "complete-fail-account")
 
@@ -256,7 +257,7 @@ FOR EACH ROW EXECUTE FUNCTION fail_mark_completed();
 func TestExecuteReleasesRunningLeaseWhenCancelledAfterProviderReturns(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionOrchestratorTestDB(t)
-	accountRepo := accounts.NewAccountRepository(db)
+	accountRepo := accountrepo.NewRepository(db)
 	taskRepo := taskstore.NewRepository(db)
 	account := createRiverTestAccount(t, db, accountRepo, "cancel-after-provider-account")
 
@@ -318,7 +319,7 @@ func TestExecuteReleasesRunningLeaseWhenCancelledAfterProviderReturns(t *testing
 func TestExecuteReleasesRunningLeaseWhenCancelledBeforeProvider(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionOrchestratorTestDB(t)
-	accountRepo := accounts.NewAccountRepository(db)
+	accountRepo := accountrepo.NewRepository(db)
 	taskRepo := taskstore.NewRepository(db)
 	account := createRiverTestAccount(t, db, accountRepo, "cancel-before-provider-account")
 
@@ -384,7 +385,7 @@ func TestExecuteReleasesRunningLeaseWhenCancelledBeforeProvider(t *testing.T) {
 
 func TestExecuteReturnsErrorWhenMarkFailedPersistenceFails(t *testing.T) {
 	db := newTaskExecutionOrchestratorTestDB(t)
-	accountRepo := accounts.NewAccountRepository(db)
+	accountRepo := accountrepo.NewRepository(db)
 	taskRepo := taskstore.NewRepository(db)
 	account := createRiverTestAccount(t, db, accountRepo, "failed-fail-account")
 
@@ -437,7 +438,7 @@ FOR EACH ROW EXECUTE FUNCTION fail_mark_failed();
 func TestExecuteProviderFailureRoutesThroughConvergenceDecision(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionOrchestratorTestDB(t)
-	accountRepo := accounts.NewAccountRepository(db)
+	accountRepo := accountrepo.NewRepository(db)
 	taskRepo := taskstore.NewRepository(db)
 	account := createRiverTestAccount(t, db, accountRepo, "convergence-primary-account")
 
@@ -555,7 +556,7 @@ WHERE task_id = $1`, task.TaskID).Scan(&attemptStatus, &attemptReason, &attemptF
 func TestExecuteTemporaryProviderFailureRequeuesWithoutFailureResult(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionOrchestratorTestDB(t)
-	accountRepo := accounts.NewAccountRepository(db)
+	accountRepo := accountrepo.NewRepository(db)
 	taskRepo := taskstore.NewRepository(db)
 	account := createRiverTestAccount(t, db, accountRepo, "retry-primary-account")
 
@@ -613,7 +614,7 @@ func TestExecuteTemporaryProviderFailureRequeuesWithoutFailureResult(t *testing.
 func TestExecuteProviderParseFailureFinalFailsWithFailureResultEnvelope(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionOrchestratorTestDB(t)
-	accountRepo := accounts.NewAccountRepository(db)
+	accountRepo := accountrepo.NewRepository(db)
 	taskRepo := taskstore.NewRepository(db)
 	account := createRiverTestAccount(t, db, accountRepo, "parse-primary-account")
 

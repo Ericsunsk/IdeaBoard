@@ -1,4 +1,4 @@
-package accounts
+package domain
 
 import (
 	"strings"
@@ -6,9 +6,12 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
-func FilterAccountsWithOutputResolution(accounts []*ApiAccount, resolution string) []*ApiAccount {
+func FilterByResolution(accounts []*ApiAccount, resolution string) []*ApiAccount {
 	result := make([]*ApiAccount, 0, len(accounts))
 	for _, account := range accounts {
+		if account == nil {
+			continue
+		}
 		for _, model := range account.Models {
 			if model.Enabled && workflow.SupportsOutputResolution(resolution, model.Supports2K, model.Supports4K) {
 				result = append(result, account)
@@ -19,7 +22,7 @@ func FilterAccountsWithOutputResolution(accounts []*ApiAccount, resolution strin
 	return result
 }
 
-func FilterAccountsWithCapability(accounts []*ApiAccount, capability string) []*ApiAccount {
+func FilterByCapability(accounts []*ApiAccount, capability string) []*ApiAccount {
 	capability = strings.ToLower(strings.TrimSpace(capability))
 	if capability == "" {
 		return nil

@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/workflow"

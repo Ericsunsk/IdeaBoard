@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounts "ideaboard/api/internal/accountpool/accounts/domain"
+	accountrepo "ideaboard/api/internal/accountpool/accounts/infrastructure/postgres"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
 	"ideaboard/api/internal/testdb"
@@ -25,7 +26,7 @@ func newStatisticsTestService(t *testing.T) (*Service, *taskstore.Repository, *s
 
 func seedStatisticsAccount(t testing.TB, ctx context.Context, db *sql.DB, name string) *accounts.ApiAccount {
 	t.Helper()
-	accountRepo := accounts.NewAccountRepository(db)
+	accountRepo := accountrepo.NewRepository(db)
 	var channelID int64
 	if err := db.QueryRowContext(ctx, `
 INSERT INTO provider_endpoints (api_type, name, base_url, status)
@@ -683,7 +684,7 @@ func TestGetStatisticsBackfillStatusReportsMissingDays(t *testing.T) {
 func TestGetStatisticsKeepsUnknownWhenAccountHasMultipleModels(t *testing.T) {
 	ctx := context.Background()
 	svc, taskRepo, db := newStatisticsTestService(t)
-	accountRepo := accounts.NewAccountRepository(db)
+	accountRepo := accountrepo.NewRepository(db)
 	var channelID int64
 	if err := db.QueryRowContext(ctx, `
 INSERT INTO provider_endpoints (api_type, name, base_url, status)

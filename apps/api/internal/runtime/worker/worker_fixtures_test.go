@@ -7,7 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounts "ideaboard/api/internal/accountpool/accounts/domain"
+	accountrepo "ideaboard/api/internal/accountpool/accounts/infrastructure/postgres"
 	taskexecution "ideaboard/api/internal/tasking/application/execution"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/testsupport/secretstest"
@@ -161,7 +162,7 @@ func (f *fakeCancelStoreForRiver) ClearCancelled(_ context.Context, taskID strin
 	return nil
 }
 
-func createRiverTestAccount(t *testing.T, db testRuntimeDB, repo *accounts.AccountRepository, name string) *accounts.ApiAccount {
+func createRiverTestAccount(t *testing.T, db testRuntimeDB, repo *accountrepo.Repository, name string) *accounts.ApiAccount {
 	t.Helper()
 	secretstest.EnableEncryption(t)
 	channelID := createRiverTestChannel(t, db, name)

@@ -1,4 +1,4 @@
-package accounts
+package domain
 
 import (
 	"bytes"
@@ -89,7 +89,6 @@ func (p *NullableIntPatch) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// 请求结构
 type CreateAccountRequest struct {
 	Name               string              `json:"name"`
 	ProviderEndpointID int64               `json:"provider_endpoint_id" binding:"required"`
@@ -132,7 +131,6 @@ type AccountLimits struct {
 	TimeoutSeconds AccountLimitRange `json:"timeout_seconds"`
 }
 
-// 列表响应
 type AccountListRequest struct {
 	Keyword  string `form:"keyword"`
 	ApiType  string `form:"api_type"`

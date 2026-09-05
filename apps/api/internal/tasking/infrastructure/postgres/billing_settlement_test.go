@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	accountspool "ideaboard/api/internal/accountpool/accounts"
+	accountrepo "ideaboard/api/internal/accountpool/accounts/infrastructure/postgres"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits"
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
@@ -491,16 +491,16 @@ func TestAccountStopAndArchiveReleaseBilledHoldsAtomically(t *testing.T) {
 			credentialID := loadRepositoryTestCredentialID(t, db, accountID)
 			task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-account-"+operation, accountID, channelID, credentialID, "lease-account", "lease-account")
 			holdTaskForSettlementTest(t, pool, taskBilling, task, request)
-			accountRepo := accountspool.NewAccountRepository(db, repo)
+			accountRepo := accountrepo.NewRepository(db, repo)
 
 			var (
 				ids []string
 				err error
 			)
 			if operation == "stop" {
-				ids, err = accountRepo.StopAccountAndFinalizeRunningTasks(t.Context(), accountID, "account stopped")
+				ids, err = accountRepo.StopAndFinalizeTasks(t.Context(), accountID, "account stopped")
 			} else {
-				ids, err = accountRepo.ArchiveAccountAndFinalizeRunningTasks(t.Context(), accountID, "account archived")
+				ids, err = accountRepo.ArchiveAndFinalizeTasks(t.Context(), accountID, "account archived")
 			}
 			if err != nil || len(ids) != 1 || ids[0] != task.TaskID {
 				t.Fatalf("ids=%v err=%v", ids, err)

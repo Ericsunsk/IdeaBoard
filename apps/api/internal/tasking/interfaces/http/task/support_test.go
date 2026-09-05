@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	"ideaboard/api/internal/prompts"
 	taskapp "ideaboard/api/internal/tasking/application/task"
 	tasks "ideaboard/api/internal/tasking/domain"

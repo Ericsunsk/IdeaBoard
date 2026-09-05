@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"ideaboard/api/internal/accountpool/accounts"
+	accountapp "ideaboard/api/internal/accountpool/accounts/application"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/users/ports"
@@ -37,7 +37,7 @@ import (
 )
 
 type appTaskServices struct {
-	accountService   *accounts.AccountService
+	accountService   *accountapp.Service
 	taskService      *taskservice.Service
 	taskStatsService *taskstats.Service
 	userEvents       *events.UserEventHub
@@ -96,7 +96,7 @@ func newAppTaskRuntime(
 	}
 
 	riverQueue := taskqueue.NewRiverQueue(nil, dbs.db, postgresRuntimeStore, taskqueue.RiverMaxAttemptsDefault)
-	accountService := accounts.NewAccountService(accounts.AccountServiceDeps{
+	accountService := accountapp.NewService(accountapp.ServiceDeps{
 		AccountRepo:      repos.accountRepo,
 		TaskRepo:         repos.taskRepo.Queries(),
 		QueueStats:       riverQueue,
@@ -104,7 +104,7 @@ func newAppTaskRuntime(
 		ConcurrencyStore: postgresRuntimeStore,
 		CancelStore:      postgresRuntimeStore,
 		MonitorStore:     riverQueue,
-	}, accounts.AccountServiceOptions{
+	}, accountapp.ServiceOptions{
 		TaskEvents: taskEvents,
 	})
 	riverTaskWorker := worker.NewRiverTaskWorker(worker.RiverTaskWorkerDeps{
