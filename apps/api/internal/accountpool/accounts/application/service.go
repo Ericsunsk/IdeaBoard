@@ -9,7 +9,7 @@ import (
 
 	"ideaboard/api/internal/accountpool/accounts/domain"
 	"ideaboard/api/internal/accountpool/accounts/ports"
-	"ideaboard/api/internal/accountpool/providerendpoints"
+	providerendpointsdomain "ideaboard/api/internal/accountpool/providerendpoints/domain"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/database"
@@ -71,7 +71,7 @@ func (s *Service) CreateAccount(ctx context.Context, req *domain.CreateAccountRe
 		return nil, fmt.Errorf("ProviderEndpoint 不存在")
 	}
 	var models []domain.AccountModel
-	if len(req.Models) > 0 || !providerendpoints.AllowsModellessAccounts(protocol, capabilities) {
+	if len(req.Models) > 0 || !providerendpointsdomain.AllowsModellessAccounts(protocol, capabilities) {
 		models, err = domain.NormalizeModelInputs(req.Models)
 		if err != nil {
 			return nil, err
@@ -227,7 +227,7 @@ func (s *Service) applyModelUpdate(ctx context.Context, account *domain.ApiAccou
 		return false, err
 	}
 	models := []domain.AccountModel(nil)
-	if len(*inputs) > 0 || !providerendpoints.AllowsModellessAccounts(protocol, capabilities) {
+	if len(*inputs) > 0 || !providerendpointsdomain.AllowsModellessAccounts(protocol, capabilities) {
 		models, err = domain.NormalizeModelInputs(*inputs)
 		if err != nil {
 			return false, err

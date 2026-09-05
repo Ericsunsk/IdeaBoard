@@ -1,4 +1,4 @@
-package providerendpoints
+package postgres
 
 import (
 	"context"
@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 
+	"ideaboard/api/internal/accountpool/providerendpoints/domain"
+	"ideaboard/api/internal/accountpool/providerendpoints/ports"
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/accountlimits"
@@ -17,16 +19,13 @@ import (
 	"github.com/lib/pq"
 )
 
-var (
-	ErrNameConflict = errors.New("provider endpoint name conflict")
-	ErrURLConflict  = errors.New("provider endpoint api type/base url conflict")
-)
-
 const (
-	providerEndpointNameUniqueIndex       = "uq_provider_endpoints_name_lower"
-	providerEndpointAPITypeBaseURLUniqIdx = "uq_provider_endpoints_api_type_base_url"
+	ProviderEndpointNameUniqueIndex       = "uq_provider_endpoints_name_lower"
+	ProviderEndpointAPITypeBaseURLUniqIdx = "uq_provider_endpoints_api_type_base_url"
 	managedImageEndpointExtraConfig       = `{"managed_by":"image-processing-endpoint"}`
 )
+
+var _ ports.Repository = (*Repository)(nil)
 
 type Repository struct {
 	db *sql.DB
@@ -37,12 +36,12 @@ func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db, q: dbsqlc.New(db)}
 }
 
-func (r *Repository) Create(ctx context.Context, endpoint *Endpoint) error {
-	protocol, capabilities, err := NormalizeProtocolCapabilities(endpoint.Protocol, endpoint.Capabilities)
+func (r *Repository) Create(ctx context.Context, endpoint *domain.Endpoint) error {
+	protocol, capabilities, err := domain.NormalizeProtocolCapabilities(endpoint.Protocol, endpoint.Capabilities)
 	if err != nil {
 		return err
 	}
-	if err := ValidateProtocolAPIType(protocol, endpoint.APIType); err != nil {
+	if err := domain.ValidateProtocolAPIType(protocol, endpoint.APIType); err != nil {
 		return err
 	}
 	if err := validateManagedEndpointAPIKey(protocol, endpoint.APIKey); err != nil {
@@ -68,20 +67,20 @@ func (r *Repository) Create(ctx context.Context, endpoint *Endpoint) error {
 		return syncManagedEndpointAccount(ctx, q, endpoint)
 	})
 	if err != nil {
-		return providerEndpointConflictError(err)
+		return ProviderEndpointConflictError(err)
 	}
 	endpoint.Protocol = protocol
 	endpoint.Capabilities = capabilities
-	endpoint.APIKeyConfigured = isManagedImageEndpointProtocol(protocol)
+	endpoint.APIKeyConfigured = domain.IsManagedImageEndpointProtocol(protocol)
 	return nil
 }
 
-func (r *Repository) GetByID(ctx context.Context, id int64) (*Endpoint, error) {
+func (r *Repository) GetByID(ctx context.Context, id int64) (*domain.Endpoint, error) {
 	row, err := r.q.GetProviderEndpointByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	endpoint := Endpoint{
+	endpoint := domain.Endpoint{
 		ID:               row.ID,
 		APIType:          row.ApiType,
 		Protocol:         row.Protocol,
@@ -100,15 +99,15 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*Endpoint, error) {
 	return &endpoint, nil
 }
 
-func (r *Repository) List(ctx context.Context) ([]*Endpoint, error) {
+func (r *Repository) List(ctx context.Context) ([]*domain.Endpoint, error) {
 	rows, err := r.q.ListProviderEndpoints(ctx)
 	if err != nil {
 		return nil, err
 	}
-	endpoints := make([]*Endpoint, 0, len(rows))
+	endpoints := make([]*domain.Endpoint, 0, len(rows))
 	ids := make([]int64, 0, len(rows))
 	for _, row := range rows {
-		endpoint := Endpoint{
+		endpoint := domain.Endpoint{
 			ID:               row.ID,
 			APIType:          row.ApiType,
 			Protocol:         row.Protocol,
@@ -132,12 +131,12 @@ func (r *Repository) List(ctx context.Context) ([]*Endpoint, error) {
 	return endpoints, nil
 }
 
-func (r *Repository) Update(ctx context.Context, endpoint *Endpoint) error {
-	protocol, capabilities, err := NormalizeProtocolCapabilities(endpoint.Protocol, endpoint.Capabilities)
+func (r *Repository) Update(ctx context.Context, endpoint *domain.Endpoint) error {
+	protocol, capabilities, err := domain.NormalizeProtocolCapabilities(endpoint.Protocol, endpoint.Capabilities)
 	if err != nil {
 		return err
 	}
-	if err := ValidateProtocolAPIType(protocol, endpoint.APIType); err != nil {
+	if err := domain.ValidateProtocolAPIType(protocol, endpoint.APIType); err != nil {
 		return err
 	}
 	if err := validateManagedEndpointAPIKey(protocol, endpoint.APIKey); err != nil {
@@ -166,17 +165,17 @@ func (r *Repository) Update(ctx context.Context, endpoint *Endpoint) error {
 		return syncManagedEndpointAccount(ctx, q, endpoint)
 	})
 	if err != nil {
-		return providerEndpointConflictError(err)
+		return ProviderEndpointConflictError(err)
 	}
 	endpoint.Protocol = protocol
 	endpoint.Capabilities = capabilities
-	endpoint.APIKeyConfigured = isManagedImageEndpointProtocol(protocol)
+	endpoint.APIKeyConfigured = domain.IsManagedImageEndpointProtocol(protocol)
 	return nil
 }
 
 // UpdateStatus updates the scheduling state without touching endpoint configuration,
 // capabilities, or managed account secrets.
-func (r *Repository) UpdateStatus(ctx context.Context, id int64, status int16) (*Endpoint, error) {
+func (r *Repository) UpdateStatus(ctx context.Context, id int64, status int16) (*domain.Endpoint, error) {
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		updated, err := q.UpdateProviderEndpointStatus(ctx, dbsqlc.UpdateProviderEndpointStatusParams{
 			ID:     id,
@@ -246,14 +245,14 @@ func (r *Repository) Delete(ctx context.Context, id int64) error {
 }
 
 func validateManagedEndpointAPIKey(protocol, apiKey string) error {
-	if isManagedImageEndpointProtocol(protocol) && strings.TrimSpace(apiKey) == "" {
-		return errors.New("图片处理 API 必须配置 API Key")
+	if domain.IsManagedImageEndpointProtocol(protocol) && strings.TrimSpace(apiKey) == "" {
+		return domain.ErrAPIKeyRequired
 	}
 	return nil
 }
 
-func syncManagedEndpointAccount(ctx context.Context, q *dbsqlc.Queries, endpoint *Endpoint) error {
-	if !isManagedImageEndpointProtocol(endpoint.Protocol) {
+func syncManagedEndpointAccount(ctx context.Context, q *dbsqlc.Queries, endpoint *domain.Endpoint) error {
+	if !domain.IsManagedImageEndpointProtocol(endpoint.Protocol) {
 		_, err := q.DeleteManagedProviderEndpointAccounts(ctx, endpoint.ID)
 		return err
 	}
@@ -303,18 +302,13 @@ func syncManagedEndpointAccount(ctx context.Context, q *dbsqlc.Queries, endpoint
 	return err
 }
 
-func isManagedImageEndpointProtocol(protocol string) bool {
-	canonical, ok := CanonicalProtocol(protocol)
-	return ok && (canonical == ProtocolImagePipeline || canonical == ProtocolImageFill)
-}
-
-func providerEndpointConflictError(err error) error {
+func ProviderEndpointConflictError(err error) error {
 	constraintName := providerEndpointUniqueConstraintName(err)
 	switch constraintName {
-	case providerEndpointNameUniqueIndex:
-		return fmt.Errorf("%w: %v", ErrNameConflict, err)
-	case providerEndpointAPITypeBaseURLUniqIdx:
-		return fmt.Errorf("%w: %v", ErrURLConflict, err)
+	case ProviderEndpointNameUniqueIndex:
+		return fmt.Errorf("%w: %v", domain.ErrNameConflict, err)
+	case ProviderEndpointAPITypeBaseURLUniqIdx:
+		return fmt.Errorf("%w: %v", domain.ErrURLConflict, err)
 	default:
 		return err
 	}

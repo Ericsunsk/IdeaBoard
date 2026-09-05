@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	accounts "ideaboard/api/internal/accountpool/accounts/domain"
-	"ideaboard/api/internal/accountpool/providerendpoints"
+	providerendpoints "ideaboard/api/internal/accountpool/providerendpoints/domain"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow"
 )

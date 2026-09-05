@@ -17,7 +17,7 @@ import (
 	"time"
 
 	accounts "ideaboard/api/internal/accountpool/accounts/domain"
-	"ideaboard/api/internal/accountpool/providerendpoints"
+	providerendpoints "ideaboard/api/internal/accountpool/providerendpoints/domain"
 	mediaassets "ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
 	storagetaskmedia "ideaboard/api/internal/media/storage/application/taskmedia"

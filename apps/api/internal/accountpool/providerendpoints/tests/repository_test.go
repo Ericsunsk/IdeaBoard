@@ -1,4 +1,4 @@
-package providerendpoints
+package tests
 
 import (
 	"context"
@@ -7,29 +7,13 @@ import (
 	"strings"
 	"testing"
 
+	"ideaboard/api/internal/accountpool/providerendpoints/infrastructure/postgres"
 	"ideaboard/api/internal/platform/secrets"
-	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lib/pq"
 )
-
-func newProviderEndpointRepositoryTestDB(t *testing.T) *sql.DB {
-	t.Helper()
-	return testdb.Open(t)
-}
-
-func seedProviderEndpoint(t testing.TB, ctx context.Context, repo *Repository, endpoint *Endpoint) *Endpoint {
-	t.Helper()
-	if endpoint.Protocol == "" {
-		endpoint.Protocol = ProtocolModelAPI
-	}
-	if err := repo.Create(ctx, endpoint); err != nil {
-		t.Fatalf("seed provider endpoint failed: %v", err)
-	}
-	return endpoint
-}
 
 func TestProviderEndpointConflictErrorMapsUniqueConstraintNames(t *testing.T) {
 	tests := []struct {
@@ -39,29 +23,29 @@ func TestProviderEndpointConflictErrorMapsUniqueConstraintNames(t *testing.T) {
 	}{
 		{
 			name: "pgx duplicate name",
-			err:  &pgconn.PgError{Code: "23505", ConstraintName: providerEndpointNameUniqueIndex},
+			err:  &pgconn.PgError{Code: "23505", ConstraintName: postgres.ProviderEndpointNameUniqueIndex},
 			want: ErrNameConflict,
 		},
 		{
 			name: "pgx duplicate api type and base url",
-			err:  &pgconn.PgError{Code: "23505", ConstraintName: providerEndpointAPITypeBaseURLUniqIdx},
+			err:  &pgconn.PgError{Code: "23505", ConstraintName: postgres.ProviderEndpointAPITypeBaseURLUniqIdx},
 			want: ErrURLConflict,
 		},
 		{
 			name: "pq duplicate name",
-			err:  &pq.Error{Code: "23505", Constraint: providerEndpointNameUniqueIndex},
+			err:  &pq.Error{Code: "23505", Constraint: postgres.ProviderEndpointNameUniqueIndex},
 			want: ErrNameConflict,
 		},
 		{
 			name: "pq duplicate api type and base url",
-			err:  &pq.Error{Code: "23505", Constraint: providerEndpointAPITypeBaseURLUniqIdx},
+			err:  &pq.Error{Code: "23505", Constraint: postgres.ProviderEndpointAPITypeBaseURLUniqIdx},
 			want: ErrURLConflict,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := providerEndpointConflictError(tt.err); !errors.Is(err, tt.want) {
+			if err := postgres.ProviderEndpointConflictError(tt.err); !errors.Is(err, tt.want) {
 				t.Fatalf("mapped error = %v, want %v", err, tt.want)
 			}
 		})
@@ -198,26 +182,37 @@ WHERE account_id = (SELECT id FROM api_accounts WHERE provider_endpoint_id = $1)
 			if err != nil {
 				t.Fatalf("reload provider endpoint: %v", err)
 			}
-			if stored.APIType != before.APIType || stored.Protocol != before.Protocol || stored.Name != before.Name || stored.BaseURL != before.BaseURL || strings.Join(stored.Capabilities, ",") != strings.Join(before.Capabilities, ",") {
-				t.Fatalf("status update changed endpoint configuration: before=%+v after=%+v", before, stored)
+			assertEndpointConfigUnchanged(t, &before, stored)
+			if test.apiKey != "" {
+				assertManagedAccountSecretUnchanged(t, ctx, db, endpoint.ID, managedSecret)
 			}
-			if test.apiKey == "" {
-				return
-			}
+		})
+	}
+}
 
-			var accountStatus int16
-			var currentSecret string
-			if err := db.QueryRowContext(ctx, `
+func assertEndpointConfigUnchanged(t *testing.T, before, stored *Endpoint) {
+	t.Helper()
+	if stored.APIType != before.APIType || stored.Protocol != before.Protocol || stored.Name != before.Name || stored.BaseURL != before.BaseURL {
+		t.Fatalf("status update changed endpoint configuration: before=%+v after=%+v", before, stored)
+	}
+	if strings.Join(stored.Capabilities, ",") != strings.Join(before.Capabilities, ",") {
+		t.Fatalf("status update changed endpoint capabilities: before=%+v after=%+v", before, stored)
+	}
+}
+
+func assertManagedAccountSecretUnchanged(t *testing.T, ctx context.Context, db *sql.DB, endpointID int64, wantSecret string) {
+	t.Helper()
+	var accountStatus int16
+	var currentSecret string
+	if err := db.QueryRowContext(ctx, `
 SELECT account.status, secret.secret_payload
 FROM api_accounts AS account
 JOIN api_account_secrets AS secret ON secret.account_id = account.id AND secret.status = 'active'
-WHERE account.provider_endpoint_id = $1`, endpoint.ID).Scan(&accountStatus, &currentSecret); err != nil {
-				t.Fatalf("load managed account after status update: %v", err)
-			}
-			if accountStatus != 0 || currentSecret != managedSecret {
-				t.Fatalf("managed account status/secret = (%d, %q), want (0, unchanged)", accountStatus, currentSecret)
-			}
-		})
+WHERE account.provider_endpoint_id = $1`, endpointID).Scan(&accountStatus, &currentSecret); err != nil {
+		t.Fatalf("load managed account after status update: %v", err)
+	}
+	if accountStatus != 0 || currentSecret != wantSecret {
+		t.Fatalf("managed account status/secret = (%d, %q), want (0, unchanged)", accountStatus, currentSecret)
 	}
 }
 
@@ -319,5 +314,26 @@ func TestUpdateProviderEndpointReturnsURLConflict(t *testing.T) {
 	second.BaseURL = first.BaseURL
 	if err := repo.Update(ctx, second); !errors.Is(err, ErrURLConflict) {
 		t.Fatalf("duplicate provider endpoint update url error = %v, want ErrURLConflict", err)
+	}
+}
+
+func TestServiceGetByID(t *testing.T) {
+	ctx := context.Background()
+	db := newProviderEndpointRepositoryTestDB(t)
+	repo := NewRepository(db)
+	svc := NewService(repo)
+	endpoint := seedProviderEndpoint(t, ctx, repo, &Endpoint{
+		APIType: "openai-compatible",
+		Name:    "Service GetByID Endpoint",
+		BaseURL: "https://example.com/service-getbyid",
+		Status:  1,
+	})
+
+	got, err := svc.GetByID(ctx, endpoint.ID)
+	if err != nil {
+		t.Fatalf("svc.GetByID failed: %v", err)
+	}
+	if got.ID != endpoint.ID || got.Name != endpoint.Name {
+		t.Fatalf("svc.GetByID returned %+v, want %+v", got, endpoint)
 	}
 }

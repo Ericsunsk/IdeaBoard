@@ -4,7 +4,7 @@ import (
 	"log/slog"
 
 	accounthttp "ideaboard/api/internal/accountpool/accounts/interfaces/http"
-	"ideaboard/api/internal/accountpool/providerendpoints"
+	providerendpointshttp "ideaboard/api/internal/accountpool/providerendpoints/interfaces/http"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/billingrecords"
 	"ideaboard/api/internal/boards"
@@ -129,7 +129,7 @@ func newAppRouter(
 			AccountHandler:              accountHandler,
 			TaskHandler:                 taskHandler,
 			TaskStatsHandler:            taskStatsHandler,
-			ProviderEndpointHandler:     providerendpoints.NewHandler(repos.providerEndpointRepo, cfg.App.Env),
+			ProviderEndpointHandler:     providerendpointshttp.NewHandler(services.providerEndpointService),
 			StorageHandler:              storagehttp.NewHandler(services.storageService),
 			FeaturePromptHandler:        prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
 			StorageService:              services.storageService,

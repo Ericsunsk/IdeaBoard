@@ -1,4 +1,4 @@
-package providerendpoints
+package domain
 
 import (
 	"fmt"
@@ -121,16 +121,16 @@ func NormalizeProtocolCapabilities(protocol string, requested []string) (string,
 	var ok bool
 	protocol, ok = CanonicalProtocol(protocol)
 	if !ok {
-		return "", nil, fmt.Errorf("不支持的 ProviderEndpoint Protocol")
+		return "", nil, ErrUnsupportedProtocol
 	}
 	allowed := protocolSpecs[protocol].definition.Capabilities
 	if protocol == ProtocolImagePipeline || protocol == ProtocolImageFill {
 		if len(requested) != 1 {
-			return "", nil, fmt.Errorf("图片处理 API 必须选择一个处理功能")
+			return "", nil, ErrImageAPIRequiresFunc
 		}
 		capability := strings.ToLower(strings.TrimSpace(requested[0]))
 		if !containsCapability(allowed, capability) {
-			return "", nil, fmt.Errorf("图片处理 API 必须选择一个处理功能")
+			return "", nil, ErrImageAPIRequiresFunc
 		}
 		return protocol, []string{capability}, nil
 	}
@@ -160,7 +160,7 @@ func containsCapability(allowed []string, requested string) bool {
 	return false
 }
 
-func requestedCapabilities(capability string) []string {
+func RequestedCapabilities(capability string) []string {
 	capability = strings.TrimSpace(capability)
 	if capability == "" {
 		return nil
@@ -184,4 +184,13 @@ func AllowsModellessAccounts(protocol string, capabilities []string) bool {
 	return ((p == ProtocolImagePipeline) &&
 		(capabilities[0] == CapabilityCutout || capabilities[0] == CapabilityUpscale)) ||
 		((p == ProtocolImageFill) && capabilities[0] == CapabilityFill)
+}
+
+func IsValidStatus(status int16) bool {
+	return status == 0 || status == 1
+}
+
+func IsManagedImageEndpointProtocol(protocol string) bool {
+	canonical, ok := CanonicalProtocol(protocol)
+	return ok && (canonical == ProtocolImagePipeline || canonical == ProtocolImageFill)
 }

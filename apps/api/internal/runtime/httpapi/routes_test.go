@@ -15,7 +15,8 @@ import (
 	"testing/fstest"
 
 	accounthttp "ideaboard/api/internal/accountpool/accounts/interfaces/http"
-	"ideaboard/api/internal/accountpool/providerendpoints"
+	providerendpointsapp "ideaboard/api/internal/accountpool/providerendpoints/application"
+	providerendpointshttp "ideaboard/api/internal/accountpool/providerendpoints/interfaces/http"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/billingrecords"
 	"ideaboard/api/internal/boards"
@@ -339,7 +340,7 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 			AccountHandler:              accounthttp.NewHandler(nil),
 			TaskHandler:                 taskhttp.NewHandler(taskhttp.HandlerDeps{}),
 			TaskStatsHandler:            statisticshttp.NewHandler(nil, nil),
-			ProviderEndpointHandler:     providerendpoints.NewHandler(nil),
+			ProviderEndpointHandler:     providerendpointshttp.NewHandler(providerendpointsapp.NewService(nil)),
 			StorageHandler:              storagehttp.NewHandler(nil),
 			FeaturePromptHandler:        prompts.NewFeaturePromptHandler(nil),
 			RewardAdminCommandHandler:   rewards.NewAdminCommandHandler(nil),

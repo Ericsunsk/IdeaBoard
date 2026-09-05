@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	providerendpointsapp "ideaboard/api/internal/accountpool/providerendpoints/application"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/billingrecords"
 	"ideaboard/api/internal/boards"
@@ -30,21 +31,22 @@ import (
 )
 
 type appDomainServices struct {
-	dbPool               *pgxpool.Pool
-	authServiceClient    *auth.ServiceClient
-	runtimeSettings      *settings.RuntimeSettingsService
-	storageService       *storage.Service
-	userService          *administration.Service
-	boardService         *boards.Service
-	billingService       *billing.Service
-	billingCatalog       *billing.BillableItemCatalog
-	billableItemRegistry *billing.BillableItemRegistry
-	billingRecords       *billingrecords.Service
-	creditService        *credits.Service
-	usageService         *usage.Service
-	rewardService        *rewards.Service
-	paymentService       *payments.Service
-	userLifecycle        *identityLifecycle
+	dbPool                  *pgxpool.Pool
+	authServiceClient       *auth.ServiceClient
+	runtimeSettings         *settings.RuntimeSettingsService
+	storageService          *storage.Service
+	userService             *administration.Service
+	boardService            *boards.Service
+	billingService          *billing.Service
+	billingCatalog          *billing.BillableItemCatalog
+	billableItemRegistry    *billing.BillableItemRegistry
+	billingRecords          *billingrecords.Service
+	creditService           *credits.Service
+	usageService            *usage.Service
+	rewardService           *rewards.Service
+	paymentService          *payments.Service
+	userLifecycle           *identityLifecycle
+	providerEndpointService *providerendpointsapp.Service
 }
 
 func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepositories, appPool *pgxpool.Pool) (appDomainServices, error) {
@@ -131,20 +133,21 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		return appDomainServices{}, fmt.Errorf("initialize payments service: %w", err)
 	}
 	return appDomainServices{
-		dbPool:               appPool,
-		authServiceClient:    authServiceClient,
-		runtimeSettings:      runtimeSettings,
-		storageService:       storageService,
-		userService:          userService,
-		boardService:         boards.NewService(repos.boardRepo, repos.userRepo, storageService),
-		billingService:       billingService,
-		billingCatalog:       billingCatalog,
-		billableItemRegistry: billableItemRegistry,
-		billingRecords:       billingrecords.NewService(billingrecords.NewRepository(appPool)),
-		creditService:        creditService,
-		usageService:         usage.NewService(creditService, repos.taskBillingUsage, usage.ServiceOptions{}),
-		rewardService:        rewardService,
-		paymentService:       paymentService,
-		userLifecycle:        userLifecycle,
+		dbPool:                  appPool,
+		authServiceClient:       authServiceClient,
+		runtimeSettings:         runtimeSettings,
+		storageService:          storageService,
+		userService:             userService,
+		boardService:            boards.NewService(repos.boardRepo, repos.userRepo, storageService),
+		billingService:          billingService,
+		billingCatalog:          billingCatalog,
+		billableItemRegistry:    billableItemRegistry,
+		billingRecords:          billingrecords.NewService(billingrecords.NewRepository(appPool)),
+		creditService:           creditService,
+		usageService:            usage.NewService(creditService, repos.taskBillingUsage, usage.ServiceOptions{}),
+		rewardService:           rewardService,
+		paymentService:          paymentService,
+		userLifecycle:           userLifecycle,
+		providerEndpointService: providerendpointsapp.NewService(repos.providerEndpointRepo, cfg.App.Env),
 	}, nil
 }

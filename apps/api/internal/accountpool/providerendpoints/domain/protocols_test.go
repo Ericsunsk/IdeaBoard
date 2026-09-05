@@ -1,37 +1,60 @@
-package providerendpoints
+package domain
 
 import "testing"
 
 func TestNormalizeProtocolCapabilitiesEnforcesCompatibility(t *testing.T) {
-	protocol, capabilities, err := NormalizeProtocolCapabilities(ProtocolImagePipeline, []string{CapabilityCutout})
-	if err != nil || protocol != ProtocolImagePipeline || len(capabilities) != 1 {
-		t.Fatalf("custom protocol normalization = %q, %v, %v", protocol, capabilities, err)
+	t.Run("valid image pipeline with cutout", func(t *testing.T) {
+		protocol, capabilities, err := NormalizeProtocolCapabilities(ProtocolImagePipeline, []string{CapabilityCutout})
+		assertNormalization(t, protocol, capabilities, err, ProtocolImagePipeline, CapabilityCutout)
+	})
+
+	t.Run("valid image fill", func(t *testing.T) {
+		protocol, capabilities, err := NormalizeProtocolCapabilities(ProtocolImageFill, []string{CapabilityFill})
+		assertNormalization(t, protocol, capabilities, err, ProtocolImageFill, CapabilityFill)
+	})
+
+	t.Run("valid default model API", func(t *testing.T) {
+		protocol, capabilities, err := NormalizeProtocolCapabilities(ProtocolModelAPI, nil)
+		assertNormalization(t, protocol, capabilities, err, ProtocolModelAPI, CapabilityGeneration)
+	})
+}
+
+func assertNormalization(t *testing.T, protocol string, capabilities []string, err error, wantProtocol string, wantCapabilities ...string) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
 	}
-	if capabilities[0] != CapabilityCutout {
-		t.Fatalf("custom protocol capabilities = %v", capabilities)
+	if protocol != wantProtocol {
+		t.Fatalf("protocol = %q, want %q", protocol, wantProtocol)
 	}
-	if _, _, err = NormalizeProtocolCapabilities("image-url-json-to-image", []string{CapabilityCutout}); err == nil {
-		t.Fatal("legacy image transform protocol must be rejected")
+	if len(capabilities) != len(wantCapabilities) {
+		t.Fatalf("capabilities = %v, want %v", capabilities, wantCapabilities)
 	}
-	if _, _, err := NormalizeProtocolCapabilities(ProtocolImagePipeline, nil); err == nil {
-		t.Fatal("image processing protocol without a selected capability should fail")
+	for i, c := range wantCapabilities {
+		if capabilities[i] != c {
+			t.Fatalf("capabilities[%d] = %q, want %q", i, capabilities[i], c)
+		}
 	}
-	if _, _, err := NormalizeProtocolCapabilities(ProtocolImagePipeline, []string{CapabilityCutout, CapabilityUpscale}); err == nil {
-		t.Fatal("image processing protocol with multiple capabilities should fail")
+}
+
+func TestNormalizeProtocolCapabilitiesRejectsInvalidInputs(t *testing.T) {
+	cases := []struct {
+		name         string
+		protocol     string
+		capabilities []string
+	}{
+		{"legacy image transform", "image-url-json-to-image", []string{CapabilityCutout}},
+		{"missing capability", ProtocolImagePipeline, nil},
+		{"multiple capabilities", ProtocolImagePipeline, []string{CapabilityCutout, CapabilityUpscale}},
+		{"unsupported capability", ProtocolImagePipeline, []string{CapabilityGeneration}},
+		{"legacy image fill", "flux-fill-json-image", []string{CapabilityFill}},
 	}
-	if _, _, err := NormalizeProtocolCapabilities(ProtocolImagePipeline, []string{CapabilityGeneration}); err == nil {
-		t.Fatal("image processing protocol with an unsupported capability should fail")
-	}
-	protocol, capabilities, err = NormalizeProtocolCapabilities(ProtocolImageFill, []string{CapabilityFill})
-	if err != nil || protocol != ProtocolImageFill || len(capabilities) != 1 || capabilities[0] != CapabilityFill {
-		t.Fatalf("image fill protocol normalization = %q, %v, %v", protocol, capabilities, err)
-	}
-	if _, _, err = NormalizeProtocolCapabilities("flux-fill-json-image", []string{CapabilityFill}); err == nil {
-		t.Fatal("legacy image fill protocol must be rejected")
-	}
-	protocol, capabilities, err = NormalizeProtocolCapabilities(ProtocolModelAPI, nil)
-	if err != nil || protocol != ProtocolModelAPI || len(capabilities) != 1 || capabilities[0] != CapabilityGeneration {
-		t.Fatalf("model protocol normalization = %q, %v, %v", protocol, capabilities, err)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, _, err := NormalizeProtocolCapabilities(tc.protocol, tc.capabilities); err == nil {
+				t.Fatalf("expected error for %s, got nil", tc.name)
+			}
+		})
 	}
 }
 
@@ -82,7 +105,7 @@ func TestCustomProtocolDoesNotSupportModelDetection(t *testing.T) {
 	}
 }
 
-func TestProtocolRegistryResolvesCanonicalProtocolsAndRuntimeAdapters(t *testing.T) {
+func TestProtocolRegistryResolvesCanonicalProtocols(t *testing.T) {
 	canonical, ok := CanonicalProtocol(ProtocolImageFill)
 	if !ok || canonical != ProtocolImageFill {
 		t.Fatalf("canonical fill protocol = %q, %v", canonical, ok)
@@ -93,6 +116,15 @@ func TestProtocolRegistryResolvesCanonicalProtocolsAndRuntimeAdapters(t *testing
 	if ProtocolSupportsAPIType(ProtocolImageFill, "google-ai") {
 		t.Fatal("image fill should reject Google API types")
 	}
+	if _, ok := CanonicalProtocol("image-url-json-to-image"); ok {
+		t.Fatal("legacy image transform protocol must not resolve")
+	}
+	if _, ok := CanonicalProtocol("flux-fill-json-image"); ok {
+		t.Fatal("legacy image fill protocol must not resolve")
+	}
+}
+
+func TestProtocolRegistryResolvesRuntimeAdapters(t *testing.T) {
 	route, ok := RuntimeAdapterFor(ProtocolImagePipeline, "upscale")
 	if !ok || route != RuntimeAdapterUpscale {
 		t.Fatalf("upscale route = %q, %v", route, ok)
@@ -103,11 +135,5 @@ func TestProtocolRegistryResolvesCanonicalProtocolsAndRuntimeAdapters(t *testing
 	}
 	if _, ok := RuntimeAdapterFor(ProtocolModelAPI, "inpaint"); ok {
 		t.Fatal("model protocol must reject inpaint")
-	}
-	if _, ok := CanonicalProtocol("image-url-json-to-image"); ok {
-		t.Fatal("legacy image transform protocol must not resolve")
-	}
-	if _, ok := CanonicalProtocol("flux-fill-json-image"); ok {
-		t.Fatal("legacy image fill protocol must not resolve")
 	}
 }

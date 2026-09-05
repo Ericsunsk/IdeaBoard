@@ -6,7 +6,7 @@ import (
 	iofs "io/fs"
 
 	accounthttp "ideaboard/api/internal/accountpool/accounts/interfaces/http"
-	"ideaboard/api/internal/accountpool/providerendpoints"
+	providerendpointshttp "ideaboard/api/internal/accountpool/providerendpoints/interfaces/http"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/billingrecords"
 	"ideaboard/api/internal/boards"
@@ -110,7 +110,7 @@ type AdminRouteDeps struct {
 	AccountHandler              *accounthttp.Handler
 	TaskHandler                 *taskhttp.Handler
 	TaskStatsHandler            *statisticshttp.Handler
-	ProviderEndpointHandler     *providerendpoints.Handler
+	ProviderEndpointHandler     *providerendpointshttp.Handler
 	StorageHandler              *storagehttp.Handler
 	FeaturePromptHandler        *prompts.FeaturePromptHandler
 	StorageService              *storage.Service

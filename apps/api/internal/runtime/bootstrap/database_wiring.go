@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	accountrepo "ideaboard/api/internal/accountpool/accounts/infrastructure/postgres"
-	"ideaboard/api/internal/accountpool/providerendpoints"
+	providerendpointspg "ideaboard/api/internal/accountpool/providerendpoints/infrastructure/postgres"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/boards"
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
@@ -48,7 +48,7 @@ type appRepositories struct {
 	accountRepo          *accountrepo.Repository
 	taskRepo             *taskstore.Repository
 	taskBillingUsage     *taskbilling.UsageStore
-	providerEndpointRepo *providerendpoints.Repository
+	providerEndpointRepo *providerendpointspg.Repository
 	systemConfigRepo     *settings.SystemConfigRepository
 	featurePromptRepo    *prompts.FeaturePromptRepository
 	storageProfileRepo   *storagepostgres.Repository
@@ -179,7 +179,7 @@ func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error
 		accountRepo:          accountrepo.NewRepository(db, taskRepo),
 		taskRepo:             taskRepo,
 		taskBillingUsage:     taskbilling.NewUsageStore(db),
-		providerEndpointRepo: providerendpoints.NewRepository(db),
+		providerEndpointRepo: providerendpointspg.NewRepository(db),
 		systemConfigRepo:     settings.NewSystemConfigRepository(db),
 		featurePromptRepo:    prompts.NewFeaturePromptRepository(db),
 		storageProfileRepo:   storagepostgres.NewRepository(db),
