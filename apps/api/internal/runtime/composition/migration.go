@@ -3,6 +3,7 @@ package composition
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,8 @@ import (
 
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
+
+	"github.com/jackc/pgx/v5"
 )
 
 const defaultMigrationDirectory = "file://internal/db/migrations"
@@ -57,21 +60,21 @@ func reconcileCleanBreakDatabase(ctx context.Context, migrationConfig config.Dat
 	}
 	defer db.Close()
 
-	var revisionsTableExists bool
+	var revisionsTable sql.NullString
 	err = db.QueryRowContext(ctx, `
-		SELECT EXISTS (
-			SELECT 1 FROM pg_tables 
-			WHERE schemaname = 'public' AND tablename = 'atlas_schema_revisions'
+		SELECT COALESCE(
+			to_regclass('atlas_schema_revisions.atlas_schema_revisions')::text,
+			to_regclass('public.atlas_schema_revisions')::text
 		)
-	`).Scan(&revisionsTableExists)
+	`).Scan(&revisionsTable)
 	if err != nil {
 		return fmt.Errorf("check revisions table: %w", err)
 	}
-	if !revisionsTableExists {
+	if !revisionsTable.Valid || revisionsTable.String == "" {
 		return nil
 	}
 
-	rows, err := db.QueryContext(ctx, `SELECT version FROM atlas_schema_revisions ORDER BY version ASC`)
+	rows, err := db.QueryContext(ctx, fmt.Sprintf("SELECT version::text FROM %s ORDER BY version ASC", revisionsTable.String))
 	if err != nil {
 		return fmt.Errorf("query atlas schema revisions: %w", err)
 	}
@@ -83,6 +86,9 @@ func reconcileCleanBreakDatabase(ctx context.Context, migrationConfig config.Dat
 		if err := rows.Scan(&v); err == nil && v != "" {
 			recordedVersions = append(recordedVersions, v)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate atlas schema revisions: %w", err)
 	}
 	if len(recordedVersions) == 0 {
 		return nil
@@ -114,14 +120,21 @@ func reconcileCleanBreakDatabase(ctx context.Context, migrationConfig config.Dat
 	}
 
 	if hasMissingRevisions {
-		_, err = db.ExecContext(ctx, `
+		owner := strings.TrimSpace(migrationConfig.User)
+		if owner == "" {
+			owner = "ideaboard"
+		}
+		sanitizedOwner := pgx.Identifier{owner}.Sanitize()
+		stmt := fmt.Sprintf(`
+			DROP SCHEMA IF EXISTS atlas_schema_revisions CASCADE;
+			DROP TABLE IF EXISTS public.atlas_schema_revisions CASCADE;
 			DROP SCHEMA public CASCADE;
 			CREATE SCHEMA public;
-			ALTER SCHEMA public OWNER TO ideaboard;
-			GRANT ALL ON SCHEMA public TO ideaboard;
+			ALTER SCHEMA public OWNER TO %s;
+			GRANT ALL ON SCHEMA public TO %s;
 			GRANT ALL ON SCHEMA public TO public;
-		`)
-		if err != nil {
+		`, sanitizedOwner, sanitizedOwner)
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
 			return fmt.Errorf("reset clean break schema: %w", err)
 		}
 	}
