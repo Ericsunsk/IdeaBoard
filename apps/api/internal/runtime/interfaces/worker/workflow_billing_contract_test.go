@@ -38,9 +38,6 @@ import (
 
 type providerCallOutput = runtimeports.ProviderCallOutput
 
-var newTaskProcessor = execution.NewProcessor
-var newTaskExecutionOrchestrator = execution.NewOrchestrator
-
 func newUpstreamHTTPError(status int, body string) error {
 	return runtimeports.NewUpstreamHTTPError(status, body, 0)
 }
@@ -117,7 +114,7 @@ func TestAIImageWorkflowBillingContractUsesCurrentProviderPoolAndConvergesFacts(
 	var failedProviderID atomic.Int64
 	var successfulProviderID atomic.Int64
 	riverQueue := taskqueue.NewRiverQueueWithClient(nil, db, nil, queueName, 1)
-	orchestrator := newTaskExecutionOrchestrator(
+	orchestrator := execution.NewOrchestrator(
 		accountRepo,
 		riverQueue,
 		taskExecution,

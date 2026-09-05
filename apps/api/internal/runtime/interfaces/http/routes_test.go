@@ -26,6 +26,7 @@ import (
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
+	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
@@ -612,4 +613,55 @@ func sampleAdminRouteParam(name string) string {
 
 func adminRouteKey(route adminRouteUnderTest) string {
 	return route.Method + " " + route.Path
+}
+
+func TestAdminPaymentRoutesExposeStripeConfigurationAndOrderReads(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	registerAdminPaymentRoutes(router.Group("/api/admin"), AdminRouteDeps{
+		PaymentAdminHandler: paymenthttp.NewAdminHandler(nil, config.PublicOriginsConfig{}),
+	})
+	routes := make(map[string]struct{})
+	for _, route := range router.Routes() {
+		routes[route.Method+" "+route.Path] = struct{}{}
+	}
+	for _, expected := range []string{
+		"GET /api/admin/payments/stripe-config",
+		"PUT /api/admin/payments/stripe-config",
+		"GET /api/admin/payments/orders",
+		"GET /api/admin/payments/orders/:order_number",
+	} {
+		if _, exists := routes[expected]; !exists {
+			t.Fatalf("route %q is not registered: %#v", expected, routes)
+		}
+	}
+}
+
+func TestAdminRewardRoutesExposeOnlyCanonicalRewardCodes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	registerAdminRewardRoutes(router.Group("/api/admin"), AdminRouteDeps{
+		RewardAdminCommandHandler: rewards.NewAdminCommandHandler(nil),
+		RewardAdminReadHandler:    rewards.NewAdminReadHandler(nil, nil),
+	})
+	routes := make(map[string]struct{})
+	for _, route := range router.Routes() {
+		routes[route.Method+" "+route.Path] = struct{}{}
+	}
+	for _, expected := range []string{
+		"POST /api/admin/rewards/codes",
+		"POST /api/admin/rewards/codes/search",
+		"GET /api/admin/rewards/codes/:id/redemptions",
+		"GET /api/admin/rewards/codes/:id/redemptions/:redemption_id",
+		"PATCH /api/admin/rewards/codes/:id",
+		"PATCH /api/admin/rewards/codes/:id/enabled",
+		"DELETE /api/admin/rewards/codes/:id",
+	} {
+		if _, exists := routes[expected]; !exists {
+			t.Fatalf("route %q is not registered: %#v", expected, routes)
+		}
+	}
+	if len(routes) != 7 {
+		t.Fatalf("unexpected legacy Reward routes remain registered: %#v", routes)
+	}
 }

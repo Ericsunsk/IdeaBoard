@@ -475,10 +475,10 @@ func TestExecuteProviderFailureRoutesThroughConvergenceDecision(t *testing.T) {
 	requeuer := &fakeRequeuer{}
 	assigner := &fakeAssigner{}
 	runtime := taskexecution.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
-	decider := &recordingTaskExecutionConvergenceDecider{
-		outcomes: []taskExecutionConvergenceOutcome{taskExecutionConvergenceFinalFail},
+	decider := &recordingConvergenceDecider{
+		outcomes: []convergenceOutcome{convergenceFinalFail},
 	}
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, requeuer, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueueports.TaskAssignment) (providerCallOutput, error) {
+	orchestrator := NewOrchestrator(accountRepo, requeuer, runtime, func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueueports.TaskAssignment) (providerCallOutput, error) {
 		return providerOutputJSON(""), newUpstreamHTTPError(429, "rate limited")
 	})
 	orchestrator.convergenceDecider = decider
@@ -720,14 +720,14 @@ func providerOutputJSON(result string) providerCallOutput {
 	return output
 }
 
-type recordingTaskExecutionConvergenceDecider struct {
-	inputs   []taskExecutionConvergenceInput
-	outcomes []taskExecutionConvergenceOutcome
+type recordingConvergenceDecider struct {
+	inputs   []convergenceInput
+	outcomes []convergenceOutcome
 }
 
-func (d *recordingTaskExecutionConvergenceDecider) DecideTaskExecutionConvergence(input taskExecutionConvergenceInput) taskExecutionConvergenceDecision {
+func (d *recordingConvergenceDecider) DecideConvergence(input convergenceInput) convergenceDecision {
 	d.inputs = append(d.inputs, input)
-	decision := taskExecutionConvergencePolicy{}.DecideTaskExecutionConvergence(input)
+	decision := convergencePolicy{}.DecideConvergence(input)
 	index := len(d.inputs) - 1
 	if index < len(d.outcomes) {
 		decision.Outcome = d.outcomes[index]

@@ -22,18 +22,17 @@ type accountLookupStore interface {
 	GetRuntimeAccountForAssignment(ctx context.Context, accountID int64, providerEndpointID int64, credentialID int64) (*accounts.RuntimeAccountAccess, error)
 }
 
-type taskExecutionOrchestrator struct {
+type Orchestrator struct {
 	accountRepo        accountLookupStore
 	enqueuer           taskqueueports.TaskEnqueuer
 	taskExecution      *taskexecution.Service
-	attemptLifecycle   *taskAttemptLifecycle
+	attemptLifecycle   *attemptLifecycle
 	providerCall       providerCallFunc
-	convergenceDecider taskExecutionConvergenceDecider
+	convergenceDecider convergenceDecider
 }
 
 const taskCleanupTimeout = 5 * time.Second
 
-type Orchestrator = taskExecutionOrchestrator
 type TaskExecutionOrchestrator = Orchestrator
 
 func NewOrchestrator(
@@ -42,10 +41,17 @@ func NewOrchestrator(
 	taskExecution *taskexecution.Service,
 	providerCall providerCallFunc,
 ) *Orchestrator {
-	return newTaskExecutionOrchestrator(accountRepo, enqueuer, taskExecution, providerCall)
+	return &Orchestrator{
+		accountRepo:        accountRepo,
+		enqueuer:           enqueuer,
+		taskExecution:      taskExecution,
+		attemptLifecycle:   newAttemptLifecycle(taskExecution),
+		providerCall:       providerCall,
+		convergenceDecider: convergencePolicy{},
+	}
 }
 
-func (o *taskExecutionOrchestrator) Execute(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) error {
+func (o *Orchestrator) Execute(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) error {
 	return o.execute(ctx, task, assignment)
 }
 
@@ -54,19 +60,12 @@ func newTaskExecutionOrchestrator(
 	enqueuer taskqueueports.TaskEnqueuer,
 	taskExecution *taskexecution.Service,
 	providerCall providerCallFunc,
-) *taskExecutionOrchestrator {
-	return &taskExecutionOrchestrator{
-		accountRepo:        accountRepo,
-		enqueuer:           enqueuer,
-		taskExecution:      taskExecution,
-		attemptLifecycle:   newTaskAttemptLifecycle(taskExecution),
-		providerCall:       providerCall,
-		convergenceDecider: taskExecutionConvergencePolicy{},
-	}
+) *Orchestrator {
+	return NewOrchestrator(accountRepo, enqueuer, taskExecution, providerCall)
 }
 
-func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) error {
-	phaseMachine := newTaskExecutionPhaseMachine(task.TaskID)
+func (o *Orchestrator) execute(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) error {
+	phaseMachine := newPhaseMachine(task.TaskID)
 	correlationID := task.EnsureCorrelationID()
 	accountID := assignment.AccountID
 	slog.Info("worker executing task", "task_id", task.TaskID, "correlation_id", correlationID, "account_id", accountID)
@@ -93,16 +92,16 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 	return o.finalizeSuccessfulExecution(ctx, task, assignment, accountID, attemptCtx, providerOutput, phaseMachine, correlationID)
 }
 
-func (o *taskExecutionOrchestrator) prepareTaskExecution(
+func (o *Orchestrator) prepareTaskExecution(
 	ctx context.Context,
 	task *tasks.TaskPayload,
 	assignment taskqueueports.TaskAssignment,
-	phaseMachine *taskExecutionPhaseMachine,
+	phaseMachine *phaseMachine,
 	correlationID string,
 ) (*accounts.RuntimeAccountAccess, bool, error) {
 	account, err := o.accountRepo.GetRuntimeAccountForAssignment(ctx, assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID)
 	if err != nil {
-		if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
+		if phaseErr := phaseMachine.advance(phaseRequeued); phaseErr != nil {
 			return nil, true, phaseErr
 		}
 		return nil, true, o.requeueTask(ctx, task, assignment, "运行时账号、服务端点或凭据不可用，重新调度")
@@ -110,39 +109,39 @@ func (o *taskExecutionOrchestrator) prepareTaskExecution(
 	cancelled, err := o.taskExecution.IsTaskCancelled(ctx, task.TaskID)
 	if err != nil {
 		slog.Warn("check task cancellation failed", "task_id", task.TaskID, "correlation_id", correlationID, "err", err)
-		if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
+		if phaseErr := phaseMachine.advance(phaseRequeued); phaseErr != nil {
 			return nil, true, phaseErr
 		}
 		return nil, true, o.requeueTask(ctx, task, assignment, "检查任务取消状态失败")
 	}
 	if cancelled {
-		if err := phaseMachine.advance(taskExecutionPhaseCancelled); err != nil {
+		if err := phaseMachine.advance(phaseCancelled); err != nil {
 			return nil, true, err
 		}
 		o.skipCancelledTask(ctx, task, nil)
 		return nil, true, nil
 	}
-	if err := phaseMachine.advance(taskExecutionPhaseAssigned); err != nil {
+	if err := phaseMachine.advance(phaseAssigned); err != nil {
 		return nil, true, err
 	}
 	return account, false, nil
 }
 
-func (o *taskExecutionOrchestrator) startTaskAttempt(
+func (o *Orchestrator) startTaskAttempt(
 	ctx context.Context,
 	task *tasks.TaskPayload,
 	assignment taskqueueports.TaskAssignment,
 	account *accounts.RuntimeAccountAccess,
 	startTime time.Time,
 	correlationID string,
-	phaseMachine *taskExecutionPhaseMachine,
-) (taskExecutionAttemptContext, bool, error) {
+	phaseMachine *phaseMachine,
+) (attemptContext, bool, error) {
 	if err := o.taskExecution.ConfirmTaskLease(ctx, assignment); err != nil {
 		slog.Warn("confirm task running lease failed", "task_id", task.TaskID, "correlation_id", correlationID, "account_id", assignment.AccountID, "err", err)
 		return o.handleStartAttemptFailure(ctx, task, assignment, phaseMachine, "确认任务运行租约失败", err)
 	}
 
-	o.recordExecutionSnapshot(ctx, task.TaskID, taskExecutionSnapshot(task, account, assignment))
+	o.recordExecutionSnapshot(ctx, task.TaskID, buildExecutionSnapshot(task, account, assignment))
 	providerStartAt := time.Now()
 	attemptCtx, err := o.attemptLifecycle.begin(ctx, task, assignment, startTime, providerStartAt)
 	if err != nil {
@@ -150,53 +149,53 @@ func (o *taskExecutionOrchestrator) startTaskAttempt(
 		return o.handleStartAttemptFailure(ctx, task, assignment, phaseMachine, "记录任务执行尝试失败", err)
 	}
 	o.recordExecutionMetrics(ctx, task.TaskID, tasks.TaskExecutionMetricsPatch{TaskID: task.TaskID, CurrentStage: tasks.StringPtr(tasks.ExecutionStageProvider), ProviderStartedAt: &providerStartAt, WorkerOverheadMS: int64Ptr(nonNegativeMilliseconds(providerStartAt.Sub(startTime)))})
-	if err := phaseMachine.advance(taskExecutionPhaseProvider); err != nil {
-		return taskExecutionAttemptContext{}, true, err
+	if err := phaseMachine.advance(phaseProvider); err != nil {
+		return attemptContext{}, true, err
 	}
 	return attemptCtx, false, nil
 }
 
-func (o *taskExecutionOrchestrator) handleStartAttemptFailure(
+func (o *Orchestrator) handleStartAttemptFailure(
 	ctx context.Context,
 	task *tasks.TaskPayload,
 	assignment taskqueueports.TaskAssignment,
-	phaseMachine *taskExecutionPhaseMachine,
+	phaseMachine *phaseMachine,
 	reason string,
 	originalErr error,
-) (taskExecutionAttemptContext, bool, error) {
+) (attemptContext, bool, error) {
 	if isTaskConvergedError(originalErr) {
-		if phaseErr := phaseMachine.advance(taskExecutionPhaseDropped); phaseErr != nil {
-			return taskExecutionAttemptContext{}, true, phaseErr
+		if phaseErr := phaseMachine.advance(phaseDropped); phaseErr != nil {
+			return attemptContext{}, true, phaseErr
 		}
 		o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
-		return taskExecutionAttemptContext{}, true, nil
+		return attemptContext{}, true, nil
 	}
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 	if resetErr := o.taskExecution.ResetRunningTask(cleanupCtx, taskexecution.ResetRunningTaskInput{Assignment: assignment, Reason: reason}); resetErr != nil {
 		if isTaskConvergedError(resetErr) {
 			o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
-			return taskExecutionAttemptContext{}, true, nil
+			return attemptContext{}, true, nil
 		}
-		return taskExecutionAttemptContext{}, true, resetErr
+		return attemptContext{}, true, resetErr
 	}
-	if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
-		return taskExecutionAttemptContext{}, true, phaseErr
+	if phaseErr := phaseMachine.advance(phaseRequeued); phaseErr != nil {
+		return attemptContext{}, true, phaseErr
 	}
-	return taskExecutionAttemptContext{}, true, o.requeueTask(ctx, task, taskqueueports.TaskAssignment{}, reason)
+	return attemptContext{}, true, o.requeueTask(ctx, task, taskqueueports.TaskAssignment{}, reason)
 }
 
-func (o *taskExecutionOrchestrator) finalizeSuccessfulExecution(
+func (o *Orchestrator) finalizeSuccessfulExecution(
 	ctx context.Context,
 	task *tasks.TaskPayload,
 	assignment taskqueueports.TaskAssignment,
 	accountID int64,
-	attemptCtx taskExecutionAttemptContext,
+	attemptCtx attemptContext,
 	providerOutput runtimeports.ProviderCallOutput,
-	phaseMachine *taskExecutionPhaseMachine,
+	phaseMachine *phaseMachine,
 	correlationID string,
 ) error {
-	if err := phaseMachine.advance(taskExecutionPhaseFinalizing); err != nil {
+	if err := phaseMachine.advance(phaseFinalizing); err != nil {
 		return err
 	}
 	handled, err := o.checkCancelledBeforeFinalize(ctx, task, assignment, attemptCtx, phaseMachine, correlationID)
@@ -206,26 +205,26 @@ func (o *taskExecutionOrchestrator) finalizeSuccessfulExecution(
 	return o.applySuccessfulCompletion(ctx, task, assignment, accountID, attemptCtx, providerOutput, phaseMachine)
 }
 
-func (o *taskExecutionOrchestrator) checkCancelledBeforeFinalize(
+func (o *Orchestrator) checkCancelledBeforeFinalize(
 	ctx context.Context,
 	task *tasks.TaskPayload,
 	assignment taskqueueports.TaskAssignment,
-	attemptCtx taskExecutionAttemptContext,
-	phaseMachine *taskExecutionPhaseMachine,
+	attemptCtx attemptContext,
+	phaseMachine *phaseMachine,
 	correlationID string,
 ) (bool, error) {
 	checkCtx, checkCancel := taskCleanupContext(ctx)
 	cancelled, err := o.taskExecution.IsTaskCancelled(checkCtx, task.TaskID)
 	checkCancel()
 	if err != nil {
-		if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
+		if phaseErr := phaseMachine.advance(phaseRequeued); phaseErr != nil {
 			return true, phaseErr
 		}
 		slog.Warn("check task cancellation failed", "task_id", task.TaskID, "correlation_id", correlationID, "err", err)
 		return true, o.requeueTask(ctx, task, assignment, "检查任务取消状态失败")
 	}
 	if cancelled {
-		if err := phaseMachine.advance(taskExecutionPhaseCancelled); err != nil {
+		if err := phaseMachine.advance(phaseCancelled); err != nil {
 			return true, err
 		}
 		cancelFinish, _ := attemptCtx.buildAttemptFinish(tasks.TaskAttemptStatusCancelled, "任务已取消", tasks.ExecutionStageFinalizing, tasks.FailureCategoryCancelled, time.Now())
@@ -235,20 +234,20 @@ func (o *taskExecutionOrchestrator) checkCancelledBeforeFinalize(
 	return false, nil
 }
 
-func (o *taskExecutionOrchestrator) applySuccessfulCompletion(
+func (o *Orchestrator) applySuccessfulCompletion(
 	ctx context.Context,
 	task *tasks.TaskPayload,
 	assignment taskqueueports.TaskAssignment,
 	accountID int64,
-	attemptCtx taskExecutionAttemptContext,
+	attemptCtx attemptContext,
 	providerOutput runtimeports.ProviderCallOutput,
-	phaseMachine *taskExecutionPhaseMachine,
+	phaseMachine *phaseMachine,
 ) error {
 	elapsed := attemptCtx.elapsedSeconds()
 	completedFinish, _ := attemptCtx.buildAttemptFinish(tasks.TaskAttemptStatusCompleted, "", "", "", time.Now())
 	completed, completeErr := o.completeTask(ctx, task, assignment, providerOutput.Result, providerOutput.Outputs, elapsed, &completedFinish)
 	if completeErr != nil {
-		if phaseErr := phaseMachine.advance(taskExecutionPhaseFailed); phaseErr != nil {
+		if phaseErr := phaseMachine.advance(phaseFailed); phaseErr != nil {
 			return phaseErr
 		}
 		o.attemptLifecycle.finishFallback(ctx, attemptCtx, tasks.TaskAttemptStatusFailed, "任务结果保存失败，请稍后重试", tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, time.Now())
@@ -260,7 +259,7 @@ func (o *taskExecutionOrchestrator) applySuccessfulCompletion(
 		finishedAt = time.Now()
 	}
 	if completed {
-		if err := phaseMachine.advance(taskExecutionPhaseCompleted); err != nil {
+		if err := phaseMachine.advance(phaseCompleted); err != nil {
 			return err
 		}
 		o.recordFinalizeFinished(ctx, task.TaskID, providerOutput.Timeline, finishedAt)
@@ -270,15 +269,15 @@ func (o *taskExecutionOrchestrator) applySuccessfulCompletion(
 		}
 		return nil
 	}
-	return phaseMachine.advance(taskExecutionPhaseDropped)
+	return phaseMachine.advance(phaseDropped)
 }
 
-func (o *taskExecutionOrchestrator) handleProviderFailure(
+func (o *Orchestrator) handleProviderFailure(
 	ctx context.Context,
 	taskCtx context.Context,
-	attempt taskExecutionAttemptContext,
+	attempt attemptContext,
 	err error,
-	phaseMachine *taskExecutionPhaseMachine,
+	phaseMachine *phaseMachine,
 ) error {
 	if isContextInterrupted(taskCtx.Err()) || isContextInterrupted(ctx.Err()) {
 		return o.handleInterruptedProviderFailure(ctx, attempt, err, phaseMachine)
@@ -286,11 +285,11 @@ func (o *taskExecutionOrchestrator) handleProviderFailure(
 	return o.handleProviderFailureConvergence(ctx, attempt, err, phaseMachine)
 }
 
-func (o *taskExecutionOrchestrator) handleInterruptedProviderFailure(
+func (o *Orchestrator) handleInterruptedProviderFailure(
 	ctx context.Context,
-	attempt taskExecutionAttemptContext,
+	attempt attemptContext,
 	err error,
-	phaseMachine *taskExecutionPhaseMachine,
+	phaseMachine *phaseMachine,
 ) error {
 	checkCtx, checkCancel := taskCleanupContext(ctx)
 	cancelled, checkErr := o.taskExecution.IsTaskCancelled(checkCtx, attempt.task.TaskID)
@@ -298,32 +297,32 @@ func (o *taskExecutionOrchestrator) handleInterruptedProviderFailure(
 	if checkErr != nil {
 		slog.Warn("check task cancellation failed", "task_id", attempt.task.TaskID, "err", checkErr)
 	}
-	decision := o.decideTaskExecutionConvergence(taskExecutionConvergenceInput{
+	decision := o.decideConvergence(convergenceInput{
 		IsExecutionInterrupted: true,
 		IsTaskCancelled:        cancelled,
-		ProviderFailure: taskExecutionConvergenceProviderFailure{
+		ProviderFailure: convergenceProviderFailure{
 			Reason:   err.Error(),
 			Stage:    tasks.ExecutionStageProvider,
 			Category: tasks.FailureCategoryUnknown,
 		},
 	})
 	switch decision.Outcome {
-	case taskExecutionConvergenceCancel:
-		if phaseErr := phaseMachine.advance(taskExecutionPhaseCancelled); phaseErr != nil {
+	case convergenceCancel:
+		if phaseErr := phaseMachine.advance(phaseCancelled); phaseErr != nil {
 			return phaseErr
 		}
 		cancelFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusCancelled, "任务已取消", tasks.ExecutionStageProvider, tasks.FailureCategoryCancelled, time.Now())
 		o.skipCancelledTask(ctx, attempt.task, &cancelFinish)
 		return nil
-	case taskExecutionConvergenceInterruptRequeue:
-		if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
+	case convergenceInterruptRequeue:
+		if phaseErr := phaseMachine.advance(phaseRequeued); phaseErr != nil {
 			return phaseErr
 		}
 		requeueFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusRequeued, decision.Reason, decision.FailureStage, decision.FailureCategory, time.Now())
 		return o.handleExecutionInterrupted(ctx, attempt.task, attempt.assignment, err, &requeueFinish)
 	default:
-		slog.Warn("unexpected task execution convergence outcome for interrupted provider failure", "task_id", attempt.task.TaskID, "outcome", decision.Outcome)
-		if phaseErr := phaseMachine.advance(taskExecutionPhaseRequeued); phaseErr != nil {
+		slog.Warn("unexpected convergence outcome for interrupted provider failure", "task_id", attempt.task.TaskID, "outcome", decision.Outcome)
+		if phaseErr := phaseMachine.advance(phaseRequeued); phaseErr != nil {
 			return phaseErr
 		}
 		requeueFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusRequeued, err.Error(), tasks.ExecutionStageProvider, tasks.FailureCategoryUnknown, time.Now())
@@ -331,11 +330,11 @@ func (o *taskExecutionOrchestrator) handleInterruptedProviderFailure(
 	}
 }
 
-func (o *taskExecutionOrchestrator) handleProviderFailureConvergence(
+func (o *Orchestrator) handleProviderFailureConvergence(
 	ctx context.Context,
-	attempt taskExecutionAttemptContext,
+	attempt attemptContext,
 	err error,
-	phaseMachine *taskExecutionPhaseMachine,
+	phaseMachine *phaseMachine,
 ) error {
 	slog.Warn("upstream provider call failed", "task_id", attempt.task.TaskID, "correlation_id", attempt.task.EffectiveCorrelationID(), "account_id", attempt.accountID, "err", err)
 	elapsed := attempt.elapsedSeconds()
@@ -344,47 +343,47 @@ func (o *taskExecutionOrchestrator) handleProviderFailureConvergence(
 	isFailoverable := shouldFailoverProviderError(err)
 	o.recordAccountFailureIfEligible(ctx, attempt.accountID, isFailoverable)
 
-	decisionInput := taskExecutionConvergenceInput{
-		ProviderFailure: taskExecutionConvergenceProviderFailure{
+	decisionInput := convergenceInput{
+		ProviderFailure: convergenceProviderFailure{
 			IsFailoverable: isFailoverable,
 			Reason:         reason,
 			Stage:          failureStage,
 			Category:       failureCategory,
 		},
-		Failover: taskExecutionConvergenceFailover{
+		Failover: convergenceFailover{
 			RemainingAccountCandidates: 1,
 			HasFailoverCapacity:        true,
 		},
 	}
 
-	decision := o.decideTaskExecutionConvergence(decisionInput)
+	decision := o.decideConvergence(decisionInput)
 	switch decision.Outcome {
-	case taskExecutionConvergenceFinalFail, taskExecutionConvergenceFailoverExhaustedOrNoCapacity:
-		if phaseErr := phaseMachine.advance(taskExecutionPhaseFailed); phaseErr != nil {
+	case convergenceFinalFail, convergenceFailoverExhaustedOrNoCapacity:
+		if phaseErr := phaseMachine.advance(phaseFailed); phaseErr != nil {
 			return phaseErr
 		}
 		failFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusFailed, decision.Reason, decision.FailureStage, decision.FailureCategory, time.Now())
 		return o.completeFailedTaskWithMetricsAndAttempt(ctx, attempt.task, attempt.assignment, decision.Reason, attempt.providerOutput.Result, elapsed, decision.FailureStage, decision.FailureCategory, &failFinish)
-	case taskExecutionConvergenceDropConvergedDirtyWork:
-		if phaseErr := phaseMachine.advance(taskExecutionPhaseDropped); phaseErr != nil {
+	case convergenceDropConvergedDirtyWork:
+		if phaseErr := phaseMachine.advance(phaseDropped); phaseErr != nil {
 			return phaseErr
 		}
 		o.attemptLifecycle.finishFallback(ctx, attempt, tasks.TaskAttemptStatusFailed, decision.Reason, decision.FailureStage, decision.FailureCategory, time.Now())
 		o.dropTask(ctx, attempt.task, "任务状态已收敛，丢弃脏队列任务")
 		return nil
-	case taskExecutionConvergenceRequeue:
+	case convergenceRequeue:
 		return o.handleProviderFailoverRequeue(ctx, attempt, elapsed, decisionInput, decision, phaseMachine)
 	default:
-		if phaseErr := phaseMachine.advance(taskExecutionPhaseFailed); phaseErr != nil {
+		if phaseErr := phaseMachine.advance(phaseFailed); phaseErr != nil {
 			return phaseErr
 		}
-		slog.Warn("unexpected task execution convergence outcome for provider failure", "task_id", attempt.task.TaskID, "outcome", decision.Outcome)
+		slog.Warn("unexpected convergence outcome for provider failure", "task_id", attempt.task.TaskID, "outcome", decision.Outcome)
 		failFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusFailed, reason, failureStage, failureCategory, time.Now())
 		return o.completeFailedTaskWithMetricsAndAttempt(ctx, attempt.task, attempt.assignment, reason, attempt.providerOutput.Result, elapsed, failureStage, failureCategory, &failFinish)
 	}
 }
 
-func (o *taskExecutionOrchestrator) recordAccountFailureIfEligible(ctx context.Context, accountID int64, isFailoverable bool) {
+func (o *Orchestrator) recordAccountFailureIfEligible(ctx context.Context, accountID int64, isFailoverable bool) {
 	if !isFailoverable {
 		return
 	}
@@ -397,13 +396,13 @@ func (o *taskExecutionOrchestrator) recordAccountFailureIfEligible(ctx context.C
 	}
 }
 
-func (o *taskExecutionOrchestrator) handleProviderFailoverRequeue(
+func (o *Orchestrator) handleProviderFailoverRequeue(
 	ctx context.Context,
-	attempt taskExecutionAttemptContext,
+	attempt attemptContext,
 	elapsed float64,
-	decisionInput taskExecutionConvergenceInput,
-	decision taskExecutionConvergenceDecision,
-	phaseMachine *taskExecutionPhaseMachine,
+	decisionInput convergenceInput,
+	decision convergenceDecision,
+	phaseMachine *phaseMachine,
 ) error {
 	finalFailFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusFailed, decision.Reason, decision.FailureStage, decision.FailureCategory, time.Now())
 	requeueFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusRequeued, decision.Reason, decision.FailureStage, decision.FailureCategory, time.Now())
@@ -431,78 +430,78 @@ func (o *taskExecutionOrchestrator) handleProviderFailoverRequeue(
 		o.attemptLifecycle.finishFallback(ctx, attempt, tasks.TaskAttemptStatusFailed, decision.Reason, decision.FailureStage, decision.FailureCategory, time.Now())
 		return requeueErr
 	}
-	return phaseMachine.advance(taskExecutionPhaseRequeued)
+	return phaseMachine.advance(phaseRequeued)
 }
 
-func (o *taskExecutionOrchestrator) handleFailoverRequeueExhausted(
+func (o *Orchestrator) handleFailoverRequeueExhausted(
 	ctx context.Context,
-	attempt taskExecutionAttemptContext,
-	decisionInput taskExecutionConvergenceInput,
+	attempt attemptContext,
+	decisionInput convergenceInput,
 	completedAt time.Time,
-	phaseMachine *taskExecutionPhaseMachine,
+	phaseMachine *phaseMachine,
 ) error {
-	if phaseErr := phaseMachine.advance(taskExecutionPhaseFailed); phaseErr != nil {
+	if phaseErr := phaseMachine.advance(phaseFailed); phaseErr != nil {
 		return phaseErr
 	}
 	exhaustedInput := decisionInput
 	exhaustedInput.Failover.HasFailoverCapacity = false
-	exhaustedDecision := o.decideTaskExecutionConvergence(exhaustedInput)
-	if exhaustedDecision.Outcome != taskExecutionConvergenceFailoverExhaustedOrNoCapacity {
-		slog.Warn("unexpected task execution convergence outcome after failover retry exhausted", "task_id", attempt.task.TaskID, "outcome", exhaustedDecision.Outcome)
+	exhaustedDecision := o.decideConvergence(exhaustedInput)
+	if exhaustedDecision.Outcome != convergenceFailoverExhaustedOrNoCapacity {
+		slog.Warn("unexpected convergence outcome after failover retry exhausted", "task_id", attempt.task.TaskID, "outcome", exhaustedDecision.Outcome)
 	}
 	slog.Info("task reached failover retry limit", "task_id", attempt.task.TaskID, "correlation_id", attempt.task.EffectiveCorrelationID())
 	o.recordExecutionTerminal(ctx, attempt.task.TaskID, tasks.ExecutionStageFailed, exhaustedDecision.FailureStage, exhaustedDecision.FailureCategory, completedAt)
 	return nil
 }
 
-func (o *taskExecutionOrchestrator) handleFailoverRequeueError(
+func (o *Orchestrator) handleFailoverRequeueError(
 	ctx context.Context,
-	attempt taskExecutionAttemptContext,
+	attempt attemptContext,
 	elapsed float64,
-	decisionInput taskExecutionConvergenceInput,
-	decision taskExecutionConvergenceDecision,
+	decisionInput convergenceInput,
+	decision convergenceDecision,
 	requeueErr error,
-	phaseMachine *taskExecutionPhaseMachine,
+	phaseMachine *phaseMachine,
 ) error {
 	requeueFailureInput := decisionInput
 	requeueFailureInput.Task.IsDirtyConverged = isTaskConvergedError(requeueErr)
 	if !requeueFailureInput.Task.IsDirtyConverged {
 		requeueFailureInput.Failover.HasFailoverCapacity = false
 	}
-	requeueFailureDecision := o.decideTaskExecutionConvergence(requeueFailureInput)
+	requeueFailureDecision := o.decideConvergence(requeueFailureInput)
 	switch requeueFailureDecision.Outcome {
-	case taskExecutionConvergenceDropConvergedDirtyWork:
-		if phaseErr := phaseMachine.advance(taskExecutionPhaseDropped); phaseErr != nil {
+	case convergenceDropConvergedDirtyWork:
+		if phaseErr := phaseMachine.advance(phaseDropped); phaseErr != nil {
 			return phaseErr
 		}
 		o.attemptLifecycle.finishFallback(ctx, attempt, tasks.TaskAttemptStatusFailed, requeueFailureDecision.Reason, requeueFailureDecision.FailureStage, requeueFailureDecision.FailureCategory, time.Now())
 		o.dropTask(ctx, attempt.task, "任务状态已收敛，丢弃脏队列任务")
 		return nil
-	case taskExecutionConvergenceFinalFail, taskExecutionConvergenceFailoverExhaustedOrNoCapacity:
-		if phaseErr := phaseMachine.advance(taskExecutionPhaseFailed); phaseErr != nil {
+	case convergenceFinalFail, convergenceFailoverExhaustedOrNoCapacity:
+		if phaseErr := phaseMachine.advance(phaseFailed); phaseErr != nil {
 			return phaseErr
 		}
 		slog.Warn("reset task for failover retry failed", "task_id", attempt.task.TaskID, "correlation_id", attempt.task.EffectiveCorrelationID(), "err", requeueErr)
 		failFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusFailed, requeueFailureDecision.Reason, requeueFailureDecision.FailureStage, requeueFailureDecision.FailureCategory, time.Now())
 		return o.completeFailedTaskWithMetricsAndAttempt(ctx, attempt.task, attempt.assignment, requeueFailureDecision.Reason, attempt.providerOutput.Result, elapsed, requeueFailureDecision.FailureStage, requeueFailureDecision.FailureCategory, &failFinish)
 	default:
-		if phaseErr := phaseMachine.advance(taskExecutionPhaseFailed); phaseErr != nil {
+		if phaseErr := phaseMachine.advance(phaseFailed); phaseErr != nil {
 			return phaseErr
 		}
-		slog.Warn("unexpected task execution convergence outcome after failover requeue failure", "task_id", attempt.task.TaskID, "outcome", requeueFailureDecision.Outcome, "err", requeueErr)
+		slog.Warn("unexpected convergence outcome after failover requeue failure", "task_id", attempt.task.TaskID, "outcome", requeueFailureDecision.Outcome, "err", requeueErr)
 		failFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusFailed, decision.Reason, decision.FailureStage, decision.FailureCategory, time.Now())
 		return o.completeFailedTaskWithMetricsAndAttempt(ctx, attempt.task, attempt.assignment, decision.Reason, attempt.providerOutput.Result, elapsed, decision.FailureStage, decision.FailureCategory, &failFinish)
 	}
 }
 
-func (o *taskExecutionOrchestrator) decideTaskExecutionConvergence(input taskExecutionConvergenceInput) taskExecutionConvergenceDecision {
+func (o *Orchestrator) decideConvergence(input convergenceInput) convergenceDecision {
 	if o.convergenceDecider == nil {
-		return taskExecutionConvergencePolicy{}.DecideTaskExecutionConvergence(input)
+		return convergencePolicy{}.DecideConvergence(input)
 	}
-	return o.convergenceDecider.DecideTaskExecutionConvergence(input)
+	return o.convergenceDecider.DecideConvergence(input)
 }
 
-func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment, reason string) error {
+func (o *Orchestrator) requeueTask(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment, reason string) error {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
@@ -534,7 +533,7 @@ func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *tasks
 	return nil
 }
 
-func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment, result string, outputs []tasks.TaskOutput, elapsedSec float64, attemptFinish *tasks.TaskAttemptFinish) (bool, error) {
+func (o *Orchestrator) completeTask(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment, result string, outputs []tasks.TaskOutput, elapsedSec float64, attemptFinish *tasks.TaskAttemptFinish) (bool, error) {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
@@ -562,11 +561,11 @@ func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *task
 	return true, nil
 }
 
-func (o *taskExecutionOrchestrator) completeFailedTask(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment, reason string, elapsedSec float64) error {
+func (o *Orchestrator) completeFailedTask(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment, reason string, elapsedSec float64) error {
 	return o.completeFailedTaskWithMetrics(ctx, task, assignment, reason, "", elapsedSec, tasks.ExecutionStageAssigned, tasks.FailureCategoryUnknown)
 }
 
-func (o *taskExecutionOrchestrator) completeFailedTaskWithMetrics(
+func (o *Orchestrator) completeFailedTaskWithMetrics(
 	ctx context.Context,
 	task *tasks.TaskPayload,
 	assignment taskqueueports.TaskAssignment,
@@ -579,7 +578,7 @@ func (o *taskExecutionOrchestrator) completeFailedTaskWithMetrics(
 	return o.completeFailedTaskWithMetricsAndAttempt(ctx, task, assignment, reason, result, elapsedSec, failureStage, failureCategory, nil)
 }
 
-func (o *taskExecutionOrchestrator) completeFailedTaskWithMetricsAndAttempt(
+func (o *Orchestrator) completeFailedTaskWithMetricsAndAttempt(
 	ctx context.Context,
 	task *tasks.TaskPayload,
 	assignment taskqueueports.TaskAssignment,
@@ -617,11 +616,11 @@ func (o *taskExecutionOrchestrator) completeFailedTaskWithMetricsAndAttempt(
 	return nil
 }
 
-func (o *taskExecutionOrchestrator) failTask(ctx context.Context, task *tasks.TaskPayload, reason string) error {
+func (o *Orchestrator) failTask(ctx context.Context, task *tasks.TaskPayload, reason string) error {
 	return o.completeFailedTask(ctx, task, taskqueueports.TaskAssignment{}, reason, 0)
 }
 
-func (o *taskExecutionOrchestrator) skipCancelledTask(ctx context.Context, task *tasks.TaskPayload, attemptFinish *tasks.TaskAttemptFinish) {
+func (o *Orchestrator) skipCancelledTask(ctx context.Context, task *tasks.TaskPayload, attemptFinish *tasks.TaskAttemptFinish) {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
@@ -649,11 +648,11 @@ func (o *taskExecutionOrchestrator) skipCancelledTask(ctx context.Context, task 
 	slog.Info("task cancelled; stop execution", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID())
 }
 
-func (o *taskExecutionOrchestrator) dropTask(ctx context.Context, task *tasks.TaskPayload, reason string) {
+func (o *Orchestrator) dropTask(ctx context.Context, task *tasks.TaskPayload, reason string) {
 	slog.Info("task dropped", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "reason", reason)
 }
 
-func (o *taskExecutionOrchestrator) handleExecutionInterrupted(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment, execErr error, attemptFinish *tasks.TaskAttemptFinish) error {
+func (o *Orchestrator) handleExecutionInterrupted(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment, execErr error, attemptFinish *tasks.TaskAttemptFinish) error {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
@@ -675,7 +674,7 @@ func (o *taskExecutionOrchestrator) handleExecutionInterrupted(ctx context.Conte
 	return execErr
 }
 
-func (o *taskExecutionOrchestrator) recordProviderTimeline(ctx context.Context, taskID string, executionStartedAt time.Time, timeline runtimeports.ProviderCallTimeline) {
+func (o *Orchestrator) recordProviderTimeline(ctx context.Context, taskID string, executionStartedAt time.Time, timeline runtimeports.ProviderCallTimeline) {
 	if timeline.ProviderStartedAt != nil {
 		o.recordExecutionMetrics(ctx, taskID, tasks.TaskExecutionMetricsPatch{
 			TaskID:            taskID,
@@ -707,7 +706,7 @@ func (o *taskExecutionOrchestrator) recordProviderTimeline(ctx context.Context, 
 	}
 }
 
-func (o *taskExecutionOrchestrator) recordFinalizeFinished(ctx context.Context, taskID string, timeline runtimeports.ProviderCallTimeline, finishedAt time.Time) {
+func (o *Orchestrator) recordFinalizeFinished(ctx context.Context, taskID string, timeline runtimeports.ProviderCallTimeline, finishedAt time.Time) {
 	if timeline.FinalizeStartedAt == nil {
 		return
 	}
@@ -718,7 +717,7 @@ func (o *taskExecutionOrchestrator) recordFinalizeFinished(ctx context.Context, 
 	})
 }
 
-func (o *taskExecutionOrchestrator) recordExecutionMetrics(ctx context.Context, taskID string, patch tasks.TaskExecutionMetricsPatch) {
+func (o *Orchestrator) recordExecutionMetrics(ctx context.Context, taskID string, patch tasks.TaskExecutionMetricsPatch) {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 	if err := o.taskExecution.RecordExecutionMetrics(cleanupCtx, patch); err != nil {
@@ -726,7 +725,7 @@ func (o *taskExecutionOrchestrator) recordExecutionMetrics(ctx context.Context, 
 	}
 }
 
-func (o *taskExecutionOrchestrator) recordExecutionTerminal(ctx context.Context, taskID string, currentStage string, failureStage string, failureCategory string, finishedAt time.Time) {
+func (o *Orchestrator) recordExecutionTerminal(ctx context.Context, taskID string, currentStage string, failureStage string, failureCategory string, finishedAt time.Time) {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 	if err := o.taskExecution.RecordExecutionTerminal(cleanupCtx, taskID, currentStage, failureStage, failureCategory, finishedAt); err != nil {
@@ -734,7 +733,7 @@ func (o *taskExecutionOrchestrator) recordExecutionTerminal(ctx context.Context,
 	}
 }
 
-func (o *taskExecutionOrchestrator) recordExecutionSnapshot(ctx context.Context, taskID string, snapshot tasks.TaskExecutionSnapshot) {
+func (o *Orchestrator) recordExecutionSnapshot(ctx context.Context, taskID string, snapshot tasks.TaskExecutionSnapshot) {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 	if err := o.taskExecution.RecordExecutionSnapshot(cleanupCtx, snapshot); err != nil {
@@ -742,7 +741,7 @@ func (o *taskExecutionOrchestrator) recordExecutionSnapshot(ctx context.Context,
 	}
 }
 
-func taskExecutionSnapshot(task *tasks.TaskPayload, account *accounts.RuntimeAccountAccess, assignment taskqueueports.TaskAssignment) tasks.TaskExecutionSnapshot {
+func buildExecutionSnapshot(task *tasks.TaskPayload, account *accounts.RuntimeAccountAccess, assignment taskqueueports.TaskAssignment) tasks.TaskExecutionSnapshot {
 	snapshot := tasks.TaskExecutionSnapshot{}
 	if task == nil {
 		return snapshot

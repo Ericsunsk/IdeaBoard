@@ -29,7 +29,7 @@ import (
 	"github.com/riverqueue/river/rivertype"
 )
 
-type RiverTaskWorker struct {
+type TaskWorker struct {
 	riverqueue.WorkerDefaults[taskqueue.DrawingTaskArgs]
 	processor              *execution.TaskProcessor
 	finalFailures          *finalFailureOrchestrator
@@ -39,15 +39,15 @@ type RiverTaskWorker struct {
 	enqueueFinalFailure    func(context.Context, taskqueue.DrawingFinalFailureArgs) error
 }
 
-type RiverFinalFailureWorker struct {
+type FinalFailureWorker struct {
 	riverqueue.WorkerDefaults[taskqueue.DrawingFinalFailureArgs]
 	finalFailures *finalFailureOrchestrator
 	retryDelay    time.Duration
 }
 
 type (
-	TaskWorker         = RiverTaskWorker
-	FinalFailureWorker = RiverFinalFailureWorker
+	RiverTaskWorker         = TaskWorker
+	RiverFinalFailureWorker = FinalFailureWorker
 )
 
 const (
@@ -78,7 +78,7 @@ type WorkerAccountStore interface {
 	GetRuntimeAccountForAssignment(ctx context.Context, accountID int64, providerEndpointID int64, credentialID int64) (*accounts.RuntimeAccountAccess, error)
 }
 
-type RiverTaskWorkerDeps struct {
+type TaskWorkerDeps struct {
 	AccountRepo        WorkerAccountStore
 	TaskRepo           taskexecution.TaskStore
 	Enqueuer           taskqueueports.TaskEnqueuer
@@ -90,27 +90,28 @@ type RiverTaskWorkerDeps struct {
 	PublicOrigins      config.PublicOriginsConfig
 }
 
-func NewRiverTaskWorker(
-	deps RiverTaskWorkerDeps,
-) *RiverTaskWorker {
+type RiverTaskWorkerDeps = TaskWorkerDeps
+
+func NewTaskWorker(deps TaskWorkerDeps) *TaskWorker {
 	executor := providers.NewExecutor(deps.MediaReader, deps.ResultMaterializer, deps.PublicOrigins)
 	taskExecution := taskexecution.NewService(deps.AccountRepo, deps.TaskRepo, deps.Assigner, deps.CancelStore)
 	taskExecution.SetTaskStatusPublisher(deps.TaskEvents)
 	orchestrator := execution.NewOrchestrator(deps.AccountRepo, deps.Enqueuer, taskExecution, executor.CallDrawingAPIWithAssignment)
-	return newRiverTaskWorkerWithProcessor(execution.NewProcessor(deps.Assigner, taskExecution, orchestrator.Execute))
+	return newTaskWorkerWithProcessor(execution.NewProcessor(deps.Assigner, taskExecution, orchestrator.Execute))
 }
 
-func NewRiverTaskWorkerWithProcessor(processor *execution.TaskProcessor) *RiverTaskWorker {
-	return newRiverTaskWorkerWithProcessor(processor)
+func NewTaskWorkerWithProcessor(processor *execution.TaskProcessor) *TaskWorker {
+	return newTaskWorkerWithProcessor(processor)
 }
 
 var (
-	NewTaskWorker              = NewRiverTaskWorker
-	NewTaskWorkerWithProcessor = NewRiverTaskWorkerWithProcessor
+	NewRiverTaskWorker              = NewTaskWorker
+	NewRiverTaskWorkerWithProcessor = NewTaskWorkerWithProcessor
+	newRiverTaskWorkerWithProcessor = newTaskWorkerWithProcessor
 )
 
-func newRiverTaskWorkerWithProcessor(processor *execution.TaskProcessor) *RiverTaskWorker {
-	worker := &RiverTaskWorker{
+func newTaskWorkerWithProcessor(processor *execution.TaskProcessor) *TaskWorker {
+	worker := &TaskWorker{
 		processor:              processor,
 		noCapacityRetryDelay:   defaultNoCapacityRetryDelay,
 		finalFailureRetryDelay: defaultFinalFailureRetryDelay,
@@ -260,7 +261,7 @@ func finalFailureRetryFromJob(job *rivertype.JobRow, taskID string) (finalFailur
 	}
 }
 
-type RiverServerOptions struct {
+type ServerOptions struct {
 	QueueName        string
 	Concurrency      int
 	JobTimeout       time.Duration
@@ -269,6 +270,8 @@ type RiverServerOptions struct {
 	RegisterWorkers  func(*riverqueue.Workers)
 	PeriodicJobs     []*riverqueue.PeriodicJob
 }
+
+type RiverServerOptions = ServerOptions
 
 func NewRiverProducer(dbPool *pgxpool.Pool) (*riverqueue.Client[pgx.Tx], error) {
 	if dbPool == nil {
@@ -283,7 +286,7 @@ func NewRiverProducer(dbPool *pgxpool.Pool) (*riverqueue.Client[pgx.Tx], error) 
 	return riverqueue.NewClient(riverpgxv5.New(dbPool), &riverqueue.Config{Schema: schema})
 }
 
-func (w *RiverFinalFailureWorker) Work(ctx context.Context, job *riverqueue.Job[taskqueue.DrawingFinalFailureArgs]) error {
+func (w *FinalFailureWorker) Work(ctx context.Context, job *riverqueue.Job[taskqueue.DrawingFinalFailureArgs]) error {
 	if w == nil || w.finalFailures == nil || job == nil || strings.TrimSpace(job.Args.TaskID) == "" || job.Args.RiverJobID < 0 || strings.TrimSpace(job.Args.Reason) == "" {
 		return errors.New("invalid drawing final failure job")
 	}

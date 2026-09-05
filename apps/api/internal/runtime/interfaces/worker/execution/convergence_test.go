@@ -6,79 +6,79 @@ import (
 	tasks "ideaboard/api/internal/tasking/domain"
 )
 
-func TestTaskExecutionConvergencePolicyDecidesOutcomes(t *testing.T) {
+func TestConvergencePolicyDecidesOutcomes(t *testing.T) {
 	tests := []struct {
 		name  string
-		input taskExecutionConvergenceInput
-		want  taskExecutionConvergenceOutcome
+		input convergenceInput
+		want  convergenceOutcome
 	}{
 		{
 			name: "cancellation wins interrupted provider work",
-			input: taskExecutionConvergenceInput{
+			input: convergenceInput{
 				IsExecutionInterrupted: true,
 				IsTaskCancelled:        true,
 				ProviderFailure:        providerFailureInput(true),
 				Failover:               failoverInput(1, true),
 			},
-			want: taskExecutionConvergenceCancel,
+			want: convergenceCancel,
 		},
 		{
 			name: "interrupted non-cancelled work requeues through interrupt path",
-			input: taskExecutionConvergenceInput{
+			input: convergenceInput{
 				IsExecutionInterrupted: true,
 				ProviderFailure:        providerFailureInput(true),
 				Failover:               failoverInput(1, true),
 			},
-			want: taskExecutionConvergenceInterruptRequeue,
+			want: convergenceInterruptRequeue,
 		},
 		{
 			name: "non-failover provider failure final fails",
-			input: taskExecutionConvergenceInput{
+			input: convergenceInput{
 				ProviderFailure: providerFailureInput(false),
 			},
-			want: taskExecutionConvergenceFinalFail,
+			want: convergenceFinalFail,
 		},
 		{
 			name: "failover provider failure with retry capacity requeues",
-			input: taskExecutionConvergenceInput{
+			input: convergenceInput{
 				ProviderFailure: providerFailureInput(true),
 				Failover:        failoverInput(2, true),
 			},
-			want: taskExecutionConvergenceRequeue,
+			want: convergenceRequeue,
 		},
 		{
 			name: "failover provider failure without remaining account candidates stops requeue",
-			input: taskExecutionConvergenceInput{
+			input: convergenceInput{
 				ProviderFailure: providerFailureInput(true),
 				Failover:        failoverInput(0, true),
 			},
-			want: taskExecutionConvergenceFailoverExhaustedOrNoCapacity,
+			want: convergenceFailoverExhaustedOrNoCapacity,
 		},
 		{
 			name: "dirty converged task drops queued work",
-			input: taskExecutionConvergenceInput{
+			input: convergenceInput{
 				ProviderFailure: providerFailureInput(true),
 				Failover:        failoverInput(1, true),
-				Task: taskExecutionConvergenceTaskContext{
+				Task: convergenceTaskContext{
 					IsDirtyConverged: true,
 				},
 			},
-			want: taskExecutionConvergenceDropConvergedDirtyWork,
+			want: convergenceDropConvergedDirtyWork,
 		},
 		{
 			name: "failover exhausted or no capacity stops requeue",
-			input: taskExecutionConvergenceInput{
+			input: convergenceInput{
 				ProviderFailure: providerFailureInput(true),
 				Failover:        failoverInput(1, false),
 			},
-			want: taskExecutionConvergenceFailoverExhaustedOrNoCapacity,
+			want: convergenceFailoverExhaustedOrNoCapacity,
 		},
 	}
 
-	var decider taskExecutionConvergenceDecider = taskExecutionConvergencePolicy{}
+	var decider convergenceDecider = convergencePolicy{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := decider.DecideTaskExecutionConvergence(tt.input)
+			got := decider.DecideConvergence(tt.input)
 			if got.Outcome != tt.want {
 				t.Fatalf("outcome = %s, want %s", got.Outcome, tt.want)
 			}
@@ -95,8 +95,8 @@ func TestTaskExecutionConvergencePolicyDecidesOutcomes(t *testing.T) {
 	}
 }
 
-func providerFailureInput(isFailoverable bool) taskExecutionConvergenceProviderFailure {
-	return taskExecutionConvergenceProviderFailure{
+func providerFailureInput(isFailoverable bool) convergenceProviderFailure {
+	return convergenceProviderFailure{
 		IsFailoverable: isFailoverable,
 		Reason:         "上游图像服务调用失败",
 		Stage:          tasks.ExecutionStageProvider,
@@ -104,8 +104,8 @@ func providerFailureInput(isFailoverable bool) taskExecutionConvergenceProviderF
 	}
 }
 
-func failoverInput(remainingAccountCandidates int, hasFailoverCapacity bool) taskExecutionConvergenceFailover {
-	return taskExecutionConvergenceFailover{
+func failoverInput(remainingAccountCandidates int, hasFailoverCapacity bool) convergenceFailover {
+	return convergenceFailover{
 		RemainingAccountCandidates: remainingAccountCandidates,
 		HasFailoverCapacity:        hasFailoverCapacity,
 	}

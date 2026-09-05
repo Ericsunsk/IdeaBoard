@@ -2,75 +2,75 @@ package execution
 
 import "fmt"
 
-// taskExecutionPhase is the worker's in-process execution lifecycle. The
+// phase is the worker's in-process execution lifecycle. The
 // database task status and River job remain the durable facts; this machine
 // only makes the ordering of worker side effects explicit and fail-closed.
-type taskExecutionPhase string
+type phase string
 
 const (
-	taskExecutionPhasePreflight  taskExecutionPhase = "preflight"
-	taskExecutionPhaseAssigned   taskExecutionPhase = "assigned"
-	taskExecutionPhaseProvider   taskExecutionPhase = "provider"
-	taskExecutionPhaseFinalizing taskExecutionPhase = "finalizing"
-	taskExecutionPhaseCompleted  taskExecutionPhase = "completed"
-	taskExecutionPhaseFailed     taskExecutionPhase = "failed"
-	taskExecutionPhaseCancelled  taskExecutionPhase = "cancelled"
-	taskExecutionPhaseRequeued   taskExecutionPhase = "requeued"
-	taskExecutionPhaseDropped    taskExecutionPhase = "dropped"
+	phasePreflight  phase = "preflight"
+	phaseAssigned   phase = "assigned"
+	phaseProvider   phase = "provider"
+	phaseFinalizing phase = "finalizing"
+	phaseCompleted  phase = "completed"
+	phaseFailed     phase = "failed"
+	phaseCancelled  phase = "cancelled"
+	phaseRequeued   phase = "requeued"
+	phaseDropped    phase = "dropped"
 )
 
-var taskExecutionPhaseTransitions = map[taskExecutionPhase]map[taskExecutionPhase]struct{}{
-	taskExecutionPhasePreflight: {
-		taskExecutionPhaseAssigned:  {},
-		taskExecutionPhaseCancelled: {},
-		taskExecutionPhaseRequeued:  {},
-		taskExecutionPhaseDropped:   {},
+var phaseTransitions = map[phase]map[phase]struct{}{
+	phasePreflight: {
+		phaseAssigned:  {},
+		phaseCancelled: {},
+		phaseRequeued:  {},
+		phaseDropped:   {},
 	},
-	taskExecutionPhaseAssigned: {
-		taskExecutionPhaseProvider:  {},
-		taskExecutionPhaseRequeued:  {},
-		taskExecutionPhaseCancelled: {},
-		taskExecutionPhaseDropped:   {},
+	phaseAssigned: {
+		phaseProvider:  {},
+		phaseRequeued:  {},
+		phaseCancelled: {},
+		phaseDropped:   {},
 	},
-	taskExecutionPhaseProvider: {
-		taskExecutionPhaseFinalizing: {},
-		taskExecutionPhaseFailed:     {},
-		taskExecutionPhaseCancelled:  {},
-		taskExecutionPhaseRequeued:   {},
-		taskExecutionPhaseDropped:    {},
+	phaseProvider: {
+		phaseFinalizing: {},
+		phaseFailed:     {},
+		phaseCancelled:  {},
+		phaseRequeued:   {},
+		phaseDropped:    {},
 	},
-	taskExecutionPhaseFinalizing: {
-		taskExecutionPhaseCompleted: {},
-		taskExecutionPhaseFailed:    {},
-		taskExecutionPhaseCancelled: {},
-		taskExecutionPhaseRequeued:  {},
-		taskExecutionPhaseDropped:   {},
+	phaseFinalizing: {
+		phaseCompleted: {},
+		phaseFailed:    {},
+		phaseCancelled: {},
+		phaseRequeued:  {},
+		phaseDropped:   {},
 	},
 }
 
-type taskExecutionPhaseMachine struct {
+type phaseMachine struct {
 	taskID string
-	phase  taskExecutionPhase
+	phase  phase
 }
 
-func newTaskExecutionPhaseMachine(taskID string) *taskExecutionPhaseMachine {
-	return &taskExecutionPhaseMachine{taskID: taskID, phase: taskExecutionPhasePreflight}
+func newPhaseMachine(taskID string) *phaseMachine {
+	return &phaseMachine{taskID: taskID, phase: phasePreflight}
 }
 
-func (m *taskExecutionPhaseMachine) advance(next taskExecutionPhase) error {
+func (m *phaseMachine) advance(next phase) error {
 	if m == nil {
-		return fmt.Errorf("task execution phase machine is unavailable")
+		return fmt.Errorf("phase machine is unavailable")
 	}
-	if _, terminal := map[taskExecutionPhase]struct{}{
-		taskExecutionPhaseCompleted: {},
-		taskExecutionPhaseFailed:    {},
-		taskExecutionPhaseCancelled: {},
-		taskExecutionPhaseRequeued:  {},
-		taskExecutionPhaseDropped:   {},
+	if _, terminal := map[phase]struct{}{
+		phaseCompleted: {},
+		phaseFailed:    {},
+		phaseCancelled: {},
+		phaseRequeued:  {},
+		phaseDropped:   {},
 	}[m.phase]; terminal {
 		return fmt.Errorf("task %s execution phase is terminal: %s", m.taskID, m.phase)
 	}
-	if _, ok := taskExecutionPhaseTransitions[m.phase][next]; !ok {
+	if _, ok := phaseTransitions[m.phase][next]; !ok {
 		return fmt.Errorf("task %s invalid execution phase transition: %s -> %s", m.taskID, m.phase, next)
 	}
 	m.phase = next

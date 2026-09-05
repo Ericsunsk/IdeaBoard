@@ -12,35 +12,90 @@ import (
 	tasks "ideaboard/api/internal/tasking/domain"
 )
 
-// taskAttemptLifecycle owns the worker-side attempt record boundary. Terminal
-// Task transitions receive the finish payload and persist it atomically with
-// settlement; finishFallback is only for paths that could not converge there.
-type taskAttemptLifecycle struct {
-	runtime taskAttemptLifecycleRuntime
+type attemptContext struct {
+	task           *tasks.TaskPayload
+	assignment     taskqueueports.TaskAssignment
+	accountID      int64
+	startedAt      time.Time
+	attemptRef     tasks.TaskAttemptRef
+	providerOutput runtimeports.ProviderCallOutput
 }
 
-type taskAttemptLifecycleRuntime interface {
+func newAttemptContext(
+	task *tasks.TaskPayload,
+	assignment taskqueueports.TaskAssignment,
+	accountID int64,
+	startedAt time.Time,
+	attemptRef tasks.TaskAttemptRef,
+) attemptContext {
+	return attemptContext{
+		task:       task,
+		assignment: assignment,
+		accountID:  accountID,
+		startedAt:  startedAt,
+		attemptRef: attemptRef,
+	}
+}
+
+func (c attemptContext) withProviderOutput(
+	output runtimeports.ProviderCallOutput,
+) attemptContext {
+	c.providerOutput = output
+	return c
+}
+
+func (c attemptContext) elapsedSeconds() float64 {
+	return time.Since(c.startedAt).Seconds()
+}
+
+func (c attemptContext) buildAttemptFinish(
+	status string,
+	reason string,
+	failureStage string,
+	failureCategory string,
+	completedAt time.Time,
+) (tasks.TaskAttemptFinish, bool) {
+	return buildTaskAttemptFinish(
+		c.attemptRef,
+		status,
+		reason,
+		failureStage,
+		failureCategory,
+		c.startedAt,
+		c.providerOutput.Timeline,
+		completedAt,
+	)
+}
+
+// attemptLifecycle owns the worker-side attempt record boundary. Terminal
+// Task transitions receive the finish payload and persist it atomically with
+// settlement; finishFallback is only for paths that could not converge there.
+type attemptLifecycle struct {
+	runtime attemptLifecycleRuntime
+}
+
+type attemptLifecycleRuntime interface {
 	StartTaskAttempt(context.Context, tasks.TaskAttemptStart) (tasks.TaskAttemptRef, error)
 	FinishTaskAttempt(context.Context, tasks.TaskAttemptFinish) error
 }
 
-func newTaskAttemptLifecycle(runtime taskAttemptLifecycleRuntime) *taskAttemptLifecycle {
-	return &taskAttemptLifecycle{runtime: runtime}
+func newAttemptLifecycle(runtime attemptLifecycleRuntime) *attemptLifecycle {
+	return &attemptLifecycle{runtime: runtime}
 }
 
-func (l *taskAttemptLifecycle) begin(
+func (l *attemptLifecycle) begin(
 	ctx context.Context,
 	task *tasks.TaskPayload,
 	assignment taskqueueports.TaskAssignment,
 	executionStartedAt time.Time,
 	providerStartedAt time.Time,
-) (taskExecutionAttemptContext, error) {
-	attempt := newTaskExecutionAttemptContext(task, assignment, assignment.AccountID, executionStartedAt, tasks.TaskAttemptRef{})
+) (attemptContext, error) {
+	attempt := newAttemptContext(task, assignment, assignment.AccountID, executionStartedAt, tasks.TaskAttemptRef{})
 	if task == nil || strings.TrimSpace(task.TaskID) == "" {
 		return attempt, nil
 	}
 	if l == nil || l.runtime == nil {
-		return taskExecutionAttemptContext{}, fmt.Errorf("task attempt lifecycle runtime is unavailable")
+		return attemptContext{}, fmt.Errorf("attempt lifecycle runtime is unavailable")
 	}
 
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
@@ -55,14 +110,14 @@ func (l *taskAttemptLifecycle) begin(
 		ProviderStartedAt:  providerStartedAt,
 	})
 	if err != nil {
-		return taskExecutionAttemptContext{}, err
+		return attemptContext{}, err
 	}
-	return newTaskExecutionAttemptContext(task, assignment, assignment.AccountID, executionStartedAt, ref), nil
+	return newAttemptContext(task, assignment, assignment.AccountID, executionStartedAt, ref), nil
 }
 
-func (l *taskAttemptLifecycle) finishFallback(
+func (l *attemptLifecycle) finishFallback(
 	ctx context.Context,
-	attempt taskExecutionAttemptContext,
+	attempt attemptContext,
 	status string,
 	reason string,
 	failureStage string,

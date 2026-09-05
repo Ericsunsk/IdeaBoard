@@ -165,3 +165,13 @@ func (c *appContainer) Close() error {
 	}
 	return closeErr
 }
+
+func configureRuntimeLogging(cfg *config.Config) {
+	configinfra.ConfigureRuntimeLogging(cfg)
+}
+
+func requireAuthInternalKeyForProduction(cfg *config.Config) {
+	if err := configinfra.ValidateAuthInternalKey(cfg); err != nil {
+		fatal(err.Error())
+	}
+}

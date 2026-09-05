@@ -10,19 +10,22 @@ import (
 	"ideaboard/api/internal/runtime/ports"
 )
 
-// PlanDependencies defines the components required to execute an ordered runtime startup.
-type PlanDependencies struct {
+// StartupDependencies defines the components required to execute an ordered runtime startup.
+type StartupDependencies struct {
 	Recovery       ports.StartupRecoveryCoordinator
 	Runners        []ports.Runner
 	HealthCheckers []ports.HealthChecker
 }
+
+// PlanDependencies is an alias for StartupDependencies for backwards compatibility.
+type PlanDependencies = StartupDependencies
 
 // ExecuteStartup runs the structured runtime startup sequence:
 // 1. Begin initialization
 // 2. Begin recovery and converge orphaned tasks
 // 3. Launch runners in dependency order
 // 4. Evaluate component health and mark ready
-func ExecuteStartup(ctx context.Context, coord *lifecycle.Coordinator, deps PlanDependencies) error {
+func ExecuteStartup(ctx context.Context, coord *lifecycle.Coordinator, deps StartupDependencies) error {
 	if coord == nil {
 		return fmt.Errorf("lifecycle coordinator is required")
 	}

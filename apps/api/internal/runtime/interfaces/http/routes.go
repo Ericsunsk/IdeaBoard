@@ -2,8 +2,11 @@ package httpapi
 
 import (
 	"context"
-	credithttp "ideaboard/api/internal/credits/interfaces/http"
+	"errors"
 	iofs "io/fs"
+	"net/http"
+
+	credithttp "ideaboard/api/internal/credits/interfaces/http"
 
 	accounthttp "ideaboard/api/internal/accountpool/accounts/interfaces/http"
 	providerendpointshttp "ideaboard/api/internal/accountpool/providerendpoints/interfaces/http"
@@ -20,6 +23,7 @@ import (
 	storageports "ideaboard/api/internal/media/storage/ports"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
+	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/rewards"
@@ -156,4 +160,52 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, fronte
 	registerAuthenticatedAdminRoutes(r, deps.Auth, deps.AdminRoutes)
 
 	RegisterFrontendRoutes(r, frontendFS, frontendOptions)
+}
+
+type healthResponse struct {
+	Status string `json:"status"`
+}
+
+func registerPublicRoutes(r *gin.Engine, branding settings.BrandingSettingProvider, searchHandler *searchcatalog.SearchHandler) {
+	r.GET(RouteHealth, func(c *gin.Context) {
+		response.SuccessDTO(c, healthResponse{Status: "ok"})
+	})
+	r.GET(RoutePublicSettingsBranding, publicBrandingSettingsHandler(branding))
+	if searchHandler != nil {
+		r.GET(RoutePublicSearch, searchHandler.Search)
+	}
+}
+
+func publicBrandingSettingsHandler(provider settings.BrandingSettingProvider) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if provider == nil {
+			response.InternalError(c, http.StatusInternalServerError, "系统设置服务未初始化", errors.New("branding settings provider is not initialized"))
+			return
+		}
+		branding, err := provider.GetBranding(c.Request.Context())
+		if err != nil {
+			response.InternalError(c, http.StatusInternalServerError, "读取系统设置失败", err)
+			return
+		}
+		response.SuccessDTO(c, branding)
+	}
+}
+
+func registerPaymentWebhookRoutes(r *gin.Engine, handler *paymenthttp.WebhookHandler) {
+	if handler == nil {
+		return
+	}
+	r.POST(RoutePaymentStripeWebhook, handler.ReceiveStripeWebhook)
+}
+
+func registerInternalRoutes(r *gin.Engine, deps InternalRouteDeps) {
+	if deps.UserHandler != nil {
+		r.POST("/internal/users/login-metadata", deps.UserHandler.UpdateLoginMetadata)
+	}
+}
+
+func registerStaticUploadRoutes(r *gin.Engine, deps StaticUploadDeps) {
+	uploadsHandler := uploadStaticHandler(deps)
+	r.GET("/uploads/*filepath", uploadsHandler)
+	r.HEAD("/uploads/*filepath", uploadsHandler)
 }

@@ -21,13 +21,12 @@ var (
 	ErrFinalAttemptMarkerResetFailed = errors.New("reset after final attempt marker failure failed")
 )
 
-type taskProcessor struct {
+type Processor struct {
 	assigner      taskqueueports.TaskAssigner
 	taskExecution consumerTaskExecution
 	executeTask   func(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) error
 }
 
-type Processor = taskProcessor
 type TaskProcessor = Processor
 
 func NewProcessor(
@@ -35,37 +34,29 @@ func NewProcessor(
 	taskExecution consumerTaskExecution,
 	executeTask func(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) error,
 ) *Processor {
-	return newTaskProcessor(assigner, taskExecution, executeTask)
-}
-
-func (p *taskProcessor) TaskExecution() any {
-	if p == nil {
-		return nil
-	}
-	return p.taskExecution
-}
-
-func newTaskProcessor(
-	assigner taskqueueports.TaskAssigner,
-	taskExecution consumerTaskExecution,
-	executeTask func(ctx context.Context, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) error,
-) *taskProcessor {
-	return &taskProcessor{
+	return &Processor{
 		assigner:      assigner,
 		taskExecution: taskExecution,
 		executeTask:   executeTask,
 	}
 }
 
-func (p *taskProcessor) Process(ctx context.Context, task *tasks.TaskPayload) error {
+func (p *Processor) TaskExecution() any {
+	if p == nil {
+		return nil
+	}
+	return p.taskExecution
+}
+
+func (p *Processor) Process(ctx context.Context, task *tasks.TaskPayload) error {
 	return p.process(ctx, task, nil)
 }
 
-func (p *taskProcessor) ProcessBeforeExecute(ctx context.Context, task *tasks.TaskPayload, beforeExecute func() error) error {
+func (p *Processor) ProcessBeforeExecute(ctx context.Context, task *tasks.TaskPayload, beforeExecute func() error) error {
 	return p.process(ctx, task, beforeExecute)
 }
 
-func (p *taskProcessor) process(ctx context.Context, task *tasks.TaskPayload, beforeExecute func() error) error {
+func (p *Processor) process(ctx context.Context, task *tasks.TaskPayload, beforeExecute func() error) error {
 	if task == nil {
 		return nil
 	}
@@ -93,7 +84,7 @@ func (p *taskProcessor) process(ctx context.Context, task *tasks.TaskPayload, be
 	return p.executeTask(ctx, task, assignment)
 }
 
-func (p *taskProcessor) validateAssignment(task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment, correlationID string) (bool, error) {
+func (p *Processor) validateAssignment(task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment, correlationID string) (bool, error) {
 	switch assignment.Status {
 	case taskqueueports.AssignStatusDiscard:
 		slog.Info("task converged; discard queued task", "task_id", task.TaskID, "correlation_id", correlationID)
@@ -116,7 +107,7 @@ func (p *taskProcessor) validateAssignment(task *tasks.TaskPayload, assignment t
 	}
 }
 
-func (p *taskProcessor) runBeforeExecute(ctx context.Context, assignment taskqueueports.TaskAssignment, beforeExecute func() error) error {
+func (p *Processor) runBeforeExecute(ctx context.Context, assignment taskqueueports.TaskAssignment, beforeExecute func() error) error {
 	if beforeExecute == nil {
 		return nil
 	}

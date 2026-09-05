@@ -23,7 +23,7 @@ func TestTaskAttemptLifecycleContractBeginsWithExactLeaseIdentity(t *testing.T) 
 			LeaseToken: assignment.LeaseToken,
 		},
 	}
-	lifecycle := newTaskAttemptLifecycle(runtime)
+	lifecycle := newAttemptLifecycle(runtime)
 
 	attempt, err := lifecycle.begin(context.Background(), &tasks.TaskPayload{
 		TaskID: assignment.TaskID, RiverJobID: 78,
@@ -54,8 +54,8 @@ func TestTaskAttemptLifecycleContractFallbackFinishPreservesTimelineAndLease(t *
 	providerFinishedAt := providerStartedAt.Add(150 * time.Millisecond)
 	completedAt := startedAt.Add(500 * time.Millisecond)
 	runtime := &recordingTaskAttemptLifecycleRuntime{}
-	lifecycle := newTaskAttemptLifecycle(runtime)
-	attempt := newTaskExecutionAttemptContext(
+	lifecycle := newAttemptLifecycle(runtime)
+	attempt := newAttemptContext(
 		&tasks.TaskPayload{TaskID: "attempt-fallback-task"},
 		taskqueueports.TaskAssignment{TaskID: "attempt-fallback-task", AccountID: 12, ProviderEndpointID: 34, CredentialID: 56, LeaseToken: "lease-fallback"},
 		12,
@@ -86,9 +86,9 @@ func TestTaskAttemptLifecycleContractFallbackFinishPreservesTimelineAndLease(t *
 
 func TestTaskAttemptLifecycleContractDoesNotFallbackFinishWithoutAttempt(t *testing.T) {
 	runtime := &recordingTaskAttemptLifecycleRuntime{}
-	lifecycle := newTaskAttemptLifecycle(runtime)
+	lifecycle := newAttemptLifecycle(runtime)
 
-	lifecycle.finishFallback(context.Background(), taskExecutionAttemptContext{}, tasks.TaskAttemptStatusFailed, "ignored", "", "", time.Now())
+	lifecycle.finishFallback(context.Background(), attemptContext{}, tasks.TaskAttemptStatusFailed, "ignored", "", "", time.Now())
 	if len(runtime.finishes) != 0 {
 		t.Fatalf("finish calls = %d, want 0", len(runtime.finishes))
 	}
@@ -110,4 +110,56 @@ func (r *recordingTaskAttemptLifecycleRuntime) StartTaskAttempt(_ context.Contex
 func (r *recordingTaskAttemptLifecycleRuntime) FinishTaskAttempt(_ context.Context, finish tasks.TaskAttemptFinish) error {
 	r.finishes = append(r.finishes, finish)
 	return r.finishErr
+}
+
+func TestAttemptContextBuildsFinishFromProviderTimeline(t *testing.T) {
+	startedAt := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	providerStartedAt := startedAt.Add(50 * time.Millisecond)
+	providerFinishedAt := providerStartedAt.Add(150 * time.Millisecond)
+	finalizeStartedAt := providerFinishedAt.Add(25 * time.Millisecond)
+	finalizeFinishedAt := finalizeStartedAt.Add(75 * time.Millisecond)
+	completedAt := startedAt.Add(500 * time.Millisecond)
+	attempt := newAttemptContext(
+		&tasks.TaskPayload{TaskID: "task-attempt-context"},
+		taskqueueports.TaskAssignment{TaskID: "task-attempt-context", AccountID: 12},
+		12,
+		startedAt,
+		tasks.TaskAttemptRef{ID: 99},
+	).withProviderOutput(runtimeports.ProviderCallOutput{
+		Timeline: runtimeports.ProviderCallTimeline{
+			ProviderStartedAt:  &providerStartedAt,
+			ProviderFinishedAt: &providerFinishedAt,
+			FinalizeStartedAt:  &finalizeStartedAt,
+			FinalizeFinishedAt: &finalizeFinishedAt,
+		},
+	})
+
+	finish, ok := attempt.buildAttemptFinish(
+		tasks.TaskAttemptStatusFailed,
+		"provider failed",
+		tasks.ExecutionStageProvider,
+		tasks.FailureCategoryProviderError,
+		completedAt,
+	)
+	if !ok {
+		t.Fatal("expected finish to be built")
+	}
+	if finish.ID != 99 {
+		t.Fatalf("finish ID = %d, want 99", finish.ID)
+	}
+	if finish.ProviderLatencyMS != 150 {
+		t.Fatalf("provider latency = %d, want 150", finish.ProviderLatencyMS)
+	}
+	if finish.FinalizeLatencyMS != 75 {
+		t.Fatalf("finalize latency = %d, want 75", finish.FinalizeLatencyMS)
+	}
+	if finish.TotalLatencyMS != 500 {
+		t.Fatalf("total latency = %d, want 500", finish.TotalLatencyMS)
+	}
+	if finish.FailureStage != tasks.ExecutionStageProvider {
+		t.Fatalf("failure stage = %q", finish.FailureStage)
+	}
+	if finish.FailureCategory != tasks.FailureCategoryProviderError {
+		t.Fatalf("failure category = %q", finish.FailureCategory)
+	}
 }

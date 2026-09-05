@@ -1,57 +1,57 @@
 package execution
 
-type taskExecutionConvergenceDecider interface {
-	DecideTaskExecutionConvergence(input taskExecutionConvergenceInput) taskExecutionConvergenceDecision
+type convergenceDecider interface {
+	DecideConvergence(input convergenceInput) convergenceDecision
 }
 
-type taskExecutionConvergencePolicy struct{}
+type convergencePolicy struct{}
 
-var _ taskExecutionConvergenceDecider = taskExecutionConvergencePolicy{}
+var _ convergenceDecider = convergencePolicy{}
 
-type taskExecutionConvergenceOutcome string
+type convergenceOutcome string
 
 const (
-	taskExecutionConvergenceCancel                        taskExecutionConvergenceOutcome = "cancel"
-	taskExecutionConvergenceInterruptRequeue              taskExecutionConvergenceOutcome = "interrupt_requeue"
-	taskExecutionConvergenceFinalFail                     taskExecutionConvergenceOutcome = "final_fail"
-	taskExecutionConvergenceRequeue                       taskExecutionConvergenceOutcome = "requeue"
-	taskExecutionConvergenceDropConvergedDirtyWork        taskExecutionConvergenceOutcome = "drop_converged_dirty_work"
-	taskExecutionConvergenceFailoverExhaustedOrNoCapacity taskExecutionConvergenceOutcome = "failover_exhausted_or_no_capacity"
+	convergenceCancel                        convergenceOutcome = "cancel"
+	convergenceInterruptRequeue              convergenceOutcome = "interrupt_requeue"
+	convergenceFinalFail                     convergenceOutcome = "final_fail"
+	convergenceRequeue                       convergenceOutcome = "requeue"
+	convergenceDropConvergedDirtyWork        convergenceOutcome = "drop_converged_dirty_work"
+	convergenceFailoverExhaustedOrNoCapacity convergenceOutcome = "failover_exhausted_or_no_capacity"
 )
 
-type taskExecutionConvergenceInput struct {
+type convergenceInput struct {
 	IsExecutionInterrupted bool
 	IsTaskCancelled        bool
-	ProviderFailure        taskExecutionConvergenceProviderFailure
-	Failover               taskExecutionConvergenceFailover
-	Task                   taskExecutionConvergenceTaskContext
+	ProviderFailure        convergenceProviderFailure
+	Failover               convergenceFailover
+	Task                   convergenceTaskContext
 }
 
-type taskExecutionConvergenceProviderFailure struct {
+type convergenceProviderFailure struct {
 	IsFailoverable bool
 	Reason         string
 	Stage          string
 	Category       string
 }
 
-type taskExecutionConvergenceFailover struct {
+type convergenceFailover struct {
 	RemainingAccountCandidates int
 	HasFailoverCapacity        bool
 }
 
-type taskExecutionConvergenceTaskContext struct {
+type convergenceTaskContext struct {
 	IsDirtyConverged bool
 }
 
-type taskExecutionConvergenceDecision struct {
-	Outcome         taskExecutionConvergenceOutcome
+type convergenceDecision struct {
+	Outcome         convergenceOutcome
 	Reason          string
 	FailureStage    string
 	FailureCategory string
 }
 
-func (taskExecutionConvergencePolicy) DecideTaskExecutionConvergence(input taskExecutionConvergenceInput) taskExecutionConvergenceDecision {
-	decision := taskExecutionConvergenceDecision{
+func (convergencePolicy) DecideConvergence(input convergenceInput) convergenceDecision {
+	decision := convergenceDecision{
 		Reason:          input.ProviderFailure.Reason,
 		FailureStage:    input.ProviderFailure.Stage,
 		FailureCategory: input.ProviderFailure.Category,
@@ -59,28 +59,28 @@ func (taskExecutionConvergencePolicy) DecideTaskExecutionConvergence(input taskE
 
 	if input.IsExecutionInterrupted {
 		if input.IsTaskCancelled {
-			decision.Outcome = taskExecutionConvergenceCancel
+			decision.Outcome = convergenceCancel
 			return decision
 		}
-		decision.Outcome = taskExecutionConvergenceInterruptRequeue
+		decision.Outcome = convergenceInterruptRequeue
 		return decision
 	}
 
 	if input.Task.IsDirtyConverged {
-		decision.Outcome = taskExecutionConvergenceDropConvergedDirtyWork
+		decision.Outcome = convergenceDropConvergedDirtyWork
 		return decision
 	}
 
 	if !input.ProviderFailure.IsFailoverable {
-		decision.Outcome = taskExecutionConvergenceFinalFail
+		decision.Outcome = convergenceFinalFail
 		return decision
 	}
 
 	if input.Failover.RemainingAccountCandidates <= 0 || !input.Failover.HasFailoverCapacity {
-		decision.Outcome = taskExecutionConvergenceFailoverExhaustedOrNoCapacity
+		decision.Outcome = convergenceFailoverExhaustedOrNoCapacity
 		return decision
 	}
 
-	decision.Outcome = taskExecutionConvergenceRequeue
+	decision.Outcome = convergenceRequeue
 	return decision
 }

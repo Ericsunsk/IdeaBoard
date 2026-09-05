@@ -2,19 +2,72 @@ package providers
 
 import (
 	"bytes"
+	"context"
 	"fmt"
-	"ideaboard/api/internal/media/imageformat"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
 	"image/png"
 	"mime"
+	"net/url"
 	"path"
 	"strings"
+
+	accounts "ideaboard/api/internal/accountpool/accounts/domain"
+	"ideaboard/api/internal/media/imageformat"
+	"ideaboard/api/internal/platform/config"
+	"ideaboard/api/internal/platform/outbound"
 
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/webp"
 )
+
+func inferLocalAssetMimeType(filename string, data []byte) string {
+	if len(data) > 0 {
+		if extension := imageformat.DetectImageExtensionFromBytes(data); extension != "" {
+			if mimeType := imageformat.ImageMIMEFromExtension(extension); mimeType != "" {
+				return mimeType
+			}
+		}
+	}
+	if extension, ok := imageformat.NormalizeImageExtFromFilename(filename); ok {
+		if mimeType := imageformat.ImageMIMEFromExtension(extension); mimeType != "" {
+			return mimeType
+		}
+	}
+	return "image/png"
+}
+
+func trustedImageDownloadHosts(ctx context.Context, account *accounts.ApiAccount, publicOrigins config.PublicOriginsConfig) []string {
+	hosts := map[string]struct{}{}
+	appendHost := func(raw string) {
+		parsed, err := url.Parse(strings.TrimSpace(raw))
+		if err == nil && strings.TrimSpace(parsed.Host) != "" {
+			hosts[strings.TrimSpace(parsed.Host)] = struct{}{}
+			return
+		}
+		host := strings.TrimSpace(raw)
+		if host != "" {
+			hosts[host] = struct{}{}
+		}
+	}
+
+	if account != nil {
+		appendHost(account.ProxyURL)
+	}
+	for _, host := range trustedRuntimeAssetHosts(publicOrigins) {
+		appendHost(host)
+	}
+	for _, host := range outbound.AllowHosts(ctx) {
+		appendHost(host)
+	}
+
+	out := make([]string, 0, len(hosts))
+	for host := range hosts {
+		out = append(out, host)
+	}
+	return out
+}
 
 func normalizeOpenAIEditMultipartImage(filename, mimeType string, data []byte) (string, string, []byte, error) {
 	if _, err := imageformat.InspectDetectedBytes(data); err != nil {
