@@ -40,12 +40,8 @@
         class="retouch-layer-actions__button retouch-layer-actions__button--apply"
         primary
         :disabled="applyDisabled"
-        :aria-label="
-          applying ? t('canvas.retouch.applying') : t('canvas.retouch.applyAsNewNode')
-        "
-        :tooltip="
-          applying ? t('canvas.retouch.applying') : t('canvas.retouch.applyAsNewNode')
-        "
+        :aria-label="applying ? t('canvas.retouch.applying') : t('canvas.retouch.applyAsNewNode')"
+        :tooltip="applying ? t('canvas.retouch.applying') : t('canvas.retouch.applyAsNewNode')"
         @click="emit('apply-adjustments')"
       >
         <SendDiagonalSolid />

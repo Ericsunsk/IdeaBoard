@@ -10,17 +10,19 @@ import { createBoardSyncCoordinator, type SaveStatus } from './boardSyncCoordina
 
 function makeSnapshot(marker: string): CanvasBoardSnapshot {
   const snapshot = createEmptyCanvasBoardSnapshot()
-  snapshot.promptNodes = [{
-    id: 1,
-    type: 'prompt',
-    x: 40,
-    y: 40,
-    width: 280,
-    text: marker,
-    outputCount: 1,
-    aspectRatio: 'auto',
-    inputImages: [],
-  }]
+  snapshot.promptNodes = [
+    {
+      id: 1,
+      type: 'prompt',
+      x: 40,
+      y: 40,
+      width: 280,
+      text: marker,
+      outputCount: 1,
+      aspectRatio: 'auto',
+      inputImages: [],
+    },
+  ]
   return snapshot
 }
 
@@ -143,7 +145,10 @@ describe('Board Sync Coordinator', () => {
     const harness = createHarness()
     let resolveSave!: (result: CanvasBoardSessionSaveResult) => void
     vi.mocked(harness.boardSession.save).mockImplementationOnce(
-      () => new Promise((resolve) => { resolveSave = resolve }),
+      () =>
+        new Promise((resolve) => {
+          resolveSave = resolve
+        }),
     )
 
     const save = harness.coordinator.saveCurrentBoardSnapshot()
@@ -159,21 +164,26 @@ describe('Board Sync Coordinator', () => {
   it('keeps the current graph revision while rebasing stabilized media', async () => {
     const harness = createHarness()
     const captured = makeSnapshot('current')
-    captured.imageNodes = [{
-      id: 1,
-      type: 'image-node',
-      x: 0,
-      y: 0,
-      width: 280,
-      sourceImageUrl: 'blob:source',
-      sourceImageRatio: 1,
-      outputStatus: 'ready',
-      outputImages: [],
-    }]
+    captured.imageNodes = [
+      {
+        id: 1,
+        type: 'image-node',
+        x: 0,
+        y: 0,
+        width: 280,
+        sourceImageUrl: 'blob:source',
+        sourceImageRatio: 1,
+        outputStatus: 'ready',
+        outputImages: [],
+      },
+    ]
     harness.currentSnapshot.value = captured
     let resolveSave!: (result: CanvasBoardSessionSaveResult) => void
     vi.mocked(harness.boardSession.save).mockImplementationOnce(
-      () => new Promise((resolve) => { resolveSave = resolve }),
+      () =>
+        new Promise((resolve) => {
+          resolveSave = resolve
+        }),
     )
 
     const save = harness.coordinator.saveCurrentBoardSnapshot()
@@ -190,7 +200,9 @@ describe('Board Sync Coordinator', () => {
     const result = await save
     expect(result.reconciliation?.hasLocalDraftAdvanced).toBe(true)
     expect(result.reconciliation?.snapshot.promptNodes[0]?.text).toBe('newer edit')
-    expect(result.reconciliation?.snapshot.imageNodes[0]?.sourceImageUrl).toBe('/uploads/stable.png')
+    expect(result.reconciliation?.snapshot.imageNodes[0]?.sourceImageUrl).toBe(
+      '/uploads/stable.png',
+    )
     expect(harness.isDirty.value).toBe(true)
   })
 

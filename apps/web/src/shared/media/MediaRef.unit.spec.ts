@@ -16,8 +16,12 @@ describe('MediaRef', () => {
 
   it('rejects incomplete and invalid references', () => {
     expect(isMediaRef({ assetId: 'asset_42' })).toBe(false)
-    expect(isMediaRef({ assetId: '', derivativeTier: 'preview', derivativeFormat: 'webp' })).toBe(false)
-    expect(isMediaRef({ assetId: 'asset_42', derivativeTier: 'original', derivativeFormat: 'webp' })).toBe(false)
+    expect(isMediaRef({ assetId: '', derivativeTier: 'preview', derivativeFormat: 'webp' })).toBe(
+      false,
+    )
+    expect(
+      isMediaRef({ assetId: 'asset_42', derivativeTier: 'original', derivativeFormat: 'webp' }),
+    ).toBe(false)
   })
 
   it('includes rendition in identity equality', () => {

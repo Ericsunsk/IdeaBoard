@@ -80,8 +80,7 @@ export function useImageWorkflowExecution(
   function handleWorkflowWarning(message: string) {
     if (isProviderUnavailableMessage(message) && isGenerationAvailable()) {
       generationUnavailableUntilMs.value = Date.now() + GENERATION_UNAVAILABLE_RETRY_MS
-      generationUnavailableMessage.value =
-        message.trim() || defaultGenerationUnavailableMessage()
+      generationUnavailableMessage.value = message.trim() || defaultGenerationUnavailableMessage()
       refreshGenerationAvailabilityAfter(GENERATION_UNAVAILABLE_RETRY_MS)
     }
     options.feedback.warning(message)

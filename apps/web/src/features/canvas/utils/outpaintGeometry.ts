@@ -54,10 +54,7 @@ export function containImageRect(
   return createOutpaintRect(0, top, width, height)
 }
 
-export function clampFrameToImageRect(
-  frame: OutpaintRect,
-  imageRect: OutpaintRect,
-): OutpaintRect {
+export function clampFrameToImageRect(frame: OutpaintRect, imageRect: OutpaintRect): OutpaintRect {
   const originalLeft = imageRect.left
   const originalTop = imageRect.top
   const originalRight = imageRect.left + imageRect.width
@@ -157,12 +154,7 @@ export function resolveOutpaintIntent(
     extendTopPx > 0 || extendRightPx > 0 || extendBottomPx > 0 || extendLeftPx > 0
   return {
     frameRect: normalizedFrameRect,
-    originalImageRect: createOutpaintRect(
-      originalLeft,
-      originalTop,
-      originalWidth,
-      originalHeight,
-    ),
+    originalImageRect: createOutpaintRect(originalLeft, originalTop, originalWidth, originalHeight),
     targetRatio: normalizedFrameRect.height / normalizedFrameRect.width,
     hasExtension,
   }

@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  clampMaskBrushSize,
-  clampMaskLayerOpacity,
-} from './inpaintConstants'
+import { clampMaskBrushSize, clampMaskLayerOpacity } from './inpaintConstants'
 
 describe('inpaintConstants', () => {
   it('clamps brush size to editor bounds', () => {

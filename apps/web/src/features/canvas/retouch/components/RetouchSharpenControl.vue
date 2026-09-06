@@ -26,7 +26,7 @@
       @update:value="updateNumberParam('threshold', $event)"
     />
     <div class="editing-controls-toggle-row">
-      <span>{{ t("canvas.retouch.protectColors") }}</span>
+      <span>{{ t('canvas.retouch.protectColors') }}</span>
       <button
         class="editing-controls-toggle-button canvas-tool-tooltip-trigger"
         type="button"
@@ -35,7 +35,9 @@
         @click="updateProtectColor(!normalizedParams.protectColor)"
       >
         <ColorFilter aria-hidden="true" />
-        <span class="canvas-tool-tooltip" aria-hidden="true">{{ t("canvas.retouch.protectColors") }}</span>
+        <span class="canvas-tool-tooltip" aria-hidden="true">{{
+          t('canvas.retouch.protectColors')
+        }}</span>
       </button>
     </div>
   </div>

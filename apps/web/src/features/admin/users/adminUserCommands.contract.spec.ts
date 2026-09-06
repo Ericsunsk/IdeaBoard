@@ -91,7 +91,9 @@ describe('admin user commands', () => {
     const harness = createHarness()
     const commands = harness.createCommands()
 
-    commands.openUserActionMenu(makeUser({ publicId: 'user-8', role: 'admin', displayName: 'root' }))
+    commands.openUserActionMenu(
+      makeUser({ publicId: 'user-8', role: 'admin', displayName: 'root' }),
+    )
     commands.handleActionSelect('role')
     await harness.acceptLastConfirm()
 

@@ -39,10 +39,7 @@ describe('search auth continuation', () => {
 
   it('restores a serializable action after an OAuth page reload boundary', () => {
     const action = { kind: 'open-library' as const }
-    window.sessionStorage.setItem(
-      'ideaboard:search:pending-auth-action',
-      JSON.stringify(action),
-    )
+    window.sessionStorage.setItem('ideaboard:search:pending-auth-action', JSON.stringify(action))
 
     expect(peekPendingSearchAuthAction()).toEqual(action)
     expect(consumePendingSearchAuthAction()).toEqual(action)

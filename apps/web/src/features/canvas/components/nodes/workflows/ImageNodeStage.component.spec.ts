@@ -67,7 +67,9 @@ describe('ImageNodeStage disabled state', () => {
     })
 
     expect(view.getByLabelText('Image is being generated; upload unavailable')).toBeTruthy()
-    expect(view.getByLabelText('Image is being generated; upload unavailable').tagName).not.toBe('BUTTON')
+    expect(view.getByLabelText('Image is being generated; upload unavailable').tagName).not.toBe(
+      'BUTTON',
+    )
   })
 })
 

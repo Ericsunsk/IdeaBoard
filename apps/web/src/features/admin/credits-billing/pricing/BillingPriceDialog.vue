@@ -84,16 +84,26 @@ const emit = defineEmits<{
 
 const maxPriceCredits = 9_000_000_000_000_000
 
-const resolutions = computed<PricingVariant[]>(() => props.item?.pricingVariants ?? ['1k', '2k', '4k'])
+const resolutions = computed<PricingVariant[]>(
+  () => props.item?.pricingVariants ?? ['1k', '2k', '4k'],
+)
 const requiredVariant = computed(() => resolutions.value[0] ?? '1k')
-const prices = ref<Record<PricingVariant, number | null>>({ default: null, '1k': null, '2k': null, '4k': null })
+const prices = ref<Record<PricingVariant, number | null>>({
+  default: null,
+  '1k': null,
+  '2k': null,
+  '4k': null,
+})
 const showError = ref(false)
 const validationErrors = computed<Record<PricingVariant, string>>(() => {
   const errors = {} as Record<PricingVariant, string>
   for (const variant of resolutions.value) {
     const value = prices.value[variant]
     if (variant === requiredVariant.value && value == null) errors[variant] = '请输入价格'
-    else if (value != null && (!Number.isSafeInteger(value) || value < 0 || value > maxPriceCredits)) {
+    else if (
+      value != null &&
+      (!Number.isSafeInteger(value) || value < 0 || value > maxPriceCredits)
+    ) {
       errors[variant] = `价格必须是 0 到 ${maxPriceCredits.toLocaleString('zh-CN')} 之间的整数`
     } else errors[variant] = ''
   }

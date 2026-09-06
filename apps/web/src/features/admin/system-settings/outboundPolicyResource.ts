@@ -4,10 +4,7 @@ import {
   useGetAdminOutboundPolicy,
 } from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import { createApiDataSelector, resolveApiData } from '../../../shared/api/apiResponse'
-import type {
-  OutboundPolicySetting,
-  UpdateOutboundPolicyRequest,
-} from './outboundPolicyContract'
+import type { OutboundPolicySetting, UpdateOutboundPolicyRequest } from './outboundPolicyContract'
 
 export const outboundPolicyQueryKey = getGetAdminOutboundPolicyQueryKey()
 const selectOutboundPolicy =

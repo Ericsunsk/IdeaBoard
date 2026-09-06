@@ -23,7 +23,13 @@ vi.mock('../../storage/storageResource', () => ({
           { key: 'endpoint', label: 'Endpoint', type: 'text', required: true },
           { key: 'bucket_name', label: 'Bucket 名称', type: 'text', required: true },
           { key: 'access_key_id', label: 'Access Key ID', type: 'text', required: true },
-          { key: 'secret_access_key', label: 'Secret Access Key', type: 'password', required: true, secret: true },
+          {
+            key: 'secret_access_key',
+            label: 'Secret Access Key',
+            type: 'password',
+            required: true,
+            secret: true,
+          },
           { key: 'force_path_style', label: 'Path-style 访问', type: 'switch' },
         ],
       },
@@ -79,11 +85,7 @@ describe('AdminStoragePage', () => {
   it('renders storage cards with active badge and parameters grid', async () => {
     renderWithUser(Harness, {
       global: {
-        plugins: [
-          [PrimeVue, adminPrimeVueTestOptions],
-          ConfirmationService,
-          ToastService,
-        ],
+        plugins: [[PrimeVue, adminPrimeVueTestOptions], ConfirmationService, ToastService],
       },
     })
 
@@ -96,11 +98,7 @@ describe('AdminStoragePage', () => {
   it('opens redesigned compact dialog with tabbed pagination for cloud providers', async () => {
     const { user } = renderWithUser(Harness, {
       global: {
-        plugins: [
-          [PrimeVue, adminPrimeVueTestOptions],
-          ConfirmationService,
-          ToastService,
-        ],
+        plugins: [[PrimeVue, adminPrimeVueTestOptions], ConfirmationService, ToastService],
       },
     })
 

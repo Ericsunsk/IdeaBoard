@@ -642,12 +642,9 @@ function normalizeTransactionChanges(draft: CanvasGraphTransactionDraft): Transa
   // Transactions only mutate order through add/remove.  Derive this from the
   // changed records so a one-node edit never scans or copies Board-sized order
   // arrays merely to decide whether a History patch is needed.
-  changes.didChangeNodeOrder =
-    changes.addedNodeIds.size > 0 || changes.removedNodeIds.size > 0
-  changes.didChangeEdgeOrder =
-    changes.addedEdgeIds.size > 0 || changes.removedEdgeIds.size > 0
-  changes.didChangeGroupOrder =
-    changes.addedGroupIds.size > 0 || changes.removedGroupIds.size > 0
+  changes.didChangeNodeOrder = changes.addedNodeIds.size > 0 || changes.removedNodeIds.size > 0
+  changes.didChangeEdgeOrder = changes.addedEdgeIds.size > 0 || changes.removedEdgeIds.size > 0
+  changes.didChangeGroupOrder = changes.addedGroupIds.size > 0 || changes.removedGroupIds.size > 0
   changes.hasDomainChanges =
     changes.addedNodeIds.size > 0 ||
     changes.updatedNodeIds.size > 0 ||
@@ -722,12 +719,7 @@ function createCollectionCommitPatch<Record, Id extends string>(params: {
   clone: (record: Record) => Record
 }): CanvasGraphCollectionPatch<Record, Id> {
   const records = Array.from(params.writes, ([id, after]) =>
-    cloneRecordPatch(
-      id,
-      params.beforeRecords.get(id),
-      after ?? undefined,
-      params.clone,
-    ),
+    cloneRecordPatch(id, params.beforeRecords.get(id), after ?? undefined, params.clone),
   ).filter((patch): patch is CanvasGraphRecordPatch<Record, Id> => patch !== null)
   const order = Array.from(params.orderPatches.values(), (patch) => Object.freeze({ ...patch }))
   return Object.freeze({
@@ -736,9 +728,7 @@ function createCollectionCommitPatch<Record, Id extends string>(params: {
   })
 }
 
-function createCommitPatch(
-  draft: CanvasGraphTransactionDraft,
-): CanvasGraphCommitPatch {
+function createCommitPatch(draft: CanvasGraphTransactionDraft): CanvasGraphCommitPatch {
   return Object.freeze({
     nodes: createCollectionCommitPatch({
       writes: draft.nodeWrites,
@@ -924,11 +914,10 @@ export class CanvasGraphStore {
           continue
         }
         if (currentIndex >= 0) next.splice(currentIndex, 1)
-        const previousIndex = placement.previousId
-          ? next.indexOf(placement.previousId)
-          : -1
+        const previousIndex = placement.previousId ? next.indexOf(placement.previousId) : -1
         const nextIndex = placement.nextId ? next.indexOf(placement.nextId) : -1
-        const insertIndex = previousIndex >= 0 ? previousIndex + 1 : nextIndex >= 0 ? nextIndex : next.length
+        const insertIndex =
+          previousIndex >= 0 ? previousIndex + 1 : nextIndex >= 0 ? nextIndex : next.length
         next.splice(insertIndex, 0, patchItem.id)
       }
       return next
@@ -1142,7 +1131,10 @@ export class CanvasGraphStore {
     })
   }
 
-  _canApplyCommitPatch(patch: CanvasGraphCommitPatch, direction: CanvasGraphPatchDirection): boolean {
+  _canApplyCommitPatch(
+    patch: CanvasGraphCommitPatch,
+    direction: CanvasGraphPatchDirection,
+  ): boolean {
     const source = <Record, Id extends string>(recordPatch: CanvasGraphRecordPatch<Record, Id>) =>
       direction === 'forward' ? recordPatch.before : recordPatch.after
     const matchesRecords = <Record, Id extends string>(
@@ -1152,7 +1144,9 @@ export class CanvasGraphStore {
       collection.records.every((recordPatch) => {
         const expected = source(recordPatch)
         const current = records.get(recordPatch.id)
-        return expected === undefined ? current === undefined : !!current && isSameJsonValue(current, expected)
+        return expected === undefined
+          ? current === undefined
+          : !!current && isSameJsonValue(current, expected)
       })
     const matchesPlacement = <Id extends string>(
       order: readonly Id[],
@@ -1409,13 +1403,7 @@ export class CanvasGraphTransaction {
   cancel(): CanvasGraphTransactionSummary {
     this.assertOpen(false)
     this.status = 'cancelled'
-    return createSummary(
-      this.reason,
-      this.options,
-      this.draft.base,
-      createChangeSet(),
-      this.draft,
-    )
+    return createSummary(this.reason, this.options, this.draft.base, createChangeSet(), this.draft)
   }
 
   private assertOpen(requireCurrentRevision = true) {

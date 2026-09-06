@@ -1,6 +1,8 @@
 <template>
   <section class="grid min-w-0 gap-3" aria-labelledby="recharge-history-heading">
-    <h3 id="recharge-history-heading" class="m-0 text-lg font-bold text-ib-text">{{ t('account.topUp.historyTitle') }}</h3>
+    <h3 id="recharge-history-heading" class="m-0 text-lg font-bold text-ib-text">
+      {{ t('account.topUp.historyTitle') }}
+    </h3>
     <DataTableFrame
       :value="tableRows"
       scrollable
@@ -10,7 +12,11 @@
       frame-class="rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-control)]"
       :empty-title="t('account.topUp.historyEmptyTitle')"
     >
-      <Column field="occurred_at" :header="t('account.topUp.columnTime')" :style="{ width: '180px' }">
+      <Column
+        field="occurred_at"
+        :header="t('account.topUp.columnTime')"
+        :style="{ width: '180px' }"
+      >
         <template #body="{ data }"
           ><Skeleton v-if="isSkeleton(data)" width="8rem" /><time
             v-else
@@ -28,13 +34,19 @@
           ></template
         >
       </Column>
-      <Column field="paid_amount_minor" :header="t('account.topUp.columnPaid')" :style="{ width: '170px' }">
+      <Column
+        field="paid_amount_minor"
+        :header="t('account.topUp.columnPaid')"
+        :style="{ width: '170px' }"
+      >
         <template #body="{ data }"
           ><Skeleton v-if="isSkeleton(data)" width="6rem" /><span
             v-else-if="data.paid_amount_minor !== undefined && data.paid_currency"
             class="whitespace-nowrap font-mono font-semibold text-ib-text-muted"
             >{{ formatCurrencyMinor(data.paid_amount_minor, data.paid_currency) }}</span
-          ><span v-else class="font-semibold text-ib-text-subtle">{{ t('account.topUp.unpaid') }}</span></template
+          ><span v-else class="font-semibold text-ib-text-subtle">{{
+            t('account.topUp.unpaid')
+          }}</span></template
         >
       </Column>
       <Column field="status" :header="t('account.topUp.columnStatus')" :style="{ width: '190px' }">
@@ -66,7 +78,9 @@
           class="flex min-h-40 flex-col items-center justify-center px-6 py-10 text-center"
           role="alert"
         >
-          <p class="m-0 font-semibold text-ib-danger">{{ t('account.errors.historyLoadFailed') }}</p>
+          <p class="m-0 font-semibold text-ib-danger">
+            {{ t('account.errors.historyLoadFailed') }}
+          </p>
           <Button
             :label="t('account.reload')"
             severity="secondary"
@@ -86,7 +100,12 @@
       </template>
 
       <template #after>
-        <p v-if="initialPending" class="sr-only" role="status" :aria-label="t('account.topUp.loadingHistory')">
+        <p
+          v-if="initialPending"
+          class="sr-only"
+          role="status"
+          :aria-label="t('account.topUp.loadingHistory')"
+        >
           {{ t('account.topUp.loadingHistory') }}
         </p>
         <div

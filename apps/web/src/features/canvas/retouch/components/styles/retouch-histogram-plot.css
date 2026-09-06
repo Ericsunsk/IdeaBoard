@@ -121,8 +121,7 @@
   outline-offset: 2px;
 }
 
-.retouch-histogram-plot__range-input:focus-visible
-  + .retouch-histogram-plot__marker--range::after {
+.retouch-histogram-plot__range-input:focus-visible + .retouch-histogram-plot__marker--range::after {
   outline: var(--ib-focus-outline-width, 2px) solid
     var(--ib-focus-outline-color, var(--canvas-accent));
   outline-offset: 2px;

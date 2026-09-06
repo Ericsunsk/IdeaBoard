@@ -137,8 +137,7 @@ let pendingOpen: OpenRequest | null = null
 const searchSavePopoverPt = {
   ...createPopoverMotionPt(),
   root: {
-    class:
-      'search-save-popover ib-page-chrome-surface rounded-[var(--radius-ib-control)] p-1.5',
+    class: 'search-save-popover ib-page-chrome-surface rounded-[var(--radius-ib-control)] p-1.5',
   },
 } satisfies PopoverPassThroughOptions
 

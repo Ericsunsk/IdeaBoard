@@ -23,7 +23,9 @@
       class="rounded-[var(--radius-ib-panel)] border border-ib-danger/25 bg-ib-surface p-4 shadow-[var(--shadow-ib-control)]"
       role="alert"
     >
-      <p class="m-0 font-semibold text-ib-danger">{{ t('account.errors.pendingOrdersLoadFailed') }}</p>
+      <p class="m-0 font-semibold text-ib-danger">
+        {{ t('account.errors.pendingOrdersLoadFailed') }}
+      </p>
       <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(error) }}</p>
       <Button
         :label="t('account.reload')"
@@ -89,7 +91,11 @@
         >
           <span class="text-sm font-semibold text-ib-danger">{{ errorMessage(actionError) }}</span>
           <Button
-            :label="actionTarget.kind === 'continue' ? t('account.topUp.retryContinuePayment') : t('account.topUp.retryAbandonOrder')"
+            :label="
+              actionTarget.kind === 'continue'
+                ? t('account.topUp.retryContinuePayment')
+                : t('account.topUp.retryAbandonOrder')
+            "
             severity="secondary"
             size="small"
             text

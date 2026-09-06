@@ -6,14 +6,14 @@
 
 Baseline 证据来自 `apps/web/.benchmark-reports/` 的本地 report，汇总已写回 #65。
 
-| Case                                | Signal                                                             |
-| ----------------------------------- | ------------------------------------------------------------------ |
-| `structure-heavy 500 node-drag`     | p95 `116.7ms`，dropped `208`，`nodeArrayReplacements=36`           |
-| `structure-heavy 1000 node-drag`    | p95 `234.1ms`，dropped `479`，`nodeArrayReplacements=36`           |
-| `structure-heavy 2500 node-drag`    | p95 `950ms`，dropped `2005`，`nodeArrayReplacements=36`            |
-| `structure-heavy 2500 initial-load` | max frame `132.5ms`，dropped `12`，`longTaskMax=131ms` |
-| `structure-heavy 2500 viewport-pan` | p95 低但 max frame `3433.4ms`，dropped `341`                       |
-| `media-heavy 500/1000`              | 不比同规模 `structure-heavy` 更糟，media rendering 不是第一瓶颈    |
+| Case                                | Signal                                                          |
+| ----------------------------------- | --------------------------------------------------------------- |
+| `structure-heavy 500 node-drag`     | p95 `116.7ms`，dropped `208`，`nodeArrayReplacements=36`        |
+| `structure-heavy 1000 node-drag`    | p95 `234.1ms`，dropped `479`，`nodeArrayReplacements=36`        |
+| `structure-heavy 2500 node-drag`    | p95 `950ms`，dropped `2005`，`nodeArrayReplacements=36`         |
+| `structure-heavy 2500 initial-load` | max frame `132.5ms`，dropped `12`，`longTaskMax=131ms`          |
+| `structure-heavy 2500 viewport-pan` | p95 低但 max frame `3433.4ms`，dropped `341`                    |
+| `media-heavy 500/1000`              | 不比同规模 `structure-heavy` 更糟，media rendering 不是第一瓶颈 |
 
 #66 已移除 `node-drag` commit 的 immediate autosave flush。after benchmark 显示 `autosaveSaveCount` 从 `1` 降为 `0`，但 `nodeArrayReplacements=36` 和 drag p95 仍然很高。因此 Graph Runtime 的核心目标是 graph mutation/projection，而不是 autosave 微调。
 

@@ -49,9 +49,7 @@ export type UseCanvasImageToolsOptions = {
     y: number,
     options?: { zoom?: number; duration?: number; interpolate?: 'smooth' },
   ) => Promise<unknown> | unknown
-  createPendingAdjustmentNode: (
-    sourceNode: ImageNodeItem,
-  ) => string | null
+  createPendingAdjustmentNode: (sourceNode: ImageNodeItem) => string | null
   applyImageFileToImageNode: (nodeId: string, file: File) => Promise<boolean>
   removeNode: (nodeId: string) => void
   connectionAdapter: Pick<CanvasVueFlowConnectionAdapter, 'connectIntent'>

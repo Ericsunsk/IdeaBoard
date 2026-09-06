@@ -21,7 +21,8 @@ function createHarness() {
   const session = CanvasGraphSession.hydrate('board-1', snapshot)
   const history = useCanvasGraphHistory({
     applyPatch: (patch, direction) =>
-      session.applyCommitPatch(patch, direction, { recordHistory: false, markDirty: true }).didChange,
+      session.applyCommitPatch(patch, direction, { recordHistory: false, markDirty: true })
+        .didChange,
   })
   session.subscribe((event) => {
     if (event.sideEffects.recordHistory) history.record(event.patch)

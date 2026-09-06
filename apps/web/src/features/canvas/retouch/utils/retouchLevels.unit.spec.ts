@@ -212,8 +212,20 @@ describe('retouchLevels', () => {
       }),
     ).toEqual([
       { id: 'shadows', position: 50, ariaLabel: 'Blacks 50', ariaValueMin: 0, ariaValueMax: 50 },
-      { id: 'midtones', position: 51, ariaLabel: 'Midtones 51', ariaValueMin: 50, ariaValueMax: 51 },
-      { id: 'highlights', position: 51, ariaLabel: 'Whites 51', ariaValueMin: 51, ariaValueMax: 255 },
+      {
+        id: 'midtones',
+        position: 51,
+        ariaLabel: 'Midtones 51',
+        ariaValueMin: 50,
+        ariaValueMax: 51,
+      },
+      {
+        id: 'highlights',
+        position: 51,
+        ariaLabel: 'Whites 51',
+        ariaValueMin: 51,
+        ariaValueMax: 255,
+      },
     ])
   })
 

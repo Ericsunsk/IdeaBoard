@@ -12,7 +12,11 @@ import {
   getCachedVisionReferences,
   setCachedVisionReferences,
 } from './visionReferencePersistence'
-import { searchReferenceKey, searchResultToVisionReference, toVisionReference } from './searchLibraryBridge'
+import {
+  searchReferenceKey,
+  searchResultToVisionReference,
+  toVisionReference,
+} from './searchLibraryBridge'
 import {
   extractVisionSearch,
   isSearchQueryWithinLimit,
@@ -20,7 +24,11 @@ import {
   type SearchResult,
   type VisionReference,
 } from './searchResource'
-import { createVisionReferenceCollection, MAX_REFERENCE_BYTES, MAX_REFERENCE_COUNT } from './visionReferenceCollection'
+import {
+  createVisionReferenceCollection,
+  MAX_REFERENCE_BYTES,
+  MAX_REFERENCE_COUNT,
+} from './visionReferenceCollection'
 import { fetchVisionSearchPrice } from './visionSearchBillingResource'
 
 type VisionQueryLifecycleOptions = {
@@ -66,7 +74,8 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
   const canAddReference = collection.canAdd
   const buttonTitle = computed(() => {
     if (state.value === 'extracting') return i18n.global.t('search.buttons.searching')
-    if (references.value.length === 0 || price.value === null) return i18n.global.t('search.buttons.search')
+    if (references.value.length === 0 || price.value === null)
+      return i18n.global.t('search.buttons.search')
     return i18n.global.t('search.buttons.searchWithPrice', {
       price: price.value === 0 ? i18n.global.t('search.priceFree') : formatIdeaAmount(price.value),
     })

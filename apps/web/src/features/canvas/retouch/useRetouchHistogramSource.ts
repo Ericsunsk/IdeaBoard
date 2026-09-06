@@ -1,9 +1,5 @@
 import { computed, type ComputedRef, type Ref } from 'vue'
-import type {
-  RetouchAdjustmentLayer,
-  RetouchLayer,
-  RetouchRenderedPreview,
-} from './types'
+import type { RetouchAdjustmentLayer, RetouchLayer, RetouchRenderedPreview } from './types'
 import {
   resolveRetouchHistogramSource,
   type RetouchHistogramSourceResolution,

@@ -15,7 +15,10 @@ import {
  */
 export function bindCanvasGraphSessionProjection(options: {
   session: CanvasGraphSession
-  graphAdapter: Pick<CanvasVueFlowGraphAdapter, 'applyIncrementalProjection' | 'replaceFullProjection'>
+  graphAdapter: Pick<
+    CanvasVueFlowGraphAdapter,
+    'applyIncrementalProjection' | 'replaceFullProjection'
+  >
   readCurrent: () => CanvasFlowGraphProjection
   projectFull: () => CanvasFlowGraphProjection
   isCurrentAttachment: () => boolean

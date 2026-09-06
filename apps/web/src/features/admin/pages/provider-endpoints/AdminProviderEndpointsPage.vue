@@ -158,9 +158,7 @@
                   class="text-admin-text-3"
                 >
                   ·
-                  {{
-                    card.providerEndpoint.capabilities[0]
-                  }}
+                  {{ card.providerEndpoint.capabilities[0] }}
                 </span>
               </div>
 

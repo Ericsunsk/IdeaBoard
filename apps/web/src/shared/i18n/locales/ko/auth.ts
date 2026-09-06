@@ -94,9 +94,11 @@ export default {
     otherSessionsRevokeFailed: '다른 기기에서 로그아웃할 수 없습니다.',
     passwordUpdateFailed: '비밀번호를 업데이트할 수 없습니다. 다시 시도해 주세요.',
     stopImpersonatingFailed: '가상 계정을 종료할 수 없습니다.',
-    stopImpersonatingRetryAsAdmin: '가상 계정을 종료할 수 없습니다. 관리자 계정으로 로그인한 뒤 다시 시도해 주세요.',
+    stopImpersonatingRetryAsAdmin:
+      '가상 계정을 종료할 수 없습니다. 관리자 계정으로 로그인한 뒤 다시 시도해 주세요.',
     sessionRestoreFailed: '로그인되어 있지만 계정을 불러올 수 없습니다.',
-    sessionRestoreAfterVerifyFailed: '이메일 인증은 완료되었지만 계정을 불러올 수 없습니다. 로그인해 주세요.',
+    sessionRestoreAfterVerifyFailed:
+      '이메일 인증은 완료되었지만 계정을 불러올 수 없습니다. 로그인해 주세요.',
     invalidEmail: '올바른 이메일 주소를 입력해 주세요',
     sixDigitCode: '6자리 코드를 입력해 주세요',
     passwordMismatch: '비밀번호가 일치하지 않습니다',

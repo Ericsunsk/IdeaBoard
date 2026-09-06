@@ -17,10 +17,7 @@ export const INPAINT_DEFAULT_LAYER_OPACITY = 72
 export const INPAINT_MIN_LAYER_OPACITY = 15
 export const INPAINT_MAX_LAYER_OPACITY = 100
 
-export function clampMaskBrushSize(
-  value: number,
-  fallback = INPAINT_DEFAULT_BRUSH_SIZE,
-): number {
+export function clampMaskBrushSize(value: number, fallback = INPAINT_DEFAULT_BRUSH_SIZE): number {
   const next = Number(value)
   const resolved = Number.isFinite(next) && next > 0 ? next : fallback
   return Math.max(INPAINT_MIN_BRUSH_SIZE, Math.min(INPAINT_MAX_BRUSH_SIZE, resolved))

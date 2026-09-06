@@ -65,11 +65,9 @@ describe('bindCanvasGraphSessionProjection', () => {
       },
     ]
     const session = CanvasGraphSession.hydrate('board-1', snapshot)
-    const applyIncrementalProjection = vi
-      .fn()
-      .mockImplementationOnce(() => {
-        throw new Error('renderer unavailable')
-      })
+    const applyIncrementalProjection = vi.fn().mockImplementationOnce(() => {
+      throw new Error('renderer unavailable')
+    })
     const replaceFullProjection = vi.fn()
     const scheduled: Array<() => void> = []
     const unsubscribe = bindCanvasGraphSessionProjection({
@@ -79,7 +77,10 @@ describe('bindCanvasGraphSessionProjection', () => {
         nodes: [{ id: 'image-1', position: { x: 40, y: 20 }, data: {} }],
         edges: [],
       }),
-      projectFull: () => ({ nodes: [{ id: 'image-1', position: { x: 40, y: 20 }, data: {} }], edges: [] }),
+      projectFull: () => ({
+        nodes: [{ id: 'image-1', position: { x: 40, y: 20 }, data: {} }],
+        edges: [],
+      }),
       isCurrentAttachment: () => true,
       scheduleMicrotask: (task) => scheduled.push(task),
     })
@@ -93,7 +94,9 @@ describe('bindCanvasGraphSessionProjection', () => {
     expect(scheduled).toHaveLength(1)
 
     scheduled[0]()
-    expect(replaceFullProjection).toHaveBeenCalledWith(expect.objectContaining({ nodes: expect.any(Array) }))
+    expect(replaceFullProjection).toHaveBeenCalledWith(
+      expect.objectContaining({ nodes: expect.any(Array) }),
+    )
     unsubscribe()
   })
 })

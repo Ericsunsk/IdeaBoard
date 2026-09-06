@@ -16,23 +16,20 @@ function renderLayerActions(
     onApplyAdjustments?: () => void
   } = {},
 ) {
-  return renderWithUser(
-    RetouchLayerActions,
-    {
-      props: {
-        canCopyLayer: options.canCopyLayer ?? true,
-        canMergeLayer: options.canMergeLayer ?? true,
-        canRemoveLayer: options.canRemoveLayer ?? true,
-        applying: options.applying ?? false,
-        applyDisabled: options.applyDisabled ?? options.applying ?? false,
-        'onAdd-layer': options.onAddLayer,
-        'onCopy-layer': options.onCopyLayer,
-        'onMerge-layer': options.onMergeLayer,
-        'onRemove-layer': options.onRemoveLayer,
-        'onApply-adjustments': options.onApplyAdjustments,
-      },
+  return renderWithUser(RetouchLayerActions, {
+    props: {
+      canCopyLayer: options.canCopyLayer ?? true,
+      canMergeLayer: options.canMergeLayer ?? true,
+      canRemoveLayer: options.canRemoveLayer ?? true,
+      applying: options.applying ?? false,
+      applyDisabled: options.applyDisabled ?? options.applying ?? false,
+      'onAdd-layer': options.onAddLayer,
+      'onCopy-layer': options.onCopyLayer,
+      'onMerge-layer': options.onMergeLayer,
+      'onRemove-layer': options.onRemoveLayer,
+      'onApply-adjustments': options.onApplyAdjustments,
     },
-  )
+  })
 }
 
 describe('RetouchLayerActions', () => {
@@ -102,5 +99,4 @@ describe('RetouchLayerActions', () => {
     expect(screen.getByRole('button', { name: 'Applying…' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Applying…' })).toBeDisabled()
   })
-
 })

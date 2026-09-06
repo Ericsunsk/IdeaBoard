@@ -80,9 +80,9 @@ export function releaseCanvasGraphDeleteExecutions(
     options.edges,
     removedFlowNodeIds,
   )
-  const leases = options.captureActiveNodeExecutions(
-    [...new Set([...removedFlowNodeIds, ...candidateSlotNodeIds])],
-  )
+  const leases = options.captureActiveNodeExecutions([
+    ...new Set([...removedFlowNodeIds, ...candidateSlotNodeIds]),
+  ])
   options.releaseNodeExecutions(leases)
   return true
 }

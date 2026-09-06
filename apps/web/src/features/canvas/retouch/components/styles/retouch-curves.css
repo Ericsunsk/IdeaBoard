@@ -15,8 +15,7 @@
   position: relative;
   aspect-ratio: 1;
   width: 100%;
-  border: var(--retouch-curves-frame-border-width) solid
-    var(--retouch-curves-frame-border-color);
+  border: var(--retouch-curves-frame-border-width) solid var(--retouch-curves-frame-border-color);
   border-radius: var(--retouch-curves-frame-radius);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.92)),
@@ -96,8 +95,7 @@
   width: var(--retouch-control-point-size);
   height: var(--retouch-control-point-size);
   padding: 0;
-  border: var(--retouch-control-point-border-width) solid
-    var(--retouch-control-point-border-color);
+  border: var(--retouch-control-point-border-width) solid var(--retouch-control-point-border-color);
   border-radius: 50%;
   background: var(--retouch-control-point-bg);
   cursor: grab;

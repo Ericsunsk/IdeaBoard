@@ -18,7 +18,7 @@
       :zoomable="true"
       :inverse-pan="false"
       :zoom-step="1"
-:aria-label="t('canvas.minimap.label')"
+      :aria-label="t('canvas.minimap.label')"
       @click="onMiniMapClick"
     />
     <svg

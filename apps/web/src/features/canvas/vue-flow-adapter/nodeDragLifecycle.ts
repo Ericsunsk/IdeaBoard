@@ -58,9 +58,7 @@ function mergeNodeDragChanges(
       ...(change.position === undefined && previous?.position !== undefined
         ? { position: previous.position }
         : {}),
-      ...(change.from === undefined && previous?.from !== undefined
-        ? { from: previous.from }
-        : {}),
+      ...(change.from === undefined && previous?.from !== undefined ? { from: previous.from } : {}),
     })
   })
   return [...changesByKey.values()]

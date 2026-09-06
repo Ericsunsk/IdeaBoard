@@ -23,7 +23,12 @@ describe('credits billing API adapter', () => {
     vi.resetAllMocks()
 
     const command = { transaction_id: 'transaction-1' }
-    const wallet = { public_id: publicId, display_name: '测试用户', available_credits: 1200, reserved_credits: 0 }
+    const wallet = {
+      public_id: publicId,
+      display_name: '测试用户',
+      available_credits: 1200,
+      reserved_credits: 0,
+    }
     const ledger = { transactions: [] }
     const run = { id: 7, status: 'completed' }
     const runs = { runs: [run] }
@@ -66,7 +71,12 @@ describe('credits billing API adapter', () => {
     })
     const health = await adminCreditsBillingApi.getCreditHealth()
 
-    expect(wallet).toEqual({ public_id: publicId, display_name: '测试用户', available_credits: 1200, reserved_credits: 0 })
+    expect(wallet).toEqual({
+      public_id: publicId,
+      display_name: '测试用户',
+      available_credits: 1200,
+      reserved_credits: 0,
+    })
     expect(ledger).toEqual({ transactions: [] })
     expect(grant).toEqual({ transaction_id: 'transaction-1' })
     expect(deduction).toEqual({ transaction_id: 'transaction-1' })

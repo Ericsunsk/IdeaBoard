@@ -22,13 +22,13 @@ const props = defineProps<{
 }>()
 
 const iconMap: Record<ImageActionMenuIcon, Component> = {
-  'cutout': BorderInner,
-  'variations': Spark,
-  'render': EditPencil,
+  cutout: BorderInner,
+  variations: Spark,
+  render: EditPencil,
   upscale: Hd,
-  'outpaint': Expand,
-  'inpaint': DesignPencil,
-  'retouch': AdobePhotoshop,
+  outpaint: Expand,
+  inpaint: DesignPencil,
+  retouch: AdobePhotoshop,
 }
 
 const resolvedIcon = computed<Component>(() => iconMap[props.icon])

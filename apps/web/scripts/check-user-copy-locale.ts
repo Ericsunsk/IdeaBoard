@@ -47,13 +47,15 @@ function isSpecFile(relativePath: string): boolean {
 }
 
 function stripComments(content: string): string {
-  return content
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .split('\n')
-    // Drop line comments while keeping protocol strings like 'https://…' intact.
-    .map((line) => line.replace(/(^|[^:'"`])\/\/(?!\/).*/, '$1'))
-    .join('\n')
+  return (
+    content
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n')
+      // Drop line comments while keeping protocol strings like 'https://…' intact.
+      .map((line) => line.replace(/(^|[^:'"`])\/\/(?!\/).*/, '$1'))
+      .join('\n')
+  )
 }
 
 function loadAllowlist(): AllowlistEntry[] {

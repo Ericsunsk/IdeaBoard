@@ -45,10 +45,7 @@ export type RetouchSharpenParams = {
 export type RetouchParamKey = keyof RetouchHslParams
 
 export type RetouchAdjustmentWholeParams =
-  | RetouchThresholdParams
-  | RetouchCurvesParams
-  | RetouchLevelsParams
-  | RetouchSharpenParams
+  RetouchThresholdParams | RetouchCurvesParams | RetouchLevelsParams | RetouchSharpenParams
 
 export type RetouchSourceLayer = {
   id: string
@@ -139,8 +136,7 @@ export type RetouchMergedLayer = {
   children: RetouchEditableLayer[]
 }
 
-export type RetouchEditableLayer =
-  RetouchAdjustmentLayer | RetouchPaintLayer | RetouchMergedLayer
+export type RetouchEditableLayer = RetouchAdjustmentLayer | RetouchPaintLayer | RetouchMergedLayer
 
 export type RetouchLayer = RetouchSourceLayer | RetouchEditableLayer
 

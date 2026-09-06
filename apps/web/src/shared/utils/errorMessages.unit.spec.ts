@@ -13,9 +13,7 @@ describe('error message helpers', () => {
     expect(extractSafeApiErrorMessage({ msg: '保存失败' }, '默认错误')).toBe('保存失败')
     expect(
       formatDisplayErrorMessage(
-        new Error(
-          '无效的 Stripe API Key：请使用 sk_ 或 rk_ 开头的对应环境 Key',
-        ),
+        new Error('无效的 Stripe API Key：请使用 sk_ 或 rk_ 开头的对应环境 Key'),
         '默认错误',
       ),
     ).toBe('无效的 Stripe API Key：请使用 sk_ 或 rk_ 开头的对应环境 Key')

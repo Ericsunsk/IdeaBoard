@@ -156,7 +156,9 @@ describe('useFlowBoardHeaderActions', () => {
     await vi.waitFor(() => expect(header.isRenamePending.value).toBe(true))
     header.startBoardRename()
 
-    expect(message.warning).toHaveBeenCalledWith('Canvas name is syncing. Try renaming again shortly.')
+    expect(message.warning).toHaveBeenCalledWith(
+      'Canvas name is syncing. Try renaming again shortly.',
+    )
     resolveRename({ ok: true, board: board('board-a', 'New Board') })
     await task
     expect(header.isRenamePending.value).toBe(false)

@@ -17,7 +17,10 @@ export function getLibraryIslandState(scope = 'anonymous'): LibraryIslandState {
 
 export function setLibraryIslandState(state: LibraryIslandState, scope = 'anonymous'): void {
   try {
-    searchSessionStorage()?.setItem(searchScopedStorageKey(ISLAND_STATE_KEY, scope), JSON.stringify(state))
+    searchSessionStorage()?.setItem(
+      searchScopedStorageKey(ISLAND_STATE_KEY, scope),
+      JSON.stringify(state),
+    )
   } catch {
     // Island layout is an optional local preference.
   }

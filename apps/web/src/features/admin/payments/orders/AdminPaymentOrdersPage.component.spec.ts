@@ -108,7 +108,9 @@ describe('AdminPaymentOrdersPage', () => {
 
     expect(await screen.findByRole('dialog', { name: `支付订单 · ${orderNumber}` })).toBeVisible()
     expect(screen.queryByText('00000000-0000-4000-8000-000000000042')).not.toBeInTheDocument()
-    expect(screen.queryByText('仅显示服务端脱敏 identity，不包含 API Key、Webhook Payload 或账单地址。')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('仅显示服务端脱敏 identity，不包含 API Key、Webhook Payload 或账单地址。'),
+    ).not.toBeInTheDocument()
     expect(screen.getByText('商品金额')).toBeVisible()
     expect(screen.getByText('税费')).toBeVisible()
     expect(screen.getByText('条款版本')).toBeVisible()

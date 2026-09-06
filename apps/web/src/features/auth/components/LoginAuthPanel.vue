@@ -157,10 +157,23 @@
         />
       </form>
 
-      <form v-else class="relative z-[1] flex flex-col gap-3.5" novalidate @submit.prevent="handleResetPassword">
+      <form
+        v-else
+        class="relative z-[1] flex flex-col gap-3.5"
+        novalidate
+        @submit.prevent="handleResetPassword"
+      >
         <p class="text-xs text-ib-text-subtle">{{ t('auth.resetPasswordInstructions') }}</p>
         <IbFormField
-          v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+          v-slot="{
+            ariaInvalid,
+            describedbyId,
+            fieldId,
+            inlineError,
+            inlineErrorText,
+            invalid,
+            required,
+          }"
           :label="t('auth.fields.email')"
           :error="resetErrors.email"
           field-id="reset-email"
@@ -202,9 +215,22 @@
         </button>
       </form>
 
-      <form v-if="resetMode && resetOtpSent" class="relative z-[1] mt-3 flex flex-col gap-3.5" novalidate @submit.prevent="handleResetPasswordConfirm">
+      <form
+        v-if="resetMode && resetOtpSent"
+        class="relative z-[1] mt-3 flex flex-col gap-3.5"
+        novalidate
+        @submit.prevent="handleResetPasswordConfirm"
+      >
         <IbFormField
-          v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+          v-slot="{
+            ariaInvalid,
+            describedbyId,
+            fieldId,
+            inlineError,
+            inlineErrorText,
+            invalid,
+            required,
+          }"
           :label="t('auth.fields.otp')"
           :error="resetErrors.otp"
           field-id="reset-otp"
@@ -229,7 +255,15 @@
           />
         </IbFormField>
         <IbFormField
-          v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+          v-slot="{
+            ariaInvalid,
+            describedbyId,
+            fieldId,
+            inlineError,
+            inlineErrorText,
+            invalid,
+            required,
+          }"
           :label="t('auth.fields.newPassword')"
           :error="resetErrors.password"
           field-id="reset-password"
@@ -244,7 +278,13 @@
             :feedback="false"
             fluid
             :pt="authPasswordPt"
-            :input-props="{ id: fieldId, autocomplete: 'new-password', required, 'aria-invalid': ariaInvalid, 'aria-describedby': describedbyId }"
+            :input-props="{
+              id: fieldId,
+              autocomplete: 'new-password',
+              required,
+              'aria-invalid': ariaInvalid,
+              'aria-describedby': describedbyId,
+            }"
             :invalid="invalid"
             :input-class="[authInputClass, inlineError ? authInputErrorClass : '']"
             :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.newPassword')"
@@ -296,10 +336,7 @@ import IbFormField from '../../../shared/components/IbFormField.vue'
 import { useAuthFeedback } from '../useAuthFeedback'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import { getRequiredError } from './authFormUtils'
-import {
-  getOAuthProviderLabel,
-  type OAuthProviderCode,
-} from '../../../shared/auth/oauthProviders'
+import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../shared/auth/oauthProviders'
 import {
   authButtonPt,
   authErrorMessagePt,
@@ -440,20 +477,26 @@ async function handleResetPassword() {
   resetErrors.value.email = !email || !email.includes('@') ? t('auth.errors.invalidEmail') : ''
   if (resetErrors.value.email) return
 
-  const sent = await runAsyncAction(
-    () => userStore.requestPasswordResetOTP(email),
-    { feedback: authFeedback.login },
-  )
+  const sent = await runAsyncAction(() => userStore.requestPasswordResetOTP(email), {
+    feedback: authFeedback.login,
+  })
   if (sent) resetOtpSent.value = true
 }
 
 async function handleResetPasswordConfirm() {
-  resetErrors.value.otp = /^\d{6}$/.test(resetForm.value.otp.trim()) ? '' : t('auth.errors.sixDigitCode')
+  resetErrors.value.otp = /^\d{6}$/.test(resetForm.value.otp.trim())
+    ? ''
+    : t('auth.errors.sixDigitCode')
   resetErrors.value.password = getPasswordLengthError(resetForm.value.password)
   if (resetErrors.value.otp || resetErrors.value.password) return
 
   const reset = await runAsyncAction(
-    () => userStore.resetPasswordWithOTP(resetForm.value.email, resetForm.value.otp, resetForm.value.password),
+    () =>
+      userStore.resetPasswordWithOTP(
+        resetForm.value.email,
+        resetForm.value.otp,
+        resetForm.value.password,
+      ),
     { feedback: authFeedback.login },
   )
   if (reset) {

@@ -1,7 +1,7 @@
 <template>
   <div class="retouch-levels-output" :aria-label="t('canvas.retouch.outputLevelsLabel')">
     <div class="editing-controls-label retouch-levels-output__header">
-      <span>{{ t("canvas.retouch.outputLevelsLabel") }}</span>
+      <span>{{ t('canvas.retouch.outputLevelsLabel') }}</span>
     </div>
     <EditingTwoHandleSlider
       class="retouch-levels-output__slider"
@@ -64,10 +64,7 @@ import {
   type RetouchLevelsConstraint,
   type RetouchLevelsOutputHandleId,
 } from '../utils/retouchLevels'
-import {
-  RETOUCH_CHANNEL_MAX,
-  RETOUCH_CHANNEL_MIN,
-} from '../utils/retouchChannelScale'
+import { RETOUCH_CHANNEL_MAX, RETOUCH_CHANNEL_MIN } from '../utils/retouchChannelScale'
 import { readFiniteNumberInputValue } from '../utils/readFiniteNumberInputValue'
 
 const props = defineProps<{

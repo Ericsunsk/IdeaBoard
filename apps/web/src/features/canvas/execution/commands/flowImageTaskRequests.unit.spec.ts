@@ -331,8 +331,8 @@ describe('flowImageTaskRequests', () => {
         image_offset_y: 75,
       },
     })
-	 expect(request.params).not.toHaveProperty('custom_width')
-	 expect(request.params).not.toHaveProperty('custom_height')
+    expect(request.params).not.toHaveProperty('custom_width')
+    expect(request.params).not.toHaveProperty('custom_height')
   })
 
   it('builds outpaint readiness from the same action contract', () => {
@@ -505,7 +505,9 @@ describe('flowImageTaskRequests', () => {
     })
     expect(buildImageExecutionTaskRequest(textPlan)).not.toHaveProperty('image_urls')
     expect(buildImageExecutionTaskRequest(textPlan)).toMatchObject({ params: { output_count: 1 } })
-    expect(buildImageExecutionTaskRequest(outpaintPlan, { width: 1000, height: 1000 })).toMatchObject({
+    expect(
+      buildImageExecutionTaskRequest(outpaintPlan, { width: 1000, height: 1000 }),
+    ).toMatchObject({
       feature: EXECUTION_FEATURE.outpaint,
       image_urls: [source.url],
       params: {

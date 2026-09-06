@@ -53,7 +53,9 @@ describe('canvas billing readiness store', () => {
 
     expect(fetchReadinessMatrix).toHaveBeenCalledOnce()
     expect(fetchReadinessMatrix).toHaveBeenCalledWith(entries.map((entry) => entry.request))
-    expect(store.getFeatureState(WORKFLOW_FEATURE.variations, entries[0].request).status).toBe('ready')
+    expect(store.getFeatureState(WORKFLOW_FEATURE.variations, entries[0].request).status).toBe(
+      'ready',
+    )
     expect(store.getFeatureState(WORKFLOW_FEATURE.cutout, entries[1].request).status).toBe('ready')
   })
 

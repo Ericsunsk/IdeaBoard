@@ -53,7 +53,9 @@
             @drop.stop.prevent="onAddSlotDrop"
           >
             <Plus class="size-4" />
-            <span class="canvas-tool-tooltip" aria-hidden="true">{{ t('canvas.controls.addImageInput') }}</span>
+            <span class="canvas-tool-tooltip" aria-hidden="true">{{
+              t('canvas.controls.addImageInput')
+            }}</span>
           </button>
         </div>
         <PromptTextComposer
@@ -110,7 +112,10 @@ const emit = defineEmits<{
   (e: 'focus'): void
   (e: 'update:text', value: string): void
   (e: 'update:output-count', value: number): void
-  (e: 'update:output-resolution', value: import('../../../../../shared/domain/generationContract').OutputResolution): void
+  (
+    e: 'update:output-resolution',
+    value: import('../../../../../shared/domain/generationContract').OutputResolution,
+  ): void
   (e: 'update:aspect-ratio', value: PromptAspectRatio): void
   (e: 'update:input-images', value: PromptNodeItem['inputImages']): void
   (e: 'input-image-drop', event: DragEvent): void

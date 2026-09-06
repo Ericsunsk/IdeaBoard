@@ -111,7 +111,8 @@ export function canonicalizeRuntimeUploadRef(raw: string): string {
   try {
     const url = new URL(trimmed)
     if (!url.pathname.startsWith('/uploads/')) return raw
-    const isPublicAssetOrigin = typeof window !== 'undefined' && url.origin === window.location.origin
+    const isPublicAssetOrigin =
+      typeof window !== 'undefined' && url.origin === window.location.origin
     if (!isPublicAssetOrigin && !isLoopbackHostname(url.hostname)) return raw
     return `${url.pathname}${url.search}`
   } catch {

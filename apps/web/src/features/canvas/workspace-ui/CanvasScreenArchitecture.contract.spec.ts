@@ -47,9 +47,7 @@ describe('Canvas Screen architecture contract', () => {
     expect(uiAdapter).not.toContain('isCanvasInteractionLocked')
     expect(uiAdapter).not.toContain('selection:')
     expect(imageWorkflow).toContain('isCanvasInteractionLocked: graph.isCanvasInteractionLocked')
-    expect(imageWorkflow).toContain(
-      'selectNode: options.flowPaneAdapter.selectOnlyNode',
-    )
+    expect(imageWorkflow).toContain('selectNode: options.flowPaneAdapter.selectOnlyNode')
   })
 
   it('keeps connection endpoints immutable in the Vue Flow surface', () => {

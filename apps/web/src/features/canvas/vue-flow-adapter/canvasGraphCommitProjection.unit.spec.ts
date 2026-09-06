@@ -192,7 +192,9 @@ describe('projectCanvasGraphCommit', () => {
       current: { nodes: [], edges: [currentEdge] },
       patch: patch({
         edges: {
-          records: [{ id: 'connection-1', before: connectionRecord(1), after: connectionRecord(1) }],
+          records: [
+            { id: 'connection-1', before: connectionRecord(1), after: connectionRecord(1) },
+          ],
           order: [],
         },
       }),
@@ -240,11 +242,9 @@ describe('Canvas Graph commit projection recovery', () => {
       nodes: [flowNode('image-1', 'canonical')],
       edges: [],
     }
-    const renderer = vi
-      .fn<(projection: { kind: string }) => void>()
-      .mockImplementationOnce(() => {
-        throw new Error('renderer failed')
-      })
+    const renderer = vi.fn<(projection: { kind: string }) => void>().mockImplementationOnce(() => {
+      throw new Error('renderer failed')
+    })
     const onFailure = vi.fn()
     let scheduledRecovery: (() => void) | undefined
     const controller = createCanvasGraphCommitProjectionController({

@@ -61,10 +61,7 @@ function drawTintedMaskToCanvas(
   tintCurrentAlpha(ctx, width, height, color, alpha)
 }
 
-function drawExecutionMaskToCanvas(
-  targetCanvas: HTMLCanvasElement,
-  source: ImageData,
-) {
+function drawExecutionMaskToCanvas(targetCanvas: HTMLCanvasElement, source: ImageData) {
   const ctx = targetCanvas.getContext('2d')
   if (!ctx) return
   const imageData = ctx.createImageData(source.width, source.height)

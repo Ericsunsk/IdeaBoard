@@ -226,7 +226,10 @@ describe('useFlowNodeUiState', () => {
     expect(connectedFusionState).not.toBe(disconnectedFusionState)
     expect(connectedInputs?.image).toBe(true)
     expect(pendingInputs?.image).toBe(true)
-    expect(connectedFusionState.primaryAction).toEqual({ label: 'Waiting for Image', disabled: true })
+    expect(connectedFusionState.primaryAction).toEqual({
+      label: 'Waiting for Image',
+      disabled: true,
+    })
   })
 
   it('refreshes connection state when edges update with the same array identity', () => {

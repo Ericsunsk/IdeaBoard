@@ -81,9 +81,17 @@ describe('Canvas Execution Recovery Coordinator', () => {
   it('ignores a result that resolves after the Board attachment changes', async () => {
     const harness = createHarness()
     let resolveResult!: (value: { url: string; ratio: number }) => void
-    const coordinator = createCoordinator(harness, () => new Promise((resolve) => { resolveResult = resolve }))
+    const coordinator = createCoordinator(
+      harness,
+      () =>
+        new Promise((resolve) => {
+          resolveResult = resolve
+        }),
+    )
     const recovery = coordinator.recover()
-    await vi.waitFor(() => expect(harness.core.factFor('image-1')).toMatchObject({ status: 'running' }))
+    await vi.waitFor(() =>
+      expect(harness.core.factFor('image-1')).toMatchObject({ status: 'running' }),
+    )
 
     const nextGraph = CanvasGraphSession.hydrate('board-b', createEmptyCanvasBoardSnapshot())
     harness.core.attachBoard(CanvasBoardGraphSession.create('board-b', { graphSession: nextGraph }))
@@ -118,7 +126,11 @@ describe('Canvas Execution Recovery Coordinator', () => {
 
   it('routes materialization failures through the unified error callback', async () => {
     const failure = new Error('materialization failed')
-    const harness = createHarness({ onMaterialized: () => { throw failure } })
+    const harness = createHarness({
+      onMaterialized: () => {
+        throw failure
+      },
+    })
     const onError = vi.fn(() => true)
     const coordinator = createCoordinator(
       harness,
@@ -129,7 +141,9 @@ describe('Canvas Execution Recovery Coordinator', () => {
     const result = await coordinator.recover()
 
     expect(result?.failedNodeIds).toEqual(['image-1'])
-    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ name: 'PendingImageMaterializationError' }))
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'PendingImageMaterializationError' }),
+    )
     expect(harness.core.factFor('image-1')).toMatchObject({ status: 'failed', taskId: 'task-1' })
   })
 })

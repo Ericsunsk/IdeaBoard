@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
-import { clearCachedVisionReferences, setCachedVisionReferences } from './visionReferencePersistence'
+import {
+  clearCachedVisionReferences,
+  setCachedVisionReferences,
+} from './visionReferencePersistence'
 import { useVisionQueryLifecycle } from './useVisionQueryLifecycle'
 
 const mocks = vi.hoisted(() => ({
@@ -58,13 +61,21 @@ describe('useVisionQueryLifecycle', () => {
 
   it('restores a cached Library draft for editing without submitting a paid extraction', () => {
     setCachedVisionReferences(
-      [{ key: 'unsplash:cached', previewUrl: 'https://images.example/cached.jpg', libraryAssetID: 1 }],
+      [
+        {
+          key: 'unsplash:cached',
+          previewUrl: 'https://images.example/cached.jpg',
+          libraryAssetID: 1,
+        },
+      ],
       'user-a',
     )
 
     const { lifecycle } = createLifecycle({ scope: 'user-a' })
 
-    expect(lifecycle.references.value.map((reference) => reference.key)).toEqual(['unsplash:cached'])
+    expect(lifecycle.references.value.map((reference) => reference.key)).toEqual([
+      'unsplash:cached',
+    ])
     expect(mocks.extractVisionSearch).not.toHaveBeenCalled()
     lifecycle.dispose()
     clearCachedVisionReferences('user-a')
@@ -77,7 +88,10 @@ describe('useVisionQueryLifecycle', () => {
 
     lifecycle.addLibraryAsset(libraryAsset as never)
     lifecycle.handleFileInput({
-      target: { files: [new File(['file'], 'local.jpg', { type: 'image/jpeg' })], value: 'selected' },
+      target: {
+        files: [new File(['file'], 'local.jpg', { type: 'image/jpeg' })],
+        value: 'selected',
+      },
     } as unknown as Event)
     lifecycle.addSearchResult({
       provider: 'pexels',
@@ -116,7 +130,10 @@ describe('useVisionQueryLifecycle', () => {
   it('owns quote feedback, idempotent paid extraction, and feed handoff', async () => {
     const { lifecycle, submittedQuery, loadResults } = createLifecycle()
     lifecycle.addLibraryAsset(libraryAsset as never)
-    mocks.extractVisionSearch.mockResolvedValue({ status: 'succeeded', query: 'warm editorial cafe' })
+    mocks.extractVisionSearch.mockResolvedValue({
+      status: 'succeeded',
+      query: 'warm editorial cafe',
+    })
 
     await lifecycle.submit()
 

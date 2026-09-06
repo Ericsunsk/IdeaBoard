@@ -62,16 +62,13 @@ export function createCanvasVueFlowRendererMetricsPort(
       const computedPosition = readPoint(
         (node as Node & { computedPosition?: unknown }).computedPosition,
       )
-      const dimensions = readDimensions(
-        (node as Node & { dimensions?: unknown }).dimensions,
-      )
+      const dimensions = readDimensions((node as Node & { dimensions?: unknown }).dimensions)
       return {
         nodeId,
         position,
         dimensions,
         computedPosition,
-        measured:
-          computedPosition !== null && dimensions.width > 0 && dimensions.height > 0,
+        measured: computedPosition !== null && dimensions.width > 0 && dimensions.height > 0,
       }
     },
   }

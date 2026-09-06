@@ -1,6 +1,10 @@
 import type { CanvasGraphNodeRecord } from '../../graph-runtime'
 import type { CanvasRendererMetricsPort } from '../../vue-flow-adapter'
-import { resolveImageNodeFrameSize, resolveImageNodeStageHeight, type ImageNodeItem } from '../../../canvas-board/domain'
+import {
+  resolveImageNodeFrameSize,
+  resolveImageNodeStageHeight,
+  type ImageNodeItem,
+} from '../../../canvas-board/domain'
 import type { ImageResultAnchor, ImageExecutionInput } from '../planning/imageExecutionResultTypes'
 import { resolveImageNodeLayoutAnchor } from '../../utils/flowImageNodeSelectors'
 
@@ -19,7 +23,9 @@ const IMAGE_RESULT_NODE_X_GAP = 100
 const IMAGE_RESULT_NODE_Y_GAP = 14
 const IMAGE_NODE_HEADER_HEIGHT = 26
 
-export function estimateImageNodeHeight(source: Pick<ImageResultLayout, 'width' | 'ratio'>): number {
+export function estimateImageNodeHeight(
+  source: Pick<ImageResultLayout, 'width' | 'ratio'>,
+): number {
   return IMAGE_NODE_HEADER_HEIGHT + resolveImageNodeStageHeight(source.width, source.ratio, true)
 }
 
@@ -73,7 +79,9 @@ export function readNodeBounds(
   const imageLayout = readImageNodeLayout(node, rendererMetrics)
   if (imageLayout) {
     const metrics = rendererMetrics.readNodeMetrics(node.id)
-    const height = metrics?.measured ? metrics.dimensions.height : estimateImageNodeHeight(imageLayout)
+    const height = metrics?.measured
+      ? metrics.dimensions.height
+      : estimateImageNodeHeight(imageLayout)
     return { x: imageLayout.x, y: imageLayout.y, width: imageLayout.width, height }
   }
   const snapshot = node.snapshot as { width?: unknown; height?: unknown }
@@ -111,16 +119,24 @@ export function resolvePendingImageResultPosition(
   if (isCollisionFree(preferredPosition)) return preferredPosition
   let preferredColumnBottom = preferredPosition.y
   occupiedBounds.forEach((bounds) => {
-    const overlaps = preferredPosition.x < bounds.x + bounds.width && preferredPosition.x + target.width > bounds.x
+    const overlaps =
+      preferredPosition.x < bounds.x + bounds.width && preferredPosition.x + target.width > bounds.x
     if (overlaps && bounds.y + bounds.height > preferredPosition.y) {
-      preferredColumnBottom = Math.max(preferredColumnBottom, bounds.y + bounds.height + IMAGE_RESULT_NODE_Y_GAP)
+      preferredColumnBottom = Math.max(
+        preferredColumnBottom,
+        bounds.y + bounds.height + IMAGE_RESULT_NODE_Y_GAP,
+      )
     }
   })
   const candidate = { x: preferredPosition.x, y: preferredColumnBottom }
   if (isCollisionFree(candidate)) return candidate
   const escapePosition = {
     x: preferredPosition.x,
-    y: occupiedBounds.reduce((bottom, bounds) => Math.max(bottom, bounds.y + bounds.height), preferredPosition.y) + IMAGE_RESULT_NODE_Y_GAP,
+    y:
+      occupiedBounds.reduce(
+        (bottom, bounds) => Math.max(bottom, bounds.y + bounds.height),
+        preferredPosition.y,
+      ) + IMAGE_RESULT_NODE_Y_GAP,
   }
   if (isCollisionFree(escapePosition)) return escapePosition
   throw new Error('Unable to find a collision-free position for derived image node')
@@ -132,7 +148,10 @@ export function resolvePendingImageResultWidth(ratio: number, requestedWidth?: n
     : resolveImageNodeFrameSize(ratio, true).width
 }
 
-export function resolvePendingImageResultRatio(source: ImageExecutionInput, requestedRatio?: number) {
+export function resolvePendingImageResultRatio(
+  source: ImageExecutionInput,
+  requestedRatio?: number,
+) {
   return Number.isFinite(requestedRatio) && (requestedRatio as number) > 0
     ? (requestedRatio as number)
     : source.ratio > 0

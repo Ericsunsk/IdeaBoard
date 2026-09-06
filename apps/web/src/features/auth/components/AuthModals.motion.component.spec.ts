@@ -274,10 +274,9 @@ describe.each(authPanelCases)('$action auth panel', (testCase) => {
     expect(submitButton).not.toHaveAttribute('aria-busy')
 
     await view.user.click(submitButton)
-    expect(screen.getByLabelText(testCase.action === 'login' ? /^Email/ : /^Username/)).toHaveAttribute(
-      'data-control-tone',
-      'danger',
-    )
+    expect(
+      screen.getByLabelText(testCase.action === 'login' ? /^Email/ : /^Username/),
+    ).toHaveAttribute('data-control-tone', 'danger')
 
     await testCase.fill(view.user)
     await view.user.click(submitButton)
@@ -285,10 +284,9 @@ describe.each(authPanelCases)('$action auth panel', (testCase) => {
     await waitFor(() => expect(submitButton).toHaveAttribute('data-control-state', 'loading'))
     expect(submitButton).toHaveAttribute('aria-busy', 'true')
     expect(submitButton).toBeDisabled()
-    expect(screen.getByLabelText(testCase.action === 'login' ? /^Email/ : /^Username/)).toHaveAttribute(
-      'data-control-state',
-      'disabled',
-    )
+    expect(
+      screen.getByLabelText(testCase.action === 'login' ? /^Email/ : /^Username/),
+    ).toHaveAttribute('data-control-state', 'disabled')
 
     resolveRequest(true)
   })

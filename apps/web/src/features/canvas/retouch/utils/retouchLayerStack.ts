@@ -92,7 +92,14 @@ export type RetouchLayerCommand =
 
 export function createInitialLayerStack(): RetouchLayerStack {
   return {
-    layers: [{ id: SOURCE_LAYER_ID, type: 'source', name: i18n.global.t('canvas.retouch.layerNames.source'), visible: true }],
+    layers: [
+      {
+        id: SOURCE_LAYER_ID,
+        type: 'source',
+        name: i18n.global.t('canvas.retouch.layerNames.source'),
+        visible: true,
+      },
+    ],
     selectedLayerId: SOURCE_LAYER_ID,
   }
 }
@@ -129,9 +136,7 @@ export function applyLayerCommand(
   }
 }
 
-export function getSelectedAdjustment(
-  stack: RetouchLayerStack,
-): RetouchAdjustmentLayer | null {
+export function getSelectedAdjustment(stack: RetouchLayerStack): RetouchAdjustmentLayer | null {
   const layer = stack.layers.find((item) => item.id === stack.selectedLayerId)
   return layer && isAdjustmentLayer(layer) ? layer : null
 }
@@ -163,8 +168,7 @@ function ensureAdjustmentLayer(
   kind: ImageAdjustmentKind,
 ): RetouchLayerStack {
   const existing = stack.layers.find(
-    (layer): layer is RetouchAdjustmentLayer =>
-      layer.type === 'adjustment' && layer.kind === kind,
+    (layer): layer is RetouchAdjustmentLayer => layer.type === 'adjustment' && layer.kind === kind,
   )
   if (existing) return { ...stack, selectedLayerId: existing.id }
 
@@ -330,7 +334,10 @@ function createNumberedLayerName(layers: readonly RetouchLayer[], prefix: string
 }
 
 function createCopyLayerName(layers: readonly RetouchLayer[], name: string) {
-  return createUniqueLayerName(layers, `${name} ${i18n.global.t('canvas.retouch.layerNames.copySuffix')}`)
+  return createUniqueLayerName(
+    layers,
+    `${name} ${i18n.global.t('canvas.retouch.layerNames.copySuffix')}`,
+  )
 }
 
 function createPaintLayer(layers: readonly RetouchLayer[]): RetouchPaintLayer {
@@ -343,10 +350,7 @@ function createPaintLayer(layers: readonly RetouchLayer[]): RetouchPaintLayer {
   }
 }
 
-function cloneEditableLayer(
-  layer: RetouchEditableLayer,
-  name = layer.name,
-): RetouchEditableLayer {
+function cloneEditableLayer(layer: RetouchEditableLayer, name = layer.name): RetouchEditableLayer {
   if (layer.type === 'paint') {
     return {
       ...layer,
@@ -490,26 +494,18 @@ function cloneSharpenParams(params: RetouchSharpenParams): RetouchSharpenParams 
   return IMAGE_ADJUSTMENT_DEFINITIONS.sharpen.normalize(params)
 }
 
-function isThresholdParams(
-  params: RetouchAdjustmentWholeParams,
-): params is RetouchThresholdParams {
+function isThresholdParams(params: RetouchAdjustmentWholeParams): params is RetouchThresholdParams {
   return 'threshold' in params && 'invert' in params
 }
 
-function isCurvesParams(
-  params: RetouchAdjustmentWholeParams,
-): params is RetouchCurvesParams {
+function isCurvesParams(params: RetouchAdjustmentWholeParams): params is RetouchCurvesParams {
   return 'channels' in params
 }
 
-function isLevelsParams(
-  params: RetouchAdjustmentWholeParams,
-): params is RetouchLevelsParams {
+function isLevelsParams(params: RetouchAdjustmentWholeParams): params is RetouchLevelsParams {
   return 'shadows' in params
 }
 
-function isSharpenParams(
-  params: RetouchAdjustmentWholeParams,
-): params is RetouchSharpenParams {
+function isSharpenParams(params: RetouchAdjustmentWholeParams): params is RetouchSharpenParams {
   return 'amount' in params
 }

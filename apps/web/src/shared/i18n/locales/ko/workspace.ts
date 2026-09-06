@@ -17,7 +17,8 @@ export default {
     nameEmpty: '캔버스 이름은 비워둘 수 없습니다',
     renameConflictReloaded: '이름 충돌로 캔버스 목록을 새로고침했습니다.',
     renameSyncFailedRolledBack: '이름 변경 동기화에 실패하여 원래 이름으로 복원했습니다.',
-    renameConflictRecoveryIncomplete: '이름 충돌 및 복구가 완료되지 않았습니다. 캔버스 목록을 새로고침해 주세요.',
+    renameConflictRecoveryIncomplete:
+      '이름 충돌 및 복구가 완료되지 않았습니다. 캔버스 목록을 새로고침해 주세요.',
     renameSyncFailedNoRollback:
       '이름 변경 동기화에 실패했고 복원할 수 없습니다. 캔버스 목록을 새로고침해 주세요.',
     renamed: '캔버스 이름이 변경되었습니다',

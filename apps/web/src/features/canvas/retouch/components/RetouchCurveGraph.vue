@@ -16,10 +16,7 @@
         </defs>
         <path v-if="histogramPath" class="retouch-curves__histogram" :d="histogramPath" />
         <path class="retouch-curves__grid retouch-curves__grid--fine" :d="fineGridPath" />
-        <path
-          class="retouch-curves__grid retouch-curves__grid--strong"
-          :d="strongGridPath"
-        />
+        <path class="retouch-curves__grid retouch-curves__grid--strong" :d="strongGridPath" />
         <path class="retouch-curves__baseline" d="M 0 100 L 100 0" />
         <path
           v-for="ghost in ghostCurvePaths"
@@ -27,11 +24,7 @@
           class="retouch-curves__ghost-curve"
           :d="ghost.path"
         />
-        <path
-          class="retouch-curves__curve"
-          :d="activeCurvePath"
-          :stroke="`url(#${gradientId})`"
-        />
+        <path class="retouch-curves__curve" :d="activeCurvePath" :stroke="`url(#${gradientId})`" />
       </svg>
     </div>
     <button

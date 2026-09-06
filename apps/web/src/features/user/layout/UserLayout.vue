@@ -10,7 +10,9 @@
         >
           <Shield class="size-3.5" />
         </span>
-        <span class="whitespace-nowrap text-xs font-semibold">{{ t('common.impersonation.activeBanner') }}</span>
+        <span class="whitespace-nowrap text-xs font-semibold">{{
+          t('common.impersonation.activeBanner')
+        }}</span>
       </div>
       <Button
         type="button"
@@ -61,10 +63,7 @@ import {
 } from '../../../shared/constants/routePaths'
 import { useAuthFeedback } from '../../auth/useAuthFeedback'
 import UserAuthModals from '../../auth/components/UserAuthModals.vue'
-import {
-  createAuthOverlay,
-  provideAuthOverlay,
-} from '../../auth/authOverlay'
+import { createAuthOverlay, provideAuthOverlay } from '../../auth/authOverlay'
 import { clearPendingSearchAuthAction } from '../../search/searchAuthContinuation'
 import AccountManagementDialogHost from '../../account-management/components/AccountManagementDialogHost.vue'
 import {
@@ -101,10 +100,10 @@ type AuthSessionData = {
 const isImpersonating = computed(() =>
   Boolean((authSession.value?.data as AuthSessionData | null | undefined)?.session?.impersonatedBy),
 )
-const authModal = computed<
-  | { mode: 'login' | 'register'; presentation: 'overlay' | 'route' }
-  | null
->(() => {
+const authModal = computed<{
+  mode: 'login' | 'register'
+  presentation: 'overlay' | 'route'
+} | null>(() => {
   if (route.path === USER_LOGIN_PATH) return { mode: 'login', presentation: 'route' }
   if (route.path === USER_REGISTER_PATH) return { mode: 'register', presentation: 'route' }
   const overlayMode = authOverlay.viewModel.mode.value

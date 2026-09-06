@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import {
-  createVisionReferenceCollection,
-  MAX_REFERENCE_COUNT,
-} from './visionReferenceCollection'
+import { createVisionReferenceCollection, MAX_REFERENCE_COUNT } from './visionReferenceCollection'
 
 function reference(key: string, file?: File) {
   return { key, previewUrl: `https://example.com/${key}.jpg`, file }

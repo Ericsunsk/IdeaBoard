@@ -11,7 +11,11 @@
       :empty-title="t('account.billingRecords.emptyTitle')"
       :empty-description="t('account.billingRecords.emptyDescription')"
     >
-      <Column field="occurred_at" :header="t('account.billingRecords.columnTime')" :style="{ width: '190px' }">
+      <Column
+        field="occurred_at"
+        :header="t('account.billingRecords.columnTime')"
+        :style="{ width: '190px' }"
+      >
         <template #body="{ data }">
           <Skeleton v-if="isSkeletonRow(data)" data-testid="billing-skeleton-row" width="8rem" />
           <time v-else class="whitespace-nowrap font-mono text-[13px] text-ib-text-muted">
@@ -20,7 +24,11 @@
         </template>
       </Column>
 
-      <Column field="title" :header="t('account.billingRecords.columnDescription')" :style="{ minWidth: '220px' }">
+      <Column
+        field="title"
+        :header="t('account.billingRecords.columnDescription')"
+        :style="{ minWidth: '220px' }"
+      >
         <template #body="{ data }">
           <Skeleton v-if="isSkeletonRow(data)" width="7rem" />
           <span
@@ -33,7 +41,11 @@
         </template>
       </Column>
 
-      <Column field="credit_delta" :header="t('account.billingRecords.columnCreditChange')" :style="{ width: '140px' }">
+      <Column
+        field="credit_delta"
+        :header="t('account.billingRecords.columnCreditChange')"
+        :style="{ width: '140px' }"
+      >
         <template #body="{ data }">
           <Skeleton v-if="isSkeletonRow(data)" width="4rem" />
           <span v-else class="font-mono font-bold" :class="amountTone(data)">
@@ -42,7 +54,11 @@
         </template>
       </Column>
 
-      <Column field="available_credits_after" :header="t('account.billingRecords.columnBalanceAfter')" :style="{ width: '140px' }">
+      <Column
+        field="available_credits_after"
+        :header="t('account.billingRecords.columnBalanceAfter')"
+        :style="{ width: '140px' }"
+      >
         <template #body="{ data }">
           <Skeleton v-if="isSkeletonRow(data)" width="5rem" />
           <span v-else class="font-mono font-semibold text-ib-text-muted">
@@ -57,7 +73,9 @@
           class="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center"
           role="alert"
         >
-          <p class="m-0 font-semibold text-ib-danger">{{ t('account.billingRecords.loadFailed') }}</p>
+          <p class="m-0 font-semibold text-ib-danger">
+            {{ t('account.billingRecords.loadFailed') }}
+          </p>
           <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(initialError) }}</p>
           <Button
             :label="t('account.reload')"
@@ -73,13 +91,22 @@
           class="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center"
           role="status"
         >
-          <span class="font-semibold text-ib-text">{{ t('account.billingRecords.emptyTitle') }}</span>
-          <span class="mt-1 text-sm text-ib-text-subtle">{{ t('account.billingRecords.emptyDescription') }}</span>
+          <span class="font-semibold text-ib-text">{{
+            t('account.billingRecords.emptyTitle')
+          }}</span>
+          <span class="mt-1 text-sm text-ib-text-subtle">{{
+            t('account.billingRecords.emptyDescription')
+          }}</span>
         </div>
       </template>
 
       <template #after>
-        <p v-if="isInitialPending" class="sr-only" role="status" :aria-label="t('account.billingRecords.loading')">
+        <p
+          v-if="isInitialPending"
+          class="sr-only"
+          role="status"
+          :aria-label="t('account.billingRecords.loading')"
+        >
           {{ t('account.billingRecords.loading') }}
         </p>
 
@@ -89,7 +116,13 @@
           role="alert"
         >
           <span class="text-sm text-ib-danger">{{ errorMessage(loadMoreError) }}</span>
-          <Button :label="t('account.billingRecords.retryLoad')" severity="secondary" size="small" text @click="loadMore()" />
+          <Button
+            :label="t('account.billingRecords.retryLoad')"
+            severity="secondary"
+            size="small"
+            text
+            @click="loadMore()"
+          />
         </div>
         <div
           v-else-if="hasNextPage"

@@ -9,7 +9,9 @@ describe('runtime URL helpers', () => {
   it('keeps upload refs same-origin and canonicalizes known upload hosts', async () => {
     const { canonicalizeRuntimeUploadRef, resolveAssetUrl } = await import('./runtimeUrls')
 
-    expect(resolveAssetUrl('/uploads/canvas/U123/board/content/a.png')).toBe('/uploads/canvas/U123/board/content/a.png')
+    expect(resolveAssetUrl('/uploads/canvas/U123/board/content/a.png')).toBe(
+      '/uploads/canvas/U123/board/content/a.png',
+    )
     expect(
       canonicalizeRuntimeUploadRef(
         'https://assets.example.com/uploads/canvas/U123/board/content/a.png',

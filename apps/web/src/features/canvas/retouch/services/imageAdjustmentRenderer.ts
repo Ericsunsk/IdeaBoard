@@ -1,11 +1,7 @@
 import { i18n } from '../../../../shared/i18n'
 import { canvasToBlob } from '../../services/flowMediaIO'
 import type { ImageAdjustmentRecipe } from '../../../canvas-board/domain'
-import type {
-  RetouchAdjustmentLayer,
-  RetouchLayer,
-  RetouchRasterContent,
-} from '../types'
+import type { RetouchAdjustmentLayer, RetouchLayer, RetouchRasterContent } from '../types'
 import { createImageProcessingOutputFileName } from '../runtime/imageOutputPolicy'
 import { getImageAdjustmentProcessingRuntime } from '../runtime/imageAdjustmentProcessingRuntime'
 import type { ImageProcessingProgress, RenderFinalInput } from '../runtime/types'
@@ -17,10 +13,7 @@ import {
   flattenVisibleRetouchAdjustmentLayers,
   hasEffectiveRetouchAdjustmentLayers,
 } from '../utils/retouchLayerAdjustments'
-import {
-  flattenRetouchRasterContents,
-  hasRetouchRasterEdits,
-} from '../utils/retouchRasterTools'
+import { flattenRetouchRasterContents, hasRetouchRasterEdits } from '../utils/retouchRasterTools'
 
 export type ImageAdjustmentRenderSource = {
   url: string
@@ -91,11 +84,7 @@ export async function renderRetouchLayerStackFile(
   options: ImageAdjustmentRenderOptions = {},
 ): Promise<File> {
   if (!hasRetouchRasterEdits(layers)) {
-    return renderImageAdjustmentFile(
-      source,
-      flattenVisibleRetouchAdjustmentLayers(layers),
-      options,
-    )
+    return renderImageAdjustmentFile(source, flattenVisibleRetouchAdjustmentLayers(layers), options)
   }
 
   options.onProgress?.({ phase: 'decode' })

@@ -113,7 +113,8 @@ export default {
     renameFailedWarning: '重命名失败。',
     conflictReloadedError: '名称冲突，已重新加载画布列表。',
     syncFailedRestoredError: '重命名同步失败，已恢复原始名称。',
-    conflictRestoredRefreshFailedError: '名称冲突，已恢复原始名称，但远程列表刷新失败，请重新加载。',
+    conflictRestoredRefreshFailedError:
+      '名称冲突，已恢复原始名称，但远程列表刷新失败，请重新加载。',
     conflictRestoreFailedError: '名称冲突且恢复失败，请重新加载画布列表。',
     syncFailedRestoreFailedError: '重命名同步失败且无法恢复原始名称，请重新加载画布列表。',
     catalogReloadedSuccess: '画布列表已重新加载。',

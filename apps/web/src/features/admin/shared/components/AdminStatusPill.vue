@@ -9,10 +9,7 @@
         class="absolute inline-flex size-full animate-ping rounded-full opacity-75"
         :class="dotColorClass"
       />
-      <span
-        class="relative inline-flex size-1.5 rounded-full"
-        :class="dotColorClass"
-      />
+      <span class="relative inline-flex size-1.5 rounded-full" :class="dotColorClass" />
     </span>
     <span>{{ label }}</span>
   </span>
@@ -21,12 +18,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-export type AdminStatusPillVariant =
-  | 'success'
-  | 'danger'
-  | 'warning'
-  | 'neutral'
-  | 'info'
+export type AdminStatusPillVariant = 'success' | 'danger' | 'warning' | 'neutral' | 'info'
 
 const props = withDefaults(
   defineProps<{

@@ -280,7 +280,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
       options.onWarning(i18n.global.t('canvas.session.updateNodeStatusFailed'))
       return
     }
-
   }
 
   return {

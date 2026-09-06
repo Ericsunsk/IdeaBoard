@@ -236,5 +236,4 @@ describe('uploadApi', () => {
       uploadApi.uploadAvatar(new File(['avatar'], 'avatar.png', { type: 'image/png' })),
     ).rejects.toThrow('Avatar upload failed. Please try again.')
   })
-
 })

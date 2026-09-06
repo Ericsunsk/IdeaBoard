@@ -22,9 +22,7 @@ export function normalizeOutboundPolicyForm(
   }
 }
 
-export function outboundPolicyFormToRequest(
-  form: OutboundPolicyForm,
-): UpdateOutboundPolicyRequest {
+export function outboundPolicyFormToRequest(form: OutboundPolicyForm): UpdateOutboundPolicyRequest {
   return {
     allow_hosts: parseAllowHosts(form.allow_hosts),
   }

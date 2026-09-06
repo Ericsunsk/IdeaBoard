@@ -111,9 +111,7 @@ export function usePasswordChangeWorkflow(deps: PasswordChangeWorkflowDependenci
         resetForm()
         const isLoggedOut = await userStore.logout()
         if (!isLoggedOut) {
-          throw new Error(
-            i18n.global.t('account.security.errors.logoutAfterChangeFailed'),
-          )
+          throw new Error(i18n.global.t('account.security.errors.logoutAfterChangeFailed'))
         }
         await router.replace(USER_LOGIN_PATH)
         return true

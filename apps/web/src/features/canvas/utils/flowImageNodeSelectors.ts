@@ -56,10 +56,14 @@ export function resolveImageNodeDisplayPayload(
     url,
     ratio: resolveImageNodeDisplayRatio(imageNode),
     ...(mediaRef ? { mediaRef } : {}),
-    ...(mediaRef ? {} : (() => {
-      const legacyID = Number(latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId)
-      return Number.isInteger(legacyID) && legacyID > 0 ? { mediaAssetId: legacyID } : {}
-    })()),
+    ...(mediaRef
+      ? {}
+      : (() => {
+          const legacyID = Number(
+            latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId,
+          )
+          return Number.isInteger(legacyID) && legacyID > 0 ? { mediaAssetId: legacyID } : {}
+        })()),
   }
 }
 
@@ -79,10 +83,14 @@ export function resolveImageNodeLayoutAnchor(
     url,
     ratio: resolveImageNodeDisplayRatio(imageNode),
     ...(mediaRef ? { mediaRef } : {}),
-    ...(mediaRef ? {} : (() => {
-      const legacyID = Number(latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId)
-      return Number.isInteger(legacyID) && legacyID > 0 ? { mediaAssetId: legacyID } : {}
-    })()),
+    ...(mediaRef
+      ? {}
+      : (() => {
+          const legacyID = Number(
+            latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId,
+          )
+          return Number.isInteger(legacyID) && legacyID > 0 ? { mediaAssetId: legacyID } : {}
+        })()),
     x: Number(node.position?.x ?? imageNode.x ?? 0),
     y: Number(node.position?.y ?? imageNode.y ?? 0),
     width:

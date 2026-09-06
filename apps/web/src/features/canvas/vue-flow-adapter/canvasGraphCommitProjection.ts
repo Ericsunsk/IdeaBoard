@@ -149,7 +149,9 @@ function mergeProjectedEdge(
     ...semanticCurrent,
     ...projected,
     data: projected.data,
-    selected: selectionChanged ? record.selected : ((current as Edge & { selected?: boolean }).selected ?? false),
+    selected: selectionChanged
+      ? record.selected
+      : ((current as Edge & { selected?: boolean }).selected ?? false),
   } as unknown as Edge
 }
 
@@ -184,7 +186,9 @@ function projectCollection<Record extends { id: string }, FlowItem extends { id:
     changedIds.push(recordPatch.id)
   }
 
-  let nextItems = input.current.filter((item) => nextById.has(item.id)).map((item) => nextById.get(item.id)!)
+  let nextItems = input.current
+    .filter((item) => nextById.has(item.id))
+    .map((item) => nextById.get(item.id)!)
   for (const recordPatch of input.patch.records) {
     if (!recordPatch.after || currentById.has(recordPatch.id)) continue
     nextItems.push(nextById.get(recordPatch.id)!)
@@ -260,20 +264,24 @@ export function projectCanvasGraphCommit(input: {
         current: input.current.nodes,
         patch: input.patch.nodes,
         project: (current, record) =>
-          input.projectNode?.(mergeProjectedNode(current, record, selectionChangedNodeIds.has(record.id))) ??
-          mergeProjectedNode(current, record, selectionChangedNodeIds.has(record.id)),
+          input.projectNode?.(
+            mergeProjectedNode(current, record, selectionChangedNodeIds.has(record.id)),
+          ) ?? mergeProjectedNode(current, record, selectionChangedNodeIds.has(record.id)),
       })
       const edges = projectCollection({
         current: input.current.edges,
         patch: input.patch.edges,
-        project: (current, record) => mergeProjectedEdge(current, record, selectionChangedEdgeIds.has(record.id)),
+        project: (current, record) =>
+          mergeProjectedEdge(current, record, selectionChangedEdgeIds.has(record.id)),
       })
       const directlyChangedNodeIds = new Set(nodes.changedIds)
       const invalidatedNodeIds = new Set(directlyChangedNodeIds)
       input.patch.edges.records.forEach(({ before, after }) => {
         for (const record of [before, after]) {
           if (!record) continue
-          invalidatedNodeIds.add(`${record.connection.fromNodeType}-${record.connection.fromNodeId}`)
+          invalidatedNodeIds.add(
+            `${record.connection.fromNodeType}-${record.connection.fromNodeId}`,
+          )
           invalidatedNodeIds.add(`${record.connection.toNodeType}-${record.connection.toNodeId}`)
         }
       })
@@ -349,10 +357,7 @@ export function createCanvasGraphCommitProjectionController(options: {
     })
   }
 
-  function render(
-    projection: CanvasGraphCommitProjection,
-    scheduleOnFailure = true,
-  ) {
+  function render(projection: CanvasGraphCommitProjection, scheduleOnFailure = true) {
     try {
       options.render(projection)
       recoveryRequired = false

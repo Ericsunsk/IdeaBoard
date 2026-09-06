@@ -3,7 +3,6 @@ import { CanvasGraphSession, type CanvasGraphStore } from '../../graph-runtime'
 import type { CanvasBoardAttachment, CanvasBoardSessionIdentity } from '../../board-attachment'
 import type { MediaRef } from '../../../../shared/media/MediaRef'
 
-
 export type PendingImageResultNodeId = `image-${number}`
 
 export type PendingImageResolvedResult = Readonly<{
@@ -54,10 +53,7 @@ export type CanvasBoardGraphSessionBinding = Readonly<{
 
 export type CanvasBoardGraphSessionOptions = Readonly<{
   graphSession: CanvasGraphSession
-  onMaterialized?: (
-    store: CanvasGraphStore,
-    result: PendingImageDomainMutationResult,
-  ) => void
+  onMaterialized?: (store: CanvasGraphStore, result: PendingImageDomainMutationResult) => void
 }>
 
 export const bindCanvasBoardGraphSession = Symbol('bindCanvasBoardGraphSession')

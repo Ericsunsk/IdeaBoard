@@ -30,9 +30,13 @@ const router = useRouter()
 const userStore = useUserStore()
 const { t } = useI18n()
 const status = ref<'loading' | 'failed'>('loading')
-const rawRedirect = Array.isArray(route.query.redirect) ? route.query.redirect[0] : route.query.redirect
+const rawRedirect = Array.isArray(route.query.redirect)
+  ? route.query.redirect[0]
+  : route.query.redirect
 const safeRedirect =
-  typeof rawRedirect === 'string' && isSafeInternalRedirectPath(rawRedirect) ? rawRedirect : undefined
+  typeof rawRedirect === 'string' && isSafeInternalRedirectPath(rawRedirect)
+    ? rawRedirect
+    : undefined
 const title = computed(() =>
   status.value === 'loading' ? t('auth.oauth.completingTitle') : t('auth.oauth.failedTitle'),
 )
@@ -42,9 +46,7 @@ const message = computed(() =>
 
 async function returnToLogin() {
   await router.replace(
-    safeRedirect
-      ? { path: USER_LOGIN_PATH, query: { redirect: safeRedirect } }
-      : USER_LOGIN_PATH,
+    safeRedirect ? { path: USER_LOGIN_PATH, query: { redirect: safeRedirect } } : USER_LOGIN_PATH,
   )
 }
 

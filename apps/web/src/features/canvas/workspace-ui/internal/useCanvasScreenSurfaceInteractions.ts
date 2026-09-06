@@ -57,12 +57,7 @@ export function useCanvasScreenSurfaceInteractions(options: {
 
   useCanvasCustomLayerOverlay({
     visible: hasCanvasDismissableLayer,
-    ignore: [
-      '.node-tool-surface',
-      '.canvas-node-context-menu',
-      '[data-inpaint]',
-      '[data-retouch]',
-    ],
+    ignore: ['.node-tool-surface', '.canvas-node-context-menu', '[data-inpaint]', '[data-retouch]'],
     ownerDocument: () =>
       options.canvasWrapRef.value?.ownerDocument ??
       (typeof document === 'undefined' ? null : document),

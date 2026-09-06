@@ -253,7 +253,9 @@ describe('useFlowNodeMutations', () => {
         },
       },
     })
-    expect(graphActions.setNodes).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ id: 'prompt-42' })]))
+    expect(graphActions.setNodes).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ id: 'prompt-42' })]),
+    )
     expect(graphCommand).not.toHaveBeenCalled()
   })
 
@@ -425,6 +427,8 @@ describe('useFlowNodeMutations', () => {
     expect(edges.value).toHaveLength(0)
     expect(graphActions.addEdges).not.toHaveBeenCalled()
     expect(graphActions.setEdges).not.toHaveBeenCalled()
-    expect(onWarning).toHaveBeenCalledWith('This connection does not match the current connection rules.')
+    expect(onWarning).toHaveBeenCalledWith(
+      'This connection does not match the current connection rules.',
+    )
   })
 })

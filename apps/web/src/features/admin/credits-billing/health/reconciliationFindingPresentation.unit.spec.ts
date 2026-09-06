@@ -17,7 +17,8 @@ describe('reconciliation finding presentation', () => {
     })
     expect(getFindingTypePresentation('task_trace_missing')).toEqual({
       title: 'Task 追踪记录缺失',
-      summary: 'Billing Snapshot、Settlement、Hold 与 Ledger 完整，但对应 Task 已缺失，仅报告不限制 Wallet。',
+      summary:
+        'Billing Snapshot、Settlement、Hold 与 Ledger 完整，但对应 Task 已缺失，仅报告不限制 Wallet。',
     })
   })
 

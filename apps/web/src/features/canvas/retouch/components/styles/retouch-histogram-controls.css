@@ -76,8 +76,7 @@
   bottom: 0;
   width: var(--retouch-control-point-size);
   height: var(--retouch-control-point-size);
-  border: var(--retouch-control-point-border-width) solid
-    var(--retouch-control-point-border-color);
+  border: var(--retouch-control-point-border-width) solid var(--retouch-control-point-border-color);
   background: var(--retouch-control-point-bg);
   transform: translate(-50%, 50%);
 }

@@ -100,10 +100,7 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
       if (!entered) options.ui.warn(i18n.global.t('canvas.tools.cannotOutpaint'))
       return
     }
-    if (
-      actionMode === IMAGE_ACTION_MODE.inpaint ||
-      actionMode === IMAGE_ACTION_MODE.retouch
-    ) {
+    if (actionMode === IMAGE_ACTION_MODE.inpaint || actionMode === IMAGE_ACTION_MODE.retouch) {
       options.modes.cancelOutpaint()
       const editorMode = actionMode === IMAGE_ACTION_MODE.retouch ? 'adjust' : 'inpaint'
       const entered = options.modes.enterRetouch(nodeId, editorMode)
@@ -135,17 +132,13 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
     options.modes.cancelInpaint()
     options.ui.clearPanel()
     options.ui.hideStrengthControl()
-    void options.execution.runImageDirectAction(
-      nodeId,
-      action,
-      {
-        prompt,
-        outputCount,
-        ...(isImageStrengthAction(action)
-          ? { strength: strength ?? options.strength.getValue(action) }
-          : {}),
-      },
-    )
+    void options.execution.runImageDirectAction(nodeId, action, {
+      prompt,
+      outputCount,
+      ...(isImageStrengthAction(action)
+        ? { strength: strength ?? options.strength.getValue(action) }
+        : {}),
+    })
   }
 
   function onFlowFusionPromptGenerate(

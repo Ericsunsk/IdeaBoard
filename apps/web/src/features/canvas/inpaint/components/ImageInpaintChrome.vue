@@ -21,21 +21,17 @@
       </NodeToolIconButton>
     </template>
     <template #dock>
-      <div
-        class="editing-controls-panel editing-controls-panel--padded inpaint-right-panel"
-      >
+      <div class="editing-controls-panel editing-controls-panel--padded inpaint-right-panel">
         <section class="editing-controls-section">
           <label class="editing-controls-field inpaint-field">
-            <span class="editing-controls-label inpaint-field-label">{{ t("canvas.inpaint.brushSizeLabel") }}</span>
+            <span class="editing-controls-label inpaint-field-label">{{
+              t('canvas.inpaint.brushSizeLabel')
+            }}</span>
             <div class="editing-controls-range-row">
               <div
                 class="editing-controls-range-wrap"
                 :style="
-                  rangePresentationStyle(
-                    brushSize,
-                    INPAINT_MIN_BRUSH_SIZE,
-                    INPAINT_MAX_BRUSH_SIZE,
-                  )
+                  rangePresentationStyle(brushSize, INPAINT_MIN_BRUSH_SIZE, INPAINT_MAX_BRUSH_SIZE)
                 "
               >
                 <input
@@ -56,7 +52,9 @@
         </section>
         <section class="editing-controls-section">
           <label class="editing-controls-field inpaint-field">
-            <span class="editing-controls-label inpaint-field-label">{{ t("canvas.inpaint.maskOpacityLabel") }}</span>
+            <span class="editing-controls-label inpaint-field-label">{{
+              t('canvas.inpaint.maskOpacityLabel')
+            }}</span>
             <div class="editing-controls-range-row">
               <div
                 class="editing-controls-range-wrap"

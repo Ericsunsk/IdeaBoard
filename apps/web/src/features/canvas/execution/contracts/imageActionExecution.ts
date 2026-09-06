@@ -37,8 +37,7 @@ export type ImageActionStrengthConfig = {
   paramPath?: 'variation.strength' | 'upscale.scale'
 }
 
-export type ImageStrengthAction =
-  typeof IMAGE_NODE_ACTION.variations | typeof IMAGE_UPSCALE_ACTION
+export type ImageStrengthAction = typeof IMAGE_NODE_ACTION.variations | typeof IMAGE_UPSCALE_ACTION
 
 export const IMAGE_STRENGTH_ACTIONS = [
   IMAGE_NODE_ACTION.variations,
@@ -157,7 +156,9 @@ export function requireImageActionExecution(
 
 export const DEFAULT_UPSCALE_SCALE = 2
 
-export function getImageActionStrengthConfig(action: ImageStrengthAction): ImageActionStrengthConfig {
+export function getImageActionStrengthConfig(
+  action: ImageStrengthAction,
+): ImageActionStrengthConfig {
   const config = requireImageActionExecution(action).strength
   if (!config) throw new Error(`Image action ${action} has no strength config`)
   return config

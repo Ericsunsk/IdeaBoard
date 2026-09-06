@@ -1,8 +1,4 @@
-import type {
-  RetouchCurveChannel,
-  RetouchCurvePoint,
-  RetouchCurvesParams,
-} from '../types'
+import type { RetouchCurveChannel, RetouchCurvePoint, RetouchCurvesParams } from '../types'
 import {
   RETOUCH_CHANNEL_MAX,
   RETOUCH_CHANNEL_MIN,
@@ -296,10 +292,7 @@ export function removeCurvePoint(
   channel: RetouchCurveChannel,
   pointId: string,
 ): RetouchCurvesParams {
-  if (
-    pointId === RETOUCH_CURVE_ENDPOINT_BLACK_ID ||
-    pointId === RETOUCH_CURVE_ENDPOINT_WHITE_ID
-  ) {
+  if (pointId === RETOUCH_CURVE_ENDPOINT_BLACK_ID || pointId === RETOUCH_CURVE_ENDPOINT_WHITE_ID) {
     return params
   }
   const nextPoints = normalizeCurveChannelPoints(params.channels[channel] ?? [])

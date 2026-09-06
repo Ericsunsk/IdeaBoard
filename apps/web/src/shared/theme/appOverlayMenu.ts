@@ -11,9 +11,7 @@ export const appOverlayMenuItemClass =
 export const appOverlayMenuDangerItemClass =
   '!text-[var(--app-overlay-menu-danger-color,var(--color-ib-danger))] hover:!bg-[var(--app-overlay-menu-danger-hover-bg,var(--color-ib-surface-hover))] hover:!text-[var(--app-overlay-menu-danger-hover-color,var(--color-ib-danger))]'
 
-export function createAppOverlayMenuPt(
-  rootClass: string,
-): MenuPassThroughOptions {
+export function createAppOverlayMenuPt(rootClass: string): MenuPassThroughOptions {
   return {
     root: {
       class: `${appOverlayMenuSurfaceClass} !rounded-[var(--radius-ib-control)] !shadow-[var(--shadow-ib-overlay-menu)] backdrop-blur-[10px] ${rootClass}`,

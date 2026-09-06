@@ -15,10 +15,7 @@ import {
   EXECUTION_PARTIAL_EDIT_META,
   EXECUTION_META,
 } from '../contracts/executionContract'
-import {
-  buildExecutionSizeParams,
-  type ExecutionImageSize,
-} from '../contracts/executionSizeParams'
+import { buildExecutionSizeParams, type ExecutionImageSize } from '../contracts/executionSizeParams'
 import { buildPromptAspectRatioTaskParams } from '../contracts/promptAspectRatioTaskParams'
 import { assertRequestedOutputCount } from '../../../../shared/domain/generationContract'
 import type { OutputResolution } from '../../../../shared/domain/generationContract'
@@ -72,10 +69,7 @@ type ImageActionReadinessOptions = {
   outputResolution?: OutputResolution
 }
 
-function buildOutputBillingParams(
-  options: ImageActionReadinessOptions = {},
-  feature?: string,
-) {
+function buildOutputBillingParams(options: ImageActionReadinessOptions = {}, feature?: string) {
   const isRemoveBg = feature === EXECUTION_FEATURE.cutout
   return {
     output_count: assertRequestedOutputCount(isRemoveBg ? 1 : (options.outputCount ?? 1)),
@@ -109,10 +103,7 @@ export function buildInpaintReadinessRequest(): SubmitTaskData {
     params: {
       output_count: 1,
       output_resolution: 'default',
-      ...buildExecutionSizeParams(
-        { width: 1024, height: 1024 },
-        { width: 1024, height: 1024 },
-      ),
+      ...buildExecutionSizeParams({ width: 1024, height: 1024 }, { width: 1024, height: 1024 }),
     },
   })
 }
@@ -236,7 +227,9 @@ export function buildImageInpaintTaskRequest(input: ImageInpaintTaskRequestInput
       ...buildExecutionSizeParams(input.imageSize, input.imageSize),
       mask_image_url: input.maskImageUrl,
       use_mask: true,
-      ...(input.originalImageAssetId ? { original_image_asset_id: input.originalImageAssetId } : {}),
+      ...(input.originalImageAssetId
+        ? { original_image_asset_id: input.originalImageAssetId }
+        : {}),
     },
   })
 }
@@ -251,8 +244,13 @@ export function buildOutpaintTaskRequest(input: {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
   const prompt = `${input.prompt ?? ''}`.trim()
   const execution = requireImageActionExecution(IMAGE_OUTPAINT_ACTION)
-  if (!input.imageSize) throw new Error(i18n.global.t('canvas.execution.outpaintMissingOriginalSize'))
-  const geometry = resolveOutpaintPixelGeometry(input.imageSize, input.frameRect, input.originalImageRect)
+  if (!input.imageSize)
+    throw new Error(i18n.global.t('canvas.execution.outpaintMissingOriginalSize'))
+  const geometry = resolveOutpaintPixelGeometry(
+    input.imageSize,
+    input.frameRect,
+    input.originalImageRect,
+  )
   return buildExecutionTaskRequest({
     prompt,
     feature: execution.feature,

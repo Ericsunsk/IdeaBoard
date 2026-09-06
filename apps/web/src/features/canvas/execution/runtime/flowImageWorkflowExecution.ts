@@ -183,7 +183,11 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       prepareFlowInpaintMask(plan.rawMaskDataUrl, boardId),
       loadImageSizeFromUrl(source.url),
     ])
-    const taskRequest = buildPreparedImageInpaintTaskRequest({ plan: { ...plan, source }, maskImageUrl, imageSize })
+    const taskRequest = buildPreparedImageInpaintTaskRequest({
+      plan: { ...plan, source },
+      maskImageUrl,
+      imageSize,
+    })
     await workflowRunner.execute({
       source,
       sourceNodeId: plan.sourceNodeId,

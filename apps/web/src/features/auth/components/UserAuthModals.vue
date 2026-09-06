@@ -36,12 +36,15 @@ import AuthModalHost from './AuthModalHost.vue'
 import LoginAuthPanel from './LoginAuthPanel.vue'
 import RegisterAuthPanel from './RegisterAuthPanel.vue'
 
-const props = withDefaults(defineProps<{
-  mode: 'login' | 'register'
-  presentation?: 'overlay' | 'route'
-}>(), {
-  presentation: 'route',
-})
+const props = withDefaults(
+  defineProps<{
+    mode: 'login' | 'register'
+    presentation?: 'overlay' | 'route'
+  }>(),
+  {
+    presentation: 'route',
+  },
+)
 
 const emit = defineEmits<{
   'overlay-close': []
@@ -120,9 +123,7 @@ const oauthRedirectPath = props.presentation === 'overlay' ? route.fullPath : un
 function resolveAuthClosePath() {
   const target = resolveLoginRedirectPath()
   const protectedPrefixes = [USER_BOARDS_PATH, USER_CANVAS_PATH, SHARE_JOIN_PATH]
-  return protectedPrefixes.some(
-    (prefix) => target === prefix || target.startsWith(`${prefix}/`),
-  )
+  return protectedPrefixes.some((prefix) => target === prefix || target.startsWith(`${prefix}/`))
     ? HOME_PATH
     : target
 }

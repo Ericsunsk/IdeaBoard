@@ -7,12 +7,10 @@ import {
   USER_AUTH_CALLBACK_PATH,
   TERMS_PATH,
   USER_BOARDS_PATH,
-  USER_LOGIN_PATH as USER_LOGIN_ROUTE_PATH,
   USER_ROOT_PATH,
 } from '../../../shared/constants/routePaths'
 
 export const USER_DEFAULT_PATH = USER_BOARDS_PATH
-export const USER_LOGIN_PATH = USER_LOGIN_ROUTE_PATH
 
 export const userRoutes: RouteRecordRaw[] = [
   {

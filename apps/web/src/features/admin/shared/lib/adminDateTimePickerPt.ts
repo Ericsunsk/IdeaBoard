@@ -19,7 +19,9 @@ function selectableCellClass({ context }: DatePickerPassThroughMethodOptions) {
     context.selected
       ? 'bg-admin-accent text-admin-text-inverse font-bold shadow-xs'
       : 'text-admin-text-2 hover:bg-admin-surface-hover hover:text-admin-text-1',
-    context.today && !context.selected && 'ring-1 ring-inset ring-admin-accent/40 font-bold text-admin-accent',
+    context.today &&
+      !context.selected &&
+      'ring-1 ring-inset ring-admin-accent/40 font-bold text-admin-accent',
     context.otherMonth && !context.selected && 'text-admin-text-3 opacity-40',
     context.disabled && 'pointer-events-none opacity-30',
   ]

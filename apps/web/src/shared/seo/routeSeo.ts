@@ -36,10 +36,7 @@ const websiteJsonLd = {
 function buildHomeJsonLd(description: string): Record<string, unknown> {
   return {
     '@context': 'https://schema.org',
-    '@graph': [
-      organizationJsonLd,
-      { ...websiteJsonLd, description },
-    ],
+    '@graph': [organizationJsonLd, { ...websiteJsonLd, description }],
   }
 }
 

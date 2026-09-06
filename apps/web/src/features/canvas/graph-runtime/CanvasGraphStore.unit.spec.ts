@@ -220,13 +220,14 @@ describe('CanvasGraphStore', () => {
 
     expect(summary.commitPatch.nodes.records).toHaveLength(1)
     expect(summary.commitPatch.nodes.order).toEqual([
-      expect.objectContaining({ id: toCanvasGraphNodeId('prompt', 1_251), after: expect.any(Object) }),
+      expect.objectContaining({
+        id: toCanvasGraphNodeId('prompt', 1_251),
+        after: expect.any(Object),
+      }),
     ])
     expect(JSON.stringify(summary.commitPatch).length).toBeLessThan(2_000)
     expect(store.getNode(toCanvasGraphNodeId('prompt', 1_251))).toBeDefined()
-    expect(received).toHaveBeenCalledWith(
-      expect.objectContaining({ patch: summary.commitPatch }),
-    )
+    expect(received).toHaveBeenCalledWith(expect.objectContaining({ patch: summary.commitPatch }))
     expect(error).toHaveBeenCalledTimes(1)
 
     const removed = store
@@ -257,11 +258,7 @@ describe('CanvasGraphStore', () => {
     expect(store.getNode(imageId)).toBeDefined()
     expect(store.getNode(promptId)?.selected).toBe(false)
     expect(store.getGroup(groupId)).toBeUndefined()
-    expect(store.getNodeIds()).toEqual([
-      imageId,
-      promptId,
-      toCanvasGraphNodeId('prompt', 2),
-    ])
+    expect(store.getNodeIds()).toEqual([imageId, promptId, toCanvasGraphNodeId('prompt', 2)])
 
     store.applyCommitPatch(summary.commitPatch, 'forward')
     expect(store.getNode(imageId)).toBeUndefined()

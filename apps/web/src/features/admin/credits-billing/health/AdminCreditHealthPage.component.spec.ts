@@ -254,9 +254,7 @@ describe('AdminCreditHealthPage', () => {
     expect(within(dialog).getByRole('columnheader', { name: '耗时' })).toBeVisible()
     expect(await within(dialog).findByText('人工触发')).toBeVisible()
     expect(
-      within(dialog).getByText(
-        '3 检查发现（含业务追踪） · 1 严重 Finding · 1 Wallet 已受限',
-      ),
+      within(dialog).getByText('3 检查发现（含业务追踪） · 1 严重 Finding · 1 Wallet 已受限'),
     ).toBeVisible()
 
     const runRow = within(dialog).getByRole('row', { name: /人工触发/ })

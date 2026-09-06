@@ -40,9 +40,7 @@ export type RetouchLevelsConstraint = {
   max: number
 }
 
-export function normalizeLevelsAdjustment(
-  params: RetouchLevelsParams,
-): NormalizedLevelsAdjustment {
+export function normalizeLevelsAdjustment(params: RetouchLevelsParams): NormalizedLevelsAdjustment {
   const handles = clampLevelsHandles(params)
 
   return {
@@ -269,10 +267,7 @@ function createLevelsInputConstraintsForHandles(
   }
 }
 
-function createMidtonesConstraint(
-  shadows: number,
-  highlights: number,
-): RetouchLevelsConstraint {
+function createMidtonesConstraint(shadows: number, highlights: number): RetouchLevelsConstraint {
   if (highlights - shadows > RETOUCH_LEVELS_MIN_HANDLE_SPACING) {
     return {
       min: shadows + RETOUCH_LEVELS_MIN_HANDLE_SPACING,

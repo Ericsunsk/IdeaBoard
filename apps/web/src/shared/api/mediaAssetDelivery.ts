@@ -55,7 +55,10 @@ const SIGNED_URL_REFRESH_SKEW_MS = 2 * 60 * 1000
 
 const metadataCache = new Map<number, CachedMetadata>()
 const metadataRequests = new Map<string, Promise<MediaAssetDeliveryMetadata>>()
-const metadataBatchRequests = new Map<string, Promise<ReadonlyMap<number, MediaAssetDeliveryMetadata>>>()
+const metadataBatchRequests = new Map<
+  string,
+  Promise<ReadonlyMap<number, MediaAssetDeliveryMetadata>>
+>()
 const ensuredTiers = new Set<string>()
 const invalidationListeners = new Map<number, Set<() => void>>()
 let stopMediaEventSubscription: (() => void) | null = null
@@ -200,14 +203,13 @@ export async function getMediaAssetMetadataBatch(
   options: {
     signal?: AbortSignal
     force?: boolean
-    ensureTier?: Extract<MediaAssetDeliveryTier, 'large-preview' | 'processing' | 'processing-input'>
+    ensureTier?: Extract<
+      MediaAssetDeliveryTier,
+      'large-preview' | 'processing' | 'processing-input'
+    >
   } = {},
 ): Promise<ReadonlyMap<number, MediaAssetDeliveryMetadata>> {
-  const ids = Array.from(
-    new Set(
-      assetIds.filter((value) => Number.isInteger(value) && value > 0),
-    ),
-  )
+  const ids = Array.from(new Set(assetIds.filter((value) => Number.isInteger(value) && value > 0)))
   if (ids.length === 0) return new Map()
   if (ids.length > 100) throw new Error('Too many media assets requested')
   const sortedIDs = [...ids].sort((a, b) => a - b)
@@ -231,7 +233,9 @@ export async function getMediaAssetMetadataBatch(
         ...(options.ensureTier ? { ensure_tier: options.ensureTier } : {}),
       }),
     })
-    .then((response) => requireApiData(response, i18n.global.t('common.errors.mediaInfoLoadFailed')))
+    .then((response) =>
+      requireApiData(response, i18n.global.t('common.errors.mediaInfoLoadFailed')),
+    )
     .then((data) => {
       const result = new Map<number, MediaAssetDeliveryMetadata>()
       for (const metadata of data.items ?? []) {
@@ -244,7 +248,8 @@ export async function getMediaAssetMetadataBatch(
       return result as ReadonlyMap<number, MediaAssetDeliveryMetadata>
     })
     .finally(() => {
-      if (metadataBatchRequests.get(requestKey) === request) metadataBatchRequests.delete(requestKey)
+      if (metadataBatchRequests.get(requestKey) === request)
+        metadataBatchRequests.delete(requestKey)
     })
   metadataBatchRequests.set(requestKey, request)
   return request
@@ -386,7 +391,9 @@ export function useMediaAssetDelivery(
         signal: controller.signal,
         force,
         ensureTier:
-          currentTier === 'large-preview' || currentTier === 'processing' || currentTier === 'processing-input'
+          currentTier === 'large-preview' ||
+          currentTier === 'processing' ||
+          currentTier === 'processing-input'
             ? currentTier
             : undefined,
       })

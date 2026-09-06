@@ -129,7 +129,10 @@ function buildItemReadinessRequest(item: ImageActionMenuItem) {
 
 function refreshBillingQuotes() {
   if (!billingStore) return
-  const entries: Array<{ feature: WorkflowFeature; request: NonNullable<ReturnType<typeof buildItemReadinessRequest>> }> = actionMenuItems.value.flatMap((item) => {
+  const entries: Array<{
+    feature: WorkflowFeature
+    request: NonNullable<ReturnType<typeof buildItemReadinessRequest>>
+  }> = actionMenuItems.value.flatMap((item) => {
     const feature = resolveItemBillingFeature(item)
     const request = buildItemReadinessRequest(item)
     return feature && request ? [{ feature, request }] : []

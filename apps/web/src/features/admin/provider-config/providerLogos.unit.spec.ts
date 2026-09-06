@@ -1,12 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import {
-  adminBrandLogoMap,
-  replaceAdminBrandLogoOverrides,
-} from '../shared/logos/adminBrandLogos'
-import {
-  getProviderEndpointLogo,
-  getSearchProviderLogo,
-} from './providerLogos'
+import { adminBrandLogoMap, replaceAdminBrandLogoOverrides } from '../shared/logos/adminBrandLogos'
+import { getProviderEndpointLogo, getSearchProviderLogo } from './providerLogos'
 
 describe('providerLogos', () => {
   afterEach(() => replaceAdminBrandLogoOverrides([]))

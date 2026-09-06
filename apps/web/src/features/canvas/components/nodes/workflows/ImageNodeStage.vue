@@ -203,7 +203,9 @@ const imageImportPending = computed(
     (!!props.localUpload && !imageImportFailureMessage.value),
 )
 const isImageToolActive = computed(() => !!props.imageToolStageBinding?.active)
-const forceFullPreviewQuality = computed(() => !!props.outpaintModeActive || isImageToolActive.value)
+const forceFullPreviewQuality = computed(
+  () => !!props.outpaintModeActive || isImageToolActive.value,
+)
 const canvasViewport = useCanvasViewportContext()
 const { maxSide: previewMaxSide } = useCanvasImagePreviewQuality({
   stageWidth: () => props.stageWidth,

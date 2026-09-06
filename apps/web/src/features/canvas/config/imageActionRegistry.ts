@@ -23,13 +23,7 @@ export const IMAGE_ACTION_MODE = {
 export type ImageActionMode = (typeof IMAGE_ACTION_MODE)[keyof typeof IMAGE_ACTION_MODE]
 
 export type ImageActionMenuIcon =
-  | 'cutout'
-  | 'variations'
-  | 'render'
-  | 'upscale'
-  | 'outpaint'
-  | 'inpaint'
-  | 'retouch'
+  'cutout' | 'variations' | 'render' | 'upscale' | 'outpaint' | 'inpaint' | 'retouch'
 
 type WorkflowImageNodeAction = Extract<ImageNodeAction, WorkflowFeature>
 

@@ -1,8 +1,5 @@
 import { ref, watch } from 'vue'
-import {
-  clampMaskLayerOpacity,
-  INPAINT_DEFAULT_LAYER_OPACITY,
-} from './config/inpaintConstants'
+import { clampMaskLayerOpacity, INPAINT_DEFAULT_LAYER_OPACITY } from './config/inpaintConstants'
 
 type ValueRef<T> = {
   readonly value: T

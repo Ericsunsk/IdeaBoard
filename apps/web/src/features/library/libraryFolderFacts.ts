@@ -131,7 +131,10 @@ export function createLibraryFolderFacts(
       .catch((cause): LibraryFolderLoadResult => {
         if (disposed) return { status: 'disposed' }
         if (requestRevision !== revision) return { status: 'stale' }
-        const nextError = cause instanceof Error ? cause : new Error(i18n.global.t('library.errors.loadFoldersFailed'))
+        const nextError =
+          cause instanceof Error
+            ? cause
+            : new Error(i18n.global.t('library.errors.loadFoldersFailed'))
         return { status: 'error', error: nextError }
       })
     inFlight = request

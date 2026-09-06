@@ -35,7 +35,9 @@
           }"
           :invalid="invalid"
           :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
-          :placeholder="inlineError ? inlineErrorText : t('account.security.currentPasswordPlaceholder')"
+          :placeholder="
+            inlineError ? inlineErrorText : t('account.security.currentPasswordPlaceholder')
+          "
           toggle-mask
           @blur="validatePasswordField('oldPassword')"
           @update:model-value="clearPasswordFieldError('oldPassword')"
@@ -77,7 +79,9 @@
             }"
             :invalid="invalid"
             :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
-            :placeholder="inlineError ? inlineErrorText : t('account.security.newPasswordPlaceholder')"
+            :placeholder="
+              inlineError ? inlineErrorText : t('account.security.newPasswordPlaceholder')
+            "
             toggle-mask
             @blur="validatePasswordField('newPassword')"
             @update:model-value="handleNewPasswordInput"
@@ -118,7 +122,9 @@
             }"
             :invalid="invalid"
             :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
-            :placeholder="inlineError ? inlineErrorText : t('account.security.confirmPasswordPlaceholder')"
+            :placeholder="
+              inlineError ? inlineErrorText : t('account.security.confirmPasswordPlaceholder')
+            "
             toggle-mask
             @blur="validatePasswordField('confirmPassword')"
             @update:model-value="clearPasswordFieldError('confirmPassword')"
@@ -139,9 +145,22 @@
 
     <div class="my-8 border-t border-ib-border-soft" aria-hidden="true"></div>
 
-    <form v-if="!emailOtpSent" class="grid gap-5" novalidate @submit.prevent="handleRequestEmailChange">
+    <form
+      v-if="!emailOtpSent"
+      class="grid gap-5"
+      novalidate
+      @submit.prevent="handleRequestEmailChange"
+    >
       <IbFormField
-        v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+        v-slot="{
+          ariaInvalid,
+          describedbyId,
+          fieldId,
+          inlineError,
+          inlineErrorText,
+          invalid,
+          required,
+        }"
         :label="t('account.security.reauthCurrentPassword')"
         :error="emailErrors.currentPassword"
         field-id="email-current-password"
@@ -157,15 +176,31 @@
           fluid
           unstyled
           :pt="ibPasswordPt"
-          :input-props="{ id: fieldId, autocomplete: 'current-password', required, 'aria-invalid': ariaInvalid, 'aria-describedby': describedbyId }"
+          :input-props="{
+            id: fieldId,
+            autocomplete: 'current-password',
+            required,
+            'aria-invalid': ariaInvalid,
+            'aria-describedby': describedbyId,
+          }"
           :invalid="invalid"
           :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
-          :placeholder="inlineError ? inlineErrorText : t('account.security.currentPasswordPlaceholder')"
+          :placeholder="
+            inlineError ? inlineErrorText : t('account.security.currentPasswordPlaceholder')
+          "
           toggle-mask
         />
       </IbFormField>
       <IbFormField
-        v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+        v-slot="{
+          ariaInvalid,
+          describedbyId,
+          fieldId,
+          inlineError,
+          inlineErrorText,
+          invalid,
+          required,
+        }"
         :label="t('account.security.newEmail')"
         :error="emailErrors.newEmail"
         field-id="new-email"
@@ -200,9 +235,19 @@
     </form>
 
     <form v-else class="grid gap-5" novalidate @submit.prevent="handleConfirmEmailChange">
-      <p class="text-sm text-ib-text-subtle">{{ t('account.security.otpSentTo', { email: emailForm.newEmail }) }}</p>
+      <p class="text-sm text-ib-text-subtle">
+        {{ t('account.security.otpSentTo', { email: emailForm.newEmail }) }}
+      </p>
       <IbFormField
-        v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+        v-slot="{
+          ariaInvalid,
+          describedbyId,
+          fieldId,
+          inlineError,
+          inlineErrorText,
+          invalid,
+          required,
+        }"
         :label="t('account.security.emailOtp')"
         :error="emailErrors.otp"
         field-id="email-otp"
@@ -229,7 +274,9 @@
       <Button
         unstyled
         type="submit"
-        :label="emailLoading ? t('account.security.updating') : t('account.security.confirmEmailChange')"
+        :label="
+          emailLoading ? t('account.security.updating') : t('account.security.confirmEmailChange')
+        "
         :loading="emailLoading"
         :disabled="emailLoading"
         :class="accountPrimaryActionButtonClass"
@@ -302,9 +349,7 @@ async function handleRequestEmailChange() {
       feedback: {
         success: () => appToast.success(t('account.security.toast.verificationCodeSent')),
         error: (error) =>
-          appToast.error(
-            userFacingErrorCopy(error, t('account.security.toast.sendCodeFailed')),
-          ),
+          appToast.error(userFacingErrorCopy(error, t('account.security.toast.sendCodeFailed'))),
       },
     },
   )
@@ -323,9 +368,7 @@ async function handleConfirmEmailChange() {
       feedback: {
         success: () => appToast.success(t('account.security.toast.emailUpdated')),
         error: (error) =>
-          appToast.error(
-            userFacingErrorCopy(error, t('account.security.toast.emailUpdateFailed')),
-          ),
+          appToast.error(userFacingErrorCopy(error, t('account.security.toast.emailUpdateFailed'))),
       },
     },
   )

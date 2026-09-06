@@ -107,9 +107,7 @@ describe('RetouchLevelsControl', () => {
 
     const histogram = plot.querySelector<SVGPathElement>('.retouch-histogram-plot__histogram')
     const markers = within(plot).getAllByRole('slider')
-    const guideLines = plot.querySelectorAll<SVGLineElement>(
-      '.retouch-histogram-plot__guide-line',
-    )
+    const guideLines = plot.querySelectorAll<SVGLineElement>('.retouch-histogram-plot__guide-line')
 
     expect(histogram?.getAttribute('d')).toContain('L 0 0')
     expect(markers).toHaveLength(3)

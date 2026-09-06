@@ -99,24 +99,22 @@ describe('createCanvasNodeDragLifecycle', () => {
     expect(harness.lifecycle.isActive()).toBe(true)
     harness.lifecycle.commit()
 
-    expect(harness.committedMembershipChanges).toEqual([[
-      {
-        id: 'prompt-1',
-        type: 'position',
-        position: { x: 620, y: 96 },
-        from: { x: 40, y: 40 },
-      dragging: true,
-      },
-    ]])
+    expect(harness.committedMembershipChanges).toEqual([
+      [
+        {
+          id: 'prompt-1',
+          type: 'position',
+          position: { x: 620, y: 96 },
+          from: { x: 40, y: 40 },
+          dragging: true,
+        },
+      ],
+    ])
     expect(harness.store.getNode('prompt-1')).toMatchObject({
       selected: false,
       snapshot: { x: 620, y: 96 },
     })
-    expect(harness.lifecycleOrder).toEqual([
-      'begin',
-      'membership-stage',
-      'membership:620',
-    ])
+    expect(harness.lifecycleOrder).toEqual(['begin', 'membership-stage', 'membership:620'])
     expect(harness.lifecycle.isActive()).toBe(false)
   })
 
@@ -154,9 +152,7 @@ describe('createCanvasNodeDragLifecycle', () => {
         dragging: true,
       },
     ])
-    harness.lifecycle.handleChanges([
-      createTerminalPositionChange('prompt-1'),
-    ])
+    harness.lifecycle.handleChanges([createTerminalPositionChange('prompt-1')])
 
     harness.lifecycle.commit()
 

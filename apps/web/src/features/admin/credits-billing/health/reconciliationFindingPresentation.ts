@@ -31,11 +31,13 @@ const findingTypePresentation = {
   },
   task_trace_missing: {
     title: 'Task 追踪记录缺失',
-    summary: 'Billing Snapshot、Settlement、Hold 与 Ledger 完整，但对应 Task 已缺失，仅报告不限制 Wallet。',
+    summary:
+      'Billing Snapshot、Settlement、Hold 与 Ledger 完整，但对应 Task 已缺失，仅报告不限制 Wallet。',
   },
   task_billing_fact_missing: {
     title: 'Task Billing 事实不完整',
-    summary: 'Task Billing Snapshot、Hold 或 Settlement 缺失，或它们的 Wallet、金额与业务引用不一致。',
+    summary:
+      'Task Billing Snapshot、Hold 或 Settlement 缺失，或它们的 Wallet、金额与业务引用不一致。',
   },
   active_task_not_held: {
     title: '活动 Task 未保持 Hold',

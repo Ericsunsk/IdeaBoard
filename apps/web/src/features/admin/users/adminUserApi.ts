@@ -34,7 +34,10 @@ export async function updateAdminUserRole(input: {
   publicId: string
   role: 'admin' | 'user'
 }): Promise<void> {
-  await resolveApiOk(requestUpdateAdminUserRole(input.publicId, { role: input.role }), '角色更新失败')
+  await resolveApiOk(
+    requestUpdateAdminUserRole(input.publicId, { role: input.role }),
+    '角色更新失败',
+  )
 }
 
 export async function deleteAdminUser(publicId: string): Promise<void> {

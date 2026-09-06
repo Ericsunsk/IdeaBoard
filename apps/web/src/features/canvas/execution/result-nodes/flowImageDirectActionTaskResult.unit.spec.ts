@@ -43,13 +43,19 @@ describe('flowImageDirectActionTaskResult', () => {
     const loadImageSize = vi.fn(async () => null)
 
     await expect(
-      resolveTaskImageResultDisplay({ url: 'https://example.com/output.png', assetId: 'asset_1' }, 1.25, loadImageSize),
+      resolveTaskImageResultDisplay(
+        { url: 'https://example.com/output.png', assetId: 'asset_1' },
+        1.25,
+        loadImageSize,
+      ),
     ).resolves.toEqual({
       url: '/api/user/media-assets/asset_1/derivatives/preview/webp/content',
       mediaRef: { assetId: 'asset_1', derivativeTier: 'preview', derivativeFormat: 'webp' },
       ratio: 1.25,
     })
-    expect(loadImageSize).toHaveBeenCalledWith('/api/user/media-assets/asset_1/derivatives/preview/webp/content')
+    expect(loadImageSize).toHaveBeenCalledWith(
+      '/api/user/media-assets/asset_1/derivatives/preview/webp/content',
+    )
   })
 
   it('resolves a stable batch slot by result index', async () => {
@@ -63,7 +69,10 @@ describe('flowImageDirectActionTaskResult', () => {
         1,
         vi.fn(async () => ({ width: 100, height: 100 })),
       ),
-    ).resolves.toMatchObject({ url: '/api/user/media-assets/asset_1/derivatives/preview/webp/content', resultIndex: 0 })
+    ).resolves.toMatchObject({
+      url: '/api/user/media-assets/asset_1/derivatives/preview/webp/content',
+      resultIndex: 0,
+    })
   })
 
   it('fails a missing batch slot instead of falling through to another result', async () => {

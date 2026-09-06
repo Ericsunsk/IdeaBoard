@@ -154,7 +154,8 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
 
   function syncNodes(nextNodes: Node[]) {
     const controlledNodes = toControlledNodes(nextNodes)
-    if (controlledNodes !== options.nodes.value) recordCanvasInteractionCount('nodeArrayReplacements')
+    if (controlledNodes !== options.nodes.value)
+      recordCanvasInteractionCount('nodeArrayReplacements')
     options.nodes.value = controlledNodes
   }
 
@@ -239,24 +240,25 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     const changedNodeIds = projection.changedNodeIds ?? []
     const changedEdgeIds = projection.changedEdgeIds ?? []
     projectGraph(changedNodeIds.length, changedEdgeIds.length, () => {
-      const nodeMutations = nextNodes && nextNodes !== options.nodes.value
-        ? projection.nodeMutations ?? {
-            added: [],
-            updated: changedNodeIds
-              .map((id) => nextNodes.find((node) => node.id === id))
-              .filter((node): node is Node => !!node),
-            removedIds: [],
-          }
-        : undefined
+      const nodeMutations =
+        nextNodes && nextNodes !== options.nodes.value
+          ? (projection.nodeMutations ?? {
+              added: [],
+              updated: changedNodeIds
+                .map((id) => nextNodes.find((node) => node.id === id))
+                .filter((node): node is Node => !!node),
+              removedIds: [],
+            })
+          : undefined
       const hasAddedNodes = (nodeMutations?.added.length ?? 0) > 0
       const edgeMutations = nextEdges
-        ? projection.edgeMutations ?? {
+        ? (projection.edgeMutations ?? {
             added: [],
             updated: changedEdgeIds
               .map((id) => nextEdges.find((edge) => edge.id === id))
               .filter((edge): edge is Edge => !!edge),
             removedIds: [],
-          }
+          })
         : undefined
       const hasEdgeChanges =
         !!edgeMutations &&
@@ -275,7 +277,11 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
       }
       if (nextNodes && nextNodes !== options.nodes.value) {
         const resolvedNodeMutations = nodeMutations!
-        const { added: addedNodes, updated: updatedNodes, removedIds: removedNodeIds } = resolvedNodeMutations
+        const {
+          added: addedNodes,
+          updated: updatedNodes,
+          removedIds: removedNodeIds,
+        } = resolvedNodeMutations
         const hasStructuralNodeMutation = addedNodes.length > 0 || removedNodeIds.length > 0
         if (hasStructuralNodeMutation) {
           // addNodes/removeNodes emit nodesChange and would re-enter the

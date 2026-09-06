@@ -28,9 +28,7 @@ describe('outbound policy form contract', () => {
   })
 
   it('accepts an empty host list so all private access can be removed', () => {
-    expect(
-      outboundPolicyFormToRequest(DEFAULT_OUTBOUND_POLICY_FORM),
-    ).toEqual({
+    expect(outboundPolicyFormToRequest(DEFAULT_OUTBOUND_POLICY_FORM)).toEqual({
       allow_hosts: [],
     })
   })

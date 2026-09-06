@@ -303,11 +303,7 @@ import IbFormField from '../../../shared/components/IbFormField.vue'
 import { getPasswordLengthError } from '../../../shared/auth/passwordPolicy'
 import { useAuthFeedback } from '../useAuthFeedback'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
-import {
-  AUTH_DISPLAY_NAME_LIMIT,
-  getLengthError,
-  getRequiredError,
-} from './authFormUtils'
+import { AUTH_DISPLAY_NAME_LIMIT, getLengthError, getRequiredError } from './authFormUtils'
 import {
   authButtonPt,
   authCompactModalShellClass,
@@ -376,7 +372,11 @@ function handleFieldBlur(field: RegisterField) {
   if (field === 'displayName') {
     const displayName = formValue.value.displayName.trim()
     if (displayName) {
-      errors.value.displayName = getLengthError(displayName, AUTH_DISPLAY_NAME_LIMIT, t('auth.fields.username'))
+      errors.value.displayName = getLengthError(
+        displayName,
+        AUTH_DISPLAY_NAME_LIMIT,
+        t('auth.fields.username'),
+      )
     }
   } else if (field === 'email') {
     const email = formValue.value.email.trim()
@@ -407,7 +407,8 @@ function validateField(field: RegisterField) {
 
   if (field === 'password') {
     const password = formValue.value.password
-    errors.value.password = getRequiredError(password, t('auth.fields.password')) || getPasswordLengthError(password)
+    errors.value.password =
+      getRequiredError(password, t('auth.fields.password')) || getPasswordLengthError(password)
     return !errors.value.password
   }
 
@@ -422,7 +423,8 @@ function validateField(field: RegisterField) {
 
   const confirmPassword = formValue.value.confirmPassword
   errors.value.confirmPassword =
-    getRequiredError(confirmPassword, t('auth.fields.confirmPassword')) || getPasswordLengthError(confirmPassword)
+    getRequiredError(confirmPassword, t('auth.fields.confirmPassword')) ||
+    getPasswordLengthError(confirmPassword)
 
   if (!errors.value.confirmPassword && confirmPassword !== formValue.value.password) {
     errors.value.confirmPassword = t('auth.errors.passwordMismatch')

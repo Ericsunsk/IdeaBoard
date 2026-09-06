@@ -257,39 +257,15 @@ func validateBoardStateGroups(items []json.RawMessage) error {
 }
 
 func validateBoardStateGroup(payload json.RawMessage) error {
-	raw, err := parseBoardStateGroup(payload)
-	if err != nil {
-		return err
-	}
-	if err := validateBoardStateGroupIdentity(raw); err != nil {
-		return err
-	}
-	return validateBoardStateGroupGeometry(raw)
-}
-
-func parseBoardStateGroup(payload json.RawMessage) (map[string]json.RawMessage, error) {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(payload, &raw); err != nil || raw == nil {
-		return nil, ErrInvalidInput
+		return ErrInvalidInput
 	}
 	for key := range raw {
-		if !isBoardStateGroupField(key) {
-			return nil, ErrInvalidInput
+		if key != "id" && key != "nodeIds" && key != "x" && key != "y" && key != "width" && key != "height" {
+			return ErrInvalidInput
 		}
 	}
-	return raw, nil
-}
-
-func isBoardStateGroupField(key string) bool {
-	switch key {
-	case "id", "nodeIds", "x", "y", "width", "height":
-		return true
-	default:
-		return false
-	}
-}
-
-func validateBoardStateGroupIdentity(raw map[string]json.RawMessage) error {
 	id, err := requiredStringField(raw, "id")
 	if err != nil || !boardStateGroupIDPattern.MatchString(id) {
 		return ErrInvalidInput
@@ -303,10 +279,6 @@ func validateBoardStateGroupIdentity(raw map[string]json.RawMessage) error {
 			return ErrInvalidInput
 		}
 	}
-	return nil
-}
-
-func validateBoardStateGroupGeometry(raw map[string]json.RawMessage) error {
 	if _, err := requiredNumberField(raw, "x"); err != nil {
 		return err
 	}

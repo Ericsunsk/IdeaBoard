@@ -27,12 +27,6 @@ describe('taskResult image result helpers', () => {
   })
 
   it('drops result objects that do not carry a public asset identity', () => {
-    expect(
-      normalizeTaskImageResults([
-        { width: 0, height: 100 },
-        {},
-      ]),
-    ).toEqual([])
+    expect(normalizeTaskImageResults([{ width: 0, height: 100 }, {}])).toEqual([])
   })
-
 })

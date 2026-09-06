@@ -21,7 +21,10 @@ export const userRewardRedemptionsQueryKeys = {
 
 export async function redeemUserRewardCode(code: string): Promise<UserRewardRedeemResult> {
   try {
-    return await resolveApiData(redeemUserReward({ code }), i18n.global.t('account.errors.networkRetry'))
+    return await resolveApiData(
+      redeemUserReward({ code }),
+      i18n.global.t('account.errors.networkRetry'),
+    )
   } catch (error) {
     throw new Error(rewardRedemptionErrorMessage(error), { cause: error })
   }
@@ -53,7 +56,7 @@ export async function fetchUserRewardRedemptions(
   signal?: AbortSignal,
 ): Promise<UserRewardRedemptionPage> {
   return resolveApiData(
-      listUserRewardRedemptions(params, { signal }),
-      i18n.global.t('account.errors.rewardsHistoryLoadFailed'),
-    )
+    listUserRewardRedemptions(params, { signal }),
+    i18n.global.t('account.errors.rewardsHistoryLoadFailed'),
+  )
 }

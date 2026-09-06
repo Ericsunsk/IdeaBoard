@@ -59,10 +59,7 @@ type ImageAdjustmentRangeByKind = {
   threshold: Record<'threshold', ImageAdjustmentNumberRange>
   curves: Record<string, never>
   levels: Record<keyof RetouchLevelsParams, ImageAdjustmentNumberRange>
-  sharpen: Record<
-    Exclude<keyof RetouchSharpenParams, 'protectColor'>,
-    ImageAdjustmentNumberRange
-  >
+  sharpen: Record<Exclude<keyof RetouchSharpenParams, 'protectColor'>, ImageAdjustmentNumberRange>
 }
 
 type ImageAdjustmentDefinitionByKind = {
@@ -124,7 +121,12 @@ const THRESHOLD_RANGES = {
 } satisfies ImageAdjustmentRangeByKind['threshold']
 
 const LEVELS_RANGES = {
-  shadows: { label: i18n.global.t('canvas.retouch.params.shadows'), min: CHANNEL_MIN, max: CHANNEL_MAX, defaultValue: 0 },
+  shadows: {
+    label: i18n.global.t('canvas.retouch.params.shadows'),
+    min: CHANNEL_MIN,
+    max: CHANNEL_MAX,
+    defaultValue: 0,
+  },
   midtones: {
     label: i18n.global.t('canvas.retouch.params.midtones'),
     min: CHANNEL_MIN,
@@ -152,8 +154,18 @@ const LEVELS_RANGES = {
 } satisfies ImageAdjustmentRangeByKind['levels']
 
 const SHARPEN_RANGES = {
-  amount: { label: i18n.global.t('canvas.retouch.params.amount'), min: 0, max: 200, defaultValue: 0 },
-  radius: { label: i18n.global.t('canvas.retouch.params.radius'), min: 0.3, max: 5, defaultValue: 1 },
+  amount: {
+    label: i18n.global.t('canvas.retouch.params.amount'),
+    min: 0,
+    max: 200,
+    defaultValue: 0,
+  },
+  radius: {
+    label: i18n.global.t('canvas.retouch.params.radius'),
+    min: 0.3,
+    max: 5,
+    defaultValue: 1,
+  },
   threshold: {
     label: i18n.global.t('canvas.retouch.params.threshold'),
     min: 0,

@@ -70,7 +70,8 @@ export default {
     retryImageImport: '이미지 가져오기 다시 시도',
     stageLabel: '이미지 노드 입력 및 미리보기 영역',
     stagePreviewAlt: '이미지 노드 미리보기',
-    stagePreviewHint: '이미지 노드 미리보기. Enter를 눌러 미리보기를 열거나 Space를 눌러 캔버스에 추가하세요',
+    stagePreviewHint:
+      '이미지 노드 미리보기. Enter를 눌러 미리보기를 열거나 Space를 눌러 캔버스에 추가하세요',
     preparingPreview: '이미지 미리보기 준비 중',
     uploadOrDropImage: '입력으로 사용할 이미지를 업로드하거나 드래그하세요',
     generatingUploadBlocked: '이미지를 생성 중입니다. 업로드할 수 없습니다',
@@ -90,7 +91,8 @@ export default {
     ungroupFailed: '그룹 해제에 실패했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
     updateFailed: '그룹 관계를 업데이트하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
     moveFailed: '그룹을 이동하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
-    boundsUpdateFailed: '그룹 경계를 업데이트하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
+    boundsUpdateFailed:
+      '그룹 경계를 업데이트하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
   },
   chrome: {
     shareComingSoon: '공유 기능 곧 제공 예정',
@@ -114,9 +116,12 @@ export default {
     renameFailedWarning: '이름 변경에 실패했습니다.',
     conflictReloadedError: '이름 충돌로 캔버스 목록을 새로고침했습니다.',
     syncFailedRestoredError: '이름 변경 동기화에 실패하여 원래 이름으로 복원했습니다.',
-    conflictRestoredRefreshFailedError: '이름 충돌로 원래 이름을 복원했지만 원격 목록 새로고침에 실패했습니다. 새로고침해 주세요.',
-    conflictRestoreFailedError: '이름 충돌 및 복원에 실패했습니다. 캔버스 목록을 새로고침해 주세요.',
-    syncFailedRestoreFailedError: '이름 변경 동기화에 실패했고 원래 이름을 복원할 수 없습니다. 캔버스 목록을 새로고침해 주세요.',
+    conflictRestoredRefreshFailedError:
+      '이름 충돌로 원래 이름을 복원했지만 원격 목록 새로고침에 실패했습니다. 새로고침해 주세요.',
+    conflictRestoreFailedError:
+      '이름 충돌 및 복원에 실패했습니다. 캔버스 목록을 새로고침해 주세요.',
+    syncFailedRestoreFailedError:
+      '이름 변경 동기화에 실패했고 원래 이름을 복원할 수 없습니다. 캔버스 목록을 새로고침해 주세요.',
     catalogReloadedSuccess: '캔버스 목록을 새로고침했습니다.',
     catalogReloadFailedError: '캔버스 목록을 새로고침하지 못했습니다. 나중에 다시 시도해 주세요.',
   },
@@ -131,7 +136,8 @@ export default {
     missingBoardIdMask: '보드 ID가 없습니다. 마스크를 업로드할 수 없습니다.',
     markInpaintAreaFirst: '먼저 인페인팅할 영역을 표시하세요.',
     recoveryFailed: '이미지 결과를 복원하지 못했습니다. 다시 시도해 주세요.',
-    canvasSaveFailedProgressLost: '캔버스를 저장하지 못했습니다. 페이지를 새로고침하면 작업 진행 상황이 손실될 수 있습니다.',
+    canvasSaveFailedProgressLost:
+      '캔버스를 저장하지 못했습니다. 페이지를 새로고침하면 작업 진행 상황이 손실될 수 있습니다.',
     networkRetry: '네트워크 오류입니다. 다시 시도해 주세요.',
     tasksInProgress: '작업이 아직 실행 중입니다. 결과가 곧 캔버스에 표시됩니다.',
     generationUnavailable: '생성 기능을 일시적으로 사용할 수 없습니다. 나중에 다시 시도해 주세요.',
@@ -164,9 +170,12 @@ export default {
   },
   edges: {
     connectionSemanticsWarning: '이 연결은 현재 연결 규칙과 일치하지 않습니다.',
-    connectionWriteFailedWarning: '연결을 캔버스에 기록하지 못했습니다. 새로고침한 뒤 다시 시도해 주세요.',
-    deleteWriteFailedWarning: '삭제를 캔버스에 기록하지 못했습니다. 새로고침한 뒤 다시 시도해 주세요.',
-    deleteApplyFailedWarning: '삭제를 적용하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
+    connectionWriteFailedWarning:
+      '연결을 캔버스에 기록하지 못했습니다. 새로고침한 뒤 다시 시도해 주세요.',
+    deleteWriteFailedWarning:
+      '삭제를 캔버스에 기록하지 못했습니다. 새로고침한 뒤 다시 시도해 주세요.',
+    deleteApplyFailedWarning:
+      '삭제를 적용하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
     connectRequiredInputLabel: '{label} 연결',
     connectRequiredInputsLabel: '{count}개 입력 연결',
     waitForInputLabel: '{label} 대기 중',
@@ -284,10 +293,13 @@ export default {
     uploadFailed: '업로드에 실패했습니다.',
     createNodeFailed: '노드를 생성하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
     updateNodeFailed: '노드를 업데이트하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
-    updateNodeStatusFailed: '노드 상태를 업데이트하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
-    removeInputImageFailed: '입력 이미지를 제거하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
+    updateNodeStatusFailed:
+      '노드 상태를 업데이트하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
+    removeInputImageFailed:
+      '입력 이미지를 제거하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
     addImageFailed: '이미지를 추가하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
-    duplicateImagesFailed: '이미지를 복제하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
+    duplicateImagesFailed:
+      '이미지를 복제하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
     noExportableImages: '선택한 노드에 내보낼 이미지가 없습니다.',
     exportingImages: '이미지 {count}개를 내보내는 중...',
     exportingImageProgress: '이미지 {current}/{total}개를 내보내는 중...',
@@ -299,11 +311,15 @@ export default {
     missingBoardIdSave: '보드 ID가 없습니다. 저장할 수 없습니다.',
     uploadMissingMediaAsset: '업로드 실패: 미디어 에셋 ID가 없습니다.',
     libraryImportFailed: '라이브러리 가져오기에 실패했습니다. 나중에 다시 시도해 주세요.',
-    libraryImportInvalidAsset: '라이브러리 가져오기에 실패했습니다. 서비스에서 유효한 미디어 에셋을 반환하지 않았습니다.',
+    libraryImportInvalidAsset:
+      '라이브러리 가져오기에 실패했습니다. 서비스에서 유효한 미디어 에셋을 반환하지 않았습니다.',
     saveAuthUnavailable: '저장 실패: 사용자 세션이 없습니다. 로그인한 뒤 다시 시도해 주세요.',
-    savedLocallySyncFailed: '로컬에 저장되었습니다. 원격 동기화에 실패하여 네트워크가 복구되면 다시 시도합니다.',
-    nameConflictSavedLocally: '로컬에 저장되었지만 이미 존재하는 보드 이름입니다. 다른 이름을 선택해 주세요.',
-    boardDataInvalid: '캔버스 데이터 검증에 실패했습니다. 현재 캔버스는 유지되었습니다. 나중에 다시 시도해 주세요.',
+    savedLocallySyncFailed:
+      '로컬에 저장되었습니다. 원격 동기화에 실패하여 네트워크가 복구되면 다시 시도합니다.',
+    nameConflictSavedLocally:
+      '로컬에 저장되었지만 이미 존재하는 보드 이름입니다. 다른 이름을 선택해 주세요.',
+    boardDataInvalid:
+      '캔버스 데이터 검증에 실패했습니다. 현재 캔버스는 유지되었습니다. 나중에 다시 시도해 주세요.',
     importSnapshotFailed: '캔버스 스냅샷을 불러오지 못했습니다. 나중에 다시 시도해 주세요.',
     saved: '저장됨',
     saveFailed: '저장에 실패했습니다. 나중에 다시 시도해 주세요.',

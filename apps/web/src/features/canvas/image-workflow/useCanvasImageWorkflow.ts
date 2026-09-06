@@ -22,10 +22,7 @@ import {
   type ImageWorkflowExecution,
   type UseImageWorkflowExecutionOptions,
 } from './useImageWorkflowExecution'
-import {
-  createGenerationIntent,
-  type GenerationIntentOptions,
-} from './generationIntent'
+import { createGenerationIntent, type GenerationIntentOptions } from './generationIntent'
 
 type CanvasImageWorkflowExecutionPort = Pick<
   ImageWorkflowExecution,

@@ -357,9 +357,10 @@ function submitRefund() {
 
 function formatDispute(dispute: AdminPaymentDisputeSummary): string {
   const amount = formatPaymentMoney(dispute.amountMinor, dispute.currency)
-  const ratio = dispute.ratioBasisPoints !== undefined
-    ? ` / 比例 ${(dispute.ratioBasisPoints / 100).toLocaleString('zh-CN', { maximumFractionDigits: 2 })}%`
-    : ''
+  const ratio =
+    dispute.ratioBasisPoints !== undefined
+      ? ` / 比例 ${(dispute.ratioBasisPoints / 100).toLocaleString('zh-CN', { maximumFractionDigits: 2 })}%`
+      : ''
   const target = formatIdeas(dispute.targetIdeaQuantity ?? 0)
   const debited = formatIdeas(dispute.debitedIdeaQuantity ?? 0)
   const unrecovered = formatIdeas(dispute.unrecoveredCredits ?? 0)

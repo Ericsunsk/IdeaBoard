@@ -308,10 +308,8 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
         hasShownApiKeyHint: true,
       }
     }
-    if (
-      detectModelsLoading.value ||
-      isModellessProviderEndpoint(command.providerEndpoint)
-    ) return result
+    if (detectModelsLoading.value || isModellessProviderEndpoint(command.providerEndpoint))
+      return result
 
     const apiType = command.providerEndpoint?.apiType || DEFAULT_PROVIDER_API_TYPE
     const sessionKey = `${apiType}::${baseURL}::${secret}`

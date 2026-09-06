@@ -29,7 +29,12 @@ describe('CanvasChrome', () => {
           },
           menuItems: [],
         },
-        tools: { activeTool: 'select', libraryMounted: false, libraryOpen: false, minimapEnabled: false },
+        tools: {
+          activeTool: 'select',
+          libraryMounted: false,
+          libraryOpen: false,
+          minimapEnabled: false,
+        },
         status: { exportDisabled: false, zoomLevel: 100 },
       },
     })
@@ -70,7 +75,12 @@ describe('CanvasChrome', () => {
           },
           menuItems: [{ key: 'logout', label: '退出登录', command: vi.fn() }],
         },
-        tools: { activeTool: 'select', libraryMounted: false, libraryOpen: false, minimapEnabled: false },
+        tools: {
+          activeTool: 'select',
+          libraryMounted: false,
+          libraryOpen: false,
+          minimapEnabled: false,
+        },
         status: { exportDisabled: false, zoomLevel: 100 },
       },
     })
@@ -111,7 +121,12 @@ describe('CanvasChrome', () => {
           },
           menuItems: [],
         },
-        tools: { activeTool: 'select', libraryMounted: false, libraryOpen: false, minimapEnabled: false },
+        tools: {
+          activeTool: 'select',
+          libraryMounted: false,
+          libraryOpen: false,
+          minimapEnabled: false,
+        },
         status: { exportDisabled: false, zoomLevel: 100 },
       },
     })
@@ -146,7 +161,12 @@ describe('CanvasChrome', () => {
           },
           menuItems: [],
         },
-        tools: { activeTool: 'select', libraryMounted: false, libraryOpen: false, minimapEnabled: false },
+        tools: {
+          activeTool: 'select',
+          libraryMounted: false,
+          libraryOpen: false,
+          minimapEnabled: false,
+        },
         status: { exportDisabled: false, zoomLevel: 100 },
       },
     })
@@ -185,7 +205,12 @@ describe('CanvasChrome', () => {
           },
           menuItems: [],
         },
-        tools: { activeTool: 'select', libraryMounted: false, libraryOpen: false, minimapEnabled: false },
+        tools: {
+          activeTool: 'select',
+          libraryMounted: false,
+          libraryOpen: false,
+          minimapEnabled: false,
+        },
         status: { exportDisabled: false, zoomLevel: 100 },
       },
     })
@@ -253,7 +278,12 @@ describe('CanvasChrome', () => {
           },
           menuItems: [],
         },
-        tools: { activeTool: 'select', libraryMounted: false, libraryOpen: false, minimapEnabled: false },
+        tools: {
+          activeTool: 'select',
+          libraryMounted: false,
+          libraryOpen: false,
+          minimapEnabled: false,
+        },
         status: { exportDisabled: false, zoomLevel: 100 },
       },
     })
@@ -292,7 +322,12 @@ describe('CanvasChrome', () => {
           },
           menuItems: [],
         },
-        tools: { activeTool: 'select', libraryMounted: true, libraryOpen: true, minimapEnabled: false },
+        tools: {
+          activeTool: 'select',
+          libraryMounted: true,
+          libraryOpen: true,
+          minimapEnabled: false,
+        },
         status: { exportDisabled: false, zoomLevel: 100 },
       },
     })
@@ -331,7 +366,12 @@ describe('CanvasChrome', () => {
           },
           menuItems: [],
         },
-        tools: { activeTool: 'select', libraryMounted: true, libraryOpen: true, minimapEnabled: false },
+        tools: {
+          activeTool: 'select',
+          libraryMounted: true,
+          libraryOpen: true,
+          minimapEnabled: false,
+        },
         status: { exportDisabled: false, zoomLevel: 100 },
       },
       slots: {
@@ -371,7 +411,12 @@ describe('CanvasChrome', () => {
           },
           menuItems: [],
         },
-        tools: { activeTool: 'select', libraryMounted: false, libraryOpen: false, minimapEnabled: false },
+        tools: {
+          activeTool: 'select',
+          libraryMounted: false,
+          libraryOpen: false,
+          minimapEnabled: false,
+        },
         status: { exportDisabled: false, zoomLevel: 100 },
       },
     })

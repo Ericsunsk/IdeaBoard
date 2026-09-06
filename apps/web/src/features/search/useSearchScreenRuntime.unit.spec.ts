@@ -11,13 +11,22 @@ const mocks = vi.hoisted(() => ({
     dispose: vi.fn(),
     folderFacts: {},
     subscribe: vi.fn(
-      (_listener: (outcome: { kind: string; provider?: string; sourceID?: string; assetKey?: string }) => void) =>
+      (
+        _listener: (outcome: {
+          kind: string
+          provider?: string
+          sourceID?: string
+          assetKey?: string
+        }) => void,
+      ) =>
         () => {},
     ),
   },
   nextSession: null as ReturnType<typeof createSession> | null,
   sessions: [] as ReturnType<typeof createSession>[],
-  mutationListener: null as ((outcome: { kind: string; provider?: string; sourceID?: string; assetKey?: string }) => void) | null,
+  mutationListener: null as
+    | ((outcome: { kind: string; provider?: string; sourceID?: string; assetKey?: string }) => void)
+    | null,
 }))
 
 vi.mock('../auth/authOverlay', () => ({

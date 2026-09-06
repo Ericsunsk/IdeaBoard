@@ -26,9 +26,7 @@ const vueFlowAdapterSkin = readSource('components/styles/canvas-vue-flow-adapter
 const canvasMiniMap = readSource('components/CanvasMiniMap.vue')
 const nodeHandleRail = readSource('components/FlowCanvasNodeHandleRail.vue')
 const retouchLayerActions = readSource('retouch/components/RetouchLayerActions.vue')
-const retouchHistogram = readSource(
-  'retouch/components/styles/retouch-histogram-plot.css',
-)
+const retouchHistogram = readSource('retouch/components/styles/retouch-histogram-plot.css')
 const inpaintChrome = readSource('inpaint/components/ImageInpaintChrome.vue')
 
 describe('Canvas surface skin contract', () => {

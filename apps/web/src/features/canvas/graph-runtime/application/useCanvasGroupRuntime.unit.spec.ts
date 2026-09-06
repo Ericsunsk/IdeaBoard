@@ -1,7 +1,10 @@
 import type { Edge, Node } from '@vue-flow/core'
 import { ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../../canvas-board/domain'
+import {
+  createEmptyCanvasBoardSnapshot,
+  type CanvasBoardSnapshot,
+} from '../../../canvas-board/domain'
 import { CanvasGraphSession } from '..'
 import { useCanvasGroupRuntime } from './useCanvasGroupRuntime'
 import type { CanvasVueFlowGraphAdapter } from '../../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
@@ -80,12 +83,10 @@ function createHarness(options: { isGraphSessionAttached?: () => boolean } = {})
     if (event.patch.groups.records.length === 0) return
     boardBaseSnapshot.value = {
       ...boardBaseSnapshot.value,
-      groups: graphSession.store
-        .getGroupIds()
-        .flatMap((id) => {
-          const group = graphSession.store.getGroup(id)
-          return group ? [group] : []
-        }),
+      groups: graphSession.store.getGroupIds().flatMap((id) => {
+        const group = graphSession.store.getGroup(id)
+        return group ? [group] : []
+      }),
     }
   })
   const graphAdapter = {

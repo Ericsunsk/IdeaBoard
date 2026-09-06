@@ -75,7 +75,8 @@ export default {
   },
   toasts: {
     maxBatchSelected: '¡Máximo 8 imágenes para selección por lotes!',
-    batchVisionReferencesAdded: 'Se añadieron las 4 primeras imágenes seleccionadas como referencias de búsqueda visual',
+    batchVisionReferencesAdded:
+      'Se añadieron las 4 primeras imágenes seleccionadas como referencias de búsqueda visual',
     savedToQuickSaves: '¡Se guardó "{title}" en Guardados rápidos!',
     savedBatchSuccess: '¡Se guardaron {count} recursos en la Biblioteca!',
     savedBatchFailed: 'Error al guardar los recursos seleccionados',
@@ -86,7 +87,8 @@ export default {
     unableToLoadInspiration: 'No se pudo cargar el feed de inspiración. Inténtelo de nuevo.',
     maxReferenceImages: 'Puede añadir hasta 4 imágenes de referencia',
     onlyImageFilesSupported: 'Solo se admiten archivos de imagen',
-    maxReferenceSizeExceeded: 'El tamaño total de las imágenes de referencia no puede superar los 10MB',
+    maxReferenceSizeExceeded:
+      'El tamaño total de las imágenes de referencia no puede superar los 10MB',
   },
   lightbox: {
     untitledReference: 'Referencia sin título',

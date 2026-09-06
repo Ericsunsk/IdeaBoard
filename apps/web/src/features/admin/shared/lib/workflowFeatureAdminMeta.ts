@@ -33,7 +33,10 @@ export interface AdminWorkflowFeatureMeta {
 const ADMIN_WORKFLOW_FEATURE_META: Readonly<Record<WorkflowFeature, AdminWorkflowFeatureMeta>> = {
   [WORKFLOW_FEATURE.render]: { label: '草图成图', groupKey: ADMIN_WORKFLOW_FEATURE_GROUP.image },
   [WORKFLOW_FEATURE.inpaint]: { label: '局部重绘', groupKey: ADMIN_WORKFLOW_FEATURE_GROUP.image },
-  [WORKFLOW_FEATURE.variations]: { label: '风格延展', groupKey: ADMIN_WORKFLOW_FEATURE_GROUP.image },
+  [WORKFLOW_FEATURE.variations]: {
+    label: '风格延展',
+    groupKey: ADMIN_WORKFLOW_FEATURE_GROUP.image,
+  },
   [WORKFLOW_FEATURE.fusion]: { label: '多图融合', groupKey: ADMIN_WORKFLOW_FEATURE_GROUP.fusion },
   [WORKFLOW_FEATURE.cutout]: { label: '抠图', groupKey: ADMIN_WORKFLOW_FEATURE_GROUP.image },
   [WORKFLOW_FEATURE.generation]: {

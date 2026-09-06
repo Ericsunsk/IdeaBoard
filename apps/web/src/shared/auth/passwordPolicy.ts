@@ -5,5 +5,7 @@ export const PASSWORD_LENGTH_LIMIT = {
 
 export function getPasswordLengthError(password: string) {
   const { min, max } = PASSWORD_LENGTH_LIMIT
-  return password.length < min || password.length > max ? `Password must be ${min}-${max} characters` : ''
+  return password.length < min || password.length > max
+    ? `Password must be ${min}-${max} characters`
+    : ''
 }

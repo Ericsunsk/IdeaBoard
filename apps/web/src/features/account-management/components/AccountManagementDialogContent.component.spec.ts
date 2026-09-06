@@ -288,16 +288,24 @@ describe('AccountManagementDialogContent', () => {
 
     await user.click(screen.getByRole('button', { name: 'Transactions' }))
 
-    expect(screen.getByRole('button', { name: 'Transactions' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Transactions' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
     expect(screen.getByRole('region', { name: 'Transactions' })).toHaveTextContent('最终收支记录')
   })
 
   it('opens directly on the requested initial tab', () => {
     renderAccountManagementDialogContent('billing')
 
-    expect(screen.getByRole('button', { name: 'Transactions' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Transactions' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
     expect(screen.getByRole('region', { name: 'Transactions' })).toBeVisible()
-    expect(screen.queryByRole('region', { name: 'Account profile overview' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('region', { name: 'Account profile overview' }),
+    ).not.toBeInTheDocument()
   })
 
   it.each(accountTabCases)(
@@ -346,7 +354,10 @@ describe('AccountManagementDialogContent', () => {
 
     await user.click(screen.getByRole('button', { name: 'Redeem code' }))
 
-    expect(screen.getByRole('button', { name: 'Redeem code' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Redeem code' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
     expect(screen.getByRole('region', { name: 'Redeem code' })).toHaveTextContent('输入兑换码')
   })
 

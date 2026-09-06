@@ -64,7 +64,8 @@ async function main() {
       hasError = true
       allErrors.push(`\n[${locale}] Shape mismatches vs en:`)
       for (const m of diff.shapeMismatches.slice(0, 50)) allErrors.push(`  ! ${m}`)
-      if (diff.shapeMismatches.length > 50) allErrors.push(`  ... and ${diff.shapeMismatches.length - 50} more`)
+      if (diff.shapeMismatches.length > 50)
+        allErrors.push(`  ... and ${diff.shapeMismatches.length - 50} more`)
     }
   }
 
@@ -73,7 +74,9 @@ async function main() {
     process.exit(1)
   }
 
-  console.log(`Locale parity check passed: ${enKeys.length} keys consistent across ${LOCALES.join(', ')}`)
+  console.log(
+    `Locale parity check passed: ${enKeys.length} keys consistent across ${LOCALES.join(', ')}`,
+  )
 }
 
 main().catch((e) => {

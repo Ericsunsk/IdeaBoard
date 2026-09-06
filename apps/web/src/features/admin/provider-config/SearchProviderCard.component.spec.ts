@@ -81,8 +81,12 @@ describe('SearchProviderCard', () => {
 
     expect(await screen.findByText('Vision Search')).toBeInTheDocument()
     expect(screen.getByText('视觉模型')).toBeInTheDocument()
-    expect(await screen.findByPlaceholderText('例如: https://gateway.ai.cloudflare.com/v1/...')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('例如: @cf/meta/llama-3.2-11b-vision-instruct 或 gpt-4o')).toBeInTheDocument()
+    expect(
+      await screen.findByPlaceholderText('例如: https://gateway.ai.cloudflare.com/v1/...'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByPlaceholderText('例如: @cf/meta/llama-3.2-11b-vision-instruct 或 gpt-4o'),
+    ).toBeInTheDocument()
   })
 
   it('requires saving draft configuration before testing and never saves from the test action', async () => {
@@ -130,7 +134,9 @@ describe('SearchProviderCard', () => {
   })
 
   it('does not save draft configuration when a connection test fails', async () => {
-    vi.mocked(searchProviderResource.testSearchProvider).mockRejectedValueOnce(new Error('连接失败'))
+    vi.mocked(searchProviderResource.testSearchProvider).mockRejectedValueOnce(
+      new Error('连接失败'),
+    )
     const { user } = renderWithUser(Harness, {
       global: { plugins: [[PrimeVue, adminPrimeVueTestOptions]] },
     })

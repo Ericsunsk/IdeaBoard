@@ -3,6 +3,7 @@ node_modules/
 apps/web/dist/
 apps/web/dist-ssr/
 apps/web/.benchmark-reports/
+apps/web/docs/frontend-governance-baseline-*.md
 coverage/
 apps/auth/dist/
 logs/

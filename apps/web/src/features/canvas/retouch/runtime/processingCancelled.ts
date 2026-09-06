@@ -10,7 +10,6 @@ export function processingCancelledError(): Error {
 export function isProcessingCancelled(error: unknown): boolean {
   if (!(error instanceof Error)) return false
   return (
-    error.name === PROCESSING_CANCELLED_NAME ||
-    (error as { code?: unknown }).code === 'cancelled'
+    error.name === PROCESSING_CANCELLED_NAME || (error as { code?: unknown }).code === 'cancelled'
   )
 }

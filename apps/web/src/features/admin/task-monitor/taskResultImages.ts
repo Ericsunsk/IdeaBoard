@@ -87,15 +87,15 @@ export function hasTaskResultImageCandidate(result: string | null | undefined): 
 }
 
 export function isTaskResultImageDeletedByUser(result: string | null | undefined): boolean {
-	if (!result) return false
-	try {
-		const parsed = JSON.parse(result)
-		return (
-			parsed != null &&
-			typeof parsed === 'object' &&
-			(parsed as Record<string, unknown>).image_availability === 'deleted_by_user'
-		)
-	} catch {
-		return false
-	}
+  if (!result) return false
+  try {
+    const parsed = JSON.parse(result)
+    return (
+      parsed != null &&
+      typeof parsed === 'object' &&
+      (parsed as Record<string, unknown>).image_availability === 'deleted_by_user'
+    )
+  } catch {
+    return false
+  }
 }

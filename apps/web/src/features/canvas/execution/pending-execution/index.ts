@@ -29,7 +29,4 @@ export {
   projectPendingImageExecutionEdges,
   type PendingImageExecutionEdgeProjection,
 } from './pendingImageExecutionEdgeProjection'
-export {
-  collectPendingImageTasks,
-  type PendingImageTaskSnapshot,
-} from './pendingImageTaskSnapshot'
+export { collectPendingImageTasks, type PendingImageTaskSnapshot } from './pendingImageTaskSnapshot'

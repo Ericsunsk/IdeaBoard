@@ -7,7 +7,10 @@ import type { CanvasVueFlowGraphAdapter } from '../../vue-flow-adapter/useCanvas
 import { bindCanvasGraphSessionProjection } from '../../vue-flow-adapter/bindCanvasGraphSessionProjection'
 import { canvasBoardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
 import { CanvasGraphSession, type CanvasGraphStore } from '../../graph-runtime'
-import { CanvasBoardGraphSession, type PendingImageExecutionCore } from '../../execution/pending-execution'
+import {
+  CanvasBoardGraphSession,
+  type PendingImageExecutionCore,
+} from '../../execution/pending-execution'
 
 type CanvasGraphSessionRuntimeOptions = {
   nodes: Ref<Node[]>
@@ -110,7 +113,8 @@ export function createCanvasGraphSessionRuntime(
     nextGraph: { nodes: Node[]; edges: Edge[] },
     source: 'hydrate-replace' | 'save-reconcile',
   ) {
-    const semanticGraph = source === 'save-reconcile' ? rebaseSavedFlowProjection(nextGraph) : nextGraph
+    const semanticGraph =
+      source === 'save-reconcile' ? rebaseSavedFlowProjection(nextGraph) : nextGraph
     const projectedGraph = {
       nodes: options.projectCurrentGroupNodeLayers(semanticGraph.nodes),
       edges: semanticGraph.edges,
@@ -142,7 +146,8 @@ export function createCanvasGraphSessionRuntime(
     const session = CanvasGraphSession.hydrate(boardId, snapshot)
     graphSession = session
     const unsubscribeHistory = session.subscribe((event) => {
-      if (session !== graphSession || session.boardId !== options.boardSession.currentBoardId.value) return
+      if (session !== graphSession || session.boardId !== options.boardSession.currentBoardId.value)
+        return
       if (event.sideEffects.recordHistory) options.history.record(event.patch)
       if (event.sideEffects.markDirty) options.markDirty()
     })
@@ -151,7 +156,9 @@ export function createCanvasGraphSessionRuntime(
       graphAdapter: options.graphAdapter,
       readCurrent: () => ({ nodes: options.nodes.value, edges: options.edges.value }),
       projectFull: () => {
-        const flow = canvasBoardSnapshotToFlow(session.exportSnapshot(options.boardBaseSnapshot.value))
+        const flow = canvasBoardSnapshotToFlow(
+          session.exportSnapshot(options.boardBaseSnapshot.value),
+        )
         return {
           nodes: options.projectCurrentGroupNodeLayers(flow.nodes as Node[]),
           edges: flow.edges as Edge[],
@@ -160,12 +167,10 @@ export function createCanvasGraphSessionRuntime(
       isCurrentAttachment: () =>
         session === graphSession && session.boardId === options.boardSession.currentBoardId.value,
       readGroups: () =>
-        session.store
-          .getGroupIds()
-          .flatMap((groupId) => {
-            const group = session.store.getGroup(groupId)
-            return group ? [group] : []
-          }),
+        session.store.getGroupIds().flatMap((groupId) => {
+          const group = session.store.getGroup(groupId)
+          return group ? [group] : []
+        }),
       onGroupsChanged: options.onGroupsChanged,
       projectNode: options.projectCommittedGroupNodeLayer,
       scheduleMicrotask: options.scheduleMicrotask,
@@ -174,7 +179,9 @@ export function createCanvasGraphSessionRuntime(
       unsubscribeProjection()
       unsubscribeHistory()
     }
-    options.executionCore.attachBoard(CanvasBoardGraphSession.create(boardId, { graphSession: session }))
+    options.executionCore.attachBoard(
+      CanvasBoardGraphSession.create(boardId, { graphSession: session }),
+    )
     options.hydratePendingImageLeases?.(snapshot)
   }
 

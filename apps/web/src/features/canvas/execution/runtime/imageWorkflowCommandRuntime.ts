@@ -103,7 +103,10 @@ export function createImageWorkflowCommands(options: {
   }
 
   function warnGenerationUnavailable() {
-    options.onWarning(options.generationUnavailableMessage?.() ?? i18n.global.t('canvas.execution.generationUnavailable'))
+    options.onWarning(
+      options.generationUnavailableMessage?.() ??
+        i18n.global.t('canvas.execution.generationUnavailable'),
+    )
   }
 
   async function executePlannedAction(planAction: () => ImageExecutionPlan) {

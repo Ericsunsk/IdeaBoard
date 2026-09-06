@@ -31,9 +31,14 @@ export function mapCanvasBillingRequestError(error: unknown): Error {
     )
   }
   if (apiError?.status == null && apiError?.code == null) {
-    return new CanvasBillingPreflightError('network', i18n.global.t('common.errors.requestIncomplete'))
+    return new CanvasBillingPreflightError(
+      'network',
+      i18n.global.t('common.errors.requestIncomplete'),
+    )
   }
-  return error instanceof Error ? error : new Error(i18n.global.t('common.errors.requestIncomplete'))
+  return error instanceof Error
+    ? error
+    : new Error(i18n.global.t('common.errors.requestIncomplete'))
 }
 
 export function isCanvasBillingPreflightError(

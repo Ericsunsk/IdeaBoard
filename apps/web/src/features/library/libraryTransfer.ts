@@ -42,10 +42,7 @@ export function writeSearchReferenceTransfer(
   dataTransfer.effectAllowed = 'copy'
 }
 
-export function writeLibraryFolderMoveTransfer(
-  dataTransfer: DataTransfer,
-  assetId: number,
-): void {
+export function writeLibraryFolderMoveTransfer(dataTransfer: DataTransfer, assetId: number): void {
   setPayload(dataTransfer, LIBRARY_FOLDER_MOVE_MIME, {
     type: 'library-folder-move',
     assetId,

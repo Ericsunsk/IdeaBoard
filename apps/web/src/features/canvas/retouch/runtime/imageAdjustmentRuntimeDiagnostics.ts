@@ -3,11 +3,9 @@ import type {
   ImageAdjustmentPlanExecutionEventReporter,
 } from './planExecutorTypes'
 
-export const RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_EVENT =
-  'ideaboard:retouch:plan-executor-diagnostic'
+export const RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_EVENT = 'ideaboard:retouch:plan-executor-diagnostic'
 
-export const RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_KEY =
-  '__ideaBoardRetouchPlanExecutorDiagnostics'
+export const RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_KEY = '__ideaBoardRetouchPlanExecutorDiagnostics'
 
 export const DEFAULT_RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_LIMIT = 100
 

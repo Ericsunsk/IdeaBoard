@@ -28,9 +28,7 @@ import {
   moveThresholdHandle,
   normalizeThresholdAdjustment,
 } from '../utils/retouchThreshold'
-import RetouchHistogramPlot, {
-  type RetouchHistogramPlotMarker,
-} from './RetouchHistogramPlot.vue'
+import RetouchHistogramPlot, { type RetouchHistogramPlotMarker } from './RetouchHistogramPlot.vue'
 import RetouchThresholdFields from './RetouchThresholdFields.vue'
 import './styles/retouch-histogram-controls.css'
 

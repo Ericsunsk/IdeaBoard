@@ -121,12 +121,13 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the visual active/hidden state class that coordinates the strength control overlay.',
     },
   ],
-  'src/features/canvas/components/nodes/primitives/PromptComposerControls.options.component.spec.ts': [
-    {
-      reason:
-        'Verifies the stable count-picker style hooks preserved by the generic output option picker refactor.',
-    },
-  ],
+  'src/features/canvas/components/nodes/primitives/PromptComposerControls.options.component.spec.ts':
+    [
+      {
+        reason:
+          'Verifies the stable count-picker style hooks preserved by the generic output option picker refactor.',
+      },
+    ],
   'src/features/canvas/retouch/components/RetouchHistogramPlot.component.spec.ts': [
     {
       reason:

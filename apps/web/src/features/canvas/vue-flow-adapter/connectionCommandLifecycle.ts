@@ -3,9 +3,7 @@ import { i18n } from '../../../shared/i18n'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
-import {
-  resolveNextCanvasConnectionId,
-} from '../utils/flowSnapshotAdapter'
+import { resolveNextCanvasConnectionId } from '../utils/flowSnapshotAdapter'
 import {
   commitCanvasGraphConnectIntent,
   shouldReplaceCanvasConnection,
@@ -138,10 +136,7 @@ export function createCanvasConnectionCommandLifecycle(
     }
     if (!summary.didChange) return false
 
-    const didCommitProjection = commitConnectProjection(
-      replacement,
-      store,
-    )
+    const didCommitProjection = commitConnectProjection(replacement, store)
     if (!didCommitProjection) return false
     options.markFlowExecutionNodeDirty(resolvedConnection.target, { includeSelf: true })
     return true

@@ -60,7 +60,7 @@ Keep style ownership explicit. A selector should live at the narrowest layer tha
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | App global               | Tailwind entry, app tokens, base reset, browser/app shell rules, tiny vendor-neutral mechanical resets                 | Feature/page skins, component variants, Admin visual semantics           |
 | Third-party adapter skin | Vendor DOM that cannot be styled through props or pass-through APIs, such as Vue Flow pane/node/edge/minimap internals | Product business rules or component-private classes                      |
-| Surface skin             | Stable surface-level layout and visual language for Canvas, Admin, Boards, Auth/User Shell, or Retouch              | Cross-surface tokens that only one feature understands                   |
+| Surface skin             | Stable surface-level layout and visual language for Canvas, Admin, Boards, Auth/User Shell, or Retouch                 | Cross-surface tokens that only one feature understands                   |
 | Feature CSS contract     | Classes intentionally shared by several components inside one feature, such as Canvas node/tool contracts              | Styling private child implementation from unrelated parents              |
 | Component private style  | Markup and states owned by one component                                                                               | Selectors relied on by parents unless promoted to a feature CSS contract |
 

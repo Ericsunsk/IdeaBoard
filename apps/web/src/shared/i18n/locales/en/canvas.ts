@@ -114,9 +114,11 @@ export default {
     renameFailedWarning: 'Rename failed.',
     conflictReloadedError: 'Name conflict. Canvas list reloaded.',
     syncFailedRestoredError: 'Rename sync failed. Original name restored.',
-    conflictRestoredRefreshFailedError: 'Name conflict. Original name restored, but the remote list refresh failed. Please reload.',
+    conflictRestoredRefreshFailedError:
+      'Name conflict. Original name restored, but the remote list refresh failed. Please reload.',
     conflictRestoreFailedError: 'Name conflict and restore failed. Please reload the canvas list.',
-    syncFailedRestoreFailedError: 'Rename sync failed. Original name could not be restored. Please reload the canvas list.',
+    syncFailedRestoreFailedError:
+      'Rename sync failed. Original name could not be restored. Please reload the canvas list.',
     catalogReloadedSuccess: 'Canvas list reloaded.',
     catalogReloadFailedError: 'Failed to reload the canvas list. Please try again later.',
   },
@@ -131,7 +133,8 @@ export default {
     missingBoardIdMask: 'Missing board ID. Unable to upload the mask.',
     markInpaintAreaFirst: 'Mark the area to inpaint first.',
     recoveryFailed: 'Failed to restore image results. Please try again.',
-    canvasSaveFailedProgressLost: 'Failed to save the canvas. Task progress may be lost if you refresh the page.',
+    canvasSaveFailedProgressLost:
+      'Failed to save the canvas. Task progress may be lost if you refresh the page.',
     networkRetry: 'Network error. Please try again.',
     tasksInProgress: 'Tasks are still running. Results will appear on the canvas shortly.',
     generationUnavailable: 'Generation is temporarily unavailable. Please try again later.',
@@ -153,7 +156,8 @@ export default {
     nodeWriteFailed: 'Failed to write the image node to the canvas.',
     imageNotEditable: 'This image cannot be edited.',
     noEditableLayers: 'No editable layers to apply.',
-    autoConnectFailed: 'Image created, but automatic connection failed. Please connect it manually.',
+    autoConnectFailed:
+      'Image created, but automatic connection failed. Please connect it manually.',
     applyEditFailed: 'Failed to apply edits.',
     maskPromptPlaceholder: 'Describe how to repaint the selection',
     optionalPromptPlaceholder: 'Optional instructions',
@@ -164,7 +168,8 @@ export default {
   },
   edges: {
     connectionSemanticsWarning: 'This connection does not match the current connection rules.',
-    connectionWriteFailedWarning: 'Failed to write the connection to the canvas. Refresh and try again.',
+    connectionWriteFailedWarning:
+      'Failed to write the connection to the canvas. Refresh and try again.',
     deleteWriteFailedWarning: 'Failed to write the deletion to the canvas. Refresh and try again.',
     deleteApplyFailedWarning: 'Failed to apply the deletion. Refresh the canvas and try again.',
     connectRequiredInputLabel: 'Connect {label}',
@@ -301,9 +306,12 @@ export default {
     libraryImportFailed: 'Library import failed. Please try again later.',
     libraryImportInvalidAsset: 'Library import failed: the service returned no valid media asset.',
     saveAuthUnavailable: 'Save failed: user session is missing. Please sign in and try again.',
-    savedLocallySyncFailed: 'Saved locally. Remote sync failed; it will retry once the network recovers.',
-    nameConflictSavedLocally: 'Saved locally, but this board name already exists. Please choose another name.',
-    boardDataInvalid: 'Canvas data validation failed. Your current canvas was kept. Please try again later.',
+    savedLocallySyncFailed:
+      'Saved locally. Remote sync failed; it will retry once the network recovers.',
+    nameConflictSavedLocally:
+      'Saved locally, but this board name already exists. Please choose another name.',
+    boardDataInvalid:
+      'Canvas data validation failed. Your current canvas was kept. Please try again later.',
     importSnapshotFailed: 'Failed to load the canvas snapshot. Please try again later.',
     saved: 'Saved',
     saveFailed: 'Save failed. Please try again later.',

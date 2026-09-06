@@ -16,7 +16,8 @@ export default {
     nameAlreadyExists: 'El nombre ya existe',
     nameEmpty: 'El nombre del lienzo no puede estar vacío',
     renameConflictReloaded: 'Conflicto de nombre. Se ha recargado la lista de lienzos.',
-    renameSyncFailedRolledBack: 'Error al sincronizar el cambio de nombre. Se restauró el nombre original.',
+    renameSyncFailedRolledBack:
+      'Error al sincronizar el cambio de nombre. Se restauró el nombre original.',
     renameConflictRecoveryIncomplete:
       'Conflicto de nombre y recuperación incompleta. Recargue la lista de lienzos.',
     renameSyncFailedNoRollback:

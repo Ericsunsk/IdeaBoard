@@ -31,19 +31,17 @@ describe('canvas edge projection', () => {
       targetHandle: 'in:prompt',
     }
 
-    const renderEdges = projectCanvasRenderEdges([imageEdge, promptEdge], (edge) =>
-      edge.target === 'image-1',
+    const renderEdges = projectCanvasRenderEdges(
+      [imageEdge, promptEdge],
+      (edge) => edge.target === 'image-1',
     )
 
-    expect(renderEdges).toEqual([
-      { ...imageEdge, animated: true },
-      promptEdge,
-    ])
+    expect(renderEdges).toEqual([{ ...imageEdge, animated: true }, promptEdge])
     expect(imageEdge).not.toHaveProperty('animated')
     expect(renderEdges[1]).toBe(promptEdge)
-    expect(
-      projectCanvasRenderEdges(renderEdges, (edge) => edge.target === 'image-1'),
-    ).toBe(renderEdges)
+    expect(projectCanvasRenderEdges(renderEdges, (edge) => edge.target === 'image-1')).toBe(
+      renderEdges,
+    )
     expect(projectCanvasRenderEdges([imageEdge], () => false)).toEqual([
       { ...imageEdge, animated: false },
     ])

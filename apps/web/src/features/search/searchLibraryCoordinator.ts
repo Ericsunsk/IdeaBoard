@@ -69,17 +69,21 @@ export function createSearchLibraryCoordinator(): SearchLibraryCoordinator {
   }
 
   async function saveReferences(references: LibrarySearchReference[]) {
-    const results = await Promise.allSettled(references.map((reference) => saveSearchReference(reference)))
+    const results = await Promise.allSettled(
+      references.map((reference) => saveSearchReference(reference)),
+    )
     const outcomes = results.flatMap((result) =>
       result.status === 'fulfilled'
-        ? [{
-            kind: 'asset-saved' as const,
-            provider: result.value.provider,
-            sourceID: result.value.source_id,
-            assetKey: libraryAssetKey(result.value.provider, result.value.source_id),
-            affectedFolderKeys: ['all', 'quick-saves'],
-            galleryEffect: 'reload-current' as const,
-          }]
+        ? [
+            {
+              kind: 'asset-saved' as const,
+              provider: result.value.provider,
+              sourceID: result.value.source_id,
+              assetKey: libraryAssetKey(result.value.provider, result.value.source_id),
+              affectedFolderKeys: ['all', 'quick-saves'],
+              galleryEffect: 'reload-current' as const,
+            },
+          ]
         : [],
     )
     await mutationPublisher.publishMutations(outcomes)

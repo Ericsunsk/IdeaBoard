@@ -83,8 +83,18 @@ export const accountTabRegistry = [
           props: ({ active, paymentReturn }) => ({ active, paymentReturn }),
         },
       },
-      { key: 'subscriptions', labelKey: 'account.tabs.plans', icon: CreditCard, pane: comingSoonPane },
-      { key: 'rewards', labelKey: 'account.tabs.rewards', icon: Gift, pane: { component: UserRewardsPane, props: () => ({}) } },
+      {
+        key: 'subscriptions',
+        labelKey: 'account.tabs.plans',
+        icon: CreditCard,
+        pane: comingSoonPane,
+      },
+      {
+        key: 'rewards',
+        labelKey: 'account.tabs.rewards',
+        icon: Gift,
+        pane: { component: UserRewardsPane, props: () => ({}) },
+      },
       {
         key: 'billing',
         labelKey: 'account.tabs.billingTransactions',

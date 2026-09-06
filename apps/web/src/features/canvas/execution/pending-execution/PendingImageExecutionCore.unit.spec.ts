@@ -61,9 +61,7 @@ function attachCore(
   attachment: CanvasBoardAttachment
 } {
   const core = createPendingImageExecutionCore()
-  const attachment = core.attachBoard(
-    CanvasBoardGraphSession.create(boardId, { graphSession }),
-  )
+  const attachment = core.attachBoard(CanvasBoardGraphSession.create(boardId, { graphSession }))
   return { core, attachment }
 }
 
@@ -127,12 +125,8 @@ describe('PendingImageExecutionCore', () => {
       kind: 'applied',
       fact: { status: 'running', taskId: 'task-1' },
     })
-    const secondLease = requireLease(
-      hydrateLease(core, attachment, imageNodeId(2), 'task-2'),
-    )
-    const staleLease = requireLease(
-      hydrateLease(core, attachment, imageNodeId(3), 'task-stale'),
-    )
+    const secondLease = requireLease(hydrateLease(core, attachment, imageNodeId(2), 'task-2'))
+    const staleLease = requireLease(hydrateLease(core, attachment, imageNodeId(3), 'task-stale'))
     const currentLease = requireLease(
       hydrateLease(core, attachment, imageNodeId(3), 'task-current'),
     )
@@ -181,9 +175,7 @@ describe('PendingImageExecutionCore', () => {
     const attachment = core.attachBoard(
       CanvasBoardGraphSession.create('board-a', { graphSession: store }),
     )
-    const lease = requireLease(
-      hydrateLease(core, attachment, imageNodeId(1), 'task-1'),
-    )
+    const lease = requireLease(hydrateLease(core, attachment, imageNodeId(1), 'task-1'))
     core.fail(lease)
 
     expect(snapshots).toHaveLength(4)
@@ -292,12 +284,8 @@ describe('PendingImageExecutionCore', () => {
     const boardAAttachment = core.attachBoard(
       CanvasBoardGraphSession.create('board-a', { graphSession: boardAStore }),
     )
-    const boardALease = requireLease(
-      hydrateLease(core, boardAAttachment, imageNodeId(1), 'task-a'),
-    )
-    core.attachBoard(
-      CanvasBoardGraphSession.create('board-b', { graphSession: boardBStore }),
-    )
+    const boardALease = requireLease(hydrateLease(core, boardAAttachment, imageNodeId(1), 'task-a'))
+    core.attachBoard(CanvasBoardGraphSession.create('board-b', { graphSession: boardBStore }))
 
     expect(
       core.materializeBatch([
@@ -341,48 +329,54 @@ describe('PendingImageExecutionCore', () => {
   it('restores the persisted client action identity with a domain pending fact', () => {
     const store = createPendingResultStore(['task-1'])
     const { core, attachment } = attachCore(store)
-    const lease = requireLease(
-      hydrateLease(core, attachment, imageNodeId(1), 'task-1', 'action-1'),
-    )
+    const lease = requireLease(hydrateLease(core, attachment, imageNodeId(1), 'task-1', 'action-1'))
     expect(core.factFor(imageNodeId(1))).toMatchObject({
-      status: 'running', taskId: 'task-1', clientActionId: 'action-1',
+      status: 'running',
+      taskId: 'task-1',
+      clientActionId: 'action-1',
     })
     expect(core.isCurrent(lease, 'task-1')).toBe(true)
-    expect(core.claimHydratedLease(attachment, {
-      resultNodeId: imageNodeId(1),
-      taskId: 'task-1',
-      clientActionId: 'action-1',
-    })).toBe(lease)
-    expect(core.claimHydratedLease(attachment, {
-      resultNodeId: imageNodeId(1),
-      taskId: 'task-1',
-      clientActionId: 'action-1',
-    })).toBeNull()
-    expect(core.claimHydratedLease(attachment, {
-      resultNodeId: imageNodeId(1),
-      taskId: 'task-1',
-      clientActionId: 'action-replaced',
-    })).toBeNull()
+    expect(
+      core.claimHydratedLease(attachment, {
+        resultNodeId: imageNodeId(1),
+        taskId: 'task-1',
+        clientActionId: 'action-1',
+      }),
+    ).toBe(lease)
+    expect(
+      core.claimHydratedLease(attachment, {
+        resultNodeId: imageNodeId(1),
+        taskId: 'task-1',
+        clientActionId: 'action-1',
+      }),
+    ).toBeNull()
+    expect(
+      core.claimHydratedLease(attachment, {
+        resultNodeId: imageNodeId(1),
+        taskId: 'task-1',
+        clientActionId: 'action-replaced',
+      }),
+    ).toBeNull()
   })
 
   it('requires a client action identity when hydration creates a lease', () => {
     const store = createPendingResultStore(['task-1'])
     const { core, attachment } = attachCore(store)
 
-    expect(() => core.hydratePendingLease(attachment, {
-      resultNodeId: imageNodeId(1),
-      taskId: 'task-1',
-      clientActionId: ' ',
-    })).toThrow('clientActionId is required')
+    expect(() =>
+      core.hydratePendingLease(attachment, {
+        resultNodeId: imageNodeId(1),
+        taskId: 'task-1',
+        clientActionId: ' ',
+      }),
+    ).toThrow('clientActionId is required')
     expect(core.factFor(imageNodeId(1))).toBeNull()
   })
 
   it('reports superseded execution facts and protects a concurrent reattach with lease CAS', () => {
     const store = createPendingResultStore(['task-current'])
     const { core, attachment } = attachCore(store)
-    const staleLease = requireLease(
-      hydrateLease(core, attachment, imageNodeId(1), 'task-stale'),
-    )
+    const staleLease = requireLease(hydrateLease(core, attachment, imageNodeId(1), 'task-stale'))
     const next = hydrateLease(core, attachment, imageNodeId(1), 'task-current')
     const currentLease = requireLease(next)
 
@@ -417,12 +411,8 @@ describe('PendingImageExecutionCore', () => {
     const attachment = core.attachBoard(
       CanvasBoardGraphSession.create('board-a', { graphSession: store }),
     )
-    const firstLease = requireLease(
-      hydrateLease(core, attachment, imageNodeId(1), 'task-1'),
-    )
-    const secondLease = requireLease(
-      hydrateLease(core, attachment, imageNodeId(2), 'task-2'),
-    )
+    const firstLease = requireLease(hydrateLease(core, attachment, imageNodeId(1), 'task-1'))
+    const secondLease = requireLease(hydrateLease(core, attachment, imageNodeId(2), 'task-2'))
 
     let thrown: unknown
     try {
@@ -467,9 +457,7 @@ describe('PendingImageExecutionCore', () => {
       const core = createPendingImageExecutionCore()
       const attachment = core.attachBoard(session)
       bindSpy.mockRestore()
-      const lease = requireLease(
-        hydrateLease(core, attachment, imageNodeId(1), 'task-1'),
-      )
+      const lease = requireLease(hydrateLease(core, attachment, imageNodeId(1), 'task-1'))
 
       let thrown: unknown
       try {
@@ -494,9 +482,7 @@ describe('PendingImageExecutionCore', () => {
   it('settles stale persisted task results per slot without blocking valid siblings', () => {
     const store = createPendingResultStore(['task-valid', 'task-snapshot'])
     const { core, attachment } = attachCore(store)
-    const validLease = requireLease(
-      hydrateLease(core, attachment, imageNodeId(1), 'task-valid'),
-    )
+    const validLease = requireLease(hydrateLease(core, attachment, imageNodeId(1), 'task-valid'))
     const staleTaskLease = requireLease(
       hydrateLease(core, attachment, imageNodeId(2), 'task-runtime'),
     )

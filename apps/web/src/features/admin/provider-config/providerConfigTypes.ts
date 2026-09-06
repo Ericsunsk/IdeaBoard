@@ -1,13 +1,7 @@
-export type ProviderApiTypeValue = 'openai-compatible' | 'self-hosted' | 'google-ai' | 'google-cloud'
-export type ProviderProtocolValue =
-  | 'model-api'
-  | 'image-pipeline'
-  | 'image-fill'
-export type ProviderCapabilityValue =
-  | 'generation'
-  | 'cutout'
-  | 'upscale'
-  | 'fill'
+export type ProviderApiTypeValue =
+  'openai-compatible' | 'self-hosted' | 'google-ai' | 'google-cloud'
+export type ProviderProtocolValue = 'model-api' | 'image-pipeline' | 'image-fill'
+export type ProviderCapabilityValue = 'generation' | 'cutout' | 'upscale' | 'fill'
 export type ProviderProcessingCapabilityValue = Exclude<ProviderCapabilityValue, 'generation'>
 
 export type AdminProviderAccountLimitRange = {

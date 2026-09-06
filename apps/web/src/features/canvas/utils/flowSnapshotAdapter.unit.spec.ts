@@ -224,11 +224,9 @@ describe('flowSnapshotAdapter', () => {
     ;(localNode.data as FlowNodeData).localUpload = { previewUrl: 'blob:local-image' }
 
     const persisted = flowToCanvasBoardSnapshot({ nodes: [localNode], edges: [] })
-    const runtime = flowToCanvasBoardSnapshot(
-      { nodes: [localNode], edges: [] },
-      undefined,
-      { projection: 'runtime' },
-    )
+    const runtime = flowToCanvasBoardSnapshot({ nodes: [localNode], edges: [] }, undefined, {
+      projection: 'runtime',
+    })
 
     expect(persisted.imageNodes).toEqual([])
     expect(runtime.imageNodes.map((node) => node.id)).toEqual([1])

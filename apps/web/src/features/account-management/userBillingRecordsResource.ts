@@ -18,5 +18,8 @@ export async function fetchUserBillingRecords(
   params: ListUserBillingRecordsParams,
   signal?: AbortSignal,
 ): Promise<UserBillingRecordPage> {
-  return resolveApiData(listUserBillingRecords(params, { signal }), i18n.global.t('account.errors.billingLoadFailed'))
+  return resolveApiData(
+    listUserBillingRecords(params, { signal }),
+    i18n.global.t('account.errors.billingLoadFailed'),
+  )
 }

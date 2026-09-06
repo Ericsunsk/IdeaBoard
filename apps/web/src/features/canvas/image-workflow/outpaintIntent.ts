@@ -10,7 +10,9 @@ type UseFlowOutpaintInteractionHandlersOptions = {
   beginFlowOutpaintFrameDrag: (event: PointerEvent) => void
 }
 
-export function useFlowOutpaintInteractionHandlers(options: UseFlowOutpaintInteractionHandlersOptions) {
+export function useFlowOutpaintInteractionHandlers(
+  options: UseFlowOutpaintInteractionHandlersOptions,
+) {
   function onFlowImageOutpaintSubmit(nodeId: string, prompt: string) {
     if (options.flowOutpaintNodeId.value !== nodeId) return
     options.clearActiveNodePanel()

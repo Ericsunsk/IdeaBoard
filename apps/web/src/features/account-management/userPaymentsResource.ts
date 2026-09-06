@@ -62,19 +62,40 @@ export const userPaymentsContextKey: InjectionKey<UserPaymentsContext> =
 
 const productionResource: UserPaymentsResource = {
   getPurchaseOptions: (signal) =>
-    resolveApiData(getUserPaymentPurchaseOptions({ signal }), i18n.global.t('account.errors.optionsLoadFailed')),
+    resolveApiData(
+      getUserPaymentPurchaseOptions({ signal }),
+      i18n.global.t('account.errors.optionsLoadFailed'),
+    ),
   createCheckout: (request) =>
-    resolveApiData(createUserPaymentCheckoutSession(request), i18n.global.t('account.errors.checkoutCreateFailed')),
+    resolveApiData(
+      createUserPaymentCheckoutSession(request),
+      i18n.global.t('account.errors.checkoutCreateFailed'),
+    ),
   getReturnStatus: (publicToken, signal) =>
-    resolveApiData(getUserPaymentOrderReturnStatus(publicToken, { signal }), i18n.global.t('account.errors.orderStatusLoadFailed')),
+    resolveApiData(
+      getUserPaymentOrderReturnStatus(publicToken, { signal }),
+      i18n.global.t('account.errors.orderStatusLoadFailed'),
+    ),
   listPendingOrders: (signal) =>
-    resolveApiData(listUserPendingPaymentOrders({ signal }), i18n.global.t('account.errors.pendingOrdersLoadFailed')),
+    resolveApiData(
+      listUserPendingPaymentOrders({ signal }),
+      i18n.global.t('account.errors.pendingOrdersLoadFailed'),
+    ),
   continuePendingOrder: (publicToken) =>
-    resolveApiData(continueUserPendingPaymentOrder(publicToken), i18n.global.t('account.errors.continuePaymentFailed')),
+    resolveApiData(
+      continueUserPendingPaymentOrder(publicToken),
+      i18n.global.t('account.errors.continuePaymentFailed'),
+    ),
   abandonPendingOrder: (publicToken) =>
-    resolveApiData(abandonUserPendingPaymentOrder(publicToken), i18n.global.t('account.errors.abandonOrderFailed')),
+    resolveApiData(
+      abandonUserPendingPaymentOrder(publicToken),
+      i18n.global.t('account.errors.abandonOrderFailed'),
+    ),
   listRecharges: (params, signal) =>
-    resolveApiData(listUserPaymentRecharges(params, { signal }), i18n.global.t('account.errors.historyLoadFailed')),
+    resolveApiData(
+      listUserPaymentRecharges(params, { signal }),
+      i18n.global.t('account.errors.historyLoadFailed'),
+    ),
   subscribe: (listener) => subscribeToUserPaymentEvents(listener),
 }
 

@@ -34,9 +34,7 @@ describe('handleAuthFailure', () => {
     clearStoredAuth()
 
     expect(getAuthStorageUserScope()).toBeNull()
-    expect(getRecoverableAuthStorageUserScope()).toBe(
-      'public_00000000-0000-0000-0000-000000000001',
-    )
+    expect(getRecoverableAuthStorageUserScope()).toBe('public_00000000-0000-0000-0000-000000000001')
   })
 
   it('clears stored admin user state after an admin API 403', () => {

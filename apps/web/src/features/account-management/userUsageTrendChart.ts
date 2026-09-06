@@ -99,9 +99,9 @@ export function buildUserUsageTrendChart(
           displayColors: false,
           callbacks: {
             label: (context) =>
-            i18n.global.t('account.usage.tooltipLabel', {
-              amount: formatIdeaAmount(getParsedY(context)),
-            }),
+              i18n.global.t('account.usage.tooltipLabel', {
+                amount: formatIdeaAmount(getParsedY(context)),
+              }),
           },
         },
       },

@@ -317,7 +317,11 @@
 
         <Column header="耗时" :style="{ width: '88px' }">
           <template #body="{ data }">
-            <span v-if="getTaskDuration(data)" class="font-mono tabular-nums" :class="getTaskDurationClass(data)">
+            <span
+              v-if="getTaskDuration(data)"
+              class="font-mono tabular-nums"
+              :class="getTaskDurationClass(data)"
+            >
               {{ getTaskDuration(data)?.seconds }}s
             </span>
             <span v-else class="text-admin-meta text-admin-text-3">-</span>

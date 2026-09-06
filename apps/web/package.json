@@ -27,7 +27,9 @@
     "test:guardrails": "tsx scripts/check-test-guardrails.ts && tsx scripts/check-board-state-contract-drift.ts && npm run admin-collection:check-contract",
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:typecheck": "vue-tsc -p tsconfig.test.json --noEmit && vue-tsc -p tsconfig.test-node.json --noEmit",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "quality:check": "npm run format:check && npm run lint && npm run test:typecheck && npm run test:run && npm run build",
+    "quality:full": "npm run quality:check && npm run lint:style && npm run api:check-generated && npm run test:browser"
   },
   "dependencies": {
     "@iconoir/vue": "^7.12.1",

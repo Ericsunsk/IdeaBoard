@@ -65,19 +65,19 @@ describe('admin user command query invalidation', () => {
     const harness = createHarness()
     const commands = harness.commands
 
-    commands.openUserActionMenu(makeUser({ publicId: "user-1", status: 1, displayName: 'alice' }))
+    commands.openUserActionMenu(makeUser({ publicId: 'user-1', status: 1, displayName: 'alice' }))
     commands.handleActionSelect('status')
     await commands.confirmBanUser()
 
-    commands.openUserActionMenu(makeUser({ publicId: "user-2", status: 0, displayName: 'bob' }))
+    commands.openUserActionMenu(makeUser({ publicId: 'user-2', status: 0, displayName: 'bob' }))
     commands.handleActionSelect('status')
     await harness.acceptLastConfirm()
 
-    commands.openUserActionMenu(makeUser({ publicId: "user-3", role: 'user', displayName: 'cara' }))
+    commands.openUserActionMenu(makeUser({ publicId: 'user-3', role: 'user', displayName: 'cara' }))
     commands.handleActionSelect('role')
     await harness.acceptLastConfirm()
 
-    commands.openUserActionMenu(makeUser({ publicId: "user-4", role: 'user', displayName: 'dana' }))
+    commands.openUserActionMenu(makeUser({ publicId: 'user-4', role: 'user', displayName: 'dana' }))
     commands.handleActionSelect('delete')
     await harness.acceptLastConfirm()
 

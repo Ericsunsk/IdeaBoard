@@ -33,7 +33,9 @@ describe('task API boundary', () => {
     mocks.submitUserTask.mockResolvedValue({ code: 503, msg: 'api_key=exposed' })
     mocks.getUserTask.mockResolvedValue({ code: 0, msg: 'ok', data: {} })
 
-    await expect(taskApi.submit({ prompt: 'test' })).rejects.toThrow('Could not submit the task. Please try again.')
+    await expect(taskApi.submit({ prompt: 'test' })).rejects.toThrow(
+      'Could not submit the task. Please try again.',
+    )
     await expect(taskApi.get('task-1')).rejects.toThrow('Could not load the task.')
   })
 })

@@ -36,7 +36,9 @@
       class="flex min-h-36 flex-col items-center justify-center text-center"
       role="status"
     >
-      <p id="recharge-purchase-heading" class="m-0 font-semibold text-ib-text">{{ t('account.topUp.unavailableTitle') }}</p>
+      <p id="recharge-purchase-heading" class="m-0 font-semibold text-ib-text">
+        {{ t('account.topUp.unavailableTitle') }}
+      </p>
       <p class="mt-1 mb-0 text-sm text-ib-text-muted">
         {{ unavailableMessage(options.unavailable_reason) }}
       </p>

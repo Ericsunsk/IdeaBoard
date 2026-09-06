@@ -23,7 +23,9 @@ function rewriteSetCookie(value: string): string {
 }
 
 function rewriteLocation(value: string, origin: URL, publicOrigin: string): string {
-  return value.startsWith(origin.origin) ? `${publicOrigin}${value.slice(origin.origin.length)}` : value
+  return value.startsWith(origin.origin)
+    ? `${publicOrigin}${value.slice(origin.origin.length)}`
+    : value
 }
 
 export async function proxyRequest({ request, env }: PagesContext): Promise<Response> {
@@ -54,9 +56,8 @@ export async function proxyRequest({ request, env }: PagesContext): Promise<Resp
   const location = responseHeaders.get('location')
   if (location) responseHeaders.set('location', rewriteLocation(location, origin, publicOrigin))
 
-  const getSetCookie = (
-    response.headers as Headers & { getSetCookie?: () => string[] }
-  ).getSetCookie
+  const getSetCookie = (response.headers as Headers & { getSetCookie?: () => string[] })
+    .getSetCookie
   const cookies = getSetCookie ? getSetCookie.call(response.headers) : []
   if (cookies.length > 0) {
     responseHeaders.delete('set-cookie')

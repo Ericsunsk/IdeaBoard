@@ -18,9 +18,9 @@ describe('useRetouchSession', () => {
     expect(session.retouchLayers.value).toHaveLength(1)
 
     session.updateSelectedRetouchAdjustmentParams({ threshold: 128, invert: true })
-    expect(
-      session.retouchLayers.value.some((layer) => layer.id === 'adjustment:threshold'),
-    ).toBe(true)
+    expect(session.retouchLayers.value.some((layer) => layer.id === 'adjustment:threshold')).toBe(
+      true,
+    )
   })
 
   it('does not leave a layer when switching tools without editing', () => {
@@ -131,9 +131,7 @@ describe('useRetouchSession', () => {
     expect(mergedLayer?.name).toBe('Merged layer 1')
     expect(session.selectedRetouchLayerId.value).toBe(mergedLayer?.id)
     expect(
-      flattenVisibleRetouchAdjustmentLayers(session.retouchLayers.value).map(
-        (layer) => layer.kind,
-      ),
+      flattenVisibleRetouchAdjustmentLayers(session.retouchLayers.value).map((layer) => layer.kind),
     ).toEqual(['hsl', 'threshold'])
   })
 

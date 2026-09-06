@@ -24,7 +24,14 @@ const props = withDefaults(
     overscan?: number
     activeAnchor?: HTMLElement | null
   }>(),
-  { compact: false, hasMore: false, loading: false, scrollRoot: null, overscan: 720, activeAnchor: null },
+  {
+    compact: false,
+    hasMore: false,
+    loading: false,
+    scrollRoot: null,
+    overscan: 720,
+    activeAnchor: null,
+  },
 )
 
 const emit = defineEmits<{

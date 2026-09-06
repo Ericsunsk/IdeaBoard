@@ -1,10 +1,6 @@
 import { computed, ref } from 'vue'
 import { describe, expect, it } from 'vitest'
-import type {
-  RetouchAdjustmentLayer,
-  RetouchLayer,
-  RetouchRenderedPreview,
-} from './types'
+import type { RetouchAdjustmentLayer, RetouchLayer, RetouchRenderedPreview } from './types'
 import { useRetouchHistogramSource } from './useRetouchHistogramSource'
 
 function makeImageData(values: number[]) {

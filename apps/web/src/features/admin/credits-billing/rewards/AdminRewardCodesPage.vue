@@ -99,10 +99,7 @@
         />
       </div>
     </Message>
-    <AdminEmptyState
-      v-if="showEmptyState"
-      :title="emptyTitle"
-    />
+    <AdminEmptyState v-if="showEmptyState" :title="emptyTitle" />
     <DataTableFrame
       v-else-if="!initialError"
       :value="rewardCodes"
@@ -227,10 +224,7 @@ import { useAdminCollectionState } from '../../shared/composables/useAdminCollec
 import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
-import {
-  adminActionButtonClass,
-  adminFramedIconButtonClass,
-} from '../../shared/lib/adminUiClasses'
+import { adminActionButtonClass, adminFramedIconButtonClass } from '../../shared/lib/adminUiClasses'
 import RewardCodeFormDialog, { type RewardCodeFormValue } from './RewardCodeFormDialog.vue'
 import RewardCodePlaintextDialog from './RewardCodePlaintextDialog.vue'
 import RewardCodeRedemptionsDialog from './RewardCodeRedemptionsDialog.vue'

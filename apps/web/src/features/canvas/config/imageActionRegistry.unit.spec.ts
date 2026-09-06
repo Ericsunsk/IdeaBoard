@@ -6,11 +6,7 @@ import {
   IMAGE_ACTION_REGISTRY_LIST,
   IMAGE_NODE_ACTION,
 } from './imageActionRegistry'
-import {
-  IMAGE_OUTPAINT_ACTION,
-  IMAGE_UPSCALE_ACTION,
-  isImageStrengthAction,
-} from '../execution'
+import { IMAGE_OUTPAINT_ACTION, IMAGE_UPSCALE_ACTION, isImageStrengthAction } from '../execution'
 
 describe('imageActionRegistry', () => {
   it('defines each image action exactly once', () => {
@@ -40,9 +36,7 @@ describe('imageActionRegistry', () => {
       'Retouch',
     ])
     expect(
-      items
-        .filter((item) => isImageStrengthAction(item.action))
-        .map((item) => item.strengthAction),
+      items.filter((item) => isImageStrengthAction(item.action)).map((item) => item.strengthAction),
     ).toEqual([IMAGE_NODE_ACTION.variations, IMAGE_NODE_ACTION.upscale])
   })
 
@@ -64,17 +58,9 @@ describe('imageActionRegistry', () => {
   })
 
   it('keeps task and local tool modes explicit', () => {
-    expect(IMAGE_ACTION_REGISTRY[IMAGE_UPSCALE_ACTION].mode).toBe(
-      IMAGE_ACTION_MODE.upscaleTask,
-    )
-    expect(IMAGE_ACTION_REGISTRY[IMAGE_OUTPAINT_ACTION].mode).toBe(
-      IMAGE_ACTION_MODE.outpaint,
-    )
-    expect(IMAGE_ACTION_REGISTRY[IMAGE_NODE_ACTION.inpaint].mode).toBe(
-      IMAGE_ACTION_MODE.inpaint,
-    )
-    expect(IMAGE_ACTION_REGISTRY[IMAGE_NODE_ACTION.retouch].mode).toBe(
-      IMAGE_ACTION_MODE.retouch,
-    )
+    expect(IMAGE_ACTION_REGISTRY[IMAGE_UPSCALE_ACTION].mode).toBe(IMAGE_ACTION_MODE.upscaleTask)
+    expect(IMAGE_ACTION_REGISTRY[IMAGE_OUTPAINT_ACTION].mode).toBe(IMAGE_ACTION_MODE.outpaint)
+    expect(IMAGE_ACTION_REGISTRY[IMAGE_NODE_ACTION.inpaint].mode).toBe(IMAGE_ACTION_MODE.inpaint)
+    expect(IMAGE_ACTION_REGISTRY[IMAGE_NODE_ACTION.retouch].mode).toBe(IMAGE_ACTION_MODE.retouch)
   })
 })

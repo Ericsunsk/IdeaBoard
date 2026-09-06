@@ -6,7 +6,10 @@ import type {
   PromptNodeInputImage,
   PromptNodeItem,
 } from '../../canvas-board/domain'
-import { normalizeOutputResolution, type OutputResolution } from '../../../shared/domain/generationContract'
+import {
+  normalizeOutputResolution,
+  type OutputResolution,
+} from '../../../shared/domain/generationContract'
 import {
   areFusionBlendPointsEqual,
   requireImageNodeOutputCount,

@@ -2,11 +2,7 @@ import { resolveMediaAssetDerivativeURL } from '../api/mediaAssetDelivery'
 
 /** Immutable browser-safe reference to a concrete Media derivative. */
 export type MediaRefDerivativeTier =
-  | 'thumb'
-  | 'preview'
-  | 'large-preview'
-  | 'processing'
-  | 'processing-input'
+  'thumb' | 'preview' | 'large-preview' | 'processing' | 'processing-input'
 
 export type MediaRefDerivativeFormat = 'webp' | 'jpeg' | 'png'
 
@@ -19,11 +15,7 @@ export interface MediaRef {
 /** URLs are runtime delivery details, never persisted Canvas facts. */
 export function buildMediaBrowserURL(ref: MediaRef): string {
   if (!isMediaRef(ref)) throw new Error('buildMediaBrowserURL: valid MediaRef is required')
-  return resolveMediaAssetDerivativeURL(
-    ref.assetId,
-    ref.derivativeTier,
-    ref.derivativeFormat,
-  )
+  return resolveMediaAssetDerivativeURL(ref.assetId, ref.derivativeTier, ref.derivativeFormat)
 }
 
 export function isMediaRef(value: unknown): value is MediaRef {
@@ -37,7 +29,10 @@ export function isMediaRef(value: unknown): value is MediaRef {
   )
 }
 
-export function mediaRefEquals(a: MediaRef | null | undefined, b: MediaRef | null | undefined): boolean {
+export function mediaRefEquals(
+  a: MediaRef | null | undefined,
+  b: MediaRef | null | undefined,
+): boolean {
   return (
     a === b ||
     (!!a &&

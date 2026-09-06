@@ -34,11 +34,14 @@ describe('paymentMoney', () => {
     ['zh-CN', 'US$123.45 USD'],
     ['es', '123,45\u00a0US$ USD'],
     ['ko', 'US$123.45 USD'],
-  ] as const)('uses the %s currency pattern while keeping the ISO code visible', (locale, expected) => {
-    ;(i18n.global.locale as { value: string }).value = locale
+  ] as const)(
+    'uses the %s currency pattern while keeping the ISO code visible',
+    (locale, expected) => {
+      ;(i18n.global.locale as { value: string }).value = locale
 
-    expect(formatCurrencyMinor(12_345, 'USD')).toBe(expected)
-  })
+      expect(formatCurrencyMinor(12_345, 'USD')).toBe(expected)
+    },
+  )
 
   it('formats the largest safe minor amount without converting it through a floating point major amount', () => {
     expect(formatCurrencyMinor(Number.MAX_SAFE_INTEGER, 'USD')).toBe('$90,071,992,547,409.91 USD')

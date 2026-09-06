@@ -148,7 +148,9 @@ const quoteLabel = computed(() => {
   return formatIdeaAmount(total)
 })
 const billingTooltip = computed(() =>
-  quoteLabel.value ? `${t('canvas.controls.send')} · ${quoteLabel.value}` : t('canvas.controls.send'),
+  quoteLabel.value
+    ? `${t('canvas.controls.send')} · ${quoteLabel.value}`
+    : t('canvas.controls.send'),
 )
 const touchQuoteLabel = computed(() => quoteLabel.value)
 const formatOutputResolution = (value: OutputResolution) => value.toUpperCase()

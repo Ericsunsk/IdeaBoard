@@ -1,5 +1,10 @@
 import { defineComponent, h, type PropType } from 'vue'
-import { createMemoryHistory, createRouter, type RouteLocationNormalizedLoaded, type Router } from 'vue-router'
+import {
+  createMemoryHistory,
+  createRouter,
+  type RouteLocationNormalizedLoaded,
+  type Router,
+} from 'vue-router'
 import { describe, expect, it } from 'vitest'
 import { render } from '../../../test/render'
 import CanvasPage from './CanvasPage.vue'
@@ -8,7 +13,10 @@ const CanvasScreenStub = defineComponent({
   props: {
     route: { type: Object as PropType<RouteLocationNormalizedLoaded>, required: true },
     router: { type: Object as PropType<Router>, required: true },
-    getUserIdentity: { type: Function as PropType<() => { userId: number; userUid: string }>, required: true },
+    getUserIdentity: {
+      type: Function as PropType<() => { userId: number; userUid: string }>,
+      required: true,
+    },
     logoutAndRedirect: { type: Function as PropType<(path: string) => unknown>, required: true },
   },
   setup(props) {

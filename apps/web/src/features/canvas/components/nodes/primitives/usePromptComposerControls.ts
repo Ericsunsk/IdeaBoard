@@ -38,7 +38,9 @@ export function usePromptComposerControls(options: UsePromptComposerControlsOpti
     set: (value) => options.onTextUpdate(value),
   })
   const outputCountValue = computed(() => requireImageNodeOutputCount(options.outputCount()))
-  const outputResolutionValue = computed(() => normalizeOutputResolution(options.outputResolution()))
+  const outputResolutionValue = computed(() =>
+    normalizeOutputResolution(options.outputResolution()),
+  )
   const shouldRenderAspectRatio = computed(
     () => (options.showAspectRatio?.() ?? true) && options.aspectRatio() !== undefined,
   )

@@ -197,7 +197,8 @@ export default {
     failedTitle: 'Pago incompleto',
     failedDetail: 'No se añadieron Ideas para este pago. Intente pagar de nuevo.',
     delayedTitle: 'Procesando Ideas',
-    delayedDetail: 'Todavía estamos esperando la confirmación de Stripe. No es necesario pagar de nuevo.',
+    delayedDetail:
+      'Todavía estamos esperando la confirmación de Stripe. No es necesario pagar de nuevo.',
   },
   toast: {
     avatarFileUnsupported: 'Solo se pueden subir archivos de imagen.',

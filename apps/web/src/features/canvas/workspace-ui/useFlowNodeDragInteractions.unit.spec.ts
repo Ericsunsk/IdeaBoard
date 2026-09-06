@@ -66,7 +66,8 @@ describe('useFlowNodeDragInteractions', () => {
     expect(harness.commitNodeDragTransaction).toHaveBeenCalledTimes(1)
     expect(harness.finishFlowNodeDragDuplicateTracking).toHaveBeenCalledWith(false)
     expect(harness.commitNodeDragTransaction.mock.invocationCallOrder[0]).toBeLessThan(
-      harness.finishFlowNodeDragDuplicateTracking.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+      harness.finishFlowNodeDragDuplicateTracking.mock.invocationCallOrder[0] ??
+        Number.POSITIVE_INFINITY,
     )
   })
 

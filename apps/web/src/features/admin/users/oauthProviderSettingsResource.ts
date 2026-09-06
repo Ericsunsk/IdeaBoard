@@ -8,10 +8,7 @@ import type {
   OAuthProviderSettings,
   OAuthProviderSettingsUpdate,
 } from '../../../shared/api/generated-query/model'
-import {
-  getOAuthProviderLabel,
-  type OAuthProviderCode,
-} from '../../../shared/auth/oauthProviders'
+import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../shared/auth/oauthProviders'
 
 export type OAuthProviderSettingsSummary = {
   enabled: boolean

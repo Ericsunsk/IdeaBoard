@@ -33,12 +33,16 @@ describe('user session API boundary', () => {
   it('rejects a successful HTTP response with a failed business code', async () => {
     mocks.getUserInfo.mockResolvedValue({ code: 503, msg: 'dial tcp 127.0.0.1:5432' })
 
-    await expect(fetchCurrentUserInfo()).rejects.toThrow('Could not load your session. Please sign in again.')
+    await expect(fetchCurrentUserInfo()).rejects.toThrow(
+      'Could not load your session. Please sign in again.',
+    )
   })
 
   it('rejects a malformed successful response without a user', async () => {
     mocks.getUserInfo.mockResolvedValue({ code: 0, msg: 'ok', data: {} })
 
-    await expect(fetchCurrentUserInfo()).rejects.toThrow('Could not load your session. Please sign in again.')
+    await expect(fetchCurrentUserInfo()).rejects.toThrow(
+      'Could not load your session. Please sign in again.',
+    )
   })
 })

@@ -328,19 +328,15 @@
                   type="button"
                   class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full bg-[var(--search-overlay-btn-bg)] text-white backdrop-blur-[var(--ib-glass-blur)] transition-colors hover:bg-board-primary focus-visible:outline-none cursor-pointer"
                   :class="{
-                    '!bg-board-primary shadow-xs':
-                      references.some(
-                        (ref) => ref.key === searchReferenceKey(result.provider, result.id),
-                      ),
+                    '!bg-board-primary shadow-xs': references.some(
+                      (ref) => ref.key === searchReferenceKey(result.provider, result.id),
+                    ),
                   }"
                   :title="t('search.tooltips.useAsReference')"
                   :aria-label="t('search.tooltips.useAsReference')"
                   @click.stop="handleSearchResultReference(result)"
                 >
-                  <Search
-                    class="size-3.5"
-                    aria-hidden="true"
-                  />
+                  <Search class="size-3.5" aria-hidden="true" />
                 </button>
               </div>
 

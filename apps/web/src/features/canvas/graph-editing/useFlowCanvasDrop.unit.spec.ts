@@ -75,7 +75,11 @@ describe('useFlowCanvasDrop', () => {
     const dataTransfer = transfer()
     writeCanvasLibraryImportTransfer(dataTransfer, asset)
 
-    await harness.drop.onCanvasDrop({ clientX: 80, clientY: 90, dataTransfer } as unknown as DragEvent)
+    await harness.drop.onCanvasDrop({
+      clientX: 80,
+      clientY: 90,
+      dataTransfer,
+    } as unknown as DragEvent)
 
     expect(harness.screenToFlowCoordinate).toHaveBeenCalledWith({ x: 80, y: 90 })
     expect(harness.addLibraryAsset).toHaveBeenCalledWith(asset, { x: 92, y: 108 })
@@ -91,7 +95,11 @@ describe('useFlowCanvasDrop', () => {
       JSON.stringify({ type: 'canvas-library-import', asset: { ...asset, assetId: 0 } }),
     )
 
-    await harness.drop.onCanvasDrop({ clientX: 80, clientY: 90, dataTransfer } as unknown as DragEvent)
+    await harness.drop.onCanvasDrop({
+      clientX: 80,
+      clientY: 90,
+      dataTransfer,
+    } as unknown as DragEvent)
 
     expect(harness.addLibraryAsset).not.toHaveBeenCalled()
     expect(harness.readDroppedFile).not.toHaveBeenCalled()

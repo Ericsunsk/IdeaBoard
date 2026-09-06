@@ -17,16 +17,24 @@ export async function joinSharedCanvasBoardByToken(
   token: string,
 ): Promise<JoinSharedCanvasBoardResult> {
   const boardCatalog = useCanvasBoardCatalog()
-  const normalizedToken = normalizeRequiredText(token, i18n.global.t('workspace.joinSharedBoard.missingToken'))
+  const normalizedToken = normalizeRequiredText(
+    token,
+    i18n.global.t('workspace.joinSharedBoard.missingToken'),
+  )
   const data = await resolveApiData(
     joinBoardByShareToken({ token: normalizedToken }),
     i18n.global.t('workspace.joinSharedBoard.joinFailed'),
   )
-  const boardId = normalizeRequiredText(data.board?.board_id, i18n.global.t('workspace.joinSharedBoard.missingBoardId'))
+  const boardId = normalizeRequiredText(
+    data.board?.board_id,
+    i18n.global.t('workspace.joinSharedBoard.missingBoardId'),
+  )
 
   const hydrateResult = await boardCatalog.commands.hydrate()
   if (!hydrateResult.ok) {
-    throw new Error(i18n.global.t('workspace.joinSharedBoard.hydrateFailed'), { cause: hydrateResult.error })
+    throw new Error(i18n.global.t('workspace.joinSharedBoard.hydrateFailed'), {
+      cause: hydrateResult.error,
+    })
   }
 
   return { boardId }

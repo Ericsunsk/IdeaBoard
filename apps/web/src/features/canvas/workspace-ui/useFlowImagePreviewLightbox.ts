@@ -125,7 +125,9 @@ async function createLightboxItem(candidate: LightboxCandidate): Promise<Lightbo
   }
 }
 
-async function resolveOriginalCandidateSource(candidate: LightboxCandidate): Promise<string | null> {
+async function resolveOriginalCandidateSource(
+  candidate: LightboxCandidate,
+): Promise<string | null> {
   if (!candidate.mediaAssetId) return candidate.src
   try {
     const metadata = await getMediaAssetMetadata(candidate.mediaAssetId)

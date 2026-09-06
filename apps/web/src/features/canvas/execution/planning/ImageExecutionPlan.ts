@@ -9,14 +9,14 @@ import {
   type PromptNodeItem,
 } from '../../../canvas-board/domain'
 import { parseRequestedOutputCount } from '../../../../shared/domain/generationContract'
-import { normalizeOutputResolution, type OutputResolution } from '../../../../shared/domain/generationContract'
+import {
+  normalizeOutputResolution,
+  type OutputResolution,
+} from '../../../../shared/domain/generationContract'
 import { i18n } from '../../../../shared/i18n'
 import { EXECUTION_FUSION_META } from '../contracts/executionContract'
 import type { ImageTaskAction } from '../contracts/imageActionExecution'
-import {
-  resolveOutpaintIntent,
-  type OutpaintRect,
-} from '../../utils/outpaintGeometry'
+import { resolveOutpaintIntent, type OutpaintRect } from '../../utils/outpaintGeometry'
 import {
   resolveImageNodeLayoutAnchor,
   type ImageNodeLayoutAnchor,
@@ -339,7 +339,8 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     const graph = readGraph()
     const source = requireImageExecutionImage(graph, nodeId)
     const resolvedIntent = resolveOutpaintIntent(intent.frameRect, intent.originalImageRect)
-    if (!resolvedIntent.hasExtension) failPlanning(i18n.global.t('canvas.execution.dragOutpaintFrameFirst'))
+    if (!resolvedIntent.hasExtension)
+      failPlanning(i18n.global.t('canvas.execution.dragOutpaintFrameFirst'))
     const { targetRatio } = resolvedIntent
     const targetWidth = resolveOutpaintResultWidth(
       source.resultAnchor.width,
@@ -399,18 +400,22 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     aspectRatio: PromptAspectRatio,
   ): GenerationExecutionPlan {
     const normalizedPrompt = `${prompt ?? ''}`.trim()
-    if (referenceImages.length > 4) failPlanning(i18n.global.t('canvas.execution.tooManyReferenceImages'))
+    if (referenceImages.length > 4)
+      failPlanning(i18n.global.t('canvas.execution.tooManyReferenceImages'))
     const normalizedReferences = referenceImages.map((image) => ({
       url: `${image.url ?? ''}`.trim(),
       ratio: normalizeExecutionRatio(image.ratio),
       ...(image.mediaAssetId ? { mediaAssetId: image.mediaAssetId } : {}),
     }))
-    if (normalizedReferences.some((image) => !image.url)) failPlanning(i18n.global.t('canvas.execution.referenceImageMissingUrl'))
+    if (normalizedReferences.some((image) => !image.url))
+      failPlanning(i18n.global.t('canvas.execution.referenceImageMissingUrl'))
     const graph = readGraph()
     const promptNode = graph.nodes.find((node) => node.id === anchorNodeId)
     const outputResolution =
       promptNode?.data?.kind === 'prompt' && promptNode.data.snapshotNode
-        ? normalizeOutputResolution((promptNode.data.snapshotNode as PromptNodeItem).outputResolution)
+        ? normalizeOutputResolution(
+            (promptNode.data.snapshotNode as PromptNodeItem).outputResolution,
+          )
         : '1k'
     const source = normalizedReferences[0] ?? { url: '', ratio: 1 }
     return {

@@ -18,30 +18,29 @@ export function createImageToolChromeAdapter(
     return nodeId ? (board.getImageNodeDisplayPayload(nodeId)?.mediaAssetId ?? null) : null
   })
   const previewDelivery = useMediaAssetDelivery(previewAssetId, 'preview')
-  const { retouchRenderedPreview, retouchPreviewSource } =
-    useImageAdjustmentRenderedPreview({
-      isAdjustMode: session.isImageAdjustmentMode,
-      layers: session.retouchSession.retouchLayers,
-      sourceUrl: () => {
-        const payload = session.retouchNodeId.value
-          ? board.getImageNodeDisplayPayload(session.retouchNodeId.value)
-          : null
-        if (payload?.mediaAssetId) {
-          if (previewDelivery.status.value === 'ready') {
-            const previewVariant = previewDelivery.metadata.value?.derivatives.preview
-            const format =
-              previewVariant?.format === 'jpeg' || previewVariant?.format === 'png'
-                ? previewVariant.format
-                : 'webp'
-            return resolveMediaAssetDerivativeURL(payload.mediaAssetId, 'preview', format)
-          }
-          // A derivative is the only source allowed during editing. Falling
-          // back to the persisted URL here can silently load the original.
-          return null
+  const { retouchRenderedPreview, retouchPreviewSource } = useImageAdjustmentRenderedPreview({
+    isAdjustMode: session.isImageAdjustmentMode,
+    layers: session.retouchSession.retouchLayers,
+    sourceUrl: () => {
+      const payload = session.retouchNodeId.value
+        ? board.getImageNodeDisplayPayload(session.retouchNodeId.value)
+        : null
+      if (payload?.mediaAssetId) {
+        if (previewDelivery.status.value === 'ready') {
+          const previewVariant = previewDelivery.metadata.value?.derivatives.preview
+          const format =
+            previewVariant?.format === 'jpeg' || previewVariant?.format === 'png'
+              ? previewVariant.format
+              : 'webp'
+          return resolveMediaAssetDerivativeURL(payload.mediaAssetId, 'preview', format)
         }
-        return payload?.url ?? null
-      },
-    })
+        // A derivative is the only source allowed during editing. Falling
+        // back to the persisted URL here can silently load the original.
+        return null
+      }
+      return payload?.url ?? null
+    },
+  })
   const { retouchHistogramSource } = useRetouchHistogramSource({
     isAdjustMode: session.isImageAdjustmentMode,
     layers: session.retouchSession.retouchLayers,
@@ -67,8 +66,7 @@ export function createImageToolChromeAdapter(
       editor: {
         layers: session.retouchSession.retouchLayers.value,
         selectedLayerId: session.retouchSession.selectedRetouchLayerId.value,
-        selectedAdjustmentLayer:
-          session.retouchSession.selectedRetouchAdjustmentLayer.value,
+        selectedAdjustmentLayer: session.retouchSession.selectedRetouchAdjustmentLayer.value,
         histogramSource: retouchHistogramSource.value,
         applyingAdjustments: session.isApplyingRetouchAdjustments.value,
       },

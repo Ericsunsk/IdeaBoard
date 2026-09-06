@@ -11,7 +11,9 @@ describe('workflow feature slug contract with the API', () => {
   const openapi = readFileSync(join(__dirname, '../../../../api/openapi.yaml'), 'utf8')
 
   function extractEnum(schemaName: string): string[] {
-    const block = openapi.match(new RegExp(`${schemaName}:\\s*\\n(?:.*\\n)*?\\s+enum:\\n((?:\\s+- .*\\n?)+)`))
+    const block = openapi.match(
+      new RegExp(`${schemaName}:\\s*\\n(?:.*\\n)*?\\s+enum:\\n((?:\\s+- .*\\n?)+)`),
+    )
     if (!block) throw new Error(`OpenAPI schema ${schemaName} not found`)
     return block[1]
       .split('\n')

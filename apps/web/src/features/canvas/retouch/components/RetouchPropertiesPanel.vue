@@ -58,7 +58,9 @@
       />
     </div>
 
-    <div v-else class="editing-controls-empty-state">{{ t("canvas.retouch.selectEditingLayer") }}</div>
+    <div v-else class="editing-controls-empty-state">
+      {{ t('canvas.retouch.selectEditingLayer') }}
+    </div>
   </section>
 </template>
 

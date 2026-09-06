@@ -2,7 +2,7 @@
   <div class="editing-controls-stack retouch-curves">
     <div class="editing-controls-toolbar retouch-curves__toolbar">
       <label class="editing-controls-field retouch-curves__select-label">
-        <span class="editing-controls-label">{{ t("canvas.retouch.presetLabel") }}</span>
+        <span class="editing-controls-label">{{ t('canvas.retouch.presetLabel') }}</span>
         <select
           name="retouch-curve-preset"
           class="editing-controls-control editing-controls-select"
@@ -10,14 +10,14 @@
           :aria-label="t('canvas.retouch.curvesPresetAria')"
           @change="onPresetChange"
         >
-          <option value="custom">{{ t("canvas.retouch.customPresetOption") }}</option>
+          <option value="custom">{{ t('canvas.retouch.customPresetOption') }}</option>
           <option v-for="preset in curvePresets" :key="preset.id" :value="preset.id">
             {{ preset.label }}
           </option>
         </select>
       </label>
       <label class="editing-controls-field retouch-curves__select-label">
-        <span class="editing-controls-label">{{ t("canvas.retouch.channelLabel") }}</span>
+        <span class="editing-controls-label">{{ t('canvas.retouch.channelLabel') }}</span>
         <select
           name="retouch-curve-channel"
           class="editing-controls-control editing-controls-select"
@@ -47,7 +47,7 @@
 
     <div class="editing-controls-fields retouch-curves__fields">
       <label class="editing-controls-field retouch-curves__field">
-        <span class="editing-controls-label">{{ t("canvas.retouch.inputLabel") }}</span>
+        <span class="editing-controls-label">{{ t('canvas.retouch.inputLabel') }}</span>
         <input
           name="retouch-curve-input"
           class="editing-controls-control editing-controls-number-input"
@@ -61,7 +61,7 @@
         />
       </label>
       <label class="editing-controls-field retouch-curves__field">
-        <span class="editing-controls-label">{{ t("canvas.retouch.outputLabel") }}</span>
+        <span class="editing-controls-label">{{ t('canvas.retouch.outputLabel') }}</span>
         <input
           name="retouch-curve-output"
           class="editing-controls-control editing-controls-number-input"

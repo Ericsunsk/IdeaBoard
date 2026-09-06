@@ -53,11 +53,18 @@ describe('CanvasLibraryImportState', () => {
     const pending = pendingImage()
 
     expect(failLibraryImport(pending, 8, 'Source unavailable')).toBeNull()
-    expect(materializeLibraryImport(pending, 8, {
-      mediaAssetId: 42,
-      url: 'https://app.example/media/42',
-      width: 400,
-      height: 200,
-    }, 1)).toBeNull()
+    expect(
+      materializeLibraryImport(
+        pending,
+        8,
+        {
+          mediaAssetId: 42,
+          url: 'https://app.example/media/42',
+          width: 400,
+          height: 200,
+        },
+        1,
+      ),
+    ).toBeNull()
   })
 })

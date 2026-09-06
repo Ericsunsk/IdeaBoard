@@ -9,13 +9,21 @@
   >
     <template v-if="status?.status === 'credited'">
       <p class="m-0 font-semibold text-ib-success">
-        {{ t('account.returnStatus.creditedTitle', { amount: formatIdeaAmount(status.idea_quantity) }) }}
+        {{
+          t('account.returnStatus.creditedTitle', {
+            amount: formatIdeaAmount(status.idea_quantity),
+          })
+        }}
       </p>
-      <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ t('account.returnStatus.creditedDetail') }}</p>
+      <p class="mt-1 mb-0 text-sm text-ib-text-muted">
+        {{ t('account.returnStatus.creditedDetail') }}
+      </p>
     </template>
     <template v-else-if="source === 'cancel'">
       <p class="m-0 font-semibold text-ib-text">{{ t('account.returnStatus.returnedTitle') }}</p>
-      <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ t('account.returnStatus.returnedDetail') }}</p>
+      <p class="mt-1 mb-0 text-sm text-ib-text-muted">
+        {{ t('account.returnStatus.returnedDetail') }}
+      </p>
     </template>
     <template v-else-if="pending">
       <p class="m-0 font-semibold text-ib-text">{{ t('account.returnStatus.confirmingTitle') }}</p>
@@ -24,7 +32,9 @@
       </p>
     </template>
     <template v-else-if="error">
-      <p class="m-0 font-semibold text-ib-danger">{{ t('account.errors.orderStatusLoadFailed') }}</p>
+      <p class="m-0 font-semibold text-ib-danger">
+        {{ t('account.errors.orderStatusLoadFailed') }}
+      </p>
       <Button
         :label="t('account.returnStatus.recheck')"
         severity="secondary"
@@ -36,11 +46,15 @@
     </template>
     <template v-else-if="status?.status === 'failed'">
       <p class="m-0 font-semibold text-ib-danger">{{ t('account.returnStatus.failedTitle') }}</p>
-      <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ t('account.returnStatus.failedDetail') }}</p>
+      <p class="mt-1 mb-0 text-sm text-ib-text-muted">
+        {{ t('account.returnStatus.failedDetail') }}
+      </p>
     </template>
     <template v-else-if="delayed">
       <p class="m-0 font-semibold text-ib-text">{{ t('account.returnStatus.delayedTitle') }}</p>
-      <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ t('account.returnStatus.delayedDetail') }}</p>
+      <p class="mt-1 mb-0 text-sm text-ib-text-muted">
+        {{ t('account.returnStatus.delayedDetail') }}
+      </p>
     </template>
     <template v-else>
       <p class="m-0 font-semibold text-ib-text">{{ t('account.returnStatus.confirmingTitle') }}</p>

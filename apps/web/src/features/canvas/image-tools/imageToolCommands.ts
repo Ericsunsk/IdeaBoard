@@ -217,8 +217,7 @@ export function createImageToolCommands(session: ImageToolSession) {
     mergeEditorLayer: session.retouchSession.mergeRetouchLayer,
     removeEditorLayer: session.retouchSession.removeRetouchLayer,
     updateEditorParam: session.retouchSession.updateSelectedRetouchLayerParam,
-    updateEditorAdjustmentParams:
-      session.retouchSession.updateSelectedRetouchAdjustmentParams,
+    updateEditorAdjustmentParams: session.retouchSession.updateSelectedRetouchAdjustmentParams,
     applyAdjustments,
   }
 

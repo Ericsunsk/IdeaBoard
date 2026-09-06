@@ -184,9 +184,7 @@
             </div>
             <p class="m-0 mt-1 text-admin-micro text-admin-text-3">
               请在
-              {{
-                providerLabel === 'Google' ? 'Google Cloud Console' : 'Discord Developer Portal'
-              }}
+              {{ providerLabel === 'Google' ? 'Google Cloud Console' : 'Discord Developer Portal' }}
               将此 URL 添加为重定向白名单 URI
             </p>
           </AdminFormField>

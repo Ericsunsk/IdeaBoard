@@ -58,7 +58,9 @@ describe('AdminBillingPricingPage', () => {
     expect(screen.getAllByText('1')).toHaveLength(3)
     expect(container.querySelector('.columns-1.md\\:columns-2.xl\\:columns-3')).toBeTruthy()
     expect(container.querySelector('.break-inside-avoid')).toBeTruthy()
-    expect(container.querySelector('.grid.grid-cols-1.md\\:grid-cols-2.xl\\:grid-cols-3')).toBeNull()
+    expect(
+      container.querySelector('.grid.grid-cols-1.md\\:grid-cols-2.xl\\:grid-cols-3'),
+    ).toBeNull()
     expect(screen.queryByRole('button', { name: '新建 SKU' })).not.toBeInTheDocument()
   })
 

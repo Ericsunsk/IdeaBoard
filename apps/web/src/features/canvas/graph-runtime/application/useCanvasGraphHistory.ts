@@ -1,8 +1,5 @@
 import { shallowRef } from 'vue'
-import type {
-  CanvasGraphCommitPatch,
-  CanvasGraphPatchDirection,
-} from '..'
+import type { CanvasGraphCommitPatch, CanvasGraphPatchDirection } from '..'
 import { recordCanvasInteractionCount } from '../../utils/canvasInteractionMetrics'
 import { measureCanvasPerf } from '../../utils/canvasPerfProbe'
 
@@ -23,9 +20,7 @@ export type CanvasGraphHistory = {
  * session remains the sole source of truth and owns applying a patch back to
  * the domain; this module only manages bounded undo/redo stacks.
  */
-export function useCanvasGraphHistory(
-  options: UseCanvasGraphHistoryOptions,
-): CanvasGraphHistory {
+export function useCanvasGraphHistory(options: UseCanvasGraphHistoryOptions): CanvasGraphHistory {
   const maxSteps = Math.max(1, options.maxSteps ?? 10)
   const past = shallowRef<CanvasGraphCommitPatch[]>([])
   const future = shallowRef<CanvasGraphCommitPatch[]>([])

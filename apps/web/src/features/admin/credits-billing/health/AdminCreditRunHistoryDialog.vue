@@ -81,10 +81,7 @@
         @row-collapse="collapseRun"
       >
         <template #empty>
-          <AdminEmptyState
-            title="暂无检查记录"
-            description="运行一次检查后，记录会显示在这里"
-          />
+          <AdminEmptyState title="暂无检查记录" description="运行一次检查后，记录会显示在这里" />
         </template>
 
         <Column expander style="width: 52px" />

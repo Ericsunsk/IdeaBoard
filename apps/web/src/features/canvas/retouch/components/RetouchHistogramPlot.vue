@@ -8,11 +8,7 @@
   >
     <div class="retouch-histogram-plot__canvas" aria-hidden="true">
       <svg viewBox="0 0 100 100" focusable="false">
-        <path
-          v-if="histogramPath"
-          class="retouch-histogram-plot__histogram"
-          :d="histogramPath"
-        />
+        <path v-if="histogramPath" class="retouch-histogram-plot__histogram" :d="histogramPath" />
         <path
           class="retouch-histogram-plot__grid retouch-histogram-plot__grid--fine"
           :d="fineGridPath"

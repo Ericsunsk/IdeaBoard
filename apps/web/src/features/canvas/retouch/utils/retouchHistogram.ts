@@ -42,10 +42,7 @@ export function sampleHistogramPath(histogram: RetouchHistogram, sampleCount = 1
   return points.join(' ')
 }
 
-function createHistogramResult(
-  channel: RetouchCurveChannel,
-  bins: Uint32Array,
-): RetouchHistogram {
+function createHistogramResult(channel: RetouchCurveChannel, bins: Uint32Array): RetouchHistogram {
   const normalizedBins = new Float32Array(256)
   let maxBin = 0
   let total = 0

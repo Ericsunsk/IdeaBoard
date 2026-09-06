@@ -42,7 +42,8 @@ export default {
     stillProcessing: 'Aún se está procesando; vuelva a comprobarlo en un momento.',
     cancelled: 'Tarea cancelada',
     progressTimeout: 'Esto está tardando más de lo esperado. Vuelva a comprobarlo en un momento.',
-    progressDataInvalid: 'Los datos de progreso de la tarea no parecen válidos. Inténtelo de nuevo.',
+    progressDataInvalid:
+      'Los datos de progreso de la tarea no parecen válidos. Inténtelo de nuevo.',
     failedGeneric: 'Error al generar la imagen. Inténtelo de nuevo.',
   },
   minimap: {
@@ -69,7 +70,8 @@ export default {
     retryImageImport: 'Reintentar importación de imagen',
     stageLabel: 'Área de entrada y vista previa del nodo de imagen',
     stagePreviewAlt: 'Vista previa del nodo de imagen',
-    stagePreviewHint: 'Vista previa del nodo de imagen. Presione Enter para abrir vista previa o Espacio para añadir al lienzo',
+    stagePreviewHint:
+      'Vista previa del nodo de imagen. Presione Enter para abrir vista previa o Espacio para añadir al lienzo',
     preparingPreview: 'Preparando vista previa de imagen',
     uploadOrDropImage: 'Suba o arrastre una imagen como entrada',
     generatingUploadBlocked: 'Se está generando la imagen; subida no disponible',
@@ -87,9 +89,11 @@ export default {
   groupOps: {
     groupFailed: 'Error al agrupar. Actualice el lienzo e inténtelo de nuevo.',
     ungroupFailed: 'Error al desagrupar. Actualice el lienzo e inténtelo de nuevo.',
-    updateFailed: 'Error al actualizar las relaciones del grupo. Actualice el lienzo e inténtelo de nuevo.',
+    updateFailed:
+      'Error al actualizar las relaciones del grupo. Actualice el lienzo e inténtelo de nuevo.',
     moveFailed: 'Error al mover el grupo. Actualice el lienzo e inténtelo de nuevo.',
-    boundsUpdateFailed: 'Error al actualizar los límites del grupo. Actualice el lienzo e inténtelo de nuevo.',
+    boundsUpdateFailed:
+      'Error al actualizar los límites del grupo. Actualice el lienzo e inténtelo de nuevo.',
   },
   chrome: {
     shareComingSoon: 'Compartir próximamente',
@@ -106,18 +110,23 @@ export default {
     catalogReloadRequired: 'La lista de lienzos necesita recargarse',
     reloadCatalog: 'Recargar lista de lienzos',
     reload: 'Recargar',
-    renamePendingWarning: 'El nombre del lienzo se está sincronizando. Intente renombrar de nuevo en un momento.',
+    renamePendingWarning:
+      'El nombre del lienzo se está sincronizando. Intente renombrar de nuevo en un momento.',
     emptyNameWarning: 'Introduzca un nombre para el lienzo.',
     renameSuccess: 'Lienzo renombrado.',
     duplicateNameWarning: 'El nombre ya existe.',
     renameFailedWarning: 'Error al renombrar.',
     conflictReloadedError: 'Conflicto de nombres. Lista de lienzos recargada.',
     syncFailedRestoredError: 'Error de sincronización al renombrar. Nombre original restaurado.',
-    conflictRestoredRefreshFailedError: 'Conflicto de nombres. Nombre original restaurado, pero falló la actualización remota. Recargue la página.',
-    conflictRestoreFailedError: 'Conflicto de nombres y fallo al restaurar. Recargue la lista de lienzos.',
-    syncFailedRestoreFailedError: 'Error de sincronización al renombrar y no se pudo restaurar el nombre original. Recargue la lista de lienzos.',
+    conflictRestoredRefreshFailedError:
+      'Conflicto de nombres. Nombre original restaurado, pero falló la actualización remota. Recargue la página.',
+    conflictRestoreFailedError:
+      'Conflicto de nombres y fallo al restaurar. Recargue la lista de lienzos.',
+    syncFailedRestoreFailedError:
+      'Error de sincronización al renombrar y no se pudo restaurar el nombre original. Recargue la lista de lienzos.',
     catalogReloadedSuccess: 'Lista de lienzos recargada.',
-    catalogReloadFailedError: 'No se pudo recargar la lista de lienzos. Inténtelo de nuevo más tarde.',
+    catalogReloadFailedError:
+      'No se pudo recargar la lista de lienzos. Inténtelo de nuevo más tarde.',
   },
   viewport: {
     zoomIn: 'Acercar',
@@ -130,10 +139,13 @@ export default {
     missingBoardIdMask: 'Falta el ID del lienzo. No se puede subir la máscara.',
     markInpaintAreaFirst: 'Marque primero el área a pintar.',
     recoveryFailed: 'No se pudieron restaurar los resultados de imagen. Inténtelo de nuevo.',
-    canvasSaveFailedProgressLost: 'Error al guardar el lienzo. El progreso de la tarea podría perderse si actualiza la página.',
+    canvasSaveFailedProgressLost:
+      'Error al guardar el lienzo. El progreso de la tarea podría perderse si actualiza la página.',
     networkRetry: 'Error de red. Inténtelo de nuevo.',
-    tasksInProgress: 'Las tareas aún se están ejecutando. Los resultados aparecerán en el lienzo en un momento.',
-    generationUnavailable: 'La generación no está disponible temporalmente. Inténtelo de nuevo más tarde.',
+    tasksInProgress:
+      'Las tareas aún se están ejecutando. Los resultados aparecerán en el lienzo en un momento.',
+    generationUnavailable:
+      'La generación no está disponible temporalmente. Inténtelo de nuevo más tarde.',
     taskCompletedNoImage: 'La tarea se completó pero no devolvió ninguna imagen.',
     taskCompletedNoImageAtIndex: 'La tarea se completó pero no devolvió esta imagen.',
     invalidOutputCount: 'Cantidad de imágenes no válida.',
@@ -163,9 +175,12 @@ export default {
   },
   edges: {
     connectionSemanticsWarning: 'Esta conexión no coincide con las reglas actuales de conexión.',
-    connectionWriteFailedWarning: 'Error al escribir la conexión en el lienzo. Actualice e inténtelo de nuevo.',
-    deleteWriteFailedWarning: 'Error al escribir la eliminación en el lienzo. Actualice e inténtelo de nuevo.',
-    deleteApplyFailedWarning: 'Error al aplicar la eliminación. Actualice el lienzo e inténtelo de nuevo.',
+    connectionWriteFailedWarning:
+      'Error al escribir la conexión en el lienzo. Actualice e inténtelo de nuevo.',
+    deleteWriteFailedWarning:
+      'Error al escribir la eliminación en el lienzo. Actualice e inténtelo de nuevo.',
+    deleteApplyFailedWarning:
+      'Error al aplicar la eliminación. Actualice el lienzo e inténtelo de nuevo.',
     connectRequiredInputLabel: 'Conectar {label}',
     connectRequiredInputsLabel: 'Conectar {count} entradas',
     waitForInputLabel: 'Esperando a {label}',
@@ -283,8 +298,10 @@ export default {
     uploadFailed: 'Error al subir.',
     createNodeFailed: 'Error al crear el nodo. Actualice el lienzo e inténtelo de nuevo.',
     updateNodeFailed: 'Error al actualizar el nodo. Actualice el lienzo e inténtelo de nuevo.',
-    updateNodeStatusFailed: 'Error al actualizar el estado del nodo. Actualice el lienzo e inténtelo de nuevo.',
-    removeInputImageFailed: 'Error al quitar la imagen de entrada. Actualice el lienzo e inténtelo de nuevo.',
+    updateNodeStatusFailed:
+      'Error al actualizar el estado del nodo. Actualice el lienzo e inténtelo de nuevo.',
+    removeInputImageFailed:
+      'Error al quitar la imagen de entrada. Actualice el lienzo e inténtelo de nuevo.',
     addImageFailed: 'Error al añadir la imagen. Actualice el lienzo e inténtelo de nuevo.',
     duplicateImagesFailed: 'Error al duplicar imágenes. Actualice el lienzo e inténtelo de nuevo.',
     noExportableImages: 'Los nodos seleccionados no tienen imágenes para exportar.',
@@ -298,12 +315,18 @@ export default {
     missingBoardIdSave: 'Falta el ID del lienzo. No se puede guardar.',
     uploadMissingMediaAsset: 'Error al subir: falta el ID del recurso multimedia.',
     libraryImportFailed: 'Error al importar de la biblioteca. Inténtelo de nuevo más tarde.',
-    libraryImportInvalidAsset: 'Error al importar de la biblioteca: el servicio no devolvió un recurso multimedia válido.',
-    saveAuthUnavailable: 'Error al guardar: falta la sesión de usuario. Inicie sesión e inténtelo de nuevo.',
-    savedLocallySyncFailed: 'Guardado localmente. Falló la sincronización remota; se reintentará cuando se recupere la red.',
-    nameConflictSavedLocally: 'Guardado localmente, pero ya existe este nombre de lienzo. Elija otro nombre.',
-    boardDataInvalid: 'Falló la validación de datos del lienzo. Se mantuvo su lienzo actual. Inténtelo de nuevo más tarde.',
-    importSnapshotFailed: 'Error al cargar la instantánea del lienzo. Inténtelo de nuevo más tarde.',
+    libraryImportInvalidAsset:
+      'Error al importar de la biblioteca: el servicio no devolvió un recurso multimedia válido.',
+    saveAuthUnavailable:
+      'Error al guardar: falta la sesión de usuario. Inicie sesión e inténtelo de nuevo.',
+    savedLocallySyncFailed:
+      'Guardado localmente. Falló la sincronización remota; se reintentará cuando se recupere la red.',
+    nameConflictSavedLocally:
+      'Guardado localmente, pero ya existe este nombre de lienzo. Elija otro nombre.',
+    boardDataInvalid:
+      'Falló la validación de datos del lienzo. Se mantuvo su lienzo actual. Inténtelo de nuevo más tarde.',
+    importSnapshotFailed:
+      'Error al cargar la instantánea del lienzo. Inténtelo de nuevo más tarde.',
     saved: 'Guardado',
     saveFailed: 'Error al guardar. Inténtelo de nuevo más tarde.',
     downloadEmptyResponse: 'Error en la descarga: respuesta vacía.',
@@ -313,7 +336,8 @@ export default {
     readImageFailed: 'Error al leer la imagen: {reason}',
     unknownError: 'error desconocido',
     networkError: 'error de red',
-    readImageSizeSkipCompression: 'No se pudo leer el tamaño de la imagen; se omitió la compresión previa a la subida',
+    readImageSizeSkipCompression:
+      'No se pudo leer el tamaño de la imagen; se omitió la compresión previa a la subida',
     compressFallbackOriginal: 'Falló la compresión de la imagen; subiendo la imagen original',
     unstableImageLink: 'Error al guardar: {path} utiliza un enlace de imagen inestable. {reason}',
   },

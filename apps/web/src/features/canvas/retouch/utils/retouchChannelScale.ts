@@ -4,12 +4,7 @@ export const RETOUCH_PLOT_PERCENT_MIN = 0
 export const RETOUCH_PLOT_PERCENT_MAX = 100
 
 export function clampRetouchChannel(value: unknown, fallback = RETOUCH_CHANNEL_MIN) {
-  return clampRetouchChannelRange(
-    value,
-    RETOUCH_CHANNEL_MIN,
-    RETOUCH_CHANNEL_MAX,
-    fallback,
-  )
+  return clampRetouchChannelRange(value, RETOUCH_CHANNEL_MIN, RETOUCH_CHANNEL_MAX, fallback)
 }
 
 export function clampRetouchChannelRange(
@@ -22,10 +17,7 @@ export function clampRetouchChannelRange(
   return Math.round(clampFiniteNumber(value, min, max, resolvedFallback))
 }
 
-export function clampRetouchPlotPercent(
-  value: unknown,
-  fallback = RETOUCH_PLOT_PERCENT_MIN,
-) {
+export function clampRetouchPlotPercent(value: unknown, fallback = RETOUCH_PLOT_PERCENT_MIN) {
   const resolvedFallback = clampFiniteNumber(
     fallback,
     RETOUCH_PLOT_PERCENT_MIN,
@@ -47,20 +39,11 @@ export function clampRetouchRoundedPlotPercent(
   return Math.round(clampRetouchPlotPercent(value, fallback))
 }
 
-export function retouchChannelToPlotPercent(
-  value: unknown,
-  fallback = RETOUCH_CHANNEL_MIN,
-) {
-  return (
-    (clampRetouchChannel(value, fallback) / RETOUCH_CHANNEL_MAX) *
-    RETOUCH_PLOT_PERCENT_MAX
-  )
+export function retouchChannelToPlotPercent(value: unknown, fallback = RETOUCH_CHANNEL_MIN) {
+  return (clampRetouchChannel(value, fallback) / RETOUCH_CHANNEL_MAX) * RETOUCH_PLOT_PERCENT_MAX
 }
 
-export function retouchPlotPercentToChannel(
-  value: unknown,
-  fallbackChannel = RETOUCH_CHANNEL_MIN,
-) {
+export function retouchPlotPercentToChannel(value: unknown, fallbackChannel = RETOUCH_CHANNEL_MIN) {
   if (!isFiniteNumber(value)) return clampRetouchChannel(fallbackChannel)
   return clampRetouchChannel(
     (clampRetouchPlotPercent(value) / RETOUCH_PLOT_PERCENT_MAX) * RETOUCH_CHANNEL_MAX,

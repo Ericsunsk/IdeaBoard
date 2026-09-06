@@ -31,14 +31,20 @@ export function parseIdeaQuantity(rawValue: string): IdeaQuantityParseResult {
     return { ok: false, error: integerRangeError() }
   }
   if (quantity < MIN_IDEA_QUANTITY) {
-    return { ok: false, error: i18n.global.t('account.errors.quantityBelowMin', {
-      min: integerQuantityLabel(MIN_IDEA_QUANTITY),
-    }) }
+    return {
+      ok: false,
+      error: i18n.global.t('account.errors.quantityBelowMin', {
+        min: integerQuantityLabel(MIN_IDEA_QUANTITY),
+      }),
+    }
   }
   if (quantity > MAX_IDEA_QUANTITY) {
-    return { ok: false, error: i18n.global.t('account.errors.quantityAboveMax', {
-      max: integerQuantityLabel(MAX_IDEA_QUANTITY),
-    }) }
+    return {
+      ok: false,
+      error: i18n.global.t('account.errors.quantityAboveMax', {
+        max: integerQuantityLabel(MAX_IDEA_QUANTITY),
+      }),
+    }
   }
   return { ok: true, value: quantity }
 }

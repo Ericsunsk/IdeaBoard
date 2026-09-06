@@ -200,7 +200,6 @@ describe('useCanvasImageWorkflow', () => {
       IMAGE_NODE_ACTION.variations,
       { prompt: 'soft watercolor', outputCount: 4, strength: 72 },
     )
-
   })
 
   it('routes text Prompt intent through planning and execution with normalized inputs', async () => {
@@ -279,8 +278,8 @@ describe('useCanvasImageWorkflow', () => {
       handlers.onFlowPromptGenerate('prompt-1', 'Keep editing', 1, 'auto')
 
       expect(feedback.taskExecution.warning).toHaveBeenCalledWith(
-      i18n.global.t('canvas.execution.generationUnavailable'),
-    )
+        i18n.global.t('canvas.execution.generationUnavailable'),
+      )
       expect(mocks.planner.planGeneration).not.toHaveBeenCalled()
       expect(mocks.execution.executeImageWorkflow).not.toHaveBeenCalled()
     } finally {
@@ -334,12 +333,7 @@ describe('useCanvasImageWorkflow', () => {
 
     expect(graph.updateSnapshotNodeParam).toHaveBeenCalledTimes(3)
     expect(graph.markNodeExecutionDirty).toHaveBeenCalledTimes(3)
-    expect(mocks.planner.planFusionGeneration).toHaveBeenCalledWith(
-      'fusion-1',
-      'Blend',
-      3,
-      '1:1',
-    )
+    expect(mocks.planner.planFusionGeneration).toHaveBeenCalledWith('fusion-1', 'Blend', 3, '1:1')
     expect(mocks.execution.reattachPendingImageResults).toHaveBeenCalledOnce()
   })
 })

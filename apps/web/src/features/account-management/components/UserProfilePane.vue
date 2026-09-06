@@ -64,7 +64,12 @@
             {{ userStore.user?.display_name }}
           </p>
           <div class="mt-3 flex min-w-0 flex-wrap items-center gap-2">
-            <Tag v-if="isUserBanned" :value="t('account.profile.banned')" severity="danger" rounded />
+            <Tag
+              v-if="isUserBanned"
+              :value="t('account.profile.banned')"
+              severity="danger"
+              rounded
+            />
             <Tag :value="userRoleLabel" :severity="userRoleSeverity" rounded />
           </div>
         </div>
@@ -123,7 +128,9 @@ const formattedJoinedAt = computed(() => formatDateWithDots(userStore.user?.crea
 const formattedUpdatedAt = computed(() => formatDateWithDots(userStore.user?.updated_at))
 const isUserBanned = computed(() => userStore.user?.status === 0)
 const userRoleLabel = computed(() =>
-  userStore.user?.role === 'admin' ? t('account.profile.roleAdmin') : t('account.profile.roleCreator'),
+  userStore.user?.role === 'admin'
+    ? t('account.profile.roleAdmin')
+    : t('account.profile.roleCreator'),
 )
 const userRoleSeverity = computed<TagSeverity>(() =>
   userStore.user?.role === 'admin' ? 'info' : 'secondary',

@@ -73,7 +73,9 @@
           @click="handleLogout"
         >
           <LogOut class="h-4 w-4 shrink-0" />
-          <span class="truncate">{{ logoutLoading ? t('account.signingOut') : t('account.signOut') }}</span>
+          <span class="truncate">{{
+            logoutLoading ? t('account.signingOut') : t('account.signOut')
+          }}</span>
         </Button>
       </div>
     </aside>

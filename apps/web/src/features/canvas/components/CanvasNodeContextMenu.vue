@@ -47,7 +47,8 @@ let positionContainer: HTMLElement | null = null
 function updatePosition() {
   if (!props.visible) return
   const menu = menuRef.value
-  const container = menu?.offsetParent instanceof HTMLElement ? menu.offsetParent : menu?.parentElement
+  const container =
+    menu?.offsetParent instanceof HTMLElement ? menu.offsetParent : menu?.parentElement
   const width = menu?.offsetWidth || 160
   const height = menu?.offsetHeight || props.items.length * 34 + 12
   const containerWidth = container?.clientWidth || window.innerWidth
@@ -68,7 +69,8 @@ watch(
 onMounted(() => {
   window.addEventListener('resize', updatePosition)
   window.addEventListener('scroll', updatePosition, true)
-  positionContainer = menuRef.value?.offsetParent instanceof HTMLElement ? menuRef.value.offsetParent : null
+  positionContainer =
+    menuRef.value?.offsetParent instanceof HTMLElement ? menuRef.value.offsetParent : null
   positionContainer?.addEventListener('scroll', updatePosition)
   if (positionContainer && typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(updatePosition)

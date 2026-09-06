@@ -4,9 +4,7 @@ import type { Ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { useRetouchMode } from './useRetouchMode'
 
-function mountRetouchMode(
-  options: { nodeKind?: string; onBeforePointerCancel?: () => void } = {},
-) {
+function mountRetouchMode(options: { nodeKind?: string; onBeforePointerCancel?: () => void } = {}) {
   const activeTool = ref('select')
   const nodes: Ref<Node[]> = shallowRef([
     { id: 'node-1', data: { kind: options.nodeKind ?? 'image' } },

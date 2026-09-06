@@ -169,10 +169,9 @@ describe('useDisplayImagePreview', () => {
       expect(preview.displayUrl.value).toBe('blob:7')
     })
 
-    expect(fetch).toHaveBeenCalledWith(
-      '/uploads/canvas/U123/board/content/image.png',
-      { credentials: 'include' },
-    )
+    expect(fetch).toHaveBeenCalledWith('/uploads/canvas/U123/board/content/image.png', {
+      credentials: 'include',
+    })
     expect(createImageBitmap).toHaveBeenCalled()
     expect(flowMediaIOMocks.canvasToBlob).toHaveBeenCalled()
     scope.stop()

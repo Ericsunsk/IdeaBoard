@@ -87,8 +87,10 @@ export function createCanvasDeleteCommandLifecycle(
     options.readEdges().forEach((edge) => {
       if (!sourceIds.has(edge.source) || edge.targetHandle !== 'in:image') return
       const target = nodesById.get(edge.target)
-      const snapshot = (target?.data as { snapshotNode?: { outputStatus?: string; pendingTaskId?: string } } | undefined)
-        ?.snapshotNode
+      const snapshot = (
+        target?.data as
+          { snapshotNode?: { outputStatus?: string; pendingTaskId?: string } } | undefined
+      )?.snapshotNode
       if (
         target?.data &&
         (target.data as { kind?: string }).kind === 'image' &&
@@ -160,10 +162,7 @@ export function createCanvasDeleteCommandLifecycle(
     )
   }
 
-  function commitNativeRemove(
-    nodeChanges: NodeChange[],
-    edgeChanges: EdgeChange[],
-  ): boolean {
+  function commitNativeRemove(nodeChanges: NodeChange[], edgeChanges: EdgeChange[]): boolean {
     const removedNodes = options.resolveRemovedFlowNodes(nodeChanges)
     if (!removedNodes) return false
     const removedNodeIds = new Set<string>([

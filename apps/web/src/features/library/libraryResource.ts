@@ -84,7 +84,10 @@ export function toLibraryAssetInput(reference: LibrarySearchReference): LibraryA
 }
 
 export function getLibraryFolders(): Promise<LibraryFolder[]> {
-  return resolveApiData(listLibraryFolders(), i18n.global.t('library.errors.loadFoldersFailed')).then((data) => data.folders)
+  return resolveApiData(
+    listLibraryFolders(),
+    i18n.global.t('library.errors.loadFoldersFailed'),
+  ).then((data) => data.folders)
 }
 
 export function getLibraryAssets(params: ListLibraryAssetsParams): Promise<{
@@ -92,7 +95,10 @@ export function getLibraryAssets(params: ListLibraryAssetsParams): Promise<{
   nextCursor: string
   hasMore: boolean
 }> {
-  return resolveApiData(listLibraryAssets(params), i18n.global.t('library.errors.loadAssetsFailed')).then((data) => ({
+  return resolveApiData(
+    listLibraryAssets(params),
+    i18n.global.t('library.errors.loadAssetsFailed'),
+  ).then((data) => ({
     items: data.items,
     nextCursor: data.next_cursor ?? '',
     hasMore: data.has_more,
@@ -100,11 +106,17 @@ export function getLibraryAssets(params: ListLibraryAssetsParams): Promise<{
 }
 
 export function createFolder(name: string): Promise<LibraryFolder> {
-  return resolveApiData(createLibraryFolder({ name }), i18n.global.t('library.errors.createFolderFailed')).then((data) => data)
+  return resolveApiData(
+    createLibraryFolder({ name }),
+    i18n.global.t('library.errors.createFolderFailed'),
+  ).then((data) => data)
 }
 
 export function renameFolder(folderId: number, name: string): Promise<LibraryFolder> {
-  return resolveApiData(renameLibraryFolder(folderId, { name }), i18n.global.t('library.errors.renameFolderFailed'))
+  return resolveApiData(
+    renameLibraryFolder(folderId, { name }),
+    i18n.global.t('library.errors.renameFolderFailed'),
+  )
 }
 
 export function saveAsset(asset: LibraryAssetInput, folderId?: number, newFolderName?: string) {
@@ -123,20 +135,34 @@ export function saveSearchReference(
 }
 
 export function moveAsset(assetId: number, folderId: number): Promise<LibraryAsset> {
-  return resolveApiData(moveLibraryAsset(assetId, { folder_id: folderId }), i18n.global.t('library.errors.moveAssetFailed'))
+  return resolveApiData(
+    moveLibraryAsset(assetId, { folder_id: folderId }),
+    i18n.global.t('library.errors.moveAssetFailed'),
+  )
 }
 
 export function removeAsset(assetId: number): Promise<void> {
-  return resolveApiOk(deleteLibraryAsset(assetId), i18n.global.t('library.errors.removeAssetFailed'))
+  return resolveApiOk(
+    deleteLibraryAsset(assetId),
+    i18n.global.t('library.errors.removeAssetFailed'),
+  )
 }
 
 export function removeFolder(folderId: number): Promise<void> {
-  return resolveApiOk(deleteLibraryFolder(folderId), i18n.global.t('library.errors.deleteFolderFailed'))
+  return resolveApiOk(
+    deleteLibraryFolder(folderId),
+    i18n.global.t('library.errors.deleteFolderFailed'),
+  )
 }
 
 /** Turns an owned URL-backed Library asset into a managed Media asset for Canvas. */
-export function materializeLibraryAssetForCanvas(assetId: number): Promise<LibraryMaterializedMedia> {
-  return resolveApiData(materializeLibraryAsset(assetId), i18n.global.t('library.errors.importAssetFailed')).then((data) => ({
+export function materializeLibraryAssetForCanvas(
+  assetId: number,
+): Promise<LibraryMaterializedMedia> {
+  return resolveApiData(
+    materializeLibraryAsset(assetId),
+    i18n.global.t('library.errors.importAssetFailed'),
+  ).then((data) => ({
     mediaAssetId: data.media_asset_id,
     url: data.url,
     width: data.width,
@@ -157,7 +183,10 @@ export async function removeSearchReference(
 export async function lookupSavedAssets(
   keys: Array<{ provider: 'unsplash' | 'pexels'; source_id: string }>,
 ): Promise<LibraryAsset[]> {
-  return resolveApiData(lookupLibraryAssets({ keys }), i18n.global.t('library.errors.lookupStatusFailed')).then((data) => data.items)
+  return resolveApiData(
+    lookupLibraryAssets({ keys }),
+    i18n.global.t('library.errors.lookupStatusFailed'),
+  ).then((data) => data.items)
 }
 
 export async function lookupSavedAssetKeys(

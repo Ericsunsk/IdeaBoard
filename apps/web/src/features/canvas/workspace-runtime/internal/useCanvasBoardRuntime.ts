@@ -1,7 +1,10 @@
 import { computed, ref, shallowRef, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
-import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../../canvas-board/domain'
+import {
+  createEmptyCanvasBoardSnapshot,
+  type CanvasBoardSnapshot,
+} from '../../../canvas-board/domain'
 import { HOME_PATH, USER_BOARDS_PATH } from '../../../../shared/constants/routePaths'
 import { useCanvasBoardSession, type SaveStatus } from '../../board-session'
 import { useFlowBoardHeaderActions } from '../../workspace-chrome/useFlowBoardHeaderActions'

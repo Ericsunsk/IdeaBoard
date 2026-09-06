@@ -13,10 +13,7 @@
     <div class="text-admin-body font-semibold text-admin-text-2">
       {{ title }}
     </div>
-    <div
-      v-if="description"
-      class="mt-1 max-w-sm text-admin-caption text-admin-text-3"
-    >
+    <div v-if="description" class="mt-1 max-w-sm text-admin-caption text-admin-text-3">
       {{ description }}
     </div>
     <div v-if="$slots.actions" class="mt-3 flex items-center gap-2">

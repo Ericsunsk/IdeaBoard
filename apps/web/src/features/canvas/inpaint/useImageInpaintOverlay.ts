@@ -1,15 +1,8 @@
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import { usePointerDragSession } from '../utils/interaction/usePointerDragSession'
 import { INPAINT_INTERACTION_KEY } from './types'
-import type {
-  ImageMaskDrawMode,
-  ImageInpaintCommittedData,
-  InpaintInteractionKey,
-} from './types'
-import {
-  buildMaskCommitResult,
-  drawMaskRasterPreviewToCanvas,
-} from './lib/maskPaintingCanvas'
+import type { ImageMaskDrawMode, ImageInpaintCommittedData, InpaintInteractionKey } from './types'
+import { buildMaskCommitResult, drawMaskRasterPreviewToCanvas } from './lib/maskPaintingCanvas'
 import {
   maskStrokeEngine,
   type MaskStrokePoint,

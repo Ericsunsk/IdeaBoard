@@ -14,7 +14,9 @@
           >
             {{ selectedCount }}
           </div>
-          <span class="text-xs font-medium text-board-page-text whitespace-nowrap">{{ t('search.batch.selectedLabel') }}</span>
+          <span class="text-xs font-medium text-board-page-text whitespace-nowrap">{{
+            t('search.batch.selectedLabel')
+          }}</span>
         </div>
 
         <!-- 批量作为视觉搜索参考图 (Vision Search) -->

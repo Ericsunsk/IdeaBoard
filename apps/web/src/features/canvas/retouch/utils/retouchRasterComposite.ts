@@ -2,9 +2,7 @@ import type { RetouchEditableLayer, RetouchLayer, RetouchRasterContent } from '.
 import { applyImageAdjustmentsInPlace } from './imageAdjustmentEngine'
 import { cloneImageData } from './imageDataUtils'
 
-export type RetouchRasterLayerImageProvider = (
-  content: RetouchRasterContent,
-) => ImageData | null
+export type RetouchRasterLayerImageProvider = (content: RetouchRasterContent) => ImageData | null
 
 export type RetouchRasterCompositeOptions = {
   getRasterImageData?: RetouchRasterLayerImageProvider

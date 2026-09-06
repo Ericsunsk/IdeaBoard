@@ -38,9 +38,7 @@ export type CanvasExecutionWorkspaceState = {
 }
 
 export type CanvasExecutionWorkspaceCommands = {
-  runGeneration: (
-    plan: ActivatedImageExecutionPlan & { kind: 'generation' },
-  ) => Promise<void>
+  runGeneration: (plan: ActivatedImageExecutionPlan & { kind: 'generation' }) => Promise<void>
   hydratePendingImageLeases: (snapshot?: CanvasBoardSnapshot) => number
   reattachPendingImageResults: () => Promise<void>
 }

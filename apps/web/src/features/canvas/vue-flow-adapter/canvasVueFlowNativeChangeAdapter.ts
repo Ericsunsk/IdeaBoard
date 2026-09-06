@@ -47,8 +47,7 @@ type CanvasVueFlowNativeChangeAdapterOptions = {
 }
 
 type CanvasControlledNodeChange =
-  | Extract<NodeChange, { type: 'position' }>
-  | Extract<NodeChange, { type: 'select' }>
+  Extract<NodeChange, { type: 'position' }> | Extract<NodeChange, { type: 'select' }>
 
 function isCanvasControlledNodeChange(change: NodeChange): change is CanvasControlledNodeChange {
   return change.type === 'position' || change.type === 'select'

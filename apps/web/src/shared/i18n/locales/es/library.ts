@@ -41,7 +41,8 @@ export default {
     folderNameLabel: 'Nombre de la carpeta',
     folderNamePlaceholder: 'p. ej. Espacial Minimalista',
     deleteFolderTitle: 'Eliminar carpeta',
-    deleteFolderMessage: '¿Eliminar "{name}"? Las referencias guardadas se moverán a Guardados rápidos.',
+    deleteFolderMessage:
+      '¿Eliminar "{name}"? Las referencias guardadas se moverán a Guardados rápidos.',
     removeAssetTitle: 'Quitar referencia guardada',
     removeAssetMessage: '¿Quitar esta referencia guardada de su Biblioteca?',
     cancel: 'Cancelar',

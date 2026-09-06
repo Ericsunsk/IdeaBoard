@@ -31,7 +31,9 @@
         @click="emit('image-input-open')"
       >
         <Plus class="prompt-text-composer-image-add-icon size-4" />
-        <span class="canvas-tool-tooltip" aria-hidden="true">{{ t('canvas.controls.addImageInput') }}</span>
+        <span class="canvas-tool-tooltip" aria-hidden="true">{{
+          t('canvas.controls.addImageInput')
+        }}</span>
       </button>
     </div>
     <PromptComposerControls

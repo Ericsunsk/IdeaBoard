@@ -17,7 +17,7 @@
         :class="{ 'text-clip': isEditing }"
         :contenteditable="isEditing ? 'plaintext-only' : 'false'"
         spellcheck="false"
-:title="t('canvas.controls.renameHint')"
+        :title="t('canvas.controls.renameHint')"
         @click.stop="startEditing"
         @mousedown.stop
         @blur="commitTitle"

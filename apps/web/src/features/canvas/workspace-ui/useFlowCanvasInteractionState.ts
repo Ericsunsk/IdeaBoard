@@ -1,12 +1,7 @@
 import { computed, ref } from 'vue'
 
 export type CanvasInteractionKey =
-  | 'outpaint-overlay'
-  | 'retouch-raster'
-  | 'inpaint'
-  | 'flow-viewport'
-  | 'viewport-pan'
-  | 'node-drag'
+  'outpaint-overlay' | 'retouch-raster' | 'inpaint' | 'flow-viewport' | 'viewport-pan' | 'node-drag'
 
 const CANVAS_LOCKING_INTERACTIONS = new Set<CanvasInteractionKey>([
   // Pixel-editing modes bind pointer input to image-local coordinates, so viewport changes

@@ -62,7 +62,9 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const resolvedRemoveTitle = computed(() => props.removeTitle ?? t('canvas.controls.removeImageInput'))
+const resolvedRemoveTitle = computed(
+  () => props.removeTitle ?? t('canvas.controls.removeImageInput'),
+)
 const resolvedRemoveAriaLabel = computed(
   () => props.removeAriaLabel ?? t('canvas.controls.removeImageInput'),
 )

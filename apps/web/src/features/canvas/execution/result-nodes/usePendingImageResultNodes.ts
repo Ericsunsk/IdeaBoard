@@ -78,7 +78,8 @@ export function usePendingImageResultExecution(
     readNodeMetrics: (nodeId) => {
       const node = options.nodes.value.find((candidate) => candidate.id === nodeId)
       if (!node) return null
-      const dimensions = (node as Node & { dimensions?: { width?: number; height?: number } }).dimensions
+      const dimensions = (node as Node & { dimensions?: { width?: number; height?: number } })
+        .dimensions
       const width = Number(dimensions?.width ?? node.width ?? 0)
       const height = Number(dimensions?.height ?? node.height ?? 0)
       return {
@@ -104,7 +105,8 @@ export function usePendingImageResultExecution(
 
     graph.getEdgeIds().forEach((edgeId) => {
       const edge = graph.getEdge(edgeId)
-      if (!edge || edge.connection.fromNodeType !== 'image' || edge.connection.toPort !== 'image') return
+      if (!edge || edge.connection.fromNodeType !== 'image' || edge.connection.toPort !== 'image')
+        return
       const source = `${edge.connection.fromNodeType}-${edge.connection.fromNodeId}`
       const target = `${edge.connection.toNodeType}-${edge.connection.toNodeId}`
       const current = imageChildIdsBySource.get(source)
@@ -267,10 +269,11 @@ export function usePendingImageResultExecution(
     if (!attachment || !options.isAttachmentCurrent(attachment)) {
       throw new Error('Pending result reservation requires the current Board attachment')
     }
-    let nextConnectionId = store.getEdgeIds().reduce((highest, edgeId) => {
-      const match = /^connection-(\d+)$/.exec(edgeId)
-      return match ? Math.max(highest, Number(match[1])) : highest
-    }, 0) + 1
+    let nextConnectionId =
+      store.getEdgeIds().reduce((highest, edgeId) => {
+        const match = /^connection-(\d+)$/.exec(edgeId)
+        return match ? Math.max(highest, Number(match[1])) : highest
+      }, 0) + 1
     const pendingEdges = plans.flatMap((plan) => (plan.edgeToAppend ? [plan.edgeToAppend] : []))
     const canonicalEdges = pendingEdges.map((edge) => {
       const connection = flowConnectionToCanvasConnection(nextConnectionId++, edge)

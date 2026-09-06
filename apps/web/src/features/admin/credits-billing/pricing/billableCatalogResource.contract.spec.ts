@@ -70,9 +70,7 @@ describe('Admin Billable Catalog resource', () => {
       }),
     )
 
-    await expect(
-      publishBillableItemPrices('ai-image:inpaint', { default: 0 }),
-    ).resolves.toEqual({
+    await expect(publishBillableItemPrices('ai-image:inpaint', { default: 0 })).resolves.toEqual({
       default: {
         priceVersionId: 9,
         version: 1,

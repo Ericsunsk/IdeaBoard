@@ -1,5 +1,8 @@
 import { searchInspiration as searchPublicInspiration } from '../../shared/api/generated-query/search/search'
-import { extractUserVisionSearch, recordSearchImageFailure } from '../../shared/api/generated-query/user/user'
+import {
+  extractUserVisionSearch,
+  recordSearchImageFailure,
+} from '../../shared/api/generated-query/user/user'
 import type {
   SearchResults,
   SearchResult,
@@ -9,7 +12,7 @@ import { resolveApiData, resolveApiOk } from '../../shared/api/apiResponse'
 import { i18n } from '../../shared/i18n'
 
 export type SearchPage = SearchResults
-export const MAX_SEARCH_QUERY_RUNES = 200
+const MAX_SEARCH_QUERY_RUNES = 200
 
 export function normalizeSearchQuery(raw: string): string {
   return raw.trim().replace(/\s+/g, ' ')
@@ -111,7 +114,10 @@ export async function extractVisionSearch(input: {
 
 export async function reportSearchImageFailure(provider: SearchCatalogProvider): Promise<void> {
   try {
-    await resolveApiOk(recordSearchImageFailure({ provider }), i18n.global.t('search.reportImageFailureFailed'))
+    await resolveApiOk(
+      recordSearchImageFailure({ provider }),
+      i18n.global.t('search.reportImageFailureFailed'),
+    )
   } catch (error) {
     if (import.meta.env.DEV) console.debug('search image failure metric unavailable', error)
   }

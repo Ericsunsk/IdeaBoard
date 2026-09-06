@@ -1,7 +1,7 @@
 <template>
   <div class="editing-controls-fields retouch-threshold-fields">
     <label class="editing-controls-field">
-      <span class="editing-controls-label">{{ t("canvas.retouch.params.threshold") }}</span>
+      <span class="editing-controls-label">{{ t('canvas.retouch.params.threshold') }}</span>
       <input
         name="retouch-threshold"
         class="editing-controls-control editing-controls-number-input"
@@ -22,7 +22,9 @@
       @click="emit('update:invert', !invert)"
     >
       <FlipReverse aria-hidden="true" />
-      <span class="canvas-tool-tooltip" aria-hidden="true">{{ t("canvas.retouch.invertTooltip") }}</span>
+      <span class="canvas-tool-tooltip" aria-hidden="true">{{
+        t('canvas.retouch.invertTooltip')
+      }}</span>
     </button>
   </div>
 </template>

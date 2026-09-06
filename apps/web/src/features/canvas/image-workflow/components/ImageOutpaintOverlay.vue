@@ -42,10 +42,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { NodePromptComposer } from '../../components/nodes/primitives'
-import {
-  OUTPAINT_DRAG_ANCHORS,
-  type OutpaintDragAnchor,
-} from '../useImageOutpaintOverlay'
+import { OUTPAINT_DRAG_ANCHORS, type OutpaintDragAnchor } from '../useImageOutpaintOverlay'
 import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 import { useCanvasBillingQuote } from '../../execution'
 import { buildOutpaintReadinessRequest } from '../../execution/commands/flowImageTaskRequests'

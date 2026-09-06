@@ -61,7 +61,10 @@ export function formatCanvasNodePortLabel(port: CanvasConnectionPort): string {
 }
 
 /** Menu copy resolved read-time; callers render through their own t(). */
-export function getCanvasNodeKindMenuItems(): readonly { key: CanvasCreatableNodeKind; label: string }[] {
+export function getCanvasNodeKindMenuItems(): readonly {
+  key: CanvasCreatableNodeKind
+  label: string
+}[] {
   return CANVAS_NODE_UI_REGISTRY_LIST.map((item) => ({
     key: item.kind as CanvasCreatableNodeKind,
     label: i18n.global.t(item.defaultTitleKey),

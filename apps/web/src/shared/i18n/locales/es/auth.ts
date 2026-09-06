@@ -8,9 +8,11 @@ export default {
   kickerWelcomeBack: 'BIENVENIDO DE NUEVO',
   kickerStartMaking: 'EMPIECE A CREAR',
   forgotPassword: '¿Olvidó su contraseña?',
-  resetPasswordInstructions: 'Introduzca su correo electrónico para recibir un código de verificación.',
+  resetPasswordInstructions:
+    'Introduzca su correo electrónico para recibir un código de verificación.',
   socialSignInAria: 'Iniciar sesión con {provider}',
-  otpSentTo: 'Se ha enviado un código de verificación a {email}. Introdúzcalo a continuación para completar el registro.',
+  otpSentTo:
+    'Se ha enviado un código de verificación a {email}. Introdúzcalo a continuación para completar el registro.',
   fields: {
     email: 'Correo electrónico',
     password: 'Contraseña',
@@ -88,15 +90,18 @@ export default {
     oauthSignInFailed: 'Error al iniciar sesión con {provider}. Inténtelo de nuevo.',
     otpInvalidOrExpired: 'Este código no es válido o ha caducado.',
     otpSendFailed: 'No se pudo enviar el código. Inténtelo de nuevo.',
-    passwordResetFailed: 'No se pudo restablecer su contraseña. Compruebe el código e inténtelo de nuevo.',
+    passwordResetFailed:
+      'No se pudo restablecer su contraseña. Compruebe el código e inténtelo de nuevo.',
     currentPasswordIncorrect: 'Su contraseña actual es incorrecta.',
     emailCodeSendFailed: 'No se pudo enviar el correo de verificación. Inténtelo de nuevo.',
     otherSessionsRevokeFailed: 'No pudimos cerrar su sesión en otros dispositivos.',
     passwordUpdateFailed: 'No se pudo actualizar su contraseña. Inténtelo de nuevo.',
     stopImpersonatingFailed: 'No se pudo salir de la cuenta suplantada.',
-    stopImpersonatingRetryAsAdmin: 'No se pudo salir de la cuenta suplantada. Inicie sesión con su cuenta de administrador e inténtelo de nuevo.',
+    stopImpersonatingRetryAsAdmin:
+      'No se pudo salir de la cuenta suplantada. Inicie sesión con su cuenta de administrador e inténtelo de nuevo.',
     sessionRestoreFailed: 'Ha iniciado sesión, pero no pudimos cargar su cuenta.',
-    sessionRestoreAfterVerifyFailed: 'Su correo electrónico está verificado, pero no pudimos cargar su cuenta. Inicie sesión.',
+    sessionRestoreAfterVerifyFailed:
+      'Su correo electrónico está verificado, pero no pudimos cargar su cuenta. Inicie sesión.',
     invalidEmail: 'Introduzca una dirección de correo electrónico válida',
     sixDigitCode: 'Introduzca el código de verificación de 6 dígitos',
     passwordMismatch: 'Las contraseñas no coinciden',

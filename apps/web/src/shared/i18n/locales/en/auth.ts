@@ -94,9 +94,11 @@ export default {
     otherSessionsRevokeFailed: 'We could not sign you out on your other devices.',
     passwordUpdateFailed: 'Could not update your password. Please try again.',
     stopImpersonatingFailed: 'Could not leave the impersonated account.',
-    stopImpersonatingRetryAsAdmin: 'Could not leave the impersonated account. Sign in with your admin account and try again.',
+    stopImpersonatingRetryAsAdmin:
+      'Could not leave the impersonated account. Sign in with your admin account and try again.',
     sessionRestoreFailed: 'You are signed in, but we could not load your account.',
-    sessionRestoreAfterVerifyFailed: 'Your email is verified, but we could not load your account. Please sign in.',
+    sessionRestoreAfterVerifyFailed:
+      'Your email is verified, but we could not load your account. Please sign in.',
     invalidEmail: 'Please enter a valid email address',
     sixDigitCode: 'Please enter a 6-digit code',
     passwordMismatch: 'Passwords do not match',

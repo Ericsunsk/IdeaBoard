@@ -1,9 +1,5 @@
 <template>
-  <SettingEditorCard
-    title="私有地址访问"
-    :status="statusLabel"
-    :status-severity="statusSeverity"
-  >
+  <SettingEditorCard title="私有地址访问" :status="statusLabel" :status-severity="statusSeverity">
     <template #default>
       <div class="flex flex-col gap-5">
         <Message v-if="error" severity="error" :closable="false">

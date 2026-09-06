@@ -118,9 +118,7 @@ describe('usePendingImageResultExecution reservation projection', () => {
 
     expect(reservation.resultNodeIds).toHaveLength(1)
     expect(harness.nodes.value).toHaveLength(2)
-    expect(harness.nodes.value[1]!.position.x).toBeGreaterThan(
-      harness.nodes.value[0]!.position.x,
-    )
+    expect(harness.nodes.value[1]!.position.x).toBeGreaterThan(harness.nodes.value[0]!.position.x)
     expect(harness.store.exportSnapshot().connections).toEqual([
       expect.objectContaining({
         id: 1,
@@ -155,26 +153,44 @@ describe('usePendingImageResultExecution reservation projection', () => {
     const harness = createHarness()
     harness.nodes.value.push(imageNode(2, 390, ''))
     harness.edges.value.push({
-      id: 'edge-1', source: 'image-1', sourceHandle: 'out:image', target: 'image-2', targetHandle: 'in:image',
+      id: 'edge-1',
+      source: 'image-1',
+      sourceHandle: 'out:image',
+      target: 'image-2',
+      targetHandle: 'in:image',
     })
     harness.syncGraph()
 
-    const reservation = harness.actions.reservePendingResults({ source, sourceNodeId: 'image-1', outputCount: 1 })
+    const reservation = harness.actions.reservePendingResults({
+      source,
+      sourceNodeId: 'image-1',
+      outputCount: 1,
+    })
 
     expect(reservation.resultNodeIds).toEqual(['image-2'])
     expect(harness.nodes.value).toHaveLength(2)
-    expect(harness.nodes.value.find((node) => node.id === 'image-2')?.data.snapshotNode.outputStatus).toBe('running')
+    expect(
+      harness.nodes.value.find((node) => node.id === 'image-2')?.data.snapshotNode.outputStatus,
+    ).toBe('running')
   })
 
   it('does not reuse an active empty child slot', () => {
     const harness = createHarness(['image-2'])
     harness.nodes.value.push(imageNode(2, 390, ''))
     harness.edges.value.push({
-      id: 'edge-1', source: 'image-1', sourceHandle: 'out:image', target: 'image-2', targetHandle: 'in:image',
+      id: 'edge-1',
+      source: 'image-1',
+      sourceHandle: 'out:image',
+      target: 'image-2',
+      targetHandle: 'in:image',
     })
     harness.syncGraph()
 
-    const reservation = harness.actions.reservePendingResults({ source, sourceNodeId: 'image-1', outputCount: 1 })
+    const reservation = harness.actions.reservePendingResults({
+      source,
+      sourceNodeId: 'image-1',
+      outputCount: 1,
+    })
 
     expect(reservation.resultNodeIds[0]).not.toBe('image-2')
     expect(harness.nodes.value).toHaveLength(3)
@@ -204,7 +220,11 @@ describe('usePendingImageResultExecution reservation projection', () => {
     })
     harness.syncGraph()
 
-    const reservation = harness.actions.reservePendingResults({ source, sourceNodeId: 'image-1', outputCount: 1 })
+    const reservation = harness.actions.reservePendingResults({
+      source,
+      sourceNodeId: 'image-1',
+      outputCount: 1,
+    })
     const resultNode = harness.nodes.value.find((node) => node.id === reservation.resultNodeIds[0])
 
     expect(resultNode).toBeDefined()
@@ -215,7 +235,11 @@ describe('usePendingImageResultExecution reservation projection', () => {
 
   it('attaches persisted task identity without adding graph history', () => {
     const harness = createHarness()
-    const { resultNodeIds } = harness.actions.reservePendingResults({ source, sourceNodeId: 'image-1', outputCount: 1 })
+    const { resultNodeIds } = harness.actions.reservePendingResults({
+      source,
+      sourceNodeId: 'image-1',
+      outputCount: 1,
+    })
 
     harness.actions.attachPendingTaskIds([
       {

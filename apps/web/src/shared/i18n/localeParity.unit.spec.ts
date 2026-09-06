@@ -24,7 +24,10 @@ describe('Locale bundle parity (runtime surface)', () => {
 
     for (const locale of SUPPORTED_LOCALES) {
       if (locale === 'en') continue
-      const diff = diffLocaleBundles(enBundle as Record<string, unknown>, BUNDLES[locale] as Record<string, unknown>)
+      const diff = diffLocaleBundles(
+        enBundle as Record<string, unknown>,
+        BUNDLES[locale] as Record<string, unknown>,
+      )
       expect(diff.equal, `[${locale}] should match en exactly`).toBe(true)
       expect(diff.missing).toEqual([])
       expect(diff.extra).toEqual([])

@@ -1,8 +1,4 @@
-import type {
-  RetouchAdjustmentLayer,
-  RetouchEditableLayer,
-  RetouchLayer,
-} from '../types'
+import type { RetouchAdjustmentLayer, RetouchEditableLayer, RetouchLayer } from '../types'
 import { hasEffectiveImageAdjustments } from './imageAdjustmentEngine'
 
 export function flattenVisibleRetouchAdjustmentLayers(

@@ -24,7 +24,9 @@ function readPendingImageTask(node: ImageNodeItem): PendingImageTaskSnapshot | n
   })
 }
 
-export function collectPendingImageTasks(snapshot: CanvasBoardSnapshot): PendingImageTaskSnapshot[] {
+export function collectPendingImageTasks(
+  snapshot: CanvasBoardSnapshot,
+): PendingImageTaskSnapshot[] {
   return snapshot.imageNodes.flatMap((node) => {
     const pending = readPendingImageTask(node)
     return pending ? [pending] : []

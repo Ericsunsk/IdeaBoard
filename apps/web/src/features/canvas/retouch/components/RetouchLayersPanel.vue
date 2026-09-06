@@ -1,6 +1,10 @@
 <template>
   <section class="retouch-panel retouch-layers-panel">
-    <div class="retouch-layers-panel__list app-scrollbar" role="listbox" :aria-label="t('canvas.retouch.layersListLabel')">
+    <div
+      class="retouch-layers-panel__list app-scrollbar"
+      role="listbox"
+      :aria-label="t('canvas.retouch.layersListLabel')"
+    >
       <div
         v-for="layer in layers"
         :key="layer.id"
@@ -24,7 +28,9 @@
           v-else
           type="button"
           class="retouch-layer-row__visibility canvas-tool-tooltip-trigger"
-          :aria-label="layer.visible ? t('canvas.retouch.hideLayer') : t('canvas.retouch.showLayer')"
+          :aria-label="
+            layer.visible ? t('canvas.retouch.hideLayer') : t('canvas.retouch.showLayer')
+          "
           @click.stop="onToggleVisibility(layer)"
         >
           <Eye v-if="layer.visible" class="retouch-layer-row__icon" />
@@ -103,9 +109,7 @@ function assertNever(value: never): never {
 
 <style scoped>
 .retouch-layers-panel {
-  height: calc(
-    var(--retouch-panel-inset) * 2 + var(--retouch-panel-row-height) * 5 + 5px * 4
-  );
+  height: calc(var(--retouch-panel-inset) * 2 + var(--retouch-panel-row-height) * 5 + 5px * 4);
   min-height: 0;
   margin-top: auto;
   display: flex;

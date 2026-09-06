@@ -36,7 +36,9 @@
     </section>
 
     <section class="grid min-w-0 gap-3" aria-labelledby="reward-history-heading">
-      <h3 id="reward-history-heading" class="m-0 text-lg font-bold text-ib-text">{{ t('account.rewards.historyTitle') }}</h3>
+      <h3 id="reward-history-heading" class="m-0 text-lg font-bold text-ib-text">
+        {{ t('account.rewards.historyTitle') }}
+      </h3>
       <DataTableFrame
         :value="tableRows"
         data-key="id"
@@ -48,7 +50,11 @@
         :empty-title="t('account.rewards.emptyTitle')"
         :empty-description="t('account.rewards.emptyDescription')"
       >
-        <Column field="redeemed_at" :header="t('account.rewards.columnRedeemedAt')" :style="{ width: '190px' }">
+        <Column
+          field="redeemed_at"
+          :header="t('account.rewards.columnRedeemedAt')"
+          :style="{ width: '190px' }"
+        >
           <template #body="{ data }">
             <Skeleton v-if="isSkeletonRow(data)" width="8rem" />
             <time v-else class="whitespace-nowrap font-mono text-[13px] text-ib-text-muted">
@@ -57,7 +63,11 @@
           </template>
         </Column>
 
-        <Column field="reward_code_display_name" :header="t('account.rewards.columnReward')" :style="{ minWidth: '220px' }">
+        <Column
+          field="reward_code_display_name"
+          :header="t('account.rewards.columnReward')"
+          :style="{ minWidth: '220px' }"
+        >
           <template #body="{ data }">
             <Skeleton v-if="isSkeletonRow(data)" width="7rem" />
             <span
@@ -70,7 +80,11 @@
           </template>
         </Column>
 
-        <Column field="credited_amount" :header="t('account.rewards.columnCredited')" :style="{ width: '130px' }">
+        <Column
+          field="credited_amount"
+          :header="t('account.rewards.columnCredited')"
+          :style="{ width: '130px' }"
+        >
           <template #body="{ data }">
             <Skeleton v-if="isSkeletonRow(data)" width="4rem" />
             <span v-else class="whitespace-nowrap font-mono font-bold text-ib-success">
@@ -79,7 +93,11 @@
           </template>
         </Column>
 
-        <Column field="masked_code_hint" :header="t('account.rewards.columnCode')" :style="{ width: '150px' }">
+        <Column
+          field="masked_code_hint"
+          :header="t('account.rewards.columnCode')"
+          :style="{ width: '150px' }"
+        >
           <template #body="{ data }">
             <Skeleton v-if="isSkeletonRow(data)" width="5rem" />
             <span v-else class="whitespace-nowrap font-mono text-[13px] text-ib-text-muted">
@@ -113,12 +131,19 @@
             role="status"
           >
             <span class="font-semibold text-ib-text">{{ t('account.rewards.emptyTitle') }}</span>
-            <span class="mt-1 text-sm text-ib-text-subtle">{{ t('account.rewards.emptyDescription') }}</span>
+            <span class="mt-1 text-sm text-ib-text-subtle">{{
+              t('account.rewards.emptyDescription')
+            }}</span>
           </div>
         </template>
 
         <template #after>
-          <p v-if="isInitialPending" class="sr-only" role="status" :aria-label="t('account.rewards.loading')">
+          <p
+            v-if="isInitialPending"
+            class="sr-only"
+            role="status"
+            :aria-label="t('account.rewards.loading')"
+          >
             {{ t('account.rewards.loading') }}
           </p>
 
@@ -128,7 +153,13 @@
             role="alert"
           >
             <span class="text-sm text-ib-danger">{{ errorMessage(loadMoreError) }}</span>
-            <Button :label="t('account.rewards.retryLoad')" severity="secondary" size="small" text @click="loadMore()" />
+            <Button
+              :label="t('account.rewards.retryLoad')"
+              severity="secondary"
+              size="small"
+              text
+              @click="loadMore()"
+            />
           </div>
           <div
             v-else-if="hasNextPage"

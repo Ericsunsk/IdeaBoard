@@ -31,10 +31,7 @@ describe('useCanvasVueFlowGraphAdapter', () => {
     }
     const updateNode = vi.fn((id, update) => {
       if (id !== runtimeNode.id) return
-      Object.assign(
-        runtimeNode,
-        typeof update === 'function' ? update(runtimeNode) : update,
-      )
+      Object.assign(runtimeNode, typeof update === 'function' ? update(runtimeNode) : update)
     })
     const adapter = useCanvasVueFlowGraphAdapter({
       nodes,
@@ -70,7 +67,11 @@ describe('useCanvasVueFlowGraphAdapter', () => {
     const edges = shallowRef<Edge[]>([])
     const updateNode = vi.fn()
     const setNodes = vi.fn()
-    const adapter = useCanvasVueFlowGraphAdapter({ nodes, edges, actions: { updateNode, setNodes } })
+    const adapter = useCanvasVueFlowGraphAdapter({
+      nodes,
+      edges,
+      actions: { updateNode, setNodes },
+    })
 
     adapter.applyIncrementalProjection({
       nodes: [projectedNode],
@@ -90,7 +91,13 @@ describe('useCanvasVueFlowGraphAdapter', () => {
     const adapter = useCanvasVueFlowGraphAdapter({ nodes, edges, actions: { applyNodeChanges } })
 
     adapter.syncControlledNodeChanges([
-      { id: 'node-1', type: 'position', position: { x: 40, y: 20 }, from: { x: 0, y: 0 }, dragging: true },
+      {
+        id: 'node-1',
+        type: 'position',
+        position: { x: 40, y: 20 },
+        from: { x: 0, y: 0 },
+        dragging: true,
+      },
     ])
 
     expect(nodes.value[0]).toMatchObject({ position: { x: 40, y: 20 } })

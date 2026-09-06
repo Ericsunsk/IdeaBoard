@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiResponseAdminBrandLogoOverrideList } from '../../../../shared/api/generated-query/model'
-import {
-  getAdminBrandLogoOverride,
-  replaceAdminBrandLogoOverrides,
-} from './adminBrandLogos'
+import { getAdminBrandLogoOverride, replaceAdminBrandLogoOverrides } from './adminBrandLogos'
 import {
   createAdminBrandLogoResource,
   hydrateAdminBrandLogoOverrides,
@@ -39,7 +36,11 @@ function createQueryCache(initial?: ApiResponseAdminBrandLogoOverrideList): Quer
   return cache
 }
 
-function override(scope: 'provider-endpoint' | 'storage-profile', targetKey: string, logoKey: 'flux' | 'minio') {
+function override(
+  scope: 'provider-endpoint' | 'storage-profile',
+  targetKey: string,
+  logoKey: 'flux' | 'minio',
+) {
   return {
     scope,
     target_key: targetKey,
@@ -70,7 +71,9 @@ describe('adminBrandLogoResource', () => {
 
     await createAdminBrandLogoResource(cache as never).save('provider-endpoint', '2', 'minio')
 
-    expect(cache.cancelQueries).toHaveBeenCalledWith({ queryKey: ['admin', 'brand-logo-overrides'] })
+    expect(cache.cancelQueries).toHaveBeenCalledWith({
+      queryKey: ['admin', 'brand-logo-overrides'],
+    })
     expect(cache.value?.data?.overrides).toEqual([initial, saved])
     expect(getAdminBrandLogoOverride('provider-endpoint', '1')).toBe('flux')
     expect(getAdminBrandLogoOverride('provider-endpoint', '2')).toBe('minio')

@@ -262,11 +262,7 @@ export function useDisplayImagePreview(
       return mediaDelivery.url.value
     }
     if (previewUrl.value) return previewUrl.value
-    if (
-      isManagedUpload.value &&
-      resolvedMaxSide.value !== null &&
-      !isResolved.value
-    ) {
+    if (isManagedUpload.value && resolvedMaxSide.value !== null && !isResolved.value) {
       return ''
     }
     return resolvedSourceUrl.value

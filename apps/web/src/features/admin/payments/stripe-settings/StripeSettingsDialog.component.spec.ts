@@ -114,9 +114,7 @@ describe('StripeSettingsDialog', () => {
 
   it('shows a safe Stripe validation error, keeps the dialog open, and clears the API Key', async () => {
     vi.mocked(resource.save).mockRejectedValueOnce(
-      new Error(
-        '无效的 Stripe API Key：请使用 sk_ 或 rk_ 开头的对应环境 Key',
-      ),
+      new Error('无效的 Stripe API Key：请使用 sk_ 或 rk_ 开头的对应环境 Key'),
     )
     const { user, emitted } = renderDialog()
     await screen.findByText('acct_123')
@@ -125,9 +123,7 @@ describe('StripeSettingsDialog', () => {
     await user.click(screen.getByRole('button', { name: '保存设置' }))
 
     expect(
-      await screen.findByText(
-        '无效的 Stripe API Key：请使用 sk_ 或 rk_ 开头的对应环境 Key',
-      ),
+      await screen.findByText('无效的 Stripe API Key：请使用 sk_ 或 rk_ 开头的对应环境 Key'),
     ).toBeVisible()
     expect(emitted()['update:visible']).toBeUndefined()
     expect((screen.getByLabelText('Stripe API Key') as HTMLInputElement).value).toBe('')
