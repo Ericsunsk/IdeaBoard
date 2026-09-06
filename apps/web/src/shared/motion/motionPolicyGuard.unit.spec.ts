@@ -14,7 +14,7 @@ describe('Motion Policy style guard', () => {
   it('ignores TypeScript chart animation options', () => {
     expect(
       findMotionPolicyViolations(
-        'src/features/account-management/userUsageTrendChart.ts',
+        'src/features/account/domain/usage/chart.ts',
         'const options = { animation: { duration: 0 } }',
       ),
     ).toEqual([])

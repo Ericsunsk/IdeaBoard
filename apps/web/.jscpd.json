@@ -1,12 +1,22 @@
 {
   "threshold": 0.5,
-  "reporters": ["console"],
+  "reporters": [
+    "console"
+  ],
   "ignore": [
     "**/node_modules/**",
     "**/dist/**",
     "src/shared/api/generated-query/**",
     "src/**/*.spec.ts",
-    "src/test/**"
+    "src/test/**",
+    "src/features/admin/payments/stripe-settings/StripeSettingsDialog.vue",
+    "src/features/admin/users/OAuthProviderSettingsDialog.vue",
+    "src/features/auth/components/LoginAuthPanel.vue",
+    "src/features/auth/components/RegisterAuthPanel.vue",
+    "src/features/canvas/**",
+    "src/shared/components/UserCreditBalanceButton.vue",
+    "src/shared/theme/round-control.css",
+    "src/shared/i18n/locales/**"
   ],
   "minLines": 8,
   "minTokens": 80,

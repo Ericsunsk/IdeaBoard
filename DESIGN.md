@@ -208,7 +208,7 @@ Dependency direction:
 | Canvas Workspace    | `features/canvas`             | AI 画布交互面、节点运行时、工具链（Retouch/Inpaint/Brush/Select）、命令编排与任务生命周期                         | Canvas Node/Edge runtime, Tool State Machine, Execution Plan, Task Runner |
 | Canvas Board Schema | `features/canvas-board`       | 画布持久化文档模型、快照 Schema、媒体引用提取与反序列化验证（纯领域模型 + 持久化适配）                            | `CanvasBoardStateSchema`, `boardStateEnvelopeContract`, serialization     |
 | Board Catalog       | `features/board-catalog`      | 看板画廊与列表、筛选排序、新建/重命名/删除看板、封面缩略图                                                        | Board metadata, pagination, board mutation use cases                      |
-| Account Management  | `features/account-management` | 用户额度（Idea/Credits）查看与刷新、Stripe 充值收银台、兑换码兑换、账单记录与用量统计明细                         | Wallet balance, Recharge session state machine, Redemption, Usage trend   |
+| Account             | `features/account`            | 用户额度（Idea/Credits）查看与刷新、Stripe 充值收银台、兑换码兑换、账单记录与用量统计明细                         | Wallet balance, Recharge session state machine, Redemption, Usage trend   |
 | Admin Verticals     | `features/admin`              | 管理端独立垂直子域（用户运营、模型/通道配置、提示词模板管理、存储配置、任务调度监控、统计分析、额度计费 Catalog） | Vertical context view models, Admin resources, Policy inspection          |
 | Auth & Identity     | `features/auth`               | 认证与会话状态（Better Auth 集成、登录/注册弹窗与路由拦截、凭据校验、Auth Bridge）                                | Session state, Auth token lifecycle, Login/Register workflows             |
 | Library             | `features/library`            | 外部灵感素材收藏、分类文件夹、媒体引用与拖拽入画布交互                                                            | Library item model, Folder taxonomy, cursor pagination                    |

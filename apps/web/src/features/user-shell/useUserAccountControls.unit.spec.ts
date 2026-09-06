@@ -4,16 +4,16 @@ import { render } from '../../test/render'
 import type { User } from '../../shared/api/userSession'
 import { ADMIN_ROOT_PATH, HOME_PATH } from '../../shared/constants/routePaths'
 import {
-  createAccountManagementOverlay,
-  provideAccountManagementOverlay,
-  type AccountManagementOverlay,
-} from '../account-management/accountManagementOverlay'
-import type { UserCreditWalletSummaryState } from '../account-management/useUserCreditWalletSummary'
+  createAccountOverlay,
+  provideAccountOverlay,
+  type AccountOverlay,
+  type CreditWalletState,
+} from '../account'
 import { createAuthOverlay, provideAuthOverlay, type AuthOverlay } from '../auth/authOverlay'
 import { useUserAccountControls } from './useUserAccountControls'
 
 const currentUser = ref<User | null>(null)
-const walletState = ref<UserCreditWalletSummaryState>({
+const walletState = ref<CreditWalletState>({
   status: 'ready',
   availableCredits: 1280,
 })
@@ -26,9 +26,13 @@ vi.mock('../auth/session/authSession', () => ({
   }),
 }))
 
-vi.mock('../account-management/useUserCreditWalletSummary', () => ({
-  useUserCreditWalletSummary: () => ({ state: walletState }),
-}))
+vi.mock('../account', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../account')>()
+  return {
+    ...actual,
+    useCreditWallet: () => ({ state: walletState }),
+  }
+})
 
 function makeUser(role: 'admin' | 'user' = 'user'): User {
   return {
@@ -45,11 +49,11 @@ function makeUser(role: 'admin' | 'user' = 'user'): User {
 
 function renderAccountControls(options: Parameters<typeof useUserAccountControls>[0]): {
   controls: ReturnType<typeof useUserAccountControls>
-  overlay: AccountManagementOverlay
+  overlay: AccountOverlay
   authOverlay: AuthOverlay
 } {
   let controls: ReturnType<typeof useUserAccountControls> | undefined
-  let overlay: AccountManagementOverlay | undefined
+  let overlay: AccountOverlay | undefined
   let authOverlay: AuthOverlay | undefined
   // The consumer must be a descendant because Vue does not expose a component's own provides to it.
   // eslint-disable-next-line vue/one-component-per-file
@@ -62,7 +66,7 @@ function renderAccountControls(options: Parameters<typeof useUserAccountControls
   // eslint-disable-next-line vue/one-component-per-file
   const Harness = defineComponent({
     setup() {
-      overlay = createAccountManagementOverlay({
+      overlay = createAccountOverlay({
         currentUser,
         reportError: vi.fn(),
         navigation: {
@@ -71,7 +75,7 @@ function renderAccountControls(options: Parameters<typeof useUserAccountControls
         },
         route: { fullPath: '/user/boards', hash: '', path: '/user/boards', query: {} },
       })
-      provideAccountManagementOverlay(overlay)
+      provideAccountOverlay(overlay)
       authOverlay = createAuthOverlay()
       provideAuthOverlay(authOverlay)
       return () => h(Consumer)

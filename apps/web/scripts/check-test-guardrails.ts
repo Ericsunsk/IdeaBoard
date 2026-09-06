@@ -80,25 +80,25 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the keyboard focus visibility class contract for the image result action; the DOM harness cannot compute Tailwind focus pseudo-state styles.',
     },
   ],
-  'src/features/account-management/components/UserRewardsPane.component.spec.ts': [
+  'src/features/account/presentation/rewards/RewardsPane.component.spec.ts': [
     {
       reason:
         'Verifies that the redemption action stays on the User Shell semantic button contract instead of inheriting the Admin PrimeVue primary theme.',
     },
   ],
-  'src/features/account-management/components/UserSecurityPane.component.spec.ts': [
+  'src/features/account/presentation/security/SecurityPane.component.spec.ts': [
     {
       reason:
         'Verifies that the password action stays on the User Shell semantic button contract instead of inheriting the Admin PrimeVue primary theme.',
     },
   ],
-  'src/features/account-management/components/UserBillingRecordsPane.component.spec.ts': [
+  'src/features/account/presentation/billing/BillingPane.component.spec.ts': [
     {
       reason:
         'Verifies the confirmed semantic color contract for income, ordinary consumption, and system deductions.',
     },
   ],
-  'src/features/account-management/components/UserUsagePane.component.spec.ts': [
+  'src/features/account/presentation/usage/UsagePane.component.spec.ts': [
     {
       reason:
         'Verifies the fixed responsive 5-column to 2x2-plus-spanning-row layout and stable loading geometry required by the usage summary contract.',

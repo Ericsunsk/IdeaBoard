@@ -35,7 +35,7 @@
       <router-view :key="route.path === USER_CANVAS_PATH ? route.path : route.fullPath" />
     </div>
 
-    <AccountManagementDialogHost />
+    <AccountDialogHost />
     <UserAuthModals
       v-if="authModal"
       :mode="authModal.mode"
@@ -66,10 +66,10 @@ import UserAuthModals from '../../auth/components/UserAuthModals.vue'
 import { createAuthOverlay, provideAuthOverlay } from '../../auth/authOverlay'
 import { clearPendingSearchAuthAction } from '../../search/searchAuthContinuation'
 import {
-  AccountManagementDialogHost,
-  createAccountManagementOverlay,
-  provideAccountManagementOverlay,
-} from '../../account-management'
+  AccountDialogHost,
+  createAccountOverlay,
+  provideAccountOverlay,
+} from '../../account'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -77,16 +77,16 @@ const route = useRoute()
 const authFeedback = useAuthFeedback()
 const { runAsyncAction } = useAsyncAction()
 const userStore = useUserStore()
-const accountManagementOverlay = createAccountManagementOverlay({
+const accountOverlay = createAccountOverlay({
   currentUser: computed(() => userStore.user),
-  reportError: (error) => console.warn('[account-management] payment-return cleanup failed', error),
+  reportError: (error) => console.warn('[account] payment-return cleanup failed', error),
   navigation: {
     replace: (location) => router.replace(location),
     resolve: (location) => router.resolve(location),
   },
   route,
 })
-provideAccountManagementOverlay(accountManagementOverlay)
+provideAccountOverlay(accountOverlay)
 const authOverlay = createAuthOverlay()
 provideAuthOverlay(authOverlay)
 

@@ -11,11 +11,11 @@ import { formatLocaleNumber } from '../../shared/i18n/formatters'
 import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
 import { formatIdeaAmount } from '../../shared/i18n/userIdeaCurrency'
 import {
-  defaultAccountManagementTab,
-  useAccountManagementOverlay,
-  useUserCreditWalletSummary,
-  type AccountManagementTab,
-} from '../account-management'
+  defaultAccountTab,
+  useAccountOverlay,
+  useCreditWallet,
+  type AccountTab,
+} from '../account'
 import { useAuthOverlay } from '../auth/authOverlay'
 
 export type UserShellNavigationAdapter = {
@@ -34,13 +34,13 @@ function formatIdeaValue(value: number): string {
 
 export function useUserAccountControls(options: UseUserAccountControlsOptions) {
   const userStore = useUserStore()
-  const wallet = useUserCreditWalletSummary(() => Boolean(userStore.user))
-  const accountManagement = useAccountManagementOverlay()
+  const wallet = useCreditWallet(() => Boolean(userStore.user))
+  const accountOverlay = useAccountOverlay()
 
   const authOverlay = useAuthOverlay()
 
-  function openAccount(tab: AccountManagementTab = defaultAccountManagementTab) {
-    accountManagement.commands.open(tab)
+  function openAccount(tab: AccountTab = defaultAccountTab) {
+    accountOverlay.commands.open(tab)
   }
 
   function openLogin() {

@@ -28,7 +28,7 @@ module.exports = {
       comment:
         'Route pages and app layers must use feature/resource/shared API adapters instead of generated-query directly.',
       from: {
-        path: '^src/(app|features/[^/]+/(components|pages|app))',
+        path: '^src/(app|features/[^/]+/(components|presentation|pages|app))',
       },
       to: {
         path: '^src/shared/api/generated-query',
