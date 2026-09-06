@@ -1,13 +1,7 @@
 import { QueryClient, type InfiniteData } from '@tanstack/vue-query'
 import { describe, expect, it, vi } from 'vitest'
-import {
-  rewardRedemptionsQueryKeys,
-  type RewardRedemptionPageData,
-} from '../../infrastructure'
-import {
-  createRewardRedemptionWorkflow,
-  prependRewardRedemption,
-} from './useRewardRedemption'
+import { rewardRedemptionsQueryKeys, type RewardRedemptionPageData } from '../../infrastructure'
+import { createRewardRedemptionWorkflow, prependRewardRedemption } from './useRewardRedemption'
 
 const redeemed = {
   redemption: {

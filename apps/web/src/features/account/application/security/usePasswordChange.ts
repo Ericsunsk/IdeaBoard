@@ -2,7 +2,10 @@ import { ref, type Ref } from 'vue'
 import type { Router } from 'vue-router'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../../../auth/session/authSession'
-import { type AsyncActionFeedback, useAsyncAction } from '../../../../shared/composables/useAsyncAction'
+import {
+  type AsyncActionFeedback,
+  useAsyncAction,
+} from '../../../../shared/composables/useAsyncAction'
 import { getPasswordLengthError } from '../../../../shared/auth/passwordPolicy'
 import { USER_LOGIN_PATH } from '../../../../shared/constants/routePaths'
 import { markRequiredError } from '../../../../shared/utils/formValidation'

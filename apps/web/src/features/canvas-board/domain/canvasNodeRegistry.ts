@@ -127,7 +127,7 @@ function createFusionSnapshot(point: CanvasPoint, id: number): FusionNodeItem {
   }
 }
 
-export const CANVAS_NODE_REGISTRY = {
+const CANVAS_NODE_REGISTRY = {
   image: {
     kind: 'image',
     snapshotType: 'image-node',

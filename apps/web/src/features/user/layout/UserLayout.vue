@@ -65,11 +65,7 @@ import { useAuthFeedback } from '../../auth/useAuthFeedback'
 import UserAuthModals from '../../auth/components/UserAuthModals.vue'
 import { createAuthOverlay, provideAuthOverlay } from '../../auth/authOverlay'
 import { clearPendingSearchAuthAction } from '../../search/searchAuthContinuation'
-import {
-  AccountDialogHost,
-  createAccountOverlay,
-  provideAccountOverlay,
-} from '../../account'
+import { AccountDialogHost, createAccountOverlay, provideAccountOverlay } from '../../account'
 
 const { t } = useI18n()
 const router = useRouter()

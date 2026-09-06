@@ -11,33 +11,9 @@ type BoundaryCase = {
 }
 
 const restrictedBoundaryCases: BoundaryCase[] = [
-  {
-    name: 'app layer cannot import generated-query directly',
-    filePath: path.join(webRoot, 'src/app/stores/import-boundary.fixture.ts'),
-    code: `
-      import { getUserInfo } from '../../shared/api/generated-query/user/user'
-
-      console.log(getUserInfo)
-    `,
-  },
-  {
-    name: 'feature page cannot import generated-query directly',
-    filePath: path.join(webRoot, 'src/features/admin/pages/import-boundary.fixture.ts'),
-    code: `
-      import { useGetAdminMonitor } from '../../../shared/api/generated-query/admin-monitor/admin-monitor'
-
-      console.log(useGetAdminMonitor)
-    `,
-  },
-  {
-    name: 'shared cannot import feature modules',
-    filePath: path.join(webRoot, 'src/shared/api/import-boundary.fixture.ts'),
-    code: `
-      import { adminRoutes } from '../../features/admin/app/adminRoutes'
-
-      console.log(adminRoutes)
-    `,
-  },
+  // NOTE: module-direction rules (generated-query, shared -> features) are
+  // owned by dependency-cruiser; this smoke covers only the ESLint-owned
+  // Overlay adapter conventions from eslint.config.js.
   {
     name: 'route page cannot import the base overlay lifecycle directly',
     filePath: path.join(webRoot, 'src/features/admin/pages/import-boundary.fixture.ts'),

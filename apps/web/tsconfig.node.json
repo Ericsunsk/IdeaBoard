@@ -21,6 +21,7 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true,
     "useUnknownInCatchVariables": true,
     "noUncheckedSideEffectImports": true
   },

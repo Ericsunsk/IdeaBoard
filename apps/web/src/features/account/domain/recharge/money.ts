@@ -115,4 +115,4 @@ function currencyFractionDigits(currency: string): number {
   )
 }
 
-export { MAX_IDEA_QUANTITY, MIN_IDEA_QUANTITY }
+export { MIN_IDEA_QUANTITY }

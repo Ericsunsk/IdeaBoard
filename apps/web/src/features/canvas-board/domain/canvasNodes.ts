@@ -6,7 +6,6 @@ import {
   MIN_REQUESTED_OUTPUT_COUNT,
   REQUESTED_OUTPUT_COUNT_OPTIONS,
   type OutputResolution,
-  normalizeOutputResolution,
 } from '../../../shared/domain/generationContract'
 import type { MediaRef } from '../../../shared/media/MediaRef'
 
@@ -17,7 +16,7 @@ export interface CanvasPoint {
 
 export type WorkflowNodeOutputStatus = 'idle' | 'running' | 'ready' | 'stale'
 
-export const WORKFLOW_NODE_OUTPUT_STATUSES: readonly WorkflowNodeOutputStatus[] = [
+const WORKFLOW_NODE_OUTPUT_STATUSES: readonly WorkflowNodeOutputStatus[] = [
   'idle',
   'running',
   'ready',
@@ -32,7 +31,6 @@ export const DEFAULT_FUSION_NODE_OUTPUT_COUNT = 1
 export const CANVAS_BOARD_STATE_SCHEMA_VERSION = 3
 export { DEFAULT_PROMPT_ASPECT_RATIO, type PromptAspectRatio }
 export type { OutputResolution }
-export { normalizeOutputResolution }
 export { DEFAULT_FUSION_BLEND_POINT, type FusionBlendPoint }
 
 function isWorkflowNodeOutputStatus(value: unknown): value is WorkflowNodeOutputStatus {

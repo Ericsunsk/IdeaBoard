@@ -198,7 +198,12 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
           pendingIncoming[portContract.port] = false
           return
         }
-        const sourceType = getNodeType(matchedEdges[0].source)
+        const matchedEdge = matchedEdges[0]
+        if (!matchedEdge) {
+          pendingIncoming[portContract.port] = false
+          return
+        }
+        const sourceType = getNodeType(matchedEdge.source)
         if (sourceType) incomingSourceKind[portContract.port] = sourceType
         if (portContract.port === 'image') {
           pendingIncoming[portContract.port] = matchedEdges.some(

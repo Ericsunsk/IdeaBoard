@@ -1,8 +1,6 @@
 /** Shared media URL/Blob/Canvas utilities used across canvas services. */
-import { i18n } from '../../../shared/i18n'
 import { USER_DOWNLOAD_ENDPOINT } from '../../../shared/constants/media'
 import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../shared/config/runtimeUrls'
-import { uploadApi } from '../../../shared/api/upload'
 
 /**
  * Returns true if the value is a data: URL.
@@ -16,7 +14,7 @@ export function isDataUrl(value: string): boolean {
  * Parses a raw URL string with window.location.origin fallback.
  * Returns null for invalid or empty input.
  */
-export function toAbsoluteUrl(raw: string): URL | null {
+function toAbsoluteUrl(raw: string): URL | null {
   const normalized = resolveAssetUrl(canonicalizeRuntimeUploadRef(raw.trim()).trim())
   if (!normalized) return null
   try {
@@ -85,20 +83,6 @@ export function canvasToBlob(
       quality,
     )
   })
-}
-
-/** Upload a generated image Blob to the canvas upload API. */
-export async function uploadCanvasBlob(
-  blob: Blob,
-  fileName: string,
-  boardId?: string,
-): Promise<string> {
-  const normalizedBoardId = `${boardId ?? ''}`.trim()
-  if (!normalizedBoardId) {
-    throw new Error(i18n.global.t('canvas.session.missingBoardIdUpload'))
-  }
-  const file = new File([blob], fileName, { type: blob.type || 'image/png' })
-  return (await uploadApi.upload(file, normalizedBoardId)).url
 }
 
 /** Guess a file extension from a MIME type string. */

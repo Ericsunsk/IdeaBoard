@@ -68,7 +68,7 @@ export async function publishBillableItemPrices(
   ) as Partial<Record<PricingVariant, AdminBillableItemPrice>>
 }
 
-export async function fetchAdminBillableItems(): Promise<AdminBillableItemCard[]> {
+async function fetchAdminBillableItems(): Promise<AdminBillableItemCard[]> {
   const data = await resolveApiData(listAdminBillableItems(), '加载功能定价失败')
   return data.items.map(normalizeBillableItem)
 }

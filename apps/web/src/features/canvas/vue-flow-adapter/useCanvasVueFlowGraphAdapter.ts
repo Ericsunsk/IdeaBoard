@@ -370,7 +370,10 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
       nextGraph: createGraph(nextNodes, options.edges.value),
       commit: () =>
         projectGraph(nextNodes.length, options.edges.value.length, () => {
-          options.actions?.addNodes?.(nodesToAdd.length === 1 ? nodesToAdd[0] : nodesToAdd)
+          const singleNodeToAdd = nodesToAdd[0]
+          options.actions?.addNodes?.(
+            nodesToAdd.length === 1 && singleNodeToAdd ? singleNodeToAdd : nodesToAdd,
+          )
           syncNodes(nextNodes)
         }),
       commandOptions,
@@ -394,8 +397,9 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
       commit: () =>
         projectGraph(options.nodes.value.length, nextEdges.length, () => {
           const projectedEdges = projectEdgesForActions(edgesToAdd)
+          const singleEdgeToAdd = projectedEdges[0]
           options.actions?.addEdges?.(
-            projectedEdges.length === 1 ? projectedEdges[0] : projectedEdges,
+            projectedEdges.length === 1 && singleEdgeToAdd ? singleEdgeToAdd : projectedEdges,
           )
           syncEdges(nextEdges)
         }),
@@ -476,6 +480,9 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
       return commandRunner.noOp('updateNode', commandOptions)
     }
     const currentNode = options.nodes.value[nodeIndex]
+    if (!currentNode) {
+      return commandRunner.noOp('updateNode', commandOptions)
+    }
     const patch = typeof update === 'function' ? update(currentNode) : update
     const nextNode = commandOptions.replace
       ? ({ id: currentNode.id, ...patch } as Node)

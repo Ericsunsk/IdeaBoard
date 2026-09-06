@@ -32,10 +32,7 @@ import Dialog from 'primevue/dialog'
 import { usePrimeDialogOverlayLifecycle } from '../../../../shared/composables/usePrimeDialogOverlayLifecycle'
 import { defaultAccountTab, type AccountTab, type PaymentReturnContext } from '../../domain'
 import AccountDialogContent from './AccountDialogContent.vue'
-import {
-  accountDialogStyle,
-  createAccountDialogPt,
-} from '../common/ui'
+import { accountDialogStyle, createAccountDialogPt } from '../common/ui'
 
 const props = withDefaults(
   defineProps<{

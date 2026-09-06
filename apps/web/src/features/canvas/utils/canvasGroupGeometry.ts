@@ -8,10 +8,10 @@ import {
 } from '../graph-runtime'
 
 export const CANVAS_GROUP_FRAME_PADDING_PX = 10
-export const CANVAS_GROUP_FRAME_MIN_WIDTH_PX = 120
-export const CANVAS_GROUP_FRAME_MIN_HEIGHT_PX = 80
-export const CANVAS_GROUP_NODE_Z_INDEX_BASE = 1
-export const CANVAS_GROUP_NODE_Z_INDEX_GROUPED = 2
+const CANVAS_GROUP_FRAME_MIN_WIDTH_PX = 120
+const CANVAS_GROUP_FRAME_MIN_HEIGHT_PX = 80
+const CANVAS_GROUP_NODE_Z_INDEX_BASE = 1
+const CANVAS_GROUP_NODE_Z_INDEX_GROUPED = 2
 
 export type CanvasFlowViewportTransform = {
   x: number
@@ -80,7 +80,7 @@ function readSnapshotNodeSize(node: Node): FlowNodeSize | null {
   }
 }
 
-export function readFlowNodeSize(node: Node): FlowNodeSize {
+function readFlowNodeSize(node: Node): FlowNodeSize {
   const dimensions = (node as { dimensions?: { width?: unknown; height?: unknown } }).dimensions
   const dimensionsWidth = readPositiveNumber(dimensions?.width)
   const dimensionsHeight = readPositiveNumber(dimensions?.height)
@@ -100,7 +100,7 @@ export function readFlowNodeSize(node: Node): FlowNodeSize {
   return { width: 1, height: 1 }
 }
 
-export function readFlowNodeBounds(node: Node): CanvasRect {
+function readFlowNodeBounds(node: Node): CanvasRect {
   const size = readFlowNodeSize(node)
   return {
     left: node.position.x,
@@ -112,12 +112,7 @@ export function readFlowNodeBounds(node: Node): CanvasRect {
   }
 }
 
-export function createCanvasRect(
-  left: number,
-  top: number,
-  width: number,
-  height: number,
-): CanvasRect {
+function createCanvasRect(left: number, top: number, width: number, height: number): CanvasRect {
   const right = left + width
   const bottom = top + height
   return {
@@ -130,7 +125,7 @@ export function createCanvasRect(
   }
 }
 
-export function expandRect(rect: CanvasRect, padding: number): CanvasRect {
+function expandRect(rect: CanvasRect, padding: number): CanvasRect {
   const left = rect.left - padding
   const top = rect.top - padding
   const right = rect.right + padding
@@ -145,7 +140,7 @@ export function expandRect(rect: CanvasRect, padding: number): CanvasRect {
   }
 }
 
-export function mergeRects(left: CanvasRect, right: CanvasRect): CanvasRect {
+function mergeRects(left: CanvasRect, right: CanvasRect): CanvasRect {
   const nextLeft = Math.min(left.left, right.left)
   const nextTop = Math.min(left.top, right.top)
   const nextRight = Math.max(left.right, right.right)
@@ -160,7 +155,7 @@ export function mergeRects(left: CanvasRect, right: CanvasRect): CanvasRect {
   }
 }
 
-export function pointInRect(point: CanvasPoint, rect: CanvasRect): boolean {
+function pointInRect(point: CanvasPoint, rect: CanvasRect): boolean {
   return (
     point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom
   )
@@ -197,11 +192,11 @@ export function canvasRectToGroupGeometry(rect: CanvasRect): CanvasGraphGroupGeo
   }
 }
 
-export function canvasGroupToRect(group: Pick<CanvasGroup, 'x' | 'y' | 'width' | 'height'>) {
+function canvasGroupToRect(group: Pick<CanvasGroup, 'x' | 'y' | 'width' | 'height'>) {
   return createCanvasRect(group.x, group.y, group.width, group.height)
 }
 
-export function resolveCanvasGroupBoundsFromNodes(options: {
+function resolveCanvasGroupBoundsFromNodes(options: {
   nodes: readonly Node[]
   nodeIds: readonly CanvasGraphNodeId[]
   padding?: number
@@ -241,7 +236,7 @@ export function resolveCanvasSelectionGroupActionBounds(options: {
   })
 }
 
-export function flowPointToViewportPoint(
+function flowPointToViewportPoint(
   point: CanvasPoint,
   viewport: CanvasFlowViewportTransform,
 ): CanvasPoint {
@@ -338,14 +333,13 @@ export function findTopmostCanvasGroupFrameAtPoint(
 ): CanvasGroupFrame | null {
   for (let index = frames.length - 1; index >= 0; index -= 1) {
     const frame = frames[index]
+    if (!frame) continue
     if (pointInRect(point, frame.bounds)) return frame
   }
   return null
 }
 
-export function resolveCanvasGroupNodeZIndexes(
-  groups: readonly CanvasGroup[],
-): Map<string, number> {
+function resolveCanvasGroupNodeZIndexes(groups: readonly CanvasGroup[]): Map<string, number> {
   const zIndexes = new Map<string, number>()
   groups.forEach((group) => {
     group.nodeIds.forEach((nodeId) => {

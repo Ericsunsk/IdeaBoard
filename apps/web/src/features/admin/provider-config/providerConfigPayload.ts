@@ -16,13 +16,13 @@ import type {
 } from './providerConfigTypes'
 
 export const DEFAULT_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['openai-compatible']
-export const SELF_HOSTED_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['self-hosted']
-export const DEFAULT_ADMIN_PROVIDER_ENDPOINT_PROTOCOL: ProviderProtocolValue = 'model-api'
-export const GOOGLE_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['google-ai']
-export const GOOGLE_CLOUD_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['google-cloud']
+const SELF_HOSTED_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['self-hosted']
+const DEFAULT_ADMIN_PROVIDER_ENDPOINT_PROTOCOL: ProviderProtocolValue = 'model-api'
+const GOOGLE_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['google-ai']
+const GOOGLE_CLOUD_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['google-cloud']
 export const DEFAULT_ADMIN_ACCOUNT_EXTRA_CONFIG = '{}'
-export const DEFAULT_ADMIN_ACCOUNT_WEIGHT = 100
-export const DEFAULT_ADMIN_ACCOUNT_MODEL_WEIGHT = 1
+const DEFAULT_ADMIN_ACCOUNT_WEIGHT = 100
+const DEFAULT_ADMIN_ACCOUNT_MODEL_WEIGHT = 1
 
 export const ADMIN_PROVIDER_ENDPOINT_API_TYPE_OPTIONS: Array<{
   label: string
@@ -56,20 +56,6 @@ const providerProtocolRegistry: Record<
     capabilities: ['fill'],
   },
 }
-
-const canonicalProviderProtocols: readonly ProviderProtocolValue[] = [
-  'model-api',
-  'image-pipeline',
-  'image-fill',
-]
-
-export const ADMIN_PROVIDER_ENDPOINT_PROTOCOL_OPTIONS: Array<{
-  label: string
-  value: ProviderProtocolValue
-}> = canonicalProviderProtocols.map((value) => ({
-  label: providerProtocolRegistry[value].label,
-  value,
-}))
 
 const adminProviderEndpointApiTypeLabelByValue = new Map([
   ...ADMIN_PROVIDER_ENDPOINT_API_TYPE_OPTIONS.map((item) => [item.value, item.label] as const),

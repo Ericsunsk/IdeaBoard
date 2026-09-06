@@ -338,8 +338,8 @@ describe('imageAdjustmentEngine', () => {
     ])
 
     expect(pixelValues(wide)).not.toEqual(pixelValues(narrow))
-    expect(Math.abs(wide.data[4] - source.data[4])).toBeGreaterThan(
-      Math.abs(narrow.data[4] - source.data[4]),
+    expect(Math.abs((wide.data[4] ?? 0) - (source.data[4] ?? 0))).toBeGreaterThan(
+      Math.abs((narrow.data[4] ?? 0) - (source.data[4] ?? 0)),
     )
   })
 
@@ -361,9 +361,9 @@ describe('imageAdjustmentEngine', () => {
       }),
     ])
     const protectedDeltas = [
-      protectedColor.data[8] - source.data[8],
-      protectedColor.data[9] - source.data[9],
-      protectedColor.data[10] - source.data[10],
+      (protectedColor.data[8] ?? 0) - (source.data[8] ?? 0),
+      (protectedColor.data[9] ?? 0) - (source.data[9] ?? 0),
+      (protectedColor.data[10] ?? 0) - (source.data[10] ?? 0),
     ]
 
     expect(pixelValues(protectedColor)).not.toEqual(pixelValues(directRgb))

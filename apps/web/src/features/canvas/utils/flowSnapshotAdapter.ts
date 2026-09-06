@@ -82,7 +82,7 @@ function appendCurrentGroups(
   })
 }
 
-export function toFlowNodeId(nodeType: CanvasConnectionNodeType, id: number) {
+function toFlowNodeId(nodeType: CanvasConnectionNodeType, id: number) {
   return `${nodeType}-${id}`
 }
 

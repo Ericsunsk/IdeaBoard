@@ -25,7 +25,9 @@ describe('CanvasGraphGeometry', () => {
     ]
     const store = createCanvasGraphStore(snapshot)
 
-    expect(resolveCanvasGraphNodeDimensions('image', snapshot.imageNodes[0])).toEqual({
+    const imageNode = snapshot.imageNodes[0]
+    if (!imageNode) throw new Error('expected image node fixture')
+    expect(resolveCanvasGraphNodeDimensions('image', imageNode)).toEqual({
       width: 280,
       height: 582,
     })

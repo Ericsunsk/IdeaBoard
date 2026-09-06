@@ -11,7 +11,7 @@ export type AuthFeedback = {
   stopImpersonating: AsyncActionFeedback<boolean>
 }
 
-export function createAuthFeedback(appToast: AuthToast): AuthFeedback {
+function createAuthFeedback(appToast: AuthToast): AuthFeedback {
   return {
     login: {
       success() {

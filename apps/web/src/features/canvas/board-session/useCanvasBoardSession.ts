@@ -187,7 +187,7 @@ export function useCanvasBoardSession(options: CanvasBoardSessionTestOptions): C
   }
 }
 
-export function resolveBoardIdFromQueryValue(raw: unknown): string | null {
+function resolveBoardIdFromQueryValue(raw: unknown): string | null {
   const value = Array.isArray(raw) ? raw[0] : raw
   if (typeof value !== 'string') return null
   const boardId = value.trim()

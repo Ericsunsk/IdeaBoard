@@ -18,25 +18,25 @@ export function createAdminMailConfigResource(): AdminMailConfigResource {
   }
 }
 
-export function getMailConfig() {
+function getMailConfig() {
   return resolveApiData<MailConfigSummary>(api.request('/admin/settings/mail'), '加载邮件配置失败')
 }
 
-export function updateMailConfig(input: MailConfigUpdate) {
+function updateMailConfig(input: MailConfigUpdate) {
   return resolveApiData<MailConfigSummary>(
     api.request('/admin/settings/mail', { method: 'PUT', body: input }),
     '保存邮件配置失败',
   )
 }
 
-export function clearMailConfig() {
+function clearMailConfig() {
   return resolveApiOk(
     api.request('/admin/settings/mail', { method: 'DELETE', body: {} }),
     '删除邮件配置失败',
   )
 }
 
-export function testMailConfig(recipient: string) {
+function testMailConfig(recipient: string) {
   return resolveApiOk(
     api.request('/admin/settings/mail/test', { method: 'POST', body: { recipient } }),
     '测试邮件发送失败',

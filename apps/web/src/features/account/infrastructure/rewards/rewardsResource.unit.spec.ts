@@ -74,8 +74,6 @@ describe('rewardsResource', () => {
   it('maps redemption transport failures to stable user copy', async () => {
     generated.redeemUserReward.mockRejectedValue(new Error('fetch failed'))
 
-    await expect(redeemRewardCode('IDEA2026')).rejects.toThrow(
-      'Network error. Please try again.',
-    )
+    await expect(redeemRewardCode('IDEA2026')).rejects.toThrow('Network error. Please try again.')
   })
 })

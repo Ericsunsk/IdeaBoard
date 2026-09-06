@@ -50,7 +50,10 @@ describe('useAdminTaskCancel', () => {
       intent: 'warn',
     })
 
-    await requests[0].onConfirm()
+    const confirmRequest = requests[0]
+    if (!confirmRequest) throw new Error('expected cancel confirm request')
+
+    await confirmRequest.onConfirm()
 
     expect(mocks.cancelAdminTaskByID).toHaveBeenCalledWith(runningTask.task_id)
     expect(feedback.taskCancelled).toHaveBeenCalledOnce()

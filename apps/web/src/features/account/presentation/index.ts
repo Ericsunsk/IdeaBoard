@@ -1,8 +1,4 @@
-export {
-  accountTabRegistry,
-  resolveAccountTab,
-  type AccountTabEntry,
-} from './common/tabRegistry'
+export { accountTabRegistry, resolveAccountTab, type AccountTabEntry } from './common/tabRegistry'
 export { default as AccountDialogHost } from './dialog/AccountDialogHost.vue'
 export { default as AccountDialog } from './dialog/AccountDialog.vue'
 export { default as AccountDialogContent } from './dialog/AccountDialogContent.vue'
@@ -15,6 +11,3 @@ export { default as BillingPane } from './billing/BillingPane.vue'
 export { default as RewardsPane } from './rewards/RewardsPane.vue'
 export { default as UsagePane } from './usage/UsagePane.vue'
 export * from './common/ui'
-
-
-

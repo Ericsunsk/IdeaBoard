@@ -423,9 +423,14 @@ function parsePaths(rawValue: string): BenchmarkPath[] {
 function parseViewport(rawValue: string): BenchmarkOptions['viewport'] {
   const match = rawValue.match(/^(\d+)x(\d+)$/)
   if (!match) throw new Error(`--viewport must use WIDTHxHEIGHT, got ${rawValue}`)
+  const rawWidth = match[1]
+  const rawHeight = match[2]
+  if (rawWidth === undefined || rawHeight === undefined) {
+    throw new Error(`--viewport must use WIDTHxHEIGHT, got ${rawValue}`)
+  }
   return {
-    width: parsePositiveInteger(match[1], '--viewport width'),
-    height: parsePositiveInteger(match[2], '--viewport height'),
+    width: parsePositiveInteger(rawWidth, '--viewport width'),
+    height: parsePositiveInteger(rawHeight, '--viewport height'),
   }
 }
 
@@ -694,6 +699,7 @@ function createStructureHeavyConnections(
     const source = sources[cursor % sources.length]
     const target = targets[(cursor * 7 + Math.floor(cursor / sources.length)) % targets.length]
     cursor += 1
+    if (!source || !target) break
 
     if (flowNodeId(source) === flowNodeId(target)) continue
 
@@ -1220,7 +1226,7 @@ function percentile(values: number[], percentileValue: number): number {
     sorted.length - 1,
     Math.max(0, Math.ceil(sorted.length * percentileValue) - 1),
   )
-  return sorted[index]
+  return sorted[index] ?? 0
 }
 
 function average(values: number[]): number {
@@ -1339,7 +1345,7 @@ function evaluateBudgetFailures(
 
 function findWorstPath(results: PathResult[]): PathResult | null {
   if (results.length === 0) return null
-  return [...results].sort((left, right) => {
+  const ranked = [...results].sort((left, right) => {
     if (right.longTaskMaxMs !== left.longTaskMaxMs) {
       return right.longTaskMaxMs - left.longTaskMaxMs
     }
@@ -1347,7 +1353,8 @@ function findWorstPath(results: PathResult[]): PathResult | null {
     if (right.p95FrameMs !== left.p95FrameMs) return right.p95FrameMs - left.p95FrameMs
     if (right.droppedFrames !== left.droppedFrames) return right.droppedFrames - left.droppedFrames
     return right.timeToInteractiveMs - left.timeToInteractiveMs
-  })[0]
+  })
+  return ranked[0] ?? null
 }
 
 function writeReport(report: BenchmarkReport, output: string): string {

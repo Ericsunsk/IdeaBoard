@@ -154,7 +154,7 @@ export function requireImageActionExecution(
   return execution
 }
 
-export const DEFAULT_UPSCALE_SCALE = 2
+const DEFAULT_UPSCALE_SCALE = 2
 
 export function getImageActionStrengthConfig(
   action: ImageStrengthAction,

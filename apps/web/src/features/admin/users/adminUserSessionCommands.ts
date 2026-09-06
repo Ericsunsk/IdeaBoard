@@ -9,7 +9,7 @@ export type AdminUserSessionCommands = {
   startImpersonation: (publicId: string) => Promise<void>
 }
 
-export function createBrowserRedirect(): AdminUserRedirect {
+function createBrowserRedirect(): AdminUserRedirect {
   return {
     schedule(url, delayMs) {
       setTimeout(() => {

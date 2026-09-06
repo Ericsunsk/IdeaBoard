@@ -62,11 +62,13 @@ describe('CanvasGroupFramesOverlay', () => {
 
     const frames = container.querySelectorAll<HTMLElement>('.canvas-group-frame-body')
     expect(frames).toHaveLength(2)
-    expect(frames[1].style.left).toBe('500px')
-    expect(frames[1].style.top).toBe('120px')
-    expect(frames[1].style.width).toBe('320px')
-    expect(frames[1].style.height).toBe('180px')
-    expect(frames[1].getAttribute('class')).toContain('is-selected')
+    const selectedFrame = frames[1]
+    if (!selectedFrame) throw new Error('expected selected group frame')
+    expect(selectedFrame.style.left).toBe('500px')
+    expect(selectedFrame.style.top).toBe('120px')
+    expect(selectedFrame.style.width).toBe('320px')
+    expect(selectedFrame.style.height).toBe('180px')
+    expect(selectedFrame.getAttribute('class')).toContain('is-selected')
   })
 
   it('renders selected group controls with resize zones only', () => {

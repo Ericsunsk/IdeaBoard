@@ -1,11 +1,7 @@
 import type { CanvasGraphNodeRecord } from '../../graph-runtime'
 import type { CanvasRendererMetricsPort } from '../../vue-flow-adapter'
-import {
-  resolveImageNodeFrameSize,
-  resolveImageNodeStageHeight,
-  type ImageNodeItem,
-} from '../../../canvas-board/domain'
-import type { ImageResultAnchor, ImageExecutionInput } from '../planning/imageExecutionResultTypes'
+import { resolveImageNodeStageHeight, type ImageNodeItem } from '../../../canvas-board/domain'
+import type { ImageResultAnchor } from '../planning/imageExecutionResultTypes'
 import { resolveImageNodeLayoutAnchor } from '../../utils/flowImageNodeSelectors'
 
 export type ImageResultLayout = ImageResultAnchor & { ratio: number }
@@ -23,13 +19,11 @@ const IMAGE_RESULT_NODE_X_GAP = 100
 const IMAGE_RESULT_NODE_Y_GAP = 14
 const IMAGE_NODE_HEADER_HEIGHT = 26
 
-export function estimateImageNodeHeight(
-  source: Pick<ImageResultLayout, 'width' | 'ratio'>,
-): number {
+function estimateImageNodeHeight(source: Pick<ImageResultLayout, 'width' | 'ratio'>): number {
   return IMAGE_NODE_HEADER_HEIGHT + resolveImageNodeStageHeight(source.width, source.ratio, true)
 }
 
-export function readImageNodeLayout(
+function readImageNodeLayout(
   node: CanvasGraphNodeRecord,
   rendererMetrics: CanvasRendererMetricsPort,
 ): ImageResultLayout | null {
@@ -72,7 +66,7 @@ export function readOutputAnchorLayout(
   return anchorHint ? { ...anchorHint, ratio: fallback.ratio } : fallback
 }
 
-export function readNodeBounds(
+function readNodeBounds(
   node: CanvasGraphNodeRecord,
   rendererMetrics: CanvasRendererMetricsPort,
 ): { x: number; y: number; width: number; height: number } | null {
@@ -140,21 +134,4 @@ export function resolvePendingImageResultPosition(
   }
   if (isCollisionFree(escapePosition)) return escapePosition
   throw new Error('Unable to find a collision-free position for derived image node')
-}
-
-export function resolvePendingImageResultWidth(ratio: number, requestedWidth?: number) {
-  return Number.isFinite(requestedWidth) && (requestedWidth as number) > 0
-    ? Math.max(1, Math.round(requestedWidth as number))
-    : resolveImageNodeFrameSize(ratio, true).width
-}
-
-export function resolvePendingImageResultRatio(
-  source: ImageExecutionInput,
-  requestedRatio?: number,
-) {
-  return Number.isFinite(requestedRatio) && (requestedRatio as number) > 0
-    ? (requestedRatio as number)
-    : source.ratio > 0
-      ? source.ratio
-      : 1
 }

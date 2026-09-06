@@ -97,7 +97,7 @@ export function createAdminUserRowView(user: AdminUserListItem): AdminUserRowVie
   }
 }
 
-export function normalizeCountryCode(country: string) {
+function normalizeCountryCode(country: string) {
   const normalized = country.trim().toUpperCase()
   return /^[A-Z]{2}$/.test(normalized) && normalized !== 'XX' ? normalized : ''
 }

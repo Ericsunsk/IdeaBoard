@@ -12,7 +12,7 @@ export function resolveImageNodeLatestOutput(
   imageNode: Pick<ImageNodeItem, 'outputImages'>,
 ): ImageNodeOutputItem | null {
   const outputs = Array.isArray(imageNode.outputImages) ? imageNode.outputImages : []
-  return outputs.length > 0 ? outputs[outputs.length - 1] : null
+  return outputs.length > 0 ? (outputs[outputs.length - 1] ?? null) : null
 }
 
 export function resolveImageNodeDisplayRatio(
@@ -24,7 +24,7 @@ export function resolveImageNodeDisplayRatio(
   return normalizeImageNodeRatio(imageNode.sourceImageRatio)
 }
 
-export function normalizeImageNodeRatio(value: unknown): number {
+function normalizeImageNodeRatio(value: unknown): number {
   const ratio = Number(value)
   return Number.isFinite(ratio) && ratio > 0 ? ratio : 1
 }

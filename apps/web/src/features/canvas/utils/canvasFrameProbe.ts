@@ -88,7 +88,7 @@ function createInertCanvasFrameProbeSession(scene: CanvasFrameProbeScene): Canva
 function percentile(sortedValues: number[], percentileValue: number): number {
   if (sortedValues.length === 0) return 0
   const index = Math.ceil(sortedValues.length * percentileValue) - 1
-  return sortedValues[Math.max(0, Math.min(index, sortedValues.length - 1))]
+  return sortedValues[Math.max(0, Math.min(index, sortedValues.length - 1))] ?? 0
 }
 
 function countDroppedFrames(frameDeltas: number[]): number {

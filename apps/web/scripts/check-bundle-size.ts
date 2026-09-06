@@ -116,7 +116,13 @@ function collectInitialChunks(manifest: ViteManifest): ManifestChunk[] {
     throw new Error('Vite manifest does not contain an entry chunk.')
   }
 
-  return [...initialChunkKeys].map((chunkKey) => manifest[chunkKey])
+  return [...initialChunkKeys].map((chunkKey) => {
+    const chunk = manifest[chunkKey]
+    if (!chunk) {
+      throw new Error(`Vite manifest references missing chunk: ${chunkKey}`)
+    }
+    return chunk
+  })
 }
 
 async function sumChunkBytes(chunks: ManifestChunk[]): Promise<number> {

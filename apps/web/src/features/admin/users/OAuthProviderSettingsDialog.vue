@@ -396,7 +396,7 @@ async function submit() {
       }),
       ...changedProviders.map((provider) =>
         activeResource().save(provider, {
-          enabled: providerEnabled[provider],
+          enabled: providerEnabled[provider] ?? false,
           clientId: providerSummaries.value[provider]?.clientId ?? '',
           clientSecret: '',
         }),
@@ -404,7 +404,7 @@ async function submit() {
     ]
     const [savedSummary] = await Promise.all(saveRequests)
     clearSensitiveState()
-    applySummary(savedSummary)
+    if (savedSummary) applySummary(savedSummary)
     toast.success(`${providerLabel.value} OAuth 设置已保存`)
     try {
       const state = await fetchProviderState()

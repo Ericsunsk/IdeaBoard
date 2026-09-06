@@ -51,12 +51,16 @@ describe('canvas billing readiness store', () => {
     await store.ensureMatrix(entries)
     await store.ensureMatrix(entries)
 
+    const firstEntry = entries[0]
+    const secondEntry = entries[1]
+    if (!firstEntry || !secondEntry) throw new Error('expected readiness entries')
+
     expect(fetchReadinessMatrix).toHaveBeenCalledOnce()
     expect(fetchReadinessMatrix).toHaveBeenCalledWith(entries.map((entry) => entry.request))
-    expect(store.getFeatureState(WORKFLOW_FEATURE.variations, entries[0].request).status).toBe(
+    expect(store.getFeatureState(WORKFLOW_FEATURE.variations, firstEntry.request).status).toBe(
       'ready',
     )
-    expect(store.getFeatureState(WORKFLOW_FEATURE.cutout, entries[1].request).status).toBe('ready')
+    expect(store.getFeatureState(WORKFLOW_FEATURE.cutout, secondEntry.request).status).toBe('ready')
   })
 
   it('exposes the server quote and refreshes when the quote changes', async () => {

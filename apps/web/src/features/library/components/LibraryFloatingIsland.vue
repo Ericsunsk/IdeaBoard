@@ -596,7 +596,10 @@ const columnBuckets = computed(() => {
   const buckets: LibraryAssetView[][] = Array.from({ length: count }, () => [])
   const list = workspace.assets.value
   for (let i = 0; i < list.length; i++) {
-    buckets[i % count].push(list[i])
+    const bucket = buckets[i % count]
+    const asset = list[i]
+    if (!bucket || !asset) continue
+    bucket.push(asset)
   }
   return buckets
 })

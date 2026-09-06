@@ -9,7 +9,7 @@ export const CANVAS_IMAGE_PREVIEW_MAX_SIDE = {
   full: null,
 } as const
 
-export const CANVAS_IMAGE_PREVIEW_RENDERED_SIDE_LIMIT = {
+const CANVAS_IMAGE_PREVIEW_RENDERED_SIDE_LIMIT = {
   compact: 240,
   balanced: 520,
   detailed: 960,

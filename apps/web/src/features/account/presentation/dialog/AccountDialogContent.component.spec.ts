@@ -114,8 +114,7 @@ const TestProviders = defineComponent({
   props: {
     initialTab: { type: String, default: 'profile' },
   },
-  template:
-    '<IconoirProvider><AccountDialogContent :initial-tab="initialTab" /></IconoirProvider>',
+  template: '<IconoirProvider><AccountDialogContent :initial-tab="initialTab" /></IconoirProvider>',
 })
 
 // Resolve expected visible labels through the same locale the component uses.
@@ -125,13 +124,13 @@ const enAccountMessages = (
   }
 ).default
 
-const accountTabCases: Array<{ key: AccountTab; label: string }> =
-  accountTabRegistry.flatMap(({ tabs }) =>
+const accountTabCases: Array<{ key: AccountTab; label: string }> = accountTabRegistry.flatMap(
+  ({ tabs }) =>
     tabs.map(({ key, labelKey }) => ({
       key,
-      label: enAccountMessages.tabs[labelKey.replace('account.tabs.', '')],
+      label: enAccountMessages.tabs[labelKey.replace('account.tabs.', '')] ?? key,
     })),
-  )
+)
 
 function makeUser(): User {
   return {

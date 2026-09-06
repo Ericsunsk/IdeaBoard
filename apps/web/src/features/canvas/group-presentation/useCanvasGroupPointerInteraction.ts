@@ -110,7 +110,9 @@ export function useCanvasGroupPointerInteraction(options: UseCanvasGroupPointerI
   ): THandlers {
     const wrappedHandlers = {} as THandlers
     for (const key of Object.keys(handlers) as Array<keyof THandlers>) {
-      wrappedHandlers[key] = withSelectionGroupActionClosed(handlers[key]) as THandlers[typeof key]
+      const handler = handlers[key]
+      if (!handler) continue
+      wrappedHandlers[key] = withSelectionGroupActionClosed(handler) as THandlers[typeof key]
     }
     return wrappedHandlers
   }

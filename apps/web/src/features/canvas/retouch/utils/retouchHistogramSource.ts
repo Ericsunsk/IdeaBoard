@@ -52,7 +52,7 @@ export function resolveRetouchHistogramSource({
   }
 }
 
-export function areSameRetouchHistogramSourceCacheKeys(
+function areSameRetouchHistogramSourceCacheKeys(
   first: RetouchHistogramSourceCacheKey,
   second: RetouchHistogramSourceCacheKey,
 ) {

@@ -68,7 +68,7 @@ export function providerSupportsTest(provider: StorageProvider, providerMap: Pro
   return Boolean(providerMap[provider]?.supports_test)
 }
 
-export function normalizeConfig(
+function normalizeConfig(
   provider: StorageProvider,
   config: Record<string, unknown> | undefined,
   providerMap: ProviderMetaMap,
@@ -132,7 +132,7 @@ export function normalizeProfile(
   }
 }
 
-export function configText(storage: StorageCard, key: string) {
+function configText(storage: StorageCard, key: string) {
   const value = storage.config[key]
   return typeof value === 'string' ? value : value == null ? '' : String(value)
 }
@@ -152,7 +152,7 @@ function fieldSatisfied(storage: StorageCard, field: StorageProviderField) {
   return Boolean(value)
 }
 
-export function hasConfiguredProfile(storage: StorageCard, providerMap: ProviderMetaMap) {
+function hasConfiguredProfile(storage: StorageCard, providerMap: ProviderMetaMap) {
   if (storage.provider === 'local') return true
   return requiredFieldsFor(storage, providerMap).every((field) => fieldSatisfied(storage, field))
 }

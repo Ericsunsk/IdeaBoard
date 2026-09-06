@@ -55,7 +55,10 @@ function parseCssDuration(value: string | undefined): number {
   const match = /^(\d+(?:\.\d+)?|\.\d+)(ms|s)$/.exec(normalized)
   if (!match) return 0
 
-  const durationMs = Number.parseFloat(match[1]) * (match[2] === 's' ? 1000 : 1)
+  const amountText = match[1]
+  const unitText = match[2]
+  if (amountText === undefined || unitText === undefined) return 0
+  const durationMs = Number.parseFloat(amountText) * (unitText === 's' ? 1000 : 1)
   return Number.isFinite(durationMs) && durationMs >= 0 ? durationMs : 0
 }
 

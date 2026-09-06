@@ -474,6 +474,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       ? `${EXECUTION_FUSION_META.promptPrefix} ${promptText}`
       : EXECUTION_FUSION_META.promptPrefix
     const firstInput = fusionInputs[0]
+    if (!firstInput) failPlanning(i18n.global.t('canvas.execution.fusionInputsInvalid'))
     const resultAnchor = resolveGraphNodeResultAnchor(graph, nodeId)
     return {
       kind: 'fusion',

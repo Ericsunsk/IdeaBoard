@@ -2,8 +2,8 @@ import { i18n } from '../../../../shared/i18n'
 import { resolveFetchUrl } from '../../services/flowMediaIO'
 import { isAnimatedImageBlob, releaseCanvas } from '../utils/imageAdjustmentMedia'
 
-export const DEFAULT_IMAGE_SOURCE_CACHE_LIMIT = 12
-export const DEFAULT_FULL_SIZE_SOURCE_MAX_PIXELS = 24_000_000
+const DEFAULT_IMAGE_SOURCE_CACHE_LIMIT = 12
+const DEFAULT_FULL_SIZE_SOURCE_MAX_PIXELS = 24_000_000
 
 export type ImageSourceCacheErrorCode =
   | 'invalid-url'
@@ -47,7 +47,7 @@ type LoadImageSourceOptions = {
   readonly resolveOptions?: ImageSourceResolveOptions
 }
 
-export class ImageSourceCacheError extends Error {
+class ImageSourceCacheError extends Error {
   readonly code: ImageSourceCacheErrorCode
 
   constructor(code: ImageSourceCacheErrorCode, message: string) {

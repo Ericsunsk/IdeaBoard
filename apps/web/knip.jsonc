@@ -1,4 +1,14 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "project": ["src/**/*.{ts,vue,css}", "scripts/*.ts"],
+  // Public feature entrypoints (Feature Completion Contract). Their exports
+  // are the intended cross-feature seams even while consumers still migrate
+  // off deep imports, so they are audited as entry surface, not dead code.
+  "entry": [
+    "src/features/account/presentation/index.ts",
+    "src/features/canvas/components/nodes/primitives/index.ts",
+    "src/features/canvas/components/nodes/workflows/index.ts",
+    "src/features/canvas/execution/index.ts",
+    "src/features/canvas/vue-flow-adapter/index.ts",
+  ],
 }

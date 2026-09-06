@@ -21,7 +21,6 @@ export function createAccountDialogPt(): DialogPassThroughOptions {
   }
 }
 
-
 export const accountMainContentClass =
   'relative grid h-[min(78dvh,720px)] min-h-0 grid-cols-[234px_minmax(0,1fr)] overflow-hidden bg-white max-[820px]:h-[calc(100dvh-64px)] max-[820px]:grid-cols-1 max-[820px]:grid-rows-[auto_minmax(0,1fr)]'
 

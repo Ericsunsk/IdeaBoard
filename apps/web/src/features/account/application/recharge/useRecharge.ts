@@ -76,27 +76,22 @@ export function useRecharge(
     publicToken: string,
     update: (order: PendingPaymentOrder) => PendingPaymentOrder,
   ) {
-    queryClient.setQueryData<PendingPaymentOrderList>(
-      paymentsQueryKeys.pending,
-      (current) => {
-        if (!current) return current
-        return {
-          ...current,
-          items: current.items.map((item) =>
-            item.public_token === publicToken ? update(item) : item,
-          ),
-        }
-      },
-    )
+    queryClient.setQueryData<PendingPaymentOrderList>(paymentsQueryKeys.pending, (current) => {
+      if (!current) return current
+      return {
+        ...current,
+        items: current.items.map((item) =>
+          item.public_token === publicToken ? update(item) : item,
+        ),
+      }
+    })
   }
 
   function removeCachedPendingOrder(publicToken: string) {
-    queryClient.setQueryData<PendingPaymentOrderList>(
-      paymentsQueryKeys.pending,
-      (current) =>
-        current
-          ? { ...current, items: current.items.filter((item) => item.public_token !== publicToken) }
-          : current,
+    queryClient.setQueryData<PendingPaymentOrderList>(paymentsQueryKeys.pending, (current) =>
+      current
+        ? { ...current, items: current.items.filter((item) => item.public_token !== publicToken) }
+        : current,
     )
   }
 

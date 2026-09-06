@@ -57,8 +57,8 @@ function isBoardCanvasUploadPath(path: string, userUid: string, boardId: string)
   const segments = path.split('/').filter(Boolean)
   for (let i = 0; i + 4 < segments.length; i += 1) {
     if (segments[i] !== 'uploads' || segments[i + 1] !== 'canvas') continue
-    if (!pathSegmentMatches(segments[i + 2], userUid)) continue
-    if (!pathSegmentMatches(segments[i + 3], boardId)) continue
+    if (!pathSegmentMatches(segments[i + 2] ?? '', userUid)) continue
+    if (!pathSegmentMatches(segments[i + 3] ?? '', boardId)) continue
     if (segments[i + 4] !== 'content') continue
     return true
   }

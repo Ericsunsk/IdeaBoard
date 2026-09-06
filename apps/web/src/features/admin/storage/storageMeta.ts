@@ -22,7 +22,7 @@ export interface VendorPresetOption extends VendorPreset {
   supported: boolean
 }
 
-export const vendorLogoMap: Partial<Record<StorageProvider, string>> = {
+const vendorLogoMap: Partial<Record<StorageProvider, string>> = {
   's3-compatible': logoAmazonS3,
   'tencent-cos': logoTencentCloud,
   'aws-s3': logoAmazonS3,

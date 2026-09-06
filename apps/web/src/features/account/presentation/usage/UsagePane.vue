@@ -143,11 +143,7 @@ import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
 import { useUsage } from '../../application/usage/useUsage'
 import { DEFAULT_USAGE_RANGE, type UsageRange } from '../../infrastructure'
-import {
-  buildUsageTrendChart,
-  createUsageChartPlugins,
-  resolveUsageChartTheme,
-} from '../../domain'
+import { buildUsageTrendChart, createUsageChartPlugins, resolveUsageChartTheme } from '../../domain'
 import AccountPane from '../common/AccountPane.vue'
 
 const props = defineProps<{ active: boolean }>()

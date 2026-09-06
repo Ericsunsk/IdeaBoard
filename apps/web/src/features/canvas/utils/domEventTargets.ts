@@ -1,4 +1,4 @@
-export const CANVAS_EDITING_SURFACE_SELECTOR = [
+const CANVAS_EDITING_SURFACE_SELECTOR = [
   '[data-flow-editing-surface]',
   '[data-retouch]',
   '[data-inpaint]',

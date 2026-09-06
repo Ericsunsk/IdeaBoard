@@ -52,7 +52,7 @@ export function createCpuWorkerImageProcessingBackend(
   )
 }
 
-export function createHybridImageProcessingBackend(
+function createHybridImageProcessingBackend(
   options: Omit<CreateImageAdjustmentProcessingBackendOptions, 'backend'> = {},
 ): ImageProcessingBackend {
   return createMainThreadBackendWithPlanExecutor(

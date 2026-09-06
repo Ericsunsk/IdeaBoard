@@ -76,6 +76,7 @@ describe('imageWorkflowCommandRuntime', () => {
     ).mock.calls.map(([plan]) => plan as ActivatedImageExecutionPlan)
     expect(firstPlan).toMatchObject({ activationId: expect.stringMatching(/^canvas:/) })
     expect(secondPlan).toMatchObject({ activationId: expect.stringMatching(/^canvas:/) })
+    if (!firstPlan || !secondPlan) throw new Error('expected two execution plans')
     expect(firstPlan.activationId).not.toBe(secondPlan.activationId)
   })
 })

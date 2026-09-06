@@ -9,8 +9,8 @@ import type {
   ImageProcessingOutputPolicy,
 } from './types'
 
-export const DEFAULT_IMAGE_PROCESSING_OUTPUT_SUFFIX = 'adjusted'
-export const DEFAULT_IMAGE_PROCESSING_OUTPUT_BASENAME = 'image-adjusted'
+const DEFAULT_IMAGE_PROCESSING_OUTPUT_SUFFIX = 'adjusted'
+const DEFAULT_IMAGE_PROCESSING_OUTPUT_BASENAME = 'image-adjusted'
 
 export function resolveImageProcessingOutputEncoding(
   input: Parameters<ImageProcessingOutputPolicy['resolveEncoding']>[0],
@@ -48,7 +48,7 @@ export function createImageProcessingOutputFileName(input: ImageProcessingOutput
   return suffix ? `${resolvedBaseName}-${suffix}.${extension}` : `${resolvedBaseName}.${extension}`
 }
 
-export const imageProcessingOutputPolicy: ImageProcessingOutputPolicy = {
+const imageProcessingOutputPolicy: ImageProcessingOutputPolicy = {
   resolveEncoding: resolveImageProcessingOutputEncoding,
   resolveFileName: createImageProcessingOutputFileName,
 }

@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  billingRecordsQueryKeys,
-  fetchBillingRecords,
-} from './billingResource'
+import { billingRecordsQueryKeys, fetchBillingRecords } from './billingResource'
 
 const generated = vi.hoisted(() => ({
   listUserBillingRecords: vi.fn(),

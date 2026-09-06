@@ -58,7 +58,7 @@ function getFusionSlotGeometry(stageWidth?: number) {
 
 function getFusionSlotPosition(imageCount: number, index: number): FusionSlotPosition {
   const count = Math.max(0, Math.min(Math.round(imageCount), FUSION_SLOT_LAYOUT.maxSlots))
-  const slots = FUSION_SLOT_POSITION_TABLE[count] ?? FUSION_SLOT_POSITION_TABLE[4]
+  const slots = FUSION_SLOT_POSITION_TABLE[count] ?? FUSION_SLOT_POSITION_TABLE[4] ?? []
   return slots[index] ?? 'center'
 }
 
@@ -184,7 +184,7 @@ function closestPointOnTriangle(
     projectPointToSegment(point, b, c).point,
     projectPointToSegment(point, c, a).point,
   ]
-  let nearest = projections[0]
+  let nearest: FusionBlendPoint = projections[0] ?? point
   let nearestDistance = Number.POSITIVE_INFINITY
   for (const projection of projections) {
     const dx = projection.x - point.x
@@ -340,6 +340,7 @@ export function buildFusionDisplayPercentages(weights: number[]): number[] {
     const step = diff > 0 ? 1 : -1
     for (let index = 0; index < Math.abs(diff); index += 1) {
       const target = sorted[index % sorted.length]
+      if (!target) continue
       target.rounded += step
     }
     sum = rawPercents.reduce((acc, item) => acc + item.rounded, 0)

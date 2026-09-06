@@ -59,7 +59,7 @@ export function createPlanWorkUnits(imageData: ImageData, plan: ImageAdjustmentP
   return Math.max(0, estimateImageAdjustmentPlanWorkUnits(imageData, plan))
 }
 
-export function throwIfAborted(signal: AbortSignal) {
+function throwIfAborted(signal: AbortSignal) {
   if (!signal.aborted) return
   throw processingCancelledError()
 }

@@ -80,6 +80,7 @@ function applyOrderPatches<T extends { id: string }>(
     const currentIndex = nextItems.findIndex((item) => item.id === id)
     if (currentIndex < 0) continue
     const [item] = nextItems.splice(currentIndex, 1)
+    if (!item) continue
     const nextIndex = after.nextId
       ? nextItems.findIndex((candidate) => candidate.id === after.nextId)
       : -1

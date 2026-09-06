@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { USER_LOGIN_PATH } from '../../../../shared/constants/routePaths'
 import { markRequiredError } from '../../../../shared/utils/formValidation'
-import {
-  usePasswordChange,
-  type PasswordChangeDependencies,
-} from './usePasswordChange'
+import { usePasswordChange, type PasswordChangeDependencies } from './usePasswordChange'
 
 describe('usePasswordChange', () => {
   it('validates required fields, password length, and confirmation match', () => {

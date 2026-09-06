@@ -55,17 +55,17 @@ export function createAdminStorageResource(): AdminStorageResource {
   }
 }
 
-export async function fetchAdminStorageProviders(): Promise<StorageProviderMeta[]> {
+async function fetchAdminStorageProviders(): Promise<StorageProviderMeta[]> {
   const data = await resolveApiData(listAdminStorageProviders(), '加载存储供应商失败')
   return (data.providers ?? []).map(normalizeGeneratedProvider)
 }
 
-export async function fetchAdminStorageProfiles(): Promise<StorageProfile[]> {
+async function fetchAdminStorageProfiles(): Promise<StorageProfile[]> {
   const data = await resolveApiData(listAdminStorageProfiles(), '加载存储配置失败')
   return (data.profiles ?? []).map(normalizeGeneratedProfile)
 }
 
-export async function saveAdminStorageProfile(
+async function saveAdminStorageProfile(
   input: SaveStorageProfileInput,
 ): Promise<StorageProfileCommandResult> {
   const requestParams = input.apply ? { apply: true } : undefined
@@ -83,9 +83,7 @@ export async function saveAdminStorageProfile(
   }
 }
 
-export async function applyAdminStorageProfileRecord(
-  id: string,
-): Promise<StorageProfileCommandResult> {
+async function applyAdminStorageProfileRecord(id: string): Promise<StorageProfileCommandResult> {
   const data = await resolveApiData(applyAdminStorageProfile(id), '设为当前失败')
   return {
     message: data.message,
@@ -93,15 +91,15 @@ export async function applyAdminStorageProfileRecord(
   }
 }
 
-export async function testAdminStorageProfileRecord(id: string): Promise<{ message: string }> {
+async function testAdminStorageProfileRecord(id: string): Promise<{ message: string }> {
   return resolveApiData(testAdminStorageProfile(id), '连接失败')
 }
 
-export async function deleteAdminStorageProfileRecord(id: string): Promise<{ message: string }> {
+async function deleteAdminStorageProfileRecord(id: string): Promise<{ message: string }> {
   return resolveApiData(deleteAdminStorageProfile(id), '删除失败')
 }
 
-export async function fetchAdminStorageBucketDomains(id: string): Promise<string[]> {
+async function fetchAdminStorageBucketDomains(id: string): Promise<string[]> {
   const data = await resolveApiData(getAdminStorageBucketInfo(id), '获取 Bucket 信息失败')
   return data.info.domains ?? []
 }

@@ -293,7 +293,7 @@ function cloneBoardMeta(board: CanvasBoardMeta): CanvasBoardMeta {
   }
 }
 
-export function isBoardNotFoundError(error: unknown): boolean {
+function isBoardNotFoundError(error: unknown): boolean {
   if (typeof error !== 'object' || !error) return false
   const status = 'status' in error ? (error as { status?: unknown }).status : undefined
   if (status === 404) return true

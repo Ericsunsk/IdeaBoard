@@ -22,9 +22,7 @@ export type AdminProviderConfigFeedback = {
   modelDetectionFailed: (error: unknown) => void
 }
 
-export function createAdminProviderConfigFeedback(
-  toast: AdminToastPort,
-): AdminProviderConfigFeedback {
+function createAdminProviderConfigFeedback(toast: AdminToastPort): AdminProviderConfigFeedback {
   return {
     accountLimitsFallback: (error) =>
       toast.warning(formatAdminApiError(error, '账号限制加载失败，已使用默认限制')),

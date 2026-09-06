@@ -84,9 +84,9 @@ const layout = computed(() => {
   props.items.forEach((item, index) => {
     const column = heights.indexOf(Math.min(...heights))
     const height = columnWidth * (item.height > 0 && item.width > 0 ? item.height / item.width : 1)
-    const top = heights[column]
-    heights[column] += height + gap.value
-    columnEntries[column].push({
+    const top = heights[column] ?? 0
+    heights[column] = top + height + gap.value
+    columnEntries[column]?.push({
       item,
       index,
       key: `${item.provider}:${item.id}`,

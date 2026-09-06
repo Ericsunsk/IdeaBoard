@@ -120,7 +120,7 @@ function readLatestOutputImage(snapshotNode: FlowSnapshotNodeLike): ImageNodeOut
   const outputImages = Array.isArray(snapshotNode.outputImages)
     ? (snapshotNode.outputImages as ImageNodeOutputItem[])
     : []
-  return outputImages.length > 0 ? outputImages[outputImages.length - 1] : null
+  return outputImages.length > 0 ? (outputImages[outputImages.length - 1] ?? null) : null
 }
 
 export function resolveSourceImageFromNode(

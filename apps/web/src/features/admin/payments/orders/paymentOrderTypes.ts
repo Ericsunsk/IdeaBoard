@@ -1,15 +1,12 @@
-export const adminPaymentOrderStatuses = [
-  'creating',
-  'checkout_open',
-  'async_payment_pending',
-  'paid_pending_credit',
-  'credited',
-  'cancelled',
-  'expired',
-  'payment_failed',
-] as const
-
-export type AdminPaymentOrderStatus = (typeof adminPaymentOrderStatuses)[number]
+export type AdminPaymentOrderStatus =
+  | 'creating'
+  | 'checkout_open'
+  | 'async_payment_pending'
+  | 'paid_pending_credit'
+  | 'credited'
+  | 'cancelled'
+  | 'expired'
+  | 'payment_failed'
 
 export type AdminPaymentOrderUser = {
   publicId: string

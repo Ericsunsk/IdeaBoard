@@ -1417,8 +1417,10 @@ describe('useFlowCanvasRuntime', () => {
 
   it('deletes a selected group with member nodes and releases local execution without cancelling the task', async () => {
     const snapshot = createSnapshot()
-    snapshot.imageNodes[0].pendingTaskId = 'task-running-1'
-    snapshot.imageNodes[0].outputStatus = 'running'
+    const runningNode = snapshot.imageNodes[0]
+    if (!runningNode) throw new Error('expected image node fixture')
+    runningNode.pendingTaskId = 'task-running-1'
+    runningNode.outputStatus = 'running'
     snapshot.groups = [createGroup('group-1', ['image-1', 'prompt-1'])]
     const harness = createRuntimeHarness(snapshot)
     await harness.runtime.persistence.loadInitialOrRouteBoard()

@@ -1,15 +1,9 @@
 export type AccountTab =
-  | 'profile'
-  | 'security'
-  | 'recharge'
-  | 'subscriptions'
-  | 'rewards'
-  | 'billing'
-  | 'usage'
+  'profile' | 'security' | 'recharge' | 'subscriptions' | 'rewards' | 'billing' | 'usage'
 
 export const defaultAccountTab: AccountTab = 'profile'
 
-export const accountTabKeys = [
+const accountTabKeys = [
   'profile',
   'security',
   'recharge',
@@ -19,10 +13,8 @@ export const accountTabKeys = [
   'usage',
 ] as const
 
-export function isAccountTab(value: unknown): value is AccountTab {
-  return (
-    typeof value === 'string' && (accountTabKeys as readonly string[]).includes(value)
-  )
+function isAccountTab(value: unknown): value is AccountTab {
+  return typeof value === 'string' && (accountTabKeys as readonly string[]).includes(value)
 }
 
 export function resolveAccountTabKey(value: string | undefined): AccountTab {
@@ -31,4 +23,3 @@ export function resolveAccountTabKey(value: string | undefined): AccountTab {
   }
   return defaultAccountTab
 }
-

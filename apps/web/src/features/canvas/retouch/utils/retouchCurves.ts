@@ -193,23 +193,23 @@ export function sampleCurvePointsPath(points: readonly NormalizedCurveChannelPoi
 }
 
 function createCurveTransferPath(transfer: ReturnType<typeof createCurveChannelTransfer>) {
-  const commands = [
-    `M ${formatPathPoint(createTransferPathPoint(transfer.inputs[0], transfer.outputs[0]))}`,
-  ]
+  const firstInput = transfer.inputs[0] ?? 0
+  const firstOutput = transfer.outputs[0] ?? 0
+  const commands = [`M ${formatPathPoint(createTransferPathPoint(firstInput, firstOutput))}`]
 
   for (let index = 0; index < transfer.inputs.length - 1; index += 1) {
-    const input = transfer.inputs[index]
-    const output = transfer.outputs[index]
-    const nextInput = transfer.inputs[index + 1]
-    const nextOutput = transfer.outputs[index + 1]
+    const input = transfer.inputs[index] ?? 0
+    const output = transfer.outputs[index] ?? 0
+    const nextInput = transfer.inputs[index + 1] ?? 0
+    const nextOutput = transfer.outputs[index + 1] ?? 0
     const inputOffset = (nextInput - input) / 3
     const controlPointA = createTransferPathPoint(
       input + inputOffset,
-      output + transfer.slopes[index] * inputOffset,
+      output + (transfer.slopes[index] ?? 0) * inputOffset,
     )
     const controlPointB = createTransferPathPoint(
       nextInput - inputOffset,
-      nextOutput - transfer.slopes[index + 1] * inputOffset,
+      nextOutput - (transfer.slopes[index + 1] ?? 0) * inputOffset,
     )
     const nextPoint = createTransferPathPoint(nextInput, nextOutput)
 
@@ -266,6 +266,7 @@ export function moveCurvePoint(
   if (pointIndex < 0) return params
 
   const point = normalized[pointIndex]
+  if (!point) return params
   const previous = normalized[pointIndex - 1]
   const next = normalized[pointIndex + 1]
   const minInput = point.endpoint
@@ -381,7 +382,7 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
 }
 
 function composeCurveChannelLuts(first: Uint8ClampedArray, second: Uint8ClampedArray) {
-  return createLut((value) => second[first[value]])
+  return createLut((value) => second[first[value] ?? 0] ?? 0)
 }
 
 function createCurveChannelTransfer(points: readonly NormalizedCurveChannelPoint[] | undefined) {
@@ -412,9 +413,9 @@ function createMonotoneSlopes(inputs: readonly number[], outputs: readonly numbe
   const intervals: number[] = []
 
   for (let index = 0; index < pointCount - 1; index += 1) {
-    const interval = Math.max(1, inputs[index + 1] - inputs[index])
+    const interval = Math.max(1, (inputs[index + 1] ?? 0) - (inputs[index] ?? 0))
     intervals.push(interval)
-    deltas.push((outputs[index + 1] - outputs[index]) / interval)
+    deltas.push(((outputs[index + 1] ?? 0) - (outputs[index] ?? 0)) / interval)
   }
 
   const slopes = new Array<number>(pointCount).fill(0)
@@ -424,7 +425,13 @@ function createMonotoneSlopes(inputs: readonly number[], outputs: readonly numbe
   for (let index = 1; index < pointCount - 1; index += 1) {
     const previousDelta = deltas[index - 1]
     const nextDelta = deltas[index]
+    const previousInterval = intervals[index - 1]
+    const nextInterval = intervals[index]
     if (
+      previousDelta === undefined ||
+      nextDelta === undefined ||
+      previousInterval === undefined ||
+      nextInterval === undefined ||
       previousDelta === 0 ||
       nextDelta === 0 ||
       Math.sign(previousDelta) !== Math.sign(nextDelta)
@@ -432,8 +439,6 @@ function createMonotoneSlopes(inputs: readonly number[], outputs: readonly numbe
       slopes[index] = 0
       continue
     }
-    const previousInterval = intervals[index - 1]
-    const nextInterval = intervals[index]
     const firstWeight = 2 * nextInterval + previousInterval
     const secondWeight = nextInterval + 2 * previousInterval
     slopes[index] =
@@ -449,19 +454,27 @@ function interpolateMonotoneCubic(
   outputs: readonly number[],
   slopes: readonly number[],
 ) {
-  if (input <= inputs[0]) return outputs[0]
+  const firstInput = inputs[0]
+  const firstOutput = outputs[0]
+  if (firstInput === undefined || firstOutput === undefined) return 0
+  if (input <= firstInput) return firstOutput
   const lastIndex = inputs.length - 1
-  if (input >= inputs[lastIndex]) return outputs[lastIndex]
+  const lastInput = inputs[lastIndex]
+  const lastOutput = outputs[lastIndex]
+  if (lastInput === undefined || lastOutput === undefined) return 0
+  if (input >= lastInput) return lastOutput
 
   let segmentIndex = 0
-  while (segmentIndex < lastIndex - 1 && input > inputs[segmentIndex + 1]) {
+  while (segmentIndex < lastIndex - 1) {
+    const nextSegmentInput = inputs[segmentIndex + 1]
+    if (nextSegmentInput === undefined || input <= nextSegmentInput) break
     segmentIndex += 1
   }
 
-  const x0 = inputs[segmentIndex]
-  const x1 = inputs[segmentIndex + 1]
-  const y0 = outputs[segmentIndex]
-  const y1 = outputs[segmentIndex + 1]
+  const x0 = inputs[segmentIndex] ?? 0
+  const x1 = inputs[segmentIndex + 1] ?? 0
+  const y0 = outputs[segmentIndex] ?? 0
+  const y1 = outputs[segmentIndex + 1] ?? 0
   const interval = x1 - x0
   const t = (input - x0) / interval
   const t2 = t * t
@@ -472,9 +485,9 @@ function interpolateMonotoneCubic(
   const h11 = t3 - t2
   return (
     h00 * y0 +
-    h10 * interval * slopes[segmentIndex] +
+    h10 * interval * (slopes[segmentIndex] ?? 0) +
     h01 * y1 +
-    h11 * interval * slopes[segmentIndex + 1]
+    h11 * interval * (slopes[segmentIndex + 1] ?? 0)
   )
 }
 

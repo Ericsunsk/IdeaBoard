@@ -68,7 +68,7 @@ function drawExecutionMaskToCanvas(targetCanvas: HTMLCanvasElement, source: Imag
   const total = source.width * source.height
   for (let index = 0; index < total; index += 1) {
     const base = index * 4
-    const maskValue = source.data[base + 3]
+    const maskValue = source.data[base + 3] ?? 0
     imageData.data[base] = maskValue
     imageData.data[base + 1] = maskValue
     imageData.data[base + 2] = maskValue
@@ -100,7 +100,7 @@ export function drawMaskRasterPreviewToCanvas(
 
   for (let i = 0; i < total; i += 1) {
     const base = i * 4
-    const hasMask = source.data[base + 3] > 0
+    const hasMask = (source.data[base + 3] ?? 0) > 0
     imageData.data[base] = MASK_PAINTING_RGB.r
     imageData.data[base + 1] = MASK_PAINTING_RGB.g
     imageData.data[base + 2] = MASK_PAINTING_RGB.b
@@ -115,7 +115,7 @@ export function drawMaskRasterPreviewToCanvas(
 function hasMaskPaint(data: Uint8ClampedArray): boolean {
   const alphaThreshold = MASK_PAINTING_EMPTY_ALPHA_THRESHOLD * 255
   for (let idx = 3; idx < data.length; idx += 4) {
-    if (data[idx] > alphaThreshold) return true
+    if ((data[idx] ?? 0) > alphaThreshold) return true
   }
   return false
 }

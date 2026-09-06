@@ -25,9 +25,9 @@ export type CreateHybridImageAdjustmentPlanExecutorOptions =
     yieldToMainThread?: () => Promise<void>
   }
 
-export const DEFAULT_HYBRID_SYNC_MAX_WORK_UNITS = 24_000_000
-export const DEFAULT_HYBRID_COOPERATIVE_CHUNK_BYTES = 1024 * 1024
-export const DEFAULT_HYBRID_COOPERATIVE_FRAME_BUDGET_MS = 10
+const DEFAULT_HYBRID_SYNC_MAX_WORK_UNITS = 24_000_000
+const DEFAULT_HYBRID_COOPERATIVE_CHUNK_BYTES = 1024 * 1024
+const DEFAULT_HYBRID_COOPERATIVE_FRAME_BUDGET_MS = 10
 
 export function createHybridImageAdjustmentPlanExecutor(
   options: CreateHybridImageAdjustmentPlanExecutorOptions = {},

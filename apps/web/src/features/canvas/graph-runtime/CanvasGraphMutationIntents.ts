@@ -45,10 +45,7 @@ export function isSameCanvasConnectionEndpoint(
   return toCanvasConnectionEndpointKey(left) === toCanvasConnectionEndpointKey(right)
 }
 
-export function targetsSameCanvasInput(
-  left: CanvasConnectionEndpoint,
-  right: CanvasConnectionEndpoint,
-) {
+function targetsSameCanvasInput(left: CanvasConnectionEndpoint, right: CanvasConnectionEndpoint) {
   return (
     left.toNodeType === right.toNodeType &&
     left.toNodeId === right.toNodeId &&
@@ -129,7 +126,7 @@ export function commitCanvasGraphConnectIntent(
   }
 }
 
-export function resolveCanvasGraphDeleteReason(
+function resolveCanvasGraphDeleteReason(
   nodeIds: readonly CanvasGraphNodeId[],
   extraEdgeIds: readonly CanvasGraphEdgeId[],
 ): CanvasGraphTransactionReason {

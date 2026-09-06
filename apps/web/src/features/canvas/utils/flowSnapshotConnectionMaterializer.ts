@@ -37,7 +37,7 @@ export type FlowSnapshotConnectionMaterializerOptions = {
   lookupData: (nodeId: string) => FlowNodeData | undefined
 }
 
-export function parsePortFromHandle(
+function parsePortFromHandle(
   handle: string | null | undefined,
   direction: 'in' | 'out',
 ): CanvasConnectionPort | null {

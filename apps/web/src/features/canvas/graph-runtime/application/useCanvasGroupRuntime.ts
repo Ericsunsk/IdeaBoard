@@ -347,10 +347,12 @@ export function useCanvasGroupRuntime(
       isSameNodeSet(group.nodeIds as CanvasGraphNodeId[], selectedNodeIds),
     )
     if (matchingGroups.length === 1) {
+      const matchedGroup = matchingGroups[0]
+      if (!matchedGroup) return null
       return {
         kind: 'ungroup',
         label: i18n.global.t('canvas.controls.ungroupSelection'),
-        groupId: matchingGroups[0].id,
+        groupId: matchedGroup.id,
         nodeIds: selectedNodeIds,
       }
     }

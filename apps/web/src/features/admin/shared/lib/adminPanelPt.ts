@@ -2,7 +2,7 @@ import type { PanelPassThroughOptions } from 'primevue/panel'
 
 type AdminPanelDensity = 'default' | 'compact'
 
-export function createAdminPanelPt(density: AdminPanelDensity = 'default') {
+function createAdminPanelPt(density: AdminPanelDensity = 'default') {
   const compact = density === 'compact'
   return {
     root: {
@@ -24,5 +24,3 @@ export function createAdminPanelPt(density: AdminPanelDensity = 'default') {
 }
 
 export const adminPanelPt = createAdminPanelPt()
-
-export const adminCompactPanelPt = createAdminPanelPt('compact')

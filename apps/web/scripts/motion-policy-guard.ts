@@ -112,6 +112,7 @@ export function findMotionPolicyViolations(
   const allowedProperties = new Set(allowance?.properties ?? [])
   const unregisteredProperties = [...content.matchAll(clonePattern(rawCustomTimingPattern))]
     .map((match) => match[1])
+    .filter((property): property is string => property !== undefined)
     .filter((property) => !isAppMotionPolicyProperty(sourcePath, property))
     .filter((property) => !allowedProperties.has(property))
   if (unregisteredProperties.length > 0) {

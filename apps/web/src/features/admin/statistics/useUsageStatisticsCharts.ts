@@ -77,7 +77,10 @@ export function useUsageStatisticsCharts(options: {
           return
         }
         byModel.set(segment.label, {
-          color: segment.color || defaultModelColors[idx % defaultModelColors.length],
+          color:
+            segment.color ||
+            defaultModelColors[idx % defaultModelColors.length] ||
+            adminChartTheme.mist,
           total: segment.value,
         })
       })

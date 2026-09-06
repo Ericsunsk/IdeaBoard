@@ -26,7 +26,7 @@ export type AdminStorageFeedback = {
   deleteProfileFailed: (error: unknown) => void
 }
 
-export function createAdminStorageFeedback(toast: AdminToastPort): AdminStorageFeedback {
+function createAdminStorageFeedback(toast: AdminToastPort): AdminStorageFeedback {
   return {
     loadProfilesFailed(error) {
       toast.error(formatAdminDisplayError(error, '加载存储配置失败'))

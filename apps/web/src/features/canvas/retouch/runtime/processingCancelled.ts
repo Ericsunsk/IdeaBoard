@@ -1,5 +1,5 @@
 /** Cancellation is a fact (code/name), never message prose. */
-export const PROCESSING_CANCELLED_NAME = 'ImageProcessingCancelled'
+const PROCESSING_CANCELLED_NAME = 'ImageProcessingCancelled'
 
 export function processingCancelledError(): Error {
   const error = new Error('Image processing cancelled')

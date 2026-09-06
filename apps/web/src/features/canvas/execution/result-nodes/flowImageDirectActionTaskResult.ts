@@ -32,7 +32,7 @@ function normalizePositiveImageSize(width: unknown, height: unknown): ImageSize 
   return { width: normalizedWidth, height: normalizedHeight }
 }
 
-export function pickFirstValidImageResult(results: TaskImageResult[]): TaskImageResult | null {
+function pickFirstValidImageResult(results: TaskImageResult[]): TaskImageResult | null {
   return normalizeTaskImageResults(results)[0] ?? null
 }
 
@@ -64,22 +64,6 @@ export async function resolveTaskImageResultAtIndexDisplay(
   const resolved = await resolveTaskImageResultDisplay(result, fallbackRatio, loadImageSize)
   if (!resolved) throw new Error(i18n.global.t('canvas.execution.taskCompletedNoImageAtIndex'))
   return { ...resolved, resultIndex }
-}
-
-export async function resolveTaskImageRatio(
-  url: string,
-  fallbackRatio: number,
-  loadImageSize: ImageSizeLoader,
-): Promise<number> {
-  try {
-    const size = await loadImageSize(url)
-    if (size && size.width > 0 && size.height > 0) {
-      return size.height / size.width
-    }
-  } catch (error) {
-    console.warn('[canvas] failed to probe task image size', error)
-  }
-  return fallbackRatio > 0 ? fallbackRatio : 1
 }
 
 export async function resolveTaskImageResultDisplay(

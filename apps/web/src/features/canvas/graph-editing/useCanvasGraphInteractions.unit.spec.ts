@@ -155,7 +155,9 @@ describe('useCanvasGraphInteractions', () => {
     const harness = createHarness()
 
     harness.interactions.commands.beginNodeDragDuplicateTracking(true)
-    harness.nodes.value[0] = { ...harness.nodes.value[0], position: { x: 50, y: 65 } }
+    const draggedNode = harness.nodes.value[0]
+    if (!draggedNode) throw new Error('expected dragged node')
+    harness.nodes.value[0] = { ...draggedNode, position: { x: 50, y: 65 } }
     harness.interactions.commands.finishNodeDragDuplicateTracking(true)
 
     const copied = harness.nodes.value[1]?.data?.snapshotNode as ImageNodeItem

@@ -74,7 +74,7 @@ describe('task monitor resource', () => {
 
     const data = await getAdminTaskList({ page: 1, page_size: 20 })
 
-    expect(data.list[0].latest_execution).toEqual({
+    expect(data.list[0]?.latest_execution).toEqual({
       account_id: 101,
       provider_endpoint_id: 202,
       provider_endpoint_name: 'Provider A',
@@ -82,7 +82,7 @@ describe('task monitor resource', () => {
       api_type: 'google-native',
     })
     expect(data.list[0]).not.toHaveProperty('execution_attempts')
-    expect(data.list[1].latest_execution).toBeUndefined()
+    expect(data.list[1]?.latest_execution).toBeUndefined()
   })
 
   it('loads the Task-owned execution trace through the detail resource seam', async () => {

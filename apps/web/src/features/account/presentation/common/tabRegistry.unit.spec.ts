@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  accountTabRegistry,
-  resolveAccountTab,
-  resolveAccountTabKey,
-} from './tabRegistry'
+import { accountTabRegistry, resolveAccountTab, resolveAccountTabKey } from './tabRegistry'
 
 describe('accountTabRegistry', () => {
   it('defines each account tab exactly once', () => {

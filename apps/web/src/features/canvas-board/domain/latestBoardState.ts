@@ -152,18 +152,16 @@ function normalizeWithLatestSchema<T>(
   return options?.mode === 'result' ? { ok: false, error } : null
 }
 
-export function normalizeLatestCanvasBoardSnapshot(
-  snapshotLike: unknown,
-): CanvasBoardSnapshot | null
-export function normalizeLatestCanvasBoardSnapshot(
+function normalizeLatestCanvasBoardSnapshot(snapshotLike: unknown): CanvasBoardSnapshot | null
+function normalizeLatestCanvasBoardSnapshot(
   snapshotLike: unknown,
   options: LatestBoardStateNullableOptions,
 ): CanvasBoardSnapshot | null
-export function normalizeLatestCanvasBoardSnapshot(
+function normalizeLatestCanvasBoardSnapshot(
   snapshotLike: unknown,
   options: LatestBoardStateResultOptions,
 ): LatestBoardStateValidationResult<CanvasBoardSnapshot>
-export function normalizeLatestCanvasBoardSnapshot(
+function normalizeLatestCanvasBoardSnapshot(
   snapshotLike: unknown,
   options?: LatestBoardStateNormalizationOptions,
 ): CanvasBoardSnapshot | null | LatestBoardStateValidationResult<CanvasBoardSnapshot> {

@@ -93,7 +93,9 @@ describe('bindCanvasGraphSessionProjection', () => {
     })
     expect(scheduled).toHaveLength(1)
 
-    scheduled[0]()
+    const scheduledProjection = scheduled[0]
+    if (!scheduledProjection) throw new Error('expected scheduled projection')
+    scheduledProjection()
     expect(replaceFullProjection).toHaveBeenCalledWith(
       expect.objectContaining({ nodes: expect.any(Array) }),
     )

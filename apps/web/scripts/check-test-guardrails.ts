@@ -440,7 +440,7 @@ function importsSharedRenderHelper(content: string): boolean {
   let match = importPattern.exec(content)
 
   while (match) {
-    const importedNames = match[1]
+    const importedNames = (match[1] ?? '')
       .split(',')
       .map((name) =>
         name
@@ -470,8 +470,8 @@ function checkContractGeneratedQueryMocks(
   let match = mockPattern.exec(content)
 
   while (match) {
-    const mockKind = match[1]
-    const module = match[3]
+    const mockKind = match[1] ?? ''
+    const module = match[3] ?? ''
     if (hasGeneratedQueryMockException(specFile.sourcePath, module, usedExceptions)) {
       match = mockPattern.exec(content)
       continue

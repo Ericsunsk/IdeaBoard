@@ -53,9 +53,6 @@ export const authModalKickerClass =
 export const authModalTitleClass =
   "m-0 text-[22px] font-bold leading-tight tracking-tight text-[var(--color-ib-auth-title)] [font-family:'Satoshi',-apple-system,'SF_Pro_Display',sans-serif] max-[520px]:text-[20px]"
 
-export const authModalSubtitleClass =
-  'mt-1 mb-0 text-[13px] leading-snug text-[var(--color-ib-auth-muted)]'
-
 export const authFieldClass =
   'relative z-[1] flex min-w-0 flex-col gap-1 text-[12.5px] font-semibold text-[var(--color-ib-auth-subtle)]'
 
@@ -67,9 +64,6 @@ export const authInputErrorClass = ibFormInputErrorClass
 
 export const authPrimaryButtonClass =
   'ib-control-state ib-auth-primary-action [--ib-control-hover-transform:scale(1.008)] [--ib-control-active-transform:scale(0.99)] [--ib-control-disabled-opacity:0.7] mt-1 inline-flex h-[42px] w-full items-center justify-center rounded-[10px] border-0 bg-gradient-to-r from-[var(--color-ib-auth-primary-from)] to-[var(--color-ib-auth-primary-to)] px-6 text-[14px] font-semibold text-[var(--color-ib-auth-primary-text)] shadow-[var(--shadow-ib-auth-primary)] transition-[transform,box-shadow,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-[var(--shadow-ib-auth-primary-hover)]'
-
-export const authSecondaryButtonClass =
-  'ib-control-state [--ib-control-active-transform:scale(0.99)] [--ib-control-disabled-opacity:0.6] inline-flex h-[40px] w-full items-center justify-center rounded-[10px] border border-[var(--color-ib-auth-shell-border)] bg-[var(--color-ib-auth-shell)] px-4 text-[13px] font-semibold text-[var(--color-ib-auth-text)] transition-[background-color,border-color,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-[var(--color-ib-border-hover)] hover:bg-[var(--color-ib-surface-hover)]'
 
 export const authSocialIconButtonClass =
   'ib-control-state [--ib-control-active-transform:scale(0.99)] [--ib-control-disabled-opacity:0.7] inline-flex h-10 w-full items-center justify-center rounded-[10px] border border-ib-border bg-ib-surface-raised p-0 shadow-none outline-none transition-[border-color,background-color,box-shadow,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-ib-border-hover focus-visible:border-ib-creative-accent focus-visible:bg-ib-surface focus-visible:shadow-[var(--shadow-ib-focus)] disabled:bg-ib-surface-disabled'

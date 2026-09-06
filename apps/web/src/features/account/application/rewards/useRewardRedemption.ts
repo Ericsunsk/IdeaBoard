@@ -84,7 +84,7 @@ export function prependRewardRedemption(
         pages: [
           {
             ...cached.pages[0],
-            redemptions: [redemption, ...cached.pages[0].redemptions],
+            redemptions: [redemption, ...(cached.pages[0]?.redemptions ?? [])],
           },
           ...cached.pages.slice(1),
         ],

@@ -47,7 +47,7 @@ vi.mock('../../application/rewards/useRewardHistory', async () => {
     loadMore: loadMoreMock,
   })
   return {
-    useRewardRedemptionHistory: composable,
+    useRewardHistory: composable,
   }
 })
 

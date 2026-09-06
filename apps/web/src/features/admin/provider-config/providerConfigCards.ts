@@ -83,7 +83,7 @@ export function createProviderEndpointView(
   }
 }
 
-export function createProviderAccountView(account: ProviderAccountRecord): ProviderAccountView {
+function createProviderAccountView(account: ProviderAccountRecord): ProviderAccountView {
   const maxConcurrent = account.maxConcurrent || 1
   const currentConcurrent = account.currentConcurrent || 0
 

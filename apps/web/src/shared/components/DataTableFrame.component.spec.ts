@@ -89,6 +89,7 @@ describe('DataTableFrame', () => {
     })
 
     const [headerCheckbox, rowCheckbox] = screen.getAllByRole('checkbox')
+    if (!rowCheckbox) throw new Error('expected row selection checkbox')
     const dataTableRoot = screen.getByRole('table').parentElement?.parentElement
     expect(dataTableRoot).toHaveClass('p-datatable')
     expect(dataTableRoot).not.toHaveClass('p-datatable-sm')

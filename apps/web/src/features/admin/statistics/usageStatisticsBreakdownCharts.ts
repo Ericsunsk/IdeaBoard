@@ -172,7 +172,7 @@ function bottleneckSourceFallbackLabel(source: string | undefined) {
     input: '输入校验',
     unknown: '未知来源',
   }
-  return labels[source || 'unknown'] || labels.unknown
+  return labels[source || 'unknown'] ?? labels.unknown ?? '未知来源'
 }
 
 function bottleneckSourceColor(source: string | undefined, index: number) {
@@ -185,7 +185,11 @@ function bottleneckSourceColor(source: string | undefined, index: number) {
     input: adminChartTheme.warning,
     unknown: adminChartTheme.mist,
   }
-  return colors[source || 'unknown'] || defaultModelColors[index % defaultModelColors.length]
+  return (
+    colors[source || 'unknown'] ??
+    defaultModelColors[index % defaultModelColors.length] ??
+    adminChartTheme.mist
+  )
 }
 
 function failureCategoryFallbackLabel(category: string | undefined) {
@@ -200,7 +204,7 @@ function failureCategoryFallbackLabel(category: string | undefined) {
     cancelled: '任务取消',
     unknown: '未知错误',
   }
-  return labels[category || 'unknown'] || labels.unknown
+  return labels[category || 'unknown'] ?? labels.unknown ?? '未知错误'
 }
 
 function failureCategoryColor(category: string | undefined, index: number) {
@@ -215,5 +219,9 @@ function failureCategoryColor(category: string | undefined, index: number) {
     cancelled: adminChartTheme.mist,
     unknown: adminChartTheme.emptyText,
   }
-  return colors[category || 'unknown'] || defaultModelColors[index % defaultModelColors.length]
+  return (
+    colors[category || 'unknown'] ??
+    defaultModelColors[index % defaultModelColors.length] ??
+    adminChartTheme.emptyText
+  )
 }

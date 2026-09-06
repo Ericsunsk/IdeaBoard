@@ -15,7 +15,7 @@ export type AdminTaskCancellationFeedback = {
   cancelTaskFailed: (error: unknown) => void
 }
 
-export function createAdminTaskResultFeedback(toast: AdminToastPort): AdminTaskResultFeedback {
+function createAdminTaskResultFeedback(toast: AdminToastPort): AdminTaskResultFeedback {
   return {
     unsafeImageUrlRejected: () => toast.error('图片链接不安全，已拒绝打开'),
     copiedToClipboard: () => toast.success('已复制到剪贴板'),

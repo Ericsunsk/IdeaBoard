@@ -23,7 +23,7 @@
     "audit:complexity": "tsx scripts/check-complexity-hotspots.ts",
     "lint:style-governance": "tsx scripts/check-style-governance.ts",
     "lint:style": "stylelint \"src/**/*.{css,vue}\" --allow-empty-input",
-    "lint:knip": "knip --include files,duplicates,dependencies",
+    "lint:knip": "knip --include files,duplicates,dependencies,exports",
     "benchmark:canvas-interactions": "tsx scripts/canvas-interactions-benchmark.ts",
     "preview": "vite preview",
     "smoke:user": "tsx scripts/user-route-smoke.ts",

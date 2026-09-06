@@ -6,7 +6,7 @@ import type {
 } from '../../../../shared/api/generated-query/model'
 import { adminCreditsBillingApi, type AdminCreditsBillingApi } from '../creditsBillingApi'
 
-export const adminCreditHealthQueryKey = ['admin', 'credits', 'health'] as const
+const adminCreditHealthQueryKey = ['admin', 'credits', 'health'] as const
 
 export function useAdminCreditHealthResource(
   options: { enabled?: MaybeRefOrGetter<boolean> } = {},

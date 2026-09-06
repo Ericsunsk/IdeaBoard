@@ -100,16 +100,15 @@ export default tseslint.config(
       'src/features/**/app/**/*.{ts,tsx,vue}',
       'src/features/**/pages/**/*.{ts,tsx,vue}',
     ],
+    // Module-direction rules (shared -> features, pages -> generated-query,
+    // circular, cross-feature deep imports) are owned by dependency-cruiser
+    // (.dependency-cruiser.cjs + lint:dependencies). ESLint keeps only the
+    // file-local Overlay adapter conventions below.
     rules: {
       'no-restricted-imports': [
         'error',
         {
           patterns: [
-            {
-              group: ['**/generated-query/**'],
-              message:
-                'Route, page, and app layers must use feature/resource/shared API adapters instead of generated-query directly.',
-            },
             {
               group: ['**/useOverlayInteractionLifecycle'],
               message:
@@ -119,23 +118,6 @@ export default tseslint.config(
               group: ['**/overlay-lifecycle/useCanvasCustomLayerOverlay'],
               message:
                 'Import Canvas Overlay lifecycle through the overlay-lifecycle public barrel instead of its implementation file.',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  {
-    files: ['src/shared/**/*.{ts,tsx,vue}'],
-    ignores: ['src/shared/api/generated-query/**'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['**/features/**'],
-              message: 'Shared modules must not depend on concrete feature modules.',
             },
           ],
         },

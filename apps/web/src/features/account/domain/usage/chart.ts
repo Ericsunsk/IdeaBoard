@@ -7,7 +7,10 @@ import {
   type ChartData,
   type ChartOptions,
 } from '../../../../shared/lib/chartPrimitives'
-import { shouldShowChartTimeTick, type ChartTimeTickDensity } from '../../../../shared/lib/chartTimeRange'
+import {
+  shouldShowChartTimeTick,
+  type ChartTimeTickDensity,
+} from '../../../../shared/lib/chartTimeRange'
 import { resolveChartAnimation } from '../../../../shared/motion/chartMotion'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { i18n } from '../../../../shared/i18n'

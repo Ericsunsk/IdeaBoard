@@ -11,6 +11,7 @@ import {
 import { FALLBACK_ADMIN_ACCOUNT_LIMITS } from './providerConfigLimits'
 import {
   ADMIN_PROVIDER_ENDPOINT_API_TYPE_OPTIONS,
+  DEFAULT_ADMIN_PROVIDER_ENDPOINT_API_TYPE,
   createAccountCreatePayload,
   createAccountUpdatePayload,
   getAdminProviderEndpointApiTypeLabel,
@@ -85,7 +86,8 @@ export type DetectProviderModelsResult = {
 
 const activeProgressPt = { value: { class: '!bg-admin-success' } } as const
 const mutedProgressPt = { value: { class: '!bg-admin-text-3' } } as const
-const DEFAULT_PROVIDER_API_TYPE = ADMIN_PROVIDER_ENDPOINT_API_TYPE_OPTIONS[0].value
+const DEFAULT_PROVIDER_API_TYPE =
+  ADMIN_PROVIDER_ENDPOINT_API_TYPE_OPTIONS[0]?.value ?? DEFAULT_ADMIN_PROVIDER_ENDPOINT_API_TYPE
 
 export function createAdminProviderConfigWorkspace(options: AdminProviderConfigWorkspaceOptions) {
   const resource = options.resource ?? createAdminProviderConfigResource()

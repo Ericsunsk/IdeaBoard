@@ -54,7 +54,7 @@ export function containImageRect(
   return createOutpaintRect(0, top, width, height)
 }
 
-export function clampFrameToImageRect(frame: OutpaintRect, imageRect: OutpaintRect): OutpaintRect {
+function clampFrameToImageRect(frame: OutpaintRect, imageRect: OutpaintRect): OutpaintRect {
   const originalLeft = imageRect.left
   const originalTop = imageRect.top
   const originalRight = imageRect.left + imageRect.width

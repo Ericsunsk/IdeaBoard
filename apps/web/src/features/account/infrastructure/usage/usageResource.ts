@@ -13,10 +13,7 @@ export const usageQueryKeys = {
   current: (range: UsageRange) => ['user', 'usage', 'current', range] as const,
 }
 
-export async function fetchUsage(
-  range: UsageRange,
-  signal?: AbortSignal,
-): Promise<AccountUsage> {
+export async function fetchUsage(range: UsageRange, signal?: AbortSignal): Promise<AccountUsage> {
   return resolveApiData(
     getUserUsage({ range }, signal ? { signal } : undefined),
     i18n.global.t('account.errors.usageLoadFailed'),

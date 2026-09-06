@@ -1,5 +1,4 @@
 import type { CanvasVueFlowGraphCommandOptions } from './useCanvasVueFlowGraphAdapter'
-import type { CanvasGraphTransactionSummary } from '../graph-runtime'
 
 const FLOW_GRAPH_COMMAND_SIDE_EFFECTS_METADATA_KEY = 'flowGraphCommandSideEffects'
 
@@ -17,17 +16,6 @@ export function createFlowGraphCommandOptions(
       [FLOW_GRAPH_COMMAND_SIDE_EFFECTS_METADATA_KEY]: sideEffects,
     },
   }
-}
-
-export function createFlowGraphCommandOptionsFromTransactionSummary(
-  summary: CanvasGraphTransactionSummary,
-  options: { historyBefore?: unknown } = {},
-): CanvasVueFlowGraphCommandOptions {
-  return createFlowGraphCommandOptions({
-    historyBefore: summary.shouldRecordHistory ? (options.historyBefore ?? undefined) : undefined,
-    recordHistory: summary.shouldRecordHistory,
-    markDirty: summary.shouldMarkDirty,
-  })
 }
 
 export function readFlowGraphCommandSideEffects(

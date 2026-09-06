@@ -200,7 +200,7 @@ function composeChannelLuts(first: RetouchCurvesLuts, second: RetouchCurvesLuts)
 }
 
 function composeSingleChannelLuts(first: Uint8ClampedArray, second: Uint8ClampedArray) {
-  return createLut((value) => second[first[value]])
+  return createLut((value) => second[first[value] ?? 0] ?? 0)
 }
 
 function isIdentityLut(luts: RetouchCurvesLuts) {
@@ -213,7 +213,7 @@ function isIdentityLut(luts: RetouchCurvesLuts) {
 
 function isIdentitySingleLut(lut: Uint8ClampedArray) {
   for (let index = CHANNEL_MIN; index <= CHANNEL_MAX; index += 1) {
-    if (lut[index] !== index) return false
+    if ((lut[index] ?? -1) !== index) return false
   }
   return true
 }
@@ -226,7 +226,10 @@ function applyThresholdAdjustment(
   endByte: number,
 ) {
   for (let index = startByte; index < endByte; index += 4) {
-    const luminance = 0.2126 * data[index] + 0.7152 * data[index + 1] + 0.0722 * data[index + 2]
+    const luminance =
+      0.2126 * (data[index] ?? 0) +
+      0.7152 * (data[index + 1] ?? 0) +
+      0.0722 * (data[index + 2] ?? 0)
     const next = luminance >= threshold ? CHANNEL_MAX : CHANNEL_MIN
     const value = invert ? CHANNEL_MAX - next : next
     data[index] = value
@@ -242,9 +245,9 @@ function applyHslAdjustment(
   endByte: number,
 ) {
   for (let index = startByte; index < endByte; index += 4) {
-    const sourceR = data[index] / CHANNEL_MAX
-    const sourceG = data[index + 1] / CHANNEL_MAX
-    const sourceB = data[index + 2] / CHANNEL_MAX
+    const sourceR = (data[index] ?? 0) / CHANNEL_MAX
+    const sourceG = (data[index + 1] ?? 0) / CHANNEL_MAX
+    const sourceB = (data[index + 2] ?? 0) / CHANNEL_MAX
     const max = Math.max(sourceR, sourceG, sourceB)
     const min = Math.min(sourceR, sourceG, sourceB)
     const sourceLightness = (max + min) / 2
@@ -295,9 +298,9 @@ function applyChannelLut(
   endByte: number,
 ) {
   for (let index = startByte; index < endByte; index += 4) {
-    data[index] = luts.red[data[index]]
-    data[index + 1] = luts.green[data[index + 1]]
-    data[index + 2] = luts.blue[data[index + 2]]
+    data[index] = luts.red[data[index] ?? 0] ?? 0
+    data[index + 1] = luts.green[data[index + 1] ?? 0] ?? 0
+    data[index + 2] = luts.blue[data[index + 2] ?? 0] ?? 0
   }
 }
 
@@ -318,12 +321,12 @@ function applySharpenAdjustment(
     const blurOffset = pixelIndex * 3
     if (blurOffset + 2 >= state.blurredRgb.length) break
 
-    const sourceR = state.sourceData[index]
-    const sourceG = state.sourceData[index + 1]
-    const sourceB = state.sourceData[index + 2]
-    const blurredR = state.blurredRgb[blurOffset]
-    const blurredG = state.blurredRgb[blurOffset + 1]
-    const blurredB = state.blurredRgb[blurOffset + 2]
+    const sourceR = state.sourceData[index] ?? 0
+    const sourceG = state.sourceData[index + 1] ?? 0
+    const sourceB = state.sourceData[index + 2] ?? 0
+    const blurredR = state.blurredRgb[blurOffset] ?? 0
+    const blurredG = state.blurredRgb[blurOffset + 1] ?? 0
+    const blurredB = state.blurredRgb[blurOffset + 2] ?? 0
 
     if (params.protectColor) {
       const sourceLuminance = getLuminance(sourceR, sourceG, sourceB)
@@ -339,7 +342,7 @@ function applySharpenAdjustment(
       data[index + 2] = sharpenSingleChannel(sourceB, blurredB, amountScale, params.threshold)
     }
 
-    data[index + 3] = state.sourceData[index + 3]
+    data[index + 3] = state.sourceData[index + 3] ?? 0
   }
 }
 
@@ -369,9 +372,9 @@ function createBlurredRgbData(
         const sampleX = clampInteger(x + kernelIndex - kernelRadius, 0, width - 1)
         const sourceOffset = (y * width + sampleX) * 4
         const weight = kernel[kernelIndex] ?? 0
-        red += sourceData[sourceOffset] * weight
-        green += sourceData[sourceOffset + 1] * weight
-        blue += sourceData[sourceOffset + 2] * weight
+        red += (sourceData[sourceOffset] ?? 0) * weight
+        green += (sourceData[sourceOffset + 1] ?? 0) * weight
+        blue += (sourceData[sourceOffset + 2] ?? 0) * weight
       }
 
       const tempOffset = pixelIndex * 3
@@ -393,9 +396,9 @@ function createBlurredRgbData(
         const sampleY = clampInteger(y + kernelIndex - kernelRadius, 0, height - 1)
         const tempOffset = (sampleY * width + x) * 3
         const weight = kernel[kernelIndex] ?? 0
-        red += temp[tempOffset] * weight
-        green += temp[tempOffset + 1] * weight
-        blue += temp[tempOffset + 2] * weight
+        red += (temp[tempOffset] ?? 0) * weight
+        green += (temp[tempOffset + 1] ?? 0) * weight
+        blue += (temp[tempOffset + 2] ?? 0) * weight
       }
 
       const outputOffset = pixelIndex * 3
@@ -421,7 +424,7 @@ function createGaussianKernel(radius: number) {
   }
 
   for (let index = 0; index < weights.length; index += 1) {
-    weights[index] /= total
+    weights[index] = (weights[index] ?? 0) / total
   }
 
   return weights

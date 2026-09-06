@@ -7,7 +7,7 @@ import {
   type UsageRange,
 } from '../../infrastructure/usage/usageResource'
 
-export const USAGE_STALE_TIME_MS = 30_000
+const USAGE_STALE_TIME_MS = 30_000
 
 type SuccessfulUsage = {
   range: UsageRange

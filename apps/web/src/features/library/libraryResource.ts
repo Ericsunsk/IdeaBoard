@@ -119,7 +119,7 @@ export function renameFolder(folderId: number, name: string): Promise<LibraryFol
   )
 }
 
-export function saveAsset(asset: LibraryAssetInput, folderId?: number, newFolderName?: string) {
+function saveAsset(asset: LibraryAssetInput, folderId?: number, newFolderName?: string) {
   return resolveApiData(
     saveLibraryAsset({ asset, folder_id: folderId, new_folder_name: newFolderName }),
     i18n.global.t('library.errors.saveAssetFailed'),
@@ -180,7 +180,7 @@ export async function removeSearchReference(
   }
 }
 
-export async function lookupSavedAssets(
+async function lookupSavedAssets(
   keys: Array<{ provider: 'unsplash' | 'pexels'; source_id: string }>,
 ): Promise<LibraryAsset[]> {
   return resolveApiData(

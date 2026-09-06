@@ -10,12 +10,7 @@ import { i18n } from '../../shared/i18n'
 import { formatLocaleNumber } from '../../shared/i18n/formatters'
 import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
 import { formatIdeaAmount } from '../../shared/i18n/userIdeaCurrency'
-import {
-  defaultAccountTab,
-  useAccountOverlay,
-  useCreditWallet,
-  type AccountTab,
-} from '../account'
+import { defaultAccountTab, useAccountOverlay, useCreditWallet, type AccountTab } from '../account'
 import { useAuthOverlay } from '../auth/authOverlay'
 
 export type UserShellNavigationAdapter = {

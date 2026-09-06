@@ -1,6 +1,6 @@
 import { WORKFLOW_FEATURE, type WorkflowFeature } from '../../../../shared/domain/workflowFeatures'
 
-export const ADMIN_WORKFLOW_FEATURE_GROUP = {
+const ADMIN_WORKFLOW_FEATURE_GROUP = {
   image: 'image',
   prompt: 'prompt',
   fusion: 'fusion',

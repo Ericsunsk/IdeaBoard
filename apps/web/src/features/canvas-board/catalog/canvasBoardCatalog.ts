@@ -224,7 +224,7 @@ export function createCanvasBoardCatalog(
   }
 }
 
-export class CanvasBoardCatalogScopeChangedError extends Error {
+class CanvasBoardCatalogScopeChangedError extends Error {
   constructor() {
     super('CANVAS_BOARD_CATALOG_SCOPE_CHANGED')
     this.name = 'CanvasBoardCatalogScopeChangedError'

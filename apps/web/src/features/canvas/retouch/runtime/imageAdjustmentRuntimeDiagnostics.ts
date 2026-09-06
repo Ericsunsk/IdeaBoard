@@ -7,7 +7,7 @@ export const RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_EVENT = 'ideaboard:retouch:plan-e
 
 export const RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_KEY = '__ideaBoardRetouchPlanExecutorDiagnostics'
 
-export const DEFAULT_RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_LIMIT = 100
+const DEFAULT_RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_LIMIT = 100
 
 export type RetouchPlanExecutorBrowserDiagnostic = ImageAdjustmentPlanExecutionEvent & {
   sequence: number

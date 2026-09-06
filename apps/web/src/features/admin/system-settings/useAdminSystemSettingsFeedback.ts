@@ -29,9 +29,7 @@ export type AdminAccessSettingsFeedback = {
 export type AdminMediaUploadSettingsFeedback = AdminSettingFeedback
 export type AdminOutboundPolicyFeedback = AdminSettingFeedback
 
-export function createAdminBrandingSettingsFeedback(
-  toast: AdminToastPort,
-): AdminBrandingSettingsFeedback {
+function createAdminBrandingSettingsFeedback(toast: AdminToastPort): AdminBrandingSettingsFeedback {
   return {
     loadFailed: (error) => toast.error(formatAdminDisplayError(error, '加载系统设置失败')),
     validationFailed: (message) => toast.error(message),
@@ -42,9 +40,7 @@ export function createAdminBrandingSettingsFeedback(
   }
 }
 
-export function createAdminAccessSettingsFeedback(
-  toast: AdminToastPort,
-): AdminAccessSettingsFeedback {
+function createAdminAccessSettingsFeedback(toast: AdminToastPort): AdminAccessSettingsFeedback {
   return {
     loadFailed: (error) => toast.error(formatAdminDisplayError(error, '加载访问控制设置失败')),
     rateLimitValidationFailed: (message) => toast.error(message),
@@ -56,15 +52,13 @@ export function createAdminAccessSettingsFeedback(
   }
 }
 
-export function createAdminMediaUploadSettingsFeedback(
+function createAdminMediaUploadSettingsFeedback(
   toast: AdminToastPort,
 ): AdminMediaUploadSettingsFeedback {
   return createAdminSettingFeedback(toast, '加载上传设置失败', '上传设置已保存', '保存上传设置失败')
 }
 
-export function createAdminOutboundPolicyFeedback(
-  toast: AdminToastPort,
-): AdminOutboundPolicyFeedback {
+function createAdminOutboundPolicyFeedback(toast: AdminToastPort): AdminOutboundPolicyFeedback {
   return createAdminSettingFeedback(
     toast,
     '加载私有地址访问策略失败',

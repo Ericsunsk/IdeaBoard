@@ -14,10 +14,6 @@ type CompositeContext = Required<RetouchRasterCompositeOptions> & {
   output: ImageData
 }
 
-export function createTransparentImageData(width: number, height: number): ImageData {
-  return new ImageData(new Uint8ClampedArray(width * height * 4), width, height)
-}
-
 export function compositeRetouchLayerStack(
   sourceImageData: ImageData,
   layers: readonly RetouchLayer[],
@@ -74,7 +70,7 @@ function applyLayerToComposite(
   }
 }
 
-export function alphaCompositeImageData(base: ImageData, overlay: ImageData): ImageData {
+function alphaCompositeImageData(base: ImageData, overlay: ImageData): ImageData {
   const width = Math.min(base.width, overlay.width)
   const height = Math.min(base.height, overlay.height)
   const baseData = base.data

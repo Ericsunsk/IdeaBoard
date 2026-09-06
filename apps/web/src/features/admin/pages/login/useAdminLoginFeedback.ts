@@ -11,7 +11,7 @@ export type AdminLoginFeedback = {
   failed: (error: unknown) => void
 }
 
-export function createAdminLoginFeedback(toast: AdminToastPort): AdminLoginFeedback {
+function createAdminLoginFeedback(toast: AdminToastPort): AdminLoginFeedback {
   return {
     succeeded: () => toast.success('管理员登录成功'),
     sessionRevokeFailed: () => toast.warning('会话撤销失败，请稍后重试'),

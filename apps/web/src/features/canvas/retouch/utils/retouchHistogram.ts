@@ -21,7 +21,7 @@ export function createRetouchHistogram(
 
   for (let index = 0; index < data.length; index += 4) {
     const value = resolveHistogramValue(data, index, channel)
-    bins[value] += 1
+    bins[value] = (bins[value] ?? 0) + 1
   }
 
   return createHistogramResult(channel, bins)
@@ -35,7 +35,7 @@ export function sampleHistogramPath(histogram: RetouchHistogram, sampleCount = 1
   for (let index = 0; index < count; index += 1) {
     const binIndex = Math.round((index / (count - 1)) * CHANNEL_MAX)
     const x = (binIndex / CHANNEL_MAX) * PERCENT_SCALE
-    const y = PERCENT_SCALE - histogram.normalizedBins[binIndex] * PERCENT_SCALE
+    const y = PERCENT_SCALE - (histogram.normalizedBins[binIndex] ?? 0) * PERCENT_SCALE
     points.push(`L ${formatPathNumber(x)} ${formatPathNumber(y)}`)
   }
   points.push(`L ${PERCENT_SCALE} ${PERCENT_SCALE} Z`)
@@ -53,7 +53,7 @@ function createHistogramResult(channel: RetouchCurveChannel, bins: Uint32Array):
 
   if (maxBin > 0) {
     for (let index = 0; index < bins.length; index += 1) {
-      normalizedBins[index] = Math.sqrt(bins[index] / maxBin)
+      normalizedBins[index] = Math.sqrt((bins[index] ?? 0) / maxBin)
     }
   }
 
@@ -73,13 +73,17 @@ function resolveHistogramValue(
 ) {
   switch (channel) {
     case 'red':
-      return data[index]
+      return data[index] ?? 0
     case 'green':
-      return data[index + 1]
+      return data[index + 1] ?? 0
     case 'blue':
-      return data[index + 2]
+      return data[index + 2] ?? 0
     case 'rgb':
-      return Math.round(0.2126 * data[index] + 0.7152 * data[index + 1] + 0.0722 * data[index + 2])
+      return Math.round(
+        0.2126 * (data[index] ?? 0) +
+          0.7152 * (data[index + 1] ?? 0) +
+          0.0722 * (data[index + 2] ?? 0),
+      )
   }
 }
 

@@ -99,7 +99,9 @@ function resolveSourcePort(
 ): CanvasConnectionPort | null {
   if (sourceHandle.port) return sourceHandle.port
   const visibleOutputPortContracts = getVisiblePorts(sourceRef, 'output')
-  return visibleOutputPortContracts.length === 1 ? visibleOutputPortContracts[0].port : null
+  if (visibleOutputPortContracts.length !== 1) return null
+  const singlePort = visibleOutputPortContracts[0]
+  return singlePort ? singlePort.port : null
 }
 
 function collectUsedTargetPorts(targetNodeId: string, existingEdges: readonly FlowEdgeLike[]) {
@@ -134,8 +136,10 @@ function resolveTargetPort(
   )
   if (allowedPorts.length === 0) return null
   const usedPorts = collectUsedTargetPorts(targetNodeId, existingEdges)
-  const openPort = allowedPorts.find((targetPort) => !usedPorts.has(targetPort.port))
-  return (openPort ?? allowedPorts[0]).port
+  const openPort =
+    allowedPorts.find((targetPort) => !usedPorts.has(targetPort.port)) ?? allowedPorts[0]
+  if (!openPort) return null
+  return openPort.port
 }
 
 export function normalizeFlowConnection(

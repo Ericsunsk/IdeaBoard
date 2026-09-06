@@ -15,7 +15,7 @@ export type CanvasViewportStorageIdentity = {
 
 export const CANVAS_VIEWPORT_MIN_ZOOM = 0.1
 export const CANVAS_VIEWPORT_MAX_ZOOM = 2
-export const DEFAULT_CANVAS_VIEWPORT: CanvasFlowViewportState = Object.freeze({
+const DEFAULT_CANVAS_VIEWPORT: CanvasFlowViewportState = Object.freeze({
   x: 0,
   y: 0,
   zoom: 1,
@@ -28,9 +28,7 @@ function normalizeKeyPart(value: string | null | undefined): string | null {
   return normalized ? encodeURIComponent(normalized) : null
 }
 
-export function createCanvasViewportStorageKey(
-  identity: CanvasViewportStorageIdentity,
-): string | null {
+function createCanvasViewportStorageKey(identity: CanvasViewportStorageIdentity): string | null {
   const userUid = normalizeKeyPart(identity.userUid)
   const boardId = normalizeKeyPart(identity.boardId)
   if (!userUid || !boardId) return null
@@ -68,7 +66,7 @@ function normalizeViewportRecord(value: unknown): StoredCanvasViewportState | nu
   }
 }
 
-export function readCanvasViewportState(
+function readCanvasViewportState(
   identity: CanvasViewportStorageIdentity,
 ): StoredCanvasViewportState | null {
   if (typeof window === 'undefined') return null

@@ -32,12 +32,14 @@ function drawMaskStrokeOutline(
 ) {
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (!ctx || outline.length === 0) return
+  const firstPoint = outline[0]
+  if (!firstPoint) return
 
   ctx.save()
   ctx.globalCompositeOperation = drawMode === 'erase' ? 'destination-out' : 'source-over'
   ctx.fillStyle = MASK_PAINTING_COLOR
   ctx.beginPath()
-  ctx.moveTo(outline[0][0], outline[0][1])
+  ctx.moveTo(firstPoint[0], firstPoint[1])
   for (const [x, y] of outline.slice(1)) {
     ctx.lineTo(x, y)
   }

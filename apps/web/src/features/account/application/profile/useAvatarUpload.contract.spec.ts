@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import {
-  useAvatarUpload,
-  type AvatarUploadDependencies,
-} from './useAvatarUpload'
+import { useAvatarUpload, type AvatarUploadDependencies } from './useAvatarUpload'
 
 describe('useAvatarUpload', () => {
   it('clears the input value and returns when no file is selected', async () => {

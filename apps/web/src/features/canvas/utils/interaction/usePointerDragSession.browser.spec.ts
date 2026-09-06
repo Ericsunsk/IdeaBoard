@@ -130,6 +130,7 @@ describe('usePointerDragSession browser contract', () => {
 
       const start = startSnapshots[0]
       const end = endSnapshots[0]
+      if (!start || !end) throw new Error('expected drag start and end snapshots')
       expect(start).toMatchObject({
         hasCapture: true,
         payloadId: payload.id,

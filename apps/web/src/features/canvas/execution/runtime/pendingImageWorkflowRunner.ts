@@ -77,7 +77,7 @@ function imageGenerationFailureMessage(): string {
 }
 
 /** Presentation boundary: transport errors carry a kind; copy is resolved here. */
-export function taskExecutionWarning(error: unknown): string {
+function taskExecutionWarning(error: unknown): string {
   if (error instanceof TaskResultPendingError) {
     return i18n.global.t(
       error.kind === 'timeout' ? 'canvas.task.progressTimeout' : 'canvas.task.stillProcessing',

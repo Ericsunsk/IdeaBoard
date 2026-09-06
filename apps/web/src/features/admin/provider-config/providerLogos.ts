@@ -1,6 +1,6 @@
 import { adminBrandLogoMap, getAdminBrandLogo } from '../shared/logos/adminBrandLogos'
 
-const searchProviderLogoMap: Record<string, string> = {
+const searchProviderLogoMap: Record<string, string | undefined> = {
   unsplash: adminBrandLogoMap['unsplash'],
   pexels: adminBrandLogoMap['pexels'],
 }

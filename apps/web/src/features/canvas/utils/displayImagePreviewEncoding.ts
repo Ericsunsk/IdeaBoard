@@ -1,4 +1,4 @@
-export const PNG_PREVIEW_MIME_TYPE = 'image/png'
+const PNG_PREVIEW_MIME_TYPE = 'image/png'
 export const WEBP_PREVIEW_MIME_TYPE = 'image/webp'
 export const WEBP_PREVIEW_QUALITY = 0.82
 
@@ -6,7 +6,7 @@ export type PreviewMimeType = typeof PNG_PREVIEW_MIME_TYPE | typeof WEBP_PREVIEW
 
 export function imageDataHasTransparentPixels(data: Uint8ClampedArray): boolean {
   for (let alphaIndex = 3; alphaIndex < data.length; alphaIndex += 4) {
-    if (data[alphaIndex] < 255) return true
+    if ((data[alphaIndex] ?? 0) < 255) return true
   }
   return false
 }

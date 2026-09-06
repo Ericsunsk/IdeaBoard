@@ -14,11 +14,7 @@ import {
   type PaymentReturnContext,
 } from '../../domain'
 
-export {
-  defaultAccountTab,
-  resolveAccountTabKey,
-  type AccountTab,
-}
+export { defaultAccountTab, resolveAccountTabKey, type AccountTab }
 
 type AccountTabPaneContext = {
   active: boolean

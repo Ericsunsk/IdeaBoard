@@ -70,7 +70,7 @@ function toLocalState(board: UserBoardItem): CanvasBoardState | null {
   throw new RemoteBoardStateError(boardId, result.error)
 }
 
-export class RemoteBoardStateError extends InvalidBoardStateError {
+class RemoteBoardStateError extends InvalidBoardStateError {
   readonly boardId: string
 
   constructor(boardId: string, context: BoardStateValidationErrorContext) {

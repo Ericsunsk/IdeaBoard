@@ -15,7 +15,9 @@ describe('workflow feature slug contract with the API', () => {
       new RegExp(`${schemaName}:\\s*\\n(?:.*\\n)*?\\s+enum:\\n((?:\\s+- .*\\n?)+)`),
     )
     if (!block) throw new Error(`OpenAPI schema ${schemaName} not found`)
-    return block[1]
+    const enumBlock = block[1]
+    if (!enumBlock) throw new Error(`OpenAPI schema ${schemaName} has empty enum`)
+    return enumBlock
       .split('\n')
       .map((line) => line.replace(/^\s+- /, '').trim())
       .filter(Boolean)

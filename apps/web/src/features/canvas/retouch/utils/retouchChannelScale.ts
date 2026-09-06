@@ -1,6 +1,6 @@
 export const RETOUCH_CHANNEL_MIN = 0
 export const RETOUCH_CHANNEL_MAX = 255
-export const RETOUCH_PLOT_PERCENT_MIN = 0
+const RETOUCH_PLOT_PERCENT_MIN = 0
 export const RETOUCH_PLOT_PERCENT_MAX = 100
 
 export function clampRetouchChannel(value: unknown, fallback = RETOUCH_CHANNEL_MIN) {

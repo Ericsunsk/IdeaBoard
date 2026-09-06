@@ -120,8 +120,7 @@ type ProfileField = {
 
 const { t } = useI18n()
 const userStore = useUserStore()
-const { uploading: avatarUploading, handleFileChange: onAvatarFileChange } =
-  useAvatarUpload()
+const { uploading: avatarUploading, handleFileChange: onAvatarFileChange } = useAvatarUpload()
 const avatarInputRef = ref<HTMLInputElement | null>(null)
 
 const formattedJoinedAt = computed(() => formatDateWithDots(userStore.user?.created_at))

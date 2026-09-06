@@ -1,4 +1,15 @@
-/** @type {import('dependency-cruiser').IConfiguration} */
+/**
+ * Single owner for module-direction rules: no-circular,
+ * shared-not-to-features, route-pages-no-direct-generated-query,
+ * no-cross-feature-deep-imports.
+ *
+ * File-local Overlay adapter conventions live in eslint.config.js
+ * (no-restricted-imports) and are smoke-tested by
+ * scripts/check-eslint-import-boundaries.ts. Do not mirror direction
+ * rules in both systems.
+ *
+ * @type {import('dependency-cruiser').IConfiguration}
+ */
 module.exports = {
   forbidden: [
     {

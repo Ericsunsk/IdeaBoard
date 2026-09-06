@@ -15,7 +15,7 @@ export type ProfileFeedback = {
   passwordChange: AsyncActionFeedback<boolean>
 }
 
-export function createProfileFeedback(appToast: ProfileToast): ProfileFeedback {
+function createProfileFeedback(appToast: ProfileToast): ProfileFeedback {
   return {
     invalidAvatarFile() {
       appToast.warning(i18n.global.t('account.toast.avatarFileUnsupported'))

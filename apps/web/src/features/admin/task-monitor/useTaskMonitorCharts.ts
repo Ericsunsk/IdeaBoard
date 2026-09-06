@@ -152,7 +152,7 @@ export function buildTaskStatusSnapshot(
   }
 }
 
-export function getTaskStatusTotalCount(snapshot: TaskStatusSnapshot) {
+function getTaskStatusTotalCount(snapshot: TaskStatusSnapshot) {
   return Object.values(snapshot).reduce((sum, count) => sum + count, 0)
 }
 
@@ -190,7 +190,7 @@ export function buildTaskDistributionRows(snapshot: TaskStatusSnapshot): TaskDis
   })
 }
 
-export function buildAccountConcurrencyChartData(rows: AccountLoadRow[]): ChartData {
+function buildAccountConcurrencyChartData(rows: AccountLoadRow[]): ChartData {
   if (rows.length <= 0) {
     return defineChartData({
       labels: ['无账号'],
@@ -240,7 +240,7 @@ export function buildAccountConcurrencyChartData(rows: AccountLoadRow[]): ChartD
   })
 }
 
-export function buildAccountConcurrencyChartOptions(rows: AccountLoadRow[]): ChartOptions {
+function buildAccountConcurrencyChartOptions(rows: AccountLoadRow[]): ChartOptions {
   return defineAdminChartOptions({
     responsive: true,
     maintainAspectRatio: false,
@@ -301,7 +301,7 @@ export function buildTaskDistributionChartData(rows: TaskDistributionRow[]): Cha
   })
 }
 
-export function buildTaskDistributionChartOptions(rows: TaskDistributionRow[]): ChartOptions {
+function buildTaskDistributionChartOptions(rows: TaskDistributionRow[]): ChartOptions {
   return defineAdminChartOptions({
     responsive: true,
     maintainAspectRatio: false,
@@ -350,7 +350,7 @@ export function buildExecutionPressureChartData(points: TaskExecutionPressurePoi
   })
 }
 
-export function buildExecutionPressureChartOptions(): ChartOptions {
+function buildExecutionPressureChartOptions(): ChartOptions {
   return defineAdminChartOptions({
     responsive: true,
     maintainAspectRatio: false,

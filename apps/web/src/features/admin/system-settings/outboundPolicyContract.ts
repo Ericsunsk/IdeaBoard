@@ -41,7 +41,7 @@ export function validateOutboundPolicyForm(form: OutboundPolicyForm): string {
   return ''
 }
 
-export function parseAllowHosts(value: string): string[] {
+function parseAllowHosts(value: string): string[] {
   return normalizeAllowHosts(value.split(/\r?\n/))
 }
 

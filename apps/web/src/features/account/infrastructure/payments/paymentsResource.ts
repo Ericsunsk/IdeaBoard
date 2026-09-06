@@ -59,8 +59,7 @@ export type PaymentsContext = {
   navigateToCheckout: (checkoutURL: string) => void
 }
 
-export const paymentsContextKey: InjectionKey<PaymentsContext> =
-  Symbol('payments-context')
+export const paymentsContextKey: InjectionKey<PaymentsContext> = Symbol('payments-context')
 
 const productionResource: PaymentsResource = {
   getPurchaseOptions: (signal) =>
@@ -106,9 +105,7 @@ const defaultContext: PaymentsContext = {
   navigateToCheckout: (checkoutURL) => window.location.assign(checkoutURL),
 }
 
-export function subscribeToPaymentEvents(
-  listener: (event: PaymentEvent) => void,
-): () => void {
+export function subscribeToPaymentEvents(listener: (event: PaymentEvent) => void): () => void {
   const handlePayment = (message: MessageEvent<string>) => {
     const event = parsePaymentEvent(message.data)
     if (event) listener(event)
