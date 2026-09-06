@@ -2,13 +2,15 @@ import type {
   PendingImageDomainMutationInput,
   PendingImageDomainMutationOutcome,
   PendingImageDomainMutationResult,
-  PendingImageResolvedResult,
 } from './CanvasBoardGraphSession'
 import type {
   PendingImageExecutionFact,
   PendingImageExecutionLease,
   PendingImageMaterializationOutcome,
-} from './PendingImageExecutionCore'
+  PendingImageMaterializationSlot,
+} from './pendingImageExecutionTypes'
+
+export type { PendingImageMaterializationSlot } from './pendingImageExecutionTypes'
 
 export class PendingImageMutationContractError extends Error {
   constructor(message: string) {
@@ -16,11 +18,6 @@ export class PendingImageMutationContractError extends Error {
     this.name = 'PendingImageMutationContractError'
   }
 }
-
-export type PendingImageMaterializationSlot = Readonly<{
-  lease: PendingImageExecutionLease
-  result: PendingImageResolvedResult
-}>
 
 export type PendingImageMaterializationCandidate = Readonly<{
   index: number

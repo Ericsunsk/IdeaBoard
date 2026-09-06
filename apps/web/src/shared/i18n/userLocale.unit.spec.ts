@@ -17,7 +17,7 @@ import {
   userPrimeLocaleEs,
   userPrimeLocaleKo,
   userPrimeLocaleZhCN,
-} from '../../app/primeLocale'
+} from './primeLocale'
 import { englishMessages, i18n } from './index'
 import { LOCALE_MANIFEST } from './localeManifest'
 

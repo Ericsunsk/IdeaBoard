@@ -1,8 +1,8 @@
 import type { CanvasWorkspaceRuntime } from '../types'
-import type { createCanvasWorkspaceRuntimeParts } from './createCanvasWorkspaceRuntimeParts'
+import type { CanvasWorkspaceRuntimeParts } from './canvasWorkspaceRuntimePartsTypes'
 
 export function createCanvasWorkspaceRuntimeFacade(
-  parts: ReturnType<typeof createCanvasWorkspaceRuntimeParts>,
+  parts: CanvasWorkspaceRuntimeParts,
 ): CanvasWorkspaceRuntime {
   const { board, graph, viewport, persistence, imageWorkflow } = parts
 

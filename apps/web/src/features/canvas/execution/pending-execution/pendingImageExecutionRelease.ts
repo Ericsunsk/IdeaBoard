@@ -3,7 +3,7 @@ import type {
   PendingImageExecutionLease,
   PendingImageExecutionReleaseOutcome,
   PendingImageExecutionReleaseResult,
-} from './PendingImageExecutionCore'
+} from './pendingImageExecutionTypes'
 
 export type PendingImageExecutionReleaseContext = Readonly<{
   getLeaseRejection: (lease: PendingImageExecutionLease) => 'stale-execution' | 'wrong-board' | null

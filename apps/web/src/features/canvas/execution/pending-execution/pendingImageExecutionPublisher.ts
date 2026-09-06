@@ -1,4 +1,4 @@
-import type { PendingImageExecutionSnapshot } from './PendingImageExecutionCore'
+import type { PendingImageExecutionSnapshot } from './pendingImageExecutionTypes'
 
 type PendingImageExecutionPublisherOptions = Readonly<{
   createSnapshot: (version: number) => PendingImageExecutionSnapshot

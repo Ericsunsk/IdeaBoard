@@ -1,4 +1,4 @@
-import type { ComponentPublicInstance, ComputedRef, Ref } from 'vue'
+import type { ComputedRef, Ref } from 'vue'
 import type {
   ImageAdjustmentKind,
   RetouchAdjustmentLayer,
@@ -28,20 +28,12 @@ export type ImageToolStageBinding = {
   session: ImageToolSession
 }
 
-type ImageActionStrengthControlHandlers = {
-  getValue: (action: ImageStrengthAction) => number
-  setRangeRef: (action: ImageStrengthAction, el: Element | ComponentPublicInstance | null) => void
-  setTriggerRef: (action: ImageStrengthAction, el: Element | ComponentPublicInstance | null) => void
-  onRangePointerDown: (action: ImageStrengthAction, event: PointerEvent) => void
-  onInput: (action: ImageStrengthAction, event: Event) => void
-  onChange: (action: ImageStrengthAction, event: Event) => void
-  onPointerUp: (action: ImageStrengthAction, event: PointerEvent) => void
-  onClick: (action: ImageStrengthAction, event: MouseEvent) => void
-}
+import type { ImageActionStrengthControlHandlers } from './imageToolTypes'
 
-export type ImageActionStrengthControlSource = ImageActionStrengthControlHandlers & {
-  activeAction: { readonly value: ImageStrengthAction | null }
-}
+export type {
+  ImageActionStrengthControlHandlers,
+  ImageActionStrengthControlSource,
+} from './imageToolTypes'
 
 export type ImageActionStrengthControl = ImageActionStrengthControlHandlers & {
   visible: boolean

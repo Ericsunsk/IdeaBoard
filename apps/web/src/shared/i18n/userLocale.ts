@@ -1,6 +1,6 @@
 import type { PrimeVueLocaleOptions } from 'primevue/config'
 import { useAppToast } from '../composables/useAppToast'
-import { getUserPrimeLocale } from '../../app/primeLocale'
+import { getUserPrimeLocale } from './primeLocale'
 import { englishMessages, i18n } from './i18nRuntime'
 import {
   SUPPORTED_LOCALES,

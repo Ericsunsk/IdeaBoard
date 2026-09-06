@@ -15,7 +15,7 @@ import { useInpaintChromeState } from '../inpaint/useInpaintChromeState'
 import type { ImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import { createImageToolMaskOverlayState } from './maskOverlayAdapter'
-import type { ImageActionStrengthControlSource } from './imageToolBindings'
+import type { ImageActionStrengthControlSource } from './imageToolTypes'
 
 type ValueRef<T> = {
   readonly value: T

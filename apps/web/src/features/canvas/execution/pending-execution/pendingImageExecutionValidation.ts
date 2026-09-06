@@ -2,7 +2,7 @@ import type { CanvasBoardAttachment, CanvasBoardSessionIdentity } from '../../bo
 import type {
   PendingImageExecutionFact,
   PendingImageExecutionLease,
-} from './PendingImageExecutionCore'
+} from './pendingImageExecutionTypes'
 
 export function attachmentRejection(
   candidate: CanvasBoardAttachment,

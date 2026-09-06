@@ -1,6 +1,6 @@
 [
   {
-    "path": "src/app/primeLocale.ts",
+    "path": "src/shared/i18n/primeLocale.ts",
     "reason": "User PrimeVue locale definition for Simplified Chinese (zh-CN)."
   },
   {
