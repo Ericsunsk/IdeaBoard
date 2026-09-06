@@ -1,10 +1,25 @@
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
+import { visualizer } from 'rollup-plugin-visualizer'
 import { seoStaticHtmlVitePlugin } from './scripts/seo-static-html-vite-plugin.ts'
 
 export default defineConfig({
-  plugins: [vue(), tailwindcss(), seoStaticHtmlVitePlugin()],
+  plugins: [
+    vue(),
+    tailwindcss(),
+    seoStaticHtmlVitePlugin(),
+    ...(process.env.ANALYZE === 'true'
+      ? [
+          visualizer({
+            open: false,
+            filename: 'dist/stats.html',
+            gzipSize: true,
+            brotliSize: true,
+          }),
+        ]
+      : []),
+  ],
   test: {
     environment: 'happy-dom',
     include: ['src/**/*.unit.spec.ts', 'src/**/*.component.spec.ts', 'src/**/*.contract.spec.ts'],

@@ -142,7 +142,8 @@ function pushRuntimeAnomalies(
 function pushStatisticsAnomalies(drafts: AdminAnomalyDraft[], statistics: AdminStatistics | null) {
   if (!statistics) return
 
-  const riskyModel = [...statistics.model_health]
+  const modelHealth = statistics.model_health || []
+  const riskyModel = [...modelHealth]
     .filter((item) => item.total >= 20)
     .sort((a, b) => b.failure_rate - a.failure_rate)[0]
   if (riskyModel && riskyModel.failure_rate >= MODEL_FAILURE_WARNING_RATE) {
@@ -158,7 +159,8 @@ function pushStatisticsAnomalies(drafts: AdminAnomalyDraft[], statistics: AdminS
     })
   }
 
-  const slowModel = [...statistics.slow_models]
+  const slowModels = statistics.slow_models || []
+  const slowModel = [...slowModels]
     .filter((item) => item.samples >= 10)
     .sort((a, b) => b.p95_seconds - a.p95_seconds)[0]
   if (slowModel && slowModel.p95_seconds >= SLOW_MODEL_P95_WARNING_SECONDS) {
@@ -174,7 +176,8 @@ function pushStatisticsAnomalies(drafts: AdminAnomalyDraft[], statistics: AdminS
     })
   }
 
-  const latestQuality = statistics.quality_trend[statistics.quality_trend.length - 1]
+  const qualityTrend = statistics.quality_trend || []
+  const latestQuality = qualityTrend[qualityTrend.length - 1]
   if (
     latestQuality &&
     latestQuality.total >= 10 &&
@@ -236,7 +239,8 @@ function getPeakAccountLoad(monitorData: MonitorData) {
     .sort((a, b) => b.ratio - a.ratio)[0]
 }
 
-function getDominantShare<Row extends { label: string; total: number }>(rows: Row[]) {
+function getDominantShare<Row extends { label: string; total: number }>(rows?: Row[] | null) {
+  if (!rows || !Array.isArray(rows) || rows.length === 0) return null
   const total = rows.reduce((sum, item) => sum + Math.max(0, item.total || 0), 0)
   if (total <= 0) return null
   const dominant = [...rows].sort((a, b) => b.total - a.total)[0]

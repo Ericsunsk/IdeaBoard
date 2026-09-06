@@ -262,6 +262,9 @@ export function createBrowserSmokeRuntime(options: BrowserSmokeRuntimeOptions) {
     },
     devServerLogs,
     isVerbose,
+    getPage() {
+      return requirePage()
+    },
     startBrowser,
     runBrowserCode,
     runCommand,

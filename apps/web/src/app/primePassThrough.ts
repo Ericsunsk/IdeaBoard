@@ -5,6 +5,11 @@ export const ideaBoardPrimePt = {
   button: {
     root: { class: '!shadow-none font-[650]' },
   },
+  checkbox: {
+    input: {
+      'aria-label': 'Select',
+    },
+  },
   dialog: baseDialogPt,
   inputnumber: {
     pcInputText: {

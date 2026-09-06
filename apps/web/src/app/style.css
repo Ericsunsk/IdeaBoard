@@ -221,8 +221,8 @@
   --color-ib-accent-pressed: var(--color-admin-accent-pressed);
   --color-ib-accent-soft: var(--color-admin-accent-soft);
   --color-ib-creative-accent: #9278e6;
-  --color-ib-creative-accent-hover: #7a6bd5;
-  --color-ib-creative-accent-pressed: #6d5fd0;
+  --color-ib-creative-accent-hover: #725fd0;
+  --color-ib-creative-accent-pressed: #614ec2;
   --color-ib-creative-accent-secondary: #c084fc;
   --color-ib-creative-accent-soft: #f5f2ff;
   --color-ib-creative-accent-ring: rgba(146, 120, 230, 0.1);

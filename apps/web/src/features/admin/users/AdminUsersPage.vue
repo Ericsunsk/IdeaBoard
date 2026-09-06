@@ -153,6 +153,7 @@
               :key="provider"
               v-tooltip.top="getAuthProviderLabel(provider)"
               class="flex size-5 shrink-0 items-center justify-center text-admin-text-3"
+              role="img"
               :aria-label="getAuthProviderLabel(provider)"
             >
               <Mail v-if="provider === 'email'" class="size-4" aria-hidden="true" />
@@ -204,7 +205,7 @@
 
       <Column field="createdDateLabel" header="加入时间" :style="{ width: '136px' }">
         <template #body="{ data: user }">
-          <span class="whitespace-nowrap font-mono text-admin-body text-admin-text-3">
+          <span class="whitespace-nowrap font-mono text-admin-body text-admin-text-2">
             {{ user.createdDateLabel }}
           </span>
         </template>

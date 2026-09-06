@@ -94,7 +94,7 @@
           <span class="font-semibold text-ib-text">{{
             t('account.billingRecords.emptyTitle')
           }}</span>
-          <span class="mt-1 text-sm text-ib-text-subtle">{{
+          <span class="mt-1 text-sm text-ib-text-muted">{{
             t('account.billingRecords.emptyDescription')
           }}</span>
         </div>

@@ -61,6 +61,10 @@ export const userPrimeLocaleEn: PrimeVueLocaleOptions = {
     close: 'Close',
     previous: 'Previous',
     next: 'Next',
+    selectAll: 'Select all',
+    unselectAll: 'Unselect all',
+    selectRow: 'Select row',
+    unselectRow: 'Unselect row',
   },
 }
 
@@ -122,6 +126,10 @@ export const userPrimeLocaleZhCN: PrimeVueLocaleOptions = {
     close: '关闭',
     previous: '上一个',
     next: '下一个',
+    selectAll: '全选',
+    unselectAll: '取消全选',
+    selectRow: '选择行',
+    unselectRow: '取消选择行',
   },
 }
 
@@ -183,6 +191,10 @@ export const userPrimeLocaleEs: PrimeVueLocaleOptions = {
     close: 'Cerrar',
     previous: 'Anterior',
     next: 'Siguiente',
+    selectAll: 'Seleccionar todo',
+    unselectAll: 'Deseleccionar todo',
+    selectRow: 'Seleccionar fila',
+    unselectRow: 'Deseleccionar fila',
   },
 }
 
@@ -244,6 +256,10 @@ export const userPrimeLocaleKo: PrimeVueLocaleOptions = {
     close: '닫기',
     previous: '이전',
     next: '다음',
+    selectAll: '전체 선택',
+    unselectAll: '전체 선택 해제',
+    selectRow: '행 선택',
+    unselectRow: '행 선택 해제',
   },
 }
 

@@ -1,6 +1,7 @@
 import { readFile, readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { gzipSync } from 'node:zlib'
 
 type AssetKind = 'js' | 'css'
 
@@ -16,7 +17,8 @@ type AssetSummary = {
   kind: AssetKind
   files: number
   bytes: number
-  largest: { file: string; bytes: number } | null
+  gzipBytes: number
+  largest: { file: string; bytes: number; gzipBytes: number } | null
 }
 
 // Lazy route, locale, and optional converter chunks should not consume the initial-load budget.
@@ -27,6 +29,7 @@ const OPTIONAL_LAZY_JS_CHUNK_BUDGETS = new Map([
 ])
 const LOCALE_CHUNK_BUDGET_BYTES = 64_000
 const CSS_BUDGET = { totalBytes: 350_000, largestBytes: 180_000 }
+const TOTAL_GZIP_BUDGET_BYTES = 2_000_000
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url))
 const distDirectory = path.resolve(scriptDirectory, '../dist')
@@ -52,11 +55,20 @@ async function listAssetFiles(directory: string): Promise<string[]> {
 async function summarize(kind: AssetKind, files: string[]): Promise<AssetSummary> {
   const matchingFiles = files.filter((file) => file.endsWith(`.${kind}`))
   const sizes = await Promise.all(
-    matchingFiles.map(async (file) => ({ file, bytes: (await stat(file)).size })),
+    matchingFiles.map(async (file) => {
+      const buffer = await readFile(file)
+      return {
+        file,
+        bytes: buffer.byteLength,
+        gzipBytes: gzipSync(buffer).byteLength,
+      }
+    }),
   )
   const largest = sizes.reduce<AssetSummary['largest']>(
     (current, item) =>
-      !current || item.bytes > current.bytes ? { file: item.file, bytes: item.bytes } : current,
+      !current || item.bytes > current.bytes
+        ? { file: item.file, bytes: item.bytes, gzipBytes: item.gzipBytes }
+        : current,
     null,
   )
 
@@ -64,6 +76,7 @@ async function summarize(kind: AssetKind, files: string[]): Promise<AssetSummary
     kind,
     files: sizes.length,
     bytes: sizes.reduce((total, item) => total + item.bytes, 0),
+    gzipBytes: sizes.reduce((total, item) => total + item.gzipBytes, 0),
     largest,
   }
 }
@@ -177,14 +190,23 @@ async function main() {
   for (const summary of summaries) {
     const largest = summary.largest
     console.log(
-      `${summary.kind.toUpperCase()} assets: ${summary.files} files, total ${formatBytes(summary.bytes)}, largest ${largest ? `${formatBytes(largest.bytes)} (${path.relative(assetsDirectory, largest.file)})` : 'n/a'}`,
+      `${summary.kind.toUpperCase()} assets: ${summary.files} files, total ${formatBytes(summary.bytes)} (gzip ${formatBytes(summary.gzipBytes)}), largest ${largest ? `${formatBytes(largest.bytes)} (${path.relative(assetsDirectory, largest.file)})` : 'n/a'}`,
     )
   }
 
+  const totalGzipBytes = summaries.reduce((total, summary) => total + summary.gzipBytes, 0)
+  console.log(
+    `Total output: ${formatBytes(summaries.reduce((t, s) => t + s.bytes, 0))} (gzip ${formatBytes(totalGzipBytes)})`,
+  )
   console.log(`Initial JS: ${formatBytes(initialJsBytes)}`)
   if (initialJsBytes > INITIAL_JS_BUDGET_BYTES) {
     failures.push(
       `Initial JS ${formatBytes(initialJsBytes)} exceeds ${formatBytes(INITIAL_JS_BUDGET_BYTES)}`,
+    )
+  }
+  if (totalGzipBytes > TOTAL_GZIP_BUDGET_BYTES) {
+    failures.push(
+      `Total gzip output ${formatBytes(totalGzipBytes)} exceeds ${formatBytes(TOTAL_GZIP_BUDGET_BYTES)}`,
     )
   }
   failures.push(...(await findOversizedJSChunks(files, manifest, initialChunks)))

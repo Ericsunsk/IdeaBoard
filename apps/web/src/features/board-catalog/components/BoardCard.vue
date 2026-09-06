@@ -1,10 +1,6 @@
 <template>
   <article
     class="board-card relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-board-card-border bg-board-card-bg text-left transition-colors hover:border-board-card-border-hover"
-    role="button"
-    tabindex="0"
-    @keydown.enter.self.prevent="emit('click-board')"
-    @keydown.space.self.prevent="emit('click-board')"
     @click="emit('click-board')"
   >
     <div
@@ -41,9 +37,15 @@
         @keyup.enter.stop.prevent="emit('commit-rename')"
         @keyup.esc.stop.prevent="emit('cancel-rename')"
       />
-      <div v-else class="truncate text-sm font-[650] text-board-card-title">
+      <button
+        v-else
+        type="button"
+        class="pointer-events-auto block max-w-full cursor-pointer truncate border-0 bg-transparent p-0 text-left text-sm font-[650] text-board-card-title hover:underline focus-visible:outline-none focus-visible:underline"
+        :aria-label="board.name"
+        @click.stop="emit('click-board')"
+      >
         {{ board.name }}
-      </div>
+      </button>
       <div class="mt-[3px] text-xs text-board-card-text">
         {{ t('workspace.boards.edited', { date: displayDate }) }}
       </div>

@@ -4,6 +4,7 @@
       type="button"
       text
       rounded
+      autofocus
       :disabled="logoutLoading"
       :class="accountCloseButtonClass"
       :aria-label="t('account.dialog.close')"
@@ -13,7 +14,7 @@
     </Button>
 
     <aside
-      class="flex min-h-0 flex-col overflow-y-auto bg-ib-surface px-4 py-5 [scrollbar-width:none] max-[820px]:max-h-[48dvh] max-[820px]:px-4 max-[820px]:py-4"
+      class="flex min-h-0 flex-col overflow-y-auto bg-white px-4 py-5 [scrollbar-width:none] max-[820px]:max-h-[48dvh] max-[820px]:px-4 max-[820px]:py-4"
     >
       <div class="mb-7 flex min-w-0 items-center gap-2.5 px-1" :aria-label="projectName">
         <span :class="accountBrandMarkClass">
@@ -42,7 +43,7 @@
         >
           <p
             :id="`account-nav-${group.key}`"
-            class="mb-2 px-2 text-[12px] leading-5 font-semibold tracking-normal text-ib-text-subtle"
+            class="mb-2 px-2 text-[12px] leading-5 font-semibold tracking-normal text-ib-text-muted"
           >
             {{ t(group.labelKey) }}
           </p>

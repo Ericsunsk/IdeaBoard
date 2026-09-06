@@ -133,6 +133,8 @@
                   required,
                   'aria-invalid': ariaInvalid,
                   'aria-describedby': describedbyId,
+                  'aria-expanded': undefined,
+                  'aria-haspopup': undefined,
                 }"
                 :invalid="invalid"
                 :input-class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"

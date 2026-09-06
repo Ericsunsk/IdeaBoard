@@ -21,8 +21,10 @@
             class="flex min-h-40 flex-col items-center justify-center px-6 py-10 text-center"
             role="status"
           >
-            <span class="font-semibold">{{ emptyTitle || t('common.states.empty') }}</span>
-            <span v-if="emptyDescription" class="mt-1 text-sm">
+            <span class="font-semibold text-ib-text">{{
+              emptyTitle || t('common.states.empty')
+            }}</span>
+            <span v-if="emptyDescription" class="mt-1 text-sm text-ib-text-muted">
               {{ emptyDescription }}
             </span>
           </div>
