@@ -1,5 +1,6 @@
 import { defineComponent } from 'vue'
 import PrimeVue from 'primevue/config'
+import { IconoirProvider } from '@iconoir/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { adminPrimeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen } from '../../../test/render'
@@ -17,8 +18,8 @@ vi.mock('../shared/logos/adminBrandLogoResource', () => ({
 }))
 
 const Harness = defineComponent({
-  components: { SearchProviderCard },
-  template: `<SearchProviderCard />`,
+  components: { IconoirProvider, SearchProviderCard },
+  template: `<IconoirProvider><SearchProviderCard /></IconoirProvider>`,
 })
 
 describe('SearchProviderCard', () => {
