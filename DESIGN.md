@@ -6,16 +6,16 @@
 
 ## 文档职责
 
-| 文档 | 主问题 |
-| ---- | ------ |
-| [README.md](./README.md) | 这个项目是什么，怎么快速跑起来？ |
-| [DESIGN.md](./DESIGN.md) | 系统为什么这样设计，哪些 contract 不能破坏？ |
-| [docs/adr/](./docs/adr/) | system-wide architecture decisions 的 ADR、status 和后续替代关系是什么？ |
-| [DEVELOPMENT.md](./DEVELOPMENT.md) | 今天要改代码，应看哪些入口、跑哪些验证？ |
-| [apps/web/DESIGN.md](./apps/web/DESIGN.md) | Agent 做前端 UI 改动时必须遵守哪些规则？ |
-| [docs/runbooks/](./docs/runbooks/) | 部署、运营、安全、数据保护等动作怎么执行？ |
-| `CONTEXT.md` | 某个 bounded context 的 domain language 和局部规则是什么？ |
-| [AGENTS.md](./AGENTS.md) | Agent 和 coding rules 应如何约束执行？ |
+| 文档                                       | 主问题                                                                   |
+| ------------------------------------------ | ------------------------------------------------------------------------ |
+| [README.md](./README.md)                   | 这个项目是什么，怎么快速跑起来？                                         |
+| [DESIGN.md](./DESIGN.md)                   | 系统为什么这样设计，哪些 contract 不能破坏？                             |
+| [docs/adr/](./docs/adr/)                   | system-wide architecture decisions 的 ADR、status 和后续替代关系是什么？ |
+| [DEVELOPMENT.md](./DEVELOPMENT.md)         | 今天要改代码，应看哪些入口、跑哪些验证？                                 |
+| [apps/web/DESIGN.md](./apps/web/DESIGN.md) | Agent 做前端 UI 改动时必须遵守哪些规则？                                 |
+| [docs/runbooks/](./docs/runbooks/)         | 部署、运营、安全、数据保护等动作怎么执行？                               |
+| `CONTEXT.md`                               | 某个 bounded context 的 domain language 和局部规则是什么？               |
+| [AGENTS.md](./AGENTS.md)                   | Agent 和 coding rules 应如何约束执行？                                   |
 
 新增文档前先问：它回答的主问题是否已经由上表覆盖。能合并就合并，避免创建第二事实源。
 
@@ -62,15 +62,15 @@ Canvas 术语以 [apps/web/src/features/canvas/CONTEXT.md](./apps/web/src/featur
 
 支持的 workflow feature slug 必须在前端 execution contract、OpenAPI、Go validation、prompt 配置和 Admin 展示中保持一致。
 
-| Feature | 语义 |
-| ------- | ---- |
-| `render` | 草图成图 |
+| Feature      | 语义     |
+| ------------ | -------- |
+| `render`     | 草图成图 |
 | `variations` | 风格延展 |
-| `inpaint` | 局部重绘 |
-| `cutout` | 抠图 |
-| `fusion` | 多图融合 |
-| `upscale` | 放大 |
-| `outpaint` | 扩图 |
+| `inpaint`    | 局部重绘 |
+| `cutout`     | 抠图     |
+| `fusion`     | 多图融合 |
+| `upscale`    | 放大     |
+| `outpaint`   | 扩图     |
 
 Contract rules:
 
@@ -136,14 +136,14 @@ Media context 拥有 object storage provider/profile、upload serving、upload a
 
 Admin route pages 不直接依赖 generated API。每个 Admin vertical context 自己拥有 resource access、view model、command sequencing、cache invalidation 和 side effect handling。
 
-| Frontend context | Backend context | Ownership |
-| ---------------- | --------------- | --------- |
-| `features/admin/users` | `internal/identity/users` | 用户列表、角色/status、会话、伪装登录、受控注销 |
-| `features/admin/provider-config` | `internal/accountpool` | channel/account/provider payload、模型检测、调度可见性 |
-| `features/admin/prompt-config` | `internal/prompts`, `internal/workflow` | 当前 Workflow Feature 的 prompt template；变量和 merge policy 由代码维护 |
-| `features/admin/storage` | `internal/media/storage` | storage provider/profile、secret masking、bucket test/apply |
-| `features/admin/task-monitor` | `internal/tasking` | task list/detail、runtime monitor、stream/poll fallback |
-| `features/admin/statistics` | `internal/tasking/taskstats` | statistics aggregation、backfill status、range contract |
+| Frontend context                 | Backend context                                                                 | Ownership                                                                                                |
+| -------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `features/admin/users`           | `internal/identity/users`                                                       | 用户列表、角色/status、会话、伪装登录、受控注销                                                          |
+| `features/admin/provider-config` | `internal/accountpool`                                                          | channel/account/provider payload、模型检测、调度可见性                                                   |
+| `features/admin/prompt-config`   | `internal/prompts`, `internal/workflow`                                         | 当前 Workflow Feature 的 prompt template；变量和 merge policy 由代码维护                                 |
+| `features/admin/storage`         | `internal/media/storage`                                                        | storage provider/profile、secret masking、bucket test/apply                                              |
+| `features/admin/task-monitor`    | `internal/tasking`                                                              | task list/detail、runtime monitor、stream/poll fallback                                                  |
+| `features/admin/statistics`      | `internal/tasking/taskstats`                                                    | statistics aggregation、backfill status、range contract                                                  |
 | `features/admin/credits-billing` | `internal/billing`, `internal/credits`, `internal/rewards`, `internal/payments` | Registry-backed 功能定价 Catalog、Wallet/Ledger operations、Credit Health、RewardCode 运营与 Stripe 配置 |
 
 ### 9. Generated code 是边界，不是业务模型
@@ -167,23 +167,23 @@ API schema source 以 domain fragments 和显式 manifest 组织，`schema.sql` 
 
 Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.md)。
 
-| Context | Directories | Responsibility |
-| ------- | ----------- | -------------- |
-| Runtime | `internal/runtime`, `cmd` | 进程启动、HTTP route wiring、worker adapters、embedded frontend dist |
-| Platform | `internal/platform`, `internal/db`, `internal/events` | config、database、response helpers、safe HTTP、event bus、sqlc |
-| Tasking | `internal/tasking` | task model、submission、queueing、runtime state、statistics |
-| Identity | `internal/identity` | auth middleware/client、user persistence、user/admin management |
-| AccountPool | `internal/accountpool` | accounts、channels、load、scheduling visibility |
-| Boards | `internal/boards` | board ownership、access checks、board management API |
-| Media | `internal/media` | storage、assets、media refs、image format validation |
-| Library | `internal/library` | 外部灵感素材收藏、Folder、幂等保存与 cursor 分页；只保存 provider URL 和 source metadata |
-| Workflow/Prompts | `internal/workflow`, `internal/prompts` | executable feature contract、task params、prompt templates、prompt assembly |
-| Billing | `internal/billing` | 全局 immutable SKU identity、versioned Credit pricing、server-side Quote snapshot |
-| Billing Records | `internal/billingrecords` | 用户侧最终 Idea 收支 Read Model；组合 Credits Ledger 与 immutable Task Billing snapshot，不拥有账务写入 |
-| Credits | `internal/credits` | 平台 Credit Wallet（用户展示为 Idea）、Double-entry Ledger、余额 projection、幂等 Credit Commands |
-| Rewards | `internal/rewards` | RewardCode、Redemption、用户 history 与 Credits Grant 编排 |
-| [Payments](./apps/api/internal/payments/CONTEXT.md) | `internal/payments` | Stripe 配置、签名 Webhook Inbox 与支付生命周期；Idea 余额和 Ledger 写入仍由 Credits 独占 |
-| Usage | `internal/usage` | 用户侧用量 Read Model；组合 Credits Capture 与 durable Task Billing snapshot，返回 Lifetime 摘要与每日 Capture Trend，不拥有账务或任务写入 |
+| Context                                             | Directories                                           | Responsibility                                                                                                                             |
+| --------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Runtime                                             | `internal/runtime`, `cmd`                             | 进程启动、HTTP route wiring、worker adapters、embedded frontend dist                                                                       |
+| Platform                                            | `internal/platform`, `internal/db`, `internal/events` | config、database、response helpers、safe HTTP、event bus、sqlc                                                                             |
+| Tasking                                             | `internal/tasking`                                    | task model、submission、queueing、runtime state、statistics                                                                                |
+| Identity                                            | `internal/identity`                                   | auth middleware/client、user persistence、user/admin management                                                                            |
+| AccountPool                                         | `internal/accountpool`                                | accounts、channels、load、scheduling visibility                                                                                            |
+| Boards                                              | `internal/boards`                                     | board ownership、access checks、board management API                                                                                       |
+| Media                                               | `internal/media`                                      | storage、assets、media refs、image format validation                                                                                       |
+| Library                                             | `internal/library`                                    | 外部灵感素材收藏、Folder、幂等保存与 cursor 分页；只保存 provider URL 和 source metadata                                                   |
+| Workflow/Prompts                                    | `internal/workflow`, `internal/prompts`               | executable feature contract、task params、prompt templates、prompt assembly                                                                |
+| Billing                                             | `internal/billing`                                    | 全局 immutable SKU identity、versioned Credit pricing、server-side Quote snapshot                                                          |
+| Billing Records                                     | `internal/billingrecords`                             | 用户侧最终 Idea 收支 Read Model；组合 Credits Ledger 与 immutable Task Billing snapshot，不拥有账务写入                                    |
+| Credits                                             | `internal/credits`                                    | 平台 Credit Wallet（用户展示为 Idea）、Double-entry Ledger、余额 projection、幂等 Credit Commands                                          |
+| Rewards                                             | `internal/rewards`                                    | RewardCode、Redemption、用户 history 与 Credits Grant 编排                                                                                 |
+| [Payments](./apps/api/internal/payments/CONTEXT.md) | `internal/payments`                                   | Stripe 配置、签名 Webhook Inbox 与支付生命周期；Idea 余额和 Ledger 写入仍由 Credits 独占                                                   |
+| Usage                                               | `internal/usage`                                      | 用户侧用量 Read Model；组合 Credits Capture 与 durable Task Billing snapshot，返回 Lifetime 摘要与每日 Capture Trend，不拥有账务或任务写入 |
 
 Dependency direction:
 
@@ -197,18 +197,87 @@ Dependency direction:
 - Products ask Billing for an immutable `PriceSnapshot`; Provider Account routing must not influence SKU price. Billing does not write the Credits Ledger.
 - Tasking 通过 `internal/tasking/taskbilling` 编排 Billing Quote 与 Credits Commands，并持久化不可变 Task Billing snapshot；Billing/Credits 仍分别拥有价格事实和 Ledger 写入。
 
-## Frontend Context Map
+## Frontend Context Map & Architecture Contract
 
-Frontend context rules:
+### 1. Feature Ownership Map
 
-- `apps/web/src/app` owns startup, router and store wiring.
-- `features/public-site` owns anonymous English Public Site routes, Public Fact Registry, Editorial Content and build-time static HTML output; it does not own authenticated Workspace rendering.
-- `apps/web/src/features` owns business modules, route pages, feature-local UI and adapters.
-- `apps/web/src/shared` only contains cross-feature API helpers, auth, types, utils and assets.
-- `shared` must not depend on concrete feature modules.
-- Canvas submodules should depend through their `index.ts` public seams when crossing submodule boundaries.
-- `features/canvas-board/domain` remains the shared snapshot schema/core module.
-- Frontend UI changes must follow the agent protocol in [apps/web/DESIGN.md](./apps/web/DESIGN.md).
+前端业务逻辑收敛于 `apps/web/src/features`。目录命名反映真实业务所有权，不为了死板套用模板而臆造 `entities` 或 `widgets`。
+
+| Context / Feature   | Directory                     | Business Ownership                                                                                                | Key Models & State Machines                                               |
+| ------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Canvas Workspace    | `features/canvas`             | AI 画布交互面、节点运行时、工具链（Retouch/Inpaint/Brush/Select）、命令编排与任务生命周期                         | Canvas Node/Edge runtime, Tool State Machine, Execution Plan, Task Runner |
+| Canvas Board Schema | `features/canvas-board`       | 画布持久化文档模型、快照 Schema、媒体引用提取与反序列化验证（纯领域模型 + 持久化适配）                            | `CanvasBoardStateSchema`, `boardStateEnvelopeContract`, serialization     |
+| Board Catalog       | `features/board-catalog`      | 看板画廊与列表、筛选排序、新建/重命名/删除看板、封面缩略图                                                        | Board metadata, pagination, board mutation use cases                      |
+| Account Management  | `features/account-management` | 用户额度（Idea/Credits）查看与刷新、Stripe 充值收银台、兑换码兑换、账单记录与用量统计明细                         | Wallet balance, Recharge session state machine, Redemption, Usage trend   |
+| Admin Verticals     | `features/admin`              | 管理端独立垂直子域（用户运营、模型/通道配置、提示词模板管理、存储配置、任务调度监控、统计分析、额度计费 Catalog） | Vertical context view models, Admin resources, Policy inspection          |
+| Auth & Identity     | `features/auth`               | 认证与会话状态（Better Auth 集成、登录/注册弹窗与路由拦截、凭据校验、Auth Bridge）                                | Session state, Auth token lifecycle, Login/Register workflows             |
+| Library             | `features/library`            | 外部灵感素材收藏、分类文件夹、媒体引用与拖拽入画布交互                                                            | Library item model, Folder taxonomy, cursor pagination                    |
+| User Profile        | `features/user`               | 用户资料页面与用户级路由承载                                                                                      | User profile view state                                                   |
+| User Shell          | `features/user-shell`         | 应用全局外壳布局、顶栏导航、全局快捷键、用户头像菜单与全局通知                                                    | Shell layout state, navigation triggers, global menu                      |
+| Search              | `features/search`             | 灵感素材搜索、Vision Search、素材引用与搜索结果持久化                                                             | Search query state, vision reference state                                |
+| Public Site         | `features/public-site`        | 匿名公开落地页、产品介绍、展示案例与静态 HTML 生成（不负责登录后工作区渲染）                                      | Public Fact Registry, Editorial Content, SSR/SSG models                   |
+| Legal               | `features/legal`              | 服务条款、隐私政策协议与合规展示                                                                                  | Terms, Privacy Policy documents                                           |
+
+### 2. Complex Feature Layering Contract (Architecture Contract)
+
+复杂业务特性在进行 DDD 物理重构或代码演进时，可采用如下分层契约。简单展示型特性保持轻量结构，不得为了满足模板创建空目录或空抽象：
+
+- **`domain/`（纯领域层）**：
+  - 拥有纯业务模型、实体与值对象、状态机转换纯函数、领域校验规则。
+  - **Hard Constraint**：严禁导入 Vue 响应式 API（如 `ref`, `reactive`）、Vue Router、Pinia、TanStack Query 或网络传输层（Generated API DTOs）。
+  - 核心领域规则和状态转换必须具备 focused、deterministic 的单元测试；这不等同于要求 100% 全量 coverage。
+- **`application/`（用例编排层）**：
+  - 拥有具体业务用例（Use Cases）与工作流编排 Composables（如 `useUserRecharge`, `useTaskExecution`）。
+  - 负责协调领域逻辑、资源适配器与交互状态；管理生命周期、轮询与缓存失效机制。
+- **`infrastructure/`（基础设施与适配层）**：
+  - 拥有网络传输、本地存储（IndexedDB/LocalStorage）、外部 SDK 与 API 资源适配器（Resource / Adapter）。
+  - 负责将传输层 DTO 翻译为特性领域模型（DTO <-> Domain Model mapping），集中处理 HTTP 错误归一化。
+- **`ui/`（视图呈现层）**：
+  - 拥有 Vue SFC 组件、页面和弹窗。
+  - 仅负责状态渲染、交互事件分发与动画，不直接包含复杂业务逻辑或网络请求。
+- **`ports/`（外部契约层，可选）**：
+  - 定义跨特性或外部依赖的反向接口契约，用于解耦强依赖或用于测试 Mock。
+
+### 3. 状态归属契约 (State Ownership Contract)
+
+```text
+TanStack Query   -> 服务端状态与远端缓存 (Server state and cache)
+URL (Vue Router) -> 页面间可分享与回溯的导航、筛选与激活状态 (Nav & filter state)
+Form state       -> 本地表单输入与即时校验 (Local form state)
+Local composable -> 组件或弹窗内的临时交互状态 (Transient interaction state)
+Global store     -> 明确跨页面共享的纯客户端状态 (Shared client-only state)
+```
+
+禁止将 API 返回数据随意拷贝到多个全局 Store 中。每个特性必须明确其唯一事实源（Source of Truth）与缓存失效策略（Invalidation Strategy）。
+
+### 4. API 边界契约 (API Boundary Contract)
+
+严格执行如下单向调用链：
+
+```text
+Vue UI -> application use case -> resource/adapter -> generated API
+```
+
+- Vue 组件、路由页面与 app composition 层严禁直接调用 `apps/web/src/shared/api/generated-query` 生成代码。
+- Generated API 仅允许在各 feature 的 resource/adapter 或 shared API adapter 中被封装调用。
+- 绝不手工编辑生成的 API 代码。
+- 领域层代码严禁接触网络传输层 DTO。
+- 跨特性协作必须通过明确声明的 public entrypoint 或 public subpath（例如特性根目录 `index.ts` 或稳定的领域子路径）进行；禁止访问另一特性的 `internal`/private implementation。
+- `apps/web/src/shared` 仅包含跨特性通用辅助函数、基础类型与公共资产，严禁反向依赖 concrete feature modules。
+- Canvas 内部子模块跨边界协作必须经由各自子目录的 `index.ts` public seam。
+
+### 5. 特性重构完成标准 (Feature Completion Contract)
+
+当对一个高复杂度模块执行绞杀者迁移（Strangler Migration）时，只有满足以下条件才视作完成：
+
+1. 对采用分层的复杂特性，`domain` 零 Vue 响应式与网络传输依赖，且核心规则通过独立 Unit Tests 验证。
+2. `application` 独立拥有用例编排与错误/加载态处理。
+3. `infrastructure` 收敛所有外部 API 调用与 DTO 转换。
+4. `ui` 纯化为展示与交互。
+5. 核心状态机转换（Task 生命周期、支付收银台、Board 同步等）拥有确定性测试覆盖。
+6. 特性通过根目录 `index.ts` 或明确的 public subpath 暴露清晰公共 API，移除所有废弃旧门面（Facade）和无引用的兼容路径。
+
+UI 实现细节遵循 [apps/web/DESIGN.md](./apps/web/DESIGN.md)。
 
 ## Operational Invariants
 

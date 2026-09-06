@@ -7,7 +7,7 @@ It is not a product design essay, system architecture doc, API contract, or loca
 ## Read Before UI Work
 
 1. Read this file for UI rules.
-2. Read [../../DESIGN.md](../../DESIGN.md) for system contracts when the UI change crosses feature/API/backend boundaries.
+2. Read [../../DESIGN.md](../../DESIGN.md) for system contracts, Frontend Context Map, Architecture Contract, and DDD layering rules.
 3. Read [../../DEVELOPMENT.md](../../DEVELOPMENT.md) for commands and code entry points.
 4. Read [src/features/canvas/CONTEXT.md](./src/features/canvas/CONTEXT.md) for Canvas domain language.
 
