@@ -65,11 +65,11 @@ import { useAuthFeedback } from '../../auth/useAuthFeedback'
 import UserAuthModals from '../../auth/components/UserAuthModals.vue'
 import { createAuthOverlay, provideAuthOverlay } from '../../auth/authOverlay'
 import { clearPendingSearchAuthAction } from '../../search/searchAuthContinuation'
-import AccountManagementDialogHost from '../../account-management/components/AccountManagementDialogHost.vue'
 import {
+  AccountManagementDialogHost,
   createAccountManagementOverlay,
   provideAccountManagementOverlay,
-} from '../../account-management/accountManagementOverlay'
+} from '../../account-management'
 
 const { t } = useI18n()
 const router = useRouter()

@@ -12,10 +12,10 @@ import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
 import { formatIdeaAmount } from '../../shared/i18n/userIdeaCurrency'
 import {
   defaultAccountManagementTab,
+  useAccountManagementOverlay,
+  useUserCreditWalletSummary,
   type AccountManagementTab,
-} from '../account-management/accountTabRegistry'
-import { useAccountManagementOverlay } from '../account-management/accountManagementOverlay'
-import { useUserCreditWalletSummary } from '../account-management/useUserCreditWalletSummary'
+} from '../account-management'
 import { useAuthOverlay } from '../auth/authOverlay'
 
 export type UserShellNavigationAdapter = {
