@@ -42,6 +42,17 @@ export function resolveImageNodeDisplayUrl(
   return `${latestOutput?.url || imageNode.sourceImageUrl || ''}`.trim()
 }
 
+function resolveImageNodeMediaIdentity(
+  imageNode: Pick<ImageNodeItem, 'sourceMediaRef' | 'sourceMediaAssetId' | 'outputImages'>,
+): { mediaRef?: MediaRef; mediaAssetId?: number } {
+  const latestOutput = resolveImageNodeLatestOutput(imageNode)
+  const mediaRef = latestOutput ? latestOutput.mediaRef : imageNode.sourceMediaRef
+  if (mediaRef) return { mediaRef }
+
+  const legacyID = Number(latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId)
+  return Number.isInteger(legacyID) && legacyID > 0 ? { mediaAssetId: legacyID } : {}
+}
+
 export function resolveImageNodeDisplayPayload(
   imageNode: Pick<
     ImageNodeItem,
@@ -50,20 +61,10 @@ export function resolveImageNodeDisplayPayload(
 ): ImageNodeDisplayPayload | null {
   const url = resolveImageNodeDisplayUrl(imageNode)
   if (!url) return null
-  const latestOutput = resolveImageNodeLatestOutput(imageNode)
-  const mediaRef = latestOutput ? latestOutput.mediaRef : imageNode.sourceMediaRef
   return {
     url,
     ratio: resolveImageNodeDisplayRatio(imageNode),
-    ...(mediaRef ? { mediaRef } : {}),
-    ...(mediaRef
-      ? {}
-      : (() => {
-          const legacyID = Number(
-            latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId,
-          )
-          return Number.isInteger(legacyID) && legacyID > 0 ? { mediaAssetId: legacyID } : {}
-        })()),
+    ...resolveImageNodeMediaIdentity(imageNode),
   }
 }
 
@@ -77,20 +78,10 @@ export function resolveImageNodeLayoutAnchor(
 
   const width = Number(imageNode.width)
   const fallbackWidth = Number(options.fallbackWidth)
-  const latestOutput = resolveImageNodeLatestOutput(imageNode)
-  const mediaRef = latestOutput ? latestOutput.mediaRef : imageNode.sourceMediaRef
   return {
     url,
     ratio: resolveImageNodeDisplayRatio(imageNode),
-    ...(mediaRef ? { mediaRef } : {}),
-    ...(mediaRef
-      ? {}
-      : (() => {
-          const legacyID = Number(
-            latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId,
-          )
-          return Number.isInteger(legacyID) && legacyID > 0 ? { mediaAssetId: legacyID } : {}
-        })()),
+    ...resolveImageNodeMediaIdentity(imageNode),
     x: Number(node.position?.x ?? imageNode.x ?? 0),
     y: Number(node.position?.y ?? imageNode.y ?? 0),
     width:

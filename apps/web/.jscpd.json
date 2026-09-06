@@ -1,0 +1,14 @@
+{
+  "threshold": 0.5,
+  "reporters": ["console"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "src/shared/api/generated-query/**",
+    "src/**/*.spec.ts",
+    "src/test/**"
+  ],
+  "minLines": 8,
+  "minTokens": 80,
+  "mode": "mild"
+}
