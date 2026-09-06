@@ -20,6 +20,8 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "useUnknownInCatchVariables": true,
     "noUncheckedSideEffectImports": true
   },
   "include": ["vite.config.ts", "orval.config.ts", "scripts/**/*.ts"]

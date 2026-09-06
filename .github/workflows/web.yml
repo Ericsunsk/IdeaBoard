@@ -83,3 +83,6 @@ jobs:
           working-directory: apps/web
       - name: Browser smoke
         run: ./scripts/ci-parity.sh web-smoke
+      - name: Accessibility smoke
+        working-directory: apps/web
+        run: npm run test:accessibility
