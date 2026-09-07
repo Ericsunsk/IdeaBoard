@@ -145,6 +145,12 @@ function readEdgeTargetId(target: EdgeTarget): string {
   return typeof target === 'string' ? target : target.id
 }
 
+type IncrementalProjectionPlan = {
+  nodeMutations: CanvasVueFlowIncrementalProjection['nodeMutations']
+  hasAddedNodes: boolean
+  hasEdgeChanges: boolean
+}
+
 export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapterOptions) {
   const projectEdgesForActions = (edges: Edge[]) => options.projectEdgesForActions?.(edges) ?? edges
 
@@ -252,12 +258,6 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
         .filter((edge): edge is Edge => !!edge),
       removedIds: [],
     }
-  }
-
-  type IncrementalProjectionPlan = {
-    nodeMutations: CanvasVueFlowIncrementalProjection['nodeMutations']
-    hasAddedNodes: boolean
-    hasEdgeChanges: boolean
   }
 
   function planProjectionMutations(

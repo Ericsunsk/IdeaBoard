@@ -5,6 +5,12 @@ import type { CanvasNodePresentationIntent } from '../node-presentation'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 import { createCanvasNodePresentationIntentRouter } from './createCanvasNodePresentationIntentRouter'
 
+type RoutingCase = {
+  intent: CanvasNodePresentationIntent
+  command: ReturnType<typeof vi.fn>
+  args: unknown[]
+}
+
 function createCommandSurface() {
   return {
     prompt: {
@@ -44,23 +50,15 @@ function createCommandSurface() {
 }
 
 describe('Canvas Node presentation intent routing seam', () => {
-  it('routes every supported Node intent through its semantic Workspace command', () => {
+  it('routes prompt, node, and media input intents', () => {
     const commands = createCommandSurface()
     const router = createCanvasNodePresentationIntentRouter(commands)
     const nodeId = 'node-1'
     const image = { url: 'https://example.com/input.png', ratio: 1 }
     const patch = {} as FlowSnapshotParamPatch
-    const action = {} as ImageNodeAction
-    const anchor = {} as OutpaintDragAnchor
     const dragEvent = new DragEvent('drop')
-    const mouseEvent = new MouseEvent('contextmenu')
-    const pointerEvent = new PointerEvent('pointerdown')
 
-    const cases: Array<{
-      intent: CanvasNodePresentationIntent
-      command: ReturnType<typeof vi.fn>
-      args: unknown[]
-    }> = [
+    const cases: RoutingCase[] = [
       {
         intent: { type: 'text-edited', nodeId, text: 'draft' },
         command: commands.prompt.updateText,
@@ -112,6 +110,23 @@ describe('Canvas Node presentation intent routing seam', () => {
         command: commands.prompt.generate,
         args: [nodeId, 'make it', 2, '1:1'],
       },
+    ]
+
+    for (const { intent, command, args } of cases) {
+      router.dispatch(intent)
+      expect(command).toHaveBeenCalledWith(...args)
+    }
+  })
+
+  it('routes image editing and display intents', () => {
+    const commands = createCommandSurface()
+    const router = createCanvasNodePresentationIntentRouter(commands)
+    const nodeId = 'node-1'
+    const action = {} as ImageNodeAction
+    const dragEvent = new DragEvent('drop')
+    const mouseEvent = new MouseEvent('contextmenu')
+
+    const cases: RoutingCase[] = [
       {
         intent: { type: 'stage-dropped', nodeId, event: dragEvent },
         command: commands.image.dropStage,
@@ -143,14 +158,31 @@ describe('Canvas Node presentation intent routing seam', () => {
         args: [nodeId, mouseEvent],
       },
       {
-        intent: { type: 'outpaint-submitted', nodeId, prompt: 'extend' },
-        command: commands.outpaint.submit,
-        args: [nodeId, 'extend'],
-      },
-      {
         intent: { type: 'action-requested', nodeId, action, prompt: '', outputCount: 1 },
         command: commands.image.runAction,
         args: [nodeId, action, '', 1, undefined],
+      },
+    ]
+
+    for (const { intent, command, args } of cases) {
+      router.dispatch(intent)
+      expect(command).toHaveBeenCalledWith(...args)
+    }
+  })
+
+  it('routes outpaint and fusion intents', () => {
+    const commands = createCommandSurface()
+    const router = createCanvasNodePresentationIntentRouter(commands)
+    const nodeId = 'node-1'
+    const anchor = {} as OutpaintDragAnchor
+    const mouseEvent = new MouseEvent('contextmenu')
+    const pointerEvent = new PointerEvent('pointerdown')
+
+    const cases: RoutingCase[] = [
+      {
+        intent: { type: 'outpaint-submitted', nodeId, prompt: 'extend' },
+        command: commands.outpaint.submit,
+        args: [nodeId, 'extend'],
       },
       {
         intent: { type: 'outpaint-handle-pointerdown', nodeId, anchor, event: pointerEvent },

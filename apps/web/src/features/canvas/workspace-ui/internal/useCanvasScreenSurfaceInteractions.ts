@@ -1,4 +1,4 @@
-import { computed, type Ref } from 'vue'
+import { computed, type ComputedRef, type Ref } from 'vue'
 import type { NodeChange, NodeDragEvent, NodeMouseEvent } from '@vue-flow/core'
 import type { CanvasCreatableNodeKind } from '../../../canvas-board/domain'
 import { useFlowNodeDragInteractions } from '../useFlowNodeDragInteractions'
@@ -13,7 +13,7 @@ import type { useFlowActiveNodePanels } from '../useFlowActiveNodePanels'
 
 type ActivePanels = ReturnType<typeof useFlowActiveNodePanels>
 
-export function useCanvasScreenSurfaceInteractions(options: {
+type CanvasScreenSurfaceInteractionOptions = {
   workspace: CanvasWorkspaceRuntime
   flowPaneAdapter: CanvasVueFlowAdapter
   canvasWrapRef: Ref<HTMLElement | null>
@@ -21,27 +21,14 @@ export function useCanvasScreenSurfaceInteractions(options: {
   isCanvasMinimapEnabled: Ref<boolean>
   duplicateModifierPressed: Ref<boolean>
   activePanels: ActivePanels
-}) {
-  const { workspace, flowPaneAdapter } = options
-  const { viewModel, commands } = workspace
-  const contextMenu = useCanvasNodeContextMenu()
-  const imageTools = {
-    viewModel: viewModel.imageWorkflow.tools,
-    commands: commands.imageWorkflow.tools,
-  }
-  const { hideStrengthControl, cancelOutpaint } = commands.imageWorkflow
-  const { nodeId: flowOutpaintNodeId } = viewModel.imageWorkflow.outpaint
-  const {
-    viewModel: {
-      active: { nodeId: flowRetouchNodeId, maskNodeId: flowInpaintNodeId },
-      locks: { isCanvasLocked: isFlowCanvasLocked },
-    },
-    commands: {
-      lifecycle: { discardNodeEdits: discardFlowImageToolNodeEdits },
-      editor: { scheduleChromeAnchorUpdate: scheduleRetouchChromeAnchorUpdate },
-    },
-  } = imageTools
+}
 
+function useScreenTransientUi(
+  options: CanvasScreenSurfaceInteractionOptions,
+  contextMenu: ReturnType<typeof useCanvasNodeContextMenu>,
+) {
+  const { commands } = options.workspace
+  const { hideStrengthControl, cancelOutpaint } = commands.imageWorkflow
   const hasCanvasDismissableLayer = computed(
     () =>
       contextMenu.nodeContextMenu.value.visible ||
@@ -63,6 +50,110 @@ export function useCanvasScreenSurfaceInteractions(options: {
       (typeof document === 'undefined' ? null : document),
     onDismiss: () => dismissTransientCanvasUi({ closeContextMenu: true }),
   })
+
+  return dismissTransientCanvasUi
+}
+
+function useScreenGrouping(
+  options: CanvasScreenSurfaceInteractionOptions,
+  selection: ReturnType<typeof useVueFlowSelectionAdapter>,
+  dismissTransientCanvasUi: ReturnType<typeof useScreenTransientUi>,
+  isCanvasGroupInteractionEnabled: ComputedRef<boolean>,
+) {
+  const { viewModel, commands } = options.workspace
+  const { flowPaneAdapter } = options
+  function performSelectionGroupAction() {
+    const action = viewModel.graphEditing.grouping.selectionGroupAction.value
+    if (action?.kind === 'group') {
+      commands.graphEditing.grouping.groupSelectedNodes()
+      return
+    }
+    if (action?.kind === 'ungroup') commands.graphEditing.grouping.ungroupSelectedGroup()
+  }
+
+  const groupPresentation = useCanvasGroupPresentationInteraction({
+    canvas: {
+      host: options.canvasWrapRef,
+      nodes: viewModel.flowPane.nodes,
+      viewport: flowPaneAdapter.viewport,
+      isInteractionEnabled: isCanvasGroupInteractionEnabled,
+    },
+    grouping: {
+      frames: viewModel.graphEditing.grouping.groupFrames,
+      action: viewModel.graphEditing.grouping.selectionGroupAction,
+      selectAtPoint: commands.graphEditing.grouping.selectGroupAtPoint,
+      drag: commands.graphEditing.grouping.groupDrag,
+      resize: commands.graphEditing.grouping.groupResize,
+      onAction: performSelectionGroupAction,
+    },
+    pane: {
+      toFlowPoint: flowPaneAdapter.screenToFlowCoordinate,
+      onPointerDownCapture: selection.paneSelectionBindings.onPointerDownCapture,
+      dismiss: dismissTransientCanvasUi,
+    },
+  })
+
+  return groupPresentation
+}
+
+function useScreenNodeDragInteractions(
+  options: CanvasScreenSurfaceInteractionOptions,
+  dismissTransientCanvasUi: ReturnType<typeof useScreenTransientUi>,
+) {
+  const { commands, viewModel } = options.workspace
+  const tools = viewModel.imageWorkflow.tools
+  const dragInteractions = useFlowNodeDragInteractions({
+    beginNodeDragTransaction: commands.flowPane.nodeDragTransactions.begin,
+    commitNodeDragTransaction: commands.flowPane.nodeDragTransactions.commit,
+    duplicateModifierPressed: options.duplicateModifierPressed,
+    beginFlowNodeDragDuplicateTracking: commands.graphEditing.beginFlowNodeDragDuplicateTracking,
+    finishFlowNodeDragDuplicateTracking: commands.graphEditing.finishFlowNodeDragDuplicateTracking,
+    dismissTransientCanvasUi,
+    isNodeDragLocked: () => tools.locks.isCanvasLocked.value || tools.retouch.isApplying.value,
+  })
+
+  function onNodeDragStart(payload: NodeDragEvent) {
+    commands.viewportControls.onNodeDragStart()
+    try {
+      dragInteractions.onNodeDragStart(payload.nodes.map((node) => node.id))
+    } catch (error) {
+      commands.viewportControls.onNodeDragStop()
+      throw error
+    }
+  }
+
+  function onNodeDragStop() {
+    try {
+      dragInteractions.onNodeDragStop()
+    } finally {
+      commands.viewportControls.onNodeDragStop()
+    }
+  }
+
+  return { onNodeDragStart, onNodeDragStop }
+}
+
+export function useCanvasScreenSurfaceInteractions(options: CanvasScreenSurfaceInteractionOptions) {
+  const { workspace, flowPaneAdapter } = options
+  const { viewModel, commands } = workspace
+  const contextMenu = useCanvasNodeContextMenu()
+  const imageTools = {
+    viewModel: viewModel.imageWorkflow.tools,
+    commands: commands.imageWorkflow.tools,
+  }
+  const { nodeId: flowOutpaintNodeId } = viewModel.imageWorkflow.outpaint
+  const {
+    viewModel: {
+      active: { nodeId: flowRetouchNodeId, maskNodeId: flowInpaintNodeId },
+      locks: { isCanvasLocked: isFlowCanvasLocked },
+    },
+    commands: {
+      lifecycle: { discardNodeEdits: discardFlowImageToolNodeEdits },
+      editor: { scheduleChromeAnchorUpdate: scheduleRetouchChromeAnchorUpdate },
+    },
+  } = imageTools
+
+  const dismissTransientCanvasUi = useScreenTransientUi(options, contextMenu)
 
   const nodeInteractions = commands.graphEditing.createNodeInteractions({
     dismissTransientCanvasUi,
@@ -101,65 +192,17 @@ export function useCanvasScreenSurfaceInteractions(options: {
     return didDelete
   }
 
-  function performSelectionGroupAction() {
-    const action = viewModel.graphEditing.grouping.selectionGroupAction.value
-    if (action?.kind === 'group') {
-      commands.graphEditing.grouping.groupSelectedNodes()
-      return
-    }
-    if (action?.kind === 'ungroup') commands.graphEditing.grouping.ungroupSelectedGroup()
-  }
-
-  const groupPresentation = useCanvasGroupPresentationInteraction({
-    canvas: {
-      host: options.canvasWrapRef,
-      nodes: viewModel.flowPane.nodes,
-      viewport: flowPaneAdapter.viewport,
-      isInteractionEnabled: isCanvasGroupInteractionEnabled,
-    },
-    grouping: {
-      frames: viewModel.graphEditing.grouping.groupFrames,
-      action: viewModel.graphEditing.grouping.selectionGroupAction,
-      selectAtPoint: commands.graphEditing.grouping.selectGroupAtPoint,
-      drag: commands.graphEditing.grouping.groupDrag,
-      resize: commands.graphEditing.grouping.groupResize,
-      onAction: performSelectionGroupAction,
-    },
-    pane: {
-      toFlowPoint: flowPaneAdapter.screenToFlowCoordinate,
-      onPointerDownCapture: selection.paneSelectionBindings.onPointerDownCapture,
-      dismiss: dismissTransientCanvasUi,
-    },
-  })
-
-  const dragInteractions = useFlowNodeDragInteractions({
-    beginNodeDragTransaction: commands.flowPane.nodeDragTransactions.begin,
-    commitNodeDragTransaction: commands.flowPane.nodeDragTransactions.commit,
-    duplicateModifierPressed: options.duplicateModifierPressed,
-    beginFlowNodeDragDuplicateTracking: commands.graphEditing.beginFlowNodeDragDuplicateTracking,
-    finishFlowNodeDragDuplicateTracking: commands.graphEditing.finishFlowNodeDragDuplicateTracking,
+  const groupPresentation = useScreenGrouping(
+    options,
+    selection,
     dismissTransientCanvasUi,
-    isNodeDragLocked: () =>
-      isFlowCanvasLocked.value || imageTools.viewModel.retouch.isApplying.value,
-  })
+    isCanvasGroupInteractionEnabled,
+  )
 
-  function onNodeDragStart(payload: NodeDragEvent) {
-    commands.viewportControls.onNodeDragStart()
-    try {
-      dragInteractions.onNodeDragStart(payload.nodes.map((node) => node.id))
-    } catch (error) {
-      commands.viewportControls.onNodeDragStop()
-      throw error
-    }
-  }
-
-  function onNodeDragStop() {
-    try {
-      dragInteractions.onNodeDragStop()
-    } finally {
-      commands.viewportControls.onNodeDragStop()
-    }
-  }
+  const { onNodeDragStart, onNodeDragStop } = useScreenNodeDragInteractions(
+    options,
+    dismissTransientCanvasUi,
+  )
 
   function onFlowMove(payload: Parameters<typeof commands.viewportControls.onFlowMove>[0]) {
     commands.viewportControls.onFlowMove(payload)

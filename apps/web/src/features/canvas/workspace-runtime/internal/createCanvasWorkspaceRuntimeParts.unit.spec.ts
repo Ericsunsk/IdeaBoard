@@ -293,6 +293,31 @@ function createWorkspaceOptions() {
   }
 }
 
+function createWorkspacePartsHarness() {
+  const board = createBoardRuntime()
+  const graph = createGraphRuntime()
+  const imageWorkflow = createImageWorkflowRuntime()
+  const events: string[] = []
+  const viewportRuntime = {
+    zoomLevel: ref(100),
+    flushViewportPersistence: vi.fn(() => events.push('viewport')),
+    loadCanvasBoardAndProbe: vi.fn(),
+  }
+  board.boardSession.flushAutosave.mockImplementation(async () => {
+    events.push('autosave')
+  })
+  mocks.useCanvasBoardRuntime.mockReturnValue(board)
+  mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
+  mocks.useCanvasGraphInteractions.mockReturnValue(createGraphInteractionRuntime(graph))
+  mocks.useCanvasImageWorkflow.mockReturnValue(imageWorkflow)
+  mocks.useCanvasViewportRuntime.mockReturnValue(viewportRuntime)
+
+  const runtimeOptions = createWorkspaceOptions()
+  const runtime = createCanvasWorkspaceRuntimeParts(runtimeOptions)
+
+  return { board, graph, imageWorkflow, events, viewportRuntime, runtimeOptions, runtime }
+}
+
 describe('createCanvasWorkspaceRuntimeParts', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -306,27 +331,8 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     })
   })
 
-  it('owns feedback selection for board, graph, task, and image tools', async () => {
-    const board = createBoardRuntime()
-    const graph = createGraphRuntime()
-    const imageWorkflow = createImageWorkflowRuntime()
-    const events: string[] = []
-    const viewportRuntime = {
-      zoomLevel: ref(100),
-      flushViewportPersistence: vi.fn(() => events.push('viewport')),
-      loadCanvasBoardAndProbe: vi.fn(),
-    }
-    board.boardSession.flushAutosave.mockImplementation(async () => {
-      events.push('autosave')
-    })
-    mocks.useCanvasBoardRuntime.mockReturnValue(board)
-    mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
-    mocks.useCanvasGraphInteractions.mockReturnValue(createGraphInteractionRuntime(graph))
-    mocks.useCanvasImageWorkflow.mockReturnValue(imageWorkflow)
-    mocks.useCanvasViewportRuntime.mockReturnValue(viewportRuntime)
-
-    const runtimeOptions = createWorkspaceOptions()
-    const runtime = createCanvasWorkspaceRuntimeParts(runtimeOptions)
+  it('exposes only the owned board, graph, and image workflow surfaces', () => {
+    const { board, graph, imageWorkflow, runtime } = createWorkspacePartsHarness()
 
     expect(Object.keys(runtime).sort()).toEqual([
       'board',
@@ -362,6 +368,11 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect(runtime.graph.viewModel.grouping).toBe(board.graphEditing.grouping.view)
     expect(runtime.graph.commands.grouping).toBe(board.graphEditing.grouping.commands)
     expect(runtime.imageWorkflow).toBe(imageWorkflow)
+  })
+
+  it('flushes viewport before autosave and recovers both pending execution sources', async () => {
+    const { board, graph, imageWorkflow, events, viewportRuntime, runtime } =
+      createWorkspacePartsHarness()
 
     await runtime.persistence.flushAutosave({ silent: false })
     await runtime.persistence.recoverBoardSession()
@@ -371,6 +382,10 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect(viewportRuntime.loadCanvasBoardAndProbe).toHaveBeenCalledTimes(1)
     expect(imageWorkflow.reattachPendingImageResults).toHaveBeenCalledTimes(1)
     expect(graph.resumePendingLibraryImports).toHaveBeenCalledTimes(1)
+  })
+
+  it('selects feedback and adapters for each Workspace runtime responsibility', () => {
+    const { board, graph, runtimeOptions, runtime } = createWorkspacePartsHarness()
 
     expect(mocks.useCanvasBoardRuntime).toHaveBeenCalledWith(
       expect.objectContaining({

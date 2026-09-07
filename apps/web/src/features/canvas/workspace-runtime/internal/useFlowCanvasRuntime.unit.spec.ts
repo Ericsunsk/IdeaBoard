@@ -237,33 +237,7 @@ function applyHarnessEdgeChanges(edges: Edge[], changes: EdgeChange[]): Edge[] {
   return edges
 }
 
-function createRuntimeHarness(snapshot = createSnapshot()) {
-  const fullNodes = shallowRef<Node[]>([])
-  const fullEdges = shallowRef<Edge[]>([])
-  const nodes = fullNodes
-  const edges = fullEdges
-  const boardBaseSnapshot = shallowRef(createEmptyCanvasBoardSnapshot())
-  const routeBoardId = ref('board-a')
-  const savedSnapshots: CanvasBoardSnapshot[] = []
-  const scheduledMicrotasks: Array<() => void> = []
-  const onWarning = vi.fn()
-  const onError = vi.fn()
-  const graphActions = {
-    addNodes: vi.fn(),
-    setNodes: vi.fn(),
-    removeNodes: vi.fn(),
-    addEdges: vi.fn(),
-    setEdges: vi.fn(),
-    removeEdges: vi.fn(),
-    applyNodeChanges: vi.fn((changes: NodeChange[]) =>
-      applyHarnessNodeChanges(nodes.value, changes),
-    ),
-    applyEdgeChanges: vi.fn((changes: EdgeChange[]) =>
-      applyHarnessEdgeChanges(edges.value, changes),
-    ),
-  }
-  const isDirty = ref(false)
-  const saveStatus = ref<SaveStatus>('idle')
+function createExecutionRuntimeHarness() {
   const executionCore = createPendingImageExecutionCore()
   const terminalStates = new Map<string, { status: string; taskId?: string | undefined }>()
   const executionRuntime = {
@@ -327,6 +301,37 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
       return false
     },
   }
+  return { executionCore, executionRuntime }
+}
+
+function createRuntimeHarness(snapshot = createSnapshot()) {
+  const fullNodes = shallowRef<Node[]>([])
+  const fullEdges = shallowRef<Edge[]>([])
+  const nodes = fullNodes
+  const edges = fullEdges
+  const boardBaseSnapshot = shallowRef(createEmptyCanvasBoardSnapshot())
+  const routeBoardId = ref('board-a')
+  const savedSnapshots: CanvasBoardSnapshot[] = []
+  const scheduledMicrotasks: Array<() => void> = []
+  const onWarning = vi.fn()
+  const onError = vi.fn()
+  const graphActions = {
+    addNodes: vi.fn(),
+    setNodes: vi.fn(),
+    removeNodes: vi.fn(),
+    addEdges: vi.fn(),
+    setEdges: vi.fn(),
+    removeEdges: vi.fn(),
+    applyNodeChanges: vi.fn((changes: NodeChange[]) =>
+      applyHarnessNodeChanges(nodes.value, changes),
+    ),
+    applyEdgeChanges: vi.fn((changes: EdgeChange[]) =>
+      applyHarnessEdgeChanges(edges.value, changes),
+    ),
+  }
+  const isDirty = ref(false)
+  const saveStatus = ref<SaveStatus>('idle')
+  const { executionCore, executionRuntime } = createExecutionRuntimeHarness()
   const boardSession: CanvasBoardSession = {
     currentBoardId: computed(() => routeBoardId.value),
     exists: vi.fn(() => true),

@@ -101,46 +101,14 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     scheduleFlowNodeInternalsRefresh([nodeId])
   }
 
-  function setLocalUploadState(nodeId: string, state: FlowLocalUploadState | null) {
-    const node = options.nodes.value.find((item) => item.id === nodeId)
-    const data = node?.data as FlowNodeData | undefined
-    if (!node || data?.kind !== 'image') return
-    options.graphAdapter.updateNode(
-      nodeId,
-      {
-        data: {
-          ...data,
-          ...(state ? { localUpload: state } : { localUpload: undefined }),
-        },
-      },
-      createFlowGraphCommandOptions({ recordHistory: false, markDirty: false }),
-    )
-  }
-
-  const { getImageNodeSnapshot, getImageNodeDisplayPayload } = useFlowImageNodeSnapshots({
-    nodes: options.nodes,
-  })
-  const uploadActions = useFlowImageUploadActions({
-    currentBoardId: options.currentBoardId,
-    createNodeAtPosition: nodeMutations.createNodeAtPosition,
-    updateSnapshotNode,
+  const uploadActions = useGraphEditingImageUploads(options, nodeMutations, updateSnapshotNode)
+  const {
+    uploadImageToBoard,
+    applyImageFileToImageNode,
+    createImageNodeFromFile,
     getImageNodeSnapshot,
-    uploadApi: options.upload,
-    onWarning: options.feedback.operationWarning,
-    onNodeMutated: (nodeId) => nodeMutations.markFlowExecutionNodeDirty(nodeId),
-    setLocalUploadState,
-  })
-  const { uploadImageToBoard, applyImageFileToImageNode, createImageNodeFromFile } = uploadActions
-
-  watch(
-    () => ({
-      boardId: options.currentBoardId.value,
-      liveNodeIds: new Set(options.nodes.value.map((node) => node.id)),
-    }),
-    ({ boardId, liveNodeIds }) => uploadActions.releaseDetachedLocalUploads(liveNodeIds, boardId),
-    { flush: 'sync' },
-  )
-  onScopeDispose(() => uploadActions.disposeLocalUploads())
+    getImageNodeDisplayPayload,
+  } = uploadActions
   const mediaInputs = useFlowMediaInputImages({
     browser: options.browser,
     nodes: options.nodes,
@@ -155,23 +123,11 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     openImageUrlPreview: options.preview.openImageUrl,
     onWarning: options.feedback.operationWarning,
   })
-  const libraryImport = useCanvasLibraryImportRuntime({
-    nodes: options.nodes,
-    readAttachment: options.readLibraryImportAttachment,
-    graphAdapter: options.graphAdapter,
-    updateImageSnapshot: (nodeId, mutate) =>
-      nodeMutations.updateSnapshotNode(
-        nodeId,
-        (snapshot) => (snapshot.type === 'image-node' ? mutate(snapshot) : snapshot),
-        { history: false },
-      ),
-    createImageNodeAtPosition: (x, y, initialSnapshotPatch) =>
-      nodeMutations.createNodeAtPosition('image', x, y, initialSnapshotPatch),
-    refreshNodeInternals: scheduleFlowNodeInternalsRefresh,
-    selectOnlyNode: options.selectOnlyNode,
-    materialize: options.materializeLibraryAsset,
-    onWarning: options.feedback.operationWarning,
-  })
+  const libraryImport = useGraphEditingLibraryImport(
+    options,
+    nodeMutations,
+    scheduleFlowNodeInternalsRefresh,
+  )
 
   async function retryImageImport(nodeId: string): Promise<boolean> {
     if (libraryImport.retry(nodeId)) return true
@@ -285,4 +241,76 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
       resumePendingLibraryImports: libraryImport.resumePending,
     },
   }
+}
+
+function useGraphEditingLibraryImport(
+  options: UseCanvasGraphEditingOptions,
+  nodeMutations: ReturnType<typeof useFlowNodeMutations>,
+  scheduleFlowNodeInternalsRefresh: ReturnType<
+    typeof useFlowNodeInternalsRefreshQueue
+  >['scheduleFlowNodeInternalsRefresh'],
+) {
+  return useCanvasLibraryImportRuntime({
+    nodes: options.nodes,
+    readAttachment: options.readLibraryImportAttachment,
+    graphAdapter: options.graphAdapter,
+    updateImageSnapshot: (nodeId, mutate) =>
+      nodeMutations.updateSnapshotNode(
+        nodeId,
+        (snapshot) => (snapshot.type === 'image-node' ? mutate(snapshot) : snapshot),
+        { history: false },
+      ),
+    createImageNodeAtPosition: (x, y, initialSnapshotPatch) =>
+      nodeMutations.createNodeAtPosition('image', x, y, initialSnapshotPatch),
+    refreshNodeInternals: scheduleFlowNodeInternalsRefresh,
+    selectOnlyNode: options.selectOnlyNode,
+    materialize: options.materializeLibraryAsset,
+    onWarning: options.feedback.operationWarning,
+  })
+}
+function useGraphEditingImageUploads(
+  options: UseCanvasGraphEditingOptions,
+  nodeMutations: ReturnType<typeof useFlowNodeMutations>,
+  updateSnapshotNode: ReturnType<typeof useFlowNodeMutations>['updateSnapshotNode'],
+) {
+  function setLocalUploadState(nodeId: string, state: FlowLocalUploadState | null) {
+    const node = options.nodes.value.find((item) => item.id === nodeId)
+    const data = node?.data as FlowNodeData | undefined
+    if (!node || data?.kind !== 'image') return
+    options.graphAdapter.updateNode(
+      nodeId,
+      {
+        data: {
+          ...data,
+          ...(state ? { localUpload: state } : { localUpload: undefined }),
+        },
+      },
+      createFlowGraphCommandOptions({ recordHistory: false, markDirty: false }),
+    )
+  }
+
+  const { getImageNodeSnapshot, getImageNodeDisplayPayload } = useFlowImageNodeSnapshots({
+    nodes: options.nodes,
+  })
+  const uploadActions = useFlowImageUploadActions({
+    currentBoardId: options.currentBoardId,
+    createNodeAtPosition: nodeMutations.createNodeAtPosition,
+    updateSnapshotNode,
+    getImageNodeSnapshot,
+    uploadApi: options.upload,
+    onWarning: options.feedback.operationWarning,
+    onNodeMutated: (nodeId) => nodeMutations.markFlowExecutionNodeDirty(nodeId),
+    setLocalUploadState,
+  })
+
+  watch(
+    () => ({
+      boardId: options.currentBoardId.value,
+      liveNodeIds: new Set(options.nodes.value.map((node) => node.id)),
+    }),
+    ({ boardId, liveNodeIds }) => uploadActions.releaseDetachedLocalUploads(liveNodeIds, boardId),
+    { flush: 'sync' },
+  )
+  onScopeDispose(() => uploadActions.disposeLocalUploads())
+  return { ...uploadActions, getImageNodeSnapshot, getImageNodeDisplayPayload }
 }

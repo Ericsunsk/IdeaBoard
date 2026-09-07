@@ -30,7 +30,7 @@ type SaveStorageProfile = (input: {
 
 type StorageProfileCommand = (id: string) => Promise<{ profile: StorageProfile; message: string }>
 
-export function useStorageProfileEditor(options: {
+type StorageProfileEditorOptions = {
   creatableProviders: { value: StorageProviderMeta[] }
   providerMap: { value: ProviderMetaMap }
   storages: { value: StorageCard[] }
@@ -39,7 +39,9 @@ export function useStorageProfileEditor(options: {
   testProfile: (id: string) => Promise<{ message: string }>
   deleteProfile: (id: string) => Promise<{ message: string }>
   fetchBucketDomains: (id: string) => Promise<string[]>
-}) {
+}
+
+export function useStorageProfileEditor(options: StorageProfileEditorOptions) {
   const storageFeedback = useAdminStorageFeedback()
   const { runAsyncAction } = useAsyncAction()
   const saving = ref(false)
@@ -50,94 +52,13 @@ export function useStorageProfileEditor(options: {
   const editorOpen = ref(false)
   const editorMode = ref<'create' | 'edit'>('create')
   const editingId = ref<string | null>(null)
-  const selectedVendorKey = ref('aliyun-oss')
   const bucketDomains = ref<string[]>([])
-  const form = ref<StorageCard>(
-    createEmptyStorageProfile('s3-compatible', options.providerMap.value),
-  )
-  const vendorPresets = computed(() => buildVendorPresets(options.creatableProviders.value))
-  const selectedProviderMeta = computed(() => options.providerMap.value[form.value.provider])
-  const textFields = computed(() =>
-    (selectedProviderMeta.value?.fields || []).filter((field) => field.type !== 'switch'),
-  )
-  const switchFields = computed(() =>
-    (selectedProviderMeta.value?.fields || []).filter((field) => field.type === 'switch'),
-  )
-  const activeVendorPreset = computed(
-    () =>
-      vendorPresets.value.find((vendor) => vendor.key === selectedVendorKey.value) ||
-      vendorPresets.value[0],
-  )
-  const vendorSelectOptions = computed(() =>
-    vendorPresets.value.map((vendor) => ({
-      label: vendor.label,
-      value: vendor.key,
-      disabled: !vendor.supported,
-      vendor,
-    })),
-  )
-
-  function configTextValue(key: string) {
-    const value = form.value.config[key]
-    return typeof value === 'string' ? value : value == null ? '' : String(value)
-  }
-
-  function configBoolValue(key: string) {
-    return Boolean(form.value.config[key])
-  }
-
-  function updateConfigValue(key: string, value: string | boolean) {
-    form.value.config = {
-      ...form.value.config,
-      [key]: value,
-    }
-  }
-
-  function createEmptyProfile(provider: StorageProvider) {
-    return createEmptyStorageProfile(provider, options.providerMap.value)
-  }
-
-  function profileFromVendorPreset(vendor: VendorPresetOption) {
-    const profile = createEmptyProfile(vendor.provider)
-    profile.name = vendor.defaultName
-    profile.config = {
-      ...profile.config,
-      ...(vendor.defaultConfig || {}),
-    }
-    return profile
-  }
-
-  function providerLabel(provider: StorageProvider) {
-    return resolveProviderLabel(provider, options.providerMap.value)
-  }
-
-  function supportsTest(storage: StorageCard) {
-    return providerSupportsTest(storage.provider, options.providerMap.value)
-  }
-
-  function canTest(storage: StorageCard) {
-    return canTestProfile(storage, options.providerMap.value)
-  }
-
-  function canApply(storage: StorageCard) {
-    return canApplyProfile(storage, options.providerMap.value)
-  }
-
-  function statusText(storage: StorageCard) {
-    return resolveStatusText(storage, options.providerMap.value)
-  }
-
-  function statusClass(storage: StorageCard) {
-    return resolveStatusClass(storage, options.providerMap.value)
-  }
-
-  function storageSubtitle(storage: StorageCard) {
-    return resolveStorageSubtitle(storage)
-  }
-
-  function storageMetaItems(storage: StorageCard) {
-    return resolveStorageMetaItems(storage)
-  }
+  const {
+    view: formView,
+    vendorPresets,
+    profileFromVendorPreset,
+  } = createStorageProfileForm(options)
+  const { selectedVendorKey, form, selectedProviderMeta } = formView
 
   function handleVendorSelect(nextKey: string | undefined) {
     if (!nextKey) return
@@ -332,25 +253,8 @@ export function useStorageProfileEditor(options: {
     testingId,
     editorOpen,
     editorMode,
-    selectedVendorKey,
     bucketDomains,
-    form,
-    selectedProviderMeta,
-    textFields,
-    switchFields,
-    activeVendorPreset,
-    vendorSelectOptions,
-    configTextValue,
-    configBoolValue,
-    updateConfigValue,
-    providerLabel,
-    supportsTest,
-    canTest,
-    canApply,
-    statusText,
-    statusClass,
-    storageSubtitle,
-    storageMetaItems,
+    ...formView,
     handleVendorSelect,
     openCreate,
     openEdit,
@@ -361,5 +265,122 @@ export function useStorageProfileEditor(options: {
     handleTest,
     fetchBucketDomains,
     removeProfile,
+  }
+}
+
+function createStorageProfileForm(
+  options: Pick<StorageProfileEditorOptions, 'creatableProviders' | 'providerMap'>,
+) {
+  const selectedVendorKey = ref('aliyun-oss')
+  const form = ref<StorageCard>(
+    createEmptyStorageProfile('s3-compatible', options.providerMap.value),
+  )
+  const vendorPresets = computed(() => buildVendorPresets(options.creatableProviders.value))
+  const selectedProviderMeta = computed(() => options.providerMap.value[form.value.provider])
+  const textFields = computed(() =>
+    (selectedProviderMeta.value?.fields || []).filter((field) => field.type !== 'switch'),
+  )
+  const switchFields = computed(() =>
+    (selectedProviderMeta.value?.fields || []).filter((field) => field.type === 'switch'),
+  )
+  const activeVendorPreset = computed(
+    () =>
+      vendorPresets.value.find((vendor) => vendor.key === selectedVendorKey.value) ||
+      vendorPresets.value[0],
+  )
+  const vendorSelectOptions = computed(() =>
+    vendorPresets.value.map((vendor) => ({
+      label: vendor.label,
+      value: vendor.key,
+      disabled: !vendor.supported,
+      vendor,
+    })),
+  )
+
+  function configTextValue(key: string) {
+    const value = form.value.config[key]
+    return typeof value === 'string' ? value : value == null ? '' : String(value)
+  }
+
+  function configBoolValue(key: string) {
+    return Boolean(form.value.config[key])
+  }
+
+  function updateConfigValue(key: string, value: string | boolean) {
+    form.value.config = {
+      ...form.value.config,
+      [key]: value,
+    }
+  }
+
+  function createEmptyProfile(provider: StorageProvider) {
+    return createEmptyStorageProfile(provider, options.providerMap.value)
+  }
+
+  function profileFromVendorPreset(vendor: VendorPresetOption) {
+    const profile = createEmptyProfile(vendor.provider)
+    profile.name = vendor.defaultName
+    profile.config = {
+      ...profile.config,
+      ...(vendor.defaultConfig || {}),
+    }
+    return profile
+  }
+
+  function providerLabel(provider: StorageProvider) {
+    return resolveProviderLabel(provider, options.providerMap.value)
+  }
+
+  function supportsTest(storage: StorageCard) {
+    return providerSupportsTest(storage.provider, options.providerMap.value)
+  }
+
+  function canTest(storage: StorageCard) {
+    return canTestProfile(storage, options.providerMap.value)
+  }
+
+  function canApply(storage: StorageCard) {
+    return canApplyProfile(storage, options.providerMap.value)
+  }
+
+  function statusText(storage: StorageCard) {
+    return resolveStatusText(storage, options.providerMap.value)
+  }
+
+  function statusClass(storage: StorageCard) {
+    return resolveStatusClass(storage, options.providerMap.value)
+  }
+
+  function storageSubtitle(storage: StorageCard) {
+    return resolveStorageSubtitle(storage)
+  }
+
+  function storageMetaItems(storage: StorageCard) {
+    return resolveStorageMetaItems(storage)
+  }
+
+  return {
+    vendorPresets,
+    profileFromVendorPreset,
+    view: {
+      selectedVendorKey,
+      form,
+      selectedProviderMeta,
+      textFields,
+      switchFields,
+      activeVendorPreset,
+      vendorSelectOptions,
+      configTextValue,
+      configBoolValue,
+      updateConfigValue,
+      providerLabel,
+      supportsTest,
+      canTest,
+      canApply,
+      statusText,
+      statusClass,
+      storageSubtitle,
+      storageMetaItems,
+    },
   }
 }

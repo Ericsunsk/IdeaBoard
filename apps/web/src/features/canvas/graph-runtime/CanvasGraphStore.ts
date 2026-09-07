@@ -917,6 +917,72 @@ function createSummary(
   }
 }
 
+function selectCommitPatchRecords<Record, Id extends string>(
+  collection: CanvasGraphCollectionPatch<Record, Id>,
+  writes: TransactionRecordWrites<Id, Record>,
+  clone: (record: Record) => Record,
+  direction: CanvasGraphPatchDirection,
+): void {
+  for (const recordPatch of collection.records) {
+    const next = direction === 'forward' ? recordPatch.after : recordPatch.before
+    writes.set(recordPatch.id, next === undefined ? null : clone(next))
+  }
+}
+
+function applyCommitPatchOrder<Id extends string>(
+  current: readonly Id[],
+  orderPatch: readonly CanvasGraphOrderPatch<Id>[],
+  direction: CanvasGraphPatchDirection,
+): Id[] | undefined {
+  if (orderPatch.length === 0) return undefined
+  const targetPlacement = (patchItem: CanvasGraphOrderPatch<Id>) =>
+    direction === 'forward' ? patchItem.after : patchItem.before
+  const next = [...current]
+  const orderedPatches = direction === 'forward' ? orderPatch : [...orderPatch].reverse()
+  for (const patchItem of orderedPatches) {
+    const placement = targetPlacement(patchItem)
+    const currentIndex = next.indexOf(patchItem.id)
+    if (!placement) {
+      if (currentIndex >= 0) next.splice(currentIndex, 1)
+      continue
+    }
+    if (currentIndex >= 0) next.splice(currentIndex, 1)
+    const previousIndex = placement.previousId ? next.indexOf(placement.previousId) : -1
+    const nextIndex = placement.nextId ? next.indexOf(placement.nextId) : -1
+    const insertIndex =
+      previousIndex >= 0 ? previousIndex + 1 : nextIndex >= 0 ? nextIndex : next.length
+    next.splice(insertIndex, 0, patchItem.id)
+  }
+  return next
+}
+
+function recordAppliedOrderPatch<Id extends string>(
+  before: readonly Id[],
+  after: readonly Id[] | undefined,
+  target: Map<Id, CanvasGraphOrderPatch<Id>>,
+): void {
+  if (!after) return
+  const ids = new Set([...before, ...after])
+  const placement = (order: readonly Id[], id: Id) => {
+    const index = order.indexOf(id)
+    if (index < 0) return undefined
+    return {
+      ...(order[index - 1] === undefined ? {} : { previousId: order[index - 1] }),
+      ...(order[index + 1] === undefined ? {} : { nextId: order[index + 1] }),
+    }
+  }
+  ids.forEach((id) => {
+    const beforePlacement = placement(before, id)
+    const afterPlacement = placement(after, id)
+    if (JSON.stringify(beforePlacement) === JSON.stringify(afterPlacement)) return
+    target.set(id, {
+      id,
+      ...(beforePlacement ? { before: beforePlacement } : {}),
+      ...(afterPlacement ? { after: afterPlacement } : {}),
+    })
+  })
+}
+
 export class CanvasGraphStore {
   private state: CanvasGraphStoreState
   private revision = 0
@@ -969,73 +1035,12 @@ export class CanvasGraphStore {
       )
     }
     const draft = this._createTransactionDraft()
-    const select = <Record, Id extends string>(
-      collection: CanvasGraphCollectionPatch<Record, Id>,
-      writes: TransactionRecordWrites<Id, Record>,
-      clone: (record: Record) => Record,
-    ) => {
-      for (const recordPatch of collection.records) {
-        const next = direction === 'forward' ? recordPatch.after : recordPatch.before
-        writes.set(recordPatch.id, next === undefined ? null : clone(next))
-      }
-    }
-    const applyOrder = <Id extends string>(
-      current: readonly Id[],
-      orderPatch: readonly CanvasGraphOrderPatch<Id>[],
-    ): Id[] | undefined => {
-      if (orderPatch.length === 0) return undefined
-      const targetPlacement = (patchItem: CanvasGraphOrderPatch<Id>) =>
-        direction === 'forward' ? patchItem.after : patchItem.before
-      const next = [...current]
-      const orderedPatches = direction === 'forward' ? orderPatch : [...orderPatch].reverse()
-      for (const patchItem of orderedPatches) {
-        const placement = targetPlacement(patchItem)
-        const currentIndex = next.indexOf(patchItem.id)
-        if (!placement) {
-          if (currentIndex >= 0) next.splice(currentIndex, 1)
-          continue
-        }
-        if (currentIndex >= 0) next.splice(currentIndex, 1)
-        const previousIndex = placement.previousId ? next.indexOf(placement.previousId) : -1
-        const nextIndex = placement.nextId ? next.indexOf(placement.nextId) : -1
-        const insertIndex =
-          previousIndex >= 0 ? previousIndex + 1 : nextIndex >= 0 ? nextIndex : next.length
-        next.splice(insertIndex, 0, patchItem.id)
-      }
-      return next
-    }
-    const recordAppliedOrderPatch = <Id extends string>(
-      before: readonly Id[],
-      after: readonly Id[] | undefined,
-      target: Map<Id, CanvasGraphOrderPatch<Id>>,
-    ) => {
-      if (!after) return
-      const ids = new Set([...before, ...after])
-      const placement = (order: readonly Id[], id: Id) => {
-        const index = order.indexOf(id)
-        if (index < 0) return undefined
-        return {
-          ...(order[index - 1] === undefined ? {} : { previousId: order[index - 1] }),
-          ...(order[index + 1] === undefined ? {} : { nextId: order[index + 1] }),
-        }
-      }
-      ids.forEach((id) => {
-        const beforePlacement = placement(before, id)
-        const afterPlacement = placement(after, id)
-        if (JSON.stringify(beforePlacement) === JSON.stringify(afterPlacement)) return
-        target.set(id, {
-          id,
-          ...(beforePlacement ? { before: beforePlacement } : {}),
-          ...(afterPlacement ? { after: afterPlacement } : {}),
-        })
-      })
-    }
-    select(patch.nodes, draft.nodeWrites, cloneNodeRecord)
-    select(patch.edges, draft.edgeWrites, cloneEdgeRecord)
-    select(patch.groups, draft.groupWrites, cloneGroupRecord)
-    draft.nodeOrder = applyOrder(this.state.nodeOrder, patch.nodes.order)
-    draft.edgeOrder = applyOrder(this.state.edgeOrder, patch.edges.order)
-    draft.groupOrder = applyOrder(this.state.groupOrder, patch.groups.order)
+    selectCommitPatchRecords(patch.nodes, draft.nodeWrites, cloneNodeRecord, direction)
+    selectCommitPatchRecords(patch.edges, draft.edgeWrites, cloneEdgeRecord, direction)
+    selectCommitPatchRecords(patch.groups, draft.groupWrites, cloneGroupRecord, direction)
+    draft.nodeOrder = applyCommitPatchOrder(this.state.nodeOrder, patch.nodes.order, direction)
+    draft.edgeOrder = applyCommitPatchOrder(this.state.edgeOrder, patch.edges.order, direction)
+    draft.groupOrder = applyCommitPatchOrder(this.state.groupOrder, patch.groups.order, direction)
     recordAppliedOrderPatch(this.state.nodeOrder, draft.nodeOrder, draft.nodeOrderPatches)
     recordAppliedOrderPatch(this.state.edgeOrder, draft.edgeOrder, draft.edgeOrderPatches)
     recordAppliedOrderPatch(this.state.groupOrder, draft.groupOrder, draft.groupOrderPatches)

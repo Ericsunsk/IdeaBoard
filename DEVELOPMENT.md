@@ -6,12 +6,12 @@
 
 环境要求：
 
-| 组件 | 建议版本 |
-| ---- | -------- |
-| Node.js | `22.23.2` |
-| Go | `1.26.6+` |
-| PostgreSQL | `17+` |
-| Atlas CLI | `1.3.0` |
+| 组件       | 建议版本  |
+| ---------- | --------- |
+| Node.js    | `22.23.2` |
+| Go         | `1.26.6+` |
+| PostgreSQL | `17+`     |
+| Atlas CLI  | `1.3.0`   |
 
 启动本地依赖：
 
@@ -111,37 +111,39 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 
 开发代理：
 
-| Path | Target |
-| ---- | ------ |
+| Path           | Target                  |
+| -------------- | ----------------------- |
 | `/api/auth/**` | `http://localhost:6001` |
-| `/api/**` | `http://localhost:6000` |
-| `/uploads/**` | `http://localhost:6000` |
+| `/api/**`      | `http://localhost:6000` |
+| `/uploads/**`  | `http://localhost:6000` |
 
 ## 验证矩阵
 
 日常小改优先跑最小相关检查；跨层 contract 改动同时验证前后端。
 
-| 场景 | 命令 |
-| ---- | ---- |
-| Web unit/spec | `cd apps/web && npm run test:run` |
-| Web test typecheck | `cd apps/web && npm run test:typecheck` |
-| Web browser-level spec | `cd apps/web && npm run test:browser` |
-| Web build/type | `cd apps/web && npm run build` |
-| Web lint | `cd apps/web && npm run lint` |
-| Web style lint | `cd apps/web && npm run lint:style` |
-| API tests | `cd apps/api && go test ./...` |
-| Test infrastructure modules | `cd apps/api/internal/testdb && go test ./...` and `cd apps/api/internal/testsupport && go test ./...` |
-| API build | `cd apps/api && go build ./...` |
-| Production dead-code scan | `cd apps/api && deadcode ./...` |
-| Test reachability dead-code scan | `cd apps/api && deadcode -test ./...` |
-| Schema snapshot generation | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' BASE_SHA=HEAD go run ./cmd/schema-release --write-artifact` |
-| Schema Release check | `cd apps/api && BASE_SHA="$(git merge-base HEAD origin/main)" API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schema-release` |
-| sqlc regeneration | `cd apps/api && go tool sqlc generate` |
-| Auth build | `cd apps/auth && npm run build` |
-| Credits million dataset | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/credits -run '^TestCreditMillionTransactionDataset$' -count=1 -v` |
-| Usage million dataset | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/usage -run '^TestUsageMillionTransactionDataset$' -count=1 -v` |
+| 场景                             | 命令                                                                                                                          |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Web unit/spec                    | `cd apps/web && npm run test:run`                                                                                             |
+| Web test typecheck               | `cd apps/web && npm run test:typecheck`                                                                                       |
+| Web browser-level spec           | `cd apps/web && npm run test:browser`                                                                                         |
+| Web build/type                   | `cd apps/web && npm run build`                                                                                                |
+| Web lint                         | `cd apps/web && npm run lint`                                                                                                 |
+| Web style lint                   | `cd apps/web && npm run lint:style`                                                                                           |
+| API tests                        | `cd apps/api && go test ./...`                                                                                                |
+| Test infrastructure modules      | `cd apps/api/internal/testdb && go test ./...` and `cd apps/api/internal/testsupport && go test ./...`                        |
+| API build                        | `cd apps/api && go build ./...`                                                                                               |
+| Production dead-code scan        | `cd apps/api && deadcode ./...`                                                                                               |
+| Test reachability dead-code scan | `cd apps/api && deadcode -test ./...`                                                                                         |
+| Schema snapshot generation       | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' BASE_SHA=HEAD go run ./cmd/schema-release --write-artifact`                |
+| Schema Release check             | `cd apps/api && BASE_SHA="$(git merge-base HEAD origin/main)" API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schema-release` |
+| sqlc regeneration                | `cd apps/api && go tool sqlc generate`                                                                                        |
+| Auth build                       | `cd apps/auth && npm run build`                                                                                               |
+| Credits million dataset          | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/credits -run '^TestCreditMillionTransactionDataset$' -count=1 -v`      |
+| Usage million dataset            | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/usage -run '^TestUsageMillionTransactionDataset$' -count=1 -v`         |
 
 ### CI parity gate
+
+Frontend 函数长度检查使用 `governance/function-length`：每个函数最多 100 行自身代码，空行和纯注释不计，嵌套函数体由各自的检查负责。仅 `.spec.ts` 中从 Vitest 导入的 `describe` 分组回调豁免；`it`、hooks、测试 helper 和生产函数仍接受检查。`complexity ≤ 15`、`max-depth ≤ 4` 保持独立约束。完整组件/工厂体积仍通过 `npm run audit:complexity` 报告，避免把单函数检查误当作整个模块的复杂度指标。
 
 GitHub 只暴露一个稳定的 required check：`CI Gate`。它在 PR、`main` push 和手动运行上始终创建，先把改动分类为 Web、API、Auth、Schema、Migration Integration、Docker 与 Ops，再只调用受影响的 reusable workflows；docs-only 改动会明确成功。Dependency audit 由 Web/Auth quality 与 API quality 各自负责，周一 schedule 的 `security.yml` 做全量 audit。未知路径采用 fail-safe 分类，执行全部 context，避免新增目录静默绕过 CI。
 
@@ -196,81 +198,81 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 
 ### Canvas workflow
 
-| 入口 | 用途 |
-| ---- | ---- |
-| [CanvasPage.vue](./apps/web/src/features/canvas/pages/CanvasPage.vue) | Canvas route page |
-| [executionContract.ts](./apps/web/src/features/canvas/execution/contracts/executionContract.ts) | 前端 workflow feature contract |
-| [generationIntent.ts](./apps/web/src/features/canvas/image-workflow/generationIntent.ts) | Prompt/node execution orchestration |
-| [useFlowImageActionOrchestrator.ts](./apps/web/src/features/canvas/composables/useFlowImageActionOrchestrator.ts) | Image node direct actions |
-| [taskEvents.ts](./apps/web/src/shared/api/taskEvents.ts) | Task SSE events |
-| [features.go](./apps/api/internal/workflow/features.go) | 后端 canonical feature contract |
+| 入口                                                                                                              | 用途                                |
+| ----------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| [CanvasPage.vue](./apps/web/src/features/canvas/pages/CanvasPage.vue)                                             | Canvas route page                   |
+| [executionContract.ts](./apps/web/src/features/canvas/execution/contracts/executionContract.ts)                   | 前端 workflow feature contract      |
+| [generationIntent.ts](./apps/web/src/features/canvas/image-workflow/generationIntent.ts)                          | Prompt/node execution orchestration |
+| [useFlowImageActionOrchestrator.ts](./apps/web/src/features/canvas/composables/useFlowImageActionOrchestrator.ts) | Image node direct actions           |
+| [taskEvents.ts](./apps/web/src/shared/api/taskEvents.ts)                                                          | Task SSE events                     |
+| [features.go](./apps/api/internal/workflow/features.go)                                                           | 后端 canonical feature contract     |
 
 ### Task runtime
 
-| 入口 | 用途 |
-| ---- | ---- |
-| [service.go](./apps/api/internal/tasking/taskservice/service.go) | Task service |
-| [store.go](./apps/api/internal/tasking/tasksubmission/store.go) | Transactional task submission |
-| [river_queue.go](./apps/api/internal/tasking/taskqueue/river_queue.go) | River enqueue adapter |
-| [river_worker.go](./apps/api/internal/runtime/worker/river_worker.go) | River worker adapter |
-| [task_processor.go](./apps/api/internal/runtime/worker/task_processor.go) | Worker task processing |
-| [provider_request.go](./apps/api/internal/runtime/worker/provider_request.go) | Provider request shaping |
+| 入口                                                                          | 用途                          |
+| ----------------------------------------------------------------------------- | ----------------------------- |
+| [service.go](./apps/api/internal/tasking/taskservice/service.go)              | Task service                  |
+| [store.go](./apps/api/internal/tasking/tasksubmission/store.go)               | Transactional task submission |
+| [river_queue.go](./apps/api/internal/tasking/taskqueue/river_queue.go)        | River enqueue adapter         |
+| [river_worker.go](./apps/api/internal/runtime/worker/river_worker.go)         | River worker adapter          |
+| [task_processor.go](./apps/api/internal/runtime/worker/task_processor.go)     | Worker task processing        |
+| [provider_request.go](./apps/api/internal/runtime/worker/provider_request.go) | Provider request shaping      |
 
 ### Prompt config
 
-| 入口 | 用途 |
-| ---- | ---- |
-| [AdminPromptConfigPage.vue](./apps/web/src/features/admin/pages/prompt-config/AdminPromptConfigPage.vue) | Admin prompt UI |
-| [engine.go](./apps/api/internal/prompts/engine.go) | Prompt rendering |
-| [docs/runbooks/system-prompts.md](./docs/runbooks/system-prompts.md) | 运营模板和变量规则 |
+| 入口                                                                                                     | 用途               |
+| -------------------------------------------------------------------------------------------------------- | ------------------ |
+| [AdminPromptConfigPage.vue](./apps/web/src/features/admin/pages/prompt-config/AdminPromptConfigPage.vue) | Admin prompt UI    |
+| [engine.go](./apps/api/internal/prompts/engine.go)                                                       | Prompt rendering   |
+| [docs/runbooks/system-prompts.md](./docs/runbooks/system-prompts.md)                                     | 运营模板和变量规则 |
 
 ### Auth
 
-| 入口 | 用途 |
-| ---- | ---- |
-| [middleware.go](./apps/api/internal/identity/auth/middleware.go) | API auth middleware |
+| 入口                                                                     | 用途                       |
+| ------------------------------------------------------------------------ | -------------------------- |
+| [middleware.go](./apps/api/internal/identity/auth/middleware.go)         | API auth middleware        |
 | [service_client.go](./apps/api/internal/identity/auth/service_client.go) | Go -> Auth internal client |
-| [index.ts](./apps/auth/src/index.ts) | Auth service routes |
-| [client.ts](./apps/web/src/shared/auth/client.ts) | Web auth client |
-| [authSession.ts](./apps/web/src/features/auth/session/authSession.ts) | User session store |
-| [docs/runbooks/auth-operations.md](./docs/runbooks/auth-operations.md) | Auth operation rules |
+| [index.ts](./apps/auth/src/index.ts)                                     | Auth service routes        |
+| [client.ts](./apps/web/src/shared/auth/client.ts)                        | Web auth client            |
+| [authSession.ts](./apps/web/src/features/auth/session/authSession.ts)    | User session store         |
+| [docs/runbooks/auth-operations.md](./docs/runbooks/auth-operations.md)   | Auth operation rules       |
 
 ### Credits
 
-| 入口 | 用途 |
-| ---- | ---- |
-| [service.go](./apps/api/internal/credits/service.go) | Grant/Hold/Capture/Release/Refund Command seam 与 caller-owned transaction adapter |
+| 入口                                                               | 用途                                                                                       |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| [service.go](./apps/api/internal/credits/service.go)               | Grant/Hold/Capture/Release/Refund Command seam 与 caller-owned transaction adapter         |
 | [reconciliation.go](./apps/api/internal/credits/reconciliation.go) | 自动账本检查、Run history 与全局 Finding queue；Stale Hold 固定 24 小时且不接受 Admin 配置 |
-| [CONTEXT.md](./apps/api/internal/credits/CONTEXT.md) | Credits domain language 与 invariants |
-| [credits-million.md](./docs/benchmarks/credits-million.md) | 显式百万流水 harness 与参考结果 |
-| [web-performance.md](./docs/benchmarks/web-performance.md) | Web bundle size guard 与 Canvas interaction benchmark |
+| [CONTEXT.md](./apps/api/internal/credits/CONTEXT.md)               | Credits domain language 与 invariants                                                      |
+| [credits-million.md](./docs/benchmarks/credits-million.md)         | 显式百万流水 harness 与参考结果                                                            |
+| [web-performance.md](./docs/benchmarks/web-performance.md)         | Web bundle size guard 与 Canvas interaction benchmark                                      |
 
 ### Rewards
 
-| 入口 | 用途 |
-| ---- | ---- |
+| 入口                                                 | 用途                                                                    |
+| ---------------------------------------------------- | ----------------------------------------------------------------------- |
 | [service.go](./apps/api/internal/rewards/service.go) | RewardCode、Redemption create/list/redeem/history 与 Credits Grant 编排 |
-| [CONTEXT.md](./apps/api/internal/rewards/CONTEXT.md) | Rewards Domain Language 与 invariants |
+| [CONTEXT.md](./apps/api/internal/rewards/CONTEXT.md) | Rewards Domain Language 与 invariants                                   |
 
 ### Billing
 
-| 入口 | 用途 |
-| ---- | ---- |
-| [service.go](./apps/api/internal/billing/service.go) | 全局 SKU Catalog、versioned pricing 与 Quote seam |
-| [CONTEXT.md](./apps/api/internal/billing/CONTEXT.md) | Billing domain language、SKU namespace 与 snapshot invariants |
+| 入口                                                             | 用途                                                                                             |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| [service.go](./apps/api/internal/billing/service.go)             | 全局 SKU Catalog、versioned pricing 与 Quote seam                                                |
+| [CONTEXT.md](./apps/api/internal/billing/CONTEXT.md)             | Billing domain language、SKU namespace 与 snapshot invariants                                    |
 | [service.go](./apps/api/internal/tasking/taskbilling/service.go) | AI Image Workflow SKU resolver、Readiness、Submit Hold 与 terminal Capture/Release orchestration |
 
 ## Workflow Feature Contract
 
-| Feature | 语义 |
-| ------- | ---- |
-| `render` | 草图成图 |
+| Feature      | 语义     |
+| ------------ | -------- |
+| `render`     | 草图成图 |
 | `variations` | 风格延展 |
-| `inpaint` | 局部重绘 |
-| `cutout` | 抠图 |
-| `fusion` | 多图融合 |
-| `upscale` | 放大 |
-| `outpaint` | 扩图 |
+| `inpaint`    | 局部重绘 |
+| `cutout`     | 抠图     |
+| `fusion`     | 多图融合 |
+| `upscale`    | 放大     |
+| `outpaint`   | 扩图     |
 
 Rules:
 
@@ -303,16 +305,16 @@ sqlc:
 
 本地 API/Auth 至少确认：
 
-| 变量 | 说明 |
-| ---- | ---- |
-| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | 当前 API/Auth 进程的 runtime PostgreSQL 连接；runtime role 不拥有 schema |
-| `DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` | 仅 API/Auth migration command 使用的 schema owner；必须与 `DB_USER` 不同 |
-| `AUTH_SERVICE_BASE_URL` | Go 调用 Auth service 的地址 |
-| `AUTH_INTERNAL_KEY` | API/Auth internal endpoint 共享密钥 |
-| `APP_SECRETS_ENCRYPTION_KEY` | API key 和 storage secret 静态加密主密钥 |
-| `REWARDS_CODE_HMAC_KEYS` | Rewards Code current/previous keyed-HMAC JSON registry；key 至少 32 bytes，不能放入 Admin settings |
-| `BETTER_AUTH_SECRET` | Better Auth 签名密钥，生产必须高熵 |
-| `BETTER_AUTH_URL` | Auth 对外基准 URL |
+| 变量                                                          | 说明                                                                                               |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | 当前 API/Auth 进程的 runtime PostgreSQL 连接；runtime role 不拥有 schema                           |
+| `DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD`                 | 仅 API/Auth migration command 使用的 schema owner；必须与 `DB_USER` 不同                           |
+| `AUTH_SERVICE_BASE_URL`                                       | Go 调用 Auth service 的地址                                                                        |
+| `AUTH_INTERNAL_KEY`                                           | API/Auth internal endpoint 共享密钥                                                                |
+| `APP_SECRETS_ENCRYPTION_KEY`                                  | API key 和 storage secret 静态加密主密钥                                                           |
+| `REWARDS_CODE_HMAC_KEYS`                                      | Rewards Code current/previous keyed-HMAC JSON registry；key 至少 32 bytes，不能放入 Admin settings |
+| `BETTER_AUTH_SECRET`                                          | Better Auth 签名密钥，生产必须高熵                                                                 |
+| `BETTER_AUTH_URL`                                             | Auth 对外基准 URL                                                                                  |
 
 Auth 使用相同的 owner/runtime separation：长期运行的 Auth 读取 `DB_USER=ideaboard_auth`，`npm run migrate` 通过 `DB_MIGRATION_USER` 临时使用 owner，并在完成后只授予 Better Auth tables 权限。本地 migration credential 只放在已忽略的 `docker/migration.env`，不要复制进 API/Auth runtime `.env`。
 

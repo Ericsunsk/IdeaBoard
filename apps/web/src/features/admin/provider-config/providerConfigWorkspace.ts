@@ -120,15 +120,7 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
   const emptyProviderEndpointMessage = computed(() =>
     hasProviderEndpointSearch.value ? '无匹配供应商端点' : '暂无供应商端点',
   )
-  const totalAccountCount = computed(() => accounts.value.length)
-  const runningAccountCount = computed(
-    () => accounts.value.filter((account) => account.status === 1 && account.failCount < 5).length,
-  )
-  const accountRunningLabel = computed(() =>
-    totalAccountCount.value > 0
-      ? `${runningAccountCount.value}/${totalAccountCount.value} 运行中`
-      : '0 APIKey',
-  )
+  const accountRunningLabel = computed(() => formatAccountRunningLabel(accounts.value))
   const activeModelCount = computed(() => countUniqueAccountModels(accounts.value))
 
   async function loadAccountLimits() {
@@ -505,6 +497,14 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
     getAccountStatusDotClass,
     getAccountProgressPt,
   }
+}
+
+function formatAccountRunningLabel(accounts: readonly ProviderAccountRecord[]): string {
+  if (accounts.length === 0) return '0 APIKey'
+  const runningCount = accounts.filter(
+    (account) => account.status === 1 && account.failCount < 5,
+  ).length
+  return `${runningCount}/${accounts.length} 运行中`
 }
 
 function getAccountStatusDotClass(account: ProviderAccountView) {

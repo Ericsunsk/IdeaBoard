@@ -23,7 +23,33 @@ import {
 } from './searchAuthContinuation'
 import { type SearchLibraryCoordinator } from './searchLibraryCoordinator'
 
-export function useSearchSession(options: {
+function useLibraryIslandState(cacheScope: string, isAuthenticated: () => boolean) {
+  const islandState = getLibraryIslandState(cacheScope)
+  // A persisted open state must never auto-mount the protected Library island
+  // for an anonymous Search session. It would immediately issue 401 requests.
+  const libraryIslandOpen = ref(isAuthenticated() && islandState.open)
+  const libraryIslandExpanded = ref(isAuthenticated() && islandState.expanded)
+  function closeLibraryIsland(): void {
+    libraryIslandOpen.value = false
+    libraryIslandExpanded.value = false
+  }
+
+  function toggleLibraryIsland(): void {
+    if (libraryIslandOpen.value) {
+      closeLibraryIsland()
+      return
+    }
+    libraryIslandOpen.value = true
+  }
+
+  watch([libraryIslandOpen, libraryIslandExpanded], ([open, expanded]) => {
+    setLibraryIslandState({ open, expanded }, cacheScope)
+  })
+
+  return { libraryIslandOpen, libraryIslandExpanded, closeLibraryIsland, toggleLibraryIsland }
+}
+
+type SearchSessionOptions = {
   libraryCoordinator: SearchLibraryCoordinator
   cacheScope?: string
   scrollContainer?: Ref<HTMLElement | null>
@@ -33,13 +59,15 @@ export function useSearchSession(options: {
   route?: ReturnType<typeof useRoute>
   router?: ReturnType<typeof useRouter>
   toast?: ReturnType<typeof useAppToast>
-}) {
-  const route = options.route ?? useRoute()
-  const router = options.router ?? useRouter()
-  const toast = options.toast ?? useAppToast()
-  const cacheScope = options.cacheScope ?? 'anonymous'
-  const isAuthenticated = options.isAuthenticated ?? (() => true)
-  const libraryCoordinator = options.libraryCoordinator
+}
+
+function useSearchQueryState(
+  options: SearchSessionOptions,
+  cacheScope: string,
+  isAuthenticated: () => boolean,
+  router: ReturnType<typeof useRouter>,
+  toast: ReturnType<typeof useAppToast>,
+) {
   const draftQuery = ref('')
   const submittedQuery = ref('')
   const queryError = ref('')
@@ -64,12 +92,26 @@ export function useSearchSession(options: {
     router,
     toast,
   })
+  return { draftQuery, submittedQuery, queryError, feed, vision }
+}
+
+export function useSearchSession(options: SearchSessionOptions) {
+  const route = options.route ?? useRoute()
+  const router = options.router ?? useRouter()
+  const toast = options.toast ?? useAppToast()
+  const cacheScope = options.cacheScope ?? 'anonymous'
+  const isAuthenticated = options.isAuthenticated ?? (() => true)
+  const libraryCoordinator = options.libraryCoordinator
+  const { draftQuery, submittedQuery, queryError, feed, vision } = useSearchQueryState(
+    options,
+    cacheScope,
+    isAuthenticated,
+    router,
+    toast,
+  )
   const lightbox = useSearchLightbox()
-  const islandState = getLibraryIslandState(cacheScope)
-  // A persisted open state must never auto-mount the protected Library island
-  // for an anonymous Search session. It would immediately issue 401 requests.
-  const libraryIslandOpen = ref(isAuthenticated() && islandState.open)
-  const libraryIslandExpanded = ref(isAuthenticated() && islandState.expanded)
+  const { libraryIslandOpen, libraryIslandExpanded, closeLibraryIsland, toggleLibraryIsland } =
+    useLibraryIslandState(cacheScope, isAuthenticated)
   const selectedBatchResults = ref<SearchResult[]>([])
   const heading = computed(() => {
     if (vision.references.value.length > 0) return i18n.global.t('search.headings.visualConcepts')
@@ -199,19 +241,6 @@ export function useSearchSession(options: {
     feed.markUnsavedKey(key)
   }
 
-  function closeLibraryIsland(): void {
-    libraryIslandOpen.value = false
-    libraryIslandExpanded.value = false
-  }
-
-  function toggleLibraryIsland(): void {
-    if (libraryIslandOpen.value) {
-      closeLibraryIsland()
-      return
-    }
-    libraryIslandOpen.value = true
-  }
-
   async function submitQuery(): Promise<void> {
     const query = normalizeSearchQuery(draftQuery.value)
     if (!isSearchQueryWithinLimit(query)) {
@@ -240,10 +269,6 @@ export function useSearchSession(options: {
       return
     }
     void feed.load(true)
-  })
-
-  watch([libraryIslandOpen, libraryIslandExpanded], ([open, expanded]) => {
-    setLibraryIslandState({ open, expanded }, cacheScope)
   })
 
   watch(feed.results, clearSelection)

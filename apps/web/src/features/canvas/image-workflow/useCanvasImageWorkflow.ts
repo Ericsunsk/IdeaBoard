@@ -155,71 +155,7 @@ export function useCanvasImageWorkflow(
     graph.markNodeExecutionDirty(nodeId, { includeSelf: true })
   }
 
-  const strengthControl = useFlowImageActionStrengthControl({
-    onCommit: () => undefined,
-    onCancel: ui.panels.clear,
-  })
-
-  const outpaint = useImageOutpaintOverlay({
-    activeTool: ui.activeTool,
-    getImageStageElement: ui.getImageStageElement,
-    nodes: graph.nodes,
-    getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
-    startCanvasInteraction: graph.startCanvasInteraction,
-    stopCanvasInteraction: graph.stopCanvasInteraction,
-    onBeforePointerCancel: graph.clearSelectedFlowElements,
-    onCommit: async (payload) => {
-      await execution.runOutpaintAction(payload.nodeId, {
-        frameRect: payload.frameRect,
-        originalImageRect: payload.originalImageRect,
-        prompt: payload.prompt,
-      })
-    },
-  })
-
-  const imageTools = useCanvasImageTools({
-    nodes: graph.nodes,
-    activeTool: ui.activeTool,
-    canvasWrapRef: ui.canvasWrapRef,
-    isCanvasInteractionLocked: graph.isCanvasInteractionLocked,
-    currentBoardId: graph.currentBoardId,
-    getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
-    getImageNodeSnapshot: graph.getImageNodeSnapshot,
-    updateSnapshotNode: graph.updateSnapshotNode,
-    getImageStageElement: ui.getImageStageElement,
-    screenToFlowCoordinate: options.flowPaneAdapter.screenToFlowCoordinate,
-    getViewport: options.flowPaneAdapter.getViewport,
-    setViewport: options.flowPaneAdapter.setViewport,
-    setCenter: options.flowPaneAdapter.setCenter,
-    createPendingRetouchNode: graph.createPendingRetouchNode,
-    applyImageFileToImageNode: graph.applyImageFileToImageNode,
-    removeNode: graph.removeNode,
-    connectionAdapter: graph.connectionAdapter,
-    uploadImageToBoard: graph.uploadImageToBoard,
-    openImageUrlPreview: options.openImageUrlPreview,
-    clearActiveNodePanel: ui.panels.clear,
-    hideStrengthControl: strengthControl.hideStrengthControl,
-    runInpaintAction: execution.runImageInpaintAction,
-    isImageActionPanelVisible: (nodeId) => ui.panels.isActive('image-tools', nodeId),
-    isImagePromptComposerVisible: (nodeId) => ui.panels.isActive('image-tools', nodeId),
-    isGenerationAvailable: execution.isGenerationAvailable,
-    isNodeExecutionActive: execution.isNodeExecutionActive,
-    strengthControl: {
-      activeAction: strengthControl.activeStrengthAction,
-      getValue: strengthControl.getActionStrength,
-      setRangeRef: strengthControl.setStrengthRangeRef,
-      setTriggerRef: strengthControl.setStrengthTriggerRef,
-      onRangePointerDown: strengthControl.onStrengthRangePointerDown,
-      onInput: strengthControl.onStrengthInput,
-      onChange: strengthControl.onStrengthChange,
-      onPointerUp: strengthControl.onStrengthPointerUp,
-      onClick: strengthControl.onStrengthClick,
-    },
-    clearSelectedFlowElements: graph.clearSelectedFlowElements,
-    startCanvasInteraction: graph.startCanvasInteraction,
-    stopCanvasInteraction: graph.stopCanvasInteraction,
-    feedback: options.feedback.imageTools,
-  })
+  const { strengthControl, outpaint, imageTools } = useWorkflowImageEditing(options, execution)
 
   const imageActions = createImageActionIntentRouter({
     state: {
@@ -293,4 +229,78 @@ export function useCanvasImageWorkflow(
     hydratePendingImageLeases: execution.hydratePendingImageLeases,
     reattachPendingImageResults: execution.reattachPendingImageResults,
   }
+}
+
+function useWorkflowImageEditing(
+  options: CanvasImageWorkflowOptions,
+  execution: ImageWorkflowExecution,
+) {
+  const { graph, ui } = options
+  const strengthControl = useFlowImageActionStrengthControl({
+    onCommit: () => undefined,
+    onCancel: ui.panels.clear,
+  })
+
+  const outpaint = useImageOutpaintOverlay({
+    activeTool: ui.activeTool,
+    getImageStageElement: ui.getImageStageElement,
+    nodes: graph.nodes,
+    getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
+    startCanvasInteraction: graph.startCanvasInteraction,
+    stopCanvasInteraction: graph.stopCanvasInteraction,
+    onBeforePointerCancel: graph.clearSelectedFlowElements,
+    onCommit: async (payload) => {
+      await execution.runOutpaintAction(payload.nodeId, {
+        frameRect: payload.frameRect,
+        originalImageRect: payload.originalImageRect,
+        prompt: payload.prompt,
+      })
+    },
+  })
+
+  const imageTools = useCanvasImageTools({
+    nodes: graph.nodes,
+    activeTool: ui.activeTool,
+    canvasWrapRef: ui.canvasWrapRef,
+    isCanvasInteractionLocked: graph.isCanvasInteractionLocked,
+    currentBoardId: graph.currentBoardId,
+    getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
+    getImageNodeSnapshot: graph.getImageNodeSnapshot,
+    updateSnapshotNode: graph.updateSnapshotNode,
+    getImageStageElement: ui.getImageStageElement,
+    screenToFlowCoordinate: options.flowPaneAdapter.screenToFlowCoordinate,
+    getViewport: options.flowPaneAdapter.getViewport,
+    setViewport: options.flowPaneAdapter.setViewport,
+    setCenter: options.flowPaneAdapter.setCenter,
+    createPendingRetouchNode: graph.createPendingRetouchNode,
+    applyImageFileToImageNode: graph.applyImageFileToImageNode,
+    removeNode: graph.removeNode,
+    connectionAdapter: graph.connectionAdapter,
+    uploadImageToBoard: graph.uploadImageToBoard,
+    openImageUrlPreview: options.openImageUrlPreview,
+    clearActiveNodePanel: ui.panels.clear,
+    hideStrengthControl: strengthControl.hideStrengthControl,
+    runInpaintAction: execution.runImageInpaintAction,
+    isImageActionPanelVisible: (nodeId) => ui.panels.isActive('image-tools', nodeId),
+    isImagePromptComposerVisible: (nodeId) => ui.panels.isActive('image-tools', nodeId),
+    isGenerationAvailable: execution.isGenerationAvailable,
+    isNodeExecutionActive: execution.isNodeExecutionActive,
+    strengthControl: {
+      activeAction: strengthControl.activeStrengthAction,
+      getValue: strengthControl.getActionStrength,
+      setRangeRef: strengthControl.setStrengthRangeRef,
+      setTriggerRef: strengthControl.setStrengthTriggerRef,
+      onRangePointerDown: strengthControl.onStrengthRangePointerDown,
+      onInput: strengthControl.onStrengthInput,
+      onChange: strengthControl.onStrengthChange,
+      onPointerUp: strengthControl.onStrengthPointerUp,
+      onClick: strengthControl.onStrengthClick,
+    },
+    clearSelectedFlowElements: graph.clearSelectedFlowElements,
+    startCanvasInteraction: graph.startCanvasInteraction,
+    stopCanvasInteraction: graph.stopCanvasInteraction,
+    feedback: options.feedback.imageTools,
+  })
+
+  return { strengthControl, outpaint, imageTools }
 }

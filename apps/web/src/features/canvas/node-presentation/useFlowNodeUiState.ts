@@ -127,6 +127,136 @@ function areFlowNodeUiStatesEqual(left: FlowNodeUiState, right: FlowNodeUiState)
   )
 }
 
+function getSnapshotNode(node: FlowNodeLike | undefined): CanvasNodeItem | null {
+  if (!node?.data?.snapshotNode || typeof node.data.snapshotNode !== 'object') return null
+  return node.data.snapshotNode as CanvasNodeItem
+}
+
+function getNodeType(node: FlowNodeLike | undefined): CanvasConnectionNodeType | null {
+  return isCanvasConnectionNodeType(node?.data?.kind) ? node.data.kind : null
+}
+
+function resolveConnectedImageReady(
+  node: FlowNodeLike | undefined,
+  isNodeExecutionActive: (nodeId: string) => boolean,
+): boolean {
+  if (!node?.data?.snapshotNode || typeof node.data.snapshotNode !== 'object') return false
+  const snapshotNode = node.data.snapshotNode as Record<string, unknown>
+  const nodeType = getNodeType(node)
+  if (nodeType === 'image') {
+    const outputUrl = resolveSourceImageFromNode(nodeType, snapshotNode).trim()
+    return !isNodeExecutionActive(node.id) && !!outputUrl
+  }
+  if (!nodeType || !isCanvasExecutionOutputNodeType(nodeType)) return false
+  const outputUrl = resolveSourceImageFromNode(nodeType, snapshotNode).trim()
+  if (!outputUrl) return false
+  const outputImages = Array.isArray(snapshotNode.outputImages) ? snapshotNode.outputImages : []
+  const outputStatus = resolveWorkflowNodeOutputStatus(snapshotNode.outputStatus, outputImages)
+  return outputStatus === 'ready'
+}
+
+function getNodeConnectionStatus(
+  nodeType: CanvasConnectionNodeType,
+  nodeId: string,
+  connectionIndex: FlowConnectionIndex,
+  nodeMap: ReadonlyMap<string, FlowNodeLike>,
+  isNodeExecutionActive: (nodeId: string) => boolean,
+): FlowNodeConnectionStatus {
+  const incoming: Partial<Record<CanvasConnectionPort, boolean>> = {}
+  const pendingIncoming: Partial<Record<CanvasConnectionPort, boolean>> = {}
+  const incomingSourceKind: Partial<Record<CanvasConnectionPort, CanvasConnectionNodeType>> = {}
+  const outgoing: Partial<Record<CanvasConnectionPort, boolean>> = {}
+  const incomingEdges = connectionIndex.incomingByNodeId.get(nodeId) ?? []
+  const outgoingEdges = connectionIndex.outgoingByNodeId.get(nodeId) ?? []
+
+  getCanvasNodeVisibleInputPorts(nodeType).forEach((portContract) => {
+    const matchedEdges = incomingEdges.filter((edge) => edge.targetPort === portContract.port)
+    const connected = matchedEdges.length > 0
+    incoming[portContract.port] = connected
+    if (!connected) {
+      pendingIncoming[portContract.port] = false
+      return
+    }
+    const matchedEdge = matchedEdges[0]
+    if (!matchedEdge) {
+      pendingIncoming[portContract.port] = false
+      return
+    }
+    const sourceType = getNodeType(nodeMap.get(matchedEdge.source))
+    if (sourceType) incomingSourceKind[portContract.port] = sourceType
+    if (portContract.port === 'image') {
+      pendingIncoming[portContract.port] = matchedEdges.some(
+        (edge) => !resolveConnectedImageReady(nodeMap.get(edge.source), isNodeExecutionActive),
+      )
+      return
+    }
+    pendingIncoming[portContract.port] = false
+  })
+
+  const outputPort = getCanvasNodePrimaryOutputPort(nodeType)
+  outgoing[outputPort] = outgoingEdges.some((edge) => edge.sourcePort === outputPort)
+
+  return {
+    hasAnyConnection: incomingEdges.length > 0 || outgoingEdges.length > 0,
+    incoming,
+    pendingIncoming,
+    incomingSourceKind,
+    outgoing,
+  }
+}
+
+function buildPrimaryAction(
+  nodeType: CanvasExecutionOutputNodeType,
+  status: FlowNodeConnectionStatus,
+  isRunning: boolean,
+) {
+  const actionLabels = getCanvasNodeExecutionActionLabels(nodeType)
+  if (isRunning) {
+    return {
+      label: actionLabels.running,
+      disabled: true,
+    }
+  }
+
+  const requiredPorts = getCanvasNodeRequiredInputPorts(nodeType).map(
+    (port) => port.port as CanvasConnectionPort,
+  )
+  const disconnectedPorts = requiredPorts.filter((port) => !status.incoming[port])
+  if (disconnectedPorts.length > 0) {
+    const missingLabels = disconnectedPorts.map((port) => formatCanvasNodePortLabel(port))
+    return {
+      label:
+        disconnectedPorts.length === 1
+          ? i18n.global.t('canvas.edges.connectRequiredInputLabel', {
+              label: missingLabels[0],
+            })
+          : i18n.global.t('canvas.edges.connectRequiredInputsLabel', {
+              count: disconnectedPorts.length,
+            }),
+      disabled: true,
+    }
+  }
+
+  const pendingPorts = getCanvasNodeVisibleInputPorts(nodeType)
+    .map((port) => port.port)
+    .filter((port) => !!status.incoming[port] && !!status.pendingIncoming[port])
+  if (pendingPorts.length > 0) {
+    const pendingLabels = pendingPorts.map((port) => formatCanvasNodePortLabel(port))
+    return {
+      label:
+        pendingPorts.length === 1
+          ? i18n.global.t('canvas.edges.waitForInputLabel', { label: pendingLabels[0] })
+          : i18n.global.t('canvas.edges.waitForInputsLabel', { count: pendingPorts.length }),
+      disabled: true,
+    }
+  }
+
+  return {
+    label: actionLabels.ready,
+    disabled: false,
+  }
+}
+
 export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
   let previousUiStateByNodeId = new Map<string, FlowNodeUiState>()
 
@@ -151,143 +281,15 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       nextUiStateByNodeId.set(nodeId, state)
     }
 
-    function getSnapshotNode(nodeId: string): CanvasNodeItem | null {
-      const node = nodeMap.get(nodeId)
-      if (!node?.data?.snapshotNode || typeof node.data.snapshotNode !== 'object') return null
-      return node.data.snapshotNode as CanvasNodeItem
-    }
-
-    function getNodeType(nodeId: string): CanvasConnectionNodeType | null {
-      const node = nodeMap.get(nodeId)
-      return isCanvasConnectionNodeType(node?.data?.kind) ? node.data.kind : null
-    }
-
-    function resolveConnectedImageReady(nodeId: string): boolean {
-      const node = nodeMap.get(nodeId)
-      if (!node?.data?.snapshotNode || typeof node.data.snapshotNode !== 'object') return false
-      const snapshotNode = node.data.snapshotNode as Record<string, unknown>
-      const nodeType = getNodeType(nodeId)
-      if (nodeType === 'image') {
-        const outputUrl = resolveSourceImageFromNode(nodeType, snapshotNode).trim()
-        return !options.isNodeExecutionActive(nodeId) && !!outputUrl
-      }
-      if (!nodeType || !isCanvasExecutionOutputNodeType(nodeType)) return false
-      const outputUrl = resolveSourceImageFromNode(nodeType, snapshotNode).trim()
-      if (!outputUrl) return false
-      const outputImages = Array.isArray(snapshotNode.outputImages) ? snapshotNode.outputImages : []
-      const outputStatus = resolveWorkflowNodeOutputStatus(snapshotNode.outputStatus, outputImages)
-      return outputStatus === 'ready'
-    }
-
-    function getNodeConnectionStatus(
-      nodeType: CanvasConnectionNodeType,
-      nodeId: string,
-    ): FlowNodeConnectionStatus {
-      const incoming: Partial<Record<CanvasConnectionPort, boolean>> = {}
-      const pendingIncoming: Partial<Record<CanvasConnectionPort, boolean>> = {}
-      const incomingSourceKind: Partial<Record<CanvasConnectionPort, CanvasConnectionNodeType>> = {}
-      const outgoing: Partial<Record<CanvasConnectionPort, boolean>> = {}
-      const incomingEdges = connectionIndex.incomingByNodeId.get(nodeId) ?? []
-      const outgoingEdges = connectionIndex.outgoingByNodeId.get(nodeId) ?? []
-
-      getCanvasNodeVisibleInputPorts(nodeType).forEach((portContract) => {
-        const matchedEdges = incomingEdges.filter((edge) => edge.targetPort === portContract.port)
-        const connected = matchedEdges.length > 0
-        incoming[portContract.port] = connected
-        if (!connected) {
-          pendingIncoming[portContract.port] = false
-          return
-        }
-        const matchedEdge = matchedEdges[0]
-        if (!matchedEdge) {
-          pendingIncoming[portContract.port] = false
-          return
-        }
-        const sourceType = getNodeType(matchedEdge.source)
-        if (sourceType) incomingSourceKind[portContract.port] = sourceType
-        if (portContract.port === 'image') {
-          pendingIncoming[portContract.port] = matchedEdges.some(
-            (edge) => !resolveConnectedImageReady(edge.source),
-          )
-          return
-        }
-        pendingIncoming[portContract.port] = false
-      })
-
-      const outputPort = getCanvasNodePrimaryOutputPort(nodeType)
-      outgoing[outputPort] = outgoingEdges.some((edge) => edge.sourcePort === outputPort)
-
-      return {
-        hasAnyConnection: incomingEdges.length > 0 || outgoingEdges.length > 0,
-        incoming,
-        pendingIncoming,
-        incomingSourceKind,
-        outgoing,
-      }
-    }
-
-    function buildPrimaryAction(
-      nodeType: CanvasExecutionOutputNodeType,
-      nodeId: string,
-      status: FlowNodeConnectionStatus,
-      isRunning: boolean,
-    ) {
-      const actionLabels = getCanvasNodeExecutionActionLabels(nodeType)
-      if (isRunning) {
-        return {
-          label: actionLabels.running,
-          disabled: true,
-        }
-      }
-
-      const requiredPorts = getCanvasNodeRequiredInputPorts(nodeType).map(
-        (port) => port.port as CanvasConnectionPort,
-      )
-      const disconnectedPorts = requiredPorts.filter((port) => !status.incoming[port])
-      if (disconnectedPorts.length > 0) {
-        const missingLabels = disconnectedPorts.map((port) => formatCanvasNodePortLabel(port))
-        return {
-          label:
-            disconnectedPorts.length === 1
-              ? i18n.global.t('canvas.edges.connectRequiredInputLabel', {
-                  label: missingLabels[0],
-                })
-              : i18n.global.t('canvas.edges.connectRequiredInputsLabel', {
-                  count: disconnectedPorts.length,
-                }),
-          disabled: true,
-        }
-      }
-
-      const pendingPorts = getCanvasNodeVisibleInputPorts(nodeType)
-        .map((port) => port.port)
-        .filter((port) => !!status.incoming[port] && !!status.pendingIncoming[port])
-      if (pendingPorts.length > 0) {
-        const pendingLabels = pendingPorts.map((port) => formatCanvasNodePortLabel(port))
-        return {
-          label:
-            pendingPorts.length === 1
-              ? i18n.global.t('canvas.edges.waitForInputLabel', { label: pendingLabels[0] })
-              : i18n.global.t('canvas.edges.waitForInputsLabel', { count: pendingPorts.length }),
-          disabled: true,
-        }
-      }
-
-      return {
-        label: actionLabels.ready,
-        disabled: false,
-      }
-    }
-
     flowNodes.forEach((node) => {
-      const nodeType = isCanvasConnectionNodeType(node.data?.kind) ? node.data.kind : null
+      const nodeType = getNodeType(node)
       if (!nodeType) {
         setFlowNodeUiState(node.id, {
           connection: { hasAnyConnection: false, connected: {} },
         })
         return
       }
-      const snapshotNode = getSnapshotNode(node.id)
+      const snapshotNode = getSnapshotNode(node)
       if (!snapshotNode) {
         setFlowNodeUiState(node.id, {
           connection: { hasAnyConnection: false, connected: {} },
@@ -295,7 +297,13 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
         return
       }
 
-      const status = getNodeConnectionStatus(nodeType, node.id)
+      const status = getNodeConnectionStatus(
+        nodeType,
+        node.id,
+        connectionIndex,
+        nodeMap,
+        options.isNodeExecutionActive,
+      )
       const connection = {
         hasAnyConnection: status.hasAnyConnection,
         connected: {
@@ -319,7 +327,7 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       const isRunning = options.isNodeExecutionActive(node.id)
       setFlowNodeUiState(node.id, {
         connection,
-        primaryAction: buildPrimaryAction(nodeType, node.id, status, isRunning),
+        primaryAction: buildPrimaryAction(nodeType, status, isRunning),
         cacheStatus: resolveWorkflowNodeOutputStatus(
           executionNode.outputStatus,
           executionNode.outputImages,

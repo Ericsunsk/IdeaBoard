@@ -424,22 +424,6 @@ export function useCanvasGroupRuntime(
     return true
   }
 
-  function createPositionChanges(
-    positions: ReadonlyMap<CanvasGraphNodeId, CanvasPoint>,
-    delta: CanvasPoint,
-    dragging: boolean,
-  ): NodeChange[] {
-    return Array.from(positions, ([nodeId, startPosition]) => ({
-      id: nodeId,
-      type: 'position',
-      position: {
-        x: startPosition.x + delta.x,
-        y: startPosition.y + delta.y,
-      },
-      dragging,
-    })) as NodeChange[]
-  }
-
   function deleteSelectedGroup(): boolean {
     membership.clearPendingGroupJoin()
     const group = readGroup(selectedGroupId.value)
@@ -467,44 +451,12 @@ export function useCanvasGroupRuntime(
     return true
   }
 
-  function readGroupMemberNodePositions(store: CanvasGraphStore, groupId: CanvasGraphGroupId) {
-    const group = store.getGroup(groupId)
-    if (!group) return null
-    const positions = new Map<CanvasGraphNodeId, CanvasPoint>()
-    group.nodeIds.forEach((nodeId) => {
-      const node = store.getNode(nodeId)
-      if (!node) return
-      positions.set(nodeId, { x: node.snapshot.x, y: node.snapshot.y })
-    })
-    return positions
-  }
-
-  const groupResize = createGroupResizeRuntime({
+  const { groupResize, groupDrag } = createGroupTransformRuntime(options, {
     groupFrames,
-    readCanvasGraphStore: options.readCanvasGraphStore,
-    isDragActive: () => groupDrag.isActive(),
     clearPendingGroupJoin: membership.clearPendingGroupJoin,
     selectGroup,
     setPreviewGroupBounds,
     clearPreviewGroupBounds,
-    onWarning: options.onWarning,
-    boundsUpdateFailedMessage: i18n.global.t('canvas.groupOps.boundsUpdateFailed'),
-  })
-
-  const groupDrag = createGroupDragRuntime({
-    groupFrames,
-    graphAdapter: options.graphAdapter,
-    readCanvasGraphStore: options.readCanvasGraphStore,
-    clearPendingGroupJoin: membership.clearPendingGroupJoin,
-    selectGroup,
-    readGroupMemberNodePositions,
-    createPositionChanges,
-    setPreviewGroupBounds,
-    clearPreviewGroupBounds,
-    findTopmostGroupFrame: (point) => findTopmostCanvasGroupFrameAtPoint(groupFrames.value, point),
-    onWarning: options.onWarning,
-    moveFailedMessage: i18n.global.t('canvas.groupOps.moveFailed'),
-    isResizeActive: () => groupResize.isActive(),
   })
 
   function resetTransientSelectionState() {
@@ -557,4 +509,82 @@ export function useCanvasGroupRuntime(
       applyDraggedNodeMembershipChanges: membership.applyDraggedNodeMembershipChanges,
     },
   }
+}
+
+function createGroupTransformRuntime(
+  options: UseCanvasGroupRuntimeOptions,
+  bindings: Pick<
+    Parameters<typeof createGroupDragRuntime>[0],
+    | 'groupFrames'
+    | 'clearPendingGroupJoin'
+    | 'selectGroup'
+    | 'setPreviewGroupBounds'
+    | 'clearPreviewGroupBounds'
+  >,
+) {
+  const {
+    groupFrames,
+    clearPendingGroupJoin,
+    selectGroup,
+    setPreviewGroupBounds,
+    clearPreviewGroupBounds,
+  } = bindings
+
+  function createPositionChanges(
+    positions: ReadonlyMap<CanvasGraphNodeId, CanvasPoint>,
+    delta: CanvasPoint,
+    dragging: boolean,
+  ): NodeChange[] {
+    return Array.from(positions, ([nodeId, startPosition]) => ({
+      id: nodeId,
+      type: 'position',
+      position: {
+        x: startPosition.x + delta.x,
+        y: startPosition.y + delta.y,
+      },
+      dragging,
+    })) as NodeChange[]
+  }
+
+  function readGroupMemberNodePositions(store: CanvasGraphStore, groupId: CanvasGraphGroupId) {
+    const group = store.getGroup(groupId)
+    if (!group) return null
+    const positions = new Map<CanvasGraphNodeId, CanvasPoint>()
+    group.nodeIds.forEach((nodeId) => {
+      const node = store.getNode(nodeId)
+      if (!node) return
+      positions.set(nodeId, { x: node.snapshot.x, y: node.snapshot.y })
+    })
+    return positions
+  }
+
+  const groupResize = createGroupResizeRuntime({
+    groupFrames,
+    readCanvasGraphStore: options.readCanvasGraphStore,
+    isDragActive: () => groupDrag.isActive(),
+    clearPendingGroupJoin,
+    selectGroup,
+    setPreviewGroupBounds,
+    clearPreviewGroupBounds,
+    onWarning: options.onWarning,
+    boundsUpdateFailedMessage: i18n.global.t('canvas.groupOps.boundsUpdateFailed'),
+  })
+
+  const groupDrag = createGroupDragRuntime({
+    groupFrames,
+    graphAdapter: options.graphAdapter,
+    readCanvasGraphStore: options.readCanvasGraphStore,
+    clearPendingGroupJoin,
+    selectGroup,
+    readGroupMemberNodePositions,
+    createPositionChanges,
+    setPreviewGroupBounds,
+    clearPreviewGroupBounds,
+    findTopmostGroupFrame: (point) => findTopmostCanvasGroupFrameAtPoint(groupFrames.value, point),
+    onWarning: options.onWarning,
+    moveFailedMessage: i18n.global.t('canvas.groupOps.moveFailed'),
+    isResizeActive: () => groupResize.isActive(),
+  })
+
+  return { groupResize, groupDrag }
 }

@@ -242,15 +242,7 @@ const ContextMenuStub = defineComponent({
   },
 })
 
-function createRuntime() {
-  const flushAutosave = vi.fn()
-  const recoverBoardSession = vi.fn(async () => {})
-  const onZoomOut = vi.fn()
-  const onExportSelectedImages = vi.fn()
-  const handlePaneClick = vi.fn()
-  const groupSelectedNodes = vi.fn()
-  const deleteSelectedGroup = vi.fn(() => false)
-  const onFlowDeleteNode = vi.fn()
+function createRuntimeViewModel() {
   const selectionGroupAction = ref({ kind: 'group' as const })
   const imageToolsViewModel = {
     active: { nodeId: ref(null), maskNodeId: ref(null) },
@@ -261,6 +253,35 @@ function createRuntime() {
     },
     chrome: ref({ isReady: false }),
   }
+  return {
+    flowPane: { nodes: ref([]), edges: ref([]) },
+    boardChrome: {
+      currentBoardId: ref('board-a'),
+      isBoardMenuOpen: ref(false),
+      isRenamingBoard: ref(false),
+      boardNameDraft: ref('Board A'),
+      isRenamePending: ref(false),
+      catalogRecovery: ref({ status: 'idle' }),
+      currentBoardName: ref('Board A'),
+      boardOptions: ref([]),
+    },
+    persistence: { history: { undo: vi.fn(), redo: vi.fn() } },
+    viewportControls: { zoomLevel: ref(100) },
+    graphEditing: {
+      hasSelectedFlowNodes: ref(false),
+      isFlowInteractionActive: ref(false),
+      isFlowViewportPanInteractionActive: ref(false),
+      isFlowInteractionLocked: ref(false),
+      grouping: { groupFrames: ref([]), selectionGroupAction },
+    },
+    imageWorkflow: {
+      tools: imageToolsViewModel,
+      outpaint: { nodeId: ref(null), overlayStyle: ref(null), handleRadius: 4 },
+    },
+  }
+}
+
+function createImageWorkflowCommands() {
   const imageToolCommands = {
     lifecycle: { enter: vi.fn(), cancel: vi.fn(), discardNodeEdits: vi.fn() },
     editor: {
@@ -285,33 +306,27 @@ function createRuntime() {
   }
 
   return {
+    isGenerationAvailable: vi.fn(() => true),
+    tools: imageToolCommands,
+    interactions: imageWorkflowInteractions,
+    cancelOutpaint: vi.fn(),
+    hideStrengthControl: vi.fn(),
+  }
+}
+
+function createRuntime() {
+  const flushAutosave = vi.fn()
+  const recoverBoardSession = vi.fn(async () => {})
+  const onZoomOut = vi.fn()
+  const onExportSelectedImages = vi.fn()
+  const handlePaneClick = vi.fn()
+  const groupSelectedNodes = vi.fn()
+  const deleteSelectedGroup = vi.fn(() => false)
+  const onFlowDeleteNode = vi.fn()
+
+  return {
     runtime: {
-      viewModel: {
-        flowPane: { nodes: ref([]), edges: ref([]) },
-        boardChrome: {
-          currentBoardId: ref('board-a'),
-          isBoardMenuOpen: ref(false),
-          isRenamingBoard: ref(false),
-          boardNameDraft: ref('Board A'),
-          isRenamePending: ref(false),
-          catalogRecovery: ref({ status: 'idle' }),
-          currentBoardName: ref('Board A'),
-          boardOptions: ref([]),
-        },
-        persistence: { history: { undo: vi.fn(), redo: vi.fn() } },
-        viewportControls: { zoomLevel: ref(100) },
-        graphEditing: {
-          hasSelectedFlowNodes: ref(false),
-          isFlowInteractionActive: ref(false),
-          isFlowViewportPanInteractionActive: ref(false),
-          isFlowInteractionLocked: ref(false),
-          grouping: { groupFrames: ref([]), selectionGroupAction },
-        },
-        imageWorkflow: {
-          tools: imageToolsViewModel,
-          outpaint: { nodeId: ref(null), overlayStyle: ref(null), handleRadius: 4 },
-        },
-      },
+      viewModel: createRuntimeViewModel(),
       commands: {
         boardSession: {
           setBoardNameInputRef: vi.fn(),
@@ -390,13 +405,7 @@ function createRuntime() {
             onFlowImageStageDrop: vi.fn(),
           }),
         },
-        imageWorkflow: {
-          isGenerationAvailable: vi.fn(() => true),
-          tools: imageToolCommands,
-          interactions: imageWorkflowInteractions,
-          cancelOutpaint: vi.fn(),
-          hideStrengthControl: vi.fn(),
-        },
+        imageWorkflow: createImageWorkflowCommands(),
       },
     },
     flushAutosave,

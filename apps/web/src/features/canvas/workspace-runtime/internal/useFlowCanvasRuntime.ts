@@ -51,11 +51,9 @@ export type UseFlowCanvasRuntimeOptions = {
   vueFlowGraphActions?: CanvasVueFlowGraphActions | undefined
 }
 
-export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
+function useCanvasExecutionProjection(options: UseFlowCanvasRuntimeOptions) {
   const renderNodes = options.nodes
   const renderEdgesRef = options.edges
-  const localEditVersion = ref(0)
-  let graphSessionRuntime: CanvasGraphSessionRuntime | null = null
   const executionSnapshot = shallowRef(options.executionCore.snapshot())
   const projectEdgesForRendering = (edges: Edge[]) =>
     projectPendingImageExecutionEdges(edges, executionSnapshot.value).edges
@@ -117,25 +115,22 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   })
   onScopeDispose(unsubscribeExecutionSnapshot)
 
-  function requireGraphSessionRuntime(): CanvasGraphSessionRuntime {
-    if (!graphSessionRuntime) throw new Error('Canvas Graph Session runtime is not initialized')
-    return graphSessionRuntime
+  return {
+    renderEdges,
+    isNodeExecutionActive,
+    releaseNodeExecutions,
+    preserveCurrentSelection,
+    graphAdapter,
   }
+}
 
-  const readCanvasGraphStore = () => requireGraphSessionRuntime().readCanvasGraphStore()
-
-  const canvasGraphHistory = useCanvasGraphHistory({
-    maxSteps: 10,
-    applyPatch: (patch, direction) => {
-      const summary = readCanvasGraphStore().applyCommitPatch(patch, direction, {
-        recordHistory: false,
-        markDirty: true,
-      })
-      return summary.didChange
-    },
-  })
-
-  const boardSync = useCanvasBoardSync({
+function useCanvasRuntimeBoardSync(
+  options: UseFlowCanvasRuntimeOptions,
+  requireGraphSessionRuntime: () => CanvasGraphSessionRuntime,
+  localEditVersion: Ref<number>,
+  canApplyReconciliation: () => boolean,
+) {
+  return useCanvasBoardSync({
     buildCurrentSnapshot: () =>
       requireGraphSessionRuntime().exportGraphSnapshot(options.boardBaseSnapshot.value),
     isDirty: options.isDirty,
@@ -148,10 +143,138 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     onWarning: options.onWarning,
     onSuccess: options.onSuccess,
     onError: options.onError,
-    canApplyReconciliation: () => !nodeDragLifecycle.isActive(),
+    canApplyReconciliation,
+  })
+}
+
+function useCanvasRuntimeGroupCommands(
+  options: UseFlowCanvasRuntimeOptions,
+  graphAdapter: CanvasVueFlowGraphAdapter,
+  readCanvasGraphStore: CanvasGraphSessionRuntime['readCanvasGraphStore'],
+  isGraphSessionAttached: () => boolean,
+  releaseNodeExecutions: (leases: readonly PendingImageExecutionLease[]) => void,
+) {
+  const groupRuntime = useCanvasGroupRuntime({
+    nodes: options.nodes,
+    edges: options.edges,
+    boardBaseSnapshot: options.boardBaseSnapshot,
+    graphAdapter,
+    readCanvasGraphStore,
+    isGraphSessionAttached,
+    onWarning: options.onWarning,
+    captureActiveNodeExecutions: options.executionCore.captureActiveLeases,
+    releaseNodeExecutions,
   })
 
-  const currentBoardId = boardSync.currentBoardId
+  const nodeDragLifecycle: CanvasNodeDragLifecycle = createCanvasNodeDragLifecycle({
+    createCommand: () => {
+      const store = readCanvasGraphStore()
+      return {
+        store,
+        transaction: store.beginTransaction('node-drag'),
+      }
+    },
+    onBegin: groupRuntime.internal.onNodeDragStart,
+    reconcileMembership: groupRuntime.internal.applyDraggedNodeMembershipChanges,
+  })
+
+  return { groupRuntime, nodeDragLifecycle }
+}
+
+function createCanvasRuntimeSession(
+  options: UseFlowCanvasRuntimeOptions,
+  integration: Pick<
+    Parameters<typeof createCanvasGraphSessionRuntime>[0],
+    'graphAdapter' | 'history' | 'markDirty' | 'isNodeExecutionActive' | 'preserveCurrentSelection'
+  >,
+  groupRuntime: ReturnType<typeof useCanvasGroupRuntime>,
+) {
+  return createCanvasGraphSessionRuntime({
+    ...integration,
+    nodes: options.nodes,
+    edges: options.edges,
+    boardBaseSnapshot: options.boardBaseSnapshot,
+    boardSession: options.boardSession,
+    executionCore: options.executionCore,
+    hydratePendingImageLeases: options.hydratePendingImageLeases,
+    projectCurrentGroupNodeLayers: (nodes) =>
+      groupRuntime.internal.projectCurrentGroupNodeLayers(nodes),
+    projectCommittedGroupNodeLayer: (node) =>
+      groupRuntime.internal.projectCommittedGroupNodeLayer(node),
+    onGroupsChanged: (groups) => {
+      options.boardBaseSnapshot.value = { ...options.boardBaseSnapshot.value, groups }
+      groupRuntime.internal.handleCommittedGroupsChanged()
+    },
+    scheduleMicrotask:
+      options.scheduleMicrotask ??
+      ((callback: () => void) => void Promise.resolve().then(callback)),
+  })
+}
+
+function createCanvasRuntimeDeletion(
+  options: UseFlowCanvasRuntimeOptions,
+  readCanvasGraphStore: CanvasGraphSessionRuntime['readCanvasGraphStore'],
+  groupRuntime: ReturnType<typeof useCanvasGroupRuntime>,
+  releaseNodeExecutions: (leases: readonly PendingImageExecutionLease[]) => void,
+) {
+  return createCanvasDeleteCommandLifecycle({
+    readNodes: () => options.nodes.value,
+    readEdges: () => options.edges.value,
+    readGraphStore: readCanvasGraphStore,
+    resolveRemovedFlowNodes: groupRuntime.internal.resolveRemovedFlowNodeChanges,
+    scheduleMicrotask:
+      options.scheduleMicrotask ??
+      ((callback: () => void) => void Promise.resolve().then(callback)),
+    onWarning: options.onWarning,
+    captureActiveNodeExecutions: options.executionCore.captureActiveLeases,
+    releaseNodeExecutions,
+  })
+}
+
+function useCanvasRuntimeHistory(
+  readCanvasGraphStore: CanvasGraphSessionRuntime['readCanvasGraphStore'],
+) {
+  return useCanvasGraphHistory({
+    maxSteps: 10,
+    applyPatch: (patch, direction) => {
+      const summary = readCanvasGraphStore().applyCommitPatch(patch, direction, {
+        recordHistory: false,
+        markDirty: true,
+      })
+      return summary.didChange
+    },
+  })
+}
+
+export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
+  const renderNodes = options.nodes
+  const renderEdgesRef = options.edges
+  const localEditVersion = ref(0)
+  let graphSessionRuntime: CanvasGraphSessionRuntime | null = null
+  const {
+    renderEdges,
+    isNodeExecutionActive,
+    releaseNodeExecutions,
+    preserveCurrentSelection,
+    graphAdapter,
+  } = useCanvasExecutionProjection(options)
+
+  function requireGraphSessionRuntime(): CanvasGraphSessionRuntime {
+    if (!graphSessionRuntime) throw new Error('Canvas Graph Session runtime is not initialized')
+    return graphSessionRuntime
+  }
+
+  const readCanvasGraphStore = () => requireGraphSessionRuntime().readCanvasGraphStore()
+
+  const canvasGraphHistory = useCanvasRuntimeHistory(readCanvasGraphStore)
+
+  const boardSync = useCanvasRuntimeBoardSync(
+    options,
+    requireGraphSessionRuntime,
+    localEditVersion,
+    () => !nodeDragLifecycle.isActive(),
+  )
+
   function applyBoardSnapshot(
     snapshot: CanvasBoardSnapshot,
     source: 'hydrate-replace' | 'save-reconcile',
@@ -196,7 +319,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     }
     return result.saved
   }
-  const canSaveBoard = boardSync.canSaveBoard
 
   const { markDirtyAndSchedule, flushAutosave } = useCanvasBoardAutosave({
     isDirty: options.isDirty,
@@ -208,7 +330,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   })
 
   function markDirty() {
-    if (!canSaveBoard.value) return
+    if (!boardSync.canSaveBoard.value) return
     localEditVersion.value += 1
     options.isDirty.value = true
     if (options.saveStatus.value === 'idle' || options.saveStatus.value === 'saved') {
@@ -217,67 +339,32 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     markDirtyAndSchedule()
   }
 
-  const groupRuntime = useCanvasGroupRuntime({
-    nodes: renderNodes,
-    edges: renderEdgesRef,
-    boardBaseSnapshot: options.boardBaseSnapshot,
+  const { groupRuntime, nodeDragLifecycle } = useCanvasRuntimeGroupCommands(
+    options,
     graphAdapter,
     readCanvasGraphStore,
-    isGraphSessionAttached: () => graphSessionRuntime?.isAttached() ?? false,
-    onWarning: options.onWarning,
-    captureActiveNodeExecutions: options.executionCore.captureActiveLeases,
+    () => graphSessionRuntime?.isAttached() ?? false,
     releaseNodeExecutions,
-  })
+  )
 
-  const nodeDragLifecycle: CanvasNodeDragLifecycle = createCanvasNodeDragLifecycle({
-    createCommand: () => {
-      const store = readCanvasGraphStore()
-      return {
-        store,
-        transaction: store.beginTransaction('node-drag'),
-      }
+  graphSessionRuntime = createCanvasRuntimeSession(
+    options,
+    {
+      graphAdapter,
+      history: canvasGraphHistory,
+      markDirty,
+      isNodeExecutionActive,
+      preserveCurrentSelection,
     },
-    onBegin: groupRuntime.internal.onNodeDragStart,
-    reconcileMembership: groupRuntime.internal.applyDraggedNodeMembershipChanges,
-  })
+    groupRuntime,
+  )
 
-  graphSessionRuntime = createCanvasGraphSessionRuntime({
-    nodes: renderNodes,
-    edges: renderEdgesRef,
-    boardBaseSnapshot: options.boardBaseSnapshot,
-    boardSession: options.boardSession,
-    graphAdapter,
-    executionCore: options.executionCore,
-    hydratePendingImageLeases: options.hydratePendingImageLeases,
-    history: canvasGraphHistory,
-    markDirty,
-    isNodeExecutionActive,
-    preserveCurrentSelection,
-    projectCurrentGroupNodeLayers: (nodes) =>
-      groupRuntime.internal.projectCurrentGroupNodeLayers(nodes),
-    projectCommittedGroupNodeLayer: (node) =>
-      groupRuntime.internal.projectCommittedGroupNodeLayer(node),
-    onGroupsChanged: (groups) => {
-      options.boardBaseSnapshot.value = { ...options.boardBaseSnapshot.value, groups }
-      groupRuntime.internal.handleCommittedGroupsChanged()
-    },
-    scheduleMicrotask:
-      options.scheduleMicrotask ??
-      ((callback: () => void) => void Promise.resolve().then(callback)),
-  })
-
-  const deleteLifecycle = createCanvasDeleteCommandLifecycle({
-    readNodes: () => renderNodes.value,
-    readEdges: () => renderEdgesRef.value,
-    readGraphStore: readCanvasGraphStore,
-    resolveRemovedFlowNodes: groupRuntime.internal.resolveRemovedFlowNodeChanges,
-    scheduleMicrotask:
-      options.scheduleMicrotask ??
-      ((callback: () => void) => void Promise.resolve().then(callback)),
-    onWarning: options.onWarning,
-    captureActiveNodeExecutions: options.executionCore.captureActiveLeases,
+  const deleteLifecycle = createCanvasRuntimeDeletion(
+    options,
+    readCanvasGraphStore,
+    groupRuntime,
     releaseNodeExecutions,
-  })
+  )
 
   function deleteNode(nodeId: string): boolean {
     if (!renderNodes.value.some((node) => node.id === nodeId)) return false
@@ -364,7 +451,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
 
   return {
     persistence: {
-      currentBoardId,
+      currentBoardId: boardSync.currentBoardId,
       loadInitialOrRouteBoard,
       flushAutosave,
       history: canvasGraphHistory,

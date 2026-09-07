@@ -20,20 +20,13 @@ type AdminUsersContextDependencies = {
   sessionCommands?: AdminUserSessionCommands | undefined
 }
 
-export function useAdminUsersContext(
-  options: {
-    feedback: AdminUsersFeedback
-    confirm: AdminConfirmPort
-  },
-  dependencies: AdminUsersContextDependencies = {},
-) {
+function createAdminUsersQueryState() {
   const pageState = ref(1)
   const pageSize = ref(10)
   const searchKeyword = ref('')
   const appliedSearchKeyword = ref('')
   const userRoleFilter = ref<UserRoleFilter>(USER_ROLE_FILTER_ALL)
   const userStatusFilter = ref<UserStatusFilter>(USER_STATUS_FILTER_ALL)
-  const selectedUsers = ref<AdminUserRowView[]>([])
 
   const hasUserFilter = computed(
     () =>
@@ -59,6 +52,38 @@ export function useAdminUsersContext(
     role: selectedUserRole.value,
     status: selectedUserStatus.value,
   }))
+  return {
+    pageState,
+    pageSize,
+    searchKeyword,
+    appliedSearchKeyword,
+    userRoleFilter,
+    userStatusFilter,
+    hasUserFilter,
+    hasAppliedUserQuery,
+    userQueryParams,
+  }
+}
+
+export function useAdminUsersContext(
+  options: {
+    feedback: AdminUsersFeedback
+    confirm: AdminConfirmPort
+  },
+  dependencies: AdminUsersContextDependencies = {},
+) {
+  const {
+    pageState,
+    pageSize,
+    searchKeyword,
+    appliedSearchKeyword,
+    userRoleFilter,
+    userStatusFilter,
+    hasUserFilter,
+    hasAppliedUserQuery,
+    userQueryParams,
+  } = createAdminUsersQueryState()
+  const selectedUsers = ref<AdminUserRowView[]>([])
   const usersQuery = useAdminUsersResource(userQueryParams)
   const usersData = computed(() => usersQuery.data.value)
   const users = computed<AdminUserRowView[]>(() =>

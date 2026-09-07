@@ -4,6 +4,7 @@ import tseslint from 'typescript-eslint'
 import vue from 'eslint-plugin-vue'
 import vueA11y from 'eslint-plugin-vuejs-accessibility'
 import prettierConfig from 'eslint-config-prettier'
+import { functionLengthRule } from './scripts/eslint-function-length.mjs'
 
 export default tseslint.config(
   {
@@ -26,6 +27,7 @@ export default tseslint.config(
   },
   {
     files: ['src/**/*.{ts,tsx,vue}'],
+    plugins: { governance: { rules: { 'function-length': functionLengthRule } } },
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -36,15 +38,10 @@ export default tseslint.config(
       'no-undef': 'off',
       'no-empty': 'error',
       'no-useless-assignment': 'error',
-      // Complexity budget (Phase 4): complexity/max-depth block, while
-      // max-lines-per-function stays reporting until factory/composable
-      // structural splits land (tracked follow-up, ~60 long factories).
+      // Nested functions receive their own budget; Vitest describe only groups tests.
       complexity: ['error', 15],
       'max-depth': ['error', 4],
-      'max-lines-per-function': [
-        'warn',
-        { max: 100, skipBlankLines: true, skipComments: true, IIFEs: true },
-      ],
+      'governance/function-length': ['warn', { max: 100 }],
       'no-unused-vars': 'off',
       'preserve-caught-error': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
