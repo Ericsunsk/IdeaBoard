@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { RetouchLayerStack } from './retouchLayerStack'
 import {
   applyLayerCommand,
-  createDefaultImageAdjustmentLayer,
+  createDefaultImageEffectLayer,
   createInitialLayerStack,
-  getSelectedAdjustment,
+  getSelectedEffect,
   selectAfterRemove,
 } from './retouchLayerStack'
 
@@ -16,21 +16,21 @@ describe('retouchLayerStack', () => {
     expect(firstStack.layers.map((layer) => layer.id)).toEqual(['source'])
   })
 
-  it('creates independent default adjustment layer params', () => {
-    const firstHslLayer = createDefaultImageAdjustmentLayer('hsl')
-    const secondHslLayer = createDefaultImageAdjustmentLayer('hsl')
+  it('creates independent default retouch layer params', () => {
+    const firstHslLayer = createDefaultImageEffectLayer('hsl')
+    const secondHslLayer = createDefaultImageEffectLayer('hsl')
     firstHslLayer.params.lightness = 45
 
     expect(secondHslLayer.params).toEqual({ hue: 0, saturation: 0, lightness: 0 })
   })
 
-  it('copies adjustment params without sharing nested curve references', () => {
+  it('copies retouch params without sharing nested curve references', () => {
     const stackWithCurves = applyLayerCommand(createInitialLayerStack(), {
-      type: 'ensure-adjustment',
+      type: 'ensure-retouch',
       kind: 'curves',
     })
     const updatedStack = applyLayerCommand(stackWithCurves, {
-      type: 'update-selected-adjustment-params',
+      type: 'update-selected-retouch-params',
       params: {
         channels: {
           rgb: [{ id: 'midtone', input: 50, output: 60 }],
@@ -40,12 +40,12 @@ describe('retouchLayerStack', () => {
 
     const copiedStack = applyLayerCommand(updatedStack, { type: 'copy-selected' })
     const curvesLayers = copiedStack.layers.filter(
-      (layer) => layer.type === 'adjustment' && layer.kind === 'curves',
+      (layer) => layer.type === 'effect' && layer.kind === 'curves',
     )
     const [copyLayer, originalLayer] = curvesLayers
-    expect(copyLayer?.type).toBe('adjustment')
-    expect(originalLayer?.type).toBe('adjustment')
-    if (copyLayer?.type !== 'adjustment' || originalLayer?.type !== 'adjustment') return
+    expect(copyLayer?.type).toBe('effect')
+    expect(originalLayer?.type).toBe('effect')
+    if (copyLayer?.type !== 'effect' || originalLayer?.type !== 'effect') return
     expect(copyLayer.kind).toBe('curves')
     expect(originalLayer.kind).toBe('curves')
     if (copyLayer.kind !== 'curves' || originalLayer.kind !== 'curves') return
@@ -58,17 +58,17 @@ describe('retouchLayerStack', () => {
   it('selects the nearest editable fallback after removing the selected layer', () => {
     const stack = applyLayerCommand(
       applyLayerCommand(createInitialLayerStack(), {
-        type: 'ensure-adjustment',
+        type: 'ensure-retouch',
         kind: 'threshold',
       }),
-      { type: 'ensure-adjustment', kind: 'hsl' },
+      { type: 'ensure-retouch', kind: 'hsl' },
     )
 
-    const nextStack = applyLayerCommand(stack, { type: 'remove', layerId: 'adjustment:hsl' })
+    const nextStack = applyLayerCommand(stack, { type: 'remove', layerId: 'retouch:hsl' })
 
-    expect(nextStack.layers.map((layer) => layer.id)).toEqual(['adjustment:threshold', 'source'])
-    expect(nextStack.selectedLayerId).toBe('adjustment:threshold')
-    expect(selectAfterRemove(nextStack.layers, 0)).toBe('adjustment:threshold')
+    expect(nextStack.layers.map((layer) => layer.id)).toEqual(['retouch:threshold', 'source'])
+    expect(nextStack.selectedLayerId).toBe('retouch:threshold')
+    expect(selectAfterRemove(nextStack.layers, 0)).toBe('retouch:threshold')
   })
 
   it('protects the source layer from destructive commands', () => {
@@ -85,27 +85,27 @@ describe('retouchLayerStack', () => {
     expect(removedStack.selectedLayerId).toBe('source')
   })
 
-  it('creates and selects the requested adjustment layer command', () => {
+  it('creates and selects the requested retouch layer command', () => {
     const nextStack = applyLayerCommand(createInitialLayerStack(), {
-      type: 'ensure-adjustment',
+      type: 'ensure-retouch',
       kind: 'threshold',
     })
 
-    expect(nextStack.selectedLayerId).toBe('adjustment:threshold')
-    expect(getSelectedAdjustment(nextStack)).toMatchObject({
-      id: 'adjustment:threshold',
+    expect(nextStack.selectedLayerId).toBe('retouch:threshold')
+    expect(getSelectedEffect(nextStack)).toMatchObject({
+      id: 'retouch:threshold',
       kind: 'threshold',
     })
-    expect(nextStack.layers.map((layer) => layer.id)).toEqual(['adjustment:threshold', 'source'])
+    expect(nextStack.layers.map((layer) => layer.id)).toEqual(['retouch:threshold', 'source'])
   })
 
-  it('creates sharpen adjustment layers with normalized params', () => {
+  it('creates sharpen retouch layers with normalized params', () => {
     const sharpenStack = applyLayerCommand(createInitialLayerStack(), {
-      type: 'ensure-adjustment',
+      type: 'ensure-retouch',
       kind: 'sharpen',
     })
     const updatedStack = applyLayerCommand(sharpenStack, {
-      type: 'update-selected-adjustment-params',
+      type: 'update-selected-retouch-params',
       params: {
         amount: 240,
         radius: 8,
@@ -114,9 +114,9 @@ describe('retouchLayerStack', () => {
       },
     })
 
-    expect(updatedStack.selectedLayerId).toBe('adjustment:sharpen')
-    expect(getSelectedAdjustment(updatedStack)).toMatchObject({
-      id: 'adjustment:sharpen',
+    expect(updatedStack.selectedLayerId).toBe('retouch:sharpen')
+    expect(getSelectedEffect(updatedStack)).toMatchObject({
+      id: 'retouch:sharpen',
       kind: 'sharpen',
       name: 'Sharpen 1',
       params: {
@@ -126,22 +126,22 @@ describe('retouchLayerStack', () => {
         protectColor: false,
       },
     })
-    expect(updatedStack.layers.map((layer) => layer.id)).toEqual(['adjustment:sharpen', 'source'])
+    expect(updatedStack.layers.map((layer) => layer.id)).toEqual(['retouch:sharpen', 'source'])
   })
 
   it('falls back to source selection when the last editable layer is removed', () => {
     const stack = applyLayerCommand(createInitialLayerStack(), {
-      type: 'ensure-adjustment',
+      type: 'ensure-retouch',
       kind: 'hsl',
     })
     const nextStack = applyLayerCommand(stack, {
       type: 'remove',
-      layerId: 'adjustment:hsl',
+      layerId: 'retouch:hsl',
     })
 
     expect(nextStack.layers.map((layer) => layer.id)).toEqual(['source'])
     expect(nextStack.selectedLayerId).toBe('source')
-    expect(getSelectedAdjustment(nextStack)).toBeNull()
+    expect(getSelectedEffect(nextStack)).toBeNull()
   })
 
   it('does not share whole-param update input references with layer state', () => {
@@ -151,17 +151,17 @@ describe('retouchLayerStack', () => {
       },
     }
     const curvesStack = applyLayerCommand(createInitialLayerStack(), {
-      type: 'ensure-adjustment',
+      type: 'ensure-retouch',
       kind: 'curves',
     })
 
     const nextStack = applyLayerCommand(curvesStack, {
-      type: 'update-selected-adjustment-params',
+      type: 'update-selected-retouch-params',
       params,
     })
     params.channels.rgb[0]!.output = 10
 
-    expect(getSelectedAdjustment(nextStack)).toMatchObject({
+    expect(getSelectedEffect(nextStack)).toMatchObject({
       kind: 'curves',
       params: {
         channels: {
@@ -175,7 +175,7 @@ describe('retouchLayerStack', () => {
     const stack: RetouchLayerStack = createInitialLayerStack()
 
     const nextStack = applyLayerCommand(stack, {
-      type: 'update-selected-adjustment-params',
+      type: 'update-selected-retouch-params',
       params: { threshold: 20, invert: false },
     })
 

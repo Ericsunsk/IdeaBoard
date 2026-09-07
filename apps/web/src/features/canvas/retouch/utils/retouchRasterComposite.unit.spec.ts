@@ -47,7 +47,7 @@ describe('retouchRasterComposite', () => {
     expect(Array.from(output.data)).toEqual([127, 0, 128, 255])
   })
 
-  it('applies adjustment layers only to the composited result below them', () => {
+  it('applies retouch layers only to the composited result below them', () => {
     const layers: RetouchLayer[] = [
       {
         id: 'paint:1',
@@ -57,8 +57,8 @@ describe('retouchRasterComposite', () => {
         content: rasterContent,
       },
       {
-        id: 'adjustment:threshold',
-        type: 'adjustment',
+        id: 'retouch:threshold',
+        type: 'effect',
         kind: 'threshold',
         name: '阈值 1',
         visible: true,

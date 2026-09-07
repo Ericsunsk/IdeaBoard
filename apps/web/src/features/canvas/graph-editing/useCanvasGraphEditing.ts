@@ -200,7 +200,7 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     })
   }
 
-  function createPendingAdjustmentNode(sourceNode: ImageNodeItem): string | null {
+  function createPendingRetouchNode(sourceNode: ImageNodeItem): string | null {
     const ratio = resolveImageNodeDisplayRatio(sourceNode)
     const sourceWidth = Number(sourceNode.width)
     const width =
@@ -272,7 +272,7 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
       getImageNodeSnapshot,
       updateSnapshotNode,
       createImageNodeFromFile,
-      createPendingAdjustmentNode,
+      createPendingRetouchNode,
       applyImageFileToImageNode,
       deleteNode: options.deleteNode,
       uploadImageToBoard,

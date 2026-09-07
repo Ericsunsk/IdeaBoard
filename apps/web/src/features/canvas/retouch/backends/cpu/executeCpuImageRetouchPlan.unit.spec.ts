@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ImageAdjustmentPlan } from '../../utils/imageAdjustmentEngine'
-import { executeCpuImageAdjustmentPlanInPlace } from './executeCpuImageAdjustmentPlan'
+import type { ImageRetouchPlan } from '../../utils/imageRetouchEngine'
+import { executeCpuImageRetouchPlanInPlace } from './executeCpuImageRetouchPlan'
 
 function makeImageData(values: number[]) {
   class TestImageData {
@@ -21,14 +21,14 @@ function pixelValues(imageData: ImageData) {
   return Array.from(imageData.data)
 }
 
-describe('cpu image adjustment backend', () => {
+describe('cpu image retouch backend', () => {
   it('keeps the in-place execution path available for runtime backends', () => {
     const source = makeImageData([10, 20, 30, 77])
-    const plan: ImageAdjustmentPlan = [
+    const plan: ImageRetouchPlan = [
       { kind: 'channel-lut', luts: createRgbChannelLutsForTest(createChannelLiftLut()) },
     ]
 
-    const result = executeCpuImageAdjustmentPlanInPlace(source, plan)
+    const result = executeCpuImageRetouchPlanInPlace(source, plan)
 
     expect(result).toBe(source)
     expect(pixelValues(source)).toEqual([20, 30, 40, 77])

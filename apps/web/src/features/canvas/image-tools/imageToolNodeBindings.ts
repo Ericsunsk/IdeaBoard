@@ -90,7 +90,7 @@ export function createImageToolNodeBindings(
     const activeStrengthAction = ui.strengthControl.activeAction.value
     const directGenerating =
       execution.isNodeExecutionActive(nodeId) ||
-      session.activeImageAdjustmentPendingNodeId.value === nodeId
+      session.activeImageRetouchPendingNodeId.value === nodeId
     const nextBinding: ImageActionBinding = {
       actionMenuVisible,
       promptComposerVisible: ui.isImagePromptComposerVisible(nodeId),

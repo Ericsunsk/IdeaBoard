@@ -35,23 +35,36 @@ function toPositiveNumber(value: unknown): number | undefined {
   return Number.isFinite(num) && num > 0 ? num : undefined
 }
 
+function resolveResultDimensions(result: TaskImageResultInput): {
+  width?: number
+  height?: number
+} {
+  const width = toPositiveNumber(result?.width)
+  const height = toPositiveNumber(result?.height)
+  return {
+    ...(width ? { width } : {}),
+    ...(height ? { height } : {}),
+  }
+}
+
+function resolveResultIndexValue(result: TaskImageResultInput): number | undefined {
+  const resultIndex = Number(result?.result_index ?? result?.resultIndex)
+  return Number.isInteger(resultIndex) && resultIndex >= 0 ? resultIndex : undefined
+}
+
 export function normalizeTaskImageResult(result: TaskImageResultInput): TaskImageResult | null {
   const assetId = `${result?.assetId ?? result?.asset_id ?? ''}`.trim()
   if (!assetId) return null
   const url = buildMediaBrowserURL({ assetId, derivativeTier: 'preview', derivativeFormat: 'webp' })
-  const width = toPositiveNumber(result?.width)
-  const height = toPositiveNumber(result?.height)
   const mimeType = `${result?.mimeType ?? ''}`.trim()
-  const resultIndex = Number(result?.result_index ?? result?.resultIndex)
-  const normalized: TaskImageResult = {
+  const resultIndex = resolveResultIndexValue(result)
+  return {
     url,
-    ...(assetId ? { assetId } : {}),
-    ...(width ? { width } : {}),
-    ...(height ? { height } : {}),
+    assetId,
+    ...resolveResultDimensions(result),
     ...(mimeType ? { mimeType } : {}),
-    ...(Number.isInteger(resultIndex) && resultIndex >= 0 ? { resultIndex } : {}),
+    ...(resultIndex === undefined ? {} : { resultIndex }),
   }
-  return normalized
 }
 
 export function normalizeTaskImageResults(results: TaskImageResultInput[]): TaskImageResult[] {

@@ -8,27 +8,25 @@ import {
   type Ref,
 } from 'vue'
 import type { RetouchLayer, RetouchRenderedPreview } from './types'
-import { createImageAdjustmentInlinePreviewRenderer } from './services/imageAdjustmentInlinePreviewRenderer'
-import { buildImageAdjustmentPlan } from './utils/imageAdjustmentPlanPipeline'
+import { createImageRetouchInlinePreviewRenderer } from './services/imageRetouchInlinePreviewRenderer'
+import { buildImageRetouchPlan } from './utils/imageRetouchPlanPipeline'
 
-type UseImageAdjustmentRenderedPreviewOptions = {
+type UseImageRetouchRenderedPreviewOptions = {
   isAdjustMode: Ref<boolean>
   layers: Ref<readonly RetouchLayer[]>
   sourceUrl?: MaybeRefOrGetter<string | null | undefined>
 }
 
-export function useImageAdjustmentRenderedPreview(
-  options: UseImageAdjustmentRenderedPreviewOptions,
-) {
+export function useImageRetouchRenderedPreview(options: UseImageRetouchRenderedPreviewOptions) {
   const retouchRenderedPreview = shallowRef<RetouchRenderedPreview | null>(null)
   const retouchPreviewSource = shallowRef<RetouchRenderedPreview | null>(null)
 
   const sourceUrl = computed(() => toValue(options.sourceUrl) ?? null)
-  const imageAdjustmentPlan = computed(() => {
+  const imageRetouchPlan = computed(() => {
     if (!options.isAdjustMode.value) return []
-    return buildImageAdjustmentPlan(options.layers.value)
+    return buildImageRetouchPlan(options.layers.value)
   })
-  const previewRenderer = createImageAdjustmentInlinePreviewRenderer({
+  const previewRenderer = createImageRetouchInlinePreviewRenderer({
     onPreview(preview) {
       retouchRenderedPreview.value = preview
     },
@@ -43,7 +41,7 @@ export function useImageAdjustmentRenderedPreview(
         : null
     },
     onError(error) {
-      console.warn('[retouch] failed to load adjustment preview source', error)
+      console.warn('[retouch] failed to load retouch preview source', error)
     },
   })
 
@@ -55,14 +53,14 @@ export function useImageAdjustmentRenderedPreview(
     { immediate: true },
   )
 
-  watch(imageAdjustmentPlan, (plan) => previewRenderer.updatePlan(plan), { immediate: true })
+  watch(imageRetouchPlan, (plan) => previewRenderer.updatePlan(plan), { immediate: true })
 
   onBeforeUnmount(() => {
     previewRenderer.dispose()
   })
 
   const renderedPreview = computed<RetouchRenderedPreview | null>(() => {
-    if (!options.isAdjustMode.value || imageAdjustmentPlan.value.length === 0) return null
+    if (!options.isAdjustMode.value || imageRetouchPlan.value.length === 0) return null
     return retouchRenderedPreview.value
   })
   const previewSource = computed<RetouchRenderedPreview | null>(() => {

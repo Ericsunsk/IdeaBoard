@@ -308,7 +308,7 @@ describe('boardSync', () => {
     await expect(syncCanvasBoardToServer('board-1')).rejects.toThrow('画布名称已存在')
   })
 
-  it('returns hydrate failure for old-shape remote board state without upgrading it', async () => {
+  it('returns hydrate failure for pre-migration remote board state without upgrading it', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     try {
       mocks.state.listResponse = {
@@ -320,7 +320,7 @@ describe('boardSync', () => {
               createdAt: 100,
               updatedAt: 1_500,
               state: {
-                schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION - 1,
+                schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION - 2,
                 imageNodes: [
                   {
                     id: 1,

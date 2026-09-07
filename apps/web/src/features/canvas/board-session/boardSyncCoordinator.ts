@@ -203,6 +203,96 @@ export function createBoardSyncCoordinator(
     options.onWarning(i18n.global.t('canvas.session.savedLocallySyncFailed'))
   }
 
+  type BoardSaveStep = Awaited<ReturnType<CanvasBoardSession['save']>>
+
+  function reportSaveSyncOutcome(
+    boardId: string,
+    saveOptions: SaveCurrentBoardSnapshotOptions,
+    remoteSync: BoardSaveStep['remoteSync'],
+    hasLocalDraftAdvanced: boolean,
+    canApplyReconciliation: boolean,
+  ): void {
+    if (remoteSync.ok) {
+      const hasUnreconciledDraft = hasLocalDraftAdvanced || !canApplyReconciliation
+      options.isDirty.value = hasUnreconciledDraft
+      options.saveStatus.value = hasUnreconciledDraft ? 'pending' : 'saved'
+      if (!saveOptions.silent && !hasUnreconciledDraft) {
+        options.onSuccess(i18n.global.t('canvas.session.saved'))
+      }
+      return
+    }
+    options.isDirty.value = true
+    const failureStatus = remoteSync.reason === 'conflict' ? 'conflict' : 'retry'
+    options.saveStatus.value = failureStatus
+    if (shouldNotifySaveFailure(saveOptions.silent, boardId, remoteSync.reason)) {
+      notifyRemoteSyncFailure(remoteSync.reason)
+    }
+  }
+
+  function settleCommittedSave(args: {
+    boardId: string
+    saveOptions: SaveCurrentBoardSnapshotOptions
+    saveToken: number
+    saveGraphRevision: number
+    capturedSnapshot: CanvasBoardSnapshot
+    stabilizedSnapshot: CanvasBoardSnapshot
+    remoteSync: BoardSaveStep['remoteSync']
+    previousSaveStatus: SaveStatus
+    isSaveStillCurrent: () => boolean
+  }): CanvasBoardSaveReconciliation | undefined {
+    if (!args.isSaveStillCurrent()) {
+      if (
+        args.saveToken === saveSequence &&
+        (options.saveStatus.value === 'pending' || options.saveStatus.value === 'recover')
+      ) {
+        options.saveStatus.value = args.previousSaveStatus
+      }
+      return undefined
+    }
+    const hasLocalDraftAdvanced = readGraphRevision() !== args.saveGraphRevision
+    const currentSnapshot = hasLocalDraftAdvanced ? buildCurrentBoardSnapshot() : null
+    const committedSnapshot = currentSnapshot
+      ? rebaseStabilizedMedia(args.capturedSnapshot, currentSnapshot, args.stabilizedSnapshot)
+      : args.stabilizedSnapshot
+    const canApplyReconciliation = options.canApplyReconciliation()
+    if (canApplyReconciliation) {
+      deferredMediaStabilization = null
+    } else {
+      deferredMediaStabilization = {
+        captured: args.capturedSnapshot,
+        stabilized: args.stabilizedSnapshot,
+      }
+    }
+    reportSaveSyncOutcome(
+      args.boardId,
+      args.saveOptions,
+      args.remoteSync,
+      hasLocalDraftAdvanced,
+      canApplyReconciliation,
+    )
+    return canApplyReconciliation
+      ? { snapshot: committedSnapshot, hasLocalDraftAdvanced }
+      : undefined
+  }
+
+  function settleSaveFailure(
+    error: unknown,
+    boardId: string,
+    saveOptions: SaveCurrentBoardSnapshotOptions,
+    isSaveStillCurrent: () => boolean,
+  ): void {
+    if (isSaveStillCurrent()) {
+      options.saveStatus.value = 'retry'
+    }
+    console.warn('[canvas] save board snapshot failed', error)
+    if (
+      isSaveStillCurrent() &&
+      shouldNotifySaveFailure(saveOptions.silent, boardId, 'save-failed')
+    ) {
+      options.onError(userFacingErrorCopy(error, i18n.global.t('canvas.session.saveFailed')))
+    }
+  }
+
   async function saveCurrentBoardSnapshot(
     saveOptions: SaveCurrentBoardSnapshotOptions = {},
   ): Promise<CanvasBoardSaveResult> {
@@ -244,60 +334,23 @@ export function createBoardSyncCoordinator(
       if (remoteSync.ok) {
         clearNotifiedSaveFailure(boardId)
       }
-      const shouldCommitToCurrentGraph = isSaveStillCurrent()
-      let reconciliation: CanvasBoardSaveReconciliation | undefined
-      if (shouldCommitToCurrentGraph) {
-        const hasLocalDraftAdvanced = readGraphRevision() !== saveGraphRevision
-        const currentSnapshot = hasLocalDraftAdvanced ? buildCurrentBoardSnapshot() : null
-        const committedSnapshot = currentSnapshot
-          ? rebaseStabilizedMedia(capturedSnapshot, currentSnapshot, stabilizedSnapshot)
-          : stabilizedSnapshot
-        const canApplyReconciliation = options.canApplyReconciliation()
-        if (canApplyReconciliation) {
-          deferredMediaStabilization = null
-          reconciliation = { snapshot: committedSnapshot, hasLocalDraftAdvanced }
-        } else {
-          deferredMediaStabilization = {
-            captured: capturedSnapshot,
-            stabilized: stabilizedSnapshot,
-          }
-        }
-        if (remoteSync.ok) {
-          const hasUnreconciledDraft = hasLocalDraftAdvanced || !canApplyReconciliation
-          options.isDirty.value = hasUnreconciledDraft
-          options.saveStatus.value = hasUnreconciledDraft ? 'pending' : 'saved'
-          if (!saveOptions.silent && !hasUnreconciledDraft) {
-            options.onSuccess(i18n.global.t('canvas.session.saved'))
-          }
-        } else {
-          options.isDirty.value = true
-          const failureStatus = remoteSync.reason === 'conflict' ? 'conflict' : 'retry'
-          options.saveStatus.value = failureStatus
-          if (shouldNotifySaveFailure(saveOptions.silent, boardId, remoteSync.reason)) {
-            notifyRemoteSyncFailure(remoteSync.reason)
-          }
-        }
-      } else if (
-        saveToken === saveSequence &&
-        (options.saveStatus.value === 'pending' || options.saveStatus.value === 'recover')
-      ) {
-        options.saveStatus.value = previousSaveStatus
-      }
+      const reconciliation = settleCommittedSave({
+        boardId,
+        saveOptions,
+        saveToken,
+        saveGraphRevision,
+        capturedSnapshot,
+        stabilizedSnapshot,
+        remoteSync,
+        previousSaveStatus,
+        isSaveStillCurrent,
+      })
       return {
         saved: remoteSync.ok,
         reconciliation,
       }
     } catch (error) {
-      if (isSaveStillCurrent()) {
-        options.saveStatus.value = 'retry'
-      }
-      console.warn('[canvas] save board snapshot failed', error)
-      if (
-        isSaveStillCurrent() &&
-        shouldNotifySaveFailure(saveOptions.silent, boardId, 'save-failed')
-      ) {
-        options.onError(userFacingErrorCopy(error, i18n.global.t('canvas.session.saveFailed')))
-      }
+      settleSaveFailure(error, boardId, saveOptions, isSaveStillCurrent)
       return { saved: false }
     } finally {
       if (saveToken === saveSequence) {

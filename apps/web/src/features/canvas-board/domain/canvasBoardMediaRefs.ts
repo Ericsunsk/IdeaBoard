@@ -54,7 +54,7 @@ export function rebuildCanvasBoardMediaRefs(
       refId,
       resolveImageNodeMediaRefRole(base, refId),
     )
-    appendRef(node.adjustmentRecipe?.sourceMediaAssetId, refId, 'recipe-source')
+    appendRef(node.retouchRecipe?.sourceMediaAssetId, refId, 'recipe-source')
     node.outputImages.forEach((output, index) => {
       appendImageRef(output, refId, `output:${index}`)
     })

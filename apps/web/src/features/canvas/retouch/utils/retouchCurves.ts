@@ -28,7 +28,7 @@ export type NormalizedCurveChannelPoint = RetouchCurvePoint & {
   endpoint: boolean
 }
 
-export type NormalizedCurvesAdjustment = {
+export type NormalizedCurvesEffect = {
   channels: Partial<Record<RetouchCurveChannel, NormalizedCurveChannelPoint[]>>
 }
 
@@ -97,8 +97,8 @@ export const RETOUCH_CURVE_PRESETS: readonly RetouchCurvePreset[] = [
   },
 ]
 
-export function normalizeCurvesParams(params: RetouchCurvesParams): NormalizedCurvesAdjustment {
-  const channels: NormalizedCurvesAdjustment['channels'] = {}
+export function normalizeCurvesParams(params: RetouchCurvesParams): NormalizedCurvesEffect {
+  const channels: NormalizedCurvesEffect['channels'] = {}
   const sourceParams = params as Partial<RetouchCurvesParams> | null | undefined
   const sourceChannels = isCurveChannelsRecord(sourceParams?.channels) ? sourceParams.channels : {}
   for (const channel of RETOUCH_CURVE_CHANNELS) {
@@ -155,7 +155,7 @@ export function normalizeCurveChannelPoints(
   ]
 }
 
-function denormalizeCurvesParams(params: NormalizedCurvesAdjustment): RetouchCurvesParams {
+function denormalizeCurvesParams(params: NormalizedCurvesEffect): RetouchCurvesParams {
   const channels: RetouchCurvesParams['channels'] = {}
   for (const channel of RETOUCH_CURVE_CHANNELS) {
     const points = params.channels[channel]
@@ -168,7 +168,7 @@ function denormalizeCurvesParams(params: NormalizedCurvesAdjustment): RetouchCur
   return { channels }
 }
 
-export function createCurvesLuts(params: NormalizedCurvesAdjustment): RetouchCurvesLuts {
+export function createCurvesLuts(params: NormalizedCurvesEffect): RetouchCurvesLuts {
   const rgbLut = createCurveChannelLut(params.channels.rgb)
   return {
     red: composeCurveChannelLuts(rgbLut, createCurveChannelLut(params.channels.red)),
@@ -423,29 +423,35 @@ function createMonotoneSlopes(inputs: readonly number[], outputs: readonly numbe
   slopes[pointCount - 1] = deltas[deltas.length - 1] ?? 0
 
   for (let index = 1; index < pointCount - 1; index += 1) {
-    const previousDelta = deltas[index - 1]
-    const nextDelta = deltas[index]
-    const previousInterval = intervals[index - 1]
-    const nextInterval = intervals[index]
-    if (
-      previousDelta === undefined ||
-      nextDelta === undefined ||
-      previousInterval === undefined ||
-      nextInterval === undefined ||
-      previousDelta === 0 ||
-      nextDelta === 0 ||
-      Math.sign(previousDelta) !== Math.sign(nextDelta)
-    ) {
-      slopes[index] = 0
-      continue
-    }
-    const firstWeight = 2 * nextInterval + previousInterval
-    const secondWeight = nextInterval + 2 * previousInterval
-    slopes[index] =
-      (firstWeight + secondWeight) / (firstWeight / previousDelta + secondWeight / nextDelta)
+    slopes[index] = resolveMonotoneSlopeAt(deltas, intervals, index)
   }
 
   return slopes
+}
+
+function resolveMonotoneSlopeAt(
+  deltas: readonly number[],
+  intervals: readonly number[],
+  index: number,
+): number {
+  const previousDelta = deltas[index - 1]
+  const nextDelta = deltas[index]
+  const previousInterval = intervals[index - 1]
+  const nextInterval = intervals[index]
+  if (
+    previousDelta === undefined ||
+    nextDelta === undefined ||
+    previousInterval === undefined ||
+    nextInterval === undefined ||
+    previousDelta === 0 ||
+    nextDelta === 0 ||
+    Math.sign(previousDelta) !== Math.sign(nextDelta)
+  ) {
+    return 0
+  }
+  const firstWeight = 2 * nextInterval + previousInterval
+  const secondWeight = nextInterval + 2 * previousInterval
+  return (firstWeight + secondWeight) / (firstWeight / previousDelta + secondWeight / nextDelta)
 }
 
 function interpolateMonotoneCubic(
@@ -464,13 +470,7 @@ function interpolateMonotoneCubic(
   if (lastInput === undefined || lastOutput === undefined) return 0
   if (input >= lastInput) return lastOutput
 
-  let segmentIndex = 0
-  while (segmentIndex < lastIndex - 1) {
-    const nextSegmentInput = inputs[segmentIndex + 1]
-    if (nextSegmentInput === undefined || input <= nextSegmentInput) break
-    segmentIndex += 1
-  }
-
+  const segmentIndex = findCurveSegmentIndex(inputs, input, lastIndex)
   const x0 = inputs[segmentIndex] ?? 0
   const x1 = inputs[segmentIndex + 1] ?? 0
   const y0 = outputs[segmentIndex] ?? 0
@@ -491,7 +491,21 @@ function interpolateMonotoneCubic(
   )
 }
 
-function serializeNormalizedCurvesParams(params: NormalizedCurvesAdjustment) {
+function findCurveSegmentIndex(
+  inputs: readonly number[],
+  input: number,
+  lastIndex: number,
+): number {
+  let segmentIndex = 0
+  while (segmentIndex < lastIndex - 1) {
+    const nextSegmentInput = inputs[segmentIndex + 1]
+    if (nextSegmentInput === undefined || input <= nextSegmentInput) break
+    segmentIndex += 1
+  }
+  return segmentIndex
+}
+
+function serializeNormalizedCurvesParams(params: NormalizedCurvesEffect) {
   return JSON.stringify(
     RETOUCH_CURVE_CHANNELS.map((channel) => [
       channel,

@@ -2,21 +2,21 @@ import { nextTick, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageProcessingRuntime } from './runtime/types'
 import type { RetouchLayer } from './types'
-import { buildImageAdjustmentPlan } from './utils/imageAdjustmentPlanPipeline'
-import { useImageAdjustmentRenderedPreview } from './useImageAdjustmentRenderedPreview'
+import { buildImageRetouchPlan } from './utils/imageRetouchPlanPipeline'
+import { useImageRetouchRenderedPreview } from './useImageRetouchRenderedPreview'
 
-const { getImageAdjustmentProcessingRuntimeMock } = vi.hoisted(() => ({
-  getImageAdjustmentProcessingRuntimeMock: vi.fn(),
+const { getImageRetouchProcessingRuntimeMock } = vi.hoisted(() => ({
+  getImageRetouchProcessingRuntimeMock: vi.fn(),
 }))
 
-vi.mock('./runtime/imageAdjustmentProcessingRuntime', () => ({
-  getImageAdjustmentProcessingRuntime: getImageAdjustmentProcessingRuntimeMock,
+vi.mock('./runtime/imageRetouchProcessingRuntime', () => ({
+  getImageRetouchProcessingRuntime: getImageRetouchProcessingRuntimeMock,
 }))
 
 function createHslLayer(params = { hue: 0, saturation: 0, lightness: 0 }) {
   return {
-    id: 'adjustment:hsl',
-    type: 'adjustment',
+    id: 'retouch:hsl',
+    type: 'effect',
     kind: 'hsl',
     name: '色相/饱和度 1',
     visible: true,
@@ -26,8 +26,8 @@ function createHslLayer(params = { hue: 0, saturation: 0, lightness: 0 }) {
 
 function createThresholdLayer(params = { threshold: 128, invert: false }) {
   return {
-    id: 'adjustment:threshold',
-    type: 'adjustment',
+    id: 'retouch:threshold',
+    type: 'effect',
     kind: 'threshold',
     name: '阈值 1',
     visible: true,
@@ -37,8 +37,8 @@ function createThresholdLayer(params = { threshold: 128, invert: false }) {
 
 function createCurvesLayer(params = { channels: {} }) {
   return {
-    id: 'adjustment:curves',
-    type: 'adjustment',
+    id: 'retouch:curves',
+    type: 'effect',
     kind: 'curves',
     name: '曲线 1',
     visible: true,
@@ -50,8 +50,8 @@ function createLevelsLayer(
   params = { shadows: 0, midtones: 128, highlights: 255, outputBlack: 0, outputWhite: 255 },
 ) {
   return {
-    id: 'adjustment:levels',
-    type: 'adjustment',
+    id: 'retouch:levels',
+    type: 'effect',
     kind: 'levels',
     name: '色阶 1',
     visible: true,
@@ -63,8 +63,8 @@ function createSharpenLayer(
   params = { amount: 120, radius: 1.5, threshold: 4, protectColor: true },
 ) {
   return {
-    id: 'adjustment:sharpen',
-    type: 'adjustment',
+    id: 'retouch:sharpen',
+    type: 'effect',
     kind: 'sharpen',
     name: '锐化 1',
     visible: true,
@@ -81,16 +81,16 @@ async function flushPreviewLoad() {
 afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
-  getImageAdjustmentProcessingRuntimeMock.mockReset()
+  getImageRetouchProcessingRuntimeMock.mockReset()
 })
 
-describe('useImageAdjustmentRenderedPreview', () => {
+describe('useImageRetouchRenderedPreview', () => {
   it('routes inline preview rendering through the shared image processing runtime', async () => {
     const runtime = installPreviewRuntimeMock({
       sourceValues: [10, 20, 30, 255],
       previewValues: [245, 235, 225, 255],
     })
-    const preview = useImageAdjustmentRenderedPreview({
+    const preview = useImageRetouchRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
       layers: ref([createThresholdLayer({ threshold: 128, invert: true })]),
@@ -101,8 +101,8 @@ describe('useImageAdjustmentRenderedPreview', () => {
     expect(runtime.renderPreview).toHaveBeenCalledWith(
       expect.objectContaining({
         source: { url: 'https://example.com/source.png' },
-        plan: buildImageAdjustmentPlan([createThresholdLayer({ threshold: 128, invert: true })]),
-        taskId: 'image-adjustment:inline-preview',
+        plan: buildImageRetouchPlan([createThresholdLayer({ threshold: 128, invert: true })]),
+        taskId: 'image-retouch:inline-preview',
         latestOnly: true,
         sizeStrategy: { maxSide: 960 },
       }),
@@ -124,7 +124,7 @@ describe('useImageAdjustmentRenderedPreview', () => {
       sourceValues: [10, 20, 30, 255],
       previewValues: [245, 235, 225, 255],
     })
-    const preview = useImageAdjustmentRenderedPreview({
+    const preview = useImageRetouchRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
       layers: ref([createThresholdLayer()]),
@@ -142,7 +142,7 @@ describe('useImageAdjustmentRenderedPreview', () => {
     })
   })
 
-  it('passes the compiled layered adjustment plan to preview rendering', async () => {
+  it('passes the compiled layered retouch plan to preview rendering', async () => {
     const sourceValues = [16, 48, 112, 255, 80, 140, 220, 240, 196, 88, 24, 192, 240, 240, 96, 128]
     const runtime = installPreviewRuntimeMock({
       sourceValues,
@@ -165,8 +165,8 @@ describe('useImageAdjustmentRenderedPreview', () => {
       createSharpenLayer(),
       createThresholdLayer({ threshold: 150, invert: true }),
     ] satisfies RetouchLayer[]
-    const finalPlan = buildImageAdjustmentPlan(layers)
-    const preview = useImageAdjustmentRenderedPreview({
+    const finalPlan = buildImageRetouchPlan(layers)
+    const preview = useImageRetouchRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
       layers: ref(layers),
@@ -186,12 +186,12 @@ describe('useImageAdjustmentRenderedPreview', () => {
     })
   })
 
-  it('loads the preview source but does not expose rendered output for neutral adjustment stacks', async () => {
+  it('loads the preview source but does not expose rendered output for neutral retouch stacks', async () => {
     const runtime = installPreviewRuntimeMock({
       sourceValues: [10, 20, 30, 255],
       previewValues: [10, 20, 30, 255],
     })
-    const preview = useImageAdjustmentRenderedPreview({
+    const preview = useImageRetouchRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
       layers: ref([
@@ -231,7 +231,7 @@ describe('useImageAdjustmentRenderedPreview', () => {
         lightness: Number.NEGATIVE_INFINITY,
       }),
     ] satisfies RetouchLayer[]
-    const preview = useImageAdjustmentRenderedPreview({
+    const preview = useImageRetouchRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
       layers: ref(layers),
@@ -241,7 +241,7 @@ describe('useImageAdjustmentRenderedPreview', () => {
 
     expect(runtime.renderPreview).toHaveBeenCalledWith(
       expect.objectContaining({
-        plan: buildImageAdjustmentPlan(layers),
+        plan: buildImageRetouchPlan(layers),
       }),
     )
     expect(preview.retouchRenderedPreview.value).toMatchObject({
@@ -262,7 +262,7 @@ describe('useImageAdjustmentRenderedPreview', () => {
       installRaf: false,
     })
     const layers = ref<RetouchLayer[]>([createThresholdLayer({ threshold: 32, invert: false })])
-    const preview = useImageAdjustmentRenderedPreview({
+    const preview = useImageRetouchRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
       layers,
@@ -280,7 +280,7 @@ describe('useImageAdjustmentRenderedPreview', () => {
     expect(runtime.renderPreview).toHaveBeenCalledTimes(1)
     expect(runtime.renderPreview).toHaveBeenCalledWith(
       expect.objectContaining({
-        plan: buildImageAdjustmentPlan([createThresholdLayer({ threshold: 64, invert: false })]),
+        plan: buildImageRetouchPlan([createThresholdLayer({ threshold: 64, invert: false })]),
       }),
     )
     expect(preview.retouchRenderedPreview.value).toMatchObject({
@@ -305,7 +305,7 @@ function installPreviewRuntimeMock(input: {
   const previewImageData = makeImageData(input.previewValues)
   const renderPreview = vi.fn<ImageProcessingRuntime['renderPreview']>(async () => ({
     status: 'completed',
-    taskId: 'image-adjustment:inline-preview',
+    taskId: 'image-retouch:inline-preview',
     revision: 1,
     output: {
       sourceImageData,
@@ -320,7 +320,7 @@ function installPreviewRuntimeMock(input: {
     cancel: vi.fn<ImageProcessingRuntime['cancel']>(),
     dispose: vi.fn<ImageProcessingRuntime['dispose']>(),
   }
-  getImageAdjustmentProcessingRuntimeMock.mockReturnValue(runtime)
+  getImageRetouchProcessingRuntimeMock.mockReturnValue(runtime)
   return runtime
 }
 

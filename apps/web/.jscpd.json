@@ -19,7 +19,6 @@
     "src/features/canvas/image-tools/imageToolSession.ts",
     "src/features/canvas/retouch/useRetouchCoordinateAdapter.ts",
     "src/features/canvas/inpaint/components/ImageInpaintChrome.vue",
-    "src/features/canvas/retouch/components/RetouchAdjustmentActions.vue",
     "src/shared/components/UserCreditBalanceButton.vue",
     "src/shared/theme/round-control.css",
     "src/shared/i18n/locales/en/index.ts",

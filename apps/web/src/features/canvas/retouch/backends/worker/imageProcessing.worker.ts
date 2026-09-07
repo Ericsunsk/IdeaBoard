@@ -1,9 +1,9 @@
 import {
-  createImageAdjustmentPlanStepExecutionState,
-  estimateImageAdjustmentPlanStepRangeWorkUnits,
-  estimateImageAdjustmentPlanWorkUnits,
-  executeImageAdjustmentPlanStepRange,
-} from '../../utils/imageAdjustmentEngine'
+  createImageRetouchPlanStepExecutionState,
+  estimateImageRetouchPlanStepRangeWorkUnits,
+  estimateImageRetouchPlanWorkUnits,
+  executeImageRetouchPlanStepRange,
+} from '../../utils/imageRetouchEngine'
 import { i18n } from '../../../../../shared/i18n'
 import type {
   WorkerImageProcessingErrorPayload,
@@ -66,7 +66,7 @@ async function executeRequest(
       progress: createRenderProgress(0, createRenderProgressTotal(request)),
     })
 
-    const imageData = await executeWorkerImageAdjustmentPlanInChunks(request, (progress) => {
+    const imageData = await executeWorkerImageRetouchPlanInChunks(request, (progress) => {
       postResponse({
         type: 'progress',
         requestId: request.requestId,
@@ -110,7 +110,7 @@ async function executeRequest(
   }
 }
 
-async function executeWorkerImageAdjustmentPlanInChunks(
+async function executeWorkerImageRetouchPlanInChunks(
   request: WorkerImageProcessingExecuteRequest,
   onProgress: (progress: WorkerImageProcessingProgress) => void,
 ) {
@@ -124,7 +124,7 @@ async function executeWorkerImageAdjustmentPlanInChunks(
     const step = request.plan[stepIndex]
     if (!step) continue
 
-    const state = createImageAdjustmentPlanStepExecutionState(output, step)
+    const state = createImageRetouchPlanStepExecutionState(output, step)
     for (
       let startByte = 0;
       startByte < output.data.length;
@@ -133,8 +133,8 @@ async function executeWorkerImageAdjustmentPlanInChunks(
       throwIfCancelled(request.requestId)
 
       const endByte = Math.min(startByte + WORKER_RENDER_CHUNK_BYTES, output.data.length)
-      executeImageAdjustmentPlanStepRange(output.data, step, startByte, endByte, state)
-      loaded += estimateImageAdjustmentPlanStepRangeWorkUnits(output.data, step, startByte, endByte)
+      executeImageRetouchPlanStepRange(output.data, step, startByte, endByte, state)
+      loaded += estimateImageRetouchPlanStepRangeWorkUnits(output.data, step, startByte, endByte)
       onProgress(createRenderProgress(loaded, total))
 
       await yieldWorkerEventLoop()
@@ -154,7 +154,7 @@ function createRenderProgress(loaded: number, total: number): WorkerImageProcess
 }
 
 function createRenderProgressTotal(request: WorkerImageProcessingExecuteRequest) {
-  return estimateImageAdjustmentPlanWorkUnits(request.imageData, request.plan)
+  return estimateImageRetouchPlanWorkUnits(request.imageData, request.plan)
 }
 
 function throwIfCancelled(requestId: string) {

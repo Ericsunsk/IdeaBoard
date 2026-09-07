@@ -1,9 +1,9 @@
 <template>
   <section class="editing-controls-panel retouch-properties-panel">
-    <div v-if="adjustmentLayer?.kind === 'hsl'" class="editing-controls-panel__body">
+    <div v-if="effectLayer?.kind === 'hsl'" class="editing-controls-panel__body">
       <RetouchSlider
         :label="ranges.hsl.ranges.hue.label"
-        :value="adjustmentLayer.params.hue"
+        :value="effectLayer.params.hue"
         :min="ranges.hsl.ranges.hue.min"
         :max="ranges.hsl.ranges.hue.max"
         track-variant="hue"
@@ -11,7 +11,7 @@
       />
       <RetouchSlider
         :label="ranges.hsl.ranges.saturation.label"
-        :value="adjustmentLayer.params.saturation"
+        :value="effectLayer.params.saturation"
         :min="ranges.hsl.ranges.saturation.min"
         :max="ranges.hsl.ranges.saturation.max"
         track-variant="tonal-reverse"
@@ -19,7 +19,7 @@
       />
       <RetouchSlider
         :label="ranges.hsl.ranges.lightness.label"
-        :value="adjustmentLayer.params.lightness"
+        :value="effectLayer.params.lightness"
         :min="ranges.hsl.ranges.lightness.min"
         :max="ranges.hsl.ranges.lightness.max"
         track-variant="tonal"
@@ -27,33 +27,33 @@
       />
     </div>
 
-    <div v-else-if="adjustmentLayer?.kind === 'threshold'" class="editing-controls-panel__body">
+    <div v-else-if="effectLayer?.kind === 'threshold'" class="editing-controls-panel__body">
       <RetouchThresholdControl
-        :params="adjustmentLayer.params"
+        :params="effectLayer.params"
         :histogram-source="histogramSource"
         @update:params="emit('update-params', $event)"
       />
     </div>
 
-    <div v-else-if="adjustmentLayer?.kind === 'curves'" class="editing-controls-panel__body">
+    <div v-else-if="effectLayer?.kind === 'curves'" class="editing-controls-panel__body">
       <RetouchCurvesControl
-        :params="adjustmentLayer.params"
+        :params="effectLayer.params"
         :histogram-source="histogramSource"
         @update:params="emit('update-params', $event)"
       />
     </div>
 
-    <div v-else-if="adjustmentLayer?.kind === 'levels'" class="editing-controls-panel__body">
+    <div v-else-if="effectLayer?.kind === 'levels'" class="editing-controls-panel__body">
       <RetouchLevelsControl
-        :params="adjustmentLayer.params"
+        :params="effectLayer.params"
         :histogram-source="histogramSource"
         @update:params="emit('update-params', $event)"
       />
     </div>
 
-    <div v-else-if="adjustmentLayer?.kind === 'sharpen'" class="editing-controls-panel__body">
+    <div v-else-if="effectLayer?.kind === 'sharpen'" class="editing-controls-panel__body">
       <RetouchSharpenControl
-        :params="adjustmentLayer.params"
+        :params="effectLayer.params"
         @update:params="emit('update-params', $event)"
       />
     </div>
@@ -67,8 +67,8 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import type {
-  RetouchAdjustmentWholeParams,
-  RetouchAdjustmentLayer,
+  RetouchEffectWholeParams,
+  RetouchEffectLayer,
   RetouchParamKey,
   RetouchParamValue,
 } from '../types'
@@ -77,21 +77,21 @@ import RetouchLevelsControl from './RetouchLevelsControl.vue'
 import RetouchSharpenControl from './RetouchSharpenControl.vue'
 import RetouchSlider from './RetouchSlider.vue'
 import RetouchThresholdControl from './RetouchThresholdControl.vue'
-import { IMAGE_ADJUSTMENT_DEFINITIONS } from '../utils/imageAdjustmentDefinitions'
+import { IMAGE_RETOUCH_DEFINITIONS } from '../utils/imageRetouchDefinitions'
 
 defineProps<{
-  adjustmentLayer: RetouchAdjustmentLayer | null
+  effectLayer: RetouchEffectLayer | null
   histogramSource: ImageData | null
 }>()
 
 const emit = defineEmits<{
   (e: 'update-param', key: RetouchParamKey, value: RetouchParamValue): void
-  (e: 'update-params', value: RetouchAdjustmentWholeParams): void
+  (e: 'update-params', value: RetouchEffectWholeParams): void
 }>()
 
 const { t } = useI18n()
 
-const ranges = IMAGE_ADJUSTMENT_DEFINITIONS
+const ranges = IMAGE_RETOUCH_DEFINITIONS
 </script>
 
 <style scoped>

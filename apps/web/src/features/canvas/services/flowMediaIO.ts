@@ -32,6 +32,24 @@ function toAbsoluteUrl(raw: string): URL | null {
  * - External http/https URLs are proxied through USER_DOWNLOAD_ENDPOINT.
  * - options.blockExternal can prevent external URL resolution.
  */
+function resolveProxiedDownloadUrl(url: URL): string {
+  const target = (url.searchParams.get('url') || '').trim()
+  if (!target) return ''
+  return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(target)}`
+}
+
+function resolveRemoteImageUrl(
+  url: URL,
+  trimmed: string,
+  options?: { allowSameOriginUploads?: boolean; blockExternal?: boolean },
+): string {
+  if (url.protocol === 'http:' || url.protocol === 'https:') {
+    if (options?.blockExternal) return ''
+    return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(trimmed)}`
+  }
+  return trimmed
+}
+
 export function resolveFetchUrl(
   raw: string,
   options?: { allowSameOriginUploads?: boolean; blockExternal?: boolean },
@@ -45,9 +63,7 @@ export function resolveFetchUrl(
   const isSameOrigin = url.origin === window.location.origin
   const isApiOrigin = url.origin === endpoint.origin
   if ((isSameOrigin || isApiOrigin) && url.pathname === endpoint.pathname) {
-    const target = (url.searchParams.get('url') || '').trim()
-    if (!target) return ''
-    return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(target)}`
+    return resolveProxiedDownloadUrl(url)
   }
   if (
     (isSameOrigin || isApiOrigin) &&
@@ -60,11 +76,7 @@ export function resolveFetchUrl(
   // origin instead of sending them through the remote-image download proxy.
   if (isApiOrigin) return url.toString()
   if (isSameOrigin) return trimmed
-  if (url.protocol === 'http:' || url.protocol === 'https:') {
-    if (options?.blockExternal) return ''
-    return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(trimmed)}`
-  }
-  return trimmed
+  return resolveRemoteImageUrl(url, trimmed, options)
 }
 
 /** Convert a canvas to a Blob for upload. */

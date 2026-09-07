@@ -194,6 +194,66 @@ export function getAdminBrandLogoOverride(
   return adminBrandLogoOverrides.value[compoundKey]
 }
 
+type AdminBrandLogoMatchRule = {
+  key: string
+  anyOf: readonly string[]
+  allOf?: readonly string[]
+}
+
+// Ordered: first matching rule wins. Keep this order in sync with the
+// previous if-chain semantics when adding providers.
+const ADMIN_BRAND_LOGO_MATCH_RULES: readonly AdminBrandLogoMatchRule[] = [
+  { key: 'minio', anyOf: ['minio', ':9000'] },
+  { key: 'cloudflare-r2', anyOf: ['r2.cloudflarestorage.com', 'cloudflare-r2'] },
+  { key: 'alibabacloud', allOf: ['aliyuncs.com'], anyOf: ['oss-', 's3-compatible'] },
+  { key: 'tencent-cos', allOf: ['myqcloud.com'], anyOf: ['cos.', 'tencent-cos'] },
+  { key: 'amazons3', allOf: ['amazonaws.com'], anyOf: ['s3.', 'aws-s3', 's3-compatible'] },
+  { key: 'cloudflare', anyOf: ['cloudflare', 'workers.dev'] },
+  { key: 'flux', anyOf: ['flux', 'bfl', 'blackforestlabs'] },
+  { key: 'fal', anyOf: ['fal.ai', 'fal-ai', 'fal_ai', 'fal.'] },
+  { key: 'replicate', anyOf: ['replicate'] },
+  { key: 'ideogram', anyOf: ['ideogram'] },
+  { key: 'recraft', anyOf: ['recraft'] },
+  { key: 'runway', anyOf: ['runway', 'runwayml'] },
+  { key: 'zhipu', anyOf: ['zhipu', 'bigmodel', 'cogview', 'glm'] },
+  { key: 'aliyun', anyOf: ['dashscope', 'aliyun', 'wanx', 'qwen'] },
+  { key: 'doubao', anyOf: ['volcengine', 'volces', 'doubao', 'bytedance'] },
+  { key: 'moonshot', anyOf: ['moonshot', 'kimi'] },
+  { key: 'minimax', anyOf: ['minimax', 'hailuo'] },
+  { key: 'baidu', anyOf: ['baidu', 'baidubce', 'qianfan', 'wenxin'] },
+  { key: 'tencent', anyOf: ['tencent', 'hunyuan'] },
+  { key: 'lingyi', anyOf: ['lingyi', '01.ai', 'yi-'] },
+  { key: 'gemini', anyOf: ['gemini', 'google-ai', 'aiplatform', 'generativelanguage'] },
+  { key: 'google', anyOf: ['google', 'vertex'] },
+  { key: 'anthropic', anyOf: ['anthropic', 'claude'] },
+  { key: 'deepseek', anyOf: ['deepseek'] },
+  { key: 'siliconflow', anyOf: ['siliconflow', 'silicon'] },
+  { key: 'stability', anyOf: ['stability', 'dreamstudio', 'stable-diffusion'] },
+  { key: 'midjourney', anyOf: ['midjourney'] },
+  { key: 'mistral', anyOf: ['mistral'] },
+  { key: 'groq', anyOf: ['groq'] },
+  { key: 'together', anyOf: ['together'] },
+  { key: 'fireworks', anyOf: ['fireworks'] },
+  { key: 'huggingface', anyOf: ['huggingface', 'hf.co'] },
+  { key: 'perplexity', anyOf: ['perplexity'] },
+  { key: 'cohere', anyOf: ['cohere'] },
+  { key: 'azure', anyOf: ['azure', 'openai.azure.com'] },
+  { key: 'bedrock', anyOf: ['bedrock'] },
+  { key: 'ollama', anyOf: ['ollama', ':11434'] },
+  { key: 'novita', anyOf: ['novita'] },
+  { key: 'lepton', anyOf: ['lepton'] },
+  { key: 'unsplash', anyOf: ['unsplash'] },
+  { key: 'pexels', anyOf: ['pexels'] },
+  { key: 'github', anyOf: ['github'] },
+  { key: 'discord', anyOf: ['discord'] },
+  { key: 'openai', anyOf: ['openai', 'chatgpt', 'gpt'] },
+]
+
+function matchesBrandLogoRule(text: string, rule: AdminBrandLogoMatchRule): boolean {
+  if (rule.allOf && !rule.allOf.every((part) => text.includes(part))) return false
+  return rule.anyOf.some((part) => text.includes(part))
+}
+
 export function detectAdminBrandLogoKey(query: {
   name?: string | undefined
   baseUrl?: string | undefined
@@ -204,104 +264,7 @@ export function detectAdminBrandLogoKey(query: {
   const text =
     `${query.name || ''} ${query.baseUrl || ''} ${query.apiType || ''} ${query.provider || ''} ${query.endpoint || ''}`.toLowerCase()
 
-  // 存储特征判断
-  if (text.includes('minio') || text.includes(':9000')) return 'minio'
-  if (text.includes('r2.cloudflarestorage.com') || text.includes('cloudflare-r2'))
-    return 'cloudflare-r2'
-  if (text.includes('aliyuncs.com') && (text.includes('oss-') || text.includes('s3-compatible')))
-    return 'alibabacloud'
-  if (text.includes('myqcloud.com') && (text.includes('cos.') || text.includes('tencent-cos')))
-    return 'tencent-cos'
-  if (
-    text.includes('amazonaws.com') &&
-    (text.includes('s3.') || text.includes('aws-s3') || text.includes('s3-compatible'))
-  )
-    return 'amazons3'
-
-  // AI 服务特征判断
-  if (text.includes('cloudflare') || text.includes('workers.dev')) return 'cloudflare'
-  if (text.includes('flux') || text.includes('bfl') || text.includes('blackforestlabs'))
-    return 'flux'
-  if (
-    text.includes('fal.ai') ||
-    text.includes('fal-ai') ||
-    text.includes('fal_ai') ||
-    text.includes('fal.')
-  )
-    return 'fal'
-  if (text.includes('replicate')) return 'replicate'
-  if (text.includes('ideogram')) return 'ideogram'
-  if (text.includes('recraft')) return 'recraft'
-  if (text.includes('runway') || text.includes('runwayml')) return 'runway'
-  if (
-    text.includes('zhipu') ||
-    text.includes('bigmodel') ||
-    text.includes('cogview') ||
-    text.includes('glm')
-  )
-    return 'zhipu'
-  if (
-    text.includes('dashscope') ||
-    text.includes('aliyun') ||
-    text.includes('wanx') ||
-    text.includes('qwen')
-  )
-    return 'aliyun'
-  if (
-    text.includes('volcengine') ||
-    text.includes('volces') ||
-    text.includes('doubao') ||
-    text.includes('bytedance')
-  )
-    return 'doubao'
-  if (text.includes('moonshot') || text.includes('kimi')) return 'moonshot'
-  if (text.includes('minimax') || text.includes('hailuo')) return 'minimax'
-  if (
-    text.includes('baidu') ||
-    text.includes('baidubce') ||
-    text.includes('qianfan') ||
-    text.includes('wenxin')
-  )
-    return 'baidu'
-  if (text.includes('tencent') || text.includes('hunyuan')) return 'tencent'
-  if (text.includes('lingyi') || text.includes('01.ai') || text.includes('yi-')) return 'lingyi'
-  if (
-    text.includes('gemini') ||
-    text.includes('google-ai') ||
-    text.includes('aiplatform') ||
-    text.includes('generativelanguage')
-  )
-    return 'gemini'
-  if (text.includes('google') || text.includes('vertex')) return 'google'
-  if (text.includes('anthropic') || text.includes('claude')) return 'anthropic'
-  if (text.includes('deepseek')) return 'deepseek'
-  if (text.includes('siliconflow') || text.includes('silicon')) return 'siliconflow'
-  if (
-    text.includes('stability') ||
-    text.includes('dreamstudio') ||
-    text.includes('stable-diffusion')
-  )
-    return 'stability'
-  if (text.includes('midjourney')) return 'midjourney'
-  if (text.includes('mistral')) return 'mistral'
-  if (text.includes('groq')) return 'groq'
-  if (text.includes('together')) return 'together'
-  if (text.includes('fireworks')) return 'fireworks'
-  if (text.includes('huggingface') || text.includes('hf.co')) return 'huggingface'
-  if (text.includes('perplexity')) return 'perplexity'
-  if (text.includes('cohere')) return 'cohere'
-  if (text.includes('azure') || text.includes('openai.azure.com')) return 'azure'
-  if (text.includes('bedrock')) return 'bedrock'
-  if (text.includes('ollama') || text.includes(':11434')) return 'ollama'
-  if (text.includes('novita')) return 'novita'
-  if (text.includes('lepton')) return 'lepton'
-  if (text.includes('unsplash')) return 'unsplash'
-  if (text.includes('pexels')) return 'pexels'
-  if (text.includes('github')) return 'github'
-  if (text.includes('discord')) return 'discord'
-  if (text.includes('openai') || text.includes('chatgpt') || text.includes('gpt')) return 'openai'
-
-  return undefined
+  return ADMIN_BRAND_LOGO_MATCH_RULES.find((rule) => matchesBrandLogoRule(text, rule))?.key
 }
 
 export function getAdminBrandLogo(

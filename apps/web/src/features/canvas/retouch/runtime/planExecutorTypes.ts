@@ -1,21 +1,21 @@
-import type { ImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
+import type { ImageRetouchPlan } from '../utils/imageRetouchEngine'
 import type { ImageProcessingProgress } from './types'
 
 export type ImageProcessingBackendTaskProgressReporter = (progress: ImageProcessingProgress) => void
 
-export type ImageAdjustmentPlanExecutorInput = {
+export type ImageRetouchPlanExecutorInput = {
   imageData: ImageData
-  plan: ImageAdjustmentPlan
+  plan: ImageRetouchPlan
   signal: AbortSignal
   onProgress?: ImageProcessingBackendTaskProgressReporter | undefined
 }
 
-export type ImageAdjustmentPlanExecutor = {
-  execute(input: ImageAdjustmentPlanExecutorInput): Promise<ImageData> | ImageData
+export type ImageRetouchPlanExecutor = {
+  execute(input: ImageRetouchPlanExecutorInput): Promise<ImageData> | ImageData
   dispose?(): void
 }
 
-export type ImageAdjustmentPlanExecutionEvent =
+export type ImageRetouchPlanExecutionEvent =
   | {
       kind: 'hybrid-plan-selected'
       backend: 'cpu-main'
@@ -55,17 +55,15 @@ export type ImageAdjustmentPlanExecutionEvent =
       height: number
     }
 
-export type ImageAdjustmentPlanExecutionEventReporter = (
-  event: ImageAdjustmentPlanExecutionEvent,
-) => void
+export type ImageRetouchPlanExecutionEventReporter = (event: ImageRetouchPlanExecutionEvent) => void
 
-export type CreateImageAdjustmentPlanExecutorOptions = {
-  onPlanExecutorEvent?: ImageAdjustmentPlanExecutionEventReporter | undefined
+export type CreateImageRetouchPlanExecutorOptions = {
+  onPlanExecutorEvent?: ImageRetouchPlanExecutionEventReporter | undefined
 }
 
 export function reportPlanExecutionEvent(
-  reporter: ImageAdjustmentPlanExecutionEventReporter | undefined,
-  event: ImageAdjustmentPlanExecutionEvent,
+  reporter: ImageRetouchPlanExecutionEventReporter | undefined,
+  event: ImageRetouchPlanExecutionEvent,
 ) {
   reporter?.(event)
 }

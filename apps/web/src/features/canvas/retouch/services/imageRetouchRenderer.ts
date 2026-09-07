@@ -1,28 +1,28 @@
 import { i18n } from '../../../../shared/i18n'
 import { canvasToBlob } from '../../services/flowMediaIO'
-import type { ImageAdjustmentRecipe } from '../../../canvas-board/domain'
-import type { RetouchAdjustmentLayer, RetouchLayer, RetouchRasterContent } from '../types'
+import type { ImageRetouchRecipe } from '../../../canvas-board/domain'
+import type { RetouchEffectLayer, RetouchLayer, RetouchRasterContent } from '../types'
 import { createImageProcessingOutputFileName } from '../runtime/imageOutputPolicy'
-import { getImageAdjustmentProcessingRuntime } from '../runtime/imageAdjustmentProcessingRuntime'
+import { getImageRetouchProcessingRuntime } from '../runtime/imageRetouchProcessingRuntime'
 import type { ImageProcessingProgress, RenderFinalInput } from '../runtime/types'
 import { createImageSourceCache, readImageSourceImageData } from '../runtime/imageSourceCache'
 import { compositeRetouchLayerStack } from '../utils/retouchRasterComposite'
-import { buildImageAdjustmentPlan } from '../utils/imageAdjustmentPlanPipeline'
-import { deserializeImageAdjustmentPlan } from '../utils/imageAdjustmentRecipe'
+import { buildImageRetouchPlan } from '../utils/imageRetouchPlanPipeline'
+import { deserializeImageRetouchPlan } from '../utils/imageRetouchRecipe'
 import {
-  flattenVisibleRetouchAdjustmentLayers,
-  hasEffectiveRetouchAdjustmentLayers,
-} from '../utils/retouchLayerAdjustments'
+  flattenVisibleRetouchEffectLayers,
+  hasEffectiveRetouchEffectLayers,
+} from '../utils/retouchLayerEffects'
 import { flattenRetouchRasterContents, hasRetouchRasterEdits } from '../utils/retouchRasterTools'
 
-export type ImageAdjustmentRenderSource = {
+export type ImageRetouchRenderSource = {
   url: string
   title?: string
 }
 
-const IMAGE_ADJUSTMENT_FINAL_TASK_ID = 'image-adjustment-final'
+const IMAGE_RETOUCH_FINAL_TASK_ID = 'image-retouch-final'
 
-type ImageAdjustmentRenderOptions = {
+type ImageRetouchRenderOptions = {
   scopeId?: string
   onProgress?: (progress: ImageProcessingProgress) => void
   maxPixels?: number
@@ -31,24 +31,24 @@ type ImageAdjustmentRenderOptions = {
   preserveSourceMimeType?: boolean
 }
 
-export async function renderImageAdjustmentFile(
-  source: ImageAdjustmentRenderSource,
-  layers: readonly RetouchAdjustmentLayer[],
-  options: ImageAdjustmentRenderOptions = {},
+export async function renderImageRetouchFile(
+  source: ImageRetouchRenderSource,
+  layers: readonly RetouchEffectLayer[],
+  options: ImageRetouchRenderOptions = {},
 ): Promise<File> {
-  const plan = buildImageAdjustmentPlan(layers)
+  const plan = buildImageRetouchPlan(layers)
   if (plan.length === 0) {
     throw new Error(i18n.global.t('canvas.tools.noEditableLayers'))
   }
-  return renderImageAdjustmentPlanFile(source, plan, options)
+  return renderImageRetouchPlanFile(source, plan, options)
 }
 
-export async function renderImageAdjustmentRecipeFile(
-  source: ImageAdjustmentRenderSource,
-  recipe: ImageAdjustmentRecipe,
-  options: ImageAdjustmentRenderOptions = {},
+export async function renderImageRetouchRecipeFile(
+  source: ImageRetouchRenderSource,
+  recipe: ImageRetouchRecipe,
+  options: ImageRetouchRenderOptions = {},
 ): Promise<File> {
-  return renderImageAdjustmentPlanFile(source, deserializeImageAdjustmentPlan(recipe), {
+  return renderImageRetouchPlanFile(source, deserializeImageRetouchPlan(recipe), {
     ...options,
     preserveSourceMimeType: true,
     maxPixels: options.maxPixels ?? 64_000_000,
@@ -56,16 +56,16 @@ export async function renderImageAdjustmentRecipeFile(
   })
 }
 
-async function renderImageAdjustmentPlanFile(
-  source: ImageAdjustmentRenderSource,
-  plan: ReturnType<typeof deserializeImageAdjustmentPlan>,
-  options: ImageAdjustmentRenderOptions,
+async function renderImageRetouchPlanFile(
+  source: ImageRetouchRenderSource,
+  plan: ReturnType<typeof deserializeImageRetouchPlan>,
+  options: ImageRetouchRenderOptions,
 ): Promise<File> {
   if (plan.length === 0) throw new Error(i18n.global.t('canvas.tools.noEditableLayers'))
   const renderInput: RenderFinalInput = {
     source,
     plan,
-    taskId: getImageAdjustmentFinalTaskId(options.scopeId),
+    taskId: getImageRetouchFinalTaskId(options.scopeId),
     latestOnly: true,
     maxPixels: options.maxPixels,
     maxSide: options.maxSide,
@@ -73,18 +73,18 @@ async function renderImageAdjustmentPlanFile(
     preserveSourceMimeType: options.preserveSourceMimeType,
   }
   if (options.onProgress !== undefined) renderInput.onProgress = options.onProgress
-  const result = await getImageAdjustmentProcessingRuntime().renderFinal(renderInput)
+  const result = await getImageRetouchProcessingRuntime().renderFinal(renderInput)
   if (result.status === 'completed') return result.output.file
   throw new Error(result.error.message)
 }
 
 export async function renderRetouchLayerStackFile(
-  source: ImageAdjustmentRenderSource,
+  source: ImageRetouchRenderSource,
   layers: readonly RetouchLayer[],
-  options: ImageAdjustmentRenderOptions = {},
+  options: ImageRetouchRenderOptions = {},
 ): Promise<File> {
   if (!hasRetouchRasterEdits(layers)) {
-    return renderImageAdjustmentFile(source, flattenVisibleRetouchAdjustmentLayers(layers), options)
+    return renderImageRetouchFile(source, flattenVisibleRetouchEffectLayers(layers), options)
   }
 
   options.onProgress?.({ phase: 'decode' })
@@ -126,15 +126,15 @@ export async function renderRetouchLayerStackFile(
 }
 
 export function hasRenderableRetouchLayerStack(layers: readonly RetouchLayer[]) {
-  return hasRetouchRasterEdits(layers) || hasEffectiveRetouchAdjustmentLayers(layers)
+  return hasRetouchRasterEdits(layers) || hasEffectiveRetouchEffectLayers(layers)
 }
 
-export function cancelImageAdjustmentFinalRender(scopeId?: string) {
-  getImageAdjustmentProcessingRuntime().cancel(getImageAdjustmentFinalTaskId(scopeId))
+export function cancelImageRetouchFinalRender(scopeId?: string) {
+  getImageRetouchProcessingRuntime().cancel(getImageRetouchFinalTaskId(scopeId))
 }
 
-function getImageAdjustmentFinalTaskId(scopeId?: string) {
-  return scopeId ? `${IMAGE_ADJUSTMENT_FINAL_TASK_ID}:${scopeId}` : IMAGE_ADJUSTMENT_FINAL_TASK_ID
+function getImageRetouchFinalTaskId(scopeId?: string) {
+  return scopeId ? `${IMAGE_RETOUCH_FINAL_TASK_ID}:${scopeId}` : IMAGE_RETOUCH_FINAL_TASK_ID
 }
 
 async function loadRasterContentImages(contents: readonly RetouchRasterContent[]) {

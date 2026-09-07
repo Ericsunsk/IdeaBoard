@@ -1,33 +1,33 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
-import { createCpuImageAdjustmentPlanExecutor } from './cpuPlanExecutor'
-import { createHybridImageAdjustmentPlanExecutor } from './hybridPlanExecutor'
-import { createWorkerImageAdjustmentPlanExecutor } from './workerPlanExecutor'
-import type { ImageAdjustmentPlanExecutionEvent } from './planExecutorTypes'
+import type { ImageRetouchPlan } from '../utils/imageRetouchEngine'
+import { createCpuImageRetouchPlanExecutor } from './cpuPlanExecutor'
+import { createHybridImageRetouchPlanExecutor } from './hybridPlanExecutor'
+import { createWorkerImageRetouchPlanExecutor } from './workerPlanExecutor'
+import type { ImageRetouchPlanExecutionEvent } from './planExecutorTypes'
 
-const { disposeDefaultWorkerImageProcessingClientMock, executeWorkerImageAdjustmentPlanMock } =
+const { disposeDefaultWorkerImageProcessingClientMock, executeWorkerImageRetouchPlanMock } =
   vi.hoisted(() => ({
     disposeDefaultWorkerImageProcessingClientMock: vi.fn(),
-    executeWorkerImageAdjustmentPlanMock: vi.fn(),
+    executeWorkerImageRetouchPlanMock: vi.fn(),
   }))
 
-vi.mock('../backends/worker/executeWorkerImageAdjustmentPlan', () => ({
+vi.mock('../backends/worker/executeWorkerImageRetouchPlan', () => ({
   disposeDefaultWorkerImageProcessingClient: disposeDefaultWorkerImageProcessingClientMock,
-  executeWorkerImageAdjustmentPlan: executeWorkerImageAdjustmentPlanMock,
+  executeWorkerImageRetouchPlan: executeWorkerImageRetouchPlanMock,
 }))
 
 afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
-  executeWorkerImageAdjustmentPlanMock.mockReset()
+  executeWorkerImageRetouchPlanMock.mockReset()
   disposeDefaultWorkerImageProcessingClientMock.mockReset()
 })
 
-describe('image adjustment plan executor', () => {
+describe('image retouch plan executor', () => {
   it('runs the CPU executor and reports completion diagnostics', async () => {
     const source = makeImageData([10, 20, 30, 255])
-    const onPlanExecutorEvent = vi.fn<(event: ImageAdjustmentPlanExecutionEvent) => void>()
-    const executor = createCpuImageAdjustmentPlanExecutor({ onPlanExecutorEvent })
+    const onPlanExecutorEvent = vi.fn<(event: ImageRetouchPlanExecutionEvent) => void>()
+    const executor = createCpuImageRetouchPlanExecutor({ onPlanExecutorEvent })
 
     const result = await executor.execute({
       imageData: source,
@@ -50,10 +50,10 @@ describe('image adjustment plan executor', () => {
     const workerOutput = makeImageData([11, 22, 33, 255])
     const signal = new AbortController().signal
     const onProgress = vi.fn()
-    const onPlanExecutorEvent = vi.fn<(event: ImageAdjustmentPlanExecutionEvent) => void>()
-    executeWorkerImageAdjustmentPlanMock.mockResolvedValue(workerOutput)
+    const onPlanExecutorEvent = vi.fn<(event: ImageRetouchPlanExecutionEvent) => void>()
+    executeWorkerImageRetouchPlanMock.mockResolvedValue(workerOutput)
 
-    const executor = createWorkerImageAdjustmentPlanExecutor({ onPlanExecutorEvent })
+    const executor = createWorkerImageRetouchPlanExecutor({ onPlanExecutorEvent })
     const result = await executor.execute({
       imageData: source,
       plan: createChannelLutPlan(),
@@ -62,14 +62,10 @@ describe('image adjustment plan executor', () => {
     })
 
     expect(result).toBe(workerOutput)
-    expect(executeWorkerImageAdjustmentPlanMock).toHaveBeenCalledWith(
-      source,
-      createChannelLutPlan(),
-      {
-        signal,
-        onProgress,
-      },
-    )
+    expect(executeWorkerImageRetouchPlanMock).toHaveBeenCalledWith(source, createChannelLutPlan(), {
+      signal,
+      onProgress,
+    })
     expect(onPlanExecutorEvent).toHaveBeenNthCalledWith(1, {
       kind: 'worker-plan-started',
       planLength: 1,
@@ -86,8 +82,8 @@ describe('image adjustment plan executor', () => {
 
   it('uses the sync CPU executor for hybrid plans below the work threshold', async () => {
     const source = makeImageData([10, 20, 30, 255])
-    const onPlanExecutorEvent = vi.fn<(event: ImageAdjustmentPlanExecutionEvent) => void>()
-    const executor = createHybridImageAdjustmentPlanExecutor({
+    const onPlanExecutorEvent = vi.fn<(event: ImageRetouchPlanExecutionEvent) => void>()
+    const executor = createHybridImageRetouchPlanExecutor({
       syncMaxWorkUnits: 4,
       onPlanExecutorEvent,
     })
@@ -98,7 +94,7 @@ describe('image adjustment plan executor', () => {
       signal: new AbortController().signal,
     })
 
-    expect(executeWorkerImageAdjustmentPlanMock).not.toHaveBeenCalled()
+    expect(executeWorkerImageRetouchPlanMock).not.toHaveBeenCalled()
     expect(result).toBe(source)
     expect(pixelValues(result)).toEqual([20, 30, 40, 255])
     expect(onPlanExecutorEvent).toHaveBeenNthCalledWith(1, {
@@ -119,10 +115,10 @@ describe('image adjustment plan executor', () => {
     const source = makeImageData([10, 20, 30, 255, 40, 50, 60, 255])
     const signal = new AbortController().signal
     const onProgress = vi.fn()
-    const onPlanExecutorEvent = vi.fn<(event: ImageAdjustmentPlanExecutionEvent) => void>()
+    const onPlanExecutorEvent = vi.fn<(event: ImageRetouchPlanExecutionEvent) => void>()
     const yieldToMainThread = vi.fn(async () => {})
 
-    const executor = createHybridImageAdjustmentPlanExecutor({
+    const executor = createHybridImageRetouchPlanExecutor({
       cooperativeChunkBytes: 4,
       cooperativeFrameBudgetMs: 0,
       syncMaxWorkUnits: 0,
@@ -137,7 +133,7 @@ describe('image adjustment plan executor', () => {
       onProgress,
     })
 
-    expect(executeWorkerImageAdjustmentPlanMock).not.toHaveBeenCalled()
+    expect(executeWorkerImageRetouchPlanMock).not.toHaveBeenCalled()
     expect(result).not.toBe(source)
     expect(pixelValues(result)).toEqual([20, 30, 40, 255, 50, 60, 70, 255])
     expect(pixelValues(source)).toEqual([10, 20, 30, 255, 40, 50, 60, 255])
@@ -171,13 +167,13 @@ describe('image adjustment plan executor', () => {
       30, 30, 200, 220, 220, 220, 190, 220, 220, 220, 180,
     ]
     const source = makeImageData(values, 4, 2)
-    const expected = await createCpuImageAdjustmentPlanExecutor().execute({
+    const expected = await createCpuImageRetouchPlanExecutor().execute({
       imageData: makeImageData(values, 4, 2),
       plan: createSharpenPlan(),
       signal: new AbortController().signal,
     })
     const onProgress = vi.fn()
-    const executor = createHybridImageAdjustmentPlanExecutor({
+    const executor = createHybridImageRetouchPlanExecutor({
       cooperativeChunkBytes: 12,
       cooperativeFrameBudgetMs: 0,
       syncMaxWorkUnits: 0,
@@ -205,9 +201,9 @@ describe('image adjustment plan executor', () => {
     const source = makeImageData([10, 20, 30, 255, 40, 50, 60, 255])
     const workerOutput = makeImageData([11, 22, 33, 255, 44, 55, 66, 255])
     const signal = new AbortController().signal
-    executeWorkerImageAdjustmentPlanMock.mockResolvedValue(workerOutput)
+    executeWorkerImageRetouchPlanMock.mockResolvedValue(workerOutput)
 
-    const executor = createHybridImageAdjustmentPlanExecutor({
+    const executor = createHybridImageRetouchPlanExecutor({
       cooperativeChunkBytes: 4,
       cooperativeFrameBudgetMs: 0,
       syncMaxWorkUnits: 0,
@@ -222,21 +218,17 @@ describe('image adjustment plan executor', () => {
 
     expect(result).toBe(workerOutput)
     expect(pixelValues(source)).toEqual([10, 20, 30, 255, 40, 50, 60, 255])
-    expect(executeWorkerImageAdjustmentPlanMock).toHaveBeenCalledWith(
-      source,
-      createChannelLutPlan(),
-      {
-        signal,
-        onProgress: undefined,
-      },
-    )
+    expect(executeWorkerImageRetouchPlanMock).toHaveBeenCalledWith(source, createChannelLutPlan(), {
+      signal,
+      onProgress: undefined,
+    })
   })
 
   it('does not fall back to the worker when cooperative CPU execution is cancelled', async () => {
     const controller = new AbortController()
     const source = makeImageData([10, 20, 30, 255, 40, 50, 60, 255])
 
-    const executor = createHybridImageAdjustmentPlanExecutor({
+    const executor = createHybridImageRetouchPlanExecutor({
       cooperativeChunkBytes: 4,
       cooperativeFrameBudgetMs: 0,
       syncMaxWorkUnits: 0,
@@ -255,13 +247,13 @@ describe('image adjustment plan executor', () => {
     ).rejects.toThrow('Image processing cancelled')
 
     expect(pixelValues(source)).toEqual([10, 20, 30, 255, 40, 50, 60, 255])
-    expect(executeWorkerImageAdjustmentPlanMock).not.toHaveBeenCalled()
+    expect(executeWorkerImageRetouchPlanMock).not.toHaveBeenCalled()
   })
 
   it('uses the sync CPU executor for empty hybrid plans', async () => {
     const source = makeImageData([10, 20, 30, 255])
-    const onPlanExecutorEvent = vi.fn<(event: ImageAdjustmentPlanExecutionEvent) => void>()
-    const executor = createHybridImageAdjustmentPlanExecutor({
+    const onPlanExecutorEvent = vi.fn<(event: ImageRetouchPlanExecutionEvent) => void>()
+    const executor = createHybridImageRetouchPlanExecutor({
       syncMaxWorkUnits: 0,
       onPlanExecutorEvent,
     })
@@ -273,7 +265,7 @@ describe('image adjustment plan executor', () => {
     })
 
     expect(result).toBe(source)
-    expect(executeWorkerImageAdjustmentPlanMock).not.toHaveBeenCalled()
+    expect(executeWorkerImageRetouchPlanMock).not.toHaveBeenCalled()
     expect(pixelValues(result)).toEqual([10, 20, 30, 255])
     expect(onPlanExecutorEvent).toHaveBeenNthCalledWith(1, {
       kind: 'hybrid-plan-selected',
@@ -291,10 +283,10 @@ describe('image adjustment plan executor', () => {
 
   it('falls back to the CPU executor when worker execution fails without cancellation', async () => {
     const source = makeImageData([10, 20, 30, 255])
-    const onPlanExecutorEvent = vi.fn<(event: ImageAdjustmentPlanExecutionEvent) => void>()
-    executeWorkerImageAdjustmentPlanMock.mockRejectedValue(new Error('worker failed'))
+    const onPlanExecutorEvent = vi.fn<(event: ImageRetouchPlanExecutionEvent) => void>()
+    executeWorkerImageRetouchPlanMock.mockRejectedValue(new Error('worker failed'))
 
-    const executor = createWorkerImageAdjustmentPlanExecutor({ onPlanExecutorEvent })
+    const executor = createWorkerImageRetouchPlanExecutor({ onPlanExecutorEvent })
     const result = await executor.execute({
       imageData: source,
       plan: createChannelLutPlan(),
@@ -328,13 +320,13 @@ describe('image adjustment plan executor', () => {
   it('does not fall back to CPU when worker execution fails after cancellation', async () => {
     const controller = new AbortController()
     const source = makeImageData([10, 20, 30, 255])
-    const onPlanExecutorEvent = vi.fn<(event: ImageAdjustmentPlanExecutionEvent) => void>()
-    executeWorkerImageAdjustmentPlanMock.mockImplementation(() => {
+    const onPlanExecutorEvent = vi.fn<(event: ImageRetouchPlanExecutionEvent) => void>()
+    executeWorkerImageRetouchPlanMock.mockImplementation(() => {
       controller.abort()
       return Promise.reject(new Error('cancelled'))
     })
 
-    const executor = createWorkerImageAdjustmentPlanExecutor({ onPlanExecutorEvent })
+    const executor = createWorkerImageRetouchPlanExecutor({ onPlanExecutorEvent })
     await expect(
       executor.execute({
         imageData: source,
@@ -373,7 +365,7 @@ function pixelValues(imageData: ImageData) {
   return Array.from(imageData.data)
 }
 
-function createChannelLutPlan(): ImageAdjustmentPlan {
+function createChannelLutPlan(): ImageRetouchPlan {
   const lut = new Uint8ClampedArray(256)
   for (let index = 0; index < lut.length; index += 1) {
     lut[index] = Math.min(255, index + 10)
@@ -381,7 +373,7 @@ function createChannelLutPlan(): ImageAdjustmentPlan {
   return [{ kind: 'channel-lut', luts: createRgbChannelLutsForTest(lut) }]
 }
 
-function createSharpenPlan(): ImageAdjustmentPlan {
+function createSharpenPlan(): ImageRetouchPlan {
   return [
     {
       kind: 'sharpen',

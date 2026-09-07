@@ -18,7 +18,7 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions): Canvas
     () =>
       options.isCanvasInteractionLocked.value ||
       !!session.retouchNodeId.value ||
-      session.isApplyingRetouchAdjustments.value,
+      session.isApplyingRetouch.value,
   )
 
   return {
@@ -33,8 +33,8 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions): Canvas
         isCanvasLocked,
       },
       chrome: chrome.chromeModel,
-      adjustment: {
-        isApplying: session.isApplyingRetouchAdjustments,
+      retouch: {
+        isApplying: session.isApplyingRetouch,
       },
       nodeBindings: {
         stageFor: nodeBindings.stageBindingFor,
@@ -49,7 +49,7 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions): Canvas
         discardNodeEdits: session.discardNodeEdits,
       },
       editor: {
-        apply: commands.applyAdjustments,
+        apply: commands.applyRetouch,
         onCanvasWheel: session.coordinates.onCanvasWheel,
         focusAndShowChrome: session.coordinates.focusRetouchAndShowChrome,
         scheduleChromeAnchorUpdate: session.coordinates.scheduleRetouchChromeAnchorUpdate,

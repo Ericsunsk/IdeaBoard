@@ -140,7 +140,7 @@ describe('ImageToolStagePresentation', () => {
     expect(current.setMaskCanvasRef).toHaveBeenCalledExactlyOnceWith('node-1', null)
   })
 
-  it('replaces source media with the rendered adjustment preview', () => {
+  it('replaces source media with the rendered retouch preview', () => {
     const source = createBinding('adjust', 'node-1')
     const rendered = createBinding('adjust', 'node-2', {
       renderedPreview: {

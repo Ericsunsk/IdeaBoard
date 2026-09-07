@@ -279,10 +279,80 @@ describe('canvasBoardStateSchema', () => {
     expect(nonFiniteGeometryParsed.success).toBe(false)
   })
 
-  it('rejects old schema versions during latest-state normalization', () => {
+  it('rejects non-migratable old schema versions during latest-state normalization', () => {
+    const parsed = normalizeLatestCanvasBoardState({
+      ...makeCanvasBoardState(),
+      schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION - 2,
+    })
+
+    expect(parsed).toBeNull()
+  })
+
+  it('migrates v3 adjustmentRecipe to retouchRecipe during latest-state normalization', () => {
+    const recipe = {
+      version: 1,
+      sourceMediaAssetId: 42,
+      plan: [{ kind: 'threshold', threshold: 0.5, invert: false }],
+    }
     const parsed = normalizeLatestCanvasBoardState({
       ...makeCanvasBoardState(),
       schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION - 1,
+      imageNodes: [
+        {
+          id: 1,
+          type: 'image-node',
+          x: 0,
+          y: 0,
+          width: 280,
+          sourceImageUrl: 'https://example.com/source.png',
+          sourceImageRatio: 1,
+          outputStatus: 'ready',
+          outputImages: [{ url: 'https://example.com/output.png', ratio: 1 }],
+          // Intentionally legacy: v3 payloads carry the pre-rename field.
+          adjustmentRecipe: recipe,
+        },
+      ],
+    })
+
+    expect(parsed).not.toBeNull()
+    const imageNode = parsed?.imageNodes[0]
+    expect(parsed?.schemaVersion).toBe(CANVAS_BOARD_STATE_SCHEMA_VERSION)
+    expect(imageNode).toMatchObject({ retouchRecipe: recipe })
+    expect(imageNode).not.toHaveProperty('adjustmentRecipe')
+  })
+
+  it('migrates v3 payloads without a recipe during latest-state normalization', () => {
+    const parsed = normalizeLatestCanvasBoardState({
+      ...makeCanvasBoardState(),
+      schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION - 1,
+    })
+
+    expect(parsed).not.toBeNull()
+    expect(parsed?.schemaVersion).toBe(CANVAS_BOARD_STATE_SCHEMA_VERSION)
+  })
+
+  it('rejects stale adjustmentRecipe keys on current-version payloads', () => {
+    const parsed = normalizeLatestCanvasBoardState({
+      ...makeCanvasBoardState(),
+      imageNodes: [
+        {
+          id: 1,
+          type: 'image-node',
+          x: 0,
+          y: 0,
+          width: 280,
+          sourceImageUrl: 'https://example.com/source.png',
+          sourceImageRatio: 1,
+          outputStatus: 'ready',
+          outputImages: [{ url: 'https://example.com/output.png', ratio: 1 }],
+          // Intentionally stale: current-version payloads must not carry it.
+          adjustmentRecipe: {
+            version: 1,
+            sourceMediaAssetId: 42,
+            plan: [],
+          },
+        },
+      ],
     })
 
     expect(parsed).toBeNull()

@@ -203,6 +203,57 @@ export function resolveFlowSourceImageRatio(
   return 1
 }
 
+type SnapshotInputRecord = {
+  id?: unknown
+  sourceType?: unknown
+  sourceId?: unknown
+  sourceNodeId?: unknown
+  url?: unknown
+  ratio?: unknown
+  mediaAssetId?: unknown
+}
+
+function readSnapshotInputIdentity(record: SnapshotInputRecord):
+  | (Pick<ResolvedFlowInputImage, 'id' | 'sourceType' | 'sourceId'> & {
+      sourceNodeId?: string
+    })
+  | null {
+  const id = typeof record.id === 'string' ? record.id : ''
+  const sourceType =
+    record.sourceType === 'node' || record.sourceType === 'external' ? record.sourceType : null
+  const sourceId = typeof record.sourceId === 'string' ? record.sourceId : ''
+  const sourceNodeId = typeof record.sourceNodeId === 'string' ? record.sourceNodeId : undefined
+  if (!id || !sourceType || !sourceId) return null
+  return {
+    id,
+    sourceType,
+    sourceId,
+    ...(sourceNodeId ? { sourceNodeId } : {}),
+  }
+}
+
+function readSnapshotInputMedia(
+  record: SnapshotInputRecord,
+): (Pick<ResolvedFlowInputImage, 'url' | 'ratio'> & { mediaAssetId?: number }) | null {
+  const url = typeof record.url === 'string' ? record.url.trim() : ''
+  const ratio = Number(record.ratio)
+  const mediaAssetId = Number(record.mediaAssetId)
+  if (!url || !Number.isFinite(ratio) || ratio <= 0) return null
+  return {
+    url,
+    ratio,
+    ...(Number.isInteger(mediaAssetId) && mediaAssetId > 0 ? { mediaAssetId } : {}),
+  }
+}
+
+function normalizeSnapshotInputImage(item: unknown): ResolvedFlowInputImage | null {
+  const record = item as SnapshotInputRecord
+  const identity = readSnapshotInputIdentity(record)
+  const media = readSnapshotInputMedia(record)
+  if (!identity || !media) return null
+  return { ...identity, ...media }
+}
+
 export function resolveConnectedImageInputs(
   options: FlowExecutionGraphOptions,
   targetNodeId: string,
@@ -212,44 +263,8 @@ export function resolveConnectedImageInputs(
   const normalizedSnapshot: ResolvedFlowInputImage[] = []
   if (Array.isArray(snapshotInputImages)) {
     snapshotInputImages.forEach((item) => {
-      const record = item as {
-        id?: unknown
-        sourceType?: unknown
-        sourceId?: unknown
-        sourceNodeId?: unknown
-        url?: unknown
-        ratio?: unknown
-        mediaAssetId?: unknown
-      }
-      const id = typeof record.id === 'string' ? record.id : ''
-      const sourceType =
-        record.sourceType === 'node' || record.sourceType === 'external' ? record.sourceType : null
-      const sourceId = typeof record.sourceId === 'string' ? record.sourceId : ''
-      const sourceNodeId = typeof record.sourceNodeId === 'string' ? record.sourceNodeId : undefined
-      const mediaAssetId = Number(record.mediaAssetId)
-      const url = typeof record.url === 'string' ? record.url.trim() : ''
-      const ratio = Number(record.ratio)
-      if (!id || !sourceType || !sourceId || !url || !Number.isFinite(ratio) || ratio <= 0) return
-      if (sourceNodeId) {
-        normalizedSnapshot.push({
-          id,
-          sourceType,
-          sourceId,
-          sourceNodeId,
-          url,
-          ratio,
-          ...(Number.isInteger(mediaAssetId) && mediaAssetId > 0 ? { mediaAssetId } : {}),
-        })
-        return
-      }
-      normalizedSnapshot.push({
-        id,
-        sourceType,
-        sourceId,
-        url,
-        ratio,
-        ...(Number.isInteger(mediaAssetId) && mediaAssetId > 0 ? { mediaAssetId } : {}),
-      })
+      const normalized = normalizeSnapshotInputImage(item)
+      if (normalized) normalizedSnapshot.push(normalized)
     })
   }
 

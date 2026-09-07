@@ -581,9 +581,10 @@ function isSameJsonValue(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right)
 }
 
-function normalizeTransactionChanges(draft: CanvasGraphTransactionDraft): TransactionChangeSet {
-  const changes = createChangeSet()
-
+function collectNodeWriteChanges(
+  draft: CanvasGraphTransactionDraft,
+  changes: TransactionChangeSet,
+): void {
   for (const [nodeId, nextRecord] of draft.nodeWrites) {
     const baseRecord = draft.base.nodesById.get(nodeId)
     if (!baseRecord && nextRecord) {
@@ -600,7 +601,12 @@ function normalizeTransactionChanges(draft: CanvasGraphTransactionDraft): Transa
     }
     if (baseRecord.selected !== nextRecord.selected) changes.selectedNodeIds.add(nodeId)
   }
+}
 
+function collectEdgeWriteChanges(
+  draft: CanvasGraphTransactionDraft,
+  changes: TransactionChangeSet,
+): void {
   for (const [edgeId, nextRecord] of draft.edgeWrites) {
     const baseRecord = draft.base.edgesById.get(edgeId)
     if (!baseRecord && nextRecord) {
@@ -618,7 +624,12 @@ function normalizeTransactionChanges(draft: CanvasGraphTransactionDraft): Transa
     }
     if (baseRecord.selected !== nextRecord.selected) changes.selectedEdgeIds.add(edgeId)
   }
+}
 
+function collectGroupWriteChanges(
+  draft: CanvasGraphTransactionDraft,
+  changes: TransactionChangeSet,
+): void {
   for (const [groupId, nextRecord] of draft.groupWrites) {
     const baseRecord = draft.base.groupsById.get(groupId)
     if (!baseRecord && nextRecord) {
@@ -638,7 +649,9 @@ function normalizeTransactionChanges(draft: CanvasGraphTransactionDraft): Transa
       changes.updatedGroupIds.add(groupId)
     }
   }
+}
 
+function summarizeChangeSetFlags(changes: TransactionChangeSet): void {
   // Transactions only mutate order through add/remove.  Derive this from the
   // changed records so a one-node edit never scans or copies Board-sized order
   // arrays merely to decide whether a History patch is needed.
@@ -657,6 +670,75 @@ function normalizeTransactionChanges(draft: CanvasGraphTransactionDraft): Transa
     changes.didChangeNodeOrder ||
     changes.didChangeEdgeOrder ||
     changes.didChangeGroupOrder
+}
+
+function commitNodeWrites(
+  state: CanvasGraphStoreState,
+  nodeWrites: TransactionRecordWrites<CanvasGraphNodeId, CanvasGraphNodeRecord>,
+): void {
+  for (const [nodeId, nextRecord] of nodeWrites) {
+    const previousRecord = state.nodesById.get(nodeId)
+    if (!nextRecord) {
+      if (previousRecord) {
+        state.nodesById.delete(nodeId)
+        state.indexes.nodeIdsByKind.get(previousRecord.kind)?.delete(nodeId)
+        state.indexes.groupIdByNodeId.delete(nodeId)
+      }
+      continue
+    }
+    state.nodesById.set(nodeId, nextRecord)
+    if (!previousRecord) state.indexes.nodeIdsByKind.get(nextRecord.kind)?.add(nodeId)
+  }
+}
+
+function commitEdgeWrites(
+  state: CanvasGraphStoreState,
+  edgeWrites: TransactionRecordWrites<CanvasGraphEdgeId, CanvasGraphEdgeRecord>,
+): void {
+  for (const [edgeId, nextRecord] of edgeWrites) {
+    const previousRecord = state.edgesById.get(edgeId)
+    const didChangeTopology =
+      !previousRecord || !nextRecord || !hasSameEdgeTopology(previousRecord, nextRecord)
+    if (previousRecord && didChangeTopology) {
+      removeEdgeFromIndexes(state.indexes, previousRecord)
+    }
+    if (!nextRecord) {
+      state.edgesById.delete(edgeId)
+      continue
+    }
+    state.edgesById.set(edgeId, nextRecord)
+    if (didChangeTopology) addEdgeToIndexes(state.indexes, nextRecord)
+  }
+}
+
+function commitGroupWrites(
+  state: CanvasGraphStoreState,
+  groupWrites: TransactionRecordWrites<CanvasGraphGroupId, CanvasGraphGroupRecord>,
+): void {
+  for (const [groupId, nextRecord] of groupWrites) {
+    const previousRecord = state.groupsById.get(groupId)
+    const didChangeMembership =
+      !previousRecord || !nextRecord || !hasSameGroupMembership(previousRecord, nextRecord)
+    if (previousRecord && didChangeMembership) {
+      removeGroupFromIndexes(state.indexes, previousRecord)
+    }
+    if (!nextRecord) {
+      state.groupsById.delete(groupId)
+      continue
+    }
+    state.groupsById.set(groupId, nextRecord)
+    if (didChangeMembership) {
+      addGroupToIndexes(state.indexes, nextRecord, state.nodesById)
+    }
+  }
+}
+
+function normalizeTransactionChanges(draft: CanvasGraphTransactionDraft): TransactionChangeSet {
+  const changes = createChangeSet()
+  collectNodeWriteChanges(draft, changes)
+  collectEdgeWriteChanges(draft, changes)
+  collectGroupWriteChanges(draft, changes)
+  summarizeChangeSetFlags(changes)
   return changes
 }
 
@@ -1055,51 +1137,9 @@ export class CanvasGraphStore {
   _commitTransaction(draft: CanvasGraphTransactionDraft) {
     this._assertTransactionCurrent(draft)
 
-    for (const [nodeId, nextRecord] of draft.nodeWrites) {
-      const previousRecord = this.state.nodesById.get(nodeId)
-      if (!nextRecord) {
-        if (previousRecord) {
-          this.state.nodesById.delete(nodeId)
-          this.state.indexes.nodeIdsByKind.get(previousRecord.kind)?.delete(nodeId)
-          this.state.indexes.groupIdByNodeId.delete(nodeId)
-        }
-        continue
-      }
-      this.state.nodesById.set(nodeId, nextRecord)
-      if (!previousRecord) this.state.indexes.nodeIdsByKind.get(nextRecord.kind)?.add(nodeId)
-    }
-
-    for (const [edgeId, nextRecord] of draft.edgeWrites) {
-      const previousRecord = this.state.edgesById.get(edgeId)
-      const didChangeTopology =
-        !previousRecord || !nextRecord || !hasSameEdgeTopology(previousRecord, nextRecord)
-      if (previousRecord && didChangeTopology) {
-        removeEdgeFromIndexes(this.state.indexes, previousRecord)
-      }
-      if (!nextRecord) {
-        this.state.edgesById.delete(edgeId)
-        continue
-      }
-      this.state.edgesById.set(edgeId, nextRecord)
-      if (didChangeTopology) addEdgeToIndexes(this.state.indexes, nextRecord)
-    }
-
-    for (const [groupId, nextRecord] of draft.groupWrites) {
-      const previousRecord = this.state.groupsById.get(groupId)
-      const didChangeMembership =
-        !previousRecord || !nextRecord || !hasSameGroupMembership(previousRecord, nextRecord)
-      if (previousRecord && didChangeMembership) {
-        removeGroupFromIndexes(this.state.indexes, previousRecord)
-      }
-      if (!nextRecord) {
-        this.state.groupsById.delete(groupId)
-        continue
-      }
-      this.state.groupsById.set(groupId, nextRecord)
-      if (didChangeMembership) {
-        addGroupToIndexes(this.state.indexes, nextRecord, this.state.nodesById)
-      }
-    }
+    commitNodeWrites(this.state, draft.nodeWrites)
+    commitEdgeWrites(this.state, draft.edgeWrites)
+    commitGroupWrites(this.state, draft.groupWrites)
 
     if (draft.nodeOrder) this.state.nodeOrder = draft.nodeOrder
     if (draft.edgeOrder) this.state.edgeOrder = draft.edgeOrder

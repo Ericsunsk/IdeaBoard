@@ -1,8 +1,8 @@
 import type { ComputedRef, Ref } from 'vue'
 import type {
-  ImageAdjustmentKind,
-  RetouchAdjustmentLayer,
-  RetouchAdjustmentWholeParams,
+  ImageRetouchKind,
+  RetouchEffectLayer,
+  RetouchEffectWholeParams,
   RetouchLayer,
   RetouchMode,
   RetouchParamKey,
@@ -64,9 +64,9 @@ export type ImageToolChromeModel = {
   editor: {
     layers: RetouchLayer[]
     selectedLayerId: string
-    selectedAdjustmentLayer: RetouchAdjustmentLayer | null
+    selectedEffectLayer: RetouchEffectLayer | null
     histogramSource: ImageData | null
-    applyingAdjustments: boolean
+    applyingRetouch: boolean
   }
 }
 
@@ -78,7 +78,7 @@ export type ImageToolChromeCommands = {
   undoMask: () => void
   redoMask: () => void
   submitMaskPrompt: (prompt: string) => void
-  selectAdjustmentLayer: (kind: ImageAdjustmentKind) => void
+  selectEffectLayer: (kind: ImageRetouchKind) => void
   selectEditorLayer: (layerId: string) => void
   setEditorLayerVisible: (layerId: string, visible: boolean) => void
   addEditorLayer: () => void
@@ -86,8 +86,8 @@ export type ImageToolChromeCommands = {
   mergeEditorLayer: () => void
   removeEditorLayer: (layerId: string) => void
   updateEditorParam: (key: RetouchParamKey, value: RetouchParamValue) => void
-  updateEditorAdjustmentParams: (params: RetouchAdjustmentWholeParams) => void
-  applyAdjustments: () => Promise<void>
+  updateEditorRetouchParams: (params: RetouchEffectWholeParams) => void
+  applyRetouch: () => Promise<void>
 }
 
 export type CanvasImageTools = {
@@ -102,7 +102,7 @@ export type CanvasImageTools = {
       isCanvasLocked: ComputedRef<boolean>
     }
     chrome: ComputedRef<ImageToolChromeModel>
-    adjustment: {
+    retouch: {
       isApplying: Ref<boolean>
     }
     nodeBindings: {

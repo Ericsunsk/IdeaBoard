@@ -1,27 +1,25 @@
 import { computed, ref } from 'vue'
 import type {
-  ImageAdjustmentKind,
-  RetouchAdjustmentLayer,
-  RetouchAdjustmentWholeParams,
+  ImageRetouchKind,
+  RetouchEffectLayer,
+  RetouchEffectWholeParams,
   RetouchLayer,
   RetouchParamKey,
   RetouchParamValue,
 } from './types'
 import {
   applyLayerCommand,
-  createDefaultImageAdjustmentLayer,
+  createDefaultImageEffectLayer,
   createInitialLayerStack,
-  getSelectedAdjustment,
+  getSelectedEffect,
   SOURCE_LAYER_ID,
   type RetouchLayerCommand,
 } from './utils/retouchLayerStack'
-import { getImageAdjustmentDefaultParams } from './utils/imageAdjustmentDefinitions'
+import { getImageRetouchDefaultParams } from './utils/imageRetouchDefinitions'
 
 export function useRetouchSession() {
   const stack = ref(createInitialLayerStack())
-  const pendingAdjustment = ref<RetouchAdjustmentLayer | null>(
-    createDefaultImageAdjustmentLayer('hsl'),
-  )
+  const pendingRetouch = ref<RetouchEffectLayer | null>(createDefaultImageEffectLayer('hsl'))
 
   const layers = computed<RetouchLayer[]>({
     get: () => stack.value.layers,
@@ -35,8 +33,8 @@ export function useRetouchSession() {
       stack.value = { ...stack.value, selectedLayerId: nextSelectedLayerId }
     },
   })
-  const selectedAdjustmentLayer = computed<RetouchAdjustmentLayer | null>(
-    () => getSelectedAdjustment(stack.value) ?? pendingAdjustment.value,
+  const selectedEffectLayer = computed<RetouchEffectLayer | null>(
+    () => getSelectedEffect(stack.value) ?? pendingRetouch.value,
   )
   function applyCommand(command: RetouchLayerCommand) {
     stack.value = applyLayerCommand(stack.value, command)
@@ -44,41 +42,40 @@ export function useRetouchSession() {
 
   function resetRetouchSession() {
     stack.value = createInitialLayerStack()
-    pendingAdjustment.value = createDefaultImageAdjustmentLayer('hsl')
+    pendingRetouch.value = createDefaultImageEffectLayer('hsl')
   }
 
   function selectLayer(layerId: string) {
-    pendingAdjustment.value = null
+    pendingRetouch.value = null
     applyCommand({ type: 'select-layer', layerId })
   }
 
   function addLayer() {
-    pendingAdjustment.value = null
+    pendingRetouch.value = null
     applyCommand({ type: 'add-paint' })
   }
 
   function copyLayer() {
-    pendingAdjustment.value = null
+    pendingRetouch.value = null
     applyCommand({ type: 'copy-selected' })
   }
 
   function mergeLayer() {
-    pendingAdjustment.value = null
+    pendingRetouch.value = null
     applyCommand({ type: 'merge-selected-down' })
   }
 
-  function selectAdjustmentLayer(kind: ImageAdjustmentKind) {
+  function selectEffectLayer(kind: ImageRetouchKind) {
     const existing = stack.value.layers.find(
-      (layer): layer is RetouchAdjustmentLayer =>
-        layer.type === 'adjustment' && layer.kind === kind,
+      (layer): layer is RetouchEffectLayer => layer.type === 'effect' && layer.kind === kind,
     )
     if (existing) {
-      pendingAdjustment.value = null
+      pendingRetouch.value = null
       applyCommand({ type: 'select-layer', layerId: existing.id })
       return
     }
 
-    pendingAdjustment.value = createDefaultImageAdjustmentLayer(kind)
+    pendingRetouch.value = createDefaultImageEffectLayer(kind)
     stack.value = { ...stack.value, selectedLayerId: SOURCE_LAYER_ID }
   }
 
@@ -87,42 +84,42 @@ export function useRetouchSession() {
   }
 
   function removeLayer(layerId: string) {
-    pendingAdjustment.value = null
+    pendingRetouch.value = null
     applyCommand({ type: 'remove', layerId })
   }
 
   function updateSelectedLayerParam(key: RetouchParamKey, value: RetouchParamValue) {
-    if (pendingAdjustment.value?.kind === 'hsl') {
-      const params = { ...pendingAdjustment.value.params, [key]: value }
-      updatePendingAdjustment({ ...pendingAdjustment.value, params })
+    if (pendingRetouch.value?.kind === 'hsl') {
+      const params = { ...pendingRetouch.value.params, [key]: value }
+      updatePendingRetouch({ ...pendingRetouch.value, params })
       return
     }
     applyCommand({ type: 'update-selected-param', key, value })
   }
 
-  function updateSelectedAdjustmentParams(params: RetouchAdjustmentWholeParams) {
-    const pending = pendingAdjustment.value
+  function updateSelectedRetouchParams(params: RetouchEffectWholeParams) {
+    const pending = pendingRetouch.value
     if (pending && pending.kind !== 'hsl') {
       const next = updatePendingWholeParams(pending, params)
-      if (next) updatePendingAdjustment(next)
+      if (next) updatePendingRetouch(next)
       return
     }
-    applyCommand({ type: 'update-selected-adjustment-params', params })
+    applyCommand({ type: 'update-selected-retouch-params', params })
   }
 
-  function updatePendingAdjustment(next: RetouchAdjustmentLayer) {
-    const defaults = getImageAdjustmentDefaultParams(next.kind)
+  function updatePendingRetouch(next: RetouchEffectLayer) {
+    const defaults = getImageRetouchDefaultParams(next.kind)
     if (JSON.stringify(next.params) === JSON.stringify(defaults)) {
-      pendingAdjustment.value = {
+      pendingRetouch.value = {
         ...next,
         params: structuredClone(defaults),
-      } as RetouchAdjustmentLayer
+      } as RetouchEffectLayer
       return
     }
 
     const kind = next.kind
-    pendingAdjustment.value = null
-    applyCommand({ type: 'ensure-adjustment', kind })
+    pendingRetouch.value = null
+    applyCommand({ type: 'ensure-retouch', kind })
     if (kind === 'hsl') {
       for (const [key, value] of Object.entries(next.params)) {
         applyCommand({
@@ -133,13 +130,13 @@ export function useRetouchSession() {
       }
       return
     }
-    applyCommand({ type: 'update-selected-adjustment-params', params: next.params })
+    applyCommand({ type: 'update-selected-retouch-params', params: next.params })
   }
 
   function updatePendingWholeParams(
-    pending: Exclude<RetouchAdjustmentLayer, { kind: 'hsl' }>,
-    params: RetouchAdjustmentWholeParams,
-  ): RetouchAdjustmentLayer | null {
+    pending: Exclude<RetouchEffectLayer, { kind: 'hsl' }>,
+    params: RetouchEffectWholeParams,
+  ): RetouchEffectLayer | null {
     if (pending.kind === 'threshold' && 'threshold' in params && 'invert' in params) {
       return { ...pending, params }
     }
@@ -158,7 +155,7 @@ export function useRetouchSession() {
   return {
     retouchLayers: layers,
     selectedRetouchLayerId: selectedLayerId,
-    selectedRetouchAdjustmentLayer: selectedAdjustmentLayer,
+    selectedRetouchEffectLayer: selectedEffectLayer,
     resetRetouchSession,
     selectRetouchLayer: selectLayer,
     setRetouchLayerVisible: setLayerVisible,
@@ -167,7 +164,7 @@ export function useRetouchSession() {
     mergeRetouchLayer: mergeLayer,
     removeRetouchLayer: removeLayer,
     updateSelectedRetouchLayerParam: updateSelectedLayerParam,
-    updateSelectedRetouchAdjustmentParams: updateSelectedAdjustmentParams,
-    selectImageAdjustmentLayer: selectAdjustmentLayer,
+    updateSelectedRetouchEffectParams: updateSelectedRetouchParams,
+    selectImageEffectLayer: selectEffectLayer,
   }
 }

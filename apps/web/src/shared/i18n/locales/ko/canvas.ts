@@ -240,7 +240,7 @@ export default {
       strongContrast: '강한 대비',
       matte: '매트',
     },
-    adjustments: {
+    effects: {
       threshold: '임계값',
       hsl: '색조/채도',
       sharpen: '샤프닝',

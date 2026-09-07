@@ -228,6 +228,117 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     })
   }
 
+  function fallbackNodeMutations(
+    changedNodeIds: readonly string[],
+    nextNodes: Node[],
+  ): CanvasVueFlowIncrementalProjection['nodeMutations'] {
+    return {
+      added: [],
+      updated: changedNodeIds
+        .map((id) => nextNodes.find((node) => node.id === id))
+        .filter((node): node is Node => !!node),
+      removedIds: [],
+    }
+  }
+
+  function fallbackEdgeMutations(
+    changedEdgeIds: readonly string[],
+    nextEdges: Edge[],
+  ): CanvasVueFlowIncrementalProjection['edgeMutations'] {
+    return {
+      added: [],
+      updated: changedEdgeIds
+        .map((id) => nextEdges.find((edge) => edge.id === id))
+        .filter((edge): edge is Edge => !!edge),
+      removedIds: [],
+    }
+  }
+
+  type IncrementalProjectionPlan = {
+    nodeMutations: CanvasVueFlowIncrementalProjection['nodeMutations']
+    hasAddedNodes: boolean
+    hasEdgeChanges: boolean
+  }
+
+  function planProjectionMutations(
+    projection: CanvasVueFlowIncrementalProjection,
+    nextNodes: Node[] | undefined,
+    nextEdges: Edge[] | undefined,
+    changedNodeIds: readonly string[],
+    changedEdgeIds: readonly string[],
+  ): IncrementalProjectionPlan {
+    const nodeMutations =
+      nextNodes && nextNodes !== options.nodes.value
+        ? (projection.nodeMutations ?? fallbackNodeMutations(changedNodeIds, nextNodes))
+        : undefined
+    const edgeMutations = nextEdges
+      ? (projection.edgeMutations ?? fallbackEdgeMutations(changedEdgeIds, nextEdges))
+      : undefined
+    return {
+      nodeMutations,
+      hasAddedNodes: (nodeMutations?.added.length ?? 0) > 0,
+      hasEdgeChanges:
+        !!edgeMutations &&
+        (edgeMutations.added.length > 0 ||
+          edgeMutations.updated.length > 0 ||
+          edgeMutations.removedIds.length > 0 ||
+          nextEdges !== options.edges.value),
+    }
+  }
+
+  function applyProjectedEdgesFirst(
+    plan: IncrementalProjectionPlan,
+    nextEdges: Edge[] | undefined,
+  ): boolean {
+    // A renderer projection must not emit edgesChange. Apply an edge update
+    // before node removal so edges never reference a missing runtime node.
+    // If new nodes are being added, defer the set until those nodes exist.
+    if (nextEdges && plan.hasEdgeChanges && !plan.hasAddedNodes) {
+      options.actions?.setEdges?.(projectEdgesForActions(nextEdges))
+      return true
+    }
+    return false
+  }
+
+  function applyProjectedNodes(
+    plan: IncrementalProjectionPlan,
+    nextNodes: Node[] | undefined,
+    changedNodeIds: readonly string[],
+  ): void {
+    if (!nextNodes || nextNodes === options.nodes.value || !plan.nodeMutations) return
+    const {
+      added: addedNodes,
+      updated: updatedNodes,
+      removedIds: removedNodeIds,
+    } = plan.nodeMutations
+    if (addedNodes.length > 0 || removedNodeIds.length > 0) {
+      // addNodes/removeNodes emit nodesChange and would re-enter the
+      // canonical graph command path. setNodes parses the full structural
+      // projection without emitting a second command and reuses existing
+      // runtime nodes by id.
+      options.actions?.setNodes?.(toControlledNodes(nextNodes))
+    } else {
+      updatedNodes.forEach(updateRendererNodeProjection)
+    }
+    recordCanvasInteractionCount('incrementalNodeProjectionCount', changedNodeIds.length)
+    syncNodes(nextNodes)
+  }
+
+  function applyProjectedEdgesFinally(
+    plan: IncrementalProjectionPlan,
+    nextEdges: Edge[] | undefined,
+    changedEdgeIds: readonly string[],
+    edgesApplied: boolean,
+  ): void {
+    if (!nextEdges || nextEdges === options.edges.value) return
+    if (!edgesApplied && plan.hasEdgeChanges) {
+      // New nodes must be present before Vue Flow validates their edges.
+      options.actions?.setEdges?.(projectEdgesForActions(nextEdges))
+    }
+    recordCanvasInteractionCount('incrementalEdgeProjectionCount', changedEdgeIds.length)
+    syncEdges(nextEdges)
+  }
+
   /**
    * Applies an already-planned canonical graph commit without creating a Flow
    * command. History and persistence consume the graph commit itself; Flow is
@@ -240,69 +351,16 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     const changedNodeIds = projection.changedNodeIds ?? []
     const changedEdgeIds = projection.changedEdgeIds ?? []
     projectGraph(changedNodeIds.length, changedEdgeIds.length, () => {
-      const nodeMutations =
-        nextNodes && nextNodes !== options.nodes.value
-          ? (projection.nodeMutations ?? {
-              added: [],
-              updated: changedNodeIds
-                .map((id) => nextNodes.find((node) => node.id === id))
-                .filter((node): node is Node => !!node),
-              removedIds: [],
-            })
-          : undefined
-      const hasAddedNodes = (nodeMutations?.added.length ?? 0) > 0
-      const edgeMutations = nextEdges
-        ? (projection.edgeMutations ?? {
-            added: [],
-            updated: changedEdgeIds
-              .map((id) => nextEdges.find((edge) => edge.id === id))
-              .filter((edge): edge is Edge => !!edge),
-            removedIds: [],
-          })
-        : undefined
-      const hasEdgeChanges =
-        !!edgeMutations &&
-        (edgeMutations.added.length > 0 ||
-          edgeMutations.updated.length > 0 ||
-          edgeMutations.removedIds.length > 0 ||
-          nextEdges !== options.edges.value)
-      let edgesApplied = false
-
-      // A renderer projection must not emit edgesChange. Apply an edge update
-      // before node removal so edges never reference a missing runtime node.
-      // If new nodes are being added, defer the set until those nodes exist.
-      if (nextEdges && hasEdgeChanges && !hasAddedNodes) {
-        options.actions?.setEdges?.(projectEdgesForActions(nextEdges))
-        edgesApplied = true
-      }
-      if (nextNodes && nextNodes !== options.nodes.value) {
-        const resolvedNodeMutations = nodeMutations!
-        const {
-          added: addedNodes,
-          updated: updatedNodes,
-          removedIds: removedNodeIds,
-        } = resolvedNodeMutations
-        const hasStructuralNodeMutation = addedNodes.length > 0 || removedNodeIds.length > 0
-        if (hasStructuralNodeMutation) {
-          // addNodes/removeNodes emit nodesChange and would re-enter the
-          // canonical graph command path. setNodes parses the full structural
-          // projection without emitting a second command and reuses existing
-          // runtime nodes by id.
-          options.actions?.setNodes?.(toControlledNodes(nextNodes))
-        } else {
-          updatedNodes.forEach(updateRendererNodeProjection)
-        }
-        recordCanvasInteractionCount('incrementalNodeProjectionCount', changedNodeIds.length)
-        syncNodes(nextNodes)
-      }
-      if (nextEdges && nextEdges !== options.edges.value) {
-        if (!edgesApplied && hasEdgeChanges) {
-          // New nodes must be present before Vue Flow validates their edges.
-          options.actions?.setEdges?.(projectEdgesForActions(nextEdges))
-        }
-        recordCanvasInteractionCount('incrementalEdgeProjectionCount', changedEdgeIds.length)
-        syncEdges(nextEdges)
-      }
+      const plan = planProjectionMutations(
+        projection,
+        nextNodes,
+        nextEdges,
+        changedNodeIds,
+        changedEdgeIds,
+      )
+      const edgesApplied = applyProjectedEdgesFirst(plan, nextEdges)
+      applyProjectedNodes(plan, nextNodes, changedNodeIds)
+      applyProjectedEdgesFinally(plan, nextEdges, changedEdgeIds, edgesApplied)
     })
   }
 

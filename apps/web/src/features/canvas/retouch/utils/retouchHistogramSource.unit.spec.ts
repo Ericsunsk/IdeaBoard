@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { RetouchAdjustmentLayer, RetouchLayer } from '../types'
+import type { RetouchEffectLayer, RetouchLayer } from '../types'
 import { resolveRetouchHistogramSource } from './retouchHistogramSource'
 
 function makeImageData(values: number[]) {
@@ -21,10 +21,10 @@ function pixelValues(imageData: ImageData | null) {
   return imageData ? Array.from(imageData.data) : []
 }
 
-function createThresholdLayer(id = 'adjustment:threshold'): RetouchAdjustmentLayer {
+function createThresholdLayer(id = 'retouch:threshold'): RetouchEffectLayer {
   return {
     id,
-    type: 'adjustment',
+    type: 'effect',
     kind: 'threshold',
     name: '阈值',
     visible: true,
@@ -32,10 +32,10 @@ function createThresholdLayer(id = 'adjustment:threshold'): RetouchAdjustmentLay
   }
 }
 
-function createCurvesLayer(id = 'adjustment:curves', output = 50): RetouchAdjustmentLayer {
+function createCurvesLayer(id = 'retouch:curves', output = 50): RetouchEffectLayer {
   return {
     id,
-    type: 'adjustment',
+    type: 'effect',
     kind: 'curves',
     name: '曲线',
     visible: true,
@@ -57,7 +57,7 @@ function createSourceLayer(): RetouchLayer {
 }
 
 describe('resolveRetouchHistogramSource', () => {
-  it('renders visible upstream adjustment layers for the target adjustment layer', () => {
+  it('renders visible upstream retouch layers for the target retouch layer', () => {
     const sourceImageData = makeImageData([10, 20, 30, 255])
     const thresholdLayer = createThresholdLayer()
     const curvesLayer = createCurvesLayer()
@@ -76,14 +76,14 @@ describe('resolveRetouchHistogramSource', () => {
   it('reuses cached output when the selected layer changes but upstream refs stay the same', () => {
     const sourceImageData = makeImageData([10, 20, 30, 255])
     const thresholdLayer = createThresholdLayer()
-    const firstCurvesLayer = createCurvesLayer('adjustment:curves', 60)
+    const firstCurvesLayer = createCurvesLayer('retouch:curves', 60)
     const firstLayers = [thresholdLayer, firstCurvesLayer, createSourceLayer()]
     const cachedResolution = resolveRetouchHistogramSource({
       sourceImageData,
       layers: firstLayers,
       targetLayerId: firstCurvesLayer.id,
     })
-    const nextCurvesLayer = createCurvesLayer('adjustment:curves', 20)
+    const nextCurvesLayer = createCurvesLayer('retouch:curves', 20)
     const nextLayers = [thresholdLayer, nextCurvesLayer, createSourceLayer()]
 
     const nextResolution = resolveRetouchHistogramSource({

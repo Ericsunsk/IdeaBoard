@@ -231,7 +231,7 @@ export default {
       strongContrast: '强对比',
       matte: '哑光',
     },
-    adjustments: {
+    effects: {
       threshold: '阈值',
       hsl: '色相/饱和度',
       sharpen: '锐化',

@@ -44,7 +44,7 @@ type CanvasImageWorkflowGraphPort = Pick<
   | 'getImageNodeDisplayPayload'
   | 'getImageNodeSnapshot'
   | 'updateSnapshotNode'
-  | 'createPendingAdjustmentNode'
+  | 'createPendingRetouchNode'
   | 'applyImageFileToImageNode'
   | 'removeNode'
   | 'connectionAdapter'
@@ -191,7 +191,7 @@ export function useCanvasImageWorkflow(
     getViewport: options.flowPaneAdapter.getViewport,
     setViewport: options.flowPaneAdapter.setViewport,
     setCenter: options.flowPaneAdapter.setCenter,
-    createPendingAdjustmentNode: graph.createPendingAdjustmentNode,
+    createPendingRetouchNode: graph.createPendingRetouchNode,
     applyImageFileToImageNode: graph.applyImageFileToImageNode,
     removeNode: graph.removeNode,
     connectionAdapter: graph.connectionAdapter,

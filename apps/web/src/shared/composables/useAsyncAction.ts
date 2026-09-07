@@ -33,36 +33,13 @@ export function useAsyncAction() {
     pending.value = true
     activeActionCount.value += 1
     let loadingFeedback: AsyncActionLoadingHandle | undefined
-    let actionResult: T | undefined
-    let actionSucceeded = false
+    let outcome: AsyncActionRunOutcome<T> = { actionResult: undefined, actionSucceeded: false }
     const lifecycleErrors: unknown[] = []
 
     try {
       options.before?.()
       loadingFeedback = options.feedback?.loading?.()
-
-      try {
-        actionResult = await action()
-        actionSucceeded = true
-      } catch (error) {
-        if (options.feedback?.error) {
-          try {
-            options.feedback.error(error)
-          } catch (feedbackError) {
-            lifecycleErrors.push(error, feedbackError)
-          }
-        } else {
-          lifecycleErrors.push(error)
-        }
-      }
-
-      if (actionSucceeded) {
-        try {
-          options.feedback?.success?.(actionResult as T)
-        } catch (error) {
-          lifecycleErrors.push(error)
-        }
-      }
+      outcome = await executeGuardedAction(action, options.feedback, lifecycleErrors)
     } catch (error) {
       lifecycleErrors.push(error)
     }
@@ -76,13 +53,50 @@ export function useAsyncAction() {
     }, lifecycleErrors)
 
     throwLifecycleErrors(lifecycleErrors)
-    return actionSucceeded ? actionResult : undefined
+    return outcome.actionSucceeded ? outcome.actionResult : undefined
   }
 
   return {
     isPending,
     runAsyncAction,
   }
+}
+
+type AsyncActionRunOutcome<T> = {
+  actionResult: T | undefined
+  actionSucceeded: boolean
+}
+
+async function executeGuardedAction<T>(
+  action: () => T | Promise<T>,
+  feedback: AsyncActionFeedback<T> | undefined,
+  lifecycleErrors: unknown[],
+): Promise<AsyncActionRunOutcome<T>> {
+  let actionResult: T | undefined
+  let actionSucceeded = false
+  try {
+    actionResult = await action()
+    actionSucceeded = true
+  } catch (error) {
+    if (feedback?.error) {
+      try {
+        feedback.error(error)
+      } catch (feedbackError) {
+        lifecycleErrors.push(error, feedbackError)
+      }
+    } else {
+      lifecycleErrors.push(error)
+    }
+  }
+
+  if (actionSucceeded) {
+    try {
+      feedback?.success?.(actionResult as T)
+    } catch (error) {
+      lifecycleErrors.push(error)
+    }
+  }
+  return { actionResult, actionSucceeded }
 }
 
 function runCleanupStep(step: (() => void) | undefined, errors: unknown[]) {

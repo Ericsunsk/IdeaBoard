@@ -7,13 +7,13 @@ import {
   createLevelsOutputConstraints,
   moveLevelsHandle,
   moveLevelsOutputHandle,
-  normalizeLevelsAdjustment,
+  normalizeLevelsEffect,
 } from './retouchLevels'
 
 describe('retouchLevels', () => {
   it('normalizes integer channel handles without changing neutral midtones', () => {
     expect(
-      normalizeLevelsAdjustment({
+      normalizeLevelsEffect({
         shadows: 64,
         midtones: 128,
         highlights: 191,
@@ -32,7 +32,7 @@ describe('retouchLevels', () => {
   it('keeps normalized gamma finite for boundary and non-finite midtones', () => {
     expect(
       Number.isFinite(
-        normalizeLevelsAdjustment({
+        normalizeLevelsEffect({
           shadows: 0,
           midtones: 260,
           highlights: 255,
@@ -42,7 +42,7 @@ describe('retouchLevels', () => {
       ),
     ).toBe(true)
     expect(
-      normalizeLevelsAdjustment({
+      normalizeLevelsEffect({
         shadows: 0,
         midtones: Number.NaN,
         highlights: 255,
@@ -72,8 +72,8 @@ describe('retouchLevels', () => {
     expect(clampLevelsHandles(highEndpoint).midtones).toBe(19)
     expect(moveLevelsHandle(lowEndpoint, 'midtones', 10).midtones).toBe(11)
     expect(moveLevelsHandle(highEndpoint, 'midtones', 20).midtones).toBe(19)
-    expect(normalizeLevelsAdjustment(lowEndpoint).gamma).toBeCloseTo(Math.log(0.5) / Math.log(0.1))
-    expect(normalizeLevelsAdjustment(lowEndpoint).gamma).not.toBe(1)
+    expect(normalizeLevelsEffect(lowEndpoint).gamma).toBeCloseTo(Math.log(0.5) / Math.log(0.1))
+    expect(normalizeLevelsEffect(lowEndpoint).gamma).not.toBe(1)
   })
 
   it('allows midtones to degrade to endpoints only when no interior channel exists', () => {
@@ -87,11 +87,11 @@ describe('retouchLevels', () => {
 
     expect(clampLevelsHandles(params)).toEqual(params)
     expect(createLevelsInputConstraints(params).midtones).toEqual({ min: 50, max: 51 })
-    expect(normalizeLevelsAdjustment(params).gamma).toBe(1)
+    expect(normalizeLevelsEffect(params).gamma).toBe(1)
   })
 
   it('normalizes invalid handle ordering through the same clamp rules as the UI', () => {
-    const normalized = normalizeLevelsAdjustment({
+    const normalized = normalizeLevelsEffect({
       shadows: 252,
       midtones: 128,
       highlights: 51,
@@ -248,7 +248,7 @@ describe('retouchLevels', () => {
     })
   })
 
-  it('creates the same LUT behavior as the existing levels adjustment path', () => {
+  it('creates the same LUT behavior as the existing levels retouch path', () => {
     const lut = createLevelsLut({
       blackPoint: 64,
       whitePoint: 191,

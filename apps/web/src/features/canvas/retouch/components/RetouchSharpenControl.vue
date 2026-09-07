@@ -48,7 +48,7 @@ import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'
 import { ColorFilter } from '@iconoir/vue'
 import type { RetouchSharpenParams } from '../types'
-import { IMAGE_ADJUSTMENT_DEFINITIONS } from '../utils/imageAdjustmentDefinitions'
+import { IMAGE_RETOUCH_DEFINITIONS } from '../utils/imageRetouchDefinitions'
 import RetouchSlider from './RetouchSlider.vue'
 
 const props = defineProps<{
@@ -61,10 +61,8 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const ranges = IMAGE_ADJUSTMENT_DEFINITIONS.sharpen.ranges
-const normalizedParams = computed(() =>
-  IMAGE_ADJUSTMENT_DEFINITIONS.sharpen.normalize(props.params),
-)
+const ranges = IMAGE_RETOUCH_DEFINITIONS.sharpen.ranges
+const normalizedParams = computed(() => IMAGE_RETOUCH_DEFINITIONS.sharpen.normalize(props.params))
 
 function updateNumberParam(
   key: Exclude<keyof RetouchSharpenParams, 'protectColor'>,
@@ -78,6 +76,6 @@ function updateProtectColor(protectColor: boolean) {
 }
 
 function emitNormalizedParams(params: RetouchSharpenParams) {
-  emit('update:params', IMAGE_ADJUSTMENT_DEFINITIONS.sharpen.normalize(params))
+  emit('update:params', IMAGE_RETOUCH_DEFINITIONS.sharpen.normalize(params))
 }
 </script>

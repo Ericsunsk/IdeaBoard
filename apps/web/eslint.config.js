@@ -36,6 +36,15 @@ export default tseslint.config(
       'no-undef': 'off',
       'no-empty': 'error',
       'no-useless-assignment': 'error',
+      // Complexity budget (Phase 4): complexity/max-depth block, while
+      // max-lines-per-function stays reporting until factory/composable
+      // structural splits land (tracked follow-up, ~60 long factories).
+      complexity: ['error', 15],
+      'max-depth': ['error', 4],
+      'max-lines-per-function': [
+        'warn',
+        { max: 100, skipBlankLines: true, skipComments: true, IIFEs: true },
+      ],
       'no-unused-vars': 'off',
       'preserve-caught-error': 'error',
       '@typescript-eslint/no-explicit-any': 'error',

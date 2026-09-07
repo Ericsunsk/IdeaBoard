@@ -45,16 +45,19 @@ function hasInputImages(snapshotNode: CanvasNodeItem): snapshotNode is NodeWithI
   return snapshotNode.type === 'prompt' || snapshotNode.type === 'fusion'
 }
 
-function isPromptNodeInputImage(value: unknown): value is PromptNodeInputImage {
-  if (!value || typeof value !== 'object') return false
-  const item = value as Partial<PromptNodeInputImage>
+function hasImageIdentityFields(item: Partial<PromptNodeInputImage>): boolean {
   return (
     typeof item.id === 'string' &&
     item.id.length > 0 &&
     (item.sourceType === 'node' || item.sourceType === 'external') &&
     typeof item.sourceId === 'string' &&
     item.sourceId.length > 0 &&
-    (item.sourceNodeId === undefined || typeof item.sourceNodeId === 'string') &&
+    (item.sourceNodeId === undefined || typeof item.sourceNodeId === 'string')
+  )
+}
+
+function hasImageContentFields(item: Partial<PromptNodeInputImage>): boolean {
+  return (
     typeof item.url === 'string' &&
     item.url.trim().length > 0 &&
     typeof item.ratio === 'number' &&
@@ -63,6 +66,12 @@ function isPromptNodeInputImage(value: unknown): value is PromptNodeInputImage {
     (item.mediaAssetId === undefined ||
       (Number.isInteger(item.mediaAssetId) && item.mediaAssetId > 0))
   )
+}
+
+function isPromptNodeInputImage(value: unknown): value is PromptNodeInputImage {
+  if (!value || typeof value !== 'object') return false
+  const item = value as Partial<PromptNodeInputImage>
+  return hasImageIdentityFields(item) && hasImageContentFields(item)
 }
 
 function normalizePromptInputImages(value: unknown, inputLimit: number): PromptNodeInputImage[] {
@@ -101,80 +110,120 @@ function arePromptInputImagesEqual(
     )
   )
 }
+function patchTitleParam(snapshotNode: CanvasNodeItem, value: string): CanvasNodeItem {
+  const nextTitle = String(value ?? '').trim()
+  if (!nextTitle || snapshotNode.title === nextTitle) return snapshotNode
+  return { ...snapshotNode, title: nextTitle }
+}
+
+function patchOutputCountParam(snapshotNode: CanvasNodeItem, value: number): CanvasNodeItem {
+  if (!hasOutputCount(snapshotNode)) return snapshotNode
+  const nextOutputCount = requireImageNodeOutputCount(value)
+  if (snapshotNode.outputCount === nextOutputCount) return snapshotNode
+  return { ...snapshotNode, outputCount: nextOutputCount }
+}
+
+function patchOutputResolutionParam(
+  snapshotNode: CanvasNodeItem,
+  value: OutputResolution,
+): CanvasNodeItem {
+  const nextResolution = normalizeOutputResolution(value)
+  if (snapshotNode.outputResolution === nextResolution) return snapshotNode
+  return { ...snapshotNode, outputResolution: nextResolution }
+}
+
+function patchPromptParam(snapshotNode: CanvasNodeItem, value: string): CanvasNodeItem {
+  if (snapshotNode.type !== 'fusion') return snapshotNode
+  const nextPrompt = String(value ?? '').trim()
+  if (snapshotNode.prompt === nextPrompt) return snapshotNode
+  return { ...snapshotNode, prompt: nextPrompt }
+}
+
+function patchAspectRatioParam(
+  snapshotNode: CanvasNodeItem,
+  value: PromptAspectRatio,
+): CanvasNodeItem {
+  if (!hasAspectRatio(snapshotNode)) return snapshotNode
+  const nextAspectRatio = normalizePromptAspectRatio(value)
+  if (snapshotNode.aspectRatio === nextAspectRatio) return snapshotNode
+  return { ...snapshotNode, aspectRatio: nextAspectRatio }
+}
+
+function patchFusionInputImagesParam(
+  snapshotNode: FusionNodeItem,
+  nextInputImages: PromptNodeInputImage[],
+  inputUnchanged: boolean,
+): CanvasNodeItem {
+  const nextBlendPoint = constrainFusionBlendPoint(
+    snapshotNode.blendPoint,
+    nextInputImages.length,
+    snapshotNode.width,
+  )
+  const currentBlendPoint = normalizeFusionBlendPoint(snapshotNode.blendPoint)
+  const blendUnchanged = areFusionBlendPointsEqual(currentBlendPoint, nextBlendPoint)
+  if (inputUnchanged && blendUnchanged) return snapshotNode
+  return {
+    ...snapshotNode,
+    inputImages: nextInputImages,
+    ...(blendUnchanged ? {} : { blendPoint: nextBlendPoint }),
+  }
+}
+
+function patchInputImagesParam(
+  snapshotNode: CanvasNodeItem,
+  value: PromptNodeInputImage[],
+): CanvasNodeItem {
+  if (!hasInputImages(snapshotNode)) return snapshotNode
+  const inputLimit = getCanvasNodeImageInputLimit(snapshotNode.type)
+  const nextInputImages = normalizePromptInputImages(value, inputLimit)
+  const inputUnchanged = arePromptInputImagesEqual(
+    snapshotNode.inputImages,
+    nextInputImages,
+    inputLimit,
+  )
+  if (snapshotNode.type !== 'fusion') {
+    if (inputUnchanged) return snapshotNode
+    return { ...snapshotNode, inputImages: nextInputImages }
+  }
+  return patchFusionInputImagesParam(snapshotNode, nextInputImages, inputUnchanged)
+}
+
+function patchBlendPointParam(
+  snapshotNode: CanvasNodeItem,
+  value: FusionBlendPoint,
+): CanvasNodeItem {
+  if (snapshotNode.type !== 'fusion') return snapshotNode
+  const nextBlendPoint = constrainFusionBlendPoint(
+    value,
+    Array.isArray(snapshotNode.inputImages) ? snapshotNode.inputImages.length : 0,
+    snapshotNode.width,
+  )
+  const currentBlendPoint = normalizeFusionBlendPoint(snapshotNode.blendPoint)
+  if (areFusionBlendPointsEqual(currentBlendPoint, nextBlendPoint)) return snapshotNode
+  return { ...snapshotNode, blendPoint: nextBlendPoint }
+}
+
+type SnapshotParamPatchValue = FlowSnapshotParamPatch['value']
+
+const SNAPSHOT_PARAM_PATCHERS: Record<
+  FlowSnapshotParamPatch['key'],
+  (snapshotNode: CanvasNodeItem, value: never) => CanvasNodeItem
+> = {
+  title: patchTitleParam,
+  outputCount: patchOutputCountParam,
+  outputResolution: patchOutputResolutionParam,
+  prompt: patchPromptParam,
+  aspectRatio: patchAspectRatioParam,
+  inputImages: patchInputImagesParam,
+  blendPoint: patchBlendPointParam,
+}
+
 export function patchFlowSnapshotParam(
   snapshotNode: CanvasNodeItem,
   payload: FlowSnapshotParamPatch,
 ): CanvasNodeItem {
-  const { key, value } = payload
-  switch (key) {
-    case 'title': {
-      const nextTitle = String(value ?? '').trim()
-      if (!nextTitle || snapshotNode.title === nextTitle) return snapshotNode
-      return { ...snapshotNode, title: nextTitle }
-    }
-    case 'outputCount': {
-      if (!hasOutputCount(snapshotNode)) return snapshotNode
-      const nextOutputCount = requireImageNodeOutputCount(value)
-      if (snapshotNode.outputCount === nextOutputCount) return snapshotNode
-      return { ...snapshotNode, outputCount: nextOutputCount }
-    }
-    case 'outputResolution': {
-      const nextResolution = normalizeOutputResolution(value)
-      if (snapshotNode.outputResolution === nextResolution) return snapshotNode
-      return { ...snapshotNode, outputResolution: nextResolution }
-    }
-    case 'prompt': {
-      if (snapshotNode.type !== 'fusion') return snapshotNode
-      const nextPrompt = String(value ?? '').trim()
-      if (snapshotNode.prompt === nextPrompt) return snapshotNode
-      return { ...snapshotNode, prompt: nextPrompt }
-    }
-    case 'aspectRatio': {
-      if (!hasAspectRatio(snapshotNode)) return snapshotNode
-      const nextAspectRatio = normalizePromptAspectRatio(value)
-      if (snapshotNode.aspectRatio === nextAspectRatio) return snapshotNode
-      return { ...snapshotNode, aspectRatio: nextAspectRatio }
-    }
-    case 'inputImages': {
-      if (!hasInputImages(snapshotNode)) return snapshotNode
-      const inputLimit = getCanvasNodeImageInputLimit(snapshotNode.type)
-      const nextInputImages = normalizePromptInputImages(value, inputLimit)
-      const inputUnchanged = arePromptInputImagesEqual(
-        snapshotNode.inputImages,
-        nextInputImages,
-        inputLimit,
-      )
-      if (snapshotNode.type !== 'fusion') {
-        if (inputUnchanged) return snapshotNode
-        return { ...snapshotNode, inputImages: nextInputImages }
-      }
-
-      const nextBlendPoint = constrainFusionBlendPoint(
-        snapshotNode.blendPoint,
-        nextInputImages.length,
-        snapshotNode.width,
-      )
-      const currentBlendPoint = normalizeFusionBlendPoint(snapshotNode.blendPoint)
-      const blendUnchanged = areFusionBlendPointsEqual(currentBlendPoint, nextBlendPoint)
-      if (inputUnchanged && blendUnchanged) return snapshotNode
-      return {
-        ...snapshotNode,
-        inputImages: nextInputImages,
-        ...(blendUnchanged ? {} : { blendPoint: nextBlendPoint }),
-      }
-    }
-    case 'blendPoint': {
-      if (snapshotNode.type !== 'fusion') return snapshotNode
-      const nextBlendPoint = constrainFusionBlendPoint(
-        value,
-        Array.isArray(snapshotNode.inputImages) ? snapshotNode.inputImages.length : 0,
-        snapshotNode.width,
-      )
-      const currentBlendPoint = normalizeFusionBlendPoint(snapshotNode.blendPoint)
-      if (areFusionBlendPointsEqual(currentBlendPoint, nextBlendPoint)) return snapshotNode
-      return { ...snapshotNode, blendPoint: nextBlendPoint }
-    }
-    default:
-      return snapshotNode
-  }
+  const patcher = SNAPSHOT_PARAM_PATCHERS[payload.key] as
+    ((snapshotNode: CanvasNodeItem, value: SnapshotParamPatchValue) => CanvasNodeItem) | undefined
+  if (!patcher) return snapshotNode
+  return patcher(snapshotNode, payload.value)
 }

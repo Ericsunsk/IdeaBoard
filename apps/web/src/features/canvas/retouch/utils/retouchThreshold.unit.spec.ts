@@ -3,7 +3,7 @@ import {
   clampThresholdValue,
   createThresholdMarker,
   moveThresholdHandle,
-  normalizeThresholdAdjustment,
+  normalizeThresholdEffect,
 } from './retouchThreshold'
 
 describe('retouchThreshold', () => {
@@ -15,7 +15,7 @@ describe('retouchThreshold', () => {
   })
 
   it('normalizes threshold params without dropping invert', () => {
-    expect(normalizeThresholdAdjustment({ threshold: Number.NaN, invert: true })).toEqual({
+    expect(normalizeThresholdEffect({ threshold: Number.NaN, invert: true })).toEqual({
       threshold: 128,
       invert: true,
     })

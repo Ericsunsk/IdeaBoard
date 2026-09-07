@@ -4,6 +4,50 @@ export function isValidSupportedLocale(locale: unknown): locale is SupportedLoca
   return typeof locale === 'string' && (SUPPORTED_LOCALES as readonly string[]).includes(locale)
 }
 
+type LocaleMatchRule = {
+  locale: SupportedLocale
+  exact: readonly string[]
+  prefix: readonly string[]
+}
+
+// Ordered: first matching rule wins. `exact` requires a full-tag match,
+// `prefix` matches tag prefixes (dash handling included in the entries).
+const LOCALE_MATCH_RULES: readonly LocaleMatchRule[] = [
+  // Traditional Chinese tags fall back to 'en' per product decision §3.2
+  {
+    locale: 'en',
+    exact: ['zh-tw', 'zh-hk', 'zh-mo'],
+    prefix: ['zh-tw-', 'zh-hk-', 'zh-mo-', 'zh-hant'],
+  },
+  // Simplified Chinese tags map to 'zh-CN'
+  {
+    locale: 'zh-CN',
+    exact: ['zh-cn', 'zh-sg', 'zh-hans'],
+    prefix: ['zh-cn-', 'zh-sg-', 'zh-hans'],
+  },
+  // Spanish dialects map to 'es'
+  { locale: 'es', exact: ['es'], prefix: ['es-'] },
+  // Korean dialects map to 'ko'
+  { locale: 'ko', exact: ['ko'], prefix: ['ko-'] },
+  // English dialects map to 'en'
+  { locale: 'en', exact: ['en'], prefix: ['en-'] },
+]
+
+function matchLocaleTag(tag: string): SupportedLocale | null {
+  const rule = LOCALE_MATCH_RULES.find(
+    ({ exact, prefix }) => exact.includes(tag) || prefix.some((part) => tag.startsWith(part)),
+  )
+  return rule?.locale ?? null
+}
+
+function resolveNavigatorLanguages(
+  navigatorLanguages?: readonly string[],
+): readonly unknown[] | null {
+  if (navigatorLanguages !== undefined) return navigatorLanguages
+  if (typeof navigator === 'undefined') return null
+  return navigator.languages?.length ? navigator.languages : [navigator.language].filter(Boolean)
+}
+
 /**
  * Resolves the initial user locale.
  * Checks storage first (if valid); falls back to navigator.languages (mapped per product rules);
@@ -26,58 +70,14 @@ export function resolveInitialUserLocale(
     return resolvedStorageValue
   }
 
-  let resolvedLanguages = navigatorLanguages
-  if (resolvedLanguages === undefined && typeof navigator !== 'undefined') {
-    resolvedLanguages = navigator.languages?.length
-      ? navigator.languages
-      : [navigator.language].filter(Boolean)
-  }
-
+  const resolvedLanguages = resolveNavigatorLanguages(navigatorLanguages)
   if (resolvedLanguages && resolvedLanguages.length > 0) {
     for (const rawTag of resolvedLanguages) {
       if (typeof rawTag !== 'string') continue
       const tag = rawTag.trim().toLowerCase()
       if (!tag) continue
-
-      // Traditional Chinese tags fall back to 'en' per product decision §3.2
-      if (
-        tag === 'zh-tw' ||
-        tag === 'zh-hk' ||
-        tag === 'zh-mo' ||
-        tag.startsWith('zh-tw-') ||
-        tag.startsWith('zh-hk-') ||
-        tag.startsWith('zh-mo-') ||
-        tag.startsWith('zh-hant')
-      ) {
-        return 'en'
-      }
-
-      // Simplified Chinese tags map to 'zh-CN'
-      if (
-        tag === 'zh-cn' ||
-        tag === 'zh-sg' ||
-        tag === 'zh-hans' ||
-        tag.startsWith('zh-cn-') ||
-        tag.startsWith('zh-sg-') ||
-        tag.startsWith('zh-hans')
-      ) {
-        return 'zh-CN'
-      }
-
-      // Spanish dialects map to 'es'
-      if (tag === 'es' || tag.startsWith('es-')) {
-        return 'es'
-      }
-
-      // Korean dialects map to 'ko'
-      if (tag === 'ko' || tag.startsWith('ko-')) {
-        return 'ko'
-      }
-
-      // English dialects map to 'en'
-      if (tag === 'en' || tag.startsWith('en-')) {
-        return 'en'
-      }
+      const matched = matchLocaleTag(tag)
+      if (matched) return matched
     }
   }
 

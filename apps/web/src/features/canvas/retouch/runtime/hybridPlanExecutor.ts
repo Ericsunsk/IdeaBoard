@@ -2,38 +2,37 @@ import {
   createPlanWorkUnits,
   defaultNow,
   defaultYieldToMainThread,
-  executeCooperativeCpuImageAdjustmentPlan,
+  executeCooperativeCpuImageRetouchPlan,
   isAbortSignalError,
   normalizePixelChunkBytes,
   normalizePositiveInteger,
   normalizePositiveNumber,
 } from './cooperativeCpuPlanExecutor'
-import { createCpuImageAdjustmentPlanExecutor } from './cpuPlanExecutor'
+import { createCpuImageRetouchPlanExecutor } from './cpuPlanExecutor'
 import {
   reportPlanExecutionEvent,
-  type CreateImageAdjustmentPlanExecutorOptions,
-  type ImageAdjustmentPlanExecutor,
+  type CreateImageRetouchPlanExecutorOptions,
+  type ImageRetouchPlanExecutor,
 } from './planExecutorTypes'
-import { createWorkerImageAdjustmentPlanExecutor } from './workerPlanExecutor'
+import { createWorkerImageRetouchPlanExecutor } from './workerPlanExecutor'
 
-export type CreateHybridImageAdjustmentPlanExecutorOptions =
-  CreateImageAdjustmentPlanExecutorOptions & {
-    cooperativeChunkBytes?: number
-    cooperativeFrameBudgetMs?: number
-    syncMaxWorkUnits?: number
-    now?: () => number
-    yieldToMainThread?: () => Promise<void>
-  }
+export type CreateHybridImageRetouchPlanExecutorOptions = CreateImageRetouchPlanExecutorOptions & {
+  cooperativeChunkBytes?: number
+  cooperativeFrameBudgetMs?: number
+  syncMaxWorkUnits?: number
+  now?: () => number
+  yieldToMainThread?: () => Promise<void>
+}
 
 const DEFAULT_HYBRID_SYNC_MAX_WORK_UNITS = 24_000_000
 const DEFAULT_HYBRID_COOPERATIVE_CHUNK_BYTES = 1024 * 1024
 const DEFAULT_HYBRID_COOPERATIVE_FRAME_BUDGET_MS = 10
 
-export function createHybridImageAdjustmentPlanExecutor(
-  options: CreateHybridImageAdjustmentPlanExecutorOptions = {},
-): ImageAdjustmentPlanExecutor {
-  const cpuExecutor = createCpuImageAdjustmentPlanExecutor(options)
-  const workerExecutor = createWorkerImageAdjustmentPlanExecutor(options)
+export function createHybridImageRetouchPlanExecutor(
+  options: CreateHybridImageRetouchPlanExecutorOptions = {},
+): ImageRetouchPlanExecutor {
+  const cpuExecutor = createCpuImageRetouchPlanExecutor(options)
+  const workerExecutor = createWorkerImageRetouchPlanExecutor(options)
   const syncMaxWorkUnits = normalizePositiveInteger(
     options.syncMaxWorkUnits,
     DEFAULT_HYBRID_SYNC_MAX_WORK_UNITS,
@@ -70,7 +69,7 @@ export function createHybridImageAdjustmentPlanExecutor(
       if (executionMode === 'sync') return cpuExecutor.execute(input)
 
       try {
-        const output = await executeCooperativeCpuImageAdjustmentPlan({
+        const output = await executeCooperativeCpuImageRetouchPlan({
           imageData: input.imageData,
           plan: input.plan,
           signal: input.signal,

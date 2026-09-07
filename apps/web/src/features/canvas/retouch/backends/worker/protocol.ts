@@ -1,4 +1,4 @@
-import type { ImageAdjustmentPlan } from '../../utils/imageAdjustmentEngine'
+import type { ImageRetouchPlan } from '../../utils/imageRetouchEngine'
 
 export type WorkerImageProcessingRequestId = string
 
@@ -12,7 +12,7 @@ export type WorkerImageProcessingExecuteRequest = {
   type: 'execute'
   requestId: WorkerImageProcessingRequestId
   imageData: ImageData
-  plan: ImageAdjustmentPlan
+  plan: ImageRetouchPlan
 }
 
 export type WorkerImageProcessingCancelRequest = {

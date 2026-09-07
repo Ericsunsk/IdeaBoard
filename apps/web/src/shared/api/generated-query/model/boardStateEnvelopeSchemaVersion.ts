@@ -9,5 +9,5 @@ export type BoardStateEnvelopeSchemaVersion =
   (typeof BoardStateEnvelopeSchemaVersion)[keyof typeof BoardStateEnvelopeSchemaVersion]
 
 export const BoardStateEnvelopeSchemaVersion = {
-  NUMBER_3: 3,
+  NUMBER_4: 4,
 } as const

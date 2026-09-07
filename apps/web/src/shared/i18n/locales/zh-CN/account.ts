@@ -104,7 +104,7 @@ export default {
       reward: '兑换奖励',
       topUp: '额度充值',
       systemGrant: '系统发放',
-      systemAdjustment: '系统调账',
+      systemRetouch: '系统调账',
     },
   },
   usage: {

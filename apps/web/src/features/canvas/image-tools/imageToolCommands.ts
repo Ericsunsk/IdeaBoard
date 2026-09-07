@@ -1,39 +1,55 @@
 import {
   hasRenderableRetouchLayerStack,
   renderRetouchLayerStackFile,
-} from '../retouch/services/imageAdjustmentRenderer'
+} from '../retouch/services/imageRetouchRenderer'
 import {
   MediaAssetDerivativeNotReadyError,
   resolveMediaAssetProcessingURL,
 } from '../../../shared/api/mediaAssetDelivery'
 import { useInpaintChromeActions } from '../inpaint/useInpaintChromeActions'
-import { isProcessingCancelled } from '../retouch/runtime/processingCancelled'
+import {
+  isProcessingCancelled,
+  processingCancelledError,
+} from '../retouch/runtime/processingCancelled'
 import { isCanvasGraphNodeId, type CanvasGraphNodeId } from '../graph-runtime'
+import type { ImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
+import type { ImageNodeItem } from '../../canvas-board/domain'
+
+type RetouchEffectLayers = Parameters<typeof hasRenderableRetouchLayerStack>[0]
+
+type RetouchApplySource = {
+  nodeId: CanvasGraphNodeId
+  boardId: string | null | undefined
+  source: ImageNodeDisplayPayload
+  sourceNode: ImageNodeItem
+  layers: RetouchEffectLayers
+}
 import { i18n } from '../../../shared/i18n'
 import type { ImageToolChromeCommands } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
-import { buildImageAdjustmentPlan } from '../retouch/utils/imageAdjustmentPlanPipeline'
+import { buildImageRetouchPlan } from '../retouch/utils/imageRetouchPlanPipeline'
 import {
-  deserializeImageAdjustmentPlan,
-  serializeImageAdjustmentPlan,
-} from '../retouch/utils/imageAdjustmentRecipe'
+  deserializeImageRetouchPlan,
+  serializeImageRetouchPlan,
+} from '../retouch/utils/imageRetouchRecipe'
 import { hasRetouchRasterEdits } from '../retouch/utils/retouchRasterTools'
 
 export function createImageToolCommands(session: ImageToolSession) {
   const { board, execution, ui, feedback } = session.capabilities
+  let latestRetouchApplyId = 0
 
   const reportGenerationFailure = () => {
     feedback.warning(i18n.global.t('canvas.feedback.imageGenerationFailed'))
   }
 
-  async function applyAdjustments() {
-    if (session.isApplyingRetouchAdjustments.value) return
+  function readApplySource(): RetouchApplySource | null {
+    if (session.isApplyingRetouch.value) return null
 
     const nodeId = session.retouchNodeId.value
-    if (!nodeId || session.retouchMode.value !== 'adjust') return
+    if (!nodeId || session.retouchMode.value !== 'adjust') return null
     if (!isCanvasGraphNodeId(nodeId)) {
       feedback.warning(i18n.global.t('canvas.tools.nodeWriteFailed'))
-      return
+      return null
     }
 
     const boardId = board.currentBoardId.value
@@ -41,18 +57,129 @@ export function createImageToolCommands(session: ImageToolSession) {
     const sourceNode = board.getImageNodeSnapshot(nodeId)
     if (!source || !sourceNode) {
       feedback.warning(i18n.global.t('canvas.tools.imageNotEditable'))
-      return
+      return null
     }
 
     const layers = [...session.retouchSession.retouchLayers.value]
     if (!hasRenderableRetouchLayerStack(layers)) {
       feedback.warning(i18n.global.t('canvas.tools.noEditableLayers'))
+      return null
+    }
+    return { nodeId, boardId, source, sourceNode, layers }
+  }
+
+  function createRetouchPendingNode(sourceNode: ImageNodeItem): CanvasGraphNodeId | null {
+    const createdId = board.createPendingRetouchNode(sourceNode)
+    if (!createdId || !isCanvasGraphNodeId(createdId)) {
+      reportGenerationFailure()
+      return null
+    }
+    return createdId
+  }
+
+  function connectRetouchNode(
+    nodeId: CanvasGraphNodeId,
+    pendingNodeId: CanvasGraphNodeId,
+    cleanupPendingNode: () => void,
+  ): boolean {
+    session.activeImageRetouchPendingNodeId.value = pendingNodeId
+    const didConnect = board.connectIntent({
+      sourceNodeId: nodeId,
+      sourcePort: 'image',
+      targetNodeId: pendingNodeId,
+      targetPort: 'image',
+    })
+    if (!didConnect) {
+      cleanupPendingNode()
+      feedback.warning(i18n.global.t('canvas.tools.autoConnectFailed'))
+      return false
+    }
+    return true
+  }
+
+  async function renderRetouchFile(
+    retouch: RetouchApplySource,
+    scopeId: string,
+    isCurrentScope: () => boolean,
+  ): Promise<File> {
+    // Keep image processing same-origin. The API endpoint resolves storage
+    // access server-side, avoiding CORS failures from direct signed URLs.
+    const sourceUrl = retouch.source.mediaAssetId
+      ? await resolveMediaAssetProcessingURL(retouch.source.mediaAssetId)
+      : retouch.source.url
+    // A late URL response must not supersede the current latestOnly render.
+    if (!isCurrentScope()) throw processingCancelledError()
+    return renderRetouchLayerStackFile(
+      { url: sourceUrl, title: retouch.sourceNode.title || 'Image' },
+      retouch.layers,
+      {
+        scopeId,
+        maxSide: 2560,
+        maxPixels: 8_000_000,
+        fitWithinMaxPixels: true,
+      },
+    )
+  }
+
+  function persistRetouchRecipe(
+    resultNodeId: CanvasGraphNodeId,
+    retouch: RetouchApplySource,
+  ): void {
+    const currentPlan = buildImageRetouchPlan(retouch.layers)
+    const recipeSourceMediaAssetId =
+      retouch.sourceNode.retouchRecipe?.sourceMediaAssetId ?? retouch.source.mediaAssetId
+    if (
+      recipeSourceMediaAssetId &&
+      currentPlan.length > 0 &&
+      !hasRetouchRasterEdits(retouch.layers) &&
+      session.capabilities.board.updateSnapshotNode
+    ) {
+      const previousPlan = retouch.sourceNode.retouchRecipe
+        ? deserializeImageRetouchPlan(retouch.sourceNode.retouchRecipe)
+        : []
+      const recipe = serializeImageRetouchPlan(
+        recipeSourceMediaAssetId,
+        [...previousPlan, ...currentPlan],
+        retouch.sourceNode.retouchRecipe?.sourceMimeType,
+      )
+      session.capabilities.board.updateSnapshotNode(resultNodeId, (previous) =>
+        previous.type === 'image-node' ? { ...previous, retouchRecipe: recipe } : previous,
+      )
+    }
+  }
+
+  function reportRetouchError(error: unknown, isCurrentScope: () => boolean): void {
+    if (isProcessingCancelled(error) || !isCurrentScope()) {
       return
     }
+    if (error instanceof MediaAssetDerivativeNotReadyError) {
+      if (error.status === 'pending' || error.status === 'processing') {
+        feedback.warning(i18n.global.t('canvas.task.stillProcessing'))
+      } else {
+        reportGenerationFailure()
+      }
+      return
+    }
+    reportGenerationFailure()
+  }
 
-    session.isApplyingRetouchAdjustments.value = true
+  function releaseRetouchScope(scopeId: string): void {
+    if (session.activeImageRetouchFinalScopeId.value === scopeId) {
+      session.registerImageRetouchFinalApplyCleanup(null)
+      session.activeImageRetouchFinalScopeId.value = null
+      session.isApplyingRetouch.value = false
+    }
+  }
+
+  async function applyRetouch() {
+    const retouch = readApplySource()
+    if (!retouch) return
+    const { nodeId, boardId } = retouch
+
+    session.isApplyingRetouch.value = true
+    const applyId = ++latestRetouchApplyId
     const scopeId = nodeId
-    session.activeImageAdjustmentFinalScopeId.value = scopeId
+    session.activeImageRetouchFinalScopeId.value = scopeId
 
     // The editor is a configuration surface, not the processing surface. Exit
     // immediately so the derived node can reuse the standard AI generation UI.
@@ -65,71 +192,35 @@ export function createImageToolCommands(session: ImageToolSession) {
     let pendingNodeMaterialized = false
 
     const isCurrentScope = () =>
+      applyId === latestRetouchApplyId &&
       board.currentBoardId.value === boardId &&
-      session.activeImageAdjustmentFinalScopeId.value === scopeId &&
+      session.activeImageRetouchFinalScopeId.value === scopeId &&
       !!board.getImageNodeSnapshot(nodeId)
 
     const cleanupPendingNode = () => {
       if (!pendingNodeId) return
       const nodeIdToCleanup = pendingNodeId
       if (!pendingNodeMaterialized) board.removeNode(nodeIdToCleanup)
-      if (session.activeImageAdjustmentPendingNodeId.value === nodeIdToCleanup) {
-        session.activeImageAdjustmentPendingNodeId.value = null
+      if (session.activeImageRetouchPendingNodeId.value === nodeIdToCleanup) {
+        session.activeImageRetouchPendingNodeId.value = null
       }
       pendingNodeId = null
     }
-    session.registerImageAdjustmentFinalApplyCleanup(cleanupPendingNode)
+    session.registerImageRetouchFinalApplyCleanup(cleanupPendingNode)
 
     try {
-      const createdId = board.createPendingAdjustmentNode(sourceNode)
-      if (!createdId || !isCanvasGraphNodeId(createdId)) {
-        reportGenerationFailure()
-        return
-      }
-      pendingNodeId = createdId
-      session.activeImageAdjustmentPendingNodeId.value = createdId
-      const didConnect = board.connectIntent({
-        sourceNodeId: nodeId,
-        sourcePort: 'image',
-        targetNodeId: pendingNodeId,
-        targetPort: 'image',
-      })
-      if (!didConnect) {
-        cleanupPendingNode()
-        feedback.warning(i18n.global.t('canvas.tools.autoConnectFailed'))
-        return
-      }
+      const createdNodeId = createRetouchPendingNode(retouch.sourceNode)
+      if (!createdNodeId) return
+      pendingNodeId = createdNodeId
+      if (!connectRetouchNode(nodeId, createdNodeId, cleanupPendingNode)) return
 
-      // Keep image processing same-origin. The API endpoint resolves storage
-      // access server-side, avoiding CORS failures from direct signed URLs.
-      const sourceUrl = source.mediaAssetId
-        ? await resolveMediaAssetProcessingURL(source.mediaAssetId)
-        : source.url
-      if (!isCurrentScope()) {
-        cleanupPendingNode()
-        return
-      }
-      const renderedFile = await renderRetouchLayerStackFile(
-        { url: sourceUrl, title: sourceNode.title || 'Image' },
-        layers,
-        {
-          scopeId,
-          maxSide: 2560,
-          maxPixels: 8_000_000,
-          fitWithinMaxPixels: true,
-        },
-      )
+      const renderedFile = await renderRetouchFile(retouch, scopeId, isCurrentScope)
       if (!isCurrentScope()) {
         cleanupPendingNode()
         return
       }
 
-      const resultNodeId = pendingNodeId
-      if (!resultNodeId) {
-        reportGenerationFailure()
-        return
-      }
-      const materialized = await board.applyImageFileToImageNode(resultNodeId, renderedFile)
+      const materialized = await board.applyImageFileToImageNode(createdNodeId, renderedFile)
       if (!isCurrentScope()) {
         cleanupPendingNode()
         return
@@ -145,49 +236,14 @@ export function createImageToolCommands(session: ImageToolSession) {
         return
       }
 
-      const currentPlan = buildImageAdjustmentPlan(layers)
-      const recipeSourceMediaAssetId =
-        sourceNode.adjustmentRecipe?.sourceMediaAssetId ?? source.mediaAssetId
-      if (
-        resultNodeId &&
-        recipeSourceMediaAssetId &&
-        currentPlan.length > 0 &&
-        !hasRetouchRasterEdits(layers) &&
-        session.capabilities.board.updateSnapshotNode
-      ) {
-        const previousPlan = sourceNode.adjustmentRecipe
-          ? deserializeImageAdjustmentPlan(sourceNode.adjustmentRecipe)
-          : []
-        const recipe = serializeImageAdjustmentPlan(
-          recipeSourceMediaAssetId,
-          [...previousPlan, ...currentPlan],
-          sourceNode.adjustmentRecipe?.sourceMimeType,
-        )
-        session.capabilities.board.updateSnapshotNode(resultNodeId, (previous) =>
-          previous.type === 'image-node' ? { ...previous, adjustmentRecipe: recipe } : previous,
-        )
-      }
+      persistRetouchRecipe(createdNodeId, retouch)
       feedback.succeeded(i18n.global.t('canvas.feedback.imageGenerated'))
     } catch (error) {
       cleanupPendingNode()
-      if (isImageAdjustmentFinalApplyCancelled(error) || !isCurrentScope()) {
-        return
-      }
-      if (error instanceof MediaAssetDerivativeNotReadyError) {
-        if (error.status === 'pending' || error.status === 'processing') {
-          feedback.warning(i18n.global.t('canvas.task.stillProcessing'))
-        } else {
-          reportGenerationFailure()
-        }
-        return
-      }
-      reportGenerationFailure()
+      reportRetouchError(error, isCurrentScope)
     } finally {
-      if (session.activeImageAdjustmentFinalScopeId.value === scopeId) {
-        session.registerImageAdjustmentFinalApplyCleanup(null)
-        session.activeImageAdjustmentFinalScopeId.value = null
-        session.isApplyingRetouchAdjustments.value = false
-      }
+      // Runtime scopes use node IDs, which can be reused by a newer apply.
+      if (applyId === latestRetouchApplyId) releaseRetouchScope(scopeId)
     }
   }
 
@@ -209,7 +265,7 @@ export function createImageToolCommands(session: ImageToolSession) {
     undoMask: session.inpaint.undoMask,
     redoMask: session.inpaint.redoMask,
     submitMaskPrompt: maskChromeActions.onInpaintChromeSubmit,
-    selectAdjustmentLayer: session.retouchSession.selectImageAdjustmentLayer,
+    selectEffectLayer: session.retouchSession.selectImageEffectLayer,
     selectEditorLayer: session.retouchSession.selectRetouchLayer,
     setEditorLayerVisible: session.retouchSession.setRetouchLayerVisible,
     addEditorLayer: session.retouchSession.addRetouchLayer,
@@ -217,16 +273,12 @@ export function createImageToolCommands(session: ImageToolSession) {
     mergeEditorLayer: session.retouchSession.mergeRetouchLayer,
     removeEditorLayer: session.retouchSession.removeRetouchLayer,
     updateEditorParam: session.retouchSession.updateSelectedRetouchLayerParam,
-    updateEditorAdjustmentParams: session.retouchSession.updateSelectedRetouchAdjustmentParams,
-    applyAdjustments,
+    updateEditorRetouchParams: session.retouchSession.updateSelectedRetouchEffectParams,
+    applyRetouch,
   }
 
   return {
     chromeCommands,
-    applyAdjustments,
+    applyRetouch,
   }
-}
-
-function isImageAdjustmentFinalApplyCancelled(error: unknown) {
-  return isProcessingCancelled(error)
 }

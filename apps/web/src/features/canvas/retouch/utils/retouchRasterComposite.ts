@@ -1,5 +1,5 @@
 import type { RetouchEditableLayer, RetouchLayer, RetouchRasterContent } from '../types'
-import { applyImageAdjustmentsInPlace } from './imageAdjustmentEngine'
+import { applyImageRetouchInPlace } from './imageRetouchEngine'
 import { cloneImageData } from './imageDataUtils'
 
 export type RetouchRasterLayerImageProvider = (content: RetouchRasterContent) => ImageData | null
@@ -60,9 +60,9 @@ function applyLayerToComposite(
       alphaCompositeImageData(context.output, imageData)
       return
     }
-    case 'adjustment':
+    case 'effect':
       if (!layer.visible) return
-      applyImageAdjustmentsInPlace(context.output, [layer])
+      applyImageRetouchInPlace(context.output, [layer])
       return
     case 'merged':
       if (!layer.visible) return

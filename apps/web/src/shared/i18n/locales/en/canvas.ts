@@ -236,7 +236,7 @@ export default {
       strongContrast: 'Strong contrast',
       matte: 'Matte',
     },
-    adjustments: {
+    effects: {
       threshold: 'Threshold',
       hsl: 'Hue/Saturation',
       sharpen: 'Sharpen',

@@ -1,11 +1,11 @@
-import type { ImageAdjustmentRecipe, ImageAdjustmentRecipeStep } from '../../../canvas-board/domain'
-import type { ImageAdjustmentPlan, ImageAdjustmentPlanStep } from './imageAdjustmentEngine'
+import type { ImageRetouchRecipe, ImageRetouchRecipeStep } from '../../../canvas-board/domain'
+import type { ImageRetouchPlan, ImageRetouchPlanStep } from './imageRetouchEngine'
 
-export function serializeImageAdjustmentPlan(
+export function serializeImageRetouchPlan(
   sourceMediaAssetId: number,
-  plan: ImageAdjustmentPlan,
+  plan: ImageRetouchPlan,
   sourceMimeType?: string,
-): ImageAdjustmentRecipe {
+): ImageRetouchRecipe {
   return {
     version: 1,
     sourceMediaAssetId,
@@ -14,11 +14,11 @@ export function serializeImageAdjustmentPlan(
   }
 }
 
-export function deserializeImageAdjustmentPlan(recipe: ImageAdjustmentRecipe): ImageAdjustmentPlan {
+export function deserializeImageRetouchPlan(recipe: ImageRetouchRecipe): ImageRetouchPlan {
   return recipe.plan.map(deserializeStep)
 }
 
-function serializeStep(step: ImageAdjustmentPlanStep): ImageAdjustmentRecipeStep {
+function serializeStep(step: ImageRetouchPlanStep): ImageRetouchRecipeStep {
   switch (step.kind) {
     case 'hsl':
       return { kind: 'hsl', params: { ...step.params } }
@@ -38,7 +38,7 @@ function serializeStep(step: ImageAdjustmentPlanStep): ImageAdjustmentRecipeStep
   }
 }
 
-function deserializeStep(step: ImageAdjustmentRecipeStep): ImageAdjustmentPlanStep {
+function deserializeStep(step: ImageRetouchRecipeStep): ImageRetouchPlanStep {
   switch (step.kind) {
     case 'hsl':
       return { kind: 'hsl', params: { ...step.params } }

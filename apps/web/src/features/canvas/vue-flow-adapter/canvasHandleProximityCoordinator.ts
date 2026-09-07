@@ -83,8 +83,7 @@ export function createCanvasHandleProximityCoordinator(geometry: CanvasHandlePro
   let lastPointer: CanvasHandleProximityPoint | null = null
   let isSuspended = false
 
-  function evaluate(pointer: CanvasHandleProximityPoint | null) {
-    lastPointer = pointer
+  function selectWinningCandidate(pointer: CanvasHandleProximityPoint | null) {
     let winner: Candidate | null = null
 
     if (pointer && !isSuspended) {
@@ -104,6 +103,10 @@ export function createCanvasHandleProximityCoordinator(geometry: CanvasHandlePro
       }
     }
 
+    return winner
+  }
+
+  function notifyRegistrations(winner: Candidate | null) {
     activeRegistration = winner?.registration ?? null
     for (const registration of registrations) {
       if (registration === winner?.registration && winner) {
@@ -115,6 +118,11 @@ export function createCanvasHandleProximityCoordinator(geometry: CanvasHandlePro
         notify(registration, { isActive: false, point: ORIGIN })
       }
     }
+  }
+
+  function evaluate(pointer: CanvasHandleProximityPoint | null) {
+    lastPointer = pointer
+    notifyRegistrations(selectWinningCandidate(pointer))
   }
 
   function register(options: CanvasHandleProximityRegistration) {

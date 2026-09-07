@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import type { RetouchAdjustmentLayer } from '../types'
+import type { RetouchEffectLayer } from '../types'
 import {
-  applyImageAdjustmentsInPlace,
-  compileImageAdjustmentPlan,
-  createImageAdjustmentPlanStepExecutionState,
-  executeImageAdjustmentPlan,
-  executeImageAdjustmentPlanStepRange,
-  hasEffectiveImageAdjustments,
-  type ImageAdjustmentPlan,
-} from './imageAdjustmentEngine'
-import { normalizeImageAdjustmentLayer } from './imageAdjustmentDefinitions'
+  applyImageRetouchInPlace,
+  compileImageRetouchPlan,
+  createImageRetouchPlanStepExecutionState,
+  executeImageRetouchPlan,
+  executeImageRetouchPlanStepRange,
+  hasEffectiveImageRetouch,
+  type ImageRetouchPlan,
+} from './imageRetouchEngine'
+import { normalizeImageEffectLayer } from './imageRetouchDefinitions'
 
 function makeImageData(values: number[], width = values.length / 4, height = 1) {
   class TestImageData {
@@ -30,92 +30,87 @@ function pixelValues(imageData: ImageData) {
   return Array.from(imageData.data)
 }
 
-function applyImageAdjustments(
-  source: ImageData,
-  layers: readonly RetouchAdjustmentLayer[],
-): ImageData {
+function applyImageRetouch(source: ImageData, layers: readonly RetouchEffectLayer[]): ImageData {
   const output = makeImageData(pixelValues(source), source.width, source.height)
-  applyImageAdjustmentsInPlace(output, layers)
+  applyImageRetouchInPlace(output, layers)
   return output
 }
 
 function makeLayer(
-  layer: RetouchAdjustmentLayer,
-  overrides: Partial<RetouchAdjustmentLayer> = {},
-): RetouchAdjustmentLayer {
-  return { ...layer, ...overrides } as RetouchAdjustmentLayer
+  layer: RetouchEffectLayer,
+  overrides: Partial<RetouchEffectLayer> = {},
+): RetouchEffectLayer {
+  return { ...layer, ...overrides } as RetouchEffectLayer
 }
 
-const hslLayer: RetouchAdjustmentLayer = {
-  id: 'adjustment:hsl',
-  type: 'adjustment',
+const hslLayer: RetouchEffectLayer = {
+  id: 'retouch:hsl',
+  type: 'effect',
   kind: 'hsl',
   name: '色相/饱和度 1',
   visible: true,
   params: { hue: 0, saturation: 0, lightness: 0 },
 }
 
-const thresholdLayer: RetouchAdjustmentLayer = {
-  id: 'adjustment:threshold',
-  type: 'adjustment',
+const thresholdLayer: RetouchEffectLayer = {
+  id: 'retouch:threshold',
+  type: 'effect',
   kind: 'threshold',
   name: '阈值 1',
   visible: true,
   params: { threshold: 128, invert: false },
 }
 
-const curvesLayer: RetouchAdjustmentLayer = {
-  id: 'adjustment:curves',
-  type: 'adjustment',
+const curvesLayer: RetouchEffectLayer = {
+  id: 'retouch:curves',
+  type: 'effect',
   kind: 'curves',
   name: '曲线 1',
   visible: true,
   params: { channels: {} },
 }
 
-const levelsLayer: RetouchAdjustmentLayer = {
-  id: 'adjustment:levels',
-  type: 'adjustment',
+const levelsLayer: RetouchEffectLayer = {
+  id: 'retouch:levels',
+  type: 'effect',
   kind: 'levels',
   name: '色阶 1',
   visible: true,
   params: { shadows: 0, midtones: 128, highlights: 255, outputBlack: 0, outputWhite: 255 },
 }
 
-const sharpenLayer: RetouchAdjustmentLayer = {
-  id: 'adjustment:sharpen',
-  type: 'adjustment',
+const sharpenLayer: RetouchEffectLayer = {
+  id: 'retouch:sharpen',
+  type: 'effect',
   kind: 'sharpen',
   name: '锐化 1',
   visible: true,
   params: { amount: 0, radius: 1, threshold: 4, protectColor: true },
 }
 
-describe('imageAdjustmentEngine', () => {
-  it('keeps default adjustment layers visually neutral', () => {
+describe('imageRetouchEngine', () => {
+  it('keeps default retouch layers visually neutral', () => {
     const source = makeImageData([32, 96, 160, 128])
 
-    const result = applyImageAdjustments(source, [hslLayer, curvesLayer, levelsLayer, sharpenLayer])
+    const result = applyImageRetouch(source, [hslLayer, curvesLayer, levelsLayer, sharpenLayer])
 
     expect(pixelValues(result)).toEqual([32, 96, 160, 128])
     expect(pixelValues(source)).toEqual([32, 96, 160, 128])
-    expect(hasEffectiveImageAdjustments([hslLayer, curvesLayer, levelsLayer, sharpenLayer])).toBe(
-      false,
-    )
+    expect(hasEffectiveImageRetouch([hslLayer, curvesLayer, levelsLayer, sharpenLayer])).toBe(false)
   })
 
   it('skips hidden layers and keeps alpha unchanged', () => {
     const source = makeImageData([10, 20, 30, 77])
 
-    const result = applyImageAdjustments(source, [makeLayer(thresholdLayer, { visible: false })])
+    const result = applyImageRetouch(source, [makeLayer(thresholdLayer, { visible: false })])
 
     expect(pixelValues(result)).toEqual([10, 20, 30, 77])
   })
 
-  it('can execute adjustments in place for renderer memory efficiency', () => {
+  it('can execute effects in place for renderer memory efficiency', () => {
     const source = makeImageData([10, 20, 30, 77])
 
-    const result = applyImageAdjustmentsInPlace(source, [thresholdLayer])
+    const result = applyImageRetouchInPlace(source, [thresholdLayer])
 
     expect(result).toBe(source)
     expect(pixelValues(source)).toEqual([0, 0, 0, 77])
@@ -125,7 +120,7 @@ describe('imageAdjustmentEngine', () => {
     const sourceValues = [10, 20, 30, 77, 120, 80, 40, 88, 200, 210, 220, 99, 32, 96, 160, 111]
     const wholeImage = makeImageData(sourceValues)
     const rangedImage = makeImageData(sourceValues)
-    const plan: ImageAdjustmentPlan = [
+    const plan: ImageRetouchPlan = [
       { kind: 'channel-lut', luts: createChannelLiftLutsForTest() },
       { kind: 'threshold', threshold: 128, invert: true },
       {
@@ -138,10 +133,10 @@ describe('imageAdjustmentEngine', () => {
       },
     ]
 
-    executeImageAdjustmentPlan(wholeImage, plan)
+    executeImageRetouchPlan(wholeImage, plan)
     for (const step of plan) {
-      executeImageAdjustmentPlanStepRange(rangedImage.data, step, 0, 8)
-      executeImageAdjustmentPlanStepRange(rangedImage.data, step, 8, rangedImage.data.length)
+      executeImageRetouchPlanStepRange(rangedImage.data, step, 0, 8)
+      executeImageRetouchPlanStepRange(rangedImage.data, step, 8, rangedImage.data.length)
     }
 
     expect(pixelValues(rangedImage)).toEqual(pixelValues(wholeImage))
@@ -155,24 +150,18 @@ describe('imageAdjustmentEngine', () => {
     ]
     const wholeImage = makeImageData(sourceValues, 4, 3)
     const rangedImage = makeImageData(sourceValues, 4, 3)
-    const plan = compileImageAdjustmentPlan([
+    const plan = compileImageRetouchPlan([
       makeLayer(sharpenLayer, {
         params: { amount: 160, radius: 1.4, threshold: 0, protectColor: true },
       }),
     ])
 
-    executeImageAdjustmentPlan(wholeImage, plan)
+    executeImageRetouchPlan(wholeImage, plan)
     for (const step of plan) {
-      const state = createImageAdjustmentPlanStepExecutionState(rangedImage, step)
-      executeImageAdjustmentPlanStepRange(rangedImage.data, step, 0, 12, state)
-      executeImageAdjustmentPlanStepRange(rangedImage.data, step, 12, 28, state)
-      executeImageAdjustmentPlanStepRange(
-        rangedImage.data,
-        step,
-        28,
-        rangedImage.data.length,
-        state,
-      )
+      const state = createImageRetouchPlanStepExecutionState(rangedImage, step)
+      executeImageRetouchPlanStepRange(rangedImage.data, step, 0, 12, state)
+      executeImageRetouchPlanStepRange(rangedImage.data, step, 12, 28, state)
+      executeImageRetouchPlanStepRange(rangedImage.data, step, 28, rangedImage.data.length, state)
     }
 
     expect(pixelValues(rangedImage)).toEqual(pixelValues(wholeImage))
@@ -181,8 +170,8 @@ describe('imageAdjustmentEngine', () => {
   it('applies threshold and threshold invert', () => {
     const source = makeImageData([120, 120, 120, 255, 200, 200, 200, 200])
 
-    const normal = applyImageAdjustments(source, [thresholdLayer])
-    const inverted = applyImageAdjustments(source, [
+    const normal = applyImageRetouch(source, [thresholdLayer])
+    const inverted = applyImageRetouch(source, [
       makeLayer(thresholdLayer, { params: { threshold: 128, invert: true } }),
     ])
 
@@ -193,7 +182,7 @@ describe('imageAdjustmentEngine', () => {
   it('applies curves with multiple smooth RGB control points', () => {
     const source = makeImageData([64, 128, 192, 255])
 
-    const result = applyImageAdjustments(source, [
+    const result = applyImageRetouch(source, [
       makeLayer(curvesLayer, {
         params: {
           channels: {
@@ -213,7 +202,7 @@ describe('imageAdjustmentEngine', () => {
   it('keeps curves endpoint LUTs monotonic and continuous', () => {
     const source = makeImageData([0, 64, 128, 255, 192, 255, 255, 255])
 
-    const inputAtBlack = applyImageAdjustments(source, [
+    const inputAtBlack = applyImageRetouch(source, [
       makeLayer(curvesLayer, {
         params: {
           channels: {
@@ -222,7 +211,7 @@ describe('imageAdjustmentEngine', () => {
         },
       }),
     ])
-    const inputAtWhite = applyImageAdjustments(source, [
+    const inputAtWhite = applyImageRetouch(source, [
       makeLayer(curvesLayer, {
         params: {
           channels: {
@@ -239,7 +228,7 @@ describe('imageAdjustmentEngine', () => {
   it('applies per-channel curves after RGB composite curves', () => {
     const source = makeImageData([128, 128, 128, 255])
 
-    const result = applyImageAdjustments(source, [
+    const result = applyImageRetouch(source, [
       makeLayer(curvesLayer, {
         params: {
           channels: {
@@ -256,7 +245,7 @@ describe('imageAdjustmentEngine', () => {
   it('applies levels with black and white points', () => {
     const source = makeImageData([0, 64, 192, 255])
 
-    const result = applyImageAdjustments(source, [
+    const result = applyImageRetouch(source, [
       makeLayer(levelsLayer, {
         params: { shadows: 64, midtones: 128, highlights: 191, outputBlack: 0, outputWhite: 255 },
       }),
@@ -265,10 +254,10 @@ describe('imageAdjustmentEngine', () => {
     expect(pixelValues(result)).toEqual([0, 0, 255, 255])
   })
 
-  it('applies hue and lightness adjustments', () => {
+  it('applies hue and lightness effects', () => {
     const source = makeImageData([255, 0, 0, 255])
 
-    const result = applyImageAdjustments(source, [
+    const result = applyImageRetouch(source, [
       makeLayer(hslLayer, { params: { hue: 120, saturation: 0, lightness: 10 } }),
     ])
 
@@ -282,7 +271,7 @@ describe('imageAdjustmentEngine', () => {
       1,
     )
 
-    const result = applyImageAdjustments(source, [
+    const result = applyImageRetouch(source, [
       makeLayer(sharpenLayer, {
         params: { amount: 150, radius: 1, threshold: 0, protectColor: false },
       }),
@@ -301,12 +290,12 @@ describe('imageAdjustmentEngine', () => {
   it('uses threshold to suppress low-contrast sharpen noise', () => {
     const source = makeImageData([100, 100, 100, 255, 104, 104, 104, 255, 100, 100, 100, 255], 3, 1)
 
-    const suppressed = applyImageAdjustments(source, [
+    const suppressed = applyImageRetouch(source, [
       makeLayer(sharpenLayer, {
         params: { amount: 200, radius: 1, threshold: 10, protectColor: false },
       }),
     ])
-    const enhanced = applyImageAdjustments(source, [
+    const enhanced = applyImageRetouch(source, [
       makeLayer(sharpenLayer, {
         params: { amount: 200, radius: 1, threshold: 0, protectColor: false },
       }),
@@ -326,12 +315,12 @@ describe('imageAdjustmentEngine', () => {
       1,
     )
 
-    const narrow = applyImageAdjustments(source, [
+    const narrow = applyImageRetouch(source, [
       makeLayer(sharpenLayer, {
         params: { amount: 160, radius: 0.3, threshold: 0, protectColor: false },
       }),
     ])
-    const wide = applyImageAdjustments(source, [
+    const wide = applyImageRetouch(source, [
       makeLayer(sharpenLayer, {
         params: { amount: 160, radius: 3, threshold: 0, protectColor: false },
       }),
@@ -350,12 +339,12 @@ describe('imageAdjustmentEngine', () => {
       1,
     )
 
-    const protectedColor = applyImageAdjustments(source, [
+    const protectedColor = applyImageRetouch(source, [
       makeLayer(sharpenLayer, {
         params: { amount: 120, radius: 1, threshold: 0, protectColor: true },
       }),
     ])
-    const directRgb = applyImageAdjustments(source, [
+    const directRgb = applyImageRetouch(source, [
       makeLayer(sharpenLayer, {
         params: { amount: 120, radius: 1, threshold: 0, protectColor: false },
       }),
@@ -373,13 +362,13 @@ describe('imageAdjustmentEngine', () => {
   it('applies non-commutative layers in declared order', () => {
     const source = makeImageData([128, 128, 128, 255])
 
-    const curvesThenThreshold = applyImageAdjustments(source, [
+    const curvesThenThreshold = applyImageRetouch(source, [
       makeLayer(curvesLayer, {
         params: { channels: { rgb: [{ id: 'point:mid', input: 50, output: 25 }] } },
       }),
       thresholdLayer,
     ])
-    const thresholdThenCurves = applyImageAdjustments(source, [
+    const thresholdThenCurves = applyImageRetouch(source, [
       thresholdLayer,
       makeLayer(curvesLayer, {
         params: { channels: { rgb: [{ id: 'point:mid', input: 50, output: 25 }] } },
@@ -391,11 +380,11 @@ describe('imageAdjustmentEngine', () => {
   })
 
   it('compiles neutral layers away and merges continuous channel LUT work', () => {
-    const plan = compileImageAdjustmentPlan([hslLayer, curvesLayer, levelsLayer])
+    const plan = compileImageRetouchPlan([hslLayer, curvesLayer, levelsLayer])
 
     expect(plan).toEqual([])
 
-    const channelPlan = compileImageAdjustmentPlan([
+    const channelPlan = compileImageRetouchPlan([
       makeLayer(curvesLayer, {
         params: { channels: { rgb: [{ id: 'point:mid', input: 50, output: 25 }] } },
       }),
@@ -409,7 +398,7 @@ describe('imageAdjustmentEngine', () => {
   })
 
   it('compiles non-neutral sharpen as an ordered spatial plan step', () => {
-    const plan = compileImageAdjustmentPlan([
+    const plan = compileImageRetouchPlan([
       makeLayer(curvesLayer, {
         params: { channels: { rgb: [{ id: 'point:mid', input: 50, output: 25 }] } },
       }),
@@ -428,10 +417,10 @@ describe('imageAdjustmentEngine', () => {
     })
   })
 
-  it('treats non-finite adjustment params as neutral defaults', () => {
+  it('treats non-finite retouch params as neutral defaults', () => {
     const source = makeImageData([32, 96, 160, 255])
 
-    const result = applyImageAdjustments(source, [
+    const result = applyImageRetouch(source, [
       makeLayer(hslLayer, {
         params: {
           hue: Number.NaN,
@@ -461,8 +450,8 @@ describe('imageAdjustmentEngine', () => {
     expect(pixelValues(result)).toEqual([0, 0, 0, 255])
   })
 
-  it('normalizes adjustment params through centralized definitions', () => {
-    const normalizedHsl = normalizeImageAdjustmentLayer(
+  it('normalizes retouch params through centralized definitions', () => {
+    const normalizedHsl = normalizeImageEffectLayer(
       makeLayer(hslLayer, {
         params: {
           hue: Number.NaN,
@@ -471,10 +460,10 @@ describe('imageAdjustmentEngine', () => {
         },
       }),
     )
-    const normalizedThreshold = normalizeImageAdjustmentLayer(
+    const normalizedThreshold = normalizeImageEffectLayer(
       makeLayer(thresholdLayer, { params: { threshold: Number.NaN, invert: true } }),
     )
-    const normalizedSharpen = normalizeImageAdjustmentLayer(
+    const normalizedSharpen = normalizeImageEffectLayer(
       makeLayer(sharpenLayer, {
         params: {
           amount: Number.POSITIVE_INFINITY,
@@ -486,7 +475,7 @@ describe('imageAdjustmentEngine', () => {
     )
 
     expect(normalizedHsl.kind).toBe('hsl')
-    if (normalizedHsl.kind !== 'hsl') throw new Error('expected hsl adjustment')
+    if (normalizedHsl.kind !== 'hsl') throw new Error('expected hsl retouch')
     expect(normalizedHsl.params).toEqual({
       hueShift: 0,
       saturationScale: 1,
@@ -503,7 +492,7 @@ describe('imageAdjustmentEngine', () => {
 })
 
 function createChannelLiftLutsForTest(): NonNullable<
-  Extract<ImageAdjustmentPlan[number], { kind: 'channel-lut' }>['luts']
+  Extract<ImageRetouchPlan[number], { kind: 'channel-lut' }>['luts']
 > {
   const lut = new Uint8ClampedArray(256)
   for (let index = 0; index < lut.length; index += 1) {

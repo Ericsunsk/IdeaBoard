@@ -140,77 +140,86 @@ export function createSearchFeed(
     })
   }
 
+  function beginResetLoad(): SearchFeedSnapshot | null {
+    controller?.abort()
+    cancelCacheWrite()
+    cancelScrollWrite()
+    controller = new AbortController()
+    savedKeys.value = new Set()
+    savedMutationRevision = 0
+    savedKeyMutationRevisions.clear()
+    failedImages.value = new Set()
+    imageRetryCounts.value = new Map()
+
+    const cached = dependencies.persistence.read(options.submittedQuery.value, cacheScope, true)
+    const cachedFallback =
+      cached && cached.results.length > 0 && !options.keepResultsOnNextLoad.value ? cached : null
+    if (cachedFallback) {
+      hydrate(cachedFallback)
+    } else {
+      if (!options.keepResultsOnNextLoad.value) results.value = []
+      hasMore.value = false
+    }
+    nextCursor.value = options.submittedQuery.value === '' ? dependencies.randomCursor() : ''
+    loading.value = true
+    options.keepResultsOnNextLoad.value = false
+    hasError.value = false
+    return cachedFallback
+  }
+
+  async function fetchSearchPage(reset: boolean, generation: number): Promise<void> {
+    const page = await dependencies.search({
+      query: options.submittedQuery.value,
+      cursor: nextCursor.value || undefined,
+      limit: 24,
+      signal: controller?.signal,
+    })
+    if (generation !== loadGeneration) return
+    const nextResults = reset ? page.results : [...results.value, ...page.results]
+    results.value = nextResults
+    nextCursor.value = page.next_cursor || ''
+    hasMore.value = page.has_more
+    scheduleCacheWrite(
+      {
+        query: options.submittedQuery.value,
+        results: nextResults,
+        nextCursor: nextCursor.value,
+        hasMore: hasMore.value,
+      },
+      generation,
+    )
+    // Fresh results replace cached cards, so resolve saved state only once
+    // against the rendered page instead of merging stale cache projections.
+    void refreshSavedKeys(page.results, generation)
+  }
+
+  function recoverFromLoadError(
+    error: unknown,
+    generation: number,
+    cachedFallback: SearchFeedSnapshot | null,
+  ): void {
+    if (generation !== loadGeneration) return
+    if (error instanceof DOMException && error.name === 'AbortError') return
+    hasError.value = true
+    if (cachedFallback) {
+      // A failed SWR refresh must leave one coherent cached page behind.
+      // Otherwise cards are cached but pagination restarts at page one.
+      nextCursor.value = cachedFallback.nextCursor
+      hasMore.value = cachedFallback.hasMore
+      void refreshSavedKeys(cachedFallback.results, generation)
+    }
+  }
+
   async function load(reset: boolean): Promise<void> {
     const generation = reset ? ++loadGeneration : loadGeneration
-    let cachedFallback: SearchFeedSnapshot | null = null
-    if (reset) {
-      controller?.abort()
-      cancelCacheWrite()
-      cancelScrollWrite()
-      controller = new AbortController()
-      savedKeys.value = new Set()
-      savedMutationRevision = 0
-      savedKeyMutationRevisions.clear()
-      failedImages.value = new Set()
-      imageRetryCounts.value = new Map()
-
-      const cached = dependencies.persistence.read(options.submittedQuery.value, cacheScope, true)
-      if (cached && cached.results.length > 0 && !options.keepResultsOnNextLoad.value) {
-        cachedFallback = cached
-        hydrate(cached)
-        nextCursor.value = options.submittedQuery.value === '' ? dependencies.randomCursor() : ''
-        loading.value = true
-      } else {
-        if (!options.keepResultsOnNextLoad.value) results.value = []
-        nextCursor.value = options.submittedQuery.value === '' ? dependencies.randomCursor() : ''
-        hasMore.value = false
-        loading.value = true
-      }
-      options.keepResultsOnNextLoad.value = false
-      hasError.value = false
-    } else {
-      if (loading.value || loadingMore.value || !hasMore.value) return
-      loadingMore.value = true
-    }
+    const cachedFallback = reset ? beginResetLoad() : null
+    if (!reset && (loading.value || loadingMore.value || !hasMore.value)) return
+    if (!reset) loadingMore.value = true
 
     try {
-      const page = await dependencies.search({
-        query: options.submittedQuery.value,
-        cursor: nextCursor.value || undefined,
-        limit: 24,
-        signal: controller?.signal,
-      })
-      if (generation !== loadGeneration) return
-      const nextResults = reset ? page.results : [...results.value, ...page.results]
-      results.value = nextResults
-      nextCursor.value = page.next_cursor || ''
-      hasMore.value = page.has_more
-      scheduleCacheWrite(
-        {
-          query: options.submittedQuery.value,
-          results: nextResults,
-          nextCursor: nextCursor.value,
-          hasMore: hasMore.value,
-        },
-        generation,
-      )
-      // Fresh results replace cached cards, so resolve saved state only once
-      // against the rendered page instead of merging stale cache projections.
-      void refreshSavedKeys(page.results, generation)
+      await fetchSearchPage(reset, generation)
     } catch (error) {
-      if (
-        generation === loadGeneration &&
-        !(error instanceof DOMException && error.name === 'AbortError')
-      ) {
-        hasError.value = true
-        if (cachedFallback) {
-          // A failed SWR refresh must leave one coherent cached page behind.
-          // Otherwise cards are cached but pagination restarts at page one.
-          nextCursor.value = cachedFallback.nextCursor
-          hasMore.value = cachedFallback.hasMore
-          void refreshSavedKeys(cachedFallback.results, generation)
-        }
-      }
+      recoverFromLoadError(error, generation, cachedFallback)
     } finally {
       if (generation === loadGeneration) {
         loading.value = false

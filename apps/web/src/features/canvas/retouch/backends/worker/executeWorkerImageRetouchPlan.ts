@@ -1,4 +1,4 @@
-import type { ImageAdjustmentPlan } from '../../utils/imageAdjustmentEngine'
+import type { ImageRetouchPlan } from '../../utils/imageRetouchEngine'
 import { cloneImageData } from '../../utils/imageDataUtils'
 import type {
   WorkerImageProcessingErrorPayload,
@@ -23,7 +23,7 @@ export type WorkerImageProcessingLike = {
 
 export type WorkerImageProcessingFactory = () => WorkerImageProcessingLike
 
-export type ExecuteWorkerImageAdjustmentPlanOptions = {
+export type ExecuteWorkerImageRetouchPlanOptions = {
   signal?: AbortSignal | undefined
   onProgress?: ((progress: WorkerImageProcessingProgress) => void) | undefined
   requestId?: string | undefined
@@ -32,7 +32,7 @@ export type ExecuteWorkerImageAdjustmentPlanOptions = {
 
 type WorkerImageProcessingClientRequest = {
   imageData: ImageData
-  plan: ImageAdjustmentPlan
+  plan: ImageRetouchPlan
   signal?: AbortSignal | undefined
   onProgress?: ((progress: WorkerImageProcessingProgress) => void) | undefined
   requestId?: string | undefined
@@ -53,10 +53,10 @@ export class WorkerImageProcessingError extends Error {
   }
 }
 
-export function executeWorkerImageAdjustmentPlan(
+export function executeWorkerImageRetouchPlan(
   imageData: ImageData,
-  plan: ImageAdjustmentPlan,
-  options: ExecuteWorkerImageAdjustmentPlanOptions = {},
+  plan: ImageRetouchPlan,
+  options: ExecuteWorkerImageRetouchPlanOptions = {},
 ): Promise<ImageData> {
   const client = options.workerFactory
     ? createWorkerImageProcessingClient(options.workerFactory)
@@ -216,7 +216,7 @@ function settlePendingRequest(pending: PendingWorkerImageProcessingRequest, call
 function createWorkerExecutePayload(
   requestId: string,
   imageData: ImageData,
-  plan: ImageAdjustmentPlan,
+  plan: ImageRetouchPlan,
 ): { message: WorkerImageProcessingExecuteRequest; transfer: Transferable[] } {
   const workerImageData = cloneImageData(imageData)
   const imageBuffer = workerImageData.data.buffer
@@ -225,13 +225,13 @@ function createWorkerExecutePayload(
       type: 'execute',
       requestId,
       imageData: workerImageData,
-      plan: cloneImageAdjustmentPlanForWorker(plan),
+      plan: cloneImageRetouchPlanForWorker(plan),
     },
     transfer: imageBuffer instanceof ArrayBuffer ? [imageBuffer] : [],
   }
 }
 
-function cloneImageAdjustmentPlanForWorker(plan: ImageAdjustmentPlan): ImageAdjustmentPlan {
+function cloneImageRetouchPlanForWorker(plan: ImageRetouchPlan): ImageRetouchPlan {
   return plan.map((step) => {
     switch (step.kind) {
       case 'hsl':

@@ -1,13 +1,13 @@
-import type { RetouchAdjustmentLayer, RetouchLayer } from '../types'
-import { executeImageAdjustmentPlan } from './imageAdjustmentEngine'
-import { buildImageAdjustmentPlanFromAdjustmentLayers } from './imageAdjustmentPlanPipeline'
-import { flattenVisibleRetouchAdjustmentLayersBeforeLayer } from './retouchLayerAdjustments'
+import type { RetouchEffectLayer, RetouchLayer } from '../types'
+import { executeImageRetouchPlan } from './imageRetouchEngine'
+import { buildImageRetouchPlanFromEffectLayers } from './imageRetouchPlanPipeline'
+import { flattenVisibleRetouchEffectLayersBeforeLayer } from './retouchLayerEffects'
 import { cloneImageData } from './imageDataUtils'
 
 export type RetouchHistogramSourceCacheKey = {
   sourceImageData: ImageData
   targetLayerId: string
-  upstreamLayers: readonly RetouchAdjustmentLayer[]
+  upstreamLayers: readonly RetouchEffectLayer[]
 }
 
 export type RetouchHistogramSourceResolution = {
@@ -28,7 +28,7 @@ export function resolveRetouchHistogramSource({
   targetLayerId,
   cachedResolution,
 }: ResolveRetouchHistogramSourceOptions): RetouchHistogramSourceResolution {
-  const upstreamLayers = flattenVisibleRetouchAdjustmentLayersBeforeLayer(layers, targetLayerId)
+  const upstreamLayers = flattenVisibleRetouchEffectLayersBeforeLayer(layers, targetLayerId)
   const cacheKey: RetouchHistogramSourceCacheKey = {
     sourceImageData,
     targetLayerId,
@@ -43,8 +43,8 @@ export function resolveRetouchHistogramSource({
   }
 
   const imageData = cloneImageData(sourceImageData)
-  const plan = buildImageAdjustmentPlanFromAdjustmentLayers(upstreamLayers)
-  if (plan.length > 0) executeImageAdjustmentPlan(imageData, plan)
+  const plan = buildImageRetouchPlanFromEffectLayers(upstreamLayers)
+  if (plan.length > 0) executeImageRetouchPlan(imageData, plan)
 
   return {
     imageData,
@@ -64,8 +64,8 @@ function areSameRetouchHistogramSourceCacheKeys(
 }
 
 function areSameLayerRefs(
-  first: readonly RetouchAdjustmentLayer[],
-  second: readonly RetouchAdjustmentLayer[],
+  first: readonly RetouchEffectLayer[],
+  second: readonly RetouchEffectLayer[],
 ) {
   return first.length === second.length && first.every((layer, index) => layer === second[index])
 }

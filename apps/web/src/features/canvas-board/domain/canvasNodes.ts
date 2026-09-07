@@ -28,7 +28,7 @@ export const DEFAULT_IMAGE_NODE_OUTPUT_COUNT = 1
 export const IMAGE_OUTPUT_COUNT_PRESET_OPTIONS = REQUESTED_OUTPUT_COUNT_OPTIONS
 export const DEFAULT_PROMPT_NODE_OUTPUT_COUNT = 1
 export const DEFAULT_FUSION_NODE_OUTPUT_COUNT = 1
-export const CANVAS_BOARD_STATE_SCHEMA_VERSION = 3
+export const CANVAS_BOARD_STATE_SCHEMA_VERSION = 4
 export { DEFAULT_PROMPT_ASPECT_RATIO, type PromptAspectRatio }
 export type { OutputResolution }
 export { DEFAULT_FUSION_BLEND_POINT, type FusionBlendPoint }
@@ -84,7 +84,7 @@ export interface ImageNodeOutputItem {
   mediaAssetId?: number | undefined
 }
 
-export type ImageAdjustmentRecipeStep =
+export type ImageRetouchRecipeStep =
   | { kind: 'hsl'; params: { hueShift: number; saturationScale: number; lightnessOffset: number } }
   | { kind: 'threshold'; threshold: number; invert: boolean }
   | {
@@ -96,11 +96,11 @@ export type ImageAdjustmentRecipeStep =
       params: { amount: number; radius: number; threshold: number; protectColor: boolean }
     }
 
-export interface ImageAdjustmentRecipe {
+export interface ImageRetouchRecipe {
   version: 1
   sourceMediaAssetId: number
   sourceMimeType?: string | undefined
-  plan: ImageAdjustmentRecipeStep[]
+  plan: ImageRetouchRecipeStep[]
 }
 
 export interface BoardStateMediaRef {
@@ -130,7 +130,7 @@ export interface ImageNodeItem {
   sourceImageUrl: string
   sourceMediaRef?: MediaRef | undefined
   sourceMediaAssetId?: number | undefined
-  adjustmentRecipe?: ImageAdjustmentRecipe | undefined
+  retouchRecipe?: ImageRetouchRecipe | undefined
   sourceImageRatio: number
   outputCount?: number | undefined
   outputResolution?: OutputResolution | undefined

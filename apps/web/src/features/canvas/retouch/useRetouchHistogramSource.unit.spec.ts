@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { describe, expect, it } from 'vitest'
-import type { RetouchAdjustmentLayer, RetouchLayer, RetouchRenderedPreview } from './types'
+import type { RetouchEffectLayer, RetouchLayer, RetouchRenderedPreview } from './types'
 import { useRetouchHistogramSource } from './useRetouchHistogramSource'
 
 function makeImageData(values: number[]) {
@@ -22,10 +22,10 @@ function pixelValues(imageData: ImageData | null) {
   return imageData ? Array.from(imageData.data) : []
 }
 
-function createThresholdLayer(id = 'adjustment:threshold'): RetouchAdjustmentLayer {
+function createThresholdLayer(id = 'retouch:threshold'): RetouchEffectLayer {
   return {
     id,
-    type: 'adjustment',
+    type: 'effect',
     kind: 'threshold',
     name: '阈值',
     visible: true,
@@ -33,10 +33,10 @@ function createThresholdLayer(id = 'adjustment:threshold'): RetouchAdjustmentLay
   }
 }
 
-function createCurvesLayer(id = 'adjustment:curves', output = 50): RetouchAdjustmentLayer {
+function createCurvesLayer(id = 'retouch:curves', output = 50): RetouchEffectLayer {
   return {
     id,
-    type: 'adjustment',
+    type: 'effect',
     kind: 'curves',
     name: '曲线',
     visible: true,
@@ -58,7 +58,7 @@ function createSourceLayer(): RetouchLayer {
 }
 
 describe('useRetouchHistogramSource', () => {
-  it('uses the rendered source before the selected adjustment layer', () => {
+  it('uses the rendered source before the selected retouch layer', () => {
     const sourceImageData = makeImageData([10, 20, 30, 255])
     const previewSource = computed<RetouchRenderedPreview>(() => ({
       type: 'rendered-image',
@@ -69,11 +69,11 @@ describe('useRetouchHistogramSource', () => {
     const thresholdLayer = createThresholdLayer()
     const curvesLayer = createCurvesLayer()
     const layers = ref<RetouchLayer[]>([thresholdLayer, curvesLayer, createSourceLayer()])
-    const selectedAdjustmentLayer = computed(() => curvesLayer)
+    const selectedEffectLayer = computed(() => curvesLayer)
     const { retouchHistogramSource } = useRetouchHistogramSource({
       isAdjustMode: ref(true),
       layers,
-      selectedAdjustmentLayer,
+      selectedEffectLayer,
       previewSource,
     })
 
@@ -89,18 +89,18 @@ describe('useRetouchHistogramSource', () => {
       height: 1,
     }))
     const thresholdLayer = createThresholdLayer()
-    const curvesLayer = createCurvesLayer('adjustment:curves', 60)
+    const curvesLayer = createCurvesLayer('retouch:curves', 60)
     const layers = ref<RetouchLayer[]>([thresholdLayer, curvesLayer, createSourceLayer()])
-    const selectedAdjustmentLayer = computed(() => layers.value[1] as RetouchAdjustmentLayer)
+    const selectedEffectLayer = computed(() => layers.value[1] as RetouchEffectLayer)
     const { retouchHistogramSource } = useRetouchHistogramSource({
       isAdjustMode: ref(true),
       layers,
-      selectedAdjustmentLayer,
+      selectedEffectLayer,
       previewSource,
     })
 
     const firstHistogramSource = retouchHistogramSource.value
-    layers.value = [thresholdLayer, createCurvesLayer('adjustment:curves', 20), createSourceLayer()]
+    layers.value = [thresholdLayer, createCurvesLayer('retouch:curves', 20), createSourceLayer()]
 
     expect(retouchHistogramSource.value).toBe(firstHistogramSource)
   })
@@ -112,9 +112,9 @@ describe('useRetouchHistogramSource', () => {
       width: 1,
       height: 1,
     }))
-    const firstThresholdLayer = createThresholdLayer('adjustment:threshold:1')
-    const firstCurvesLayer = createCurvesLayer('adjustment:curves:1')
-    const secondCurvesLayer = createCurvesLayer('adjustment:curves:2')
+    const firstThresholdLayer = createThresholdLayer('retouch:threshold:1')
+    const firstCurvesLayer = createCurvesLayer('retouch:curves:1')
+    const secondCurvesLayer = createCurvesLayer('retouch:curves:2')
     const layers = ref<RetouchLayer[]>([
       firstThresholdLayer,
       firstCurvesLayer,
@@ -122,17 +122,17 @@ describe('useRetouchHistogramSource', () => {
       createSourceLayer(),
     ])
     const selectedLayerId = ref(firstCurvesLayer.id)
-    const selectedAdjustmentLayer = computed(
+    const selectedEffectLayer = computed(
       () =>
         layers.value.find(
-          (layer): layer is RetouchAdjustmentLayer =>
-            layer.type === 'adjustment' && layer.id === selectedLayerId.value,
+          (layer): layer is RetouchEffectLayer =>
+            layer.type === 'effect' && layer.id === selectedLayerId.value,
         ) ?? null,
     )
     const { retouchHistogramSource } = useRetouchHistogramSource({
       isAdjustMode: ref(true),
       layers,
-      selectedAdjustmentLayer,
+      selectedEffectLayer,
       previewSource,
     })
 

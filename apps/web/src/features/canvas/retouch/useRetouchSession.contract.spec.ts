@@ -1,45 +1,43 @@
 import { describe, expect, it } from 'vitest'
 import { useRetouchSession } from './useRetouchSession'
-import { flattenVisibleRetouchAdjustmentLayers } from './utils/retouchLayerAdjustments'
+import { flattenVisibleRetouchEffectLayers } from './utils/retouchLayerEffects'
 
 describe('useRetouchSession', () => {
-  it('keeps adjustment selection transient until a parameter changes', () => {
+  it('keeps retouch selection transient until a parameter changes', () => {
     const session = useRetouchSession()
 
-    expect(session.selectedRetouchAdjustmentLayer.value?.kind).toBe('hsl')
+    expect(session.selectedRetouchEffectLayer.value?.kind).toBe('hsl')
     expect(session.retouchLayers.value.map((layer) => layer.id)).toEqual(['source'])
 
-    session.selectImageAdjustmentLayer('threshold')
+    session.selectImageEffectLayer('threshold')
 
-    expect(session.selectedRetouchAdjustmentLayer.value?.kind).toBe('threshold')
+    expect(session.selectedRetouchEffectLayer.value?.kind).toBe('threshold')
     expect(session.retouchLayers.value).toHaveLength(1)
 
-    session.updateSelectedRetouchAdjustmentParams({ threshold: 128, invert: false })
+    session.updateSelectedRetouchEffectParams({ threshold: 128, invert: false })
     expect(session.retouchLayers.value).toHaveLength(1)
 
-    session.updateSelectedRetouchAdjustmentParams({ threshold: 128, invert: true })
-    expect(session.retouchLayers.value.some((layer) => layer.id === 'adjustment:threshold')).toBe(
-      true,
-    )
+    session.updateSelectedRetouchEffectParams({ threshold: 128, invert: true })
+    expect(session.retouchLayers.value.some((layer) => layer.id === 'retouch:threshold')).toBe(true)
   })
 
   it('does not leave a layer when switching tools without editing', () => {
     const session = useRetouchSession()
 
-    session.selectImageAdjustmentLayer('hsl')
+    session.selectImageEffectLayer('hsl')
     session.updateSelectedRetouchLayerParam('lightness', 0)
-    session.selectImageAdjustmentLayer('curves')
-    session.updateSelectedRetouchAdjustmentParams({ channels: {} })
-    session.selectImageAdjustmentLayer('levels')
-    session.updateSelectedRetouchAdjustmentParams({
+    session.selectImageEffectLayer('curves')
+    session.updateSelectedRetouchEffectParams({ channels: {} })
+    session.selectImageEffectLayer('levels')
+    session.updateSelectedRetouchEffectParams({
       shadows: 0,
       midtones: 128,
       highlights: 255,
       outputBlack: 0,
       outputWhite: 255,
     })
-    session.selectImageAdjustmentLayer('sharpen')
-    session.updateSelectedRetouchAdjustmentParams({
+    session.selectImageEffectLayer('sharpen')
+    session.updateSelectedRetouchEffectParams({
       amount: 0,
       radius: 1,
       threshold: 4,
@@ -47,15 +45,15 @@ describe('useRetouchSession', () => {
     })
 
     expect(session.retouchLayers.value.map((layer) => layer.id)).toEqual(['source'])
-    expect(session.selectedRetouchAdjustmentLayer.value?.kind).toBe('sharpen')
+    expect(session.selectedRetouchEffectLayer.value?.kind).toBe('sharpen')
   })
 
-  it('selects source layers and clears the pending adjustment', () => {
+  it('selects source layers and clears the pending retouch', () => {
     const session = useRetouchSession()
 
     session.selectRetouchLayer('source')
 
-    expect(session.selectedRetouchAdjustmentLayer.value).toBeNull()
+    expect(session.selectedRetouchEffectLayer.value).toBeNull()
   })
 
   it('adds paint layers above the selected editable layer', () => {
@@ -92,15 +90,15 @@ describe('useRetouchSession', () => {
   it('copies editable layers with unique ids and names', () => {
     const session = useRetouchSession()
 
-    session.selectImageAdjustmentLayer('hsl')
+    session.selectImageEffectLayer('hsl')
     session.updateSelectedRetouchLayerParam('lightness', 10)
     session.copyRetouchLayer()
 
     const [copyLayer, originalLayer] = session.retouchLayers.value
-    expect(copyLayer?.type).toBe('adjustment')
+    expect(copyLayer?.type).toBe('effect')
     expect(copyLayer?.id).not.toBe(originalLayer?.id)
     expect(copyLayer?.name).toBe('Hue/Saturation 1 copy')
-    expect(originalLayer?.type).toBe('adjustment')
+    expect(originalLayer?.type).toBe('effect')
     expect(session.selectedRetouchLayerId.value).toBe(copyLayer?.id)
   })
 
@@ -117,13 +115,13 @@ describe('useRetouchSession', () => {
     expect(copyLayer?.type === 'paint' ? copyLayer.content : null).toEqual({ kind: 'empty' })
   })
 
-  it('merges the selected editable layer down and preserves visible adjustments', () => {
+  it('merges the selected editable layer down and preserves visible effects', () => {
     const session = useRetouchSession()
-    session.selectImageAdjustmentLayer('hsl')
+    session.selectImageEffectLayer('hsl')
     session.updateSelectedRetouchLayerParam('lightness', 10)
-    session.selectImageAdjustmentLayer('threshold')
-    session.updateSelectedRetouchAdjustmentParams({ threshold: 128, invert: true })
-    session.selectImageAdjustmentLayer('hsl')
+    session.selectImageEffectLayer('threshold')
+    session.updateSelectedRetouchEffectParams({ threshold: 128, invert: true })
+    session.selectImageEffectLayer('hsl')
     session.mergeRetouchLayer()
 
     const mergedLayer = session.retouchLayers.value[0]
@@ -131,24 +129,24 @@ describe('useRetouchSession', () => {
     expect(mergedLayer?.name).toBe('Merged layer 1')
     expect(session.selectedRetouchLayerId.value).toBe(mergedLayer?.id)
     expect(
-      flattenVisibleRetouchAdjustmentLayers(session.retouchLayers.value).map((layer) => layer.kind),
+      flattenVisibleRetouchEffectLayers(session.retouchLayers.value).map((layer) => layer.kind),
     ).toEqual(['hsl', 'threshold'])
   })
 
   it('removes selected editable layers and selects the nearest editable fallback', () => {
     const session = useRetouchSession()
-    session.selectImageAdjustmentLayer('threshold')
-    session.updateSelectedRetouchAdjustmentParams({ threshold: 128, invert: true })
-    session.selectImageAdjustmentLayer('hsl')
+    session.selectImageEffectLayer('threshold')
+    session.updateSelectedRetouchEffectParams({ threshold: 128, invert: true })
+    session.selectImageEffectLayer('hsl')
     session.updateSelectedRetouchLayerParam('lightness', 10)
 
-    session.removeRetouchLayer('adjustment:hsl')
+    session.removeRetouchLayer('retouch:hsl')
 
     expect(session.retouchLayers.value.map((layer) => layer.id)).toEqual([
-      'adjustment:threshold',
+      'retouch:threshold',
       'source',
     ])
-    expect(session.selectedRetouchLayerId.value).toBe('adjustment:threshold')
+    expect(session.selectedRetouchLayerId.value).toBe('retouch:threshold')
   })
 
   it('keeps source layers protected from copy, merge, and remove actions', () => {
@@ -163,7 +161,7 @@ describe('useRetouchSession', () => {
     expect(session.selectedRetouchLayerId.value).toBe('source')
   })
 
-  it('updates selected adjustment layer params through the explicit whole-params API', () => {
+  it('updates selected retouch layer params through the explicit whole-params API', () => {
     const session = useRetouchSession()
     const curvesParams = {
       channels: {
@@ -171,16 +169,16 @@ describe('useRetouchSession', () => {
       },
     }
 
-    session.selectImageAdjustmentLayer('threshold')
-    session.updateSelectedRetouchAdjustmentParams({ threshold: Number.NaN, invert: true })
+    session.selectImageEffectLayer('threshold')
+    session.updateSelectedRetouchEffectParams({ threshold: Number.NaN, invert: true })
 
-    expect(session.selectedRetouchAdjustmentLayer.value).toMatchObject({
+    expect(session.selectedRetouchEffectLayer.value).toMatchObject({
       kind: 'threshold',
       params: { threshold: 128, invert: true },
     })
 
-    session.selectImageAdjustmentLayer('levels')
-    session.updateSelectedRetouchAdjustmentParams({
+    session.selectImageEffectLayer('levels')
+    session.updateSelectedRetouchEffectParams({
       shadows: 300,
       midtones: Number.NaN,
       highlights: 10,
@@ -188,7 +186,7 @@ describe('useRetouchSession', () => {
       outputWhite: 100,
     })
 
-    expect(session.selectedRetouchAdjustmentLayer.value).toMatchObject({
+    expect(session.selectedRetouchEffectLayer.value).toMatchObject({
       kind: 'levels',
       params: {
         shadows: 9,
@@ -199,11 +197,11 @@ describe('useRetouchSession', () => {
       },
     })
 
-    session.selectImageAdjustmentLayer('curves')
-    session.updateSelectedRetouchAdjustmentParams(curvesParams)
+    session.selectImageEffectLayer('curves')
+    session.updateSelectedRetouchEffectParams(curvesParams)
     curvesParams.channels.rgb[0]!.output = 10
 
-    expect(session.selectedRetouchAdjustmentLayer.value).toMatchObject({
+    expect(session.selectedRetouchEffectLayer.value).toMatchObject({
       kind: 'curves',
       params: {
         channels: {
@@ -212,15 +210,15 @@ describe('useRetouchSession', () => {
       },
     })
 
-    session.selectImageAdjustmentLayer('sharpen')
-    session.updateSelectedRetouchAdjustmentParams({
+    session.selectImageEffectLayer('sharpen')
+    session.updateSelectedRetouchEffectParams({
       amount: 80,
       radius: 1.5,
       threshold: 7,
       protectColor: false,
     })
 
-    expect(session.selectedRetouchAdjustmentLayer.value).toMatchObject({
+    expect(session.selectedRetouchEffectLayer.value).toMatchObject({
       kind: 'sharpen',
       params: {
         amount: 80,
@@ -231,12 +229,12 @@ describe('useRetouchSession', () => {
     })
   })
 
-  it('keeps simple adjustment params on the field-level API', () => {
+  it('keeps simple retouch params on the field-level API', () => {
     const session = useRetouchSession()
 
-    session.selectImageAdjustmentLayer('hsl')
+    session.selectImageEffectLayer('hsl')
     session.updateSelectedRetouchLayerParam('lightness', 25)
-    expect(session.selectedRetouchAdjustmentLayer.value).toMatchObject({
+    expect(session.selectedRetouchEffectLayer.value).toMatchObject({
       kind: 'hsl',
       params: { lightness: 25 },
     })

@@ -382,6 +382,34 @@ export function useMediaAssetDelivery(
     { immediate: true },
   )
 
+  function scheduleDeliveryRetry(
+    currentAssetId: number,
+    currentTier: MediaAssetDeliveryTier,
+  ): void {
+    window.clearTimeout(retryTimer)
+    retryTimer = window.setTimeout(() => {
+      retryTimer = 0
+      retryDelayMs = Math.min(2_000, retryDelayMs * 2)
+      void load(currentAssetId, currentTier, true)
+    }, retryDelayMs)
+  }
+
+  function settleDeliveryUrl(
+    variant: ReturnType<typeof resolveVariant> | undefined,
+    nextStatus: MediaAssetDeliveryStatus,
+    currentAssetId: number,
+    currentTier: MediaAssetDeliveryTier,
+  ): void {
+    status.value = nextStatus
+    url.value = variant?.status === 'ready' && variant.url ? resolveAssetUrl(variant.url) : ''
+    if (url.value) {
+      retryDelayMs = 800
+      scheduleRefresh(url.value, currentAssetId, currentTier)
+    } else if (nextStatus === 'pending' || nextStatus === 'processing') {
+      scheduleDeliveryRetry(currentAssetId, currentTier)
+    }
+  }
+
   async function load(currentAssetId: number, currentTier: MediaAssetDeliveryTier, force = false) {
     const token = requestToken
     abortController?.abort()
@@ -404,19 +432,7 @@ export function useMediaAssetDelivery(
       metadata.value = nextMetadata
       const variant = resolveVariant(nextMetadata, currentTier)
       const nextStatus = (variant?.status || nextMetadata.status) as MediaAssetDeliveryStatus
-      status.value = nextStatus
-      url.value = variant?.status === 'ready' && variant.url ? resolveAssetUrl(variant.url) : ''
-      if (url.value) {
-        retryDelayMs = 800
-        scheduleRefresh(url.value, currentAssetId, currentTier)
-      } else if (nextStatus === 'pending' || nextStatus === 'processing') {
-        window.clearTimeout(retryTimer)
-        retryTimer = window.setTimeout(() => {
-          retryTimer = 0
-          retryDelayMs = Math.min(2_000, retryDelayMs * 2)
-          void load(currentAssetId, currentTier, true)
-        }, retryDelayMs)
-      }
+      settleDeliveryUrl(variant, nextStatus, currentAssetId, currentTier)
     } catch (loadError) {
       if (controller.signal.aborted || token !== requestToken) return
       status.value = 'error'

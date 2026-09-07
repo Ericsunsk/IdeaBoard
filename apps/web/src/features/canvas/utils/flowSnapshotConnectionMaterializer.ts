@@ -96,20 +96,21 @@ function rememberNormalizedTargetEdge(
   }
 }
 
-export function materializeFlowSnapshotConnections({
-  edges,
-  baseConnections,
-  persistedFlowNodeRefs,
-  lookupData,
-}: FlowSnapshotConnectionMaterializerOptions): CanvasConnection[] {
-  const normalizedEdgesByTarget = new Map<string, NormalizedFlowEdgeForResolution[]>()
+type FlowSnapshotClaimCandidate = {
+  edge: FlowSnapshotConnectionEdge
+  endpoint: CanvasConnectionEndpoint
+  toRef: FlowSnapshotConnectionNodeRef
+  toPort: CanvasConnectionPort
+}
+
+function collectClaimCandidates(
+  edges: readonly FlowSnapshotConnectionEdge[],
+  persistedFlowNodeRefs: ReadonlyMap<string, FlowSnapshotConnectionNodeRef>,
+  lookupData: (nodeId: string) => FlowNodeData | undefined,
+  normalizedEdgesByTarget: Map<string, NormalizedFlowEdgeForResolution[]>,
+): FlowSnapshotClaimCandidate[] {
   const emptyNormalizedEdges: readonly NormalizedFlowEdgeForResolution[] = []
-  const candidates: Array<{
-    edge: FlowSnapshotConnectionEdge
-    endpoint: CanvasConnectionEndpoint
-    toRef: FlowSnapshotConnectionNodeRef
-    toPort: CanvasConnectionPort
-  }> = []
+  const candidates: FlowSnapshotClaimCandidate[] = []
 
   for (const edge of edges) {
     const fromRef = persistedFlowNodeRefs.get(edge.source)
@@ -129,24 +130,32 @@ export function materializeFlowSnapshotConnections({
 
     rememberNormalizedTargetEdge(normalizedEdgesByTarget, edge, toPort)
 
-    const connectionEndpoint: CanvasConnectionEndpoint = {
-      fromNodeType: fromRef.nodeType,
-      fromNodeId: fromRef.id,
-      fromPort,
-      toNodeType: toRef.nodeType,
-      toNodeId: toRef.id,
+    candidates.push({
+      edge,
+      endpoint: {
+        fromNodeType: fromRef.nodeType,
+        fromNodeId: fromRef.id,
+        fromPort,
+        toNodeType: toRef.nodeType,
+        toNodeId: toRef.id,
+        toPort,
+      },
+      toRef,
       toPort,
-    }
-    candidates.push({ edge, endpoint: connectionEndpoint, toRef, toPort })
+    })
   }
 
-  const claimIndex = createFlowConnectionClaimIndex({
-    candidates,
-    baseConnections,
-    allocateGeneratedIds: true,
-  })
+  return candidates
+}
+
+function resolveClaimedConnections(
+  candidates: readonly FlowSnapshotClaimCandidate[],
+  claimIndex: {
+    resolveConnectionId: (candidate: FlowSnapshotClaimCandidate) => number | null
+  },
+  allowsMultipleInputs: (nodeType: CanvasConnectionNodeType, port: CanvasConnectionPort) => boolean,
+): CanvasConnection[] {
   const singleInputConnectionIndex = new Map<string, number>()
-  const allowsMultipleInputs = createInputLimitResolver()
   const connections: Array<CanvasConnection | null> = []
 
   for (const candidate of candidates) {
@@ -168,4 +177,27 @@ export function materializeFlowSnapshotConnections({
   }
 
   return connections.filter((connection): connection is CanvasConnection => connection !== null)
+}
+
+export function materializeFlowSnapshotConnections({
+  edges,
+  baseConnections,
+  persistedFlowNodeRefs,
+  lookupData,
+}: FlowSnapshotConnectionMaterializerOptions): CanvasConnection[] {
+  const normalizedEdgesByTarget = new Map<string, NormalizedFlowEdgeForResolution[]>()
+  const candidates = collectClaimCandidates(
+    edges,
+    persistedFlowNodeRefs,
+    lookupData,
+    normalizedEdgesByTarget,
+  )
+
+  const claimIndex = createFlowConnectionClaimIndex({
+    candidates,
+    baseConnections,
+    allocateGeneratedIds: true,
+  })
+  const allowsMultipleInputs = createInputLimitResolver()
+  return resolveClaimedConnections(candidates, claimIndex, allowsMultipleInputs)
 }

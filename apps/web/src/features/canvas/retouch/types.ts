@@ -1,6 +1,6 @@
 export type RetouchMode = 'inpaint' | 'adjust'
 
-export type ImageAdjustmentKind = 'hsl' | 'threshold' | 'curves' | 'levels' | 'sharpen'
+export type ImageRetouchKind = 'hsl' | 'threshold' | 'curves' | 'levels' | 'sharpen'
 
 export type RetouchParamValue = number
 
@@ -44,7 +44,7 @@ export type RetouchSharpenParams = {
 
 export type RetouchParamKey = keyof RetouchHslParams
 
-export type RetouchAdjustmentWholeParams =
+export type RetouchEffectWholeParams =
   RetouchThresholdParams | RetouchCurvesParams | RetouchLevelsParams | RetouchSharpenParams
 
 export type RetouchSourceLayer = {
@@ -78,7 +78,7 @@ export type RetouchPaintLayer = {
 
 export type RetouchHslLayer = {
   id: string
-  type: 'adjustment'
+  type: 'effect'
   kind: 'hsl'
   name: string
   visible: boolean
@@ -87,7 +87,7 @@ export type RetouchHslLayer = {
 
 export type RetouchThresholdLayer = {
   id: string
-  type: 'adjustment'
+  type: 'effect'
   kind: 'threshold'
   name: string
   visible: boolean
@@ -96,7 +96,7 @@ export type RetouchThresholdLayer = {
 
 export type RetouchCurvesLayer = {
   id: string
-  type: 'adjustment'
+  type: 'effect'
   kind: 'curves'
   name: string
   visible: boolean
@@ -105,7 +105,7 @@ export type RetouchCurvesLayer = {
 
 export type RetouchLevelsLayer = {
   id: string
-  type: 'adjustment'
+  type: 'effect'
   kind: 'levels'
   name: string
   visible: boolean
@@ -114,14 +114,14 @@ export type RetouchLevelsLayer = {
 
 export type RetouchSharpenLayer = {
   id: string
-  type: 'adjustment'
+  type: 'effect'
   kind: 'sharpen'
   name: string
   visible: boolean
   params: RetouchSharpenParams
 }
 
-export type RetouchAdjustmentLayer =
+export type RetouchEffectLayer =
   | RetouchHslLayer
   | RetouchThresholdLayer
   | RetouchCurvesLayer
@@ -136,12 +136,12 @@ export type RetouchMergedLayer = {
   children: RetouchEditableLayer[]
 }
 
-export type RetouchEditableLayer = RetouchAdjustmentLayer | RetouchPaintLayer | RetouchMergedLayer
+export type RetouchEditableLayer = RetouchEffectLayer | RetouchPaintLayer | RetouchMergedLayer
 
 export type RetouchLayer = RetouchSourceLayer | RetouchEditableLayer
 
-export type RetouchLayerByKind<TKind extends ImageAdjustmentKind> = Extract<
-  RetouchAdjustmentLayer,
+export type RetouchLayerByKind<TKind extends ImageRetouchKind> = Extract<
+  RetouchEffectLayer,
   { kind: TKind }
 >
 

@@ -1,4 +1,4 @@
-import type { ImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
+import type { ImageRetouchPlan } from '../utils/imageRetouchEngine'
 
 export type ImageProcessingErrorCode =
   'backend-failed' | 'cancelled' | 'encode-failed' | 'invalid-source' | 'stale' | 'unknown'
@@ -14,7 +14,7 @@ export type ImageProcessingSource = {
   title?: string
 }
 
-export type ImageProcessingPlan = ImageAdjustmentPlan
+export type ImageProcessingPlan = ImageRetouchPlan
 
 export type ImageProcessingProgress = {
   phase: 'queued' | 'decode' | 'render' | 'encode' | 'complete'

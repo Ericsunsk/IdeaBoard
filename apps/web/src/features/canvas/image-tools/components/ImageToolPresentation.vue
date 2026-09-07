@@ -31,10 +31,10 @@
     :anchor-rect="chromeModel.anchorRect"
     :layers="chromeModel.editor.layers"
     :selected-layer-id="chromeModel.editor.selectedLayerId"
-    :selected-adjustment-layer="chromeModel.editor.selectedAdjustmentLayer"
+    :selected-effect-layer="chromeModel.editor.selectedEffectLayer"
     :histogram-source="chromeModel.editor.histogramSource"
-    :applying-adjustments="chromeModel.editor.applyingAdjustments"
-    @select-adjustment="chromeCommands.selectAdjustmentLayer"
+    :applying-retouch="chromeModel.editor.applyingRetouch"
+    @select-retouch="chromeCommands.selectEffectLayer"
     @select-layer="chromeCommands.selectEditorLayer"
     @set-layer-visible="chromeCommands.setEditorLayerVisible"
     @add-layer="chromeCommands.addEditorLayer"
@@ -42,8 +42,8 @@
     @merge-layer="chromeCommands.mergeEditorLayer"
     @remove-layer="chromeCommands.removeEditorLayer"
     @update-param="chromeCommands.updateEditorParam"
-    @update-params="chromeCommands.updateEditorAdjustmentParams"
-    @apply-adjustments="chromeCommands.applyAdjustments"
+    @update-params="chromeCommands.updateEditorRetouchParams"
+    @apply-retouch="chromeCommands.applyRetouch"
   />
 </template>
 

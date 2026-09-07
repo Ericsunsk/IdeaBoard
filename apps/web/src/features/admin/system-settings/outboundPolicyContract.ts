@@ -60,31 +60,34 @@ function normalizeAllowHosts(hosts: unknown): string[] {
   return normalized
 }
 
+function normalizeBracketedIPv6(host: string): string | null {
+  const bracketedIPv6WithPort = host.match(/^\[([^\]]+)]:(\d+)$/)
+  if (!bracketedIPv6WithPort) return null
+  const [, address = '', port = ''] = bracketedIPv6WithPort
+  if (!isValidIPv6(address) || !isValidPort(port)) return null
+  return `[${address}]:${Number(port)}`
+}
+
+function normalizeHostWithPort(host: string): string | null {
+  const colonCount = (host.match(/:/g) ?? []).length
+  if (colonCount > 1) return isValidIPv6(host) ? host : null
+
+  const [hostname = '', port = ''] = host.split(':')
+  const normalizedHostname = normalizeHostnameOrIPv4(hostname.replace(/\.$/, ''))
+  if (!normalizedHostname || !isValidPort(port)) return null
+  return `${normalizedHostname}:${Number(port)}`
+}
+
 function normalizeAllowHost(value: string): string | null {
-  let host = value.trim().toLowerCase()
+  const host = value.trim().toLowerCase()
   if (!host || host.length > 255 || host.includes('://') || /[\s/?#@\\]/.test(host)) {
     return null
   }
 
-  const bracketedIPv6WithPort = host.match(/^\[([^\]]+)]:(\d+)$/)
-  if (bracketedIPv6WithPort) {
-    const [, address = '', port = ''] = bracketedIPv6WithPort
-    if (!isValidIPv6(address) || !isValidPort(port)) return null
-    return `[${address}]:${Number(port)}`
-  }
+  if (host.startsWith('[')) return normalizeBracketedIPv6(host)
+  if (host.includes(':')) return normalizeHostWithPort(host)
 
-  if (host.includes(':')) {
-    const colonCount = (host.match(/:/g) ?? []).length
-    if (colonCount > 1) return isValidIPv6(host) ? host : null
-
-    const [hostname = '', port = ''] = host.split(':')
-    const normalizedHostname = normalizeHostnameOrIPv4(hostname.replace(/\.$/, ''))
-    if (!normalizedHostname || !isValidPort(port)) return null
-    return `${normalizedHostname}:${Number(port)}`
-  }
-
-  host = host.replace(/\.$/, '')
-  return normalizeHostnameOrIPv4(host)
+  return normalizeHostnameOrIPv4(host.replace(/\.$/, ''))
 }
 
 function normalizeHostnameOrIPv4(value: string): string | null {

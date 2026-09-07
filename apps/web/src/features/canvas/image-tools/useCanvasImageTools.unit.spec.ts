@@ -2,26 +2,26 @@ import type { Node } from '@vue-flow/core'
 import { createApp, defineComponent, nextTick, ref, shallowRef, type Ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../canvas-board/domain'
-import { renderRetouchLayerStackFile } from '../retouch/services/imageAdjustmentRenderer'
+import { renderRetouchLayerStackFile } from '../retouch/services/imageRetouchRenderer'
 import { IMAGE_STRENGTH_ACTIONS, type ImageStrengthAction } from '../execution'
 import type { UseCanvasImageToolsOptions } from './imageToolSession'
 import { useCanvasImageTools, type CanvasImageTools } from '.'
 import { i18n } from '../../../shared/i18n'
 import { loadLocaleMessages } from '../../../shared/i18n/userLocale'
+import * as mediaAssetDelivery from '../../../shared/api/mediaAssetDelivery'
 
-vi.mock('../retouch/services/imageAdjustmentRenderer', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../retouch/services/imageAdjustmentRenderer')>()
+vi.mock('../retouch/services/imageRetouchRenderer', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../retouch/services/imageRetouchRenderer')>()
   return {
     ...actual,
     renderRetouchLayerStackFile: vi.fn(),
   }
 })
 
-vi.mock('../retouch/useImageAdjustmentRenderedPreview', async () => {
+vi.mock('../retouch/useImageRetouchRenderedPreview', async () => {
   const { computed } = await import('vue')
   return {
-    useImageAdjustmentRenderedPreview: vi.fn(() => ({
+    useImageRetouchRenderedPreview: vi.fn(() => ({
       retouchRenderedPreview: computed(() => null),
       retouchPreviewSource: computed(() => null),
     })),
@@ -160,8 +160,8 @@ function mountCanvasImageTools() {
     Object.keys(imageNodeFixtures).map((id) => ({ id, data: { kind: 'image' } })) as Node[],
   )
   const connectionAdapter = { connectIntent: vi.fn(() => true) }
-  const createPendingAdjustmentNode = vi.fn<
-    NonNullable<UseCanvasImageToolsOptions['createPendingAdjustmentNode']>
+  const createPendingRetouchNode = vi.fn<
+    NonNullable<UseCanvasImageToolsOptions['createPendingRetouchNode']>
   >(() => 'image-3')
   const applyImageFileToImageNode = vi.fn<
     NonNullable<UseCanvasImageToolsOptions['applyImageFileToImageNode']>
@@ -197,7 +197,7 @@ function mountCanvasImageTools() {
           getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
           setViewport,
           setCenter,
-          createPendingAdjustmentNode,
+          createPendingRetouchNode,
           applyImageFileToImageNode,
           removeNode,
           connectionAdapter,
@@ -237,7 +237,7 @@ function mountCanvasImageTools() {
     activeStrengthAction,
     app,
     connectionAdapter,
-    createPendingAdjustmentNode,
+    createPendingRetouchNode,
     applyImageFileToImageNode,
     removeNode,
     currentBoardId,
@@ -255,10 +255,10 @@ function mountCanvasImageTools() {
   }
 }
 
-function prepareRenderableAdjustmentSession(runtime: CanvasImageTools) {
+function prepareRenderableRetouchSession(runtime: CanvasImageTools) {
   expect(runtime.commands.lifecycle.enter('image-1', 'adjust')).toBe(true)
-  runtime.commands.chrome.selectAdjustmentLayer('threshold')
-  runtime.commands.chrome.updateEditorAdjustmentParams({ threshold: 128, invert: true })
+  runtime.commands.chrome.selectEffectLayer('threshold')
+  runtime.commands.chrome.updateEditorRetouchParams({ threshold: 128, invert: true })
   return runtime.viewModel.chrome.value.editor.layers
 }
 
@@ -274,7 +274,7 @@ afterEach(() => {
   mediaAssetRequestMock.mockReset()
 })
 
-describe('useCanvasImageTools image adjustment final apply', () => {
+describe('useCanvasImageTools image retouch final apply', () => {
   it('releases the presentation session across no-tool, mode switch, node switch, reset, and unmount', () => {
     const harness = mountCanvasImageTools()
     const session = harness.runtime.viewModel.nodeBindings.stageFor('image-1').session
@@ -305,7 +305,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(harness.runtime.viewModel.locks.isChromeHidden.value).toBe(false)
       expect(harness.runtime.viewModel.locks.isCanvasLocked.value).toBe(false)
       expect(harness.runtime.viewModel.chrome.value.isReady).toBe(false)
-      expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(false)
+      expect(harness.runtime.viewModel.retouch.isApplying.value).toBe(false)
       expect(harness.runtime.viewModel.nodeBindings.stageFor).toEqual(expect.any(Function))
       expect(harness.runtime.viewModel.nodeBindings.actionFor).toEqual(expect.any(Function))
       expect(harness.runtime.commands.lifecycle.enter).toEqual(expect.any(Function))
@@ -318,7 +318,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(harness.runtime.commands.editor.scheduleChromeAnchorUpdate).toEqual(
         expect.any(Function),
       )
-      expect(harness.runtime.commands.chrome.selectAdjustmentLayer).toEqual(expect.any(Function))
+      expect(harness.runtime.commands.chrome.selectEffectLayer).toEqual(expect.any(Function))
     } finally {
       harness.unmount()
     }
@@ -356,19 +356,19 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     const harness = mountCanvasImageTools()
 
     try {
-      const renderableLayers = prepareRenderableAdjustmentSession(harness.runtime)
+      const renderableLayers = prepareRenderableRetouchSession(harness.runtime)
 
       const apply = harness.runtime.commands.editor.apply()
       await flushPromises()
 
       expect(harness.runtime.viewModel.active.mode.value).toBeNull()
       expect(harness.runtime.viewModel.active.nodeId.value).toBeNull()
-      expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(true)
+      expect(harness.runtime.viewModel.retouch.isApplying.value).toBe(true)
       expect(harness.runtime.viewModel.locks.isCanvasLocked.value).toBe(true)
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-3').directGenerating).toBe(
         true,
       )
-      expect(harness.createPendingAdjustmentNode).toHaveBeenCalledWith(
+      expect(harness.createPendingRetouchNode).toHaveBeenCalledWith(
         expect.objectContaining({ id: 1 }),
       )
       expect(harness.connectionAdapter.connectIntent).toHaveBeenCalledWith({
@@ -390,7 +390,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
 
       expect(harness.applyImageFileToImageNode).toHaveBeenCalledWith('image-3', expect.any(File))
       expect(harness.runtime.viewModel.active.mode.value).toBeNull()
-      expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(false)
+      expect(harness.runtime.viewModel.retouch.isApplying.value).toBe(false)
       expect(harness.runtime.viewModel.locks.isCanvasLocked.value).toBe(false)
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-3').directGenerating).toBe(
         false,
@@ -431,8 +431,8 @@ describe('useCanvasImageTools image adjustment final apply', () => {
 
     try {
       expect(harness.runtime.commands.lifecycle.enter('image-5', 'adjust')).toBe(true)
-      harness.runtime.commands.chrome.selectAdjustmentLayer('threshold')
-      harness.runtime.commands.chrome.updateEditorAdjustmentParams({ threshold: 128, invert: true })
+      harness.runtime.commands.chrome.selectEffectLayer('threshold')
+      harness.runtime.commands.chrome.updateEditorRetouchParams({ threshold: 128, invert: true })
 
       await harness.runtime.commands.editor.apply()
 
@@ -450,6 +450,74 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     }
   })
 
+  it.each(['board-1', 'board-other'])(
+    'ignores a cancelled apply URL response while the same node renders on %s',
+    async (nextBoardId) => {
+      let resolveOldUrl!: (url: string) => void
+      vi.spyOn(mediaAssetDelivery, 'resolveMediaAssetProcessingURL')
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              resolveOldUrl = resolve
+            }),
+        )
+        .mockResolvedValue('/api/current-processing.webp')
+      let resolveCurrentRender!: (file: File) => void
+      renderLayerStackFileMock.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveCurrentRender = resolve
+          }),
+      )
+      renderLayerStackFileMock.mockResolvedValue(
+        new File(['stale'], 'stale.webp', { type: 'image/webp' }),
+      )
+      const harness = mountCanvasImageTools()
+      harness.createPendingRetouchNode.mockReturnValueOnce('image-3').mockReturnValueOnce('image-4')
+
+      try {
+        expect(harness.runtime.commands.lifecycle.enter('image-5', 'adjust')).toBe(true)
+        harness.runtime.commands.chrome.selectEffectLayer('threshold')
+        harness.runtime.commands.chrome.updateEditorRetouchParams({ threshold: 128, invert: true })
+        const oldApply = harness.runtime.commands.editor.apply()
+        expect(renderLayerStackFileMock).not.toHaveBeenCalled()
+
+        expect(harness.runtime.commands.lifecycle.enter('image-5', 'adjust')).toBe(true)
+        harness.runtime.commands.lifecycle.cancel()
+        expect(harness.removeNode).toHaveBeenCalledExactlyOnceWith('image-3')
+        harness.currentBoardId.value = nextBoardId
+        expect(harness.runtime.commands.lifecycle.enter('image-5', 'adjust')).toBe(true)
+        harness.runtime.commands.chrome.selectEffectLayer('threshold')
+        harness.runtime.commands.chrome.updateEditorRetouchParams({ threshold: 128, invert: true })
+        const currentApply = harness.runtime.commands.editor.apply()
+        await flushPromises()
+        expect(renderLayerStackFileMock).toHaveBeenCalledOnce()
+
+        resolveOldUrl('/api/stale-processing.webp')
+        await oldApply
+
+        expect(renderLayerStackFileMock).toHaveBeenCalledOnce()
+        expect(harness.runtime.viewModel.retouch.isApplying.value).toBe(true)
+        expect(harness.runtime.viewModel.nodeBindings.actionFor('image-4').directGenerating).toBe(
+          true,
+        )
+        expect(harness.applyImageFileToImageNode).not.toHaveBeenCalled()
+        expect(harness.removeNode).toHaveBeenCalledExactlyOnceWith('image-3')
+
+        const file = new File(['current'], 'current.webp', { type: 'image/webp' })
+        resolveCurrentRender(file)
+        await currentApply
+
+        expect(harness.applyImageFileToImageNode).toHaveBeenCalledExactlyOnceWith('image-4', file)
+        expect(harness.runtime.viewModel.retouch.isApplying.value).toBe(false)
+        expect(harness.feedback.succeeded).toHaveBeenCalledOnce()
+        expect(harness.feedback.warning).not.toHaveBeenCalled()
+      } finally {
+        harness.unmount()
+      }
+    },
+  )
+
   it('reports one generation failure when the rendered image cannot be materialized', async () => {
     renderLayerStackFileMock.mockResolvedValue(
       new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
@@ -458,14 +526,14 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     harness.applyImageFileToImageNode.mockResolvedValueOnce(false)
 
     try {
-      prepareRenderableAdjustmentSession(harness.runtime)
+      prepareRenderableRetouchSession(harness.runtime)
 
       await harness.runtime.commands.editor.apply()
 
       expect(harness.feedback.warning).toHaveBeenCalledWith('Image generation failed')
       expect(harness.feedback.warning).toHaveBeenCalledTimes(1)
       expect(harness.feedback.succeeded).not.toHaveBeenCalled()
-      expect(harness.createPendingAdjustmentNode).toHaveBeenCalledWith(
+      expect(harness.createPendingRetouchNode).toHaveBeenCalledWith(
         expect.objectContaining({ id: 1 }),
       )
       expect(harness.connectionAdapter.connectIntent).toHaveBeenCalledWith({
@@ -488,7 +556,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     harness.connectionAdapter.connectIntent.mockReturnValue(false)
 
     try {
-      prepareRenderableAdjustmentSession(harness.runtime)
+      prepareRenderableRetouchSession(harness.runtime)
 
       await harness.runtime.commands.editor.apply()
 
@@ -497,7 +565,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
         'Image created, but automatic connection failed. Please connect it manually.',
       )
       expect(harness.feedback.succeeded).not.toHaveBeenCalled()
-      expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(false)
+      expect(harness.runtime.viewModel.retouch.isApplying.value).toBe(false)
     } finally {
       harness.unmount()
     }
@@ -505,28 +573,28 @@ describe('useCanvasImageTools image adjustment final apply', () => {
 
   it('clears applying state when pending node creation fails synchronously', async () => {
     const harness = mountCanvasImageTools()
-    harness.createPendingAdjustmentNode.mockImplementation(() => {
+    harness.createPendingRetouchNode.mockImplementation(() => {
       throw new Error('graph write failed')
     })
 
     try {
-      prepareRenderableAdjustmentSession(harness.runtime)
+      prepareRenderableRetouchSession(harness.runtime)
 
       await harness.runtime.commands.editor.apply()
 
-      expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(false)
+      expect(harness.runtime.viewModel.retouch.isApplying.value).toBe(false)
       expect(harness.feedback.warning).toHaveBeenCalledWith('Image generation failed')
     } finally {
       harness.unmount()
     }
   })
 
-  it('reports one generation failure when rendering adjustments fails', async () => {
+  it('reports one generation failure when rendering retouch effects fails', async () => {
     renderLayerStackFileMock.mockRejectedValueOnce(new Error('render failed'))
     const harness = mountCanvasImageTools()
 
     try {
-      prepareRenderableAdjustmentSession(harness.runtime)
+      prepareRenderableRetouchSession(harness.runtime)
 
       await harness.runtime.commands.editor.apply()
 
@@ -538,14 +606,14 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     }
   })
 
-  it('uses the active locale for image adjustment terminal feedback', async () => {
+  it('uses the active locale for image retouch terminal feedback', async () => {
     await loadLocaleMessages('zh-CN')
     ;(i18n.global.locale as { value: string }).value = 'zh-CN'
     renderLayerStackFileMock.mockRejectedValueOnce(new Error('render failed'))
     const harness = mountCanvasImageTools()
 
     try {
-      prepareRenderableAdjustmentSession(harness.runtime)
+      prepareRenderableRetouchSession(harness.runtime)
 
       await harness.runtime.commands.editor.apply()
 
@@ -560,9 +628,9 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     const harness = mountCanvasImageTools()
 
     try {
-      prepareRenderableAdjustmentSession(harness.runtime)
+      prepareRenderableRetouchSession(harness.runtime)
       expect(harness.runtime.commands.lifecycle.enter('legacy-image', 'adjust')).toBe(true)
-      harness.runtime.commands.chrome.selectAdjustmentLayer('threshold')
+      harness.runtime.commands.chrome.selectEffectLayer('threshold')
 
       await harness.runtime.commands.editor.apply()
 
@@ -588,7 +656,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     const harness = mountCanvasImageTools()
 
     try {
-      prepareRenderableAdjustmentSession(harness.runtime)
+      prepareRenderableRetouchSession(harness.runtime)
 
       const oldApply = harness.runtime.commands.editor.apply()
       await flushPromises()

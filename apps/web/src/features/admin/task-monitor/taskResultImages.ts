@@ -55,17 +55,23 @@ export function getSafeTaskResultImageUrl(result: string): string {
       const safeImageUrl = typeof imageUrl === 'string' ? getSafeResultImageUrl(imageUrl) : ''
       if (safeImageUrl) return safeImageUrl
 
-      const imageUrls = (parsed as Record<string, unknown>).image_urls
-      if (Array.isArray(imageUrls)) {
-        for (const candidate of imageUrls) {
-          if (typeof candidate !== 'string') continue
-          const safeCandidate = getSafeResultImageUrl(candidate)
-          if (safeCandidate) return safeCandidate
-        }
-      }
+      const firstSafeArrayUrl = findFirstSafeArrayImageUrl(
+        (parsed as Record<string, unknown>).image_urls,
+      )
+      if (firstSafeArrayUrl) return firstSafeArrayUrl
     }
   } catch {
     return ''
+  }
+  return ''
+}
+
+function findFirstSafeArrayImageUrl(imageUrls: unknown): string {
+  if (!Array.isArray(imageUrls)) return ''
+  for (const candidate of imageUrls) {
+    if (typeof candidate !== 'string') continue
+    const safeCandidate = getSafeResultImageUrl(candidate)
+    if (safeCandidate) return safeCandidate
   }
   return ''
 }

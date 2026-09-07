@@ -1,6 +1,6 @@
 import { i18n } from '../../../../shared/i18n'
 import { resolveFetchUrl } from '../../services/flowMediaIO'
-import { isAnimatedImageBlob, releaseCanvas } from '../utils/imageAdjustmentMedia'
+import { isAnimatedImageBlob, releaseCanvas } from '../utils/imageRetouchMedia'
 
 const DEFAULT_IMAGE_SOURCE_CACHE_LIMIT = 12
 const DEFAULT_FULL_SIZE_SOURCE_MAX_PIXELS = 24_000_000

@@ -31,9 +31,9 @@ const MaskChromeStub = defineComponent({
 const EditorChromeStub = defineComponent({
   name: 'RetouchChrome',
   props: { selectedLayerId: { type: String, required: true } },
-  emits: ['select-adjustment'],
+  emits: ['select-retouch'],
   template: `
-    <button data-testid="editor-chrome" @click="$emit('select-adjustment', 'hsl')">
+    <button data-testid="editor-chrome" @click="$emit('select-retouch', 'hsl')">
       Editor {{ selectedLayerId }}
     </button>
   `,
@@ -48,7 +48,7 @@ function createChromeCommands(): ImageToolChromeCommands {
     undoMask: vi.fn(),
     redoMask: vi.fn(),
     submitMaskPrompt: vi.fn(),
-    selectAdjustmentLayer: vi.fn(),
+    selectEffectLayer: vi.fn(),
     selectEditorLayer: vi.fn(),
     setEditorLayerVisible: vi.fn(),
     addEditorLayer: vi.fn(),
@@ -56,8 +56,8 @@ function createChromeCommands(): ImageToolChromeCommands {
     mergeEditorLayer: vi.fn(),
     removeEditorLayer: vi.fn(),
     updateEditorParam: vi.fn(),
-    updateEditorAdjustmentParams: vi.fn(),
-    applyAdjustments: vi.fn(async () => {}),
+    updateEditorRetouchParams: vi.fn(),
+    applyRetouch: vi.fn(async () => {}),
   }
 }
 
@@ -78,9 +78,9 @@ function createChromeModel(overrides: Partial<ImageToolChromeModel> = {}): Image
     editor: {
       layers: [],
       selectedLayerId: 'base',
-      selectedAdjustmentLayer: null,
+      selectedEffectLayer: null,
       histogramSource: null,
-      applyingAdjustments: false,
+      applyingRetouch: false,
     },
     ...overrides,
   }
@@ -127,7 +127,7 @@ describe('ImageToolPresentation', () => {
 
     expect(screen.getByTestId('editor-chrome')).toHaveTextContent('Editor base')
     await screen.getByTestId('editor-chrome').click()
-    expect(view.commands.selectAdjustmentLayer).toHaveBeenCalledWith('hsl')
+    expect(view.commands.selectEffectLayer).toHaveBeenCalledWith('hsl')
   })
 
   it('renders no chrome when Image Tool is inactive or not ready', () => {

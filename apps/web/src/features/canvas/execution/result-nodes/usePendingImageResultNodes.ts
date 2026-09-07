@@ -161,6 +161,40 @@ export function usePendingImageResultExecution(
     }
   }
 
+  function resolvePendingResultDimensions(
+    source: ImageExecutionInput,
+    optionsOverride?: PendingImageResultPlacementOptions,
+  ): { ratio: number; width: number } {
+    const sourceRatio = source.ratio > 0 ? source.ratio : 1
+    const ratio =
+      Number.isFinite(optionsOverride?.targetRatio) && (optionsOverride?.targetRatio as number) > 0
+        ? (optionsOverride?.targetRatio as number)
+        : sourceRatio
+    const width =
+      Number.isFinite(optionsOverride?.targetWidth) && (optionsOverride?.targetWidth as number) > 0
+        ? Math.max(1, Math.round(optionsOverride?.targetWidth as number))
+        : resolveImageNodeFrameSize(ratio, true).width
+    return { ratio, width }
+  }
+
+  function reusePreferredPendingNode(
+    preferredNodeId: string,
+    lookup: PendingImageResultLookup,
+    pendingImageNode: ImageNodeItem,
+  ): { resultNodeId: string; nextNode: Node } {
+    const currentNode = lookup.nodeById.get(preferredNodeId)
+    if (currentNode?.kind === 'image') {
+      const nextSnapshot = buildPendingImageNodeSnapshot(currentNode.snapshot as ImageNodeItem, {
+        sourceImageRatio: pendingImageNode.sourceImageRatio,
+        width: pendingImageNode.width,
+      })
+      const updatedNode = canvasNodeToFlowNode('image', nextSnapshot) as Node
+      lookup.nodeById.set(preferredNodeId, { ...currentNode, snapshot: nextSnapshot })
+      return { resultNodeId: preferredNodeId, nextNode: updatedNode }
+    }
+    throw new Error(`Reusable pending result node is no longer available: ${preferredNodeId}`)
+  }
+
   function planPendingImageResultNodeWithLookup(
     source: ImageExecutionInput,
     anchorNodeId: string,
@@ -168,11 +202,14 @@ export function usePendingImageResultExecution(
     optionsOverride?: PendingImageResultPlacementOptions,
     preferredNodeId?: string | null,
   ): PendingImageResultReservationPlan {
-    const sourceRatio = source.ratio > 0 ? source.ratio : 1
+    const { ratio: sourceRatio, width: fallbackWidth } = resolvePendingResultDimensions(
+      source,
+      undefined,
+    )
     const fallbackAnchor: ImageResultLayout = {
       x: 0,
       y: 0,
-      width: resolveImageNodeFrameSize(sourceRatio, true).width,
+      width: fallbackWidth,
       ratio: sourceRatio,
     }
     const anchor = readOutputAnchorLayout(
@@ -182,16 +219,10 @@ export function usePendingImageResultExecution(
       rendererMetrics,
       optionsOverride?.anchor,
     )
-    const resolvedRatio =
-      Number.isFinite(optionsOverride?.targetRatio) && (optionsOverride?.targetRatio as number) > 0
-        ? (optionsOverride?.targetRatio as number)
-        : source.ratio > 0
-          ? source.ratio
-          : 1
-    const resolvedWidth =
-      Number.isFinite(optionsOverride?.targetWidth) && (optionsOverride?.targetWidth as number) > 0
-        ? Math.max(1, Math.round(optionsOverride?.targetWidth as number))
-        : resolveImageNodeFrameSize(resolvedRatio, true).width
+    const { ratio: resolvedRatio, width: resolvedWidth } = resolvePendingResultDimensions(
+      source,
+      optionsOverride,
+    )
     const position = resolvePendingImageResultPosition(anchor, lookup, rendererMetrics, {
       width: resolvedWidth,
       ratio: resolvedRatio,
@@ -203,23 +234,7 @@ export function usePendingImageResultExecution(
     })
 
     if (preferredNodeId) {
-      let updatedNode: Node | null = null
-      const currentNode = lookup.nodeById.get(preferredNodeId)
-      if (currentNode?.kind === 'image') {
-        const nextSnapshot = buildPendingImageNodeSnapshot(currentNode.snapshot as ImageNodeItem, {
-          sourceImageRatio: pendingImageNode.sourceImageRatio,
-          width: pendingImageNode.width,
-        })
-        updatedNode = canvasNodeToFlowNode('image', nextSnapshot) as Node
-        lookup.nodeById.set(preferredNodeId, { ...currentNode, snapshot: nextSnapshot })
-      }
-      if (!updatedNode) {
-        throw new Error(`Reusable pending result node is no longer available: ${preferredNodeId}`)
-      }
-      return {
-        resultNodeId: preferredNodeId,
-        nextNode: updatedNode,
-      }
+      return reusePreferredPendingNode(preferredNodeId, lookup, pendingImageNode)
     }
 
     const nextNode = canvasNodeToFlowNode('image', pendingImageNode) as Node<FlowNodeData>

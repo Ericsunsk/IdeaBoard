@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-const CurrentBoardStateSchemaVersion = 3
+const CurrentBoardStateSchemaVersion = 4
 
 var (
 	boardStateGroupIDPattern     = regexp.MustCompile(`^group-[0-9]+$`)

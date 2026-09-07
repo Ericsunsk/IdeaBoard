@@ -86,7 +86,7 @@ function selectLayer(layerId: string) {
 
 function resolveLayerKind(layer: RetouchLayer) {
   if (layer.type === 'source') return 'source'
-  if (layer.type === 'adjustment') return layer.kind
+  if (layer.type === 'effect') return layer.kind
   return layer.type
 }
 

@@ -1,14 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { RetouchAdjustmentLayer } from '../types'
+import type { RetouchEffectLayer } from '../types'
 import type { ImageProcessingRuntime } from '../runtime/types'
-import * as runtimeModule from '../runtime/imageAdjustmentProcessingRuntime'
-import { buildImageAdjustmentPlan } from '../utils/imageAdjustmentPlanPipeline'
-import {
-  cancelImageAdjustmentFinalRender,
-  renderImageAdjustmentFile,
-} from './imageAdjustmentRenderer'
+import * as runtimeModule from '../runtime/imageRetouchProcessingRuntime'
+import { buildImageRetouchPlan } from '../utils/imageRetouchPlanPipeline'
+import { cancelImageRetouchFinalRender, renderImageRetouchFile } from './imageRetouchRenderer'
 
-const IMAGE_ADJUSTMENT_FINAL_TASK_ID = 'image-adjustment-final'
+const IMAGE_RETOUCH_FINAL_TASK_ID = 'image-retouch-final'
 
 const fetchMock = vi.fn()
 const createImageBitmapMock = vi.fn()
@@ -17,27 +14,27 @@ const ANIMATED_WEBP_BYTES = new Uint8Array([
   0x00, 0x00, 0x00, 0x00,
 ])
 
-const hslLayer: RetouchAdjustmentLayer = {
-  id: 'adjustment:hsl',
-  type: 'adjustment',
+const hslLayer: RetouchEffectLayer = {
+  id: 'retouch:hsl',
+  type: 'effect',
   kind: 'hsl',
   name: '色相/饱和度 1',
   visible: true,
   params: { hue: 35, saturation: 22, lightness: 8 },
 }
 
-const thresholdLayer: RetouchAdjustmentLayer = {
-  id: 'adjustment:threshold',
-  type: 'adjustment',
+const thresholdLayer: RetouchEffectLayer = {
+  id: 'retouch:threshold',
+  type: 'effect',
   kind: 'threshold',
   name: '阈值 1',
   visible: true,
   params: { threshold: 150, invert: true },
 }
 
-const curvesLayer: RetouchAdjustmentLayer = {
-  id: 'adjustment:curves',
-  type: 'adjustment',
+const curvesLayer: RetouchEffectLayer = {
+  id: 'retouch:curves',
+  type: 'effect',
   kind: 'curves',
   name: '曲线 1',
   visible: true,
@@ -48,18 +45,18 @@ const curvesLayer: RetouchAdjustmentLayer = {
   },
 }
 
-const levelsLayer: RetouchAdjustmentLayer = {
-  id: 'adjustment:levels',
-  type: 'adjustment',
+const levelsLayer: RetouchEffectLayer = {
+  id: 'retouch:levels',
+  type: 'effect',
   kind: 'levels',
   name: '色阶 1',
   visible: true,
   params: { shadows: 20, midtones: 112, highlights: 235, outputBlack: 0, outputWhite: 255 },
 }
 
-const sharpenLayer: RetouchAdjustmentLayer = {
-  id: 'adjustment:sharpen',
-  type: 'adjustment',
+const sharpenLayer: RetouchEffectLayer = {
+  id: 'retouch:sharpen',
+  type: 'effect',
   kind: 'sharpen',
   name: '锐化 1',
   visible: true,
@@ -69,7 +66,7 @@ const sharpenLayer: RetouchAdjustmentLayer = {
 function createRuntimeMock(
   renderFinal: ImageProcessingRuntime['renderFinal'] = vi.fn(async () => ({
     status: 'completed' as const,
-    taskId: IMAGE_ADJUSTMENT_FINAL_TASK_ID,
+    taskId: IMAGE_RETOUCH_FINAL_TASK_ID,
     revision: 1,
     output: {
       file: new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
@@ -139,25 +136,25 @@ function installCanvasMocks() {
   return { contexts }
 }
 
-describe('renderImageAdjustmentFile', () => {
+describe('renderImageRetouchFile', () => {
   it('uses the default final task id and internal latest-only scheduling', async () => {
     const renderFinal = vi.fn<ImageProcessingRuntime['renderFinal']>(async () => ({
       status: 'completed',
-      taskId: IMAGE_ADJUSTMENT_FINAL_TASK_ID,
+      taskId: IMAGE_RETOUCH_FINAL_TASK_ID,
       revision: 1,
       output: {
         file: new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
       },
     }))
-    vi.spyOn(runtimeModule, 'getImageAdjustmentProcessingRuntime').mockReturnValue(
+    vi.spyOn(runtimeModule, 'getImageRetouchProcessingRuntime').mockReturnValue(
       createRuntimeMock(renderFinal),
     )
 
-    await renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, [thresholdLayer])
+    await renderImageRetouchFile({ url: 'https://example.com/source.png' }, [thresholdLayer])
 
     expect(renderFinal).toHaveBeenCalledWith(
       expect.objectContaining({
-        taskId: IMAGE_ADJUSTMENT_FINAL_TASK_ID,
+        taskId: IMAGE_RETOUCH_FINAL_TASK_ID,
         latestOnly: true,
       }),
     )
@@ -167,17 +164,17 @@ describe('renderImageAdjustmentFile', () => {
     const onProgress = vi.fn()
     const renderFinal = vi.fn<ImageProcessingRuntime['renderFinal']>(async () => ({
       status: 'completed',
-      taskId: 'image-adjustment-final:node-1',
+      taskId: 'image-retouch-final:node-1',
       revision: 1,
       output: {
         file: new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
       },
     }))
-    vi.spyOn(runtimeModule, 'getImageAdjustmentProcessingRuntime').mockReturnValue(
+    vi.spyOn(runtimeModule, 'getImageRetouchProcessingRuntime').mockReturnValue(
       createRuntimeMock(renderFinal),
     )
 
-    await renderImageAdjustmentFile(
+    await renderImageRetouchFile(
       { url: 'https://example.com/source.png', title: 'Sample.png' },
       [thresholdLayer],
       {
@@ -189,48 +186,48 @@ describe('renderImageAdjustmentFile', () => {
     expect(renderFinal).toHaveBeenCalledWith(
       expect.objectContaining({
         source: { url: 'https://example.com/source.png', title: 'Sample.png' },
-        taskId: 'image-adjustment-final:node-1',
+        taskId: 'image-retouch-final:node-1',
         latestOnly: true,
         onProgress,
       }),
     )
   })
 
-  it('passes the compiled adjustment plan to final rendering without a separate final normalization path', async () => {
+  it('passes the compiled retouch plan to final rendering without a separate final normalization path', async () => {
     const layers = [hslLayer, curvesLayer, levelsLayer, sharpenLayer, thresholdLayer]
     const renderFinal = vi.fn<ImageProcessingRuntime['renderFinal']>(async () => ({
       status: 'completed',
-      taskId: IMAGE_ADJUSTMENT_FINAL_TASK_ID,
+      taskId: IMAGE_RETOUCH_FINAL_TASK_ID,
       revision: 1,
       output: {
         file: new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
       },
     }))
-    vi.spyOn(runtimeModule, 'getImageAdjustmentProcessingRuntime').mockReturnValue(
+    vi.spyOn(runtimeModule, 'getImageRetouchProcessingRuntime').mockReturnValue(
       createRuntimeMock(renderFinal),
     )
 
-    await renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, layers)
+    await renderImageRetouchFile({ url: 'https://example.com/source.png' }, layers)
 
     expect(renderFinal).toHaveBeenCalledWith(
       expect.objectContaining({
-        plan: buildImageAdjustmentPlan(layers),
+        plan: buildImageRetouchPlan(layers),
       }),
     )
   })
 
   it('cancels final render tasks through the runtime facade', () => {
     const runtime = createRuntimeMock()
-    vi.spyOn(runtimeModule, 'getImageAdjustmentProcessingRuntime').mockReturnValue(runtime)
+    vi.spyOn(runtimeModule, 'getImageRetouchProcessingRuntime').mockReturnValue(runtime)
 
-    cancelImageAdjustmentFinalRender()
-    cancelImageAdjustmentFinalRender('node-1')
+    cancelImageRetouchFinalRender()
+    cancelImageRetouchFinalRender('node-1')
 
-    expect(runtime.cancel).toHaveBeenNthCalledWith(1, IMAGE_ADJUSTMENT_FINAL_TASK_ID)
-    expect(runtime.cancel).toHaveBeenNthCalledWith(2, 'image-adjustment-final:node-1')
+    expect(runtime.cancel).toHaveBeenNthCalledWith(1, IMAGE_RETOUCH_FINAL_TASK_ID)
+    expect(runtime.cancel).toHaveBeenNthCalledWith(2, 'image-retouch-final:node-1')
   })
 
-  it('renders visible adjustment layers to an uploadable file', async () => {
+  it('renders visible retouch layers to an uploadable file', async () => {
     const { contexts } = installCanvasMocks()
     fetchMock.mockResolvedValue({
       ok: true,
@@ -244,7 +241,7 @@ describe('renderImageAdjustmentFile', () => {
     vi.stubGlobal('fetch', fetchMock)
     vi.stubGlobal('createImageBitmap', createImageBitmapMock)
 
-    const result = await renderImageAdjustmentFile(
+    const result = await renderImageRetouchFile(
       { url: 'https://example.com/source.png', title: 'Sample.png' },
       [thresholdLayer],
     )
@@ -258,17 +255,17 @@ describe('renderImageAdjustmentFile', () => {
     expect(contexts.at(-1)?.putImageData).toHaveBeenCalled()
   })
 
-  it('rejects empty visible adjustment stacks', async () => {
+  it('rejects empty visible retouch stacks', async () => {
     await expect(
-      renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, [
+      renderImageRetouchFile({ url: 'https://example.com/source.png' }, [
         { ...thresholdLayer, visible: false },
       ]),
     ).rejects.toThrow('No editable layers to apply.')
   })
 
-  it('rejects visually neutral adjustment stacks before loading the image', async () => {
+  it('rejects visually neutral retouch stacks before loading the image', async () => {
     await expect(
-      renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, [
+      renderImageRetouchFile({ url: 'https://example.com/source.png' }, [
         { ...hslLayer, params: { hue: 0, saturation: 0, lightness: 0 } },
       ]),
     ).rejects.toThrow('No editable layers to apply.')
@@ -278,23 +275,23 @@ describe('renderImageAdjustmentFile', () => {
   it('rejects runtime final rendering failures with the runtime message', async () => {
     const renderFinal = vi.fn<ImageProcessingRuntime['renderFinal']>(async () => ({
       status: 'failed',
-      taskId: IMAGE_ADJUSTMENT_FINAL_TASK_ID,
+      taskId: IMAGE_RETOUCH_FINAL_TASK_ID,
       revision: 1,
       error: {
         code: 'backend-failed',
         message: '渲染服务暂不可用',
       },
     }))
-    vi.spyOn(runtimeModule, 'getImageAdjustmentProcessingRuntime').mockReturnValue(
+    vi.spyOn(runtimeModule, 'getImageRetouchProcessingRuntime').mockReturnValue(
       createRuntimeMock(renderFinal),
     )
 
     await expect(
-      renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, [thresholdLayer]),
+      renderImageRetouchFile({ url: 'https://example.com/source.png' }, [thresholdLayer]),
     ).rejects.toThrow('渲染服务暂不可用')
   })
 
-  it('rejects animated images because adjustment output is a still frame', async () => {
+  it('rejects animated images because retouch output is a still frame', async () => {
     installCanvasMocks()
     fetchMock.mockResolvedValue({
       ok: true,
@@ -303,7 +300,7 @@ describe('renderImageAdjustmentFile', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(
-      renderImageAdjustmentFile({ url: 'https://example.com/source.gif' }, [thresholdLayer]),
+      renderImageRetouchFile({ url: 'https://example.com/source.gif' }, [thresholdLayer]),
     ).rejects.toThrow('Animated images are not supported for editing.')
     expect(createImageBitmapMock).not.toHaveBeenCalled()
   })
@@ -317,7 +314,7 @@ describe('renderImageAdjustmentFile', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(
-      renderImageAdjustmentFile({ url: 'https://example.com/source.webp' }, [thresholdLayer]),
+      renderImageRetouchFile({ url: 'https://example.com/source.webp' }, [thresholdLayer]),
     ).rejects.toThrow('Animated images are not supported for editing.')
     expect(createImageBitmapMock).not.toHaveBeenCalled()
   })

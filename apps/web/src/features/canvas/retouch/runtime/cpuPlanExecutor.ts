@@ -1,16 +1,16 @@
-import { executeCpuImageAdjustmentPlanInPlace } from '../backends/cpu/executeCpuImageAdjustmentPlan'
+import { executeCpuImageRetouchPlanInPlace } from '../backends/cpu/executeCpuImageRetouchPlan'
 import {
   reportPlanExecutionEvent,
-  type CreateImageAdjustmentPlanExecutorOptions,
-  type ImageAdjustmentPlanExecutor,
+  type CreateImageRetouchPlanExecutorOptions,
+  type ImageRetouchPlanExecutor,
 } from './planExecutorTypes'
 
-export function createCpuImageAdjustmentPlanExecutor(
-  options: Pick<CreateImageAdjustmentPlanExecutorOptions, 'onPlanExecutorEvent'> = {},
-): ImageAdjustmentPlanExecutor {
+export function createCpuImageRetouchPlanExecutor(
+  options: Pick<CreateImageRetouchPlanExecutorOptions, 'onPlanExecutorEvent'> = {},
+): ImageRetouchPlanExecutor {
   return {
     execute({ imageData, plan }) {
-      const output = executeCpuImageAdjustmentPlanInPlace(imageData, plan)
+      const output = executeCpuImageRetouchPlanInPlace(imageData, plan)
       reportPlanExecutionEvent(options.onPlanExecutorEvent, {
         kind: 'cpu-plan-completed',
         planLength: plan.length,

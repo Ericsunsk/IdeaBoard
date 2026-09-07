@@ -1,12 +1,12 @@
 <template>
   <ImageToolChromeFrame mode="adjust" :anchor-rect="anchorRect">
     <template #dock>
-      <RetouchAdjustmentActions
-        :selected-kind="selectedAdjustmentLayer?.kind ?? null"
-        @select-adjustment="emit('select-adjustment', $event)"
+      <RetouchEffectActions
+        :selected-kind="selectedEffectLayer?.kind ?? null"
+        @select-retouch="emit('select-retouch', $event)"
       />
       <RetouchPropertiesPanel
-        :adjustment-layer="selectedAdjustmentLayer"
+        :effect-layer="selectedEffectLayer"
         :histogram-source="histogramSource"
         @update-param="(key, value) => emit('update-param', key, value)"
         @update-params="emit('update-params', $event)"
@@ -21,13 +21,13 @@
         :can-copy-layer="canCopySelectedLayer"
         :can-merge-layer="canMergeSelectedLayer"
         :can-remove-layer="canRemoveSelectedLayer"
-        :applying="applyingAdjustments"
-        :apply-disabled="!canApplyAdjustments || applyingAdjustments"
+        :applying="applyingRetouch"
+        :apply-disabled="!canApplyRetouch || applyingRetouch"
         @add-layer="emit('add-layer')"
         @copy-layer="emit('copy-layer')"
         @merge-layer="emit('merge-layer')"
         @remove-layer="emit('remove-layer', selectedLayerId)"
-        @apply-adjustments="emit('apply-adjustments')"
+        @apply-retouch="emit('apply-retouch')"
       />
     </template>
   </ImageToolChromeFrame>
@@ -36,19 +36,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type {
-  ImageAdjustmentKind,
-  RetouchAdjustmentLayer,
-  RetouchAdjustmentWholeParams,
+  ImageRetouchKind,
+  RetouchEffectLayer,
+  RetouchEffectWholeParams,
   RetouchLayer,
   RetouchParamKey,
   RetouchParamValue,
 } from '../types'
-import RetouchAdjustmentActions from './RetouchAdjustmentActions.vue'
+import RetouchEffectActions from './RetouchEffectActions.vue'
 import ImageToolChromeFrame from '../../image-tools/components/ImageToolChromeFrame.vue'
 import RetouchLayerActions from './RetouchLayerActions.vue'
 import RetouchLayersPanel from './RetouchLayersPanel.vue'
 import RetouchPropertiesPanel from './RetouchPropertiesPanel.vue'
-import { hasRenderableRetouchLayerStack } from '../services/imageAdjustmentRenderer'
+import { hasRenderableRetouchLayerStack } from '../services/imageRetouchRenderer'
 
 const props = defineProps<{
   anchorRect: {
@@ -59,13 +59,13 @@ const props = defineProps<{
   }
   layers: RetouchLayer[]
   selectedLayerId: string
-  selectedAdjustmentLayer: RetouchAdjustmentLayer | null
+  selectedEffectLayer: RetouchEffectLayer | null
   histogramSource: ImageData | null
-  applyingAdjustments: boolean
+  applyingRetouch: boolean
 }>()
 
 const emit = defineEmits<{
-  (e: 'select-adjustment', kind: ImageAdjustmentKind): void
+  (e: 'select-retouch', kind: ImageRetouchKind): void
   (e: 'select-layer', layerId: string): void
   (e: 'set-layer-visible', layerId: string, visible: boolean): void
   (e: 'add-layer'): void
@@ -73,8 +73,8 @@ const emit = defineEmits<{
   (e: 'merge-layer'): void
   (e: 'remove-layer', layerId: string): void
   (e: 'update-param', key: RetouchParamKey, value: RetouchParamValue): void
-  (e: 'update-params', params: RetouchAdjustmentWholeParams): void
-  (e: 'apply-adjustments'): void
+  (e: 'update-params', params: RetouchEffectWholeParams): void
+  (e: 'apply-retouch'): void
 }>()
 
 const selectedLayerIndex = computed(() =>
@@ -93,5 +93,5 @@ const canMergeSelectedLayer = computed(() => {
 const canRemoveSelectedLayer = computed(
   () => selectedLayer.value != null && selectedLayer.value.type !== 'source',
 )
-const canApplyAdjustments = computed(() => hasRenderableRetouchLayerStack(props.layers))
+const canApplyRetouch = computed(() => hasRenderableRetouchLayerStack(props.layers))
 </script>

@@ -70,104 +70,106 @@ export type CanvasNodePresentationIntentRouter = {
   dispatch: (intent: CanvasNodePresentationIntent) => void
 }
 
+type IntentHandlerMap = {
+  [Type in CanvasNodePresentationIntent['type']]: (
+    commands: CanvasNodePresentationIntentCommands,
+    intent: CanvasNodeIntentOf<Type>,
+  ) => void
+}
+
+const INTENT_HANDLERS: IntentHandlerMap = {
+  'text-edited': (commands, intent) => {
+    commands.prompt.updateText(intent.nodeId, intent.text)
+  },
+  'parameter-changed': (commands, intent) => {
+    commands.prompt.updateParameters(intent.nodeId, intent.patch)
+  },
+  'delete-requested': (commands, intent) => {
+    commands.node.delete(intent.nodeId)
+  },
+  'image-import-retry-requested': (commands, intent) => {
+    commands.node.retryImageImport(intent.nodeId)
+  },
+  'media-input-dropped': (commands, intent) => {
+    commands.mediaInput.drop(intent.nodeId, intent.event)
+  },
+  'media-input-open-requested': (commands, intent) => {
+    commands.mediaInput.open(intent.nodeId)
+  },
+  'media-input-preview-requested': (commands, intent) => {
+    commands.mediaInput.preview(intent.image)
+  },
+  'media-input-remove-requested': (commands, intent) => {
+    commands.mediaInput.remove(intent.nodeId, intent.imageId)
+  },
+  'generation-requested': (commands, intent) => {
+    commands.prompt.generate(intent.nodeId, intent.prompt, intent.outputCount, intent.aspectRatio)
+  },
+  'stage-dropped': (commands, intent) => {
+    commands.image.dropStage(intent.nodeId, intent.event)
+  },
+  'file-open-requested': (commands, intent) => {
+    commands.image.openFile(intent.nodeId)
+  },
+  'preview-requested': (commands, intent) => {
+    commands.image.preview(intent.nodeId)
+  },
+  'append-to-canvas-requested': (commands, intent) => {
+    commands.image.appendToCanvas(intent.nodeId)
+  },
+  'reset-requested': (commands, intent) => {
+    commands.image.reset(intent.nodeId)
+  },
+  'image-context-menu-requested': (commands, intent) => {
+    commands.image.openContextMenu(intent.nodeId, intent.event)
+  },
+  'outpaint-submitted': (commands, intent) => {
+    commands.outpaint.submit(intent.nodeId, intent.prompt)
+  },
+  'action-requested': (commands, intent) => {
+    commands.image.runAction(
+      intent.nodeId,
+      intent.action,
+      intent.prompt,
+      intent.outputCount,
+      intent.strength,
+    )
+  },
+  'outpaint-handle-pointerdown': (commands, intent) => {
+    commands.outpaint.beginHandle(intent.nodeId, intent.anchor, intent.event)
+  },
+  'outpaint-handle-pointermove': (commands, intent) => {
+    commands.outpaint.moveHandle(intent.event)
+  },
+  'outpaint-handle-pointerup': (commands, intent) => {
+    commands.outpaint.endHandle(intent.event)
+  },
+  'outpaint-frame-pointerdown': (commands, intent) => {
+    commands.outpaint.beginFrame(intent.nodeId, intent.event)
+  },
+  'fusion-context-menu-requested': (commands, intent) => {
+    commands.fusion.openContextMenu(intent.nodeId, intent.event)
+  },
+  'fusion-generation-requested': (commands, intent) => {
+    commands.fusion.generate(intent.nodeId, intent.prompt, intent.outputCount, intent.aspectRatio)
+  },
+}
+
 export function createCanvasNodePresentationIntentRouter(
   commands: CanvasNodePresentationIntentCommands,
 ): CanvasNodePresentationIntentRouter {
   function dispatch(intent: CanvasNodePresentationIntent) {
-    switch (intent.type) {
-      case 'text-edited':
-        commands.prompt.updateText(intent.nodeId, intent.text)
-        return
-      case 'parameter-changed':
-        commands.prompt.updateParameters(intent.nodeId, intent.patch)
-        return
-      case 'delete-requested':
-        commands.node.delete(intent.nodeId)
-        return
-      case 'image-import-retry-requested':
-        commands.node.retryImageImport(intent.nodeId)
-        return
-      case 'media-input-dropped':
-        commands.mediaInput.drop(intent.nodeId, intent.event)
-        return
-      case 'media-input-open-requested':
-        commands.mediaInput.open(intent.nodeId)
-        return
-      case 'media-input-preview-requested':
-        commands.mediaInput.preview(intent.image)
-        return
-      case 'media-input-remove-requested':
-        commands.mediaInput.remove(intent.nodeId, intent.imageId)
-        return
-      case 'generation-requested':
-        commands.prompt.generate(
-          intent.nodeId,
-          intent.prompt,
-          intent.outputCount,
-          intent.aspectRatio,
-        )
-        return
-      case 'stage-dropped':
-        commands.image.dropStage(intent.nodeId, intent.event)
-        return
-      case 'file-open-requested':
-        commands.image.openFile(intent.nodeId)
-        return
-      case 'preview-requested':
-        commands.image.preview(intent.nodeId)
-        return
-      case 'append-to-canvas-requested':
-        commands.image.appendToCanvas(intent.nodeId)
-        return
-      case 'reset-requested':
-        commands.image.reset(intent.nodeId)
-        return
-      case 'image-context-menu-requested':
-        commands.image.openContextMenu(intent.nodeId, intent.event)
-        return
-      case 'outpaint-submitted':
-        commands.outpaint.submit(intent.nodeId, intent.prompt)
-        return
-      case 'action-requested':
-        commands.image.runAction(
-          intent.nodeId,
-          intent.action,
-          intent.prompt,
-          intent.outputCount,
-          intent.strength,
-        )
-        return
-      case 'outpaint-handle-pointerdown':
-        commands.outpaint.beginHandle(intent.nodeId, intent.anchor, intent.event)
-        return
-      case 'outpaint-handle-pointermove':
-        commands.outpaint.moveHandle(intent.event)
-        return
-      case 'outpaint-handle-pointerup':
-        commands.outpaint.endHandle(intent.event)
-        return
-      case 'outpaint-frame-pointerdown':
-        commands.outpaint.beginFrame(intent.nodeId, intent.event)
-        return
-      case 'fusion-context-menu-requested':
-        commands.fusion.openContextMenu(intent.nodeId, intent.event)
-        return
-      case 'fusion-generation-requested':
-        commands.fusion.generate(
-          intent.nodeId,
-          intent.prompt,
-          intent.outputCount,
-          intent.aspectRatio,
-        )
-        return
-      default:
-        return assertUnreachable(intent)
+    const handler = INTENT_HANDLERS[intent.type] as
+      | ((
+          commands: CanvasNodePresentationIntentCommands,
+          intent: CanvasNodePresentationIntent,
+        ) => void)
+      | undefined
+    if (!handler) {
+      throw new Error(`Unsupported Canvas Node presentation intent: ${JSON.stringify(intent)}`)
     }
+    handler(commands, intent)
   }
 
   return { dispatch }
-}
-
-function assertUnreachable(value: never): never {
-  throw new Error(`Unsupported Canvas Node presentation intent: ${JSON.stringify(value)}`)
 }

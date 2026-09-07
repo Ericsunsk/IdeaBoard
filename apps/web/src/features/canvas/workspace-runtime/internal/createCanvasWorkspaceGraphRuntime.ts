@@ -109,7 +109,7 @@ export function createCanvasWorkspaceGraphRuntime(
       getImageNodeDisplayPayload: editing.workflowPort.getImageNodeDisplayPayload,
       getImageNodeSnapshot: editing.workflowPort.getImageNodeSnapshot,
       updateSnapshotNode: editing.workflowPort.updateSnapshotNode,
-      createPendingAdjustmentNode: editing.workflowPort.createPendingAdjustmentNode,
+      createPendingRetouchNode: editing.workflowPort.createPendingRetouchNode,
       applyImageFileToImageNode: editing.workflowPort.applyImageFileToImageNode,
       removeNode: editing.workflowPort.deleteNode,
       connectionAdapter: editing.flowPane.connectionAdapter,

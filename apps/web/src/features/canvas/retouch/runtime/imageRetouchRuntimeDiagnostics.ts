@@ -1,6 +1,6 @@
 import type {
-  ImageAdjustmentPlanExecutionEvent,
-  ImageAdjustmentPlanExecutionEventReporter,
+  ImageRetouchPlanExecutionEvent,
+  ImageRetouchPlanExecutionEventReporter,
 } from './planExecutorTypes'
 
 export const RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_EVENT = 'ideaboard:retouch:plan-executor-diagnostic'
@@ -9,7 +9,7 @@ export const RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_KEY = '__ideaBoardRetouchPlanExec
 
 const DEFAULT_RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_LIMIT = 100
 
-export type RetouchPlanExecutorBrowserDiagnostic = ImageAdjustmentPlanExecutionEvent & {
+export type RetouchPlanExecutorBrowserDiagnostic = ImageRetouchPlanExecutionEvent & {
   sequence: number
   timestampMs: number
 }
@@ -30,7 +30,7 @@ export type CreateBrowserPlanExecutorDiagnosticsReporterOptions = {
 
 export function createBrowserPlanExecutorDiagnosticsReporter(
   options: CreateBrowserPlanExecutorDiagnosticsReporterOptions = {},
-): ImageAdjustmentPlanExecutionEventReporter {
+): ImageRetouchPlanExecutionEventReporter {
   const maxEvents = normalizeMaxEvents(options.maxEvents)
 
   return (event) => {

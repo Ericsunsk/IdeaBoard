@@ -15,7 +15,7 @@ function renderLayerActions(
     onCopyLayer?: () => void
     onMergeLayer?: () => void
     onRemoveLayer?: () => void
-    onApplyAdjustments?: () => void
+    onApplyRetouch?: () => void
   } = {},
 ) {
   return renderWithUser(RetouchLayerActions, {
@@ -29,7 +29,7 @@ function renderLayerActions(
       'onCopy-layer': options.onCopyLayer ?? noopHandler,
       'onMerge-layer': options.onMergeLayer ?? noopHandler,
       'onRemove-layer': options.onRemoveLayer ?? noopHandler,
-      'onApply-adjustments': options.onApplyAdjustments ?? noopHandler,
+      'onApply-retouch': options.onApplyRetouch ?? noopHandler,
     },
   })
 }
@@ -40,14 +40,14 @@ describe('RetouchLayerActions', () => {
     const onCopyLayer = vi.fn()
     const onMergeLayer = vi.fn()
     const onRemoveLayer = vi.fn()
-    const onApplyAdjustments = vi.fn()
+    const onApplyRetouch = vi.fn()
 
     const { user } = renderLayerActions({
       onAddLayer,
       onCopyLayer,
       onMergeLayer,
       onRemoveLayer,
-      onApplyAdjustments,
+      onApplyRetouch,
     })
 
     const addBtn = screen.getByRole('button', { name: 'Add layer' })
@@ -75,7 +75,7 @@ describe('RetouchLayerActions', () => {
     expect(onRemoveLayer).toHaveBeenCalledTimes(1)
 
     await user.click(applyBtn)
-    expect(onApplyAdjustments).toHaveBeenCalledTimes(1)
+    expect(onApplyRetouch).toHaveBeenCalledTimes(1)
   })
 
   it('disables actions when capability props are false', () => {

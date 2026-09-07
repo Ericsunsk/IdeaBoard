@@ -10,7 +10,7 @@ const THRESHOLD_DEFAULT = 128
 
 export const RETOUCH_THRESHOLD_MARKER_ID = 'threshold'
 
-export type NormalizedThresholdAdjustment = {
+export type NormalizedThresholdEffect = {
   threshold: number
   invert: boolean
 }
@@ -22,9 +22,9 @@ export type RetouchThresholdMarker = {
   ariaLabel: string
 }
 
-export function normalizeThresholdAdjustment(
+export function normalizeThresholdEffect(
   params: RetouchThresholdParams,
-): NormalizedThresholdAdjustment {
+): NormalizedThresholdEffect {
   return {
     threshold: clampThresholdValue(params.threshold),
     invert: params.invert === true,
@@ -36,7 +36,7 @@ export function clampThresholdValue(value: unknown) {
 }
 
 export function createThresholdMarker(
-  source: Pick<RetouchThresholdParams, 'threshold'> | NormalizedThresholdAdjustment | number,
+  source: Pick<RetouchThresholdParams, 'threshold'> | NormalizedThresholdEffect | number,
 ): RetouchThresholdMarker {
   const value = clampThresholdValue(resolveThresholdValue(source))
   return {
@@ -59,7 +59,7 @@ export function moveThresholdHandle(
 }
 
 function resolveThresholdValue(
-  source: Pick<RetouchThresholdParams, 'threshold'> | NormalizedThresholdAdjustment | number,
+  source: Pick<RetouchThresholdParams, 'threshold'> | NormalizedThresholdEffect | number,
 ) {
   return typeof source === 'number' ? source : source.threshold
 }

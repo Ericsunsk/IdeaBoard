@@ -4,13 +4,13 @@ import {
   RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_KEY,
   type RetouchPlanExecutorBrowserDiagnostic,
   type RetouchPlanExecutorDiagnosticsStore,
-} from './imageAdjustmentRuntimeDiagnostics'
-import type { ImageAdjustmentPlanExecutionEventReporter } from './planExecutorTypes'
+} from './imageRetouchRuntimeDiagnostics'
+import type { ImageRetouchPlanExecutionEventReporter } from './planExecutorTypes'
 import type { ImageProcessingBackend, ImageProcessingRuntime } from './types'
 
-const { createImageAdjustmentProcessingBackendMock, createImageProcessingRuntimeMock } = vi.hoisted(
+const { createImageRetouchProcessingBackendMock, createImageProcessingRuntimeMock } = vi.hoisted(
   () => ({
-    createImageAdjustmentProcessingBackendMock: vi.fn(),
+    createImageRetouchProcessingBackendMock: vi.fn(),
     createImageProcessingRuntimeMock: vi.fn(),
   }),
 )
@@ -20,7 +20,7 @@ vi.mock('./ImageProcessingRuntime', () => ({
 }))
 
 vi.mock('./imageProcessingBackends', () => ({
-  createImageAdjustmentProcessingBackend: createImageAdjustmentProcessingBackendMock,
+  createImageRetouchProcessingBackend: createImageRetouchProcessingBackendMock,
 }))
 
 type DiagnosticsWindow = Window & {
@@ -28,37 +28,37 @@ type DiagnosticsWindow = Window & {
 }
 
 afterEach(async () => {
-  const runtimeModule = await import('./imageAdjustmentProcessingRuntime')
-  runtimeModule.disposeImageAdjustmentProcessingRuntime()
+  const runtimeModule = await import('./imageRetouchProcessingRuntime')
+  runtimeModule.disposeImageRetouchProcessingRuntime()
   delete (window as DiagnosticsWindow)[RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_KEY]
   vi.restoreAllMocks()
-  createImageAdjustmentProcessingBackendMock.mockReset()
+  createImageRetouchProcessingBackendMock.mockReset()
   createImageProcessingRuntimeMock.mockReset()
 })
 
-describe('image adjustment processing runtime', () => {
+describe('image retouch processing runtime', () => {
   it('wires default plan executor diagnostics to browser-observable events', async () => {
-    const runtimeModule = await import('./imageAdjustmentProcessingRuntime')
+    const runtimeModule = await import('./imageRetouchProcessingRuntime')
     const backend = createBackendStub()
     const runtime = createRuntimeStub()
     const eventDetails: RetouchPlanExecutorBrowserDiagnostic[] = []
     const listener = vi.fn<EventListener>((event) => {
       eventDetails.push((event as CustomEvent<RetouchPlanExecutorBrowserDiagnostic>).detail)
     })
-    createImageAdjustmentProcessingBackendMock.mockReturnValue(backend)
+    createImageRetouchProcessingBackendMock.mockReturnValue(backend)
     createImageProcessingRuntimeMock.mockReturnValue(runtime)
     window.addEventListener(RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_EVENT, listener)
 
-    const resolvedRuntime = runtimeModule.getImageAdjustmentProcessingRuntime()
+    const resolvedRuntime = runtimeModule.getImageRetouchProcessingRuntime()
 
     expect(resolvedRuntime).toBe(runtime)
-    expect(createImageAdjustmentProcessingBackendMock).toHaveBeenCalledWith({
+    expect(createImageRetouchProcessingBackendMock).toHaveBeenCalledWith({
       onPlanExecutorEvent: expect.any(Function),
     })
     expect(createImageProcessingRuntimeMock).toHaveBeenCalledWith({ backend })
 
-    const reporter = createImageAdjustmentProcessingBackendMock.mock.calls[0]?.[0]
-      ?.onPlanExecutorEvent as ImageAdjustmentPlanExecutionEventReporter | undefined
+    const reporter = createImageRetouchProcessingBackendMock.mock.calls[0]?.[0]
+      ?.onPlanExecutorEvent as ImageRetouchPlanExecutionEventReporter | undefined
     reporter?.({
       kind: 'cpu-plan-completed',
       planLength: 4,

@@ -109,7 +109,7 @@ describe('Canvas surface skin contract', () => {
     expect(nodeSkin).not.toContain('node-inline-range')
   })
 
-  it('contains rendered adjustment previews within the existing image stage geometry', () => {
+  it('contains rendered retouch previews within the existing image stage geometry', () => {
     const previewRule = renderedImagePreviewCanvas.match(
       /\.image-node-stage-image--preview\s*\{([\s\S]*?)\}/,
     )?.[1]

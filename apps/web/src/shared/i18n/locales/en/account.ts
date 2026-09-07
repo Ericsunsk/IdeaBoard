@@ -105,7 +105,7 @@ export default {
       reward: 'Reward',
       topUp: 'Top up',
       systemGrant: 'Ideas grant',
-      systemAdjustment: 'Adjustment',
+      systemRetouch: 'Retouch',
     },
   },
   usage: {

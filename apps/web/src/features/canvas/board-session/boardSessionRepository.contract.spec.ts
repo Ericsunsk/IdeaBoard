@@ -145,6 +145,38 @@ describe('createBoardSessionRepository', () => {
     }
   })
 
+  it('migrates v3 local state to the current schema version on load', async () => {
+    const board = createCanvasBoard('Migrated Local Snapshot')
+    localStorage.setItem(
+      'ideaboard.canvas.boardStates.v2.public_00000000-0000-0000-0000-000000000001',
+      JSON.stringify({
+        [board.id]: {
+          schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION - 1,
+          imageNodes: [],
+          promptNodes: [
+            {
+              id: 1,
+              type: 'prompt',
+              x: 0,
+              y: 0,
+              width: 280,
+              text: 'migrated local',
+            },
+          ],
+          fusionNodes: [],
+          connections: [],
+          groups: [],
+          updatedAt: 2_000,
+        },
+      }),
+    )
+    const repository = createBoardSessionRepository()
+
+    const loaded = await repository.load(board.id)
+
+    expect(loaded?.schemaVersion).toBe(CANVAS_BOARD_STATE_SCHEMA_VERSION)
+  })
+
   it('keeps saving local board drafts when stored auth is temporarily missing', async () => {
     const board = createCanvasBoard('Session Recovery')
     replaceCanvasBoardStateMap({ [board.id]: makeState(1_000, 'initial') })
@@ -187,13 +219,13 @@ describe('createBoardSessionRepository', () => {
     expect(snapshot).not.toHaveProperty('viewport')
   })
 
-  it('rejects older local state instead of normalizing across schema versions', async () => {
+  it('rejects pre-migration local state instead of normalizing across schema versions', async () => {
     const board = createCanvasBoard('Older Local Snapshot')
     localStorage.setItem(
       'ideaboard.canvas.boardStates.v2.public_00000000-0000-0000-0000-000000000001',
       JSON.stringify({
         [board.id]: {
-          schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION - 1,
+          schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION - 2,
           imageNodes: [],
           promptNodes: [
             {

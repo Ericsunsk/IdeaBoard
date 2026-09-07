@@ -140,7 +140,7 @@ export function useCanvasScreenSurfaceInteractions(options: {
     finishFlowNodeDragDuplicateTracking: commands.graphEditing.finishFlowNodeDragDuplicateTracking,
     dismissTransientCanvasUi,
     isNodeDragLocked: () =>
-      isFlowCanvasLocked.value || imageTools.viewModel.adjustment.isApplying.value,
+      isFlowCanvasLocked.value || imageTools.viewModel.retouch.isApplying.value,
   })
 
   function onNodeDragStart(payload: NodeDragEvent) {

@@ -1,26 +1,26 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
+import type { ImageRetouchPlan } from '../utils/imageRetouchEngine'
 import type { ImageSourceCache, ImageSourceCacheEntry } from './imageSourceCache'
 import {
   createCpuMainImageProcessingBackend,
   createCpuWorkerImageProcessingBackend,
-  createImageAdjustmentProcessingBackend,
+  createImageRetouchProcessingBackend,
 } from './imageProcessingBackends'
 
-const { disposeDefaultWorkerImageProcessingClientMock, executeWorkerImageAdjustmentPlanMock } =
+const { disposeDefaultWorkerImageProcessingClientMock, executeWorkerImageRetouchPlanMock } =
   vi.hoisted(() => ({
     disposeDefaultWorkerImageProcessingClientMock: vi.fn(),
-    executeWorkerImageAdjustmentPlanMock: vi.fn(),
+    executeWorkerImageRetouchPlanMock: vi.fn(),
   }))
 
-vi.mock('../backends/worker/executeWorkerImageAdjustmentPlan', () => ({
+vi.mock('../backends/worker/executeWorkerImageRetouchPlan', () => ({
   disposeDefaultWorkerImageProcessingClient: disposeDefaultWorkerImageProcessingClientMock,
-  executeWorkerImageAdjustmentPlan: executeWorkerImageAdjustmentPlanMock,
+  executeWorkerImageRetouchPlan: executeWorkerImageRetouchPlanMock,
 }))
 
 afterEach(() => {
   vi.restoreAllMocks()
-  executeWorkerImageAdjustmentPlanMock.mockReset()
+  executeWorkerImageRetouchPlanMock.mockReset()
   disposeDefaultWorkerImageProcessingClientMock.mockReset()
 })
 
@@ -41,7 +41,7 @@ describe('image processing backend factories', () => {
       context: createTaskContext(),
     })
 
-    expect(executeWorkerImageAdjustmentPlanMock).not.toHaveBeenCalled()
+    expect(executeWorkerImageRetouchPlanMock).not.toHaveBeenCalled()
     expect(source.context.putImageData).toHaveBeenCalledWith(
       expect.objectContaining({
         data: new Uint8ClampedArray([20, 30, 40, 255]),
@@ -62,7 +62,7 @@ describe('image processing backend factories', () => {
     const workerOutput = makeImageData([1, 2, 3, 255])
     const sourceCache = createSourceCache({ fullSize: source })
     const onPlanExecutorEvent = vi.fn()
-    executeWorkerImageAdjustmentPlanMock.mockResolvedValue(workerOutput)
+    executeWorkerImageRetouchPlanMock.mockResolvedValue(workerOutput)
     installCanvasMock()
     const backend = createCpuWorkerImageProcessingBackend({
       sourceCache,
@@ -76,7 +76,7 @@ describe('image processing backend factories', () => {
     })
     backend.dispose?.()
 
-    expect(executeWorkerImageAdjustmentPlanMock).toHaveBeenCalledTimes(1)
+    expect(executeWorkerImageRetouchPlanMock).toHaveBeenCalledTimes(1)
     expect(source.context.putImageData).toHaveBeenCalledWith(workerOutput, 0, 0)
     expect(disposeDefaultWorkerImageProcessingClientMock).toHaveBeenCalledTimes(1)
     expect(onPlanExecutorEvent).toHaveBeenNthCalledWith(1, {
@@ -96,9 +96,9 @@ describe('image processing backend factories', () => {
   it('selects the hybrid backend by default and keeps small work on the main thread', async () => {
     const source = createImageSource([10, 20, 30, 255])
     const sourceCache = createSourceCache({ fullSize: source })
-    executeWorkerImageAdjustmentPlanMock.mockResolvedValue(makeImageData([4, 5, 6, 255]))
+    executeWorkerImageRetouchPlanMock.mockResolvedValue(makeImageData([4, 5, 6, 255]))
     installCanvasMock()
-    const backend = createImageAdjustmentProcessingBackend({ sourceCache })
+    const backend = createImageRetouchProcessingBackend({ sourceCache })
 
     await backend.renderFinal({
       source: { url: 'https://example.com/source.png' },
@@ -106,7 +106,7 @@ describe('image processing backend factories', () => {
       context: createTaskContext(),
     })
 
-    expect(executeWorkerImageAdjustmentPlanMock).not.toHaveBeenCalled()
+    expect(executeWorkerImageRetouchPlanMock).not.toHaveBeenCalled()
     expect(source.context.putImageData).toHaveBeenCalledWith(
       expect.objectContaining({
         data: new Uint8ClampedArray([20, 30, 40, 255]),
@@ -119,9 +119,9 @@ describe('image processing backend factories', () => {
   it('can still create an explicit cpu-worker backend for heavy image work', async () => {
     const source = createImageSource([10, 20, 30, 255])
     const sourceCache = createSourceCache({ fullSize: source })
-    executeWorkerImageAdjustmentPlanMock.mockResolvedValue(makeImageData([4, 5, 6, 255]))
+    executeWorkerImageRetouchPlanMock.mockResolvedValue(makeImageData([4, 5, 6, 255]))
     installCanvasMock()
-    const backend = createImageAdjustmentProcessingBackend({ backend: 'cpu-worker', sourceCache })
+    const backend = createImageRetouchProcessingBackend({ backend: 'cpu-worker', sourceCache })
 
     await backend.renderFinal({
       source: { url: 'https://example.com/source.png' },
@@ -129,7 +129,7 @@ describe('image processing backend factories', () => {
       context: createTaskContext(),
     })
 
-    expect(executeWorkerImageAdjustmentPlanMock).toHaveBeenCalledTimes(1)
+    expect(executeWorkerImageRetouchPlanMock).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -239,7 +239,7 @@ function makeImageData(values: number[]): ImageData {
   return new TestImageDataImpl(new Uint8ClampedArray(values), values.length / 4, 1) as ImageData
 }
 
-function createChannelLutPlan(): ImageAdjustmentPlan {
+function createChannelLutPlan(): ImageRetouchPlan {
   const lut = new Uint8ClampedArray(256)
   for (let index = 0; index < lut.length; index += 1) {
     lut[index] = Math.min(255, index + 10)

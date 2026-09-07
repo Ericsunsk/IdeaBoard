@@ -195,26 +195,24 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
       .filter((item): item is LinkedNodePreviewImage => !!item && !!item.url)
   }
 
-  function resolveNodePreviewImageById(nodeId: string): LinkedNodePreviewImage | null {
-    const record = createNodeById(options.readCanvasGraphStore()).get(nodeId)
-    const kind = record?.kind
-    const snapshot = record?.snapshot as Record<string, unknown> | undefined
-    if (!record || !kind || !snapshot) return null
-
-    if (kind === 'image') {
-      const display = options.getImageNodeDisplayPayload(nodeId)
-      if (!display?.url) return null
-      return {
-        id: `node:${nodeId}`,
-        sourceType: 'node',
-        sourceId: nodeId,
-        sourceNodeId: nodeId,
-        url: display.url,
-        ratio: Number.isFinite(display.ratio) && display.ratio > 0 ? display.ratio : 1,
-        ...(display.mediaRef ? { mediaRef: display.mediaRef } : {}),
-      }
+  function resolveImageNodePreview(nodeId: string): LinkedNodePreviewImage | null {
+    const display = options.getImageNodeDisplayPayload(nodeId)
+    if (!display?.url) return null
+    return {
+      id: `node:${nodeId}`,
+      sourceType: 'node',
+      sourceId: nodeId,
+      sourceNodeId: nodeId,
+      url: display.url,
+      ratio: Number.isFinite(display.ratio) && display.ratio > 0 ? display.ratio : 1,
+      ...(display.mediaRef ? { mediaRef: display.mediaRef } : {}),
     }
+  }
 
+  function resolveOutputNodePreview(
+    nodeId: string,
+    snapshot: Record<string, unknown>,
+  ): LinkedNodePreviewImage | null {
     const outputs = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
     const latest = outputs[outputs.length - 1] as
       { url?: string; ratio?: number; mediaRef?: MediaRef } | undefined
@@ -230,6 +228,19 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
       ratio: Number.isFinite(ratio) && ratio > 0 ? ratio : 1,
       ...(latest?.mediaRef ? { mediaRef: latest.mediaRef } : {}),
     }
+  }
+
+  function resolveNodePreviewImageById(nodeId: string): LinkedNodePreviewImage | null {
+    const record = createNodeById(options.readCanvasGraphStore()).get(nodeId)
+    const kind = record?.kind
+    const snapshot = record?.snapshot as Record<string, unknown> | undefined
+    if (!record || !kind || !snapshot) return null
+
+    if (kind === 'image') {
+      return resolveImageNodePreview(nodeId)
+    }
+
+    return resolveOutputNodePreview(nodeId, snapshot)
   }
 
   function resolveMediaInputNodeKind(nodeId: string): MediaInputNodeKind | null {

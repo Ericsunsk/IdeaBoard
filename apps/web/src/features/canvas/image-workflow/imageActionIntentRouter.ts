@@ -2,6 +2,7 @@ import type { Ref } from 'vue'
 import {
   IMAGE_ACTION_MODE,
   IMAGE_ACTION_REGISTRY,
+  type ImageActionMode,
   type ImageNodeAction,
 } from '../config/imageActionRegistry'
 import {
@@ -84,6 +85,33 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
     options.ui.hideStrengthControl()
   }
 
+  function enterOutpaintMode(nodeId: string): boolean {
+    options.modes.cancelInpaint()
+    const entered = options.modes.enterOutpaint(nodeId)
+    options.ui.clearPanel()
+    options.ui.hideStrengthControl()
+    if (!entered) options.ui.warn(i18n.global.t('canvas.tools.cannotOutpaint'))
+    return entered
+  }
+
+  function enterRetouchMode(nodeId: string, actionMode: ImageActionMode): boolean {
+    options.modes.cancelOutpaint()
+    const editorMode = actionMode === IMAGE_ACTION_MODE.retouch ? 'adjust' : 'inpaint'
+    const entered = options.modes.enterRetouch(nodeId, editorMode)
+    options.ui.clearPanel()
+    options.ui.hideStrengthControl()
+    if (!entered) {
+      const warningKey =
+        actionMode === IMAGE_ACTION_MODE.retouch
+          ? 'canvas.tools.imageNotEditable'
+          : 'canvas.tools.cannotInpaint'
+      options.ui.warn(i18n.global.t(warningKey))
+    } else {
+      void options.modes.focusRetouch(nodeId)
+    }
+    return entered
+  }
+
   function onFlowImageDirectAction(
     nodeId: string,
     action: ImageNodeAction,
@@ -93,28 +121,11 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
   ) {
     const actionMode = IMAGE_ACTION_REGISTRY[action].mode
     if (actionMode === IMAGE_ACTION_MODE.outpaint) {
-      options.modes.cancelInpaint()
-      const entered = options.modes.enterOutpaint(nodeId)
-      options.ui.clearPanel()
-      options.ui.hideStrengthControl()
-      if (!entered) options.ui.warn(i18n.global.t('canvas.tools.cannotOutpaint'))
+      enterOutpaintMode(nodeId)
       return
     }
     if (actionMode === IMAGE_ACTION_MODE.inpaint || actionMode === IMAGE_ACTION_MODE.retouch) {
-      options.modes.cancelOutpaint()
-      const editorMode = actionMode === IMAGE_ACTION_MODE.retouch ? 'adjust' : 'inpaint'
-      const entered = options.modes.enterRetouch(nodeId, editorMode)
-      options.ui.clearPanel()
-      options.ui.hideStrengthControl()
-      if (!entered) {
-        const warningKey =
-          actionMode === IMAGE_ACTION_MODE.retouch
-            ? 'canvas.tools.imageNotEditable'
-            : 'canvas.tools.cannotInpaint'
-        options.ui.warn(i18n.global.t(warningKey))
-      } else {
-        void options.modes.focusRetouch(nodeId)
-      }
+      enterRetouchMode(nodeId, actionMode)
       return
     }
     if (!isImageTaskAction(action)) {

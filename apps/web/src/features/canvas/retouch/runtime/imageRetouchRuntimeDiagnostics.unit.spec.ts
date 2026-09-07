@@ -6,7 +6,7 @@ import {
   RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_KEY,
   type RetouchPlanExecutorBrowserDiagnostic,
   type RetouchPlanExecutorDiagnosticsStore,
-} from './imageAdjustmentRuntimeDiagnostics'
+} from './imageRetouchRuntimeDiagnostics'
 
 type WorkerStartedPlanExecutorEvent = Omit<
   Extract<RetouchPlanExecutorBrowserDiagnostic, { kind: 'worker-plan-started' }>,
@@ -22,7 +22,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('image adjustment runtime diagnostics', () => {
+describe('image retouch runtime diagnostics', () => {
   it('stores plan executor diagnostics on window and dispatches browser events', () => {
     const reporter = createBrowserPlanExecutorDiagnosticsReporter({ now: () => 42 })
     const eventDetails: RetouchPlanExecutorBrowserDiagnostic[] = []

@@ -1,26 +1,26 @@
-import type { RetouchAdjustmentLayer } from '../types'
+import type { RetouchEffectLayer } from '../types'
 import {
   CHANNEL_MAX,
   CHANNEL_MIN,
   PERCENT_SCALE,
-  isNeutralImageAdjustment,
-  normalizeImageAdjustmentLayers,
-  type NormalizedHslAdjustment,
-  type NormalizedImageAdjustment,
-  type NormalizedSharpenAdjustment,
-} from './imageAdjustmentDefinitions'
+  isNeutralImageRetouch,
+  normalizeImageEffectLayers,
+  type NormalizedHslEffect,
+  type NormalizedImageRetouch,
+  type NormalizedSharpenEffect,
+} from './imageRetouchDefinitions'
 import { createCurvesLuts, type RetouchCurvesLuts } from './retouchCurves'
 import { createLevelsLut } from './retouchLevels'
 
-export type ImageAdjustmentPlanStep =
-  | { kind: 'hsl'; params: NormalizedHslAdjustment }
+export type ImageRetouchPlanStep =
+  | { kind: 'hsl'; params: NormalizedHslEffect }
   | { kind: 'threshold'; threshold: number; invert: boolean }
   | { kind: 'channel-lut'; luts: RetouchCurvesLuts }
-  | { kind: 'sharpen'; params: NormalizedSharpenAdjustment }
+  | { kind: 'sharpen'; params: NormalizedSharpenEffect }
 
-export type ImageAdjustmentPlan = readonly ImageAdjustmentPlanStep[]
+export type ImageRetouchPlan = readonly ImageRetouchPlanStep[]
 
-export type ImageAdjustmentPlanStepExecutionState = {
+export type ImageRetouchPlanStepExecutionState = {
   kind: 'sharpen'
   width: number
   height: number
@@ -30,34 +30,34 @@ export type ImageAdjustmentPlanStepExecutionState = {
 
 const SHARPEN_WORK_FACTOR = 3
 
-export function applyImageAdjustmentsInPlace(
+export function applyImageRetouchInPlace(
   imageData: ImageData,
-  layers: readonly RetouchAdjustmentLayer[],
+  layers: readonly RetouchEffectLayer[],
 ): ImageData {
-  executeImageAdjustmentPlan(imageData, compileImageAdjustmentPlan(layers))
+  executeImageRetouchPlan(imageData, compileImageRetouchPlan(layers))
   return imageData
 }
 
-export function hasEffectiveImageAdjustments(layers: readonly RetouchAdjustmentLayer[]) {
-  return compileImageAdjustmentPlan(layers).length > 0
+export function hasEffectiveImageRetouch(layers: readonly RetouchEffectLayer[]) {
+  return compileImageRetouchPlan(layers).length > 0
 }
 
-export function normalizeImageAdjustmentStack(
-  layers: readonly RetouchAdjustmentLayer[],
-): NormalizedImageAdjustment[] {
-  return normalizeImageAdjustmentLayers(layers.filter((layer) => layer.visible))
+export function normalizeImageRetouchStack(
+  layers: readonly RetouchEffectLayer[],
+): NormalizedImageRetouch[] {
+  return normalizeImageEffectLayers(layers.filter((layer) => layer.visible))
 }
 
-export function compileImageAdjustmentPlan(
-  layers: readonly RetouchAdjustmentLayer[],
-): ImageAdjustmentPlanStep[] {
-  return compileNormalizedImageAdjustmentPlan(normalizeImageAdjustmentStack(layers))
+export function compileImageRetouchPlan(
+  layers: readonly RetouchEffectLayer[],
+): ImageRetouchPlanStep[] {
+  return compileNormalizedImageRetouchPlan(normalizeImageRetouchStack(layers))
 }
 
-export function compileNormalizedImageAdjustmentPlan(
-  layers: readonly NormalizedImageAdjustment[],
-): ImageAdjustmentPlanStep[] {
-  const steps: ImageAdjustmentPlanStep[] = []
+export function compileNormalizedImageRetouchPlan(
+  layers: readonly NormalizedImageRetouch[],
+): ImageRetouchPlanStep[] {
+  const steps: ImageRetouchPlanStep[] = []
   let pendingChannelLut: RetouchCurvesLuts | null = null
 
   const flushPendingChannelLut = () => {
@@ -67,7 +67,7 @@ export function compileNormalizedImageAdjustmentPlan(
   }
 
   for (const layer of layers) {
-    if (isNeutralImageAdjustment(layer)) continue
+    if (isNeutralImageRetouch(layer)) continue
 
     switch (layer.kind) {
       case 'hsl':
@@ -102,22 +102,22 @@ export function compileNormalizedImageAdjustmentPlan(
   return steps
 }
 
-export function executeImageAdjustmentPlan(imageData: ImageData, plan: ImageAdjustmentPlan) {
-  executeImageAdjustmentPlanData(imageData, plan)
+export function executeImageRetouchPlan(imageData: ImageData, plan: ImageRetouchPlan) {
+  executeImageRetouchPlanData(imageData, plan)
   return imageData
 }
 
-function executeImageAdjustmentPlanData(imageData: ImageData, plan: ImageAdjustmentPlan) {
+function executeImageRetouchPlanData(imageData: ImageData, plan: ImageRetouchPlan) {
   for (const step of plan) {
-    const state = createImageAdjustmentPlanStepExecutionState(imageData, step)
-    executeImageAdjustmentPlanStepRange(imageData.data, step, 0, imageData.data.length, state)
+    const state = createImageRetouchPlanStepExecutionState(imageData, step)
+    executeImageRetouchPlanStepRange(imageData.data, step, 0, imageData.data.length, state)
   }
 }
 
-export function createImageAdjustmentPlanStepExecutionState(
+export function createImageRetouchPlanStepExecutionState(
   imageData: Pick<ImageData, 'data' | 'width' | 'height'>,
-  step: ImageAdjustmentPlanStep,
-): ImageAdjustmentPlanStepExecutionState {
+  step: ImageRetouchPlanStep,
+): ImageRetouchPlanStepExecutionState {
   if (step.kind !== 'sharpen') return null
   const width = Math.max(0, Math.floor(imageData.width))
   const height = Math.max(0, Math.floor(imageData.height))
@@ -131,33 +131,33 @@ export function createImageAdjustmentPlanStepExecutionState(
   }
 }
 
-export function estimateImageAdjustmentPlanWorkUnits(
+export function estimateImageRetouchPlanWorkUnits(
   imageData: Pick<ImageData, 'data'>,
-  plan: ImageAdjustmentPlan,
+  plan: ImageRetouchPlan,
 ) {
   return plan.reduce(
-    (total, step) => total + imageData.data.length * getImageAdjustmentPlanStepWorkFactor(step),
+    (total, step) => total + imageData.data.length * getImageRetouchPlanStepWorkFactor(step),
     0,
   )
 }
 
-export function estimateImageAdjustmentPlanStepRangeWorkUnits(
+export function estimateImageRetouchPlanStepRangeWorkUnits(
   data: Uint8ClampedArray,
-  step: ImageAdjustmentPlanStep,
+  step: ImageRetouchPlanStep,
   startByte: number,
   endByte: number,
 ) {
   const start = alignPixelByteOffset(startByte)
   const end = alignPixelByteOffset(Math.min(endByte, data.length))
-  return Math.max(0, end - start) * getImageAdjustmentPlanStepWorkFactor(step)
+  return Math.max(0, end - start) * getImageRetouchPlanStepWorkFactor(step)
 }
 
-export function executeImageAdjustmentPlanStepRange(
+export function executeImageRetouchPlanStepRange(
   data: Uint8ClampedArray,
-  step: ImageAdjustmentPlanStep,
+  step: ImageRetouchPlanStep,
   startByte: number,
   endByte: number,
-  state: ImageAdjustmentPlanStepExecutionState = null,
+  state: ImageRetouchPlanStepExecutionState = null,
 ) {
   const start = alignPixelByteOffset(startByte)
   const end = alignPixelByteOffset(Math.min(endByte, data.length))
@@ -165,21 +165,21 @@ export function executeImageAdjustmentPlanStepRange(
 
   switch (step.kind) {
     case 'hsl':
-      applyHslAdjustment(data, step.params, start, end)
+      applyHslRetouch(data, step.params, start, end)
       break
     case 'threshold':
-      applyThresholdAdjustment(data, step.threshold, step.invert, start, end)
+      applyThresholdRetouch(data, step.threshold, step.invert, start, end)
       break
     case 'channel-lut':
       applyChannelLut(data, step.luts, start, end)
       break
     case 'sharpen':
-      applySharpenAdjustment(data, step.params, start, end, state)
+      applySharpenRetouch(data, step.params, start, end, state)
       break
   }
 }
 
-function getImageAdjustmentPlanStepWorkFactor(step: ImageAdjustmentPlanStep) {
+function getImageRetouchPlanStepWorkFactor(step: ImageRetouchPlanStep) {
   return step.kind === 'sharpen' ? SHARPEN_WORK_FACTOR : 1
 }
 
@@ -218,7 +218,7 @@ function isIdentitySingleLut(lut: Uint8ClampedArray) {
   return true
 }
 
-function applyThresholdAdjustment(
+function applyThresholdRetouch(
   data: Uint8ClampedArray,
   threshold: number,
   invert: boolean,
@@ -238,9 +238,9 @@ function applyThresholdAdjustment(
   }
 }
 
-function applyHslAdjustment(
+function applyHslRetouch(
   data: Uint8ClampedArray,
-  params: NormalizedHslAdjustment,
+  params: NormalizedHslEffect,
   startByte: number,
   endByte: number,
 ) {
@@ -304,15 +304,15 @@ function applyChannelLut(
   }
 }
 
-function applySharpenAdjustment(
+function applySharpenRetouch(
   data: Uint8ClampedArray,
-  params: NormalizedSharpenAdjustment,
+  params: NormalizedSharpenEffect,
   startByte: number,
   endByte: number,
-  state: ImageAdjustmentPlanStepExecutionState,
+  state: ImageRetouchPlanStepExecutionState,
 ) {
   if (!state || state.kind !== 'sharpen') {
-    throw new Error('Sharpen adjustment requires an image-sized execution state')
+    throw new Error('Sharpen retouch requires an image-sized execution state')
   }
 
   const amountScale = params.amount / PERCENT_SCALE
@@ -360,6 +360,21 @@ function createBlurredRgbData(
   const kernel = createGaussianKernel(radius)
   const kernelRadius = Math.floor(kernel.length / 2)
 
+  blurImageRowsHorizontally(sourceData, width, height, pixelCount, temp, kernel, kernelRadius)
+  blurImageColumnsVertically(temp, width, height, pixelCount, output, kernel, kernelRadius)
+
+  return output
+}
+
+function blurImageRowsHorizontally(
+  sourceData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  pixelCount: number,
+  temp: Float32Array,
+  kernel: Float32Array,
+  kernelRadius: number,
+) {
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const pixelIndex = y * width + x
@@ -383,7 +398,17 @@ function createBlurredRgbData(
       temp[tempOffset + 2] = blue
     }
   }
+}
 
+function blurImageColumnsVertically(
+  temp: Float32Array,
+  width: number,
+  height: number,
+  pixelCount: number,
+  output: Float32Array,
+  kernel: Float32Array,
+  kernelRadius: number,
+) {
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const pixelIndex = y * width + x
@@ -407,8 +432,6 @@ function createBlurredRgbData(
       output[outputOffset + 2] = blue
     }
   }
-
-  return output
 }
 
 function createGaussianKernel(radius: number) {

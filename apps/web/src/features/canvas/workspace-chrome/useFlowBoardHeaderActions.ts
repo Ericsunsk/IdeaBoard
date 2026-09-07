@@ -85,6 +85,47 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
     cancelBoardRename()
   }
 
+  type BoardRenameOutcome = Awaited<ReturnType<typeof boardCatalog.commands.rename>>
+
+  function selectRenameRestoreErrorMessage(reason: string, rollbackSucceeded: boolean): string {
+    if (reason === 'remote-name-conflict' && rollbackSucceeded) {
+      return t('canvas.chrome.conflictRestoredRefreshFailedError')
+    }
+    if (reason === 'remote-name-conflict') {
+      return t('canvas.chrome.conflictRestoreFailedError')
+    }
+    return t('canvas.chrome.syncFailedRestoreFailedError')
+  }
+
+  function reportBoardRenameFailure(
+    result: Extract<BoardRenameOutcome, { ok: false }>,
+    boardId: string,
+  ): void {
+    if (result.reason === 'local-name-conflict') {
+      options.message.warning(t('canvas.chrome.duplicateNameWarning'))
+      return
+    }
+    if (result.reason === 'invalid-name') {
+      options.message.warning(t('canvas.chrome.renameFailedWarning'))
+      return
+    }
+    if (result.reason === 'scope-changed') return
+    if (!('rollback' in result)) return
+    const hydrateSucceeded = result.hydrate?.ok === true
+    const rollbackSucceeded = result.rollback.ok
+    if (result.reason === 'remote-name-conflict' && hydrateSucceeded) {
+      catalogRecovery.value = { status: 'idle' }
+      options.message.error?.(t('canvas.chrome.conflictReloadedError'))
+    } else if (rollbackSucceeded && result.reason === 'sync-failed') {
+      catalogRecovery.value = { status: 'idle' }
+      options.message.error?.(t('canvas.chrome.syncFailedRestoredError'))
+    } else {
+      catalogRecovery.value = { status: 'reload-required', boardId }
+      options.message.error?.(selectRenameRestoreErrorMessage(result.reason, rollbackSucceeded))
+    }
+    console.warn('[canvas] failed to sync renamed board', result.error)
+  }
+
   async function onConfirmBoardRename() {
     if (isRenamePending.value) return
     const boardId = `${options.currentBoardId.value ?? ''}`.trim()
@@ -109,35 +150,7 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
       options.message.success(t('canvas.chrome.renameSuccess'))
       return
     }
-    if (result.reason === 'local-name-conflict') {
-      options.message.warning(t('canvas.chrome.duplicateNameWarning'))
-      return
-    }
-    if (result.reason === 'invalid-name') {
-      options.message.warning(t('canvas.chrome.renameFailedWarning'))
-      return
-    }
-    if (result.reason === 'scope-changed') return
-    if (!('rollback' in result)) return
-    const hydrateSucceeded = result.hydrate?.ok === true
-    const rollbackSucceeded = result.rollback.ok
-    if (result.reason === 'remote-name-conflict' && hydrateSucceeded) {
-      catalogRecovery.value = { status: 'idle' }
-      options.message.error?.(t('canvas.chrome.conflictReloadedError'))
-    } else if (rollbackSucceeded && result.reason === 'sync-failed') {
-      catalogRecovery.value = { status: 'idle' }
-      options.message.error?.(t('canvas.chrome.syncFailedRestoredError'))
-    } else {
-      catalogRecovery.value = { status: 'reload-required', boardId }
-      options.message.error?.(
-        result.reason === 'remote-name-conflict' && rollbackSucceeded
-          ? t('canvas.chrome.conflictRestoredRefreshFailedError')
-          : result.reason === 'remote-name-conflict'
-            ? t('canvas.chrome.conflictRestoreFailedError')
-            : t('canvas.chrome.syncFailedRestoreFailedError'),
-      )
-    }
-    console.warn('[canvas] failed to sync renamed board', result.error)
+    reportBoardRenameFailure(result, boardId)
   }
 
   async function reloadCatalog() {

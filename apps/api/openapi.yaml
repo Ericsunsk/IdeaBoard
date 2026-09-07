@@ -3815,7 +3815,7 @@ components:
       properties:
         schemaVersion:
           type: integer
-          enum: [3]
+          enum: [4]
         imageNodes:
           type: array
           items:

@@ -142,11 +142,17 @@ function resolveTargetPort(
   return openPort.port
 }
 
-export function normalizeFlowConnection(
+type ParsedFlowConnectionRefs = {
+  sourceNodeRef: ParsedNodeRef
+  targetNodeRef: ParsedNodeRef
+  sourceHandle: ParsedHandleRef
+  targetHandle: ParsedHandleRef
+}
+
+function parseFlowConnectionRefs(
   connection: Connection,
   lookupData: (nodeId: string) => FlowNodeData | undefined,
-  existingEdges: readonly FlowEdgeLike[] = [],
-): Connection | null {
+): ParsedFlowConnectionRefs | null {
   const sourceNodeData = connection.source ? lookupData(connection.source) : undefined
   const targetNodeData = connection.target ? lookupData(connection.target) : undefined
   const sourceNodeType = isCanvasConnectionNodeType(sourceNodeData?.nodeType)
@@ -162,6 +168,17 @@ export function normalizeFlowConnection(
 
   if (!sourceNodeRef || !targetNodeRef || !sourceHandle || !targetHandle) return null
   if (sourceHandle.direction !== 'out' || targetHandle.direction !== 'in') return null
+  return { sourceNodeRef, targetNodeRef, sourceHandle, targetHandle }
+}
+
+export function normalizeFlowConnection(
+  connection: Connection,
+  lookupData: (nodeId: string) => FlowNodeData | undefined,
+  existingEdges: readonly FlowEdgeLike[] = [],
+): Connection | null {
+  const refs = parseFlowConnectionRefs(connection, lookupData)
+  if (!refs) return null
+  const { sourceNodeRef, targetNodeRef, sourceHandle, targetHandle } = refs
 
   const sourcePort = resolveSourcePort(sourceNodeRef, sourceHandle)
   if (!sourcePort || !connection.target) return null

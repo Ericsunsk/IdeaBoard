@@ -290,7 +290,7 @@ describe('useCanvasGraphEditing', () => {
     expect(harness.markDropAsCopy).toHaveBeenCalled()
   })
 
-  it('creates a running pending adjustment node matching the source node dimensions and ratio', () => {
+  it('creates a running pending retouch node matching the source node dimensions and ratio', () => {
     const harness = createHarness()
     const sourceNode: ImageNodeItem = {
       id: 10,
@@ -304,7 +304,7 @@ describe('useCanvasGraphEditing', () => {
       outputImages: [],
     }
 
-    const createdNodeId = harness.editing.workflowPort.createPendingAdjustmentNode(sourceNode)
+    const createdNodeId = harness.editing.workflowPort.createPendingRetouchNode(sourceNode)
 
     expect(createdNodeId).toMatch(/^image-\d+$/)
     expect(harness.nodes.value).toContainEqual(
@@ -352,7 +352,7 @@ describe('useCanvasGraphEditing', () => {
       createFlowNode('image-11', 'image', variationNode),
     ])
 
-    const createdNodeId = harness.editing.workflowPort.createPendingAdjustmentNode(sourceNode)
+    const createdNodeId = harness.editing.workflowPort.createPendingRetouchNode(sourceNode)
     const retouchNode = harness.nodes.value.find((node) => node.id === createdNodeId)
     const variationHeight = 26 + resolveImageNodeStageHeight(460, 1.5, true)
 

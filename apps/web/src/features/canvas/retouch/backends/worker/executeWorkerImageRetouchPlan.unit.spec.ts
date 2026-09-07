@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { ImageAdjustmentPlan } from '../../utils/imageAdjustmentEngine'
+import type { ImageRetouchPlan } from '../../utils/imageRetouchEngine'
 import { cloneImageData } from '../../utils/imageDataUtils'
-import { executeCpuImageAdjustmentPlanInPlace } from '../cpu/executeCpuImageAdjustmentPlan'
+import { executeCpuImageRetouchPlanInPlace } from '../cpu/executeCpuImageRetouchPlan'
 import { handleWorkerImageProcessingRequest } from './imageProcessing.worker'
 import {
   createWorkerImageProcessingClient,
-  executeWorkerImageAdjustmentPlan,
+  executeWorkerImageRetouchPlan,
   WorkerImageProcessingError,
   type WorkerImageProcessingLike,
-} from './executeWorkerImageAdjustmentPlan'
+} from './executeWorkerImageRetouchPlan'
 import type { WorkerImageProcessingRequest, WorkerImageProcessingResponse } from './protocol'
 
 function makeImageData(values: number[], width = values.length / 4, height = 1) {
@@ -56,11 +56,11 @@ function makeGeneratedGridImageData(width: number, height: number) {
   return makeImageData(values, width, height)
 }
 
-function createChannelLutPlan(): ImageAdjustmentPlan {
+function createChannelLutPlan(): ImageRetouchPlan {
   return [{ kind: 'channel-lut', luts: createRgbChannelLutsForTest(createChannelLiftLut()) }]
 }
 
-function createSharpenPlan(): ImageAdjustmentPlan {
+function createSharpenPlan(): ImageRetouchPlan {
   return [
     {
       kind: 'sharpen',
@@ -90,13 +90,13 @@ async function waitFor(assertion: () => boolean) {
   throw new Error('timed out waiting for worker response')
 }
 
-describe('worker image adjustment backend', () => {
-  it('executes a CPU adjustment plan through the worker protocol', async () => {
+describe('worker image retouch backend', () => {
+  it('executes a CPU retouch plan through the worker protocol', async () => {
     const worker = new FakeImageProcessingWorker()
     const source = makeImageData([10, 20, 30, 77])
     const progress = vi.fn()
 
-    const result = await executeWorkerImageAdjustmentPlan(source, createChannelLutPlan(), {
+    const result = await executeWorkerImageRetouchPlan(source, createChannelLutPlan(), {
       requestId: 'request:success',
       workerFactory: () => worker,
       onProgress: progress,
@@ -114,7 +114,7 @@ describe('worker image adjustment backend', () => {
 
   it('matches the CPU executor when worker rendering spans multiple chunks and steps', async () => {
     const source = makeGeneratedImageData(80_000)
-    const plan: ImageAdjustmentPlan = [
+    const plan: ImageRetouchPlan = [
       { kind: 'channel-lut', luts: createRgbChannelLutsForTest(createChannelLiftLut()) },
       { kind: 'threshold', threshold: 128, invert: true },
       {
@@ -127,9 +127,9 @@ describe('worker image adjustment backend', () => {
       },
     ]
     const progress = vi.fn()
-    const expected = executeCpuImageAdjustmentPlanInPlace(cloneImageData(source), plan)
+    const expected = executeCpuImageRetouchPlanInPlace(cloneImageData(source), plan)
 
-    const result = await executeWorkerImageAdjustmentPlan(source, plan, {
+    const result = await executeWorkerImageRetouchPlan(source, plan, {
       requestId: 'request:chunk-parity',
       workerFactory: () => new FakeImageProcessingWorker(),
       onProgress: progress,
@@ -148,9 +148,9 @@ describe('worker image adjustment backend', () => {
     const source = makeGeneratedGridImageData(320, 260)
     const plan = createSharpenPlan()
     const progress = vi.fn()
-    const expected = executeCpuImageAdjustmentPlanInPlace(cloneImageData(source), plan)
+    const expected = executeCpuImageRetouchPlanInPlace(cloneImageData(source), plan)
 
-    const result = await executeWorkerImageAdjustmentPlan(source, plan, {
+    const result = await executeWorkerImageRetouchPlan(source, plan, {
       requestId: 'request:sharpen-chunk-parity',
       workerFactory: () => new FakeImageProcessingWorker(),
       onProgress: progress,
@@ -170,7 +170,7 @@ describe('worker image adjustment backend', () => {
     const transfers: Transferable[][] = []
     const requestId = 'request:cancel-during-render'
     const source = makeGeneratedImageData(80_000)
-    const plan: ImageAdjustmentPlan = [
+    const plan: ImageRetouchPlan = [
       { kind: 'channel-lut', luts: createRgbChannelLutsForTest(createChannelLiftLut()) },
     ]
 
@@ -259,7 +259,7 @@ describe('worker image adjustment backend', () => {
     const plan = createChannelLutPlan()
     const sourceBuffer = source.data.buffer
     const luts = plan[0]?.kind === 'channel-lut' ? plan[0].luts : null
-    const promise = executeWorkerImageAdjustmentPlan(source, plan, {
+    const promise = executeWorkerImageRetouchPlan(source, plan, {
       requestId: 'request:transfer',
       workerFactory: () => worker,
     })
@@ -299,7 +299,7 @@ describe('worker image adjustment backend', () => {
     const source = makeImageData([10, 20, 30, 77, 200, 210, 220, 88], 2, 1)
     const plan = createSharpenPlan()
     const params = plan[0]?.kind === 'sharpen' ? plan[0].params : null
-    const promise = executeWorkerImageAdjustmentPlan(source, plan, {
+    const promise = executeWorkerImageRetouchPlan(source, plan, {
       requestId: 'request:sharpen-transfer',
       workerFactory: () => worker,
     })
@@ -329,7 +329,7 @@ describe('worker image adjustment backend', () => {
   it('keeps caller ImageData readable after a transferred worker request fails', async () => {
     const worker = new ManualImageProcessingWorker()
     const source = makeImageData([10, 20, 30, 77])
-    const promise = executeWorkerImageAdjustmentPlan(source, createChannelLutPlan(), {
+    const promise = executeWorkerImageRetouchPlan(source, createChannelLutPlan(), {
       requestId: 'request:transfer-error',
       workerFactory: () => worker,
     })
@@ -357,7 +357,7 @@ describe('worker image adjustment backend', () => {
 
   it('rejects structured worker errors and cleans up the worker', async () => {
     const worker = new ManualImageProcessingWorker()
-    const promise = executeWorkerImageAdjustmentPlan(makeImageData([10, 20, 30, 77]), [], {
+    const promise = executeWorkerImageRetouchPlan(makeImageData([10, 20, 30, 77]), [], {
       requestId: 'request:error',
       workerFactory: () => worker,
     })
@@ -383,7 +383,7 @@ describe('worker image adjustment backend', () => {
     const worker = new ManualImageProcessingWorker()
     const controller = new AbortController()
 
-    const promise = executeWorkerImageAdjustmentPlan(makeImageData([10, 20, 30, 77]), [], {
+    const promise = executeWorkerImageRetouchPlan(makeImageData([10, 20, 30, 77]), [], {
       requestId: 'request:abort',
       workerFactory: () => worker,
       signal: controller.signal,
@@ -440,7 +440,7 @@ describe('worker image adjustment backend', () => {
 
   it('ignores stale responses for other request ids', async () => {
     const worker = new ManualImageProcessingWorker()
-    const promise = executeWorkerImageAdjustmentPlan(makeImageData([10, 20, 30, 77]), [], {
+    const promise = executeWorkerImageRetouchPlan(makeImageData([10, 20, 30, 77]), [], {
       requestId: 'request:current',
       workerFactory: () => worker,
     })

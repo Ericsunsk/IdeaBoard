@@ -1,23 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getImageAdjustmentDefaultParams,
-  normalizeImageAdjustmentLayer,
-} from './imageAdjustmentDefinitions'
-import type { RetouchAdjustmentLayer } from '../types'
+import { getImageRetouchDefaultParams, normalizeImageEffectLayer } from './imageRetouchDefinitions'
+import type { RetouchEffectLayer } from '../types'
 
-describe('imageAdjustmentDefinitions', () => {
-  it('returns defensive copies for default adjustment params', () => {
-    const hslDefaults = getImageAdjustmentDefaultParams('hsl')
-    const sharpenDefaults = getImageAdjustmentDefaultParams('sharpen')
+describe('imageRetouchDefinitions', () => {
+  it('returns defensive copies for default retouch params', () => {
+    const hslDefaults = getImageRetouchDefaultParams('hsl')
+    const sharpenDefaults = getImageRetouchDefaultParams('sharpen')
     hslDefaults.hue = 90
     sharpenDefaults.amount = 120
 
-    expect(getImageAdjustmentDefaultParams('hsl')).toEqual({
+    expect(getImageRetouchDefaultParams('hsl')).toEqual({
       hue: 0,
       saturation: 0,
       lightness: 0,
     })
-    expect(getImageAdjustmentDefaultParams('sharpen')).toEqual({
+    expect(getImageRetouchDefaultParams('sharpen')).toEqual({
       amount: 0,
       radius: 1,
       threshold: 4,
@@ -26,9 +23,9 @@ describe('imageAdjustmentDefinitions', () => {
   })
 
   it('normalizes levels layers through the definition registry', () => {
-    const layer: RetouchAdjustmentLayer = {
-      id: 'adjustment:levels',
-      type: 'adjustment',
+    const layer: RetouchEffectLayer = {
+      id: 'retouch:levels',
+      type: 'effect',
       kind: 'levels',
       name: '色阶',
       visible: true,
@@ -41,7 +38,7 @@ describe('imageAdjustmentDefinitions', () => {
       },
     }
 
-    const normalized = normalizeImageAdjustmentLayer(layer)
+    const normalized = normalizeImageEffectLayer(layer)
 
     expect(normalized.kind).toBe('levels')
     if (normalized.kind !== 'levels') return
@@ -54,9 +51,9 @@ describe('imageAdjustmentDefinitions', () => {
   })
 
   it('normalizes sharpen layers through the definition registry', () => {
-    const layer: RetouchAdjustmentLayer = {
-      id: 'adjustment:sharpen',
-      type: 'adjustment',
+    const layer: RetouchEffectLayer = {
+      id: 'retouch:sharpen',
+      type: 'effect',
       kind: 'sharpen',
       name: '锐化',
       visible: true,
@@ -68,7 +65,7 @@ describe('imageAdjustmentDefinitions', () => {
       },
     }
 
-    const normalized = normalizeImageAdjustmentLayer(layer)
+    const normalized = normalizeImageEffectLayer(layer)
 
     expect(normalized.kind).toBe('sharpen')
     if (normalized.kind !== 'sharpen') return

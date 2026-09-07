@@ -94,25 +94,15 @@ export function createProviderEndpointEditor(options: ProviderEndpointEditorOpti
 
   function validate() {
     const nextErrors = createEmptyProviderEndpointFormErrors()
-    ;(
-      [
-        'name',
-        'apiType',
-        'protocol',
-        'capability',
-        'baseUrl',
-        'status',
-      ] as ProviderEndpointFormField[]
-    ).forEach((field) => {
-      nextErrors[field] = resolveProviderEndpointFieldError(form.value, field)
-    })
-    nextErrors.apiKey = resolveProviderEndpointFieldError(form.value, 'apiKey')
+    for (const field of Object.keys(nextErrors) as ProviderEndpointFormField[]) {
+      nextErrors[field] = PROVIDER_ENDPOINT_FIELD_VALIDATORS[field](form.value)
+    }
     errors.value = nextErrors
     return !Object.values(nextErrors).some(Boolean)
   }
 
   function validateField(field: ProviderEndpointFormField) {
-    errors.value[field] = resolveProviderEndpointFieldError(form.value, field)
+    errors.value[field] = PROVIDER_ENDPOINT_FIELD_VALIDATORS[field](form.value)
     return !errors.value[field]
   }
 
@@ -155,33 +145,33 @@ function createEmptyProviderEndpointFormErrors(): Record<ProviderEndpointFormFie
   }
 }
 
-function resolveProviderEndpointFieldError(
-  form: ProviderEndpointFormData,
-  field: ProviderEndpointFormField,
-) {
-  if (field === 'name' && !form.name.trim()) return '请输入供应商端点名称'
-  if (field === 'apiType' && !form.apiType) return '请选择接口类型'
-  if (field === 'protocol' && !form.protocol) return '请选择调用协议'
-  if (field === 'capability' && isModellessProviderProtocol(form.protocol) && !form.capability) {
-    return '请选择处理功能'
-  }
-  if (field === 'apiKey' && isModellessProviderProtocol(form.protocol) && !form.apiKey.trim()) {
-    return '请输入 API Key'
-  }
-  if (field === 'baseUrl') {
-    const apiUrl = form.baseUrl.trim()
-    if (!apiUrl) return '请输入 Base URL地址'
-    try {
-      const parsed = new URL(apiUrl)
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        return 'Base URL 需使用 http 或 https'
-      }
-    } catch {
-      return '请输入有效的 Base URL'
+type ProviderEndpointFieldValidator = (form: ProviderEndpointFormData) => string
+
+const PROVIDER_ENDPOINT_FIELD_VALIDATORS: Record<
+  ProviderEndpointFormField,
+  ProviderEndpointFieldValidator
+> = {
+  name: (form) => (!form.name.trim() ? '请输入供应商端点名称' : ''),
+  apiType: (form) => (!form.apiType ? '请选择接口类型' : ''),
+  protocol: (form) => (!form.protocol ? '请选择调用协议' : ''),
+  capability: (form) =>
+    isModellessProviderProtocol(form.protocol) && !form.capability ? '请选择处理功能' : '',
+  apiKey: (form) =>
+    isModellessProviderProtocol(form.protocol) && !form.apiKey.trim() ? '请输入 API Key' : '',
+  baseUrl: (form) => resolveBaseUrlFieldError(form.baseUrl),
+  status: (form) => (form.status !== 0 && form.status !== 1 ? '请选择启用状态' : ''),
+}
+
+function resolveBaseUrlFieldError(rawBaseUrl: string): string {
+  const apiUrl = rawBaseUrl.trim()
+  if (!apiUrl) return '请输入 Base URL地址'
+  try {
+    const parsed = new URL(apiUrl)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return 'Base URL 需使用 http 或 https'
     }
-  }
-  if (field === 'status' && form.status !== 0 && form.status !== 1) {
-    return '请选择启用状态'
+  } catch {
+    return '请输入有效的 Base URL'
   }
   return ''
 }

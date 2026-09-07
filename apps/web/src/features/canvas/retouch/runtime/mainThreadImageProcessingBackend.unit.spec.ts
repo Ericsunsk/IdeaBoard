@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WEBP_PREVIEW_QUALITY } from '../../utils/displayImagePreviewEncoding'
-import type { ImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
+import type { ImageRetouchPlan } from '../utils/imageRetouchEngine'
 import type { ImageSourceCache, ImageSourceCacheEntry } from './imageSourceCache'
 import { releaseImageSourceCanvas } from './imageSourceCache'
 import { createImageProcessingOutputPolicy } from './imageOutputPolicy'
 import { createMainThreadImageProcessingBackend } from './mainThreadImageProcessingBackend'
-import type { ImageAdjustmentPlanExecutor } from './planExecutorTypes'
+import type { ImageRetouchPlanExecutor } from './planExecutorTypes'
 import type {
   ImageProcessingBackendTaskContext,
   ImageProcessingOutputPolicy,
@@ -122,7 +122,7 @@ describe('createMainThreadImageProcessingBackend', () => {
     const sourceCache = createSourceCache({ fullSize: source, releaseCanvas: true })
     const controller = new AbortController()
     const adjusted = makeImageData([4, 5, 6, 255])
-    const planExecutor: ImageAdjustmentPlanExecutor = {
+    const planExecutor: ImageRetouchPlanExecutor = {
       execute: vi.fn(() => {
         controller.abort()
         return adjusted
@@ -398,7 +398,7 @@ function createOutputPolicy(): ImageProcessingOutputPolicy {
   }
 }
 
-function createPlanExecutor(output: ImageData): ImageAdjustmentPlanExecutor {
+function createPlanExecutor(output: ImageData): ImageRetouchPlanExecutor {
   return {
     execute: vi.fn(() => output),
     dispose: vi.fn(),
@@ -422,7 +422,7 @@ class TestImageDataImpl {
   }
 }
 
-function createChannelLutPlan(): ImageAdjustmentPlan {
+function createChannelLutPlan(): ImageRetouchPlan {
   const lut = new Uint8ClampedArray(256)
   for (let index = 0; index < lut.length; index += 1) {
     lut[index] = Math.min(255, index + 10)

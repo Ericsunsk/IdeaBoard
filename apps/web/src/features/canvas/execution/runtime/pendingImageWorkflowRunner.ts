@@ -145,6 +145,115 @@ export function createPendingImageWorkflowRunner(
     throw new Error(i18n.global.t('canvas.execution.networkRetry'))
   }
 
+  type AcquiredExecutionLeases = {
+    leases: PendingImageExecutionLease[]
+    resultNodeIds: string[]
+  }
+
+  type SettledExecutionAttempt = PromiseSettledResult<{
+    lease: PendingImageExecutionLease
+    result: ResolvedTaskImageResult
+  }>
+
+  function acquireExecutionLeases(
+    intent: PendingImageWorkflowIntent,
+  ): AcquiredExecutionLeases | null {
+    const resultNodeIds = options.pendingResults.reservePendingResults({
+      source: intent.source,
+      sourceNodeId: intent.sourceNodeId,
+      outputCount: intent.outputCount,
+      resultOptions: intent.resultOptions,
+    }).resultNodeIds
+    const leases = resultNodeIds.flatMap((resultNodeId) => {
+      const started = options.executionCore.begin(
+        intent.attachment,
+        resultNodeId as `image-${number}`,
+      )
+      return started.kind === 'started' ? [started.lease] : []
+    })
+    if (leases.length === resultNodeIds.length) return { leases, resultNodeIds }
+    const release = options.executionCore.release(leases)
+    const releasedNodeIds = releasedResultNodeIds(release)
+    if (releasedNodeIds.length > 0) options.pendingResults.removePendingResults(releasedNodeIds)
+    return null
+  }
+
+  function failRejectedLeases(
+    leases: readonly PendingImageExecutionLease[],
+    attempts: readonly SettledExecutionAttempt[],
+  ): void {
+    const failedLeases = attempts.flatMap((attempt, index) => {
+      if (attempt.status !== 'rejected' || isTaskResultPendingError(attempt.reason)) return []
+      const lease = leases[index]
+      if (!lease) return []
+      return options.executionCore.fail(lease).kind === 'applied' ? [lease] : []
+    })
+    if (failedLeases.length > 0) {
+      options.pendingResults.removePendingResults(failedLeases.map((lease) => lease.resultNodeId))
+    }
+  }
+
+  function reportSettlementOutcome(
+    resolvedCount: number,
+    pendingCount: number,
+    firstFailure: PromiseRejectedResult | undefined,
+  ): void {
+    if (firstFailure) {
+      const handled = options.onError?.(firstFailure.reason)
+      if (!handled) options.onWarning(taskExecutionWarning(firstFailure.reason))
+      return
+    }
+    if (pendingCount > 0) {
+      options.onWarning(i18n.global.t('canvas.execution.tasksInProgress'))
+      return
+    }
+    if (resolvedCount > 0) {
+      options.onSuccess(imageGenerationSuccessMessage())
+    }
+  }
+
+  function settleResolvedAttempts(
+    taskId: string,
+    leases: readonly PendingImageExecutionLease[],
+    attempts: readonly SettledExecutionAttempt[],
+  ): void {
+    const resolved = attempts.flatMap((attempt) =>
+      attempt.status === 'fulfilled' && options.executionCore.isCurrent(attempt.value.lease, taskId)
+        ? [attempt.value]
+        : [],
+    )
+    const pending = attempts.filter(
+      (attempt) => attempt.status === 'rejected' && isTaskResultPendingError(attempt.reason),
+    )
+    const firstFailure = attempts.find(
+      (attempt): attempt is PromiseRejectedResult =>
+        attempt.status === 'rejected' && !isTaskResultPendingError(attempt.reason),
+    )
+    failRejectedLeases(leases, attempts)
+    const materialized =
+      resolved.length > 0 ? options.executionCore.materializeBatch(resolved) : null
+    reportSettlementOutcome(materialized?.changedNodeIds.length ?? 0, pending.length, firstFailure)
+  }
+
+  function compensateExecutionFailure(
+    error: unknown,
+    intent: PendingImageWorkflowIntent,
+    leases: readonly PendingImageExecutionLease[],
+  ): void {
+    const release =
+      error instanceof TaskCancelledError
+        ? options.executionCore.cancel(leases)
+        : options.executionCore.release(leases)
+    options.cancelTasks(release.cancellableTaskIds)
+    const releasedNodeIds = releasedResultNodeIds(release)
+    if (releasedNodeIds.length > 0) options.pendingResults.removePendingResults(releasedNodeIds)
+    const isCurrent = options.executionCore.isAttachmentCurrent(intent.attachment)
+    const handled = isCurrent && options.onError?.(error)
+    if (!handled && isCurrent) {
+      options.onWarning(taskExecutionWarning(error))
+    }
+  }
+
   async function execute(intent: PendingImageWorkflowIntent): Promise<void> {
     let leases: PendingImageExecutionLease[] = []
     try {
@@ -154,25 +263,10 @@ export function createPendingImageWorkflowRunner(
       )
       if (!options.executionCore.isAttachmentCurrent(intent.attachment)) return
 
-      const resultNodeIds = options.pendingResults.reservePendingResults({
-        source: intent.source,
-        sourceNodeId: intent.sourceNodeId,
-        outputCount: intent.outputCount,
-        resultOptions: intent.resultOptions,
-      }).resultNodeIds
-      leases = resultNodeIds.flatMap((resultNodeId) => {
-        const started = options.executionCore.begin(
-          intent.attachment,
-          resultNodeId as `image-${number}`,
-        )
-        return started.kind === 'started' ? [started.lease] : []
-      })
-      if (leases.length !== resultNodeIds.length) {
-        const release = options.executionCore.release(leases)
-        const releasedNodeIds = releasedResultNodeIds(release)
-        if (releasedNodeIds.length > 0) options.pendingResults.removePendingResults(releasedNodeIds)
-        return
-      }
+      const acquired = acquireExecutionLeases(intent)
+      if (!acquired) return
+      leases = acquired.leases
+      const resultNodeIds = acquired.resultNodeIds
 
       const taskId = await submitSharedTask(intent, leases, resultNodeIds)
       const attempts = await Promise.allSettled(
@@ -182,58 +276,9 @@ export function createPendingImageWorkflowRunner(
         })),
       )
       if (!options.executionCore.isAttachmentCurrent(intent.attachment)) return
-
-      const resolved = attempts.flatMap((attempt) =>
-        attempt.status === 'fulfilled' &&
-        options.executionCore.isCurrent(attempt.value.lease, taskId)
-          ? [attempt.value]
-          : [],
-      )
-      const pending = attempts.filter(
-        (attempt) => attempt.status === 'rejected' && isTaskResultPendingError(attempt.reason),
-      )
-      const failures = attempts.filter(
-        (attempt) => attempt.status === 'rejected' && !isTaskResultPendingError(attempt.reason),
-      )
-      const failedLeases = attempts.flatMap((attempt, index) => {
-        if (attempt.status !== 'rejected' || isTaskResultPendingError(attempt.reason)) return []
-        const lease = leases[index]!
-        return options.executionCore.fail(lease).kind === 'applied' ? [lease] : []
-      })
-      if (failedLeases.length > 0) {
-        options.pendingResults.removePendingResults(failedLeases.map((lease) => lease.resultNodeId))
-      }
-      const materialized =
-        resolved.length > 0 ? options.executionCore.materializeBatch(resolved) : null
-      const successCount = materialized?.changedNodeIds.length ?? 0
-      const firstFailure = failures.find(
-        (attempt): attempt is PromiseRejectedResult => attempt.status === 'rejected',
-      )
-      if (firstFailure) {
-        const handled = options.onError?.(firstFailure.reason)
-        if (!handled) options.onWarning(taskExecutionWarning(firstFailure.reason))
-        return
-      }
-      if (pending.length > 0) {
-        options.onWarning(i18n.global.t('canvas.execution.tasksInProgress'))
-        return
-      }
-      if (successCount > 0) {
-        options.onSuccess(imageGenerationSuccessMessage())
-      }
+      settleResolvedAttempts(taskId, leases, attempts)
     } catch (error) {
-      const release =
-        error instanceof TaskCancelledError
-          ? options.executionCore.cancel(leases)
-          : options.executionCore.release(leases)
-      options.cancelTasks(release.cancellableTaskIds)
-      const releasedNodeIds = releasedResultNodeIds(release)
-      if (releasedNodeIds.length > 0) options.pendingResults.removePendingResults(releasedNodeIds)
-      const handled =
-        options.executionCore.isAttachmentCurrent(intent.attachment) && options.onError?.(error)
-      if (!handled && options.executionCore.isAttachmentCurrent(intent.attachment)) {
-        options.onWarning(taskExecutionWarning(error))
-      }
+      compensateExecutionFailure(error, intent, leases)
     }
   }
 

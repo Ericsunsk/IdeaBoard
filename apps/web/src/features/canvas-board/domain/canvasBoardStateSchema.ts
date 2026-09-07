@@ -77,7 +77,7 @@ const libraryImportFactSchema = v.union([
   }),
 ])
 
-const imageAdjustmentRecipeStepSchema = v.union([
+const imageRetouchRecipeStepSchema = v.union([
   v.strictObject({
     kind: v.literal('hsl'),
     params: v.strictObject({
@@ -110,11 +110,11 @@ const imageAdjustmentRecipeStepSchema = v.union([
   }),
 ])
 
-const imageAdjustmentRecipeSchema = v.strictObject({
+const imageRetouchRecipeSchema = v.strictObject({
   version: v.literal(1),
   sourceMediaAssetId: positiveIntegerSchema,
   sourceMimeType: v.optional(nonEmptyStringSchema),
-  plan: v.array(imageAdjustmentRecipeStepSchema),
+  plan: v.array(imageRetouchRecipeStepSchema),
 })
 
 const boardStateMediaRefSchema = v.strictObject({
@@ -158,7 +158,7 @@ const imageNodeItemSchema = v.strictObject({
   sourceImageUrl: v.string(),
   sourceMediaRef: v.optional(mediaRefSchema),
   sourceMediaAssetId: v.optional(positiveIntegerSchema),
-  adjustmentRecipe: v.optional(imageAdjustmentRecipeSchema),
+  retouchRecipe: v.optional(imageRetouchRecipeSchema),
   sourceImageRatio: positiveFiniteNumberSchema,
   outputCount: v.optional(outputCountSchema, DEFAULT_IMAGE_NODE_OUTPUT_COUNT),
   outputResolution: v.optional(outputResolutionSchema),

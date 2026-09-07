@@ -1,7 +1,7 @@
 import type {
-  ImageAdjustmentKind,
-  RetouchAdjustmentLayer,
-  RetouchAdjustmentWholeParams,
+  ImageRetouchKind,
+  RetouchEffectLayer,
+  RetouchEffectWholeParams,
   RetouchCurvesParams,
   RetouchEditableLayer,
   RetouchHslParams,
@@ -16,61 +16,58 @@ import type {
   RetouchSharpenParams,
   RetouchThresholdParams,
 } from '../types'
-import {
-  IMAGE_ADJUSTMENT_DEFINITIONS,
-  getImageAdjustmentDefaultParams,
-} from './imageAdjustmentDefinitions'
+import { IMAGE_RETOUCH_DEFINITIONS, getImageRetouchDefaultParams } from './imageRetouchDefinitions'
 import { normalizeCurvesParams } from './retouchCurves'
 import { clampLevelsHandles } from './retouchLevels'
-import { normalizeThresholdAdjustment } from './retouchThreshold'
+import { normalizeThresholdEffect } from './retouchThreshold'
 import { i18n } from '../../../../shared/i18n'
 
 export const SOURCE_LAYER_ID = 'source'
 
 let retouchLayerIdSeed = 0
 
-const DEFAULT_ADJUSTMENT_LAYER_BY_KIND: {
-  [TKind in ImageAdjustmentKind]: RetouchLayerByKind<TKind>
+const DEFAULT_EFFECT_LAYER_BY_KIND: {
+  [TKind in ImageRetouchKind]: RetouchLayerByKind<TKind>
 } = {
   hsl: {
-    id: 'adjustment:hsl',
-    type: 'adjustment',
+    id: 'retouch:hsl',
+    type: 'effect',
     kind: 'hsl',
-    name: `${i18n.global.t('canvas.retouch.adjustments.hsl')} 1`,
+    name: `${i18n.global.t('canvas.retouch.effects.hsl')} 1`,
     visible: true,
-    params: getImageAdjustmentDefaultParams('hsl'),
+    params: getImageRetouchDefaultParams('hsl'),
   },
   threshold: {
-    id: 'adjustment:threshold',
-    type: 'adjustment',
+    id: 'retouch:threshold',
+    type: 'effect',
     kind: 'threshold',
-    name: `${i18n.global.t('canvas.retouch.adjustments.threshold')} 1`,
+    name: `${i18n.global.t('canvas.retouch.effects.threshold')} 1`,
     visible: true,
-    params: getImageAdjustmentDefaultParams('threshold'),
+    params: getImageRetouchDefaultParams('threshold'),
   },
   curves: {
-    id: 'adjustment:curves',
-    type: 'adjustment',
+    id: 'retouch:curves',
+    type: 'effect',
     kind: 'curves',
-    name: `${i18n.global.t('canvas.retouch.adjustments.curves')} 1`,
+    name: `${i18n.global.t('canvas.retouch.effects.curves')} 1`,
     visible: true,
-    params: getImageAdjustmentDefaultParams('curves'),
+    params: getImageRetouchDefaultParams('curves'),
   },
   levels: {
-    id: 'adjustment:levels',
-    type: 'adjustment',
+    id: 'retouch:levels',
+    type: 'effect',
     kind: 'levels',
-    name: `${i18n.global.t('canvas.retouch.adjustments.levels')} 1`,
+    name: `${i18n.global.t('canvas.retouch.effects.levels')} 1`,
     visible: true,
-    params: getImageAdjustmentDefaultParams('levels'),
+    params: getImageRetouchDefaultParams('levels'),
   },
   sharpen: {
-    id: 'adjustment:sharpen',
-    type: 'adjustment',
+    id: 'retouch:sharpen',
+    type: 'effect',
     kind: 'sharpen',
-    name: `${i18n.global.t('canvas.retouch.adjustments.sharpen')} 1`,
+    name: `${i18n.global.t('canvas.retouch.effects.sharpen')} 1`,
     visible: true,
-    params: getImageAdjustmentDefaultParams('sharpen'),
+    params: getImageRetouchDefaultParams('sharpen'),
   },
 }
 
@@ -81,14 +78,14 @@ export type RetouchLayerStack = {
 
 export type RetouchLayerCommand =
   | { type: 'select-layer'; layerId: string }
-  | { type: 'ensure-adjustment'; kind: ImageAdjustmentKind }
+  | { type: 'ensure-retouch'; kind: ImageRetouchKind }
   | { type: 'add-paint' }
   | { type: 'copy-selected' }
   | { type: 'merge-selected-down' }
   | { type: 'set-visible'; layerId: string; visible: boolean }
   | { type: 'remove'; layerId: string }
   | { type: 'update-selected-param'; key: RetouchParamKey; value: RetouchParamValue }
-  | { type: 'update-selected-adjustment-params'; params: RetouchAdjustmentWholeParams }
+  | { type: 'update-selected-retouch-params'; params: RetouchEffectWholeParams }
 
 export function createInitialLayerStack(): RetouchLayerStack {
   return {
@@ -104,10 +101,10 @@ export function createInitialLayerStack(): RetouchLayerStack {
   }
 }
 
-export function createDefaultImageAdjustmentLayer<TKind extends ImageAdjustmentKind>(
+export function createDefaultImageEffectLayer<TKind extends ImageRetouchKind>(
   kind: TKind,
 ): RetouchLayerByKind<TKind> {
-  return cloneAdjustmentLayer(kind)
+  return cloneEffectLayer(kind)
 }
 
 export function applyLayerCommand(
@@ -117,8 +114,8 @@ export function applyLayerCommand(
   switch (command.type) {
     case 'select-layer':
       return selectLayer(stack, command.layerId)
-    case 'ensure-adjustment':
-      return ensureAdjustmentLayer(stack, command.kind)
+    case 'ensure-retouch':
+      return ensureEffectLayer(stack, command.kind)
     case 'add-paint':
       return addPaintLayer(stack)
     case 'copy-selected':
@@ -131,14 +128,14 @@ export function applyLayerCommand(
       return removeLayer(stack, command.layerId)
     case 'update-selected-param':
       return updateSelectedLayerParam(stack, command.key, command.value)
-    case 'update-selected-adjustment-params':
-      return updateSelectedAdjustmentParams(stack, command.params)
+    case 'update-selected-retouch-params':
+      return updateSelectedRetouchParams(stack, command.params)
   }
 }
 
-export function getSelectedAdjustment(stack: RetouchLayerStack): RetouchAdjustmentLayer | null {
+export function getSelectedEffect(stack: RetouchLayerStack): RetouchEffectLayer | null {
   const layer = stack.layers.find((item) => item.id === stack.selectedLayerId)
-  return layer && isAdjustmentLayer(layer) ? layer : null
+  return layer && isEffectLayer(layer) ? layer : null
 }
 
 export function selectAfterRemove(
@@ -163,17 +160,14 @@ function selectLayer(stack: RetouchLayerStack, layerId: string): RetouchLayerSta
   return { ...stack, selectedLayerId: layer.id }
 }
 
-function ensureAdjustmentLayer(
-  stack: RetouchLayerStack,
-  kind: ImageAdjustmentKind,
-): RetouchLayerStack {
+function ensureEffectLayer(stack: RetouchLayerStack, kind: ImageRetouchKind): RetouchLayerStack {
   const existing = stack.layers.find(
-    (layer): layer is RetouchAdjustmentLayer => layer.type === 'adjustment' && layer.kind === kind,
+    (layer): layer is RetouchEffectLayer => layer.type === 'effect' && layer.kind === kind,
   )
   if (existing) return { ...stack, selectedLayerId: existing.id }
 
   const sourceIndex = stack.layers.findIndex((layer) => layer.type === 'source')
-  const nextLayer = cloneAdjustmentLayer(kind)
+  const nextLayer = cloneEffectLayer(kind)
   const layers = stack.layers.slice()
   layers.splice(sourceIndex >= 0 ? sourceIndex : layers.length, 0, nextLayer)
   return { layers, selectedLayerId: nextLayer.id }
@@ -249,28 +243,28 @@ function updateSelectedLayerParam(
   key: RetouchParamKey,
   value: RetouchParamValue,
 ): RetouchLayerStack {
-  const target = getSelectedAdjustment(stack)
+  const target = getSelectedEffect(stack)
   if (!target) return stack
   return {
     ...stack,
     layers: stack.layers.map((layer) => {
-      if (layer.id !== target.id || layer.type !== 'adjustment') return layer
-      return updateAdjustmentLayerParam(layer, key, value)
+      if (layer.id !== target.id || layer.type !== 'effect') return layer
+      return updateEffectLayerParam(layer, key, value)
     }),
   }
 }
 
-function updateSelectedAdjustmentParams(
+function updateSelectedRetouchParams(
   stack: RetouchLayerStack,
-  params: RetouchAdjustmentWholeParams,
+  params: RetouchEffectWholeParams,
 ): RetouchLayerStack {
-  const target = getSelectedAdjustment(stack)
+  const target = getSelectedEffect(stack)
   if (!target) return stack
   return {
     ...stack,
     layers: stack.layers.map((layer) => {
-      if (layer.id !== target.id || layer.type !== 'adjustment') return layer
-      return updateAdjustmentLayerParams(layer, params)
+      if (layer.id !== target.id || layer.type !== 'effect') return layer
+      return updateEffectLayerParams(layer, params)
     }),
   }
 }
@@ -282,18 +276,16 @@ function resolveLayerInsertionIndex(stack: RetouchLayerStack) {
   return sourceIndex >= 0 ? sourceIndex : stack.layers.length
 }
 
-function cloneAdjustmentLayer<TKind extends ImageAdjustmentKind>(
-  kind: TKind,
-): RetouchLayerByKind<TKind> {
-  const layer = DEFAULT_ADJUSTMENT_LAYER_BY_KIND[kind]
+function cloneEffectLayer<TKind extends ImageRetouchKind>(kind: TKind): RetouchLayerByKind<TKind> {
+  const layer = DEFAULT_EFFECT_LAYER_BY_KIND[kind]
   return {
     ...layer,
-    params: cloneAdjustmentParams(layer.params),
+    params: cloneRetouchParams(layer.params),
   } as RetouchLayerByKind<TKind>
 }
 
-function isAdjustmentLayer(layer: RetouchLayer): layer is RetouchAdjustmentLayer {
-  return layer.type === 'adjustment'
+function isEffectLayer(layer: RetouchLayer): layer is RetouchEffectLayer {
+  return layer.type === 'effect'
 }
 
 function isEditableLayer(layer: RetouchLayer): layer is RetouchEditableLayer {
@@ -369,10 +361,10 @@ function cloneEditableLayer(layer: RetouchEditableLayer, name = layer.name): Ret
   }
   return {
     ...layer,
-    id: createLayerId(`adjustment:${layer.kind}`),
+    id: createLayerId(`retouch:${layer.kind}`),
     name,
-    params: cloneAdjustmentParams(layer.params),
-  } as RetouchAdjustmentLayer
+    params: cloneRetouchParams(layer.params),
+  } as RetouchEffectLayer
 }
 
 function clonePaintContent(content: RetouchPaintLayer['content']) {
@@ -396,11 +388,11 @@ function createMergedLayer(
   }
 }
 
-function updateAdjustmentLayerParam(
-  layer: RetouchAdjustmentLayer,
+function updateEffectLayerParam(
+  layer: RetouchEffectLayer,
   key: RetouchParamKey,
   value: RetouchParamValue,
-): RetouchAdjustmentLayer {
+): RetouchEffectLayer {
   switch (layer.kind) {
     case 'hsl':
       if (
@@ -418,10 +410,10 @@ function updateAdjustmentLayerParam(
   }
 }
 
-function updateAdjustmentLayerParams(
-  layer: RetouchAdjustmentLayer,
-  params: RetouchAdjustmentWholeParams,
-): RetouchAdjustmentLayer {
+function updateEffectLayerParams(
+  layer: RetouchEffectLayer,
+  params: RetouchEffectWholeParams,
+): RetouchEffectLayer {
   switch (layer.kind) {
     case 'hsl':
       return layer
@@ -448,7 +440,7 @@ function updateAdjustmentLayerParams(
   }
 }
 
-function cloneAdjustmentParams(
+function cloneRetouchParams(
   params:
     | RetouchHslParams
     | RetouchThresholdParams
@@ -464,7 +456,7 @@ function cloneAdjustmentParams(
 }
 
 function cloneThresholdParams(params: RetouchThresholdParams): RetouchThresholdParams {
-  return normalizeThresholdAdjustment(params)
+  return normalizeThresholdEffect(params)
 }
 
 function cloneCurvesParams(params: RetouchCurvesParams): RetouchCurvesParams {
@@ -491,21 +483,21 @@ function cloneLevelsParams(params: RetouchLevelsParams): RetouchLevelsParams {
 }
 
 function cloneSharpenParams(params: RetouchSharpenParams): RetouchSharpenParams {
-  return IMAGE_ADJUSTMENT_DEFINITIONS.sharpen.normalize(params)
+  return IMAGE_RETOUCH_DEFINITIONS.sharpen.normalize(params)
 }
 
-function isThresholdParams(params: RetouchAdjustmentWholeParams): params is RetouchThresholdParams {
+function isThresholdParams(params: RetouchEffectWholeParams): params is RetouchThresholdParams {
   return 'threshold' in params && 'invert' in params
 }
 
-function isCurvesParams(params: RetouchAdjustmentWholeParams): params is RetouchCurvesParams {
+function isCurvesParams(params: RetouchEffectWholeParams): params is RetouchCurvesParams {
   return 'channels' in params
 }
 
-function isLevelsParams(params: RetouchAdjustmentWholeParams): params is RetouchLevelsParams {
+function isLevelsParams(params: RetouchEffectWholeParams): params is RetouchLevelsParams {
   return 'shadows' in params
 }
 
-function isSharpenParams(params: RetouchAdjustmentWholeParams): params is RetouchSharpenParams {
+function isSharpenParams(params: RetouchEffectWholeParams): params is RetouchSharpenParams {
   return 'amount' in params
 }

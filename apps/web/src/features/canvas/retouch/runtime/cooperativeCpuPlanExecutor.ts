@@ -1,17 +1,17 @@
 import { cloneImageData } from '../utils/imageDataUtils'
 import { isProcessingCancelled, processingCancelledError } from './processingCancelled'
 import {
-  createImageAdjustmentPlanStepExecutionState,
-  estimateImageAdjustmentPlanStepRangeWorkUnits,
-  estimateImageAdjustmentPlanWorkUnits,
-  executeImageAdjustmentPlanStepRange,
-  type ImageAdjustmentPlan,
-} from '../utils/imageAdjustmentEngine'
+  createImageRetouchPlanStepExecutionState,
+  estimateImageRetouchPlanStepRangeWorkUnits,
+  estimateImageRetouchPlanWorkUnits,
+  executeImageRetouchPlanStepRange,
+  type ImageRetouchPlan,
+} from '../utils/imageRetouchEngine'
 import type { ImageProcessingBackendTaskProgressReporter } from './planExecutorTypes'
 
 export type CooperativeCpuPlanExecutionInput = {
   imageData: ImageData
-  plan: ImageAdjustmentPlan
+  plan: ImageRetouchPlan
   signal: AbortSignal
   onProgress?: ImageProcessingBackendTaskProgressReporter | undefined
   chunkBytes: number
@@ -20,7 +20,7 @@ export type CooperativeCpuPlanExecutionInput = {
   yieldToMainThread: () => Promise<void>
 }
 
-export async function executeCooperativeCpuImageAdjustmentPlan(
+export async function executeCooperativeCpuImageRetouchPlan(
   input: CooperativeCpuPlanExecutionInput,
 ): Promise<ImageData> {
   throwIfAborted(input.signal)
@@ -34,13 +34,13 @@ export async function executeCooperativeCpuImageAdjustmentPlan(
   if (total === 0) return output
 
   for (const step of input.plan) {
-    const state = createImageAdjustmentPlanStepExecutionState(output, step)
+    const state = createImageRetouchPlanStepExecutionState(output, step)
     for (let startByte = 0; startByte < output.data.length; startByte += input.chunkBytes) {
       throwIfAborted(input.signal)
 
       const endByte = Math.min(startByte + input.chunkBytes, output.data.length)
-      executeImageAdjustmentPlanStepRange(output.data, step, startByte, endByte, state)
-      loaded += estimateImageAdjustmentPlanStepRangeWorkUnits(output.data, step, startByte, endByte)
+      executeImageRetouchPlanStepRange(output.data, step, startByte, endByte, state)
+      loaded += estimateImageRetouchPlanStepRangeWorkUnits(output.data, step, startByte, endByte)
       input.onProgress?.({ phase: 'render', loaded, total })
       throwIfAborted(input.signal)
 
@@ -55,8 +55,8 @@ export async function executeCooperativeCpuImageAdjustmentPlan(
   return output
 }
 
-export function createPlanWorkUnits(imageData: ImageData, plan: ImageAdjustmentPlan) {
-  return Math.max(0, estimateImageAdjustmentPlanWorkUnits(imageData, plan))
+export function createPlanWorkUnits(imageData: ImageData, plan: ImageRetouchPlan) {
+  return Math.max(0, estimateImageRetouchPlanWorkUnits(imageData, plan))
 }
 
 function throwIfAborted(signal: AbortSignal) {

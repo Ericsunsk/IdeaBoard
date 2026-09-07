@@ -1,40 +1,40 @@
 import type { RetouchRenderedPreview } from '../types'
 import type { ImageProcessingRuntime } from '../runtime/types'
-import { getImageAdjustmentProcessingRuntime } from '../runtime/imageAdjustmentProcessingRuntime'
-import type { ImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
+import { getImageRetouchProcessingRuntime } from '../runtime/imageRetouchProcessingRuntime'
+import type { ImageRetouchPlan } from '../utils/imageRetouchEngine'
 import { measureCanvasPerfAsync } from '../../utils/canvasPerfProbe'
 
 const PREVIEW_MAX_SIDE = 960
-const INLINE_PREVIEW_TASK_ID = 'image-adjustment:inline-preview'
+const INLINE_PREVIEW_TASK_ID = 'image-retouch:inline-preview'
 
-type ImageAdjustmentPreviewSource = {
+type ImageRetouchPreviewSource = {
   sourceUrl: string
   imageData: ImageData
   width: number
   height: number
 }
 
-type ImageAdjustmentInlinePreviewRendererOptions = {
+type ImageRetouchInlinePreviewRendererOptions = {
   onPreview: (preview: RetouchRenderedPreview | null) => void
-  onSource?: (source: ImageAdjustmentPreviewSource | null) => void
+  onSource?: (source: ImageRetouchPreviewSource | null) => void
   onError?: (error: unknown) => void
   runtime?: ImageProcessingRuntime
 }
 
-export type ImageAdjustmentInlinePreviewRenderer = {
+export type ImageRetouchInlinePreviewRenderer = {
   updateSource: (sourceUrl: string | null) => void
-  updatePlan: (plan: ImageAdjustmentPlan) => void
+  updatePlan: (plan: ImageRetouchPlan) => void
   dispose: () => void
 }
 
-export function createImageAdjustmentInlinePreviewRenderer(
-  options: ImageAdjustmentInlinePreviewRendererOptions,
-): ImageAdjustmentInlinePreviewRenderer {
-  let currentPlan: ImageAdjustmentPlan = []
+export function createImageRetouchInlinePreviewRenderer(
+  options: ImageRetouchInlinePreviewRendererOptions,
+): ImageRetouchInlinePreviewRenderer {
+  let currentPlan: ImageRetouchPlan = []
   let currentSourceUrl: string | null = null
   let sourceRequestToken = 0
   let previewFrameId: number | null = null
-  const runtime = options.runtime ?? getImageAdjustmentProcessingRuntime()
+  const runtime = options.runtime ?? getImageRetouchProcessingRuntime()
 
   return {
     updateSource(sourceUrl) {
@@ -84,7 +84,7 @@ export function createImageAdjustmentInlinePreviewRenderer(
 
   function renderLatestPreview(
     sourceUrl: string | null,
-    plan: ImageAdjustmentPlan,
+    plan: ImageRetouchPlan,
     requestToken: number,
   ) {
     if (!sourceUrl) {
@@ -95,7 +95,7 @@ export function createImageAdjustmentInlinePreviewRenderer(
     void measureCanvasPerfAsync(
       'image.preview.render',
       () => ({
-        adjustments: plan.length,
+        effects: plan.length,
         latestOnly: true,
         stale: requestToken !== sourceRequestToken,
       }),

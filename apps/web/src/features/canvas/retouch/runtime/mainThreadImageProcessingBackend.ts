@@ -3,13 +3,13 @@ import { i18n } from '../../../../shared/i18n'
 import { canvasToBlob } from '../../services/flowMediaIO'
 import { detectCanvasTransparency } from '../../utils/displayImagePreviewEncoding'
 import { resolveImageExportEncoding } from './imageOutputPolicy'
-import { createCpuImageAdjustmentPlanExecutor } from './cpuPlanExecutor'
+import { createCpuImageRetouchPlanExecutor } from './cpuPlanExecutor'
 import {
   createImageSourceCache,
   readImageSourceImageData,
   type ImageSourceCache,
 } from './imageSourceCache'
-import type { ImageAdjustmentPlanExecutor } from './planExecutorTypes'
+import type { ImageRetouchPlanExecutor } from './planExecutorTypes'
 import type {
   ImageProcessingBackend,
   ImageProcessingBackendFinalInput,
@@ -22,7 +22,7 @@ const DEFAULT_PREVIEW_MAX_SIDE = 960
 
 export type MainThreadImageProcessingBackendOptions = {
   sourceCache?: ImageSourceCache | undefined
-  planExecutor?: ImageAdjustmentPlanExecutor | undefined
+  planExecutor?: ImageRetouchPlanExecutor | undefined
 }
 
 export function createMainThreadImageProcessingBackend(
@@ -30,15 +30,15 @@ export function createMainThreadImageProcessingBackend(
 ): ImageProcessingBackend {
   return new MainThreadImageProcessingBackend(
     options.sourceCache ?? createImageSourceCache(),
-    options.planExecutor ?? createCpuImageAdjustmentPlanExecutor(),
+    options.planExecutor ?? createCpuImageRetouchPlanExecutor(),
   )
 }
 
 class MainThreadImageProcessingBackend implements ImageProcessingBackend {
   private readonly sourceCache: ImageSourceCache
-  private readonly planExecutor: ImageAdjustmentPlanExecutor
+  private readonly planExecutor: ImageRetouchPlanExecutor
 
-  constructor(sourceCache: ImageSourceCache, planExecutor: ImageAdjustmentPlanExecutor) {
+  constructor(sourceCache: ImageSourceCache, planExecutor: ImageRetouchPlanExecutor) {
     this.sourceCache = sourceCache
     this.planExecutor = planExecutor
   }

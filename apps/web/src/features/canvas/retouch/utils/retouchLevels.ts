@@ -16,7 +16,7 @@ const LEVELS_OUTPUT_WHITE_DEFAULT = 255
 const RETOUCH_LEVELS_MIN_HANDLE_SPACING = 1
 const RETOUCH_LEVELS_OUTPUT_MIN_SPACING = 1
 
-export type NormalizedLevelsAdjustment = {
+export type NormalizedLevelsEffect = {
   blackPoint: number
   whitePoint: number
   gamma: number
@@ -40,7 +40,7 @@ export type RetouchLevelsConstraint = {
   max: number
 }
 
-export function normalizeLevelsAdjustment(params: RetouchLevelsParams): NormalizedLevelsAdjustment {
+export function normalizeLevelsEffect(params: RetouchLevelsParams): NormalizedLevelsEffect {
   const handles = clampLevelsHandles(params)
 
   return {
@@ -52,7 +52,7 @@ export function normalizeLevelsAdjustment(params: RetouchLevelsParams): Normaliz
   }
 }
 
-export function createLevelsLut(params: NormalizedLevelsAdjustment) {
+export function createLevelsLut(params: NormalizedLevelsEffect) {
   const { blackPoint, whitePoint, gamma, outputBlack, outputWhite } = params
   const range = Math.max(1, whitePoint - blackPoint)
   const outputRange = Math.max(1, outputWhite - outputBlack)

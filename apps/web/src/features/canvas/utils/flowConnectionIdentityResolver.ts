@@ -50,12 +50,16 @@ export function resolveNextFlowConnectionId(
   return maxConnectionId + 1
 }
 
-export function createFlowConnectionClaimIndex<TFlowEdge extends FlowEdgeIdentityRecord>(options: {
-  candidates: readonly FlowConnectionClaimCandidate<TFlowEdge>[]
-  baseConnections?: readonly CanvasConnection[] | undefined
-  allocateGeneratedIds: boolean
-}): FlowConnectionClaimIndex<TFlowEdge> {
-  const baseConnections = options.baseConnections ?? []
+type FlowConnectionClaimIndexes = {
+  baseConnectionIds: Set<number>
+  endpointByBaseConnectionId: Map<number, string>
+  availableBaseConnectionIdsByEndpoint: Map<string, Set<number>>
+  firstBaseConnectionIdByEndpoint: Map<string, number>
+}
+
+function indexBaseConnections(
+  baseConnections: readonly CanvasConnection[],
+): FlowConnectionClaimIndexes {
   const baseConnectionIds = new Set<number>()
   const endpointByBaseConnectionId = new Map<number, string>()
   const availableBaseConnectionIdsByEndpoint = new Map<string, Set<number>>()
@@ -76,25 +80,93 @@ export function createFlowConnectionClaimIndex<TFlowEdge extends FlowEdgeIdentit
     }
   }
 
+  return {
+    baseConnectionIds,
+    endpointByBaseConnectionId,
+    availableBaseConnectionIdsByEndpoint,
+    firstBaseConnectionIdByEndpoint,
+  }
+}
+
+function reserveExplicitConnectionIds<TFlowEdge extends FlowEdgeIdentityRecord>(
+  candidates: readonly FlowConnectionClaimCandidate<TFlowEdge>[],
+  endpointByBaseConnectionId: Map<number, string>,
+  availableBaseConnectionIdsByEndpoint: Map<string, Set<number>>,
+): Map<number, TFlowEdge> {
   const explicitOwnerByConnectionId = new Map<number, TFlowEdge>()
-  for (const { edge } of options.candidates) {
+  for (const { edge } of candidates) {
     const explicitId = resolveFlowEdgeCanvasConnectionId(edge)
     if (explicitId !== null && !explicitOwnerByConnectionId.has(explicitId)) {
       explicitOwnerByConnectionId.set(explicitId, edge)
     }
   }
-  const reservedExplicitIds = new Set(explicitOwnerByConnectionId.keys())
-  for (const connectionId of reservedExplicitIds) {
+  for (const connectionId of explicitOwnerByConnectionId.keys()) {
     const endpointKey = endpointByBaseConnectionId.get(connectionId)
     if (endpointKey) {
       availableBaseConnectionIdsByEndpoint.get(endpointKey)?.delete(connectionId)
     }
   }
+  return explicitOwnerByConnectionId
+}
 
+type FlowConnectionClaimCursor<TFlowEdge extends FlowEdgeIdentityRecord> = {
+  allocateGeneratedIds: boolean
+  indexes: FlowConnectionClaimIndexes
+  explicitOwnerByConnectionId: Map<number, TFlowEdge>
+  claimedConnectionIds: Set<number>
+  allocateGeneratedConnectionId: () => number
+}
+
+function claimCandidateConnectionId<TFlowEdge extends FlowEdgeIdentityRecord>(
+  candidate: FlowConnectionClaimCandidate<TFlowEdge>,
+  cursor: FlowConnectionClaimCursor<TFlowEdge>,
+): number | null {
+  const { edge, endpoint } = candidate
+  const explicitId = resolveFlowEdgeCanvasConnectionId(edge)
+
+  if (
+    explicitId !== null &&
+    cursor.explicitOwnerByConnectionId.get(explicitId) === edge &&
+    !cursor.claimedConnectionIds.has(explicitId) &&
+    (cursor.allocateGeneratedIds || cursor.indexes.baseConnectionIds.has(explicitId))
+  ) {
+    return explicitId
+  }
+
+  if (endpoint) {
+    const availableIds = cursor.indexes.availableBaseConnectionIdsByEndpoint.get(
+      toCanvasConnectionEndpointKey(endpoint),
+    )
+    const reusedId = availableIds?.values().next().value ?? null
+    if (reusedId !== null) return reusedId
+  }
+
+  if (cursor.allocateGeneratedIds) return cursor.allocateGeneratedConnectionId()
+  return null
+}
+
+export function createFlowConnectionClaimIndex<TFlowEdge extends FlowEdgeIdentityRecord>(options: {
+  candidates: readonly FlowConnectionClaimCandidate<TFlowEdge>[]
+  baseConnections?: readonly CanvasConnection[] | undefined
+  allocateGeneratedIds: boolean
+}): FlowConnectionClaimIndex<TFlowEdge> {
+  const baseConnections = options.baseConnections ?? []
+  const indexes = indexBaseConnections(baseConnections)
+  const {
+    baseConnectionIds,
+    endpointByBaseConnectionId,
+    availableBaseConnectionIdsByEndpoint,
+    firstBaseConnectionIdByEndpoint,
+  } = indexes
+  const explicitOwnerByConnectionId = reserveExplicitConnectionIds(
+    options.candidates,
+    endpointByBaseConnectionId,
+    availableBaseConnectionIdsByEndpoint,
+  )
+  const claimedConnectionIds = new Set<number>()
   const connectionIdByFlowEdge = new Map<TFlowEdge, number | null>()
   const connectionIdByFlowEdgeId = new Map<string, number | null>()
   const flowEdgeById = new Map<string, TFlowEdge>()
-  const claimedConnectionIds = new Set<number>()
   let nextGeneratedConnectionId = resolveNextFlowConnectionId(
     baseConnections,
     options.candidates.map(({ edge }) => edge),
@@ -111,7 +183,7 @@ export function createFlowConnectionClaimIndex<TFlowEdge extends FlowEdgeIdentit
   function allocateGeneratedConnectionId() {
     while (
       claimedConnectionIds.has(nextGeneratedConnectionId) ||
-      reservedExplicitIds.has(nextGeneratedConnectionId) ||
+      explicitOwnerByConnectionId.has(nextGeneratedConnectionId) ||
       baseConnectionIds.has(nextGeneratedConnectionId)
     ) {
       nextGeneratedConnectionId += 1
@@ -121,30 +193,17 @@ export function createFlowConnectionClaimIndex<TFlowEdge extends FlowEdgeIdentit
     return connectionId
   }
 
+  const cursor: FlowConnectionClaimCursor<TFlowEdge> = {
+    allocateGeneratedIds: options.allocateGeneratedIds,
+    indexes,
+    explicitOwnerByConnectionId,
+    claimedConnectionIds,
+    allocateGeneratedConnectionId,
+  }
+
   for (const candidate of options.candidates) {
-    const { edge, endpoint } = candidate
-    const explicitId = resolveFlowEdgeCanvasConnectionId(edge)
-    let connectionId: number | null = null
-
-    if (
-      explicitId !== null &&
-      explicitOwnerByConnectionId.get(explicitId) === edge &&
-      !claimedConnectionIds.has(explicitId) &&
-      (options.allocateGeneratedIds || baseConnectionIds.has(explicitId))
-    ) {
-      connectionId = explicitId
-    }
-
-    if (connectionId === null && endpoint) {
-      const availableIds = availableBaseConnectionIdsByEndpoint.get(
-        toCanvasConnectionEndpointKey(endpoint),
-      )
-      connectionId = availableIds?.values().next().value ?? null
-    }
-
-    if (connectionId === null && options.allocateGeneratedIds) {
-      connectionId = allocateGeneratedConnectionId()
-    }
+    const { edge } = candidate
+    const connectionId = claimCandidateConnectionId(candidate, cursor)
 
     if (connectionId !== null) claimConnectionId(edge, connectionId)
     connectionIdByFlowEdge.set(edge, connectionId)

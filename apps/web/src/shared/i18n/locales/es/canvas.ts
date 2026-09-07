@@ -245,7 +245,7 @@ export default {
       strongContrast: 'Contraste fuerte',
       matte: 'Mate',
     },
-    adjustments: {
+    effects: {
       threshold: 'Umbral',
       hsl: 'Tono/Saturación',
       sharpen: 'Enfocar',

@@ -24,9 +24,9 @@ import { createCanvasNodeAt } from '../utils/canvasNodeFactory'
 import { resolveImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
 import type { CanvasGraphInteractionBrowserAdapter } from './interactionBrowserAdapter'
 import {
-  renderImageAdjustmentRecipeFile,
-  type ImageAdjustmentRenderSource,
-} from '../retouch/services/imageAdjustmentRenderer'
+  renderImageRetouchRecipeFile,
+  type ImageRetouchRenderSource,
+} from '../retouch/services/imageRetouchRenderer'
 import { resolveMediaAssetOriginalURL } from '../../../shared/api/mediaAssetDelivery'
 
 type MessageLoadingHandle = {
@@ -60,7 +60,7 @@ type ExportImageEntry = {
   url: string
   mediaAssetId?: number | undefined
   title: string
-  adjustmentRecipe?: ImageNodeItem['adjustmentRecipe'] | undefined
+  retouchRecipe?: ImageNodeItem['retouchRecipe'] | undefined
 }
 type ExportImageCandidate = Omit<ExportImageEntry, 'title'>
 
@@ -118,12 +118,12 @@ function resolveExportEntries(snapshot: CanvasNodeItem): ExportImageEntry[] {
             ? {
                 url: outputs.at(-1)!.url,
                 mediaAssetId: outputs.at(-1)!.mediaAssetId,
-                adjustmentRecipe: snapshot.adjustmentRecipe,
+                retouchRecipe: snapshot.retouchRecipe,
               }
             : {
                 url: snapshot.sourceImageUrl,
                 mediaAssetId: snapshot.sourceMediaAssetId,
-                adjustmentRecipe: snapshot.adjustmentRecipe,
+                retouchRecipe: snapshot.retouchRecipe,
               },
         ]
       : outputs.map((item) => ({ url: item.url, mediaAssetId: item.mediaAssetId }))
@@ -132,7 +132,7 @@ function resolveExportEntries(snapshot: CanvasNodeItem): ExportImageEntry[] {
     .map((entry) => ({
       url: entry.url.trim(),
       ...(Number.isInteger(entry.mediaAssetId) ? { mediaAssetId: entry.mediaAssetId } : {}),
-      ...(entry.adjustmentRecipe ? { adjustmentRecipe: entry.adjustmentRecipe } : {}),
+      ...(entry.retouchRecipe ? { retouchRecipe: entry.retouchRecipe } : {}),
       title: snapshot.title?.trim() || 'image',
     }))
 }
@@ -220,9 +220,7 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
     })
     image.sourceImageUrl = payload.url
     image.sourceMediaAssetId = payload.mediaAssetId
-    image.adjustmentRecipe = source.adjustmentRecipe
-      ? structuredClone(source.adjustmentRecipe)
-      : undefined
+    image.retouchRecipe = source.retouchRecipe ? structuredClone(source.retouchRecipe) : undefined
     image.sourceImageRatio = payload.ratio
     image.outputCount = source.outputCount ?? image.outputCount
     image.width = resolveImageNodeFrameSize(payload.ratio, true).width
@@ -270,16 +268,16 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
         let exportFileName = ''
         try {
           let downloadUrl = entry.url
-          if (entry.adjustmentRecipe) {
-            const source: ImageAdjustmentRenderSource = {
-              url: resolveMediaAssetOriginalURL(entry.adjustmentRecipe.sourceMediaAssetId),
+          if (entry.retouchRecipe) {
+            const source: ImageRetouchRenderSource = {
+              url: resolveMediaAssetOriginalURL(entry.retouchRecipe.sourceMediaAssetId),
               title: entry.title,
             }
-            const rendered = await renderImageAdjustmentRecipeFile(source, entry.adjustmentRecipe)
+            const rendered = await renderImageRetouchRecipeFile(source, entry.retouchRecipe)
             renderedUrl = URL.createObjectURL(rendered)
             downloadUrl = renderedUrl
             exportFileName = buildUniqueExportFileName(
-              { ...entry, url: rendered.name, adjustmentRecipe: undefined },
+              { ...entry, url: rendered.name, retouchRecipe: undefined },
               counts,
             )
           } else {
@@ -287,7 +285,7 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
           }
           await options.browser.downloadImage({
             url: downloadUrl,
-            ...(!entry.adjustmentRecipe && entry.mediaAssetId
+            ...(!entry.retouchRecipe && entry.mediaAssetId
               ? { mediaAssetId: entry.mediaAssetId }
               : {}),
             fileName: exportFileName,
@@ -361,8 +359,8 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
       const copied = createCanvasNodeAt('image', { x: start.x + dx, y: start.y + dy })
       copied.sourceImageUrl = source.sourceImageUrl.trim()
       copied.sourceMediaAssetId = source.sourceMediaAssetId
-      copied.adjustmentRecipe = source.adjustmentRecipe
-        ? structuredClone(source.adjustmentRecipe)
+      copied.retouchRecipe = source.retouchRecipe
+        ? structuredClone(source.retouchRecipe)
         : undefined
       copied.sourceImageRatio = source.sourceImageRatio > 0 ? source.sourceImageRatio : 1
       copied.outputCount = source.outputCount ?? copied.outputCount

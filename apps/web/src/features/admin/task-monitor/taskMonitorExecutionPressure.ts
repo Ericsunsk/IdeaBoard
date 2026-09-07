@@ -38,23 +38,41 @@ const TASK_EXECUTION_LIFECYCLE_BUCKETS: TaskExecutionLifecycleDefinition[] = [
   { key: MonitorExecutionPressureKey.other, label: '其他状态' },
 ]
 
+function pressureNumber(value: unknown): number {
+  return Number(value ?? 0)
+}
+
+function normalizePressureMetrics(
+  point: MonitorExecutionPressurePoint | undefined,
+): Omit<TaskExecutionPressurePoint, 'key' | 'label'> {
+  return {
+    count: pressureNumber(point?.count),
+    sharePercent: pressureNumber(point?.share_percent),
+    durationPressure: pressureNumber(point?.duration_pressure),
+    anomalyPressure: pressureNumber(point?.anomaly_pressure),
+    avgDurationSeconds: pressureNumber(point?.avg_duration_seconds),
+    maxDurationSeconds: pressureNumber(point?.max_duration_seconds),
+    failedCount: pressureNumber(point?.failed_count),
+    retryCount: pressureNumber(point?.retry_count),
+  }
+}
+
+function normalizePressurePoint(
+  bucket: TaskExecutionLifecycleDefinition,
+  point: MonitorExecutionPressurePoint | undefined,
+): TaskExecutionPressurePoint {
+  return {
+    key: bucket.key,
+    label: point?.label || bucket.label,
+    ...normalizePressureMetrics(point),
+  }
+}
+
 export function normalizeMonitorExecutionPressurePoints(
   points: MonitorExecutionPressurePoint[],
 ): TaskExecutionPressurePoint[] {
   const pointsByKey = new Map(points.map((point) => [point.key, point]))
-  return TASK_EXECUTION_LIFECYCLE_BUCKETS.map((bucket) => {
-    const point = pointsByKey.get(bucket.key)
-    return {
-      key: bucket.key,
-      label: point?.label || bucket.label,
-      count: Number(point?.count ?? 0),
-      sharePercent: Number(point?.share_percent ?? 0),
-      durationPressure: Number(point?.duration_pressure ?? 0),
-      anomalyPressure: Number(point?.anomaly_pressure ?? 0),
-      avgDurationSeconds: Number(point?.avg_duration_seconds ?? 0),
-      maxDurationSeconds: Number(point?.max_duration_seconds ?? 0),
-      failedCount: Number(point?.failed_count ?? 0),
-      retryCount: Number(point?.retry_count ?? 0),
-    }
-  })
+  return TASK_EXECUTION_LIFECYCLE_BUCKETS.map((bucket) =>
+    normalizePressurePoint(bucket, pointsByKey.get(bucket.key)),
+  )
 }

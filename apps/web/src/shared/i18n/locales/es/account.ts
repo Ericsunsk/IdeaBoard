@@ -105,7 +105,7 @@ export default {
       reward: 'Recompensa',
       topUp: 'Recarga',
       systemGrant: 'Concesión del sistema',
-      systemAdjustment: 'Ajuste',
+      systemRetouch: 'Ajuste',
     },
   },
   usage: {

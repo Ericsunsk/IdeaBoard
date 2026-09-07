@@ -42,7 +42,7 @@
         :disabled="applyDisabled"
         :aria-label="applying ? t('canvas.retouch.applying') : t('canvas.retouch.applyAsNewNode')"
         :tooltip="applying ? t('canvas.retouch.applying') : t('canvas.retouch.applyAsNewNode')"
-        @click="emit('apply-adjustments')"
+        @click="emit('apply-retouch')"
       >
         <SendDiagonalSolid />
       </NodeToolIconButton>
@@ -68,7 +68,7 @@ const emit = defineEmits<{
   (e: 'copy-layer'): void
   (e: 'merge-layer'): void
   (e: 'remove-layer'): void
-  (e: 'apply-adjustments'): void
+  (e: 'apply-retouch'): void
 }>()
 
 const { t } = useI18n()

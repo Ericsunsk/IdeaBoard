@@ -66,29 +66,51 @@ export function readOutputAnchorLayout(
   return anchorHint ? { ...anchorHint, ratio: fallback.ratio } : fallback
 }
 
+function readImageLayoutBounds(
+  imageLayout: Pick<ImageResultLayout, 'x' | 'y' | 'width' | 'ratio'>,
+  rendererMetrics: CanvasRendererMetricsPort,
+  nodeId: string,
+): { x: number; y: number; width: number; height: number } {
+  const metrics = rendererMetrics.readNodeMetrics(nodeId)
+  const height = metrics?.measured
+    ? metrics.dimensions.height
+    : estimateImageNodeHeight(imageLayout)
+  return { x: imageLayout.x, y: imageLayout.y, width: imageLayout.width, height }
+}
+
+function readGenericNodeBounds(
+  snapshot: { width?: unknown; height?: unknown },
+  rendererMetrics: CanvasRendererMetricsPort,
+  nodeId: string,
+  fallbackX: number,
+  fallbackY: number,
+): { x: number; y: number; width: number; height: number } | null {
+  const metrics = rendererMetrics.readNodeMetrics(nodeId)
+  const width = metrics?.measured ? metrics.dimensions.width : Number(snapshot.width)
+  if (!Number.isFinite(width) || width <= 0) return null
+  const height = metrics?.measured ? metrics.dimensions.height : Number(snapshot.height)
+  return {
+    x: metrics?.position.x ?? fallbackX,
+    y: metrics?.position.y ?? fallbackY,
+    width,
+    height: Number.isFinite(height) && height > 0 ? height : width,
+  }
+}
+
 function readNodeBounds(
   node: CanvasGraphNodeRecord,
   rendererMetrics: CanvasRendererMetricsPort,
 ): { x: number; y: number; width: number; height: number } | null {
   const imageLayout = readImageNodeLayout(node, rendererMetrics)
-  if (imageLayout) {
-    const metrics = rendererMetrics.readNodeMetrics(node.id)
-    const height = metrics?.measured
-      ? metrics.dimensions.height
-      : estimateImageNodeHeight(imageLayout)
-    return { x: imageLayout.x, y: imageLayout.y, width: imageLayout.width, height }
-  }
+  if (imageLayout) return readImageLayoutBounds(imageLayout, rendererMetrics, node.id)
   const snapshot = node.snapshot as { width?: unknown; height?: unknown }
-  const metrics = rendererMetrics.readNodeMetrics(node.id)
-  const width = metrics?.measured ? metrics.dimensions.width : Number(snapshot.width)
-  if (!Number.isFinite(width) || width <= 0) return null
-  const height = metrics?.measured ? metrics.dimensions.height : Number(snapshot.height)
-  return {
-    x: metrics?.position.x ?? Number(node.snapshot.x ?? 0),
-    y: metrics?.position.y ?? Number(node.snapshot.y ?? 0),
-    width,
-    height: Number.isFinite(height) && height > 0 ? height : width,
-  }
+  return readGenericNodeBounds(
+    snapshot,
+    rendererMetrics,
+    node.id,
+    Number(node.snapshot.x ?? 0),
+    Number(node.snapshot.y ?? 0),
+  )
 }
 
 export function resolvePendingImageResultPosition(

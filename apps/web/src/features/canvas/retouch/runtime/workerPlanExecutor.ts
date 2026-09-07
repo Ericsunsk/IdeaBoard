@@ -1,17 +1,17 @@
 import {
   disposeDefaultWorkerImageProcessingClient,
-  executeWorkerImageAdjustmentPlan,
-} from '../backends/worker/executeWorkerImageAdjustmentPlan'
-import { createCpuImageAdjustmentPlanExecutor } from './cpuPlanExecutor'
+  executeWorkerImageRetouchPlan,
+} from '../backends/worker/executeWorkerImageRetouchPlan'
+import { createCpuImageRetouchPlanExecutor } from './cpuPlanExecutor'
 import {
   reportPlanExecutionEvent,
-  type CreateImageAdjustmentPlanExecutorOptions,
-  type ImageAdjustmentPlanExecutor,
+  type CreateImageRetouchPlanExecutorOptions,
+  type ImageRetouchPlanExecutor,
 } from './planExecutorTypes'
 
-export function createWorkerImageAdjustmentPlanExecutor(
-  options: Pick<CreateImageAdjustmentPlanExecutorOptions, 'onPlanExecutorEvent'> = {},
-): ImageAdjustmentPlanExecutor {
+export function createWorkerImageRetouchPlanExecutor(
+  options: Pick<CreateImageRetouchPlanExecutorOptions, 'onPlanExecutorEvent'> = {},
+): ImageRetouchPlanExecutor {
   return {
     async execute({ imageData, plan, signal, onProgress }) {
       try {
@@ -21,7 +21,7 @@ export function createWorkerImageAdjustmentPlanExecutor(
           width: imageData.width,
           height: imageData.height,
         })
-        const output = await executeWorkerImageAdjustmentPlan(imageData, plan, {
+        const output = await executeWorkerImageRetouchPlan(imageData, plan, {
           signal,
           onProgress,
         })
@@ -42,7 +42,7 @@ export function createWorkerImageAdjustmentPlanExecutor(
           ...normalizeExecutorError(error),
         })
 
-        return createCpuImageAdjustmentPlanExecutor(options).execute({
+        return createCpuImageRetouchPlanExecutor(options).execute({
           imageData,
           plan,
           signal,

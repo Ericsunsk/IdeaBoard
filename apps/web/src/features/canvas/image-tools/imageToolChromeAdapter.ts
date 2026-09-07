@@ -3,7 +3,7 @@ import {
   resolveMediaAssetDerivativeURL,
   useMediaAssetDelivery,
 } from '../../../shared/api/mediaAssetDelivery'
-import { useImageAdjustmentRenderedPreview } from '../retouch/useImageAdjustmentRenderedPreview'
+import { useImageRetouchRenderedPreview } from '../retouch/useImageRetouchRenderedPreview'
 import { useRetouchHistogramSource } from '../retouch/useRetouchHistogramSource'
 import type { ImageToolChromeCommands, ImageToolChromeModel } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
@@ -18,8 +18,8 @@ export function createImageToolChromeAdapter(
     return nodeId ? (board.getImageNodeDisplayPayload(nodeId)?.mediaAssetId ?? null) : null
   })
   const previewDelivery = useMediaAssetDelivery(previewAssetId, 'preview')
-  const { retouchRenderedPreview, retouchPreviewSource } = useImageAdjustmentRenderedPreview({
-    isAdjustMode: session.isImageAdjustmentMode,
+  const { retouchRenderedPreview, retouchPreviewSource } = useImageRetouchRenderedPreview({
+    isAdjustMode: session.isImageRetouchMode,
     layers: session.retouchSession.retouchLayers,
     sourceUrl: () => {
       const payload = session.retouchNodeId.value
@@ -42,9 +42,9 @@ export function createImageToolChromeAdapter(
     },
   })
   const { retouchHistogramSource } = useRetouchHistogramSource({
-    isAdjustMode: session.isImageAdjustmentMode,
+    isAdjustMode: session.isImageRetouchMode,
     layers: session.retouchSession.retouchLayers,
-    selectedAdjustmentLayer: session.retouchSession.selectedRetouchAdjustmentLayer,
+    selectedEffectLayer: session.retouchSession.selectedRetouchEffectLayer,
     previewSource: retouchPreviewSource,
   })
 
@@ -66,9 +66,9 @@ export function createImageToolChromeAdapter(
       editor: {
         layers: session.retouchSession.retouchLayers.value,
         selectedLayerId: session.retouchSession.selectedRetouchLayerId.value,
-        selectedAdjustmentLayer: session.retouchSession.selectedRetouchAdjustmentLayer.value,
+        selectedEffectLayer: session.retouchSession.selectedRetouchEffectLayer.value,
         histogramSource: retouchHistogramSource.value,
-        applyingAdjustments: session.isApplyingRetouchAdjustments.value,
+        applyingRetouch: session.isApplyingRetouch.value,
       },
     }
   })

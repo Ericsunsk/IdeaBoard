@@ -26,7 +26,7 @@ import {
   RETOUCH_THRESHOLD_MARKER_ID,
   createThresholdMarker,
   moveThresholdHandle,
-  normalizeThresholdAdjustment,
+  normalizeThresholdEffect,
 } from '../utils/retouchThreshold'
 import RetouchHistogramPlot, { type RetouchHistogramPlotMarker } from './RetouchHistogramPlot.vue'
 import RetouchThresholdFields from './RetouchThresholdFields.vue'
@@ -43,7 +43,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const normalizedParams = computed(() => normalizeThresholdAdjustment(props.params))
+const normalizedParams = computed(() => normalizeThresholdEffect(props.params))
 const histogramPath = computed(() =>
   sampleHistogramPath(createRetouchHistogram(props.histogramSource ?? null, 'rgb'), 80),
 )
@@ -72,10 +72,10 @@ function onMarkerUpdate(markerId: string, position: number) {
 }
 
 function updateThreshold(threshold: number) {
-  emit('update:params', normalizeThresholdAdjustment({ ...props.params, threshold }))
+  emit('update:params', normalizeThresholdEffect({ ...props.params, threshold }))
 }
 
 function updateInvert(invert: boolean) {
-  emit('update:params', normalizeThresholdAdjustment({ ...props.params, invert }))
+  emit('update:params', normalizeThresholdEffect({ ...props.params, invert }))
 }
 </script>
