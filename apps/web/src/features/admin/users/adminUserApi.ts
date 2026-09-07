@@ -7,17 +7,21 @@ import {
   updateAdminUserRole as requestUpdateAdminUserRole,
 } from '../../../shared/api/generated-query/admin-users/admin-users'
 import { resolveApiOk } from '../../../shared/api/apiResponse'
+import { stripUndefined } from '../../../shared/api/stripUndefined'
 
 export async function banAdminUser(input: {
   publicId: string
-  reason?: string
-  expires_in_days?: number
+  reason?: string | undefined
+  expires_in_days?: number | undefined
 }): Promise<void> {
   await resolveApiOk(
-    requestBanAdminUser(input.publicId, {
-      reason: input.reason,
-      expires_in_days: input.expires_in_days,
-    }),
+    requestBanAdminUser(
+      input.publicId,
+      stripUndefined({
+        reason: input.reason,
+        expires_in_days: input.expires_in_days,
+      }),
+    ),
     '封禁失败',
   )
 }

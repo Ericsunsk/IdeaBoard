@@ -49,10 +49,10 @@ const props = withDefaults(
   defineProps<{
     value?: readonly TRow[] | null
     loading?: boolean
-    dataKey?: string | ((item: TRow) => string)
-    size?: 'small' | 'large'
+    dataKey?: string | ((item: TRow) => string) | undefined
+    size?: 'small' | 'large' | undefined
     scrollable?: boolean
-    tableStyle?: string | Record<string, string | number>
+    tableStyle?: string | Record<string, string | number> | undefined
     tableAriaLabel?: string
     frameClass?: string
     scrollAriaLabel?: string

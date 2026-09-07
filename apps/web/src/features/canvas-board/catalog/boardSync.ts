@@ -5,6 +5,7 @@ import {
 } from '../../../shared/api/generated-query/boards/boards'
 import type { BoardStateEnvelope, UserBoardItem } from '../../../shared/api/generated-query/model'
 import { resolveApiData, resolveApiOk } from '../../../shared/api/apiResponse'
+import { stripUndefined } from '../../../shared/api/stripUndefined'
 import { i18n } from '../../../shared/i18n'
 import {
   getAuthStorageUserScope,
@@ -82,7 +83,7 @@ class RemoteBoardStateError extends InvalidBoardStateError {
 
 function toGeneratedBoardStateProjection(state: CanvasBoardState): BoardStateEnvelope {
   const envelope = serializeCanvasBoardState(state, 'remote-envelope')
-  return {
+  return stripUndefined({
     schemaVersion: envelope.schemaVersion,
     imageNodes: envelope.imageNodes.map((node) => ({ ...node })),
     promptNodes: envelope.promptNodes.map((node) => ({ ...node })),
@@ -92,12 +93,12 @@ function toGeneratedBoardStateProjection(state: CanvasBoardState): BoardStateEnv
       ...group,
       nodeIds: [...group.nodeIds],
     })),
-    mediaRefs: envelope.mediaRefs?.map((ref) => ({ ...ref })),
+    mediaRefs: envelope.mediaRefs?.map((ref) => stripUndefined({ ...ref })),
     previewSnapshotDataUrl: envelope.previewSnapshotDataUrl,
     previewSnapshotUpdatedAt: envelope.previewSnapshotUpdatedAt,
     previewSnapshotVersion: envelope.previewSnapshotVersion,
     updatedAt: envelope.updatedAt,
-  }
+  })
 }
 
 function isLocalNewer(localUpdatedAt: number | undefined, remoteUpdatedAt: number | undefined) {

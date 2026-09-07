@@ -58,9 +58,9 @@ type UseCanvasGraphInteractionsOptions = {
 
 type ExportImageEntry = {
   url: string
-  mediaAssetId?: number
+  mediaAssetId?: number | undefined
   title: string
-  adjustmentRecipe?: ImageNodeItem['adjustmentRecipe']
+  adjustmentRecipe?: ImageNodeItem['adjustmentRecipe'] | undefined
 }
 type ExportImageCandidate = Omit<ExportImageEntry, 'title'>
 

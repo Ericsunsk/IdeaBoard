@@ -56,7 +56,7 @@ export function useFlowCanvasNodeAdapter({
     return resolveSnapshotNode<FusionNodeItem>(data())
   })
 
-  const displayImage = computed<{ url: string; mediaAssetId?: number } | null>(() => {
+  const displayImage = computed<{ url: string; mediaAssetId?: number | undefined } | null>(() => {
     if (!imageSnapshot.value) return null
     const pendingPreview = data().libraryImportPreviewUrl?.trim()
     if (imageSnapshot.value.libraryImport && pendingPreview) return { url: pendingPreview }

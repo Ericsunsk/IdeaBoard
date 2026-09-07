@@ -67,7 +67,7 @@ export type UseCanvasViewportRuntimeOptions = {
   closeBoardHeaderEditing: () => void
   startCanvasInteraction: (key: CanvasViewportRuntimeInteraction) => void
   stopCanvasInteraction: (key: CanvasViewportRuntimeInteraction) => void
-  viewportPersistence?: CanvasViewportPersistence
+  viewportPersistence?: CanvasViewportPersistence | undefined
 }
 
 function viewportKey(viewport: CanvasFlowViewport) {

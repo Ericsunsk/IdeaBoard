@@ -51,8 +51,8 @@ export type CanvasVueFlowIncrementalProjection = Readonly<{
 export type UseCanvasVueFlowGraphAdapterOptions = CanvasVueFlowGraphCommandOptions & {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  actions?: CanvasVueFlowGraphActions
-  projectEdgesForActions?: (edges: Edge[]) => Edge[]
+  actions?: CanvasVueFlowGraphActions | undefined
+  projectEdgesForActions?: ((edges: Edge[]) => Edge[]) | undefined
 }
 
 type NodeInput = Node | Node[]

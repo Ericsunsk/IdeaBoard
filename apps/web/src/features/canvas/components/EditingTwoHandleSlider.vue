@@ -53,7 +53,7 @@ const props = withDefaults(
     max: number
     step?: number
     shiftStep?: number
-    ariaLabel?: string
+    ariaLabel?: string | undefined
   }>(),
   {
     step: 1,

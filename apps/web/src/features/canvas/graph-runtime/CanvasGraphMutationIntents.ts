@@ -138,9 +138,9 @@ function resolveCanvasGraphDeleteReason(
 export function commitCanvasGraphDeleteIntent(
   store: CanvasGraphStore,
   intent: {
-    nodeIds?: readonly CanvasGraphNodeId[]
-    edgeIds?: readonly CanvasGraphEdgeId[]
-    removeConnectedEdges?: boolean
+    nodeIds?: readonly CanvasGraphNodeId[] | undefined
+    edgeIds?: readonly CanvasGraphEdgeId[] | undefined
+    removeConnectedEdges?: boolean | undefined
   },
 ): CanvasGraphTransactionSummary {
   const nodeIds = [...(intent.nodeIds ?? [])]

@@ -21,8 +21,8 @@ import type {
 const DEFAULT_PREVIEW_MAX_SIDE = 960
 
 export type MainThreadImageProcessingBackendOptions = {
-  sourceCache?: ImageSourceCache
-  planExecutor?: ImageAdjustmentPlanExecutor
+  sourceCache?: ImageSourceCache | undefined
+  planExecutor?: ImageAdjustmentPlanExecutor | undefined
 }
 
 export function createMainThreadImageProcessingBackend(

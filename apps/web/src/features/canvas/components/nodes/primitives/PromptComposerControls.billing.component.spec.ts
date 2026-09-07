@@ -12,7 +12,7 @@ function renderControls(billingState?: CanvasBillingQuoteState | null) {
       textareaClass: 'prompt-input',
       actionsClass: 'prompt-actions',
       sendButtonClass: 'prompt-send',
-      billingState,
+      billingState: billingState ?? null,
     },
   })
 }

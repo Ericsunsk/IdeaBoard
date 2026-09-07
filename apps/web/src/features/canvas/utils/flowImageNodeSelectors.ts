@@ -8,7 +8,7 @@ import { buildMediaBrowserURL, type MediaRef } from '../../../shared/media/Media
 export type ImageNodeDisplayPayload = {
   url: string
   ratio: number
-  mediaRef?: MediaRef
+  mediaRef?: MediaRef | undefined
   /** Internal snapshot migration field; public API uses MediaRef.assetId. */
   mediaAssetId?: number
 }

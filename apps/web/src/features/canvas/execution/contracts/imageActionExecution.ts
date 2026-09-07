@@ -48,9 +48,9 @@ export type ImageActionExecutionConfig = {
   action: ImageExecutionAction
   mode: ImageExecutionMode
   feature: ExecutionFeature
-  prompt?: string
-  promptPrefix?: string
-  strength?: ImageActionStrengthConfig
+  prompt?: string | undefined
+  promptPrefix?: string | undefined
+  strength?: ImageActionStrengthConfig | undefined
 }
 
 type WorkflowImageExecutionAction = Extract<ImageExecutionAction, WorkflowFeature>

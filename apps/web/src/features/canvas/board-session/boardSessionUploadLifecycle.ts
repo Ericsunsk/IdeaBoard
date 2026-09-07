@@ -65,7 +65,7 @@ function isBoardCanvasUploadPath(path: string, userUid: string, boardId: string)
   return false
 }
 
-type StableImageItem = { url: string; mediaRef?: MediaRef }
+type StableImageItem = { url: string; mediaRef?: MediaRef | undefined }
 
 function appendImageItemRefs(
   refs: StableRef[],

@@ -3,7 +3,7 @@ import { i18n } from '../../../../shared/i18n'
 import { isDataUrl } from '../../services/flowMediaIO'
 
 interface EnsureFlowMaskImageUrlOptions {
-  boardId?: string
+  boardId?: string | undefined
 }
 
 async function dataUrlToFile(dataUrl: string, fileName: string): Promise<File> {

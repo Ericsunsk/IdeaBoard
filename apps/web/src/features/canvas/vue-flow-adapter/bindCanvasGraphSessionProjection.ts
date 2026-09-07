@@ -22,10 +22,10 @@ export function bindCanvasGraphSessionProjection(options: {
   readCurrent: () => CanvasFlowGraphProjection
   projectFull: () => CanvasFlowGraphProjection
   isCurrentAttachment: () => boolean
-  readGroups?: () => CanvasGroup[]
-  onGroupsChanged?: (groups: CanvasGroup[]) => void
-  projectNode?: (node: Node) => Node
-  scheduleMicrotask?: (task: () => void) => void
+  readGroups?: (() => CanvasGroup[]) | undefined
+  onGroupsChanged?: ((groups: CanvasGroup[]) => void) | undefined
+  projectNode?: ((node: Node) => Node) | undefined
+  scheduleMicrotask?: ((task: () => void) => void) | undefined
 }) {
   const controller = createCanvasGraphCommitProjectionController({
     projectFull: options.projectFull,

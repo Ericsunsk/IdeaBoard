@@ -43,7 +43,7 @@ withDefaults(
     tooltip: string
     disabled?: boolean
     format?: (value: T) => string
-    optionRole?: 'menuitemradio'
+    optionRole?: 'menuitemradio' | undefined
   }>(),
   {
     disabled: false,

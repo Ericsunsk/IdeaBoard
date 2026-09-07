@@ -24,7 +24,7 @@ function pendingSnapshot() {
   return snapshot
 }
 
-function createHarness(options: { onMaterialized?: () => void } = {}) {
+function createHarness(options: { onMaterialized?: (() => void) | undefined } = {}) {
   const snapshot = pendingSnapshot()
   const graph = CanvasGraphSession.hydrate('board-a', snapshot)
   const core = createPendingImageExecutionCore()

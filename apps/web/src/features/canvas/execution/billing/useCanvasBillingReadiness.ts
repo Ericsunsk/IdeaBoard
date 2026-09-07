@@ -30,7 +30,7 @@ export type CanvasBillingQuoteState = {
   availableCredits?: number
   priceVersionId?: number
   sufficient?: boolean
-  reason?: string
+  reason?: string | undefined
 }
 
 type CanvasBillingReadinessFetcher = (

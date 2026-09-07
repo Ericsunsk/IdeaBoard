@@ -49,24 +49,24 @@ export type ImageInpaintTaskRequestInput = {
   originalImageUrl: string
   maskImageUrl: string
   imageSize: ExecutionImageSize | null
-  originalImageAssetId?: number
+  originalImageAssetId?: number | undefined
 }
 
 export type FusionTaskRequestInput = {
   prompt: string
   imageUrls: string[]
-  imageAssetIds?: number[]
+  imageAssetIds?: number[] | undefined
   inputWeights: number[]
-  outputCount?: number
+  outputCount?: number | undefined
   sizeSource: ExecutionImageSize | null
   targetSize: ExecutionImageSize | null
   aspectRatio: PromptAspectRatio
-  outputResolution?: OutputResolution
+  outputResolution?: OutputResolution | undefined
 }
 
 type ImageActionReadinessOptions = {
-  outputCount?: number
-  outputResolution?: OutputResolution
+  outputCount?: number | undefined
+  outputResolution?: OutputResolution | undefined
 }
 
 function buildOutputBillingParams(options: ImageActionReadinessOptions = {}, feature?: string) {
@@ -149,11 +149,12 @@ export function buildImageActionReadinessRequest(
 export function buildGenerationTaskRequest(input: {
   prompt: string
   aspectRatio: PromptAspectRatio
-  imageUrls?: string[]
-  imageAssetIds?: number[]
-  referenceImageAssetIds?: number[]
+  imageUrls?: string[] | undefined
+  imageAssetIds?: number[] | undefined
+  referenceImageAssetIds?: number[] | undefined
   outputCount: number
-  outputResolution?: import('../../../../shared/domain/generationContract').OutputResolution
+  outputResolution?:
+    import('../../../../shared/domain/generationContract').OutputResolution | undefined
 }): SubmitTaskData {
   const outputCount = assertRequestedOutputCount(input.outputCount)
   return buildExecutionTaskRequest({
@@ -176,8 +177,8 @@ export function buildDirectActionTaskRequest(input: {
   imageSize: ExecutionImageSize | null
   prompt: string
   outputCount: number
-  strength?: number
-  outputResolution?: OutputResolution
+  strength?: number | undefined
+  outputResolution?: OutputResolution | undefined
 }): SubmitTaskData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
   const execution = requireImageActionExecution(input.action)
@@ -276,8 +277,8 @@ export function buildUpscaleTaskRequest(input: {
   imageSize: ExecutionImageSize | null
   prompt: string
   outputCount: number
-  strength?: number
-  outputResolution?: OutputResolution
+  strength?: number | undefined
+  outputResolution?: OutputResolution | undefined
 }): SubmitTaskData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
   const execution = requireImageActionExecution(IMAGE_UPSCALE_ACTION)

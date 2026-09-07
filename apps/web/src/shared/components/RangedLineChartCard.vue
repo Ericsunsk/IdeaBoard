@@ -45,11 +45,11 @@ withDefaults(
     title: string
     titleTag?: 'h2' | 'h3' | 'span'
     ranges: Array<{ label: string; key: TRange }>
-    rangeAriaLabel?: string
+    rangeAriaLabel?: string | undefined
     data: ChartData
     options: ChartOptions
     plugins?: Plugin[]
-    canvasProps?: HTMLAttributes
+    canvasProps?: HTMLAttributes | undefined
     size?: ChartPanelSize
     height?: string
     showChart?: boolean

@@ -20,7 +20,7 @@ type UseRetouchModeOptions = {
   nodes: Ref<Node[]>
   activeTool: Ref<string>
   getImageNodeDisplayPayload: (nodeId: string) => ImageDisplayPayload | null
-  onBeforePointerCancel?: () => void
+  onBeforePointerCancel?: (() => void) | undefined
   onBeforeExit?: (state: RetouchModeState) => boolean | void
 }
 

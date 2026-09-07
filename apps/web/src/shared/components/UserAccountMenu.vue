@@ -99,16 +99,16 @@ type AvatarButtonRef = HTMLElement | { $el?: HTMLElement }
 
 const props = withDefaults(
   defineProps<{
-    avatarUrl?: string
+    avatarUrl?: string | undefined
     items: UserAccountMenuItem[]
-    balance?: UserIdeaBalanceControl
+    balance?: UserIdeaBalanceControl | undefined
     wrapClass?: string
     avatarButtonClass?: string
     avatarImageClass?: string
     avatarPlaceholderClass?: string
     avatarIconClass?: string
     appendTo?: string
-    menuPt?: MenuPassThroughOptions
+    menuPt?: MenuPassThroughOptions | undefined
     menuItemClass?: string
     menuDangerItemClass?: string
     showCredits?: boolean

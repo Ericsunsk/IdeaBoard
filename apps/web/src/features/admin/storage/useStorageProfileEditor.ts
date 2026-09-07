@@ -23,9 +23,9 @@ import {
 } from './storageHelpers'
 
 type SaveStorageProfile = (input: {
-  id?: string
+  id?: string | undefined
   payload: StorageProfilePayload
-  apply?: boolean
+  apply?: boolean | undefined
 }) => Promise<{ profile: StorageProfile; message: string }>
 
 type StorageProfileCommand = (id: string) => Promise<{ profile: StorageProfile; message: string }>

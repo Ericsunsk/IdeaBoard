@@ -38,7 +38,7 @@ import type {
 import { createProviderEndpointSavePayload } from './providerConfigPayload'
 
 type SaveAdminProviderEndpointInput = {
-  id?: number
+  id?: number | undefined
   data: ProviderEndpointFormData
 }
 

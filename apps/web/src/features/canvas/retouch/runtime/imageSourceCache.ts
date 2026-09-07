@@ -33,18 +33,18 @@ export type ImageSourceCacheOptions = {
 }
 
 export type ImageSourceFullSizeOptions = {
-  readonly maxPixels?: number
-  readonly maxSide?: number
+  readonly maxPixels?: number | undefined
+  readonly maxSide?: number | undefined
   /** Downscale sources that exceed maxPixels instead of rejecting them. */
-  readonly fitWithinMaxPixels?: boolean
-  readonly resolveOptions?: ImageSourceResolveOptions
+  readonly fitWithinMaxPixels?: boolean | undefined
+  readonly resolveOptions?: ImageSourceResolveOptions | undefined
 }
 
 type LoadImageSourceOptions = {
-  readonly maxPixels?: number
-  readonly maxSide?: number
-  readonly fitWithinMaxPixels?: boolean
-  readonly resolveOptions?: ImageSourceResolveOptions
+  readonly maxPixels?: number | undefined
+  readonly maxSide?: number | undefined
+  readonly fitWithinMaxPixels?: boolean | undefined
+  readonly resolveOptions?: ImageSourceResolveOptions | undefined
 }
 
 class ImageSourceCacheError extends Error {

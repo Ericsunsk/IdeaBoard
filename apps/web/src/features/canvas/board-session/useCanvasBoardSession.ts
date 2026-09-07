@@ -37,7 +37,7 @@ export type CanvasBoardSessionMessage = {
 }
 
 export type CanvasBoardSessionSaveOptions = {
-  waitForPreview?: boolean
+  waitForPreview?: boolean | undefined
 }
 
 export type CanvasBoardSessionRemoteSyncFailureReason = 'sync-failed' | 'conflict'

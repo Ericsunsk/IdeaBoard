@@ -325,7 +325,7 @@ function createImageSource(
   values: number[],
   options: {
     mimeType?: string
-    canvas?: TestCanvasOptions
+    canvas?: TestCanvasOptions | undefined
   } = {},
 ): TestImageSource {
   const imageData = makeImageData(values)

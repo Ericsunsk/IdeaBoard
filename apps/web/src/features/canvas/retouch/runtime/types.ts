@@ -33,10 +33,10 @@ export type ImageProcessingOutputPolicyInput = {
 }
 
 export type ImageProcessingOutputFileNameInput = {
-  title?: string
+  title?: string | undefined
   mimeType: string
-  suffix?: string
-  fallbackBaseName?: string
+  suffix?: string | undefined
+  fallbackBaseName?: string | undefined
 }
 
 export type ImageProcessingOutputPolicy = {
@@ -47,13 +47,13 @@ export type ImageProcessingOutputPolicy = {
 export type RenderFinalInput = {
   source: ImageProcessingSource
   plan: ImageProcessingPlan
-  taskId?: string
-  latestOnly?: boolean
-  maxPixels?: number
-  maxSide?: number
-  fitWithinMaxPixels?: boolean
-  preserveSourceMimeType?: boolean
-  onProgress?: (progress: ImageProcessingProgress) => void
+  taskId?: string | undefined
+  latestOnly?: boolean | undefined
+  maxPixels?: number | undefined
+  maxSide?: number | undefined
+  fitWithinMaxPixels?: boolean | undefined
+  preserveSourceMimeType?: boolean | undefined
+  onProgress?: ((progress: ImageProcessingProgress) => void) | undefined
 }
 
 export type ImageProcessingPreviewSizeStrategy = {
@@ -63,10 +63,10 @@ export type ImageProcessingPreviewSizeStrategy = {
 export type RenderPreviewInput = {
   source: ImageProcessingSource
   plan: ImageProcessingPlan
-  taskId?: string
-  latestOnly?: boolean
-  sizeStrategy?: ImageProcessingPreviewSizeStrategy
-  onProgress?: (progress: ImageProcessingProgress) => void
+  taskId?: string | undefined
+  latestOnly?: boolean | undefined
+  sizeStrategy?: ImageProcessingPreviewSizeStrategy | undefined
+  onProgress?: ((progress: ImageProcessingProgress) => void) | undefined
 }
 
 export type RenderPreviewOutput = {
@@ -137,8 +137,8 @@ export type ImageProcessingBackendPreviewInput = Omit<
 export type ImageProcessingBackend = {
   renderFinal(input: ImageProcessingBackendFinalInput): Promise<RenderFinalOutput>
   renderPreview(input: ImageProcessingBackendPreviewInput): Promise<RenderPreviewOutput>
-  cancel?(taskId?: string): void
-  dispose?(): void
+  cancel?: ((taskId?: string) => void) | undefined
+  dispose?: (() => void) | undefined
 }
 
 export type ImageProcessingRuntime = {

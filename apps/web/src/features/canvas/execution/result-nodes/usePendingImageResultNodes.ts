@@ -29,11 +29,11 @@ type UsePendingImageResultNodesOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   readCanvasGraphStore: () => CanvasGraphReadPort
-  writeCanvasGraphStore?: () => CanvasGraphStore
-  rendererMetrics?: CanvasRendererMetricsPort
+  writeCanvasGraphStore?: (() => CanvasGraphStore) | undefined
+  rendererMetrics?: CanvasRendererMetricsPort | undefined
   readCurrentAttachment: () => CanvasBoardAttachment | null
   isAttachmentCurrent: (attachment: CanvasBoardAttachment) => boolean
-  refreshNodeInternals?: (nodeIds: string[]) => void
+  refreshNodeInternals?: ((nodeIds: string[]) => void) | undefined
   isNodeExecutionActive: (nodeId: string) => boolean
 }
 
@@ -43,7 +43,7 @@ export type PendingImageResultReservationParams = {
   source: ImageExecutionInput
   sourceNodeId: string
   outputCount: number
-  resultOptions?: PendingImageResultOptions
+  resultOptions?: PendingImageResultOptions | undefined
 }
 
 export type PendingImageResultExecution = {

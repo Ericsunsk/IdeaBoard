@@ -195,11 +195,11 @@ export function getAdminBrandLogoOverride(
 }
 
 export function detectAdminBrandLogoKey(query: {
-  name?: string
-  baseUrl?: string
-  apiType?: string
-  provider?: string
-  endpoint?: string
+  name?: string | undefined
+  baseUrl?: string | undefined
+  apiType?: string | undefined
+  provider?: string | undefined
+  endpoint?: string | undefined
 }): string | undefined {
   const text =
     `${query.name || ''} ${query.baseUrl || ''} ${query.apiType || ''} ${query.provider || ''} ${query.endpoint || ''}`.toLowerCase()
@@ -306,8 +306,8 @@ export function detectAdminBrandLogoKey(query: {
 
 export function getAdminBrandLogo(
   query: {
-    name?: string
-    baseUrl?: string
+    name?: string | undefined
+    baseUrl?: string | undefined
     apiType?: string
     provider?: string
     endpoint?: string

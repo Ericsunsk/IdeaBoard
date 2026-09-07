@@ -37,13 +37,13 @@ import { useDisplayImagePreview } from '../../../vue-flow-adapter/useDisplayImag
 const props = withDefaults(
   defineProps<{
     src: string
-    mediaAssetId?: number
+    mediaAssetId?: number | undefined
     alt?: string
     draggable?: boolean
     removable?: boolean
     previewMaxSide?: number
-    removeTitle?: string
-    removeAriaLabel?: string
+    removeTitle?: string | undefined
+    removeAriaLabel?: string | undefined
   }>(),
   {
     alt: '',

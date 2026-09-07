@@ -19,7 +19,7 @@ type CanvasGraphSessionRuntimeOptions = {
   boardSession: CanvasBoardSession
   graphAdapter: CanvasVueFlowGraphAdapter
   executionCore: PendingImageExecutionCore
-  hydratePendingImageLeases?: (snapshot: CanvasBoardSnapshot) => void
+  hydratePendingImageLeases?: ((snapshot: CanvasBoardSnapshot) => void) | undefined
   history: CanvasGraphHistory
   markDirty: () => void
   isNodeExecutionActive: (nodeId: string) => boolean
@@ -30,7 +30,7 @@ type CanvasGraphSessionRuntimeOptions = {
   projectCurrentGroupNodeLayers: (nodes: Node[]) => Node[]
   projectCommittedGroupNodeLayer: (node: Node) => Node
   onGroupsChanged: (groups: CanvasBoardSnapshot['groups']) => void
-  scheduleMicrotask?: (callback: () => void) => void
+  scheduleMicrotask?: ((callback: () => void) => void) | undefined
 }
 
 export type CanvasGraphSessionRuntime = {

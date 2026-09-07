@@ -17,7 +17,7 @@ import {
 } from './adminUserView'
 
 type AdminUsersContextDependencies = {
-  sessionCommands?: AdminUserSessionCommands
+  sessionCommands?: AdminUserSessionCommands | undefined
 }
 
 export function useAdminUsersContext(

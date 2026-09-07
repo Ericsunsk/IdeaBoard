@@ -32,7 +32,7 @@ type NormalizedFlowEdgeForResolution = Pick<FlowSnapshotConnectionEdge, 'id' | '
 
 export type FlowSnapshotConnectionMaterializerOptions = {
   edges: readonly FlowSnapshotConnectionEdge[]
-  baseConnections?: readonly CanvasConnection[]
+  baseConnections?: readonly CanvasConnection[] | undefined
   persistedFlowNodeRefs: ReadonlyMap<string, FlowSnapshotConnectionNodeRef>
   lookupData: (nodeId: string) => FlowNodeData | undefined
 }

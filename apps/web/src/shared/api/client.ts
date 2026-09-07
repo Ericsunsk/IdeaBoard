@@ -4,14 +4,18 @@ import { API_BASE_URL, normalizeRuntimeMediaRefs } from '../config/runtimeUrls'
 import { i18n } from '../i18n'
 
 export type ApiClientError = Error & {
-  code?: number | string
-  hasSafeDisplayMessage?: boolean
-  msg?: string
-  status?: number
+  code?: number | string | undefined
+  hasSafeDisplayMessage?: boolean | undefined
+  msg?: string | undefined
+  status?: number | undefined
   data?: unknown
 }
 
-export type ApiRequestConfig = Omit<FetchOptions<'json'>, 'baseURL' | 'params'>
+export type ApiRequestConfig = Omit<FetchOptions<'json'>, 'baseURL' | 'params' | 'signal'> & {
+  // Callers forward optional AbortSignals; undefined is equivalent to absent
+  // (ofetch/fetch ignore it) and is never read back as defined here.
+  signal?: AbortSignal | null | undefined
+}
 
 function toObject(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' ? (value as Record<string, unknown>) : null
@@ -65,8 +69,15 @@ const apiFetch = ofetch.create({
 })
 
 async function apiRequest<T>(url: string, config?: ApiRequestConfig): Promise<T> {
+  // Normalize here so every caller can forward optional signals: fetch
+  // treats undefined identically to absent.
+  const { signal, ...rest } = config ?? {}
+  const normalizedConfig = {
+    ...rest,
+    ...(signal == null ? {} : { signal }),
+  }
   try {
-    return await apiFetch<T>(url, config)
+    return await apiFetch<T>(url, normalizedConfig)
   } catch (error) {
     if (error && typeof error === 'object' && 'status' in error && 'msg' in error) {
       throw error

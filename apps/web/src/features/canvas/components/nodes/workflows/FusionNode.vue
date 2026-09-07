@@ -76,7 +76,7 @@ const props = defineProps<{
   copyMode: boolean
   promptComposerVisible?: boolean
   generationAvailable?: boolean
-  uiState?: NodeUiState
+  uiState?: NodeUiState | undefined
 }>()
 
 const emit = defineEmits<{

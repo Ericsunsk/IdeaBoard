@@ -11,11 +11,12 @@ type CanvasCustomLayerDismissEvent = KeyboardEvent | PointerEvent
 export type UseCanvasCustomLayerOverlayOptions = {
   visible: MaybeRefOrGetter<boolean>
   roots?: readonly CanvasCustomLayerRoot[]
-  ignore?: readonly string[]
+  ignore?: readonly string[] | undefined
   ignoreEscape?: readonly string[]
   dismissibleBy?: readonly Extract<OverlayDismissal, 'escape' | 'outside-pointer'>[]
   ownerDocument?: () => Document | null
-  shouldDismiss?: (dismissal: OverlayDismissal, event: CanvasCustomLayerDismissEvent) => boolean
+  shouldDismiss?:
+    ((dismissal: OverlayDismissal, event: CanvasCustomLayerDismissEvent) => boolean) | undefined
   onDismiss: (dismissal: OverlayDismissal, event: CanvasCustomLayerDismissEvent) => void
 }
 

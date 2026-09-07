@@ -2,6 +2,7 @@ import PrimeVue from 'primevue/config'
 import { describe, expect, it, vi } from 'vitest'
 import { adminPrimeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen } from '../../../test/render'
+import { stripUndefined } from '../../../shared/api/stripUndefined'
 import AdminTaskResultDialog from './AdminTaskResultDialog.vue'
 import { adminTaskStatuses } from './taskMonitorStatus'
 import type {
@@ -53,7 +54,7 @@ describe('AdminTaskResultDialog', () => {
     label: string
     task: Partial<AdminTaskMonitorDetailModel>
     statusText: string
-    detailText?: string
+    detailText?: string | undefined
   }>)('renders the $label task state through the shared status definition', async (testCase) => {
     renderDialog(makeTask(testCase.task))
 
@@ -264,9 +265,11 @@ function makeAttempt(
 }
 
 function makeTask(
-  overrides: Partial<AdminTaskMonitorDetailModel> = {},
+  overrides: {
+    [K in keyof AdminTaskMonitorDetailModel]?: AdminTaskMonitorDetailModel[K] | undefined
+  } = {},
 ): AdminTaskMonitorDetailModel {
-  return {
+  return stripUndefined({
     task_id: 'task_1',
     correlation_id: 'task_1',
     user_public_id: '00000000-0000-0000-0000-000000000001',
@@ -287,5 +290,7 @@ function makeTask(
     cancel_reason: '',
     execution_attempts: [],
     ...overrides,
-  }
+    // Fixtures simulate wire payloads where cleared fields are absent;
+    // rendering treats absent and undefined identically.
+  }) as AdminTaskMonitorDetailModel
 }

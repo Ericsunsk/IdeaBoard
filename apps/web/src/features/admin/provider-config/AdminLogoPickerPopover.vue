@@ -76,10 +76,10 @@ import { useAdminToast } from '../shared/lib/adminToast'
 const props = withDefaults(
   defineProps<{
     scope: AdminBrandLogoScope
-    targetId?: number | string
-    targetName?: string
-    targetBaseUrl?: string
-    targetApiType?: string
+    targetId?: number | string | undefined
+    targetName?: string | undefined
+    targetBaseUrl?: string | undefined
+    targetApiType?: string | undefined
     initialCategory?: AdminBrandCategoryKey
   }>(),
   {

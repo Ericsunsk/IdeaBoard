@@ -7,13 +7,13 @@ type PlotMarker = {
   id: string
   position: number
   ariaLabel: string
-  ariaValueMin?: number
-  ariaValueMax?: number
-  ariaValueNow?: number
-  keyboardStep?: number
-  keyboardShiftStep?: number
-  guideLine?: boolean
-  guideLineClassName?: string
+  ariaValueMin?: number | undefined
+  ariaValueMax?: number | undefined
+  ariaValueNow?: number | undefined
+  keyboardStep?: number | undefined
+  keyboardShiftStep?: number | undefined
+  guideLine?: boolean | undefined
+  guideLineClassName?: string | undefined
 }
 
 function renderHistogramPlot(

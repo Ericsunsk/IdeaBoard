@@ -62,8 +62,8 @@ const props = withDefaults(
     modelValue: PromptAspectRatio
     visible: boolean
     disabled?: boolean
-    ariaLabel?: string
-    tooltip?: string
+    ariaLabel?: string | undefined
+    tooltip?: string | undefined
   }>(),
   {
     disabled: false,

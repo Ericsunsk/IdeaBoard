@@ -26,10 +26,10 @@ export type MediaInputImage = {
   id: string
   sourceType: 'node' | 'external'
   sourceId: string
-  sourceNodeId?: string
+  sourceNodeId?: string | undefined
   url: string
   ratio: number
-  mediaRef?: MediaRef
+  mediaRef?: MediaRef | undefined
 }
 
 type UseFlowMediaInputImagesOptions = {

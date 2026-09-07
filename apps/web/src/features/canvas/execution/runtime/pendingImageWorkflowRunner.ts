@@ -61,11 +61,11 @@ export type PendingImageWorkflowRunnerOptions = {
   taskTransport: PendingImageWorkflowTaskTransport
   executionCore: PendingImageExecutionCore
   cancelTasks: (taskIds: readonly string[]) => void
-  afterTaskIdAttached?: () => Promise<void>
-  createClientActionId?: ClientActionIdFactory
+  afterTaskIdAttached?: (() => Promise<void>) | undefined
+  createClientActionId?: ClientActionIdFactory | undefined
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
-  onError?: (error: unknown) => boolean
+  onError?: ((error: unknown) => boolean) | undefined
 }
 
 function imageGenerationSuccessMessage(): string {

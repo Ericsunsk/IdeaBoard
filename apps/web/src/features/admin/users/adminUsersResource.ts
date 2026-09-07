@@ -19,9 +19,9 @@ const selectAdminUsers = createApiDataSelector<ApiResponseUserListData>('加载�
 export type AdminUsersQueryParams = {
   page: number
   page_size: number
-  keyword?: string
-  role?: AdminUsersRoleFilterValue
-  status?: AdminUsersStatusFilterValue
+  keyword?: string | undefined
+  role?: AdminUsersRoleFilterValue | undefined
+  status?: AdminUsersStatusFilterValue | undefined
 }
 
 export function useAdminUsersResource(params: MaybeRef<AdminUsersQueryParams>) {

@@ -60,10 +60,10 @@ export interface PromptNodeItem {
   x: number
   y: number
   width: number
-  title?: string
+  title?: string | undefined
   text: string
   outputCount: number
-  outputResolution?: OutputResolution
+  outputResolution?: OutputResolution | undefined
   aspectRatio: PromptAspectRatio
   inputImages: PromptNodeInputImage[]
 }
@@ -72,7 +72,7 @@ export interface PromptNodeInputImage extends ImageNodeOutputItem {
   id: string
   sourceType: 'node' | 'external'
   sourceId: string
-  sourceNodeId?: string
+  sourceNodeId?: string | undefined
 }
 export type FusionNodeInputImage = PromptNodeInputImage
 
@@ -80,8 +80,8 @@ export interface ImageNodeOutputItem {
   /** Runtime display URL. Durable board state is `mediaRef`. */
   url: string
   ratio: number
-  mediaRef?: MediaRef
-  mediaAssetId?: number
+  mediaRef?: MediaRef | undefined
+  mediaAssetId?: number | undefined
 }
 
 export type ImageAdjustmentRecipeStep =
@@ -99,7 +99,7 @@ export type ImageAdjustmentRecipeStep =
 export interface ImageAdjustmentRecipe {
   version: 1
   sourceMediaAssetId: number
-  sourceMimeType?: string
+  sourceMimeType?: string | undefined
   plan: ImageAdjustmentRecipeStep[]
 }
 
@@ -107,7 +107,7 @@ export interface BoardStateMediaRef {
   mediaAssetId: number
   refType: 'board' | 'board_node'
   refId: string
-  role?: string
+  role?: string | undefined
 }
 
 /**
@@ -125,19 +125,19 @@ export interface ImageNodeItem {
   x: number
   y: number
   width: number
-  title?: string
+  title?: string | undefined
   /** Runtime display URL. Durable board state is `sourceMediaRef`. */
   sourceImageUrl: string
-  sourceMediaRef?: MediaRef
-  sourceMediaAssetId?: number
-  adjustmentRecipe?: ImageAdjustmentRecipe
+  sourceMediaRef?: MediaRef | undefined
+  sourceMediaAssetId?: number | undefined
+  adjustmentRecipe?: ImageAdjustmentRecipe | undefined
   sourceImageRatio: number
-  outputCount?: number
-  outputResolution?: OutputResolution
-  pendingTaskId?: string
-  pendingResultIndex?: number
-  pendingClientActionId?: string
-  libraryImport?: LibraryImportFact
+  outputCount?: number | undefined
+  outputResolution?: OutputResolution | undefined
+  pendingTaskId?: string | undefined
+  pendingResultIndex?: number | undefined
+  pendingClientActionId?: string | undefined
+  libraryImport?: LibraryImportFact | undefined
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
 }
@@ -148,10 +148,10 @@ export interface FusionNodeItem {
   x: number
   y: number
   width: number
-  title?: string
+  title?: string | undefined
   prompt: string
   outputCount: number
-  outputResolution?: OutputResolution
+  outputResolution?: OutputResolution | undefined
   aspectRatio: PromptAspectRatio
   blendPoint: FusionBlendPoint
   inputImages: FusionNodeInputImage[]
@@ -206,13 +206,13 @@ export interface CanvasBoardSnapshot {
   fusionNodes: FusionNodeItem[]
   connections: CanvasConnection[]
   groups: CanvasGroup[]
-  mediaRefs?: BoardStateMediaRef[]
+  mediaRefs?: BoardStateMediaRef[] | undefined
 }
 
 export interface CanvasBoardState extends CanvasBoardSnapshot {
-  previewSnapshotDataUrl?: string
-  previewSnapshotUpdatedAt?: number
-  previewSnapshotVersion?: number
+  previewSnapshotDataUrl?: string | undefined
+  previewSnapshotUpdatedAt?: number | undefined
+  previewSnapshotVersion?: number | undefined
   updatedAt: number
 }
 

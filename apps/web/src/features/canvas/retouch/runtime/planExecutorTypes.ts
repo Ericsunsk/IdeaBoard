@@ -7,7 +7,7 @@ export type ImageAdjustmentPlanExecutorInput = {
   imageData: ImageData
   plan: ImageAdjustmentPlan
   signal: AbortSignal
-  onProgress?: ImageProcessingBackendTaskProgressReporter
+  onProgress?: ImageProcessingBackendTaskProgressReporter | undefined
 }
 
 export type ImageAdjustmentPlanExecutor = {
@@ -60,7 +60,7 @@ export type ImageAdjustmentPlanExecutionEventReporter = (
 ) => void
 
 export type CreateImageAdjustmentPlanExecutorOptions = {
-  onPlanExecutorEvent?: ImageAdjustmentPlanExecutionEventReporter
+  onPlanExecutorEvent?: ImageAdjustmentPlanExecutionEventReporter | undefined
 }
 
 export function reportPlanExecutionEvent(

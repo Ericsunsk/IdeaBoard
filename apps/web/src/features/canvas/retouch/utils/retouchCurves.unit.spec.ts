@@ -22,7 +22,9 @@ function lutValues(lut: Uint8ClampedArray, values: readonly number[]) {
 }
 
 function createRgbCurveLut(points: RetouchCurvesParams['channels']['rgb']) {
-  return createCurvesLuts(normalizeCurvesParams({ channels: { rgb: points } })).red
+  return createCurvesLuts(
+    normalizeCurvesParams({ channels: points === undefined ? {} : { rgb: points } }),
+  ).red
 }
 
 describe('retouchCurves', () => {
@@ -68,9 +70,7 @@ describe('retouchCurves', () => {
     )
     expect(
       normalizeCurvesParams({
-        channels: {
-          rgb: true as unknown as RetouchCurvesParams['channels']['rgb'],
-        },
+        channels: { rgb: true } as unknown as RetouchCurvesParams['channels'],
       }),
     ).toEqual({ channels: {} })
   })

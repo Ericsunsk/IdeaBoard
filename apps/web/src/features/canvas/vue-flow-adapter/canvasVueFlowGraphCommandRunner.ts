@@ -23,7 +23,7 @@ export type CanvasVueFlowGraphCommandContext = {
   command: CanvasVueFlowGraphCommandName
   before: CanvasVueFlowGraph
   next: CanvasVueFlowGraph
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown> | undefined
 }
 
 export type CanvasVueFlowGraphCommandResult = {
@@ -31,16 +31,16 @@ export type CanvasVueFlowGraphCommandResult = {
   before: CanvasVueFlowGraph
   after: CanvasVueFlowGraph
   didChange: boolean
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown> | undefined
 }
 
 type BeforeCommandHook = (context: CanvasVueFlowGraphCommandContext) => unknown
 type AfterCommandHook = (result: CanvasVueFlowGraphCommandResult, beforeHookValue: unknown) => void
 
 export type CanvasVueFlowGraphCommandOptions = {
-  metadata?: Record<string, unknown>
-  beforeCommand?: BeforeCommandHook
-  afterCommand?: AfterCommandHook
+  metadata?: Record<string, unknown> | undefined
+  beforeCommand?: BeforeCommandHook | undefined
+  afterCommand?: AfterCommandHook | undefined
 }
 
 type GraphCommandRunnerOptions = Pick<
@@ -54,7 +54,8 @@ type RunCommandParams = {
   command: CanvasVueFlowGraphCommandName
   nextGraph: CanvasVueFlowGraph
   commit: () => void
-  commandOptions?: CanvasVueFlowGraphCommandOptions
+  // Normalized with ?? {} in run(); explicit undefined is equivalent to absent.
+  commandOptions?: CanvasVueFlowGraphCommandOptions | undefined
 }
 
 export type CanvasVueFlowGraphCommandRunner = {

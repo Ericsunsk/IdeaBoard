@@ -1,4 +1,5 @@
 import { ProviderAPIType } from '../../../shared/api/generated-query/model'
+import { stripUndefined } from '../../../shared/api/stripUndefined'
 import type {
   AdminAccountCreateRequest,
   AdminAccountModelInput,
@@ -182,7 +183,7 @@ export function createAccountCreatePayload(input: {
 export function createAccountUpdatePayload(input: {
   form: ProviderAccountForm
   providerEndpoint: ProviderEndpointRecord | null
-  existingAccount?: ProviderAccountRecord
+  existingAccount?: ProviderAccountRecord | undefined
   modelValues: string[]
   secret?: string
   modelCapabilities?: ProviderAccountForm['modelCapabilities']
@@ -218,14 +219,14 @@ export function accountModelInputsFromValues(
   return uniqueTrimmedModelValues(values).map((name) => {
     const existing = existingByKey.get(normalizeModelKey(name))
     const configured = capabilities[normalizeModelKey(name)]
-    return {
+    return stripUndefined({
       name,
       enabled: existing?.enabled ?? true,
       weight: existing?.weight ?? DEFAULT_ADMIN_ACCOUNT_MODEL_WEIGHT,
       max_concurrent: existing?.maxConcurrent,
       supports_2k: configured?.supports2K ?? existing?.supports2K ?? false,
       supports_4k: configured?.supports4K ?? existing?.supports4K ?? false,
-    }
+    })
   })
 }
 

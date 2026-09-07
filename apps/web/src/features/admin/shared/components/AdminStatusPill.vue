@@ -24,7 +24,7 @@ const props = withDefaults(
   defineProps<{
     variant?: AdminStatusPillVariant
     label: string
-    pulse?: boolean
+    pulse?: boolean | undefined
     size?: 'small' | 'medium'
   }>(),
   {

@@ -4,15 +4,15 @@ export type StripeConfigurationSummary = {
   configured: boolean
   apiKeyConfigured: boolean
   webhookSecretConfigured: boolean
-  accountId?: string
-  mode?: StripeConfigurationMode
+  accountId?: string | undefined
+  mode?: StripeConfigurationMode | undefined
   chargesEnabled: boolean
   paymentMethodConfigurationId: string
   productTaxCode: string
   productReady: boolean
   webhookReady: boolean
   purchasesEnabled: boolean
-  updatedAt?: string
+  updatedAt?: string | undefined
 }
 
 export type SaveStripeConfigurationInput = {

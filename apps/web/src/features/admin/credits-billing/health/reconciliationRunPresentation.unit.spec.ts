@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { stripUndefined } from '../../../../shared/api/stripUndefined'
 import type { AdminCreditRun } from './adminCreditRunHistoryResource'
 import {
   formatReconciliationRunDuration,
@@ -30,8 +31,10 @@ describe('Reconciliation Run presentation', () => {
   })
 })
 
-function makeRun(overrides: Partial<AdminCreditRun> = {}): AdminCreditRun {
-  return {
+function makeRun(
+  overrides: { [K in keyof AdminCreditRun]?: AdminCreditRun[K] | undefined } = {},
+): AdminCreditRun {
+  return stripUndefined({
     id: 11,
     status: 'completed',
     trigger: 'scheduled',
@@ -43,5 +46,7 @@ function makeRun(overrides: Partial<AdminCreditRun> = {}): AdminCreditRun {
     started_at: '2026-07-17T02:00:01Z',
     completed_at: '2026-07-17T02:00:04Z',
     ...overrides,
-  }
+    // Fixtures simulate wire payloads where cleared fields are absent;
+    // formatters treat absent and undefined identically.
+  }) as AdminCreditRun
 }

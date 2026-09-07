@@ -5,6 +5,7 @@ import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { chromium, type BrowserContext, type Page, type Route } from 'playwright'
+import { stripUndefined } from '../src/shared/api/stripUndefined'
 import {
   CANVAS_BOARD_STATE_SCHEMA_VERSION,
   type CanvasBoardState,
@@ -660,19 +661,19 @@ function createStructureHeavyFixture(nodeCount: number): BenchmarkFixture {
 }
 
 function toBoardStateEnvelope(state: CanvasBoardState): BoardStateEnvelope {
-  return {
+  return stripUndefined({
     schemaVersion: state.schemaVersion,
     imageNodes: state.imageNodes.map((node) => ({ ...node })),
     promptNodes: state.promptNodes.map((node) => ({ ...node })),
     fusionNodes: state.fusionNodes.map((node) => ({ ...node })),
     connections: state.connections.map((connection) => ({ ...connection })),
     groups: state.groups.map((group) => ({ ...group, nodeIds: [...group.nodeIds] })),
-    mediaRefs: state.mediaRefs?.map((ref) => ({ ...ref })),
+    mediaRefs: state.mediaRefs?.map((ref) => stripUndefined({ ...ref })),
     previewSnapshotDataUrl: state.previewSnapshotDataUrl,
     previewSnapshotUpdatedAt: state.previewSnapshotUpdatedAt,
     previewSnapshotVersion: state.previewSnapshotVersion,
     updatedAt: state.updatedAt,
-  }
+  })
 }
 
 function createStructureHeavyConnections(

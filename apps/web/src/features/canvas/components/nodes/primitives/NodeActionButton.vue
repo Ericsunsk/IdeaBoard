@@ -32,8 +32,8 @@ const props = withDefaults(
     disabled?: boolean
     full?: boolean
     pushRight?: boolean
-    ariaLabel?: string
-    tooltip?: string
+    ariaLabel?: string | undefined
+    tooltip?: string | undefined
   }>(),
   {
     variant: 'tool',

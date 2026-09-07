@@ -17,6 +17,7 @@ import type {
   ListLibraryAssetsParams,
 } from '../../shared/api/generated-query/model'
 import { resolveApiData, resolveApiOk } from '../../shared/api/apiResponse'
+import { stripUndefined } from '../../shared/api/stripUndefined'
 import { i18n } from '../../shared/i18n'
 
 export type LibraryFolderView = LibraryFolder
@@ -121,7 +122,13 @@ export function renameFolder(folderId: number, name: string): Promise<LibraryFol
 
 function saveAsset(asset: LibraryAssetInput, folderId?: number, newFolderName?: string) {
   return resolveApiData(
-    saveLibraryAsset({ asset, folder_id: folderId, new_folder_name: newFolderName }),
+    saveLibraryAsset(
+      stripUndefined({
+        asset,
+        folder_id: folderId,
+        new_folder_name: newFolderName,
+      }),
+    ),
     i18n.global.t('library.errors.saveAssetFailed'),
   )
 }

@@ -359,7 +359,7 @@ import {
 } from './authModalUi'
 
 const props = defineProps<{
-  oauthRedirectPath?: string
+  oauthRedirectPath?: string | undefined
 }>()
 
 const emit = defineEmits<{

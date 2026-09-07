@@ -30,9 +30,9 @@ interface BoardPreviewFrame {
   height: number
   bodyOffsetY: number
   bodyHeight: number
-  imageUrl?: string
+  imageUrl?: string | undefined
   inputImageUrls?: string[]
-  blendPoint?: { x: number; y: number }
+  blendPoint?: { x: number; y: number } | undefined
   nodeType?: CanvasConnectionNodeType
   nodeId?: number
 }
@@ -403,7 +403,7 @@ function drawBlankBoardPreviewBackground(ctx: CanvasRenderingContext2D) {
 
 async function loadPreviewImage(
   url: string,
-): Promise<{ image: HTMLImageElement; revokeUrl?: string } | null> {
+): Promise<{ image: HTMLImageElement; revokeUrl?: string | undefined } | null> {
   const resolvedUrl = toAbsolutePreviewUrl(url)
   if (!resolvedUrl || typeof Image === 'undefined') return null
   let imageSrc = resolvedUrl
@@ -424,16 +424,18 @@ async function loadPreviewImage(
     imageSrc = revokeUrl
   }
 
-  return new Promise((resolve) => {
-    const image = new Image()
-    image.decoding = 'async'
-    image.onload = () => resolve({ image, revokeUrl })
-    image.onerror = () => {
-      if (revokeUrl) URL.revokeObjectURL(revokeUrl)
-      resolve(null)
-    }
-    image.src = imageSrc
-  })
+  return new Promise<{ image: HTMLImageElement; revokeUrl?: string | undefined } | null>(
+    (resolve) => {
+      const image = new Image()
+      image.decoding = 'async'
+      image.onload = () => resolve({ image, revokeUrl })
+      image.onerror = () => {
+        if (revokeUrl) URL.revokeObjectURL(revokeUrl)
+        resolve(null)
+      }
+      image.src = imageSrc
+    },
+  )
 }
 
 async function fetchPreviewObjectUrl(url: string, requireImage = false): Promise<string | null> {

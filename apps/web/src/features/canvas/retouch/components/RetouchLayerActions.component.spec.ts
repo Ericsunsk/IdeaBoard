@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import RetouchLayerActions from './RetouchLayerActions.vue'
 import { renderWithUser, screen } from '../../../../test/render'
 
+const noopHandler = () => undefined
+
 function renderLayerActions(
   options: {
     canCopyLayer?: boolean
@@ -23,11 +25,11 @@ function renderLayerActions(
       canRemoveLayer: options.canRemoveLayer ?? true,
       applying: options.applying ?? false,
       applyDisabled: options.applyDisabled ?? options.applying ?? false,
-      'onAdd-layer': options.onAddLayer,
-      'onCopy-layer': options.onCopyLayer,
-      'onMerge-layer': options.onMergeLayer,
-      'onRemove-layer': options.onRemoveLayer,
-      'onApply-adjustments': options.onApplyAdjustments,
+      'onAdd-layer': options.onAddLayer ?? noopHandler,
+      'onCopy-layer': options.onCopyLayer ?? noopHandler,
+      'onMerge-layer': options.onMergeLayer ?? noopHandler,
+      'onRemove-layer': options.onRemoveLayer ?? noopHandler,
+      'onApply-adjustments': options.onApplyAdjustments ?? noopHandler,
     },
   })
 }

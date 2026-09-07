@@ -5,8 +5,8 @@ import { canvasBoardSnapshotSchema, canvasBoardStateSchema } from './canvasBoard
 export type BoardStateValidationIssue = {
   path: string
   message: string
-  expected?: string
-  received?: string
+  expected?: string | undefined
+  received?: string | undefined
 }
 
 export type BoardStateValidationErrorContext = {
@@ -32,13 +32,6 @@ export type LatestBoardStateResultOptions = {
 export type LatestBoardStateNormalizationOptions =
   LatestBoardStateNullableOptions | LatestBoardStateResultOptions
 
-type IssueLike = {
-  message: string
-  path?: readonly { key?: unknown }[]
-  expected?: unknown
-  received?: unknown
-}
-
 const DEFAULT_VALIDATION_BOUNDARY = 'board-state'
 
 export class InvalidBoardStateError extends Error {
@@ -55,7 +48,7 @@ export class InvalidBoardStateError extends Error {
   }
 }
 
-function issuePath(issue: IssueLike): string {
+function issuePath(issue: v.BaseIssue<unknown>): string {
   return (issue.path ?? [])
     .map((item) => item.key)
     .filter((key) => key !== undefined && key !== null && key !== '')
@@ -67,7 +60,7 @@ function issueText(value: unknown): string | undefined {
   return typeof value === 'string' && value ? value : undefined
 }
 
-function toValidationIssue(issue: IssueLike): BoardStateValidationIssue {
+function toValidationIssue(issue: v.BaseIssue<unknown>): BoardStateValidationIssue {
   return {
     path: issuePath(issue),
     message: issue.message,
@@ -77,7 +70,7 @@ function toValidationIssue(issue: IssueLike): BoardStateValidationIssue {
 }
 
 function toValidationErrorContext(
-  issues: readonly IssueLike[],
+  issues: readonly v.BaseIssue<unknown>[],
   boundary: string,
 ): BoardStateValidationErrorContext {
   return {

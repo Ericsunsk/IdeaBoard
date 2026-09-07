@@ -6,14 +6,14 @@ import { renderWithUser, screen, within } from '../../../../test/render'
 import AdminDialogShell from './AdminDialogShell.vue'
 
 function renderShell(
-  props: Partial<{
-    visible: boolean
-    header: string
-    ariaLabel: string
-    size: 'compact' | 'form' | 'wide'
-    contentLayout: 'form' | 'scrollable'
-    busy: boolean
-  }> = {},
+  props: {
+    visible?: boolean
+    header?: string | undefined
+    ariaLabel?: string
+    size?: 'compact' | 'form' | 'wide'
+    contentLayout?: 'form' | 'scrollable'
+    busy?: boolean
+  } = {},
   slots: { header?: string } = {},
 ) {
   const onVisibleUpdate = vi.fn()

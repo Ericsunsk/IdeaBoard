@@ -93,7 +93,7 @@ const props = withDefaults(
   defineProps<{
     modelValue: string
     outputCount: number
-    outputResolution?: OutputResolution
+    outputResolution?: OutputResolution | undefined
     placeholder: string
     textareaClass: string
     actionsClass: string
@@ -105,7 +105,7 @@ const props = withDefaults(
     showSubmit?: boolean
     showOutputCount?: boolean
     showOutputResolution?: boolean
-    aspectRatio?: PromptAspectRatio
+    aspectRatio?: PromptAspectRatio | undefined
     showAspectRatio?: boolean
     autofocus?: boolean
     billingState?: CanvasBillingQuoteState | null

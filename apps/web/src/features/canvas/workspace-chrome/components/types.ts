@@ -23,7 +23,7 @@ export type CanvasChromeBoardState = {
 }
 
 export type CanvasChromeAccountState = {
-  avatarUrl?: string
+  avatarUrl?: string | undefined
   balance: UserIdeaBalanceControl
   menuItems: UserAccountMenuItem[]
 }

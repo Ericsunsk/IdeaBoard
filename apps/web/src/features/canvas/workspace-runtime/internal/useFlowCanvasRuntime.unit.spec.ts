@@ -265,7 +265,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   const isDirty = ref(false)
   const saveStatus = ref<SaveStatus>('idle')
   const executionCore = createPendingImageExecutionCore()
-  const terminalStates = new Map<string, { status: string; taskId?: string }>()
+  const terminalStates = new Map<string, { status: string; taskId?: string | undefined }>()
   const executionRuntime = {
     get attachment() {
       return { value: executionCore.currentAttachment() }

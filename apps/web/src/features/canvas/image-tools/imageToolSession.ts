@@ -33,10 +33,8 @@ export type UseCanvasImageToolsOptions = {
   currentBoardId: ValueRef<string | null | undefined>
   getImageNodeDisplayPayload: (nodeId: string) => ImageNodeDisplayPayload | null
   getImageNodeSnapshot: (nodeId: string) => ImageNodeItem | null
-  updateSnapshotNode?: (
-    nodeId: string,
-    patcher: (previous: CanvasNodeItem) => CanvasNodeItem,
-  ) => void
+  updateSnapshotNode?:
+    ((nodeId: string, patcher: (previous: CanvasNodeItem) => CanvasNodeItem) => void) | undefined
   getImageStageElement: (nodeId: string) => HTMLElement | null
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
   getViewport: () => FlowViewport

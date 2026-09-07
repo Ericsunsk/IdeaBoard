@@ -45,17 +45,17 @@ export function createChartEmptyStatePlugin(input: ChartEmptyStatePluginInput): 
 }
 
 export type ChartNumericScaleInput = {
-  values?: readonly number[]
-  max?: number
-  min?: number
-  axisMin?: number
-  headroom?: number
-  stacked?: boolean
-  precision?: number
-  stepSize?: number
+  values?: readonly number[] | undefined
+  max?: number | undefined
+  min?: number | undefined
+  axisMin?: number | undefined
+  headroom?: number | undefined
+  stacked?: boolean | undefined
+  precision?: number | undefined
+  stepSize?: number | undefined
   tickColor: string
   gridColor: string
-  borderColor?: string
+  borderColor?: string | undefined
   formatTick: (value: number) => string
 }
 

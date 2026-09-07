@@ -10,9 +10,9 @@ export type PendingImageResultLookup = {
   imageChildIdsBySource: Map<string, string[]>
 }
 export type PendingImageResultPlacementOptions = {
-  anchor?: ImageResultAnchor
-  targetRatio?: number
-  targetWidth?: number
+  anchor?: ImageResultAnchor | undefined
+  targetRatio?: number | undefined
+  targetWidth?: number | undefined
 }
 
 const IMAGE_RESULT_NODE_X_GAP = 100

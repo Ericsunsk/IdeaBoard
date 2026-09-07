@@ -21,7 +21,7 @@ type QueryCache = {
   cancelQueries: ReturnType<typeof vi.fn>
   getQueryData: ReturnType<typeof vi.fn>
   setQueryData: ReturnType<typeof vi.fn>
-  value?: ApiResponseAdminBrandLogoOverrideList
+  value?: ApiResponseAdminBrandLogoOverrideList | undefined
 }
 
 function createQueryCache(initial?: ApiResponseAdminBrandLogoOverrideList): QueryCache {

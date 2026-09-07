@@ -39,16 +39,16 @@ export type UseFlowCanvasRuntimeOptions = {
   saveStatus: Ref<SaveStatus>
   isLoadingBoardSnapshot: Ref<boolean>
   isSavingBoard: Ref<boolean>
-  autosaveResumeSignal?: Ref<unknown>
+  autosaveResumeSignal?: Ref<unknown> | undefined
   boardSession: CanvasBoardSession
   executionCore: PendingImageExecutionCore
-  hydratePendingImageLeases?: (snapshot: CanvasBoardSnapshot) => void
+  hydratePendingImageLeases?: ((snapshot: CanvasBoardSnapshot) => void) | undefined
   cancelTasks: (taskIds: readonly string[]) => void
   onWarning: (message: string) => void
   onSuccess: (message: string) => void
   onError: (message: string) => void
-  scheduleMicrotask?: (callback: () => void) => void
-  vueFlowGraphActions?: CanvasVueFlowGraphActions
+  scheduleMicrotask?: ((callback: () => void) => void) | undefined
+  vueFlowGraphActions?: CanvasVueFlowGraphActions | undefined
 }
 
 export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
@@ -184,8 +184,8 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   }
   const saveCurrentBoardSnapshot = async (
     saveOptions: {
-      waitForPreview?: boolean
-      silent?: boolean
+      waitForPreview?: boolean | undefined
+      silent?: boolean | undefined
     } = {},
   ) => {
     const result = await boardSync.saveCurrentBoardSnapshot(saveOptions)
@@ -203,7 +203,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     isSaving: options.isSavingBoard,
     resumeSignal: options.autosaveResumeSignal,
     canRun: () => !nodeDragLifecycle.isActive(),
-    save: (autosaveOptions) =>
+    save: (autosaveOptions?: { silent?: boolean | undefined }) =>
       saveCurrentBoardSnapshot({ waitForPreview: false, silent: autosaveOptions?.silent }),
   })
 

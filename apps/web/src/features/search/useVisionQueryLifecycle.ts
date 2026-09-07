@@ -39,10 +39,10 @@ type VisionQueryLifecycleOptions = {
   loadResults: () => Promise<void>
   isAuthenticated: () => boolean
   requireLogin: (action: SearchAuthAction) => void
-  cacheScope?: string
-  initialReferences?: VisionReference[]
-  router?: Router
-  toast?: ReturnType<typeof useAppToast>
+  cacheScope?: string | undefined
+  initialReferences?: VisionReference[] | undefined
+  router?: Router | undefined
+  toast?: ReturnType<typeof useAppToast> | undefined
 }
 
 /**

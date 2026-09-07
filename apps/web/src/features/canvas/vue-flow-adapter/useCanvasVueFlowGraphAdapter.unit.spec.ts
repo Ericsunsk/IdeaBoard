@@ -271,7 +271,7 @@ describe('useCanvasVueFlowGraphAdapter', () => {
         if (node) (node as SelectableNode).selected = change.selected
       }
       return nodes.value
-    }) as unknown as CanvasVueFlowGraphActions['applyNodeChanges']
+    }) as unknown as NonNullable<CanvasVueFlowGraphActions['applyNodeChanges']>
     const beforeCommand = vi.fn()
     const adapter = useCanvasVueFlowGraphAdapter({
       nodes,
@@ -298,7 +298,7 @@ describe('useCanvasVueFlowGraphAdapter', () => {
       expect(changes).toEqual([{ id: 'node-1', type: 'select', selected: true }])
       ;(nodeToSelect as SelectableNode).selected = true
       return nativeNodes
-    }) as unknown as CanvasVueFlowGraphActions['applyNodeChanges']
+    }) as unknown as NonNullable<CanvasVueFlowGraphActions['applyNodeChanges']>
     const afterCommand = vi.fn()
     const adapter = useCanvasVueFlowGraphAdapter({
       nodes,
@@ -389,7 +389,7 @@ describe('useCanvasVueFlowGraphAdapter', () => {
         measuredNode.dimensions = change.dimensions
       }
       return nodes.value
-    }) as unknown as CanvasVueFlowGraphActions['applyNodeChanges']
+    }) as unknown as NonNullable<CanvasVueFlowGraphActions['applyNodeChanges']>
     const afterCommand = vi.fn()
     const adapter = useCanvasVueFlowGraphAdapter({
       nodes,
@@ -472,7 +472,7 @@ describe('useCanvasVueFlowGraphAdapter', () => {
         measuredNode.resizing = change.resizing ?? measuredNode.resizing
       }
       return nodes.value
-    }) as unknown as CanvasVueFlowGraphActions['applyNodeChanges']
+    }) as unknown as NonNullable<CanvasVueFlowGraphActions['applyNodeChanges']>
     const afterCommand = vi.fn()
     const adapter = useCanvasVueFlowGraphAdapter({
       nodes,
@@ -525,7 +525,7 @@ describe('useCanvasVueFlowGraphAdapter', () => {
         positionedNode.position = change.position
       }
       return nodes.value
-    }) as unknown as CanvasVueFlowGraphActions['applyNodeChanges']
+    }) as unknown as NonNullable<CanvasVueFlowGraphActions['applyNodeChanges']>
     const beforeCommand = vi.fn()
     const adapter = useCanvasVueFlowGraphAdapter({
       nodes,
@@ -559,7 +559,7 @@ describe('useCanvasVueFlowGraphAdapter', () => {
         } as unknown as Edge
       }
       return edges.value
-    }) as unknown as CanvasVueFlowGraphActions['applyEdgeChanges']
+    }) as unknown as NonNullable<CanvasVueFlowGraphActions['applyEdgeChanges']>
     const afterCommand = vi.fn()
     const adapter = useCanvasVueFlowGraphAdapter({
       nodes,

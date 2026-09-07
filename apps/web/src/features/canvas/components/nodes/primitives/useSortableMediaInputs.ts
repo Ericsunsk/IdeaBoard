@@ -9,7 +9,7 @@ interface UseSortableMediaInputsOptions<T extends SortableMediaInput> {
   containerRef: Ref<HTMLElement | null>
   sourceItems: WatchSource<readonly T[]>
   draggableSelector: string
-  filterSelector?: string
+  filterSelector?: string | undefined
   onUpdate: (items: T[]) => void
 }
 

@@ -19,66 +19,66 @@ export type AdminPaymentOrderSummary = {
   ideaQuantity: number
   baseAmountMinor: number
   baseCurrency: string
-  paidAmountMinor?: number
-  paidCurrency?: string
+  paidAmountMinor?: number | undefined
+  paidCurrency?: string | undefined
   status: AdminPaymentOrderStatus
   stripeStatus: string
   creditStatus: string
   createdAt: string
-  paidAt?: string
-  creditedAt?: string
-  lastCheckedAt?: string
-  anomalousAt?: string
+  paidAt?: string | undefined
+  creditedAt?: string | undefined
+  lastCheckedAt?: string | undefined
+  anomalousAt?: string | undefined
 }
 
 export type AdminPaymentOrderPage = {
   orders: AdminPaymentOrderSummary[]
   total: number
-  nextCursor?: string
+  nextCursor?: string | undefined
 }
 
 export type AdminPaymentStripeSummary = {
-  accountId?: string
-  customerId?: string
-  checkoutSessionId?: string
-  paymentIntentId?: string
-  chargeId?: string
+  accountId?: string | undefined
+  customerId?: string | undefined
+  checkoutSessionId?: string | undefined
+  paymentIntentId?: string | undefined
+  chargeId?: string | undefined
 }
 
 export type AdminPaymentReconciliation = {
   anomalous: boolean
-  anomalousAt?: string
-  lastCheckedAt?: string
-  nextAttemptAt?: string
-  lastErrorCode?: string
-  lastErrorSummary?: string
+  anomalousAt?: string | undefined
+  lastCheckedAt?: string | undefined
+  nextAttemptAt?: string | undefined
+  lastErrorCode?: string | undefined
+  lastErrorSummary?: string | undefined
 }
 
 export type AdminPaymentRefundSummary = {
-  id?: string
+  id?: string | undefined
   status: string
-  ideaQuantity?: number
-  amountMinor?: number
-  currency?: string
-  stripeStatus?: string
-  updatedAt?: string
-  errorSummary?: string
+  ideaQuantity?: number | undefined
+  amountMinor?: number | undefined
+  currency?: string | undefined
+  stripeStatus?: string | undefined
+  updatedAt?: string | undefined
+  errorSummary?: string | undefined
 }
 
 export type AdminPaymentDisputeSummary = {
-  id?: string
+  id?: string | undefined
   status: string
-  providerStatus?: string
-  amountMinor?: number
-  currency?: string
-  ratioBasisPoints?: number
-  targetIdeaQuantity?: number
-  debitedIdeaQuantity?: number
-  unrecoveredCredits?: number
-  stripeDashboardUrl?: string
-  openedAt?: string
-  closedAt?: string
-  updatedAt?: string
+  providerStatus?: string | undefined
+  amountMinor?: number | undefined
+  currency?: string | undefined
+  ratioBasisPoints?: number | undefined
+  targetIdeaQuantity?: number | undefined
+  debitedIdeaQuantity?: number | undefined
+  unrecoveredCredits?: number | undefined
+  stripeDashboardUrl?: string | undefined
+  openedAt?: string | undefined
+  closedAt?: string | undefined
+  updatedAt?: string | undefined
 }
 
 export type AdminPaymentOrderDetail = {
@@ -87,35 +87,35 @@ export type AdminPaymentOrderDetail = {
   ideaQuantity: number
   baseAmountMinor: number
   baseCurrency: string
-  paidSubtotalMinor?: number
-  paidTaxMinor?: number
-  paidTotalMinor?: number
-  paidCurrency?: string
+  paidSubtotalMinor?: number | undefined
+  paidTaxMinor?: number | undefined
+  paidTotalMinor?: number | undefined
+  paidCurrency?: string | undefined
   status: AdminPaymentOrderStatus
   stripeStatus: string
   creditStatus: string
   stripe: AdminPaymentStripeSummary
   termsVersion: string
   refundPolicyVersion: string
-  receiptUrl?: string
+  receiptUrl?: string | undefined
   expiresAt: string
   createdAt: string
   updatedAt: string
-  paidAt?: string
-  creditedAt?: string
+  paidAt?: string | undefined
+  creditedAt?: string | undefined
   reconciliation: AdminPaymentReconciliation
   refunds: AdminPaymentRefundSummary[]
   disputes: AdminPaymentDisputeSummary[]
-  refundableIdeaQuantity?: number
+  refundableIdeaQuantity?: number | undefined
 }
 
 export type SearchAdminPaymentOrdersInput = {
-  orderNumber?: string
-  user?: string
-  status?: AdminPaymentOrderStatus
+  orderNumber?: string | undefined
+  user?: string | undefined
+  status?: AdminPaymentOrderStatus | undefined
   anomalyOnly?: boolean
-  cursor?: string
-  limit?: number
+  cursor?: string | undefined
+  limit?: number | undefined
   signal?: AbortSignal
 }
 

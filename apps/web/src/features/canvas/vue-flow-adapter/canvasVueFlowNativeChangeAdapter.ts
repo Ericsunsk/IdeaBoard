@@ -40,7 +40,7 @@ export type CanvasVueFlowGraphActions = Partial<
 type CanvasVueFlowNativeChangeAdapterOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  actions?: CanvasVueFlowGraphActions
+  actions?: CanvasVueFlowGraphActions | undefined
   syncNodes: (nextNodes: Node[]) => void
   syncEdges: (nextEdges: Edge[]) => void
   commandRunner: CanvasVueFlowGraphCommandRunner

@@ -4,6 +4,7 @@ import type {
   ListAdminTasksStatus as ListAdminTasksStatusValue,
 } from '../../../shared/api/generated-query/model'
 import { useAdminPagePagination } from '../shared/composables/useAdminPagePagination'
+import { stripUndefined } from '../../../shared/api/stripUndefined'
 import { useAdminQueryPolling } from '../shared/composables/useAdminQueryPolling'
 import { useAdminTaskListResource, type AdminTaskMonitorListItemModel } from './taskMonitorResource'
 import {
@@ -34,12 +35,12 @@ export function useAdminTaskList() {
   const resultPreviewEnabled = computed(() => ADMIN_TASK_MONITOR_RESULT_PREVIEW_ENABLED)
 
   function resolveParams(): ListAdminTasksParams {
-    const params: ListAdminTasksParams = {
+    const params: ListAdminTasksParams = stripUndefined({
       status: filterStatus.value || undefined,
       account_id: accountIdFilter.value || undefined,
       page: pageState.value,
       page_size: pageSize.value,
-    }
+    })
     if (appliedSearchKeyword.value) {
       if (/^[0-9a-f-]{36}$/i.test(appliedSearchKeyword.value))
         params.user_public_id = appliedSearchKeyword.value

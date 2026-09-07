@@ -77,7 +77,7 @@ const props = defineProps<{
   pending: boolean
   error: unknown
   source: PaymentReturnSource
-  status?: PaymentOrderReturnStatus
+  status?: PaymentOrderReturnStatus | undefined
 }>()
 const emit = defineEmits<{ retry: [] }>()
 const { t } = useI18n()

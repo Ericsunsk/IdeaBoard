@@ -3,7 +3,7 @@ import type { CanvasBoardSnapshot, ImageNodeItem } from '../../../canvas-board/d
 export type PendingImageTaskSnapshot = Readonly<{
   resultNodeId: `image-${number}`
   taskId: string
-  resultIndex?: number
+  resultIndex?: number | undefined
   fallbackRatio: number
   clientActionId: string
 }>

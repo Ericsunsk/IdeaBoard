@@ -32,15 +32,15 @@ type AdminUserCommandDependencies = {
     updateRole: AsyncMutation<UpdateAdminUserRoleInput>
     deleteUser: AsyncMutation<string>
   }>
-  sessionCommands?: AdminUserSessionCommands
+  sessionCommands?: AdminUserSessionCommands | undefined
 }
 
 type AdminUserMutations = Required<NonNullable<AdminUserCommandDependencies['mutations']>>
 
 type BanAdminUserInput = {
   publicId: string
-  reason?: string
-  expires_in_days?: number
+  reason?: string | undefined
+  expires_in_days?: number | undefined
 }
 
 type UpdateAdminUserRoleInput = {

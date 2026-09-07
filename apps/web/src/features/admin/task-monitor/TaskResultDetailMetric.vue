@@ -17,7 +17,7 @@ withDefaults(
   defineProps<{
     label: string
     value: string
-    title?: string
+    title?: string | undefined
   }>(),
   {
     title: undefined,

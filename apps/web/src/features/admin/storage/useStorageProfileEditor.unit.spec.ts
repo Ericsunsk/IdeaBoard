@@ -40,7 +40,7 @@ describe('useStorageProfileEditor', () => {
     const providerMap = computed(() => toProviderMetaMap(providers.value))
     const storages = ref<StorageCard[]>([])
     const saveProfile = vi.fn(
-      async (input: { payload: StorageProfilePayload; apply?: boolean }) => ({
+      async (input: { payload: StorageProfilePayload; apply?: boolean | undefined }) => ({
         message: 'saved',
         profile: {
           id: 'profile-1',
@@ -119,22 +119,24 @@ describe('useStorageProfileEditor', () => {
       },
       providerMap.value,
     )
-    const saveProfile = vi.fn(async (input: { payload: StorageProfilePayload; id?: string }) => ({
-      message: 'saved',
-      profile: {
-        id: input.id || savedProfile.id,
-        name: input.payload.name,
-        provider: input.payload.provider,
-        enabled: input.payload.enabled,
-        is_current: false,
-        builtin: false,
-        secret_configured: true,
-        config: {
-          ...input.payload.config,
-          secret_access_key: 'server-secret',
+    const saveProfile = vi.fn(
+      async (input: { payload: StorageProfilePayload; id?: string | undefined }) => ({
+        message: 'saved',
+        profile: {
+          id: input.id || savedProfile.id,
+          name: input.payload.name,
+          provider: input.payload.provider,
+          enabled: input.payload.enabled,
+          is_current: false,
+          builtin: false,
+          secret_configured: true,
+          config: {
+            ...input.payload.config,
+            secret_access_key: 'server-secret',
+          },
         },
-      },
-    }))
+      }),
+    )
 
     const editor = useStorageProfileEditor({
       creatableProviders: computed(() =>

@@ -53,7 +53,8 @@ export type CanvasBoardGraphSessionBinding = Readonly<{
 
 export type CanvasBoardGraphSessionOptions = Readonly<{
   graphSession: CanvasGraphSession
-  onMaterialized?: (store: CanvasGraphStore, result: PendingImageDomainMutationResult) => void
+  onMaterialized?:
+    ((store: CanvasGraphStore, result: PendingImageDomainMutationResult) => void) | undefined
 }>
 
 export const bindCanvasBoardGraphSession = Symbol('bindCanvasBoardGraphSession')

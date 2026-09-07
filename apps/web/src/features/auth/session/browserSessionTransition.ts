@@ -29,7 +29,7 @@ export type BrowserSessionTransition = {
   clearLocal: () => void
   fetchUserInfo: (
     force?: boolean,
-    options?: { failClosedOnError?: boolean },
+    options?: { failClosedOnError?: boolean | undefined },
   ) => Promise<User | null>
   ensureSession: (options?: { fresh?: boolean }) => Promise<User | null>
   logout: () => Promise<boolean>
@@ -86,7 +86,7 @@ export function createBrowserSessionTransition(
 
   async function fetchUserInfo(
     force = false,
-    options: { failClosedOnError?: boolean } = {},
+    options: { failClosedOnError?: boolean | undefined } = {},
   ): Promise<User | null> {
     if (state.isLoaded() && !force) return state.getUser()
     try {

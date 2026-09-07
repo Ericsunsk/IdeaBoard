@@ -10,8 +10,12 @@ import {
 import { flowConnectionToCanvasConnectionEndpoint } from '../utils/flowConnectionAdapter'
 import { createFlowConnectionClaimIndex } from '../utils/flowConnectionIdentityResolver'
 
-export type FlowEdgeIdentity = Pick<Edge, 'id' | 'data'> &
-  Partial<Pick<Edge, 'source' | 'target' | 'sourceHandle' | 'targetHandle'>>
+export type FlowEdgeIdentity = Pick<Edge, 'id' | 'data'> & {
+  source?: Edge['source'] | undefined
+  target?: Edge['target'] | undefined
+  sourceHandle?: Edge['sourceHandle'] | undefined
+  targetHandle?: Edge['targetHandle'] | undefined
+}
 
 type FlowEdgeRemoveChangeIdentity = Pick<Edge, 'id'> &
   Partial<Pick<Edge, 'data' | 'source' | 'target' | 'sourceHandle' | 'targetHandle'>>

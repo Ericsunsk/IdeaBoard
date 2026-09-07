@@ -13,7 +13,7 @@ export function mergeDetectedModelValues(
 export function createModelSuggestions(input: {
   detectedValues: string[]
   selectedValues: string[]
-  query?: string
+  query?: string | undefined
 }) {
   const allModels = uniqueTrimmedModelValues([...input.detectedValues, ...input.selectedValues])
   const query = (input.query || '').trim().toLowerCase()

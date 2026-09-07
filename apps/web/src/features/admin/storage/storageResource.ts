@@ -20,12 +20,12 @@ export type SaveStorageProfileInput =
   | {
       id?: undefined
       payload: StorageProfilePayload
-      apply?: boolean
+      apply?: boolean | undefined
     }
   | {
       id: string
       payload: StorageProfilePayload
-      apply?: boolean
+      apply?: boolean | undefined
     }
 
 export type StorageProfileCommandResult = {

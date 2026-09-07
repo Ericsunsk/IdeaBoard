@@ -79,7 +79,8 @@ export const authTransport = {
 
   async getCapabilities(): Promise<{
     social: Record<OAuthProviderCode, boolean>
-    providers?: Array<{ provider: OAuthProviderCode; label: string; available: boolean }>
+    providers?:
+      Array<{ provider: OAuthProviderCode; label: string; available: boolean }> | undefined
   }> {
     try {
       const response = await fetch(resolveAuthUrl('/api/auth/capabilities'), {

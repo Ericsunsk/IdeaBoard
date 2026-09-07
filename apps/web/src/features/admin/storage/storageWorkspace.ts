@@ -31,7 +31,7 @@ export type AdminStorageWorkspaceOptions = {
   feedback: AdminStorageFeedback
   confirm: AdminConfirmPort
   runAsyncAction: RunAsyncAction
-  resource?: AdminStorageResource
+  resource?: AdminStorageResource | undefined
 }
 
 export type StorageProfileCommandTarget = Pick<StorageCard, 'id' | 'name'>

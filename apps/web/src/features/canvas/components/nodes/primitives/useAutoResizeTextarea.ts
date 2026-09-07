@@ -2,7 +2,7 @@ import { nextTick, onMounted, watch, type Ref, type WatchSource } from 'vue'
 
 type AutoResizeTextareaOptions = {
   watchSource?: WatchSource<unknown> | WatchSource<unknown>[]
-  onResize?: (metrics: { naturalHeight: number; singleLineHeight: number }) => void
+  onResize?: ((metrics: { naturalHeight: number; singleLineHeight: number }) => void) | undefined
 }
 
 function resolveSingleLineHeight(input: HTMLTextAreaElement): number {

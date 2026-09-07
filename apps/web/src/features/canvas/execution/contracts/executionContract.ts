@@ -56,11 +56,13 @@ export const EXECUTION_FUSION_META = EXECUTION_META[EXECUTION_FEATURE.fusion]
 
 interface BuildExecutionTaskRequestOptions {
   prompt: string
-  feature?: ExecutionFeature
-  imageUrls?: string[]
-  imageAssetIds?: number[]
-  referenceImageAssetIds?: number[]
-  params?: SubmitTaskParams
+  // Optional task inputs: explicit undefined is equivalent to absent (every
+  // consumer guards with truthiness/length checks before setting DTO keys).
+  feature?: ExecutionFeature | undefined
+  imageUrls?: string[] | undefined
+  imageAssetIds?: number[] | undefined
+  referenceImageAssetIds?: number[] | undefined
+  params?: SubmitTaskParams | undefined
 }
 
 const CANVAS_INTERACTIVE_TASK_PRIORITY = 1

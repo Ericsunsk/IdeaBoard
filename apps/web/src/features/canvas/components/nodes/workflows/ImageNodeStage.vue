@@ -145,19 +145,19 @@ import NodeStageFrame from '../primitives/NodeStageFrame.vue'
 
 const props = defineProps<{
   nodeId: string | number
-  flowNodeId?: string
+  flowNodeId?: string | undefined
   stageWidth: number
   stageHeight: number
-  displayImage: { url: string; mediaAssetId?: number } | null
-  libraryImport?: LibraryImportFact
-  localUpload?: FlowLocalUploadState
+  displayImage: { url: string; mediaAssetId?: number | undefined } | null
+  libraryImport?: LibraryImportFact | undefined
+  localUpload?: FlowLocalUploadState | undefined
   inputLocked?: boolean
   emptyIconVariant?: 'image' | 'fusion'
   directGenerating?: boolean
   outpaintModeActive?: boolean
-  outpaintOverlayStyle?: Record<string, string> | null
-  outpaintHandleRadius?: number
-  imageToolStageBinding?: ImageToolStageBinding | null
+  outpaintOverlayStyle?: Record<string, string> | null | undefined
+  outpaintHandleRadius?: number | undefined
+  imageToolStageBinding?: ImageToolStageBinding | null | undefined
   active: boolean
   connectionDropTarget?: boolean
   dragging: boolean

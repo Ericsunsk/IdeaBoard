@@ -56,8 +56,8 @@ export type AdminDialogContentLayout = 'form' | 'scrollable'
 const props = withDefaults(
   defineProps<{
     visible: boolean
-    header?: string
-    ariaLabel?: string
+    header?: string | undefined
+    ariaLabel?: string | undefined
     size?: AdminDialogSize
     contentLayout?: AdminDialogContentLayout
     busy?: boolean

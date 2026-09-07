@@ -7,7 +7,7 @@ export type AsyncActionLoadingHandle = {
 export type AsyncActionFeedback<T = unknown> = {
   loading?: () => AsyncActionLoadingHandle | undefined
   success?: (result: T) => void
-  error?: (error: unknown) => void
+  error?: ((error: unknown) => void) | undefined
   finally?: () => void
 }
 

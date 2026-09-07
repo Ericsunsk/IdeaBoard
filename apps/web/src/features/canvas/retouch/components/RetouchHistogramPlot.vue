@@ -108,15 +108,15 @@ export type RetouchHistogramPlotMarker = {
   id: string
   position: number
   ariaLabel: string
-  className?: string
-  ariaValueMin?: number
-  ariaValueMax?: number
-  ariaValueNow?: number
-  ariaValueText?: string
-  keyboardStep?: number
-  keyboardShiftStep?: number
-  guideLine?: boolean
-  guideLineClassName?: string
+  className?: string | undefined
+  ariaValueMin?: number | undefined
+  ariaValueMax?: number | undefined
+  ariaValueNow?: number | undefined
+  ariaValueText?: string | undefined
+  keyboardStep?: number | undefined
+  keyboardShiftStep?: number | undefined
+  guideLine?: boolean | undefined
+  guideLineClassName?: string | undefined
 }
 
 type MarkerMode = 'button' | 'range'

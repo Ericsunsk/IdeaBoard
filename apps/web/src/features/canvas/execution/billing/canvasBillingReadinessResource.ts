@@ -61,7 +61,7 @@ export function buildFusionBillingReadinessRequest(input: {
   imageUrls: string[]
   aspectRatio: Parameters<typeof buildFusionTaskRequest>[0]['aspectRatio']
   outputCount?: Parameters<typeof buildFusionTaskRequest>[0]['outputCount']
-  outputResolution?: OutputResolution
+  outputResolution?: OutputResolution | undefined
 }): SubmitTaskData | null {
   const imageUrls = input.imageUrls
     .map((url) => url.trim())

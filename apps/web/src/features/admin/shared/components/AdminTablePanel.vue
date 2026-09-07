@@ -15,7 +15,7 @@ import { computed } from 'vue'
 import AdminSurfaceFrame from './AdminSurfaceFrame.vue'
 
 const props = defineProps<{
-  contentClass?: string
+  contentClass?: string | undefined
   viewportHeight?: boolean
 }>()
 const tableFrameClass = computed(() => [

@@ -36,7 +36,7 @@ export type CanvasNodePresentationIntent =
       action: ImageNodeAction
       prompt: string
       outputCount: number
-      strength?: number
+      strength?: number | undefined
     }
   | {
       type: 'outpaint-handle-pointerdown'

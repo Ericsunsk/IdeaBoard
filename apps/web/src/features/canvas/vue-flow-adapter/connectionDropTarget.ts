@@ -6,7 +6,8 @@ export type ConnectionEndPoint = {
 }
 
 export type CanvasConnectionStartEvent = OnConnectStartParams & {
-  event?: MouseEvent | TouchEvent
+  // VueFlow may omit the native event (e.g. keyboard-initiated connects).
+  event?: MouseEvent | TouchEvent | undefined
 }
 
 type CanvasConnectionDropLifecycleOptions = {

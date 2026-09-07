@@ -102,7 +102,7 @@ const props = defineProps<{
   dragging: boolean
   copyMode: boolean
   generationAvailable?: boolean
-  uiState?: PromptNodeUiState
+  uiState?: PromptNodeUiState | undefined
 }>()
 
 const emit = defineEmits<{

@@ -6,7 +6,7 @@ type PopoverRootRef = Ref<HTMLElement | null | undefined>
 interface NodeToolPopoverGroupOptions<T extends string> {
   keys: readonly T[]
   rootRefs: PopoverRootRef[]
-  closeOnEscape?: boolean
+  closeOnEscape?: boolean | undefined
 }
 
 export function useNodeToolPopoverGroup<T extends string>(options: NodeToolPopoverGroupOptions<T>) {

@@ -121,14 +121,14 @@ export type CanvasGraphRecordPatch<Record, Id extends string> = Readonly<{
 }>
 
 export type CanvasGraphOrderPlacement<Id extends string> = Readonly<{
-  previousId?: Id
-  nextId?: Id
+  previousId?: Id | undefined
+  nextId?: Id | undefined
 }>
 
 export type CanvasGraphOrderPatch<Id extends string> = Readonly<{
   id: Id
-  before?: CanvasGraphOrderPlacement<Id>
-  after?: CanvasGraphOrderPlacement<Id>
+  before?: CanvasGraphOrderPlacement<Id> | undefined
+  after?: CanvasGraphOrderPlacement<Id> | undefined
 }>
 
 export type CanvasGraphCollectionPatch<Record, Id extends string> = Readonly<{
@@ -214,9 +214,9 @@ type CanvasGraphTransactionDraft = {
   nodeWrites: TransactionRecordWrites<CanvasGraphNodeId, CanvasGraphNodeRecord>
   edgeWrites: TransactionRecordWrites<CanvasGraphEdgeId, CanvasGraphEdgeRecord>
   groupWrites: TransactionRecordWrites<CanvasGraphGroupId, CanvasGraphGroupRecord>
-  nodeOrder?: CanvasGraphNodeId[]
-  edgeOrder?: CanvasGraphEdgeId[]
-  groupOrder?: CanvasGraphGroupId[]
+  nodeOrder?: CanvasGraphNodeId[] | undefined
+  edgeOrder?: CanvasGraphEdgeId[] | undefined
+  groupOrder?: CanvasGraphGroupId[] | undefined
   nodeOrderPatches: Map<CanvasGraphNodeId, CanvasGraphOrderPatch<CanvasGraphNodeId>>
   edgeOrderPatches: Map<CanvasGraphEdgeId, CanvasGraphOrderPatch<CanvasGraphEdgeId>>
   groupOrderPatches: Map<CanvasGraphGroupId, CanvasGraphOrderPatch<CanvasGraphGroupId>>

@@ -9,6 +9,7 @@ import type {
   SearchCatalogProvider,
 } from '../../shared/api/generated-query/model'
 import { resolveApiData, resolveApiOk } from '../../shared/api/apiResponse'
+import { stripUndefined } from '../../shared/api/stripUndefined'
 import { i18n } from '../../shared/i18n'
 
 export type SearchPage = SearchResults
@@ -31,13 +32,16 @@ export function generateRandomInspirationCursor(): string {
   return ''
 }
 
-const inFlightRequests = new Map<string, { promise: Promise<SearchPage>; signal?: AbortSignal }>()
+const inFlightRequests = new Map<
+  string,
+  { promise: Promise<SearchPage>; signal?: AbortSignal | undefined }
+>()
 
 export async function searchInspiration(input: {
   query: string
-  cursor?: string
-  limit?: number
-  signal?: AbortSignal
+  cursor?: string | undefined
+  limit?: number | undefined
+  signal?: AbortSignal | undefined
 }): Promise<SearchPage> {
   if (input.signal?.aborted) {
     throw new DOMException('The request was aborted.', 'AbortError')
@@ -55,11 +59,11 @@ export async function searchInspiration(input: {
   }
   const request = resolveApiData(
     searchPublicInspiration(
-      {
+      stripUndefined({
         q: input.query || undefined,
         cursor: input.cursor,
         limit: input.limit,
-      },
+      }),
       { signal: input.signal },
     ),
     i18n.global.t('search.loadFailed'),
@@ -77,9 +81,9 @@ export type VisionExternalReference = {
 }
 
 export type VisionReference = {
-  file?: File
-  libraryAssetID?: number
-  externalReference?: VisionExternalReference
+  file?: File | undefined
+  libraryAssetID?: number | undefined
+  externalReference?: VisionExternalReference | undefined
   previewUrl: string
   key: string
 }
@@ -92,7 +96,7 @@ export async function extractVisionSearch(input: {
 }) {
   return resolveApiData(
     extractUserVisionSearch(
-      {
+      stripUndefined({
         images: input.references.flatMap((reference) => (reference.file ? [reference.file] : [])),
         library_asset_ids: input.references.flatMap((reference) =>
           reference.libraryAssetID ? [reference.libraryAssetID] : [],
@@ -101,7 +105,7 @@ export async function extractVisionSearch(input: {
           reference.externalReference ? [JSON.stringify(reference.externalReference)] : [],
         ),
         user_text: input.userText || undefined,
-      },
+      }),
       {
         signal: input.signal,
         timeout: 40_000,

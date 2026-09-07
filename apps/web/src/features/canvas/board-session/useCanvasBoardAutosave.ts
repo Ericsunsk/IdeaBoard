@@ -5,10 +5,10 @@ import { recordCanvasInteractionCount } from '../utils/canvasInteractionMetrics'
 export type UseCanvasBoardAutosaveOptions = {
   isDirty: Ref<boolean>
   isSaving: Ref<boolean>
-  save: (options?: { silent?: boolean }) => Promise<boolean>
-  canRun?: () => boolean
-  resumeSignal?: Ref<unknown>
-  delay?: number
+  save: (options?: { silent?: boolean | undefined }) => Promise<boolean>
+  canRun?: (() => boolean) | undefined
+  resumeSignal?: Ref<unknown> | undefined
+  delay?: number | undefined
 }
 
 export function useCanvasBoardAutosave(options: UseCanvasBoardAutosaveOptions) {

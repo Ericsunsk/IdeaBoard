@@ -25,7 +25,7 @@ withDefaults(
   defineProps<{
     title: string
     titleTag?: 'h2' | 'h3' | 'span'
-    pt?: CardPassThroughOptions
+    pt?: CardPassThroughOptions | undefined
   }>(),
   { titleTag: 'span', pt: undefined },
 )

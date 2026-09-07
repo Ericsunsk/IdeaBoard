@@ -24,18 +24,18 @@ export type WorkerImageProcessingLike = {
 export type WorkerImageProcessingFactory = () => WorkerImageProcessingLike
 
 export type ExecuteWorkerImageAdjustmentPlanOptions = {
-  signal?: AbortSignal
-  onProgress?: (progress: WorkerImageProcessingProgress) => void
-  requestId?: string
-  workerFactory?: WorkerImageProcessingFactory
+  signal?: AbortSignal | undefined
+  onProgress?: ((progress: WorkerImageProcessingProgress) => void) | undefined
+  requestId?: string | undefined
+  workerFactory?: WorkerImageProcessingFactory | undefined
 }
 
 type WorkerImageProcessingClientRequest = {
   imageData: ImageData
   plan: ImageAdjustmentPlan
-  signal?: AbortSignal
-  onProgress?: (progress: WorkerImageProcessingProgress) => void
-  requestId?: string
+  signal?: AbortSignal | undefined
+  onProgress?: ((progress: WorkerImageProcessingProgress) => void) | undefined
+  requestId?: string | undefined
 }
 
 export type WorkerImageProcessingClient = {
@@ -181,8 +181,8 @@ export function disposeDefaultWorkerImageProcessingClient() {
 
 type PendingWorkerImageProcessingRequest = {
   requestId: string
-  signal?: AbortSignal
-  onProgress?: (progress: WorkerImageProcessingProgress) => void
+  signal?: AbortSignal | undefined
+  onProgress?: ((progress: WorkerImageProcessingProgress) => void) | undefined
   resolve: (imageData: ImageData) => void
   reject: (error: WorkerImageProcessingError) => void
   remove: (requestId: string) => void

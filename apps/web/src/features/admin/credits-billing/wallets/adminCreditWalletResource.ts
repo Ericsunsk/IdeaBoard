@@ -8,6 +8,7 @@ import type {
   ListAdminCreditLedgerParams,
 } from '../../../../shared/api/generated-query/model'
 import { subscribeUserCreditsInvalidation } from '../../../../shared/query/userCreditsInvalidation'
+import { stripUndefined } from '../../../../shared/api/stripUndefined'
 import { adminCreditsBillingApi, type AdminCreditsBillingApi } from '../creditsBillingApi'
 import {
   buildAdminCreditCommandRequest,
@@ -20,7 +21,7 @@ export type AdminCreditLedgerTransaction = CreditLedgerTransaction
 
 interface AdminCreditLedgerCriteria {
   userPublicId: string
-  beforeSequence?: number
+  beforeSequence?: number | undefined
 }
 
 export function useAdminCreditWalletResource(
@@ -54,10 +55,10 @@ export function useAdminCreditWalletResource(
     ]),
     queryFn: async ({ queryKey, signal }) => {
       const criteria = queryKey.at(-1) as AdminCreditLedgerCriteria
-      const params: ListAdminCreditLedgerParams = {
+      const params: ListAdminCreditLedgerParams = stripUndefined({
         before_sequence: criteria.beforeSequence,
         limit: 25,
-      }
+      })
       return {
         criteria,
         page: await api.listLedger(criteria.userPublicId, params, { signal }),

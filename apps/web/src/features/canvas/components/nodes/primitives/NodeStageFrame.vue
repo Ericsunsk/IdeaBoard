@@ -35,9 +35,9 @@ const props = withDefaults(
     loading?: boolean
     running?: boolean
     transparent?: boolean
-    height?: number | string
+    height?: number | string | undefined
     ariaBusy?: boolean
-    ariaLabel?: string
+    ariaLabel?: string | undefined
   }>(),
   {
     variant: 'standard',

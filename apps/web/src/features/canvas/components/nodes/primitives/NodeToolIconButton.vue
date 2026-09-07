@@ -26,13 +26,13 @@ import { resolveInteractiveControlState } from '../../../../../shared/interactio
 
 const props = withDefaults(
   defineProps<{
-    size?: number | string
-    iconSize?: number | string
+    size?: number | string | undefined
+    iconSize?: number | string | undefined
     active?: boolean
     disabled?: boolean
     primary?: boolean
-    ariaLabel?: string
-    tooltip?: string
+    ariaLabel?: string | undefined
+    tooltip?: string | undefined
   }>(),
   {
     size: undefined,

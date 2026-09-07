@@ -2,7 +2,7 @@ import { createApp, defineComponent, h, nextTick, ref } from 'vue'
 import { describe, expect, it } from 'vitest'
 import { useNodeToolPopoverGroup } from './useNodeToolPopoverGroup'
 
-function mountPopoverGroup(options: { closeOnEscape?: boolean } = {}) {
+function mountPopoverGroup(options: { closeOnEscape?: boolean | undefined } = {}) {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const rootRef = ref<HTMLElement | null>(null)

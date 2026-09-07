@@ -30,15 +30,15 @@ export type ImageProcessingSchedulerResult<TValue> =
     }
 
 export type ImageProcessingScheduleOptions = {
-  taskId?: string
-  debounceMs?: number
-  latestOnly?: boolean
+  taskId?: string | undefined
+  debounceMs?: number | undefined
+  latestOnly?: boolean | undefined
 }
 
 export type ImageProcessingSchedulerOptions = {
-  debounceMs?: number
-  latestOnly?: boolean
-  createTaskId?: (revision: number) => string
+  debounceMs?: number | undefined
+  latestOnly?: boolean | undefined
+  createTaskId?: ((revision: number) => string) | undefined
 }
 
 type TimerHandle = ReturnType<typeof setTimeout>

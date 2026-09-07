@@ -54,7 +54,7 @@ export function shouldShowAdminTimeRangeTick(input: {
   index: number
   count: number
   range: GetAdminStatisticsRangeValue
-  label?: string
+  label?: string | undefined
 }): boolean {
   return shouldShowChartTimeTick({
     index: input.index,

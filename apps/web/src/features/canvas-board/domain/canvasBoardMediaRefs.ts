@@ -39,7 +39,7 @@ export function rebuildCanvasBoardMediaRefs(
   }
 
   function appendImageRef(
-    image: { url: string; mediaAssetId?: number },
+    image: { url: string; mediaAssetId?: number | undefined },
     refId: string,
     role: string,
   ) {

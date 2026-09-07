@@ -15,8 +15,8 @@ export type AdminCreditCommandDraft = {
 export type AdminCreditCommandInput = AdminCreditCommandDraft & {
   kind: AdminCreditCommandKind
   userPublicId: string
-  chargeTransactionId?: string
-  remainingRefundableCredits?: number
+  chargeTransactionId?: string | undefined
+  remainingRefundableCredits?: number | undefined
 }
 
 export type AdminCreditCommandRequest =

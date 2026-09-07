@@ -47,7 +47,7 @@ describe('useCanvasBoardAutosave', () => {
       const isSaving = ref(false)
       const resumeSignal = ref('')
       const save = vi
-        .fn<(options?: { silent?: boolean }) => Promise<boolean>>()
+        .fn<(options?: { silent?: boolean | undefined }) => Promise<boolean>>()
         .mockResolvedValueOnce(false)
         .mockImplementation(async () => {
           isDirty.value = false

@@ -35,9 +35,9 @@ const defaults: SearchFeedDependencies = {
 type SearchFeedOptions = {
   submittedQuery: Ref<string>
   keepResultsOnNextLoad: Ref<boolean>
-  cacheScope?: string
-  scrollContainer?: Ref<HTMLElement | null>
-  isAuthenticated?: () => boolean
+  cacheScope?: string | undefined
+  scrollContainer?: Ref<HTMLElement | null> | undefined
+  isAuthenticated?: (() => boolean) | undefined
 }
 
 /**

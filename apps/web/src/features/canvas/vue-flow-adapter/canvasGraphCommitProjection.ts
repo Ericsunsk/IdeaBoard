@@ -46,19 +46,26 @@ export type CanvasGraphCommitProjectionController = Readonly<{
   apply: (input: {
     current: CanvasFlowGraphProjection
     patch: CanvasGraphCommitPatch
-    readNode?: (nodeId: string) => CanvasGraphNodeRecord | undefined
-    projectNode?: (node: Node) => Node
+    readNode?: ((nodeId: string) => CanvasGraphNodeRecord | undefined) | undefined
+    projectNode?: ((node: Node) => Node) | undefined
   }) => CanvasGraphCommitProjection
   recover: () => CanvasGraphCommitProjection | null
   needsRecovery: () => boolean
 }>
 
 type OrderedRecordPatch<Record extends { id: string }> = Readonly<{
-  records: readonly Readonly<{ id: string; before?: Record; after?: Record }>[]
-  order?: readonly Readonly<{
+  records: readonly Readonly<{
     id: string
-    after?: Readonly<{ previousId?: string; nextId?: string }>
+    before?: Record | undefined
+    after?: Record | undefined
   }>[]
+  order?:
+    | readonly Readonly<{
+        id: string
+        after?:
+          Readonly<{ previousId?: string | undefined; nextId?: string | undefined }> | undefined
+      }>[]
+    | undefined
 }>
 
 function mapById<T extends { id: string }>(items: readonly T[]): Map<string, T> {
@@ -237,9 +244,9 @@ export function projectCanvasGraphCommit(input: {
   current: CanvasFlowGraphProjection
   patch: CanvasGraphCommitPatch
   /** Resolves node UI dependencies affected by an edge topology change. */
-  readNode?: (nodeId: string) => CanvasGraphNodeRecord | undefined
+  readNode?: ((nodeId: string) => CanvasGraphNodeRecord | undefined) | undefined
   /** Applies presentation-only node state (for example group z-index). */
-  projectNode?: (node: Node) => Node
+  projectNode?: ((node: Node) => Node) | undefined
 }): CanvasGraphCommitProjection & { needsRecovery: boolean } {
   return measureCanvasPerf(
     'graph-projection.incremental',
@@ -336,8 +343,8 @@ export function projectCanvasGraphCommit(input: {
 export function createCanvasGraphCommitProjectionController(options: {
   projectFull: () => CanvasFlowGraphProjection
   render: (projection: CanvasGraphCommitProjection) => void
-  onFailure?: (failure: CanvasGraphCommitProjectionFailure) => void
-  scheduleMicrotask?: (task: () => void) => void
+  onFailure?: ((failure: CanvasGraphCommitProjectionFailure) => void) | undefined
+  scheduleMicrotask?: ((task: () => void) => void) | undefined
 }): CanvasGraphCommitProjectionController {
   let recoveryRequired = false
   let recoveryScheduled = false

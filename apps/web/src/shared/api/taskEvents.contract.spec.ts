@@ -25,7 +25,7 @@ class MockEventSource {
   onerror: ((event: Event) => void) | null = null
   closed = false
   readonly url: string
-  readonly init?: EventSourceInit
+  readonly init?: EventSourceInit | undefined
   private listeners: Record<string, EventListener[]> = {}
 
   constructor(url: string, init?: EventSourceInit) {
@@ -140,7 +140,6 @@ describe('waitTaskImageResultsWithSse', () => {
 
     const error = createTaskResultFailureError({
       error_msg: '',
-      execution_metrics: undefined,
     })
 
     expect(error.message).toBe('图片生成失败')

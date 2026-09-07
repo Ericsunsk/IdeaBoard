@@ -62,7 +62,7 @@ export type ProviderAccountModelRecord = {
   name: string
   enabled: boolean
   weight: number
-  maxConcurrent?: number
+  maxConcurrent?: number | undefined
   sortOrder: number
   supports2K: boolean
   supports4K: boolean

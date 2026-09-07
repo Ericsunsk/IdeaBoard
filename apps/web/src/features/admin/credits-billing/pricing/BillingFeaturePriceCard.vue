@@ -101,8 +101,8 @@ import type {
 
 const props = defineProps<{
   item: AdminBillableItemCard
-  availabilityPending?: boolean
-  deletePending?: boolean
+  availabilityPending?: boolean | undefined
+  deletePending?: boolean | undefined
 }>()
 const emit = defineEmits<{
   publish: [item: AdminBillableItemCard]

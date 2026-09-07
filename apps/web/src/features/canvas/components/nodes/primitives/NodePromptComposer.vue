@@ -47,7 +47,7 @@ const props = withDefaults(
   defineProps<{
     modelValue: string
     outputCount: number
-    outputResolution?: OutputResolution
+    outputResolution?: OutputResolution | undefined
     placeholder: string
     disabled?: boolean
     allowEmpty?: boolean
@@ -55,7 +55,7 @@ const props = withDefaults(
     showSubmit?: boolean
     showOutputCount?: boolean
     showOutputResolution?: boolean
-    aspectRatio?: PromptAspectRatio
+    aspectRatio?: PromptAspectRatio | undefined
     offset?: string
     billingState?: CanvasBillingQuoteState | null
   }>(),

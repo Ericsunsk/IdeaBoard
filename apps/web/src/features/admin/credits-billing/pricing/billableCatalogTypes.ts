@@ -24,5 +24,5 @@ export interface AdminBillableItemCard {
   status: AdminBillableItemStatus
   pricingVariants: PricingVariant[]
   currentPrices: Partial<Record<PricingVariant, AdminBillableItemPrice>>
-  updatedAt?: string
+  updatedAt?: string | undefined
 }

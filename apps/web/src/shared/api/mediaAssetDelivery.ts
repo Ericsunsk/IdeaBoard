@@ -157,7 +157,11 @@ export function invalidateMediaAssetMetadata(assetId?: number) {
 
 export async function getMediaAssetMetadata(
   assetId: number,
-  options: { signal?: AbortSignal; force?: boolean; ensureTier?: MediaAssetDeliveryTier } = {},
+  options: {
+    signal?: AbortSignal | undefined
+    force?: boolean | undefined
+    ensureTier?: MediaAssetDeliveryTier | undefined
+  } = {},
 ): Promise<MediaAssetDeliveryMetadata> {
   if (!Number.isInteger(assetId) || assetId <= 0)
     throw new Error(i18n.global.t('common.errors.mediaInvalid'))
@@ -201,12 +205,11 @@ export async function getMediaAssetMetadata(
 export async function getMediaAssetMetadataBatch(
   assetIds: readonly number[],
   options: {
-    signal?: AbortSignal
-    force?: boolean
-    ensureTier?: Extract<
-      MediaAssetDeliveryTier,
-      'large-preview' | 'processing' | 'processing-input'
-    >
+    signal?: AbortSignal | undefined
+    force?: boolean | undefined
+    ensureTier?:
+      | Extract<MediaAssetDeliveryTier, 'large-preview' | 'processing' | 'processing-input'>
+      | undefined
   } = {},
 ): Promise<ReadonlyMap<number, MediaAssetDeliveryMetadata>> {
   const ids = Array.from(new Set(assetIds.filter((value) => Number.isInteger(value) && value > 0)))

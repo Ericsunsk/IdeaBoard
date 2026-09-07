@@ -24,14 +24,14 @@
 import { computed, useId } from 'vue'
 
 export interface AdminFormFieldSlotProps {
-  describedbyId?: string
+  describedbyId?: string | undefined
   invalid: boolean
 }
 
 const props = withDefaults(
   defineProps<{
     label: string
-    for?: string
+    for?: string | undefined
     error?: string
     hint?: string
     required?: boolean

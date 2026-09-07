@@ -41,7 +41,7 @@ export function useAppToast() {
 
   function loading(content: unknown, options?: ToastLoadingOptions): ToastLoadingHandle {
     const id = toast.loading(normalizeContent(content), {
-      description: options?.description,
+      ...(options?.description === undefined ? {} : { description: options.description }),
       duration: options?.duration ?? Number.POSITIVE_INFINITY,
     })
     return {
@@ -50,7 +50,9 @@ export function useAppToast() {
       update: (nextContent, nextOptions) =>
         toast.loading(normalizeContent(nextContent), {
           id,
-          description: nextOptions?.description,
+          ...(nextOptions?.description === undefined
+            ? {}
+            : { description: nextOptions.description }),
           duration: nextOptions?.duration ?? Number.POSITIVE_INFINITY,
         }),
     }

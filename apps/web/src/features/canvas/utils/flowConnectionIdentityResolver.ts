@@ -52,7 +52,7 @@ export function resolveNextFlowConnectionId(
 
 export function createFlowConnectionClaimIndex<TFlowEdge extends FlowEdgeIdentityRecord>(options: {
   candidates: readonly FlowConnectionClaimCandidate<TFlowEdge>[]
-  baseConnections?: readonly CanvasConnection[]
+  baseConnections?: readonly CanvasConnection[] | undefined
   allocateGeneratedIds: boolean
 }): FlowConnectionClaimIndex<TFlowEdge> {
   const baseConnections = options.baseConnections ?? []

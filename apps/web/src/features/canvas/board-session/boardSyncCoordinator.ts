@@ -14,8 +14,8 @@ export type SaveStatus = 'idle' | 'saved' | 'pending' | 'retry' | 'conflict' | '
 type SaveFailureKind = 'sync-failed' | 'conflict' | 'save-failed'
 export type ValueRef<T> = { value: T }
 export type SaveCurrentBoardSnapshotOptions = {
-  waitForPreview?: boolean
-  silent?: boolean
+  waitForPreview?: boolean | undefined
+  silent?: boolean | undefined
 }
 
 export type BoardSyncCoordinatorOptions = {
@@ -55,7 +55,7 @@ export type CanvasBoardSaveReconciliation = {
 
 export type CanvasBoardSaveResult = {
   saved: boolean
-  reconciliation?: CanvasBoardSaveReconciliation
+  reconciliation?: CanvasBoardSaveReconciliation | undefined
 }
 
 function cloneCanvasBoardSnapshot(snapshot: CanvasBoardSnapshot): CanvasBoardSnapshot {

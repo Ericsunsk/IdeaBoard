@@ -13,7 +13,7 @@ export type CooperativeCpuPlanExecutionInput = {
   imageData: ImageData
   plan: ImageAdjustmentPlan
   signal: AbortSignal
-  onProgress?: ImageProcessingBackendTaskProgressReporter
+  onProgress?: ImageProcessingBackendTaskProgressReporter | undefined
   chunkBytes: number
   frameBudgetMs: number
   now: () => number

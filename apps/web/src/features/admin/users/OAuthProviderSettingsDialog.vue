@@ -251,7 +251,7 @@ import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../shared/a
 const props = withDefaults(
   defineProps<{
     visible: boolean
-    resource?: OAuthProviderSettingsResource
+    resource?: OAuthProviderSettingsResource | undefined
   }>(),
   { resource: undefined },
 )

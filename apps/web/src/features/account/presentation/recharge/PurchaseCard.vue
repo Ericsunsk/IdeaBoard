@@ -163,7 +163,7 @@ import {
 } from '../common/ui'
 
 const props = defineProps<{
-  options?: PaymentPurchaseOptions
+  options?: PaymentPurchaseOptions | undefined
   pending: boolean
   error: unknown
   checkoutPending: boolean

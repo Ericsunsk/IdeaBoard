@@ -45,11 +45,11 @@ export type AdminProviderConfigWorkspaceOptions = {
   feedback: AdminProviderConfigFeedback
   confirm: AdminConfirmPort
   runAsyncAction: RunAsyncAction
-  resource?: AdminProviderConfigResource
+  resource?: AdminProviderConfigResource | undefined
 }
 
 export type SaveProviderEndpointCommand = {
-  id?: number
+  id?: number | undefined
   data: ProviderEndpointFormData
   isEditing: boolean
   afterSaved?: () => void

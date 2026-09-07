@@ -33,8 +33,8 @@ import { displayErrorMessage, isRequiredErrorMessage } from '../utils/formValida
 
 export type IbFormFieldSlotProps = {
   ariaInvalid: true | undefined
-  describedbyId?: string
-  errorId?: string
+  describedbyId?: string | undefined
+  errorId?: string | undefined
   fieldId: string
   inlineError: boolean
   inlineErrorText: string
@@ -46,13 +46,13 @@ const props = withDefaults(
   defineProps<{
     label: string
     error?: string
-    fieldId?: string
+    fieldId?: string | undefined
     required?: boolean
     inlineRequired?: boolean
     showMessage?: boolean
     fieldClass?: string
     labelClass?: string
-    messagePt?: object
+    messagePt?: object | undefined
   }>(),
   {
     error: '',

@@ -90,7 +90,7 @@ import { createPopoverMotionTransition } from '../../../../shared/motion/popover
 const props = defineProps<{
   strengthMenuStyle?: string | Record<string, string>
   outputCount: number
-  outputResolution?: OutputResolution
+  outputResolution?: OutputResolution | undefined
   strengthControl: ImageActionStrengthControl
 }>()
 

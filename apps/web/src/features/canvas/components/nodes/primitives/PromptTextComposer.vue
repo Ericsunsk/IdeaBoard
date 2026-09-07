@@ -77,12 +77,12 @@ const props = withDefaults(
   defineProps<{
     modelValue: string
     outputCount: number
-    outputResolution?: OutputResolution
+    outputResolution?: OutputResolution | undefined
     placeholder?: string
     disabled?: boolean
     allowEmpty?: boolean
     submitDisabled?: boolean
-    aspectRatio?: PromptAspectRatio
+    aspectRatio?: PromptAspectRatio | undefined
     imageInputs?: PromptTextComposerImageInput[]
     maxImageInputs?: number
     showAspectRatio?: boolean

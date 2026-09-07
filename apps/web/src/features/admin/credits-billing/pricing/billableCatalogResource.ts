@@ -10,6 +10,7 @@ import type {
   BillingPrice,
 } from '../../../../shared/api/generated-query/model'
 import { resolveApiData } from '../../../../shared/api/apiResponse'
+import { stripUndefined } from '../../../../shared/api/stripUndefined'
 import type {
   AdminBillableItemAvailability,
   AdminBillableItemCard,
@@ -56,9 +57,7 @@ export async function publishBillableItemPrices(
   sku: string,
   prices: Partial<Record<PricingVariant, number | undefined>>,
 ): Promise<Partial<Record<PricingVariant, AdminBillableItemPrice>>> {
-  const requestPrices = Object.fromEntries(
-    Object.entries(prices).filter(([, price]) => price !== undefined),
-  ) as Record<PricingVariant, number>
+  const requestPrices = stripUndefined(prices) as Record<PricingVariant, number>
   const data = await resolveApiData(
     publishAdminBillingPrice(sku, { prices: requestPrices }),
     '发布价格失败',

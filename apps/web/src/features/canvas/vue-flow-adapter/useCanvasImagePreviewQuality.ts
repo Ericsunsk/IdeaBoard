@@ -23,7 +23,7 @@ type ResolveCanvasImagePreviewMaxSideOptions = {
   stageHeight: number
   zoomLevel: number
   devicePixelRatio?: number
-  forceFullQuality?: boolean
+  forceFullQuality?: boolean | undefined
 }
 
 type UseCanvasImagePreviewQualityOptions = {

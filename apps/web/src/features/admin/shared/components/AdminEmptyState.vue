@@ -30,7 +30,7 @@ withDefaults(
   defineProps<{
     title?: string
     description?: string
-    icon?: Component
+    icon?: Component | undefined
     compact?: boolean
   }>(),
   {

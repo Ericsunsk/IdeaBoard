@@ -7,8 +7,8 @@ const searchProviderLogoMap: Record<string, string | undefined> = {
 
 export function getSearchProviderLogo(input: {
   provider: string
-  name?: string
-  baseUrl?: string
+  name?: string | undefined
+  baseUrl?: string | undefined
 }): string | undefined {
   return (
     getAdminBrandLogo(

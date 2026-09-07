@@ -6,7 +6,7 @@ export type ChartTimeBucket = {
 export type BuildChartTimeBucketsInput = {
   days: number
   now?: Date
-  bucketHours?: number
+  bucketHours?: number | undefined
   formatDateKey?: (date: Date) => string
   formatDailyLabel?: (date: string) => string
   formatIntradayLabel?: (startHour: number) => string
@@ -18,7 +18,7 @@ export type ChartTimeTickDensity =
 export type ChartTimeTickInput = {
   index: number
   count: number
-  label?: string
+  label?: string | undefined
   density: ChartTimeTickDensity
   maxVisibleCount?: number
 }

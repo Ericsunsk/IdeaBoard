@@ -34,7 +34,7 @@ export interface ResolvedFlowInputImage {
   sourceNodeId?: string
   url: string
   ratio: number
-  mediaAssetId?: number
+  mediaAssetId?: number | undefined
 }
 
 export type FlowConnectedInputPort = 'image' | 'prompt'

@@ -31,9 +31,9 @@ export type CanvasBoardCatalogRenameResult =
       boardId: string
       previousBoard: CanvasBoardMeta
       error: unknown
-      rolledBackBoard?: CanvasBoardMeta
+      rolledBackBoard?: CanvasBoardMeta | undefined
       rollback: CanvasBoardRollbackRenameResult
-      hydrate?: HydrateCanvasBoardsFromServerResult
+      hydrate?: HydrateCanvasBoardsFromServerResult | undefined
     }
   | CanvasBoardScopeChangedResult
 

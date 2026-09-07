@@ -107,7 +107,7 @@ import NodeShell from '../primitives/NodeShell.vue'
 
 const props = defineProps<{
   node: ImageNodeItem
-  flowNodeId?: string
+  flowNodeId?: string | undefined
   setImageStageRef?: (nodeId: string, element: Element | null) => void
   clearImageStageRef?: (nodeId: string, element?: Element | null) => void
   active: boolean
@@ -115,9 +115,9 @@ const props = defineProps<{
   dragging: boolean
   copyMode: boolean
   stageHeight: number
-  displayImage: { url: string; mediaAssetId?: number } | null
-  libraryImport?: LibraryImportFact
-  localUpload?: FlowLocalUploadState
+  displayImage: { url: string; mediaAssetId?: number | undefined } | null
+  libraryImport?: LibraryImportFact | undefined
+  localUpload?: FlowLocalUploadState | undefined
   emptyIconVariant?: 'image' | 'fusion'
   inputLocked?: boolean
   actionBinding: ImageActionBinding

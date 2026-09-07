@@ -21,7 +21,7 @@ export type RewardCode = {
   creditAmount: number
   maxRedemptions: number
   redemptionCount: number
-  expiresAt?: string
+  expiresAt?: string | undefined
   enabled: boolean
   status: GeneratedRewardCode['status']
   createdAt: string
@@ -55,20 +55,20 @@ export type UpdateRewardCodeInput = {
 
 export type UpdatedRewardCode = {
   rewardCode: RewardCode
-  plaintext?: string
-  replayed?: boolean
+  plaintext?: string | undefined
+  replayed?: boolean | undefined
 }
 
 export type RewardCodePage = {
   rewardCodes: RewardCode[]
   total: number
-  nextBeforeId?: number
+  nextBeforeId?: number | undefined
 }
 
 export type SearchRewardCodesInput = {
   query: string
-  status?: RewardCodeStatus
-  beforeId?: number
+  status?: RewardCodeStatus | undefined
+  beforeId?: number | undefined
   limit?: number
   signal?: AbortSignal
 }

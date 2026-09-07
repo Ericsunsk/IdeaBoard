@@ -25,13 +25,17 @@ export type RewardCodeRedemptionDetail = RewardCodeRedemption & {
 
 export type RewardCodeRedemptionPage = {
   redemptions: RewardCodeRedemption[]
-  nextBeforeId?: number
+  nextBeforeId?: number | undefined
 }
 
 export type RewardCodeRedemptionResource = {
   list: (
     rewardCodeId: number,
-    input?: { beforeId?: number; limit?: number; signal?: AbortSignal },
+    input?: {
+      beforeId?: number | undefined
+      limit?: number | undefined
+      signal?: AbortSignal | undefined
+    },
   ) => Promise<RewardCodeRedemptionPage>
   get: (
     rewardCodeId: number,

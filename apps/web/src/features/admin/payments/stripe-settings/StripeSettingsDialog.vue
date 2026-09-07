@@ -182,7 +182,7 @@ import type { AdminStripeSettingsResource, StripeConfigurationSummary } from './
 const props = withDefaults(
   defineProps<{
     visible: boolean
-    resource?: AdminStripeSettingsResource
+    resource?: AdminStripeSettingsResource | undefined
   }>(),
   { resource: undefined },
 )

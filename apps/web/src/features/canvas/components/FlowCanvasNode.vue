@@ -157,12 +157,12 @@ const props = withDefaults(
     connectionDropTarget?: boolean
     dragging?: boolean
     copyMode?: boolean
-    uiState?: NodeUiState | PromptNodeUiState
-    fusionPresentation?: FusionNodePresentationBinding
+    uiState?: NodeUiState | PromptNodeUiState | undefined
+    fusionPresentation?: FusionNodePresentationBinding | undefined
     generationAvailable?: boolean
     imagePresentation: ImageNodePresentationBinding
-    setImageStageRef?: (nodeId: string, element: Element | null) => void
-    clearImageStageRef?: (nodeId: string, element?: Element | null) => void
+    setImageStageRef?: ((nodeId: string, element: Element | null) => void) | undefined
+    clearImageStageRef?: ((nodeId: string, element?: Element | null) => void) | undefined
     outpaintModeActive?: boolean
     outpaintOverlayStyle?: Record<string, string> | null
     outpaintHandleRadius?: number

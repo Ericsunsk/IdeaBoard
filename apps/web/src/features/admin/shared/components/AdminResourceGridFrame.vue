@@ -38,7 +38,7 @@ import {
 } from '../lib/adminUiClasses'
 
 const props = defineProps<{
-  contentClass?: string
+  contentClass?: string | undefined
   emptyDescription?: string
   emptyTitle: string
   gridClass?: string

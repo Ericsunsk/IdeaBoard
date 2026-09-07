@@ -20,6 +20,7 @@ import {
   type LibraryFolderFacts,
   type LibraryMutationPublisher,
 } from './libraryFolderFacts'
+import { stripUndefined } from '../../shared/api/stripUndefined'
 
 export type LibraryFolderTab = {
   queryKey: string
@@ -119,14 +120,14 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
   })
   function assetParams(folderKey: string, cursor?: string) {
     const numericFolderID = Number(folderKey)
-    return {
+    return stripUndefined({
       folder_id:
         Number.isSafeInteger(numericFolderID) && numericFolderID > 0
           ? numericFolderID
           : (folderKey as 'all' | 'quick-saves'),
       cursor: cursor || undefined,
       limit: 24,
-    }
+    })
   }
 
   async function loadAssets(reset = true) {

@@ -11,6 +11,7 @@
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
     "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
     "useUnknownInCatchVariables": true,
     "noUncheckedSideEffectImports": true
   },

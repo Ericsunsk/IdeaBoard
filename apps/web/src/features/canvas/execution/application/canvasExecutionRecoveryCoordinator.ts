@@ -25,7 +25,7 @@ export type CanvasExecutionRecoveryCoordinatorOptions = Readonly<{
   resolveResult: (pending: PendingImageTaskSnapshot) => Promise<PendingImageResolvedResult>
   flushAutosave: () => Promise<void>
   cancelTasks: (taskIds: readonly string[]) => void
-  onError?: (error: unknown) => boolean
+  onError?: ((error: unknown) => boolean) | undefined
   onWarning: (message: string) => void
 }>
 

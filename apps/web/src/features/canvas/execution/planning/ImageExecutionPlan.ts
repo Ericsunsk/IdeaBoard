@@ -45,8 +45,8 @@ export type ImageActionExecutionPlan = {
   action: ImageTaskAction
   prompt: string
   outputCount: number
-  strength?: number
-  outputResolution?: OutputResolution
+  strength?: number | undefined
+  outputResolution?: OutputResolution | undefined
   resultOptions: ImageExecutionResultOptions
 }
 
@@ -81,7 +81,7 @@ export type GenerationExecutionPlan = {
   prompt: string
   outputCount: number
   aspectRatio: PromptAspectRatio
-  outputResolution?: OutputResolution
+  outputResolution?: OutputResolution | undefined
   resultOptions: ImageExecutionResultOptions
 }
 
@@ -98,7 +98,7 @@ export type FusionExecutionPlan = {
   imageUrls: string[]
   blendPoint: FusionBlendPoint
   stageWidth: number
-  outputResolution?: OutputResolution
+  outputResolution?: OutputResolution | undefined
   resultOptions: ImageExecutionResultOptions
 }
 
