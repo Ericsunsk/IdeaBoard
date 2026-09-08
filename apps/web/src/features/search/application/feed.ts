@@ -1,13 +1,13 @@
 import { nextTick, ref, type Ref } from 'vue'
 import { libraryAssetKey, lookupSavedAssetKeys } from '../../library/libraryResource'
-import { type SearchResult } from '../domain/searchModels'
+import { type SearchResult } from '../domain/models'
 import {
   generateRandomInspirationCursor,
   reportSearchImageFailure,
   searchInspiration,
 } from '../infrastructure/searchResource'
-import { createBrowserSearchFeedPersistence } from '../infrastructure/searchFeedPersistence'
-import type { SearchFeedPersistence, SearchFeedSnapshot } from '../ports/searchPersistence'
+import { createBrowserSearchFeedPersistence } from '../infrastructure/feedPersistence'
+import type { SearchFeedPersistence, SearchFeedSnapshot } from '../ports/persistencePort'
 
 export type SearchFeedDependencies = {
   randomCursor: () => string

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { isSearchQueryWithinLimit, normalizeSearchQuery } from '../domain/searchQuery'
+import { isSearchQueryWithinLimit, normalizeSearchQuery } from '../domain/queryPolicy'
 import { searchInspiration } from './searchResource'
 
 const generated = vi.hoisted(() => ({

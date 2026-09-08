@@ -1,6 +1,6 @@
 import { MAX_REFERENCE_COUNT, partitionVisionReferences } from '../domain/visionReferencePolicy'
 import { computed, ref } from 'vue'
-import type { VisionReference } from '../domain/searchModels'
+import type { VisionReference } from '../domain/models'
 
 function revokeLocalPreview(reference: VisionReference): void {
   if (reference.previewUrl.startsWith('blob:')) {

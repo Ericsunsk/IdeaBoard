@@ -6,7 +6,7 @@ import {
   MAX_ANONYMOUS_SEARCH_QUERIES,
   peekPendingSearchAuthAction,
   setPendingSearchAuthAction,
-} from './searchAuthContinuation'
+} from './authContinuation'
 
 describe('search auth continuation', () => {
   beforeEach(() => {

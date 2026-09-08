@@ -11,7 +11,7 @@ import { useAppToast } from '../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
 import type { LibraryAssetView } from '../../library/libraryResource'
-import type { SearchAuthAction } from '../domain/searchAuthAction'
+import type { SearchAuthAction } from '../domain/authAction'
 import {
   clearCachedVisionReferences,
   getCachedVisionReferences,
@@ -21,12 +21,12 @@ import {
   searchReferenceKey,
   searchResultToVisionReference,
   toVisionReference,
-} from '../infrastructure/searchLibraryBridge'
-import { type SearchResult, type VisionReference } from '../domain/searchModels'
-import { isSearchQueryWithinLimit, normalizeSearchQuery } from '../domain/searchQuery'
+} from '../infrastructure/libraryBridge'
+import { type SearchResult, type VisionReference } from '../domain/models'
+import { isSearchQueryWithinLimit, normalizeSearchQuery } from '../domain/queryPolicy'
 import { extractVisionSearch } from '../infrastructure/searchResource'
 import { createVisionReferenceCollection } from './visionReferenceCollection'
-import { fetchVisionSearchPrice } from '../infrastructure/visionSearchBillingResource'
+import { fetchVisionSearchPrice } from '../infrastructure/visionBillingResource'
 
 type VisionQueryLifecycleOptions = {
   draftQuery: Ref<string>

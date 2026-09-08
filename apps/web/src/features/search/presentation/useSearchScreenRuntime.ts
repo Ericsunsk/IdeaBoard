@@ -17,16 +17,16 @@ import {
   readSearchReferenceTransfer,
   writeSearchReferenceTransfer,
 } from '../../library/libraryTransfer'
-import { type SearchAuthAction } from '../domain/searchAuthAction'
+import { type SearchAuthAction } from '../domain/authAction'
 import {
   peekPendingSearchAuthAction,
   setPendingSearchAuthAction,
-} from '../infrastructure/searchAuthContinuation'
+} from '../infrastructure/authContinuation'
 import {
   createSearchLibraryCoordinator,
   provideSearchLibraryCoordinator,
-} from '../infrastructure/searchLibraryCoordinator'
-import { type SearchResult, type VisionReference } from '../domain/searchModels'
+} from '../infrastructure/libraryCoordinator'
+import { type SearchResult, type VisionReference } from '../domain/models'
 import { useSearchSession } from '../application/useSearchSession'
 import {
   type SearchSavePopoverController,

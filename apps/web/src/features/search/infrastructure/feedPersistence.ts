@@ -1,5 +1,5 @@
-import type { SearchFeedSnapshot, SearchFeedPersistence } from '../ports/searchPersistence'
-import { searchScopedStorageKey, searchSessionStorage } from './searchBrowserPersistence'
+import type { SearchFeedSnapshot, SearchFeedPersistence } from '../ports/persistencePort'
+import { searchScopedStorageKey, searchSessionStorage } from './browserPersistence'
 
 const FEED_CACHE_KEY = 'ideaboard:search:feed_cache'
 const FEED_SCROLL_KEY = 'ideaboard:search:feed_scroll'

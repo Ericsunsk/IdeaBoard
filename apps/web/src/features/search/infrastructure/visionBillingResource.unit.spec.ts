@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchVisionSearchPrice } from './visionSearchBillingResource'
+import { fetchVisionSearchPrice } from './visionBillingResource'
 
 const generated = vi.hoisted(() => ({ quote: vi.fn() }))
 
@@ -7,7 +7,7 @@ vi.mock('../../../shared/api/generated-query/billing/billing', () => ({
   createBillingQuote: generated.quote,
 }))
 
-describe('visionSearchBillingResource', () => {
+describe('visionBillingResource', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('reads the configured default price for one vision search', async () => {

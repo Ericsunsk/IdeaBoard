@@ -4,8 +4,8 @@ import { useSearchSession } from './useSearchSession'
 import {
   clearPendingSearchAuthAction,
   setPendingSearchAuthAction,
-} from '../infrastructure/searchAuthContinuation'
-import { createSearchLibraryCoordinator } from '../infrastructure/searchLibraryCoordinator'
+} from '../infrastructure/authContinuation'
+import { createSearchLibraryCoordinator } from '../infrastructure/libraryCoordinator'
 
 const mocks = vi.hoisted(() => ({
   route: { query: {} as Record<string, string | string[]> },
@@ -29,7 +29,7 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ replace: mocks.replace, push: mocks.push }),
 }))
 
-vi.mock('./searchFeed', () => ({
+vi.mock('./feed', () => ({
   createSearchFeed: () => ({
     load: mocks.load,
     results: { value: [] },

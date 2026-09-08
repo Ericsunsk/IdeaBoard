@@ -1,4 +1,4 @@
-import type { SearchLibraryCoordinator } from '../ports/searchLibrary'
+import type { SearchLibraryCoordinator } from '../ports/libraryCoordinatorPort'
 import { inject, provide, type InjectionKey } from 'vue'
 import {
   createLibraryFolderFacts,

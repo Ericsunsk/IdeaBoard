@@ -6,9 +6,9 @@ export type {
   VisionExternalReference,
   VisionExtraction,
   SearchCatalogProvider,
-} from './domain/searchModels'
+} from './domain/models'
 export type {
   SearchAuthAction,
   LibrarySearchReference,
-} from './domain/searchAuthAction'
-export { clearPendingSearchAuthAction } from './infrastructure/searchAuthContinuation'
+} from './domain/authAction'
+export { clearPendingSearchAuthAction } from './infrastructure/authContinuation'

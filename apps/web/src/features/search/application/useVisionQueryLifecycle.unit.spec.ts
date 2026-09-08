@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ replace: mocks.replace }) }))
 vi.mock('../../../shared/composables/useAppToast', () => ({ useAppToast: () => mocks.toast }))
-vi.mock('../infrastructure/visionSearchBillingResource', () => ({
+vi.mock('../infrastructure/visionBillingResource', () => ({
   fetchVisionSearchPrice: mocks.fetchPrice,
 }))
 vi.mock('../infrastructure/searchResource', () => ({

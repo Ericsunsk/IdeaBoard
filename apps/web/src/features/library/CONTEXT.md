@@ -51,5 +51,5 @@ _Avoid_: untyped drag payload, ambiguous drop effect
 
 - 文件夹与资产的事实主是服务端（`user-library`，分页 `limit 24 + cursor`）；`selectedFolder` 平时走 `?folder=`，无路由场景才用内部态。
 - 写操作必须经 mutation publisher 广播；各 surface 按 `galleryEffect` 响应，禁止每次全量 reload。
-- Canvas 消费 Library 资产必须 materialize；Search 桥接只传引用（`searchLibraryCoordinator`），不直接读写 gallery。
+- Canvas 消费 Library 资产必须 materialize；Search 桥接只传引用（`libraryCoordinator`），不直接读写 gallery。
 - Folder 删除是 danger 确认；选中文件夹被删后回落 `quick-saves`，不得悬空。

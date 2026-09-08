@@ -9,18 +9,18 @@ import {
   getLibraryIslandState,
   setLibraryIslandState,
 } from '../infrastructure/libraryIslandPersistence'
-import { type SearchResult, type VisionReference } from '../domain/searchModels'
+import { type SearchResult, type VisionReference } from '../domain/models'
 import {
   allowAnonymousSearchQuery,
   consumePendingSearchAuthAction,
   peekPendingSearchAuthAction,
-} from '../infrastructure/searchAuthContinuation'
-import { isSearchQueryWithinLimit, normalizeSearchQuery } from '../domain/searchQuery'
+} from '../infrastructure/authContinuation'
+import { isSearchQueryWithinLimit, normalizeSearchQuery } from '../domain/queryPolicy'
 import { useSearchLightbox } from '../presentation/useSearchLightbox'
-import { createSearchFeed } from './searchFeed'
+import { createSearchFeed } from './feed'
 import { useVisionQueryLifecycle } from './useVisionQueryLifecycle'
-import { type SearchAuthAction } from '../domain/searchAuthAction'
-import { type SearchLibraryCoordinator } from '../ports/searchLibrary'
+import { type SearchAuthAction } from '../domain/authAction'
+import { type SearchLibraryCoordinator } from '../ports/libraryCoordinatorPort'
 
 function useLibraryIslandState(cacheScope: string, isAuthenticated: () => boolean) {
   const islandState = getLibraryIslandState(cacheScope)

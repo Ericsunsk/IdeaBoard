@@ -92,12 +92,12 @@ import { computed, nextTick, ref, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Popover from 'primevue/popover'
 import { Bookmark, Folder, Search } from '@iconoir/vue'
-import type { SearchResult } from '../../domain/searchModels'
+import type { SearchResult } from '../../domain/models'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
 import { createPopoverMotionPt } from '../../../../shared/motion/popoverMotion'
 import type { PopoverPassThroughOptions } from 'primevue/popover'
-import { useSearchLibraryCoordinator } from '../../infrastructure/searchLibraryCoordinator'
+import { useSearchLibraryCoordinator } from '../../infrastructure/libraryCoordinator'
 
 export type SearchSavePopoverRequest = {
   result: SearchResult

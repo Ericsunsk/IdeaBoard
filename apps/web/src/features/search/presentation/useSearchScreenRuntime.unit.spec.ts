@@ -42,12 +42,12 @@ vi.mock('../../../shared/composables/useAppToast', () => ({
   useAppToast: () => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() }),
 }))
 
-vi.mock('../infrastructure/searchAuthContinuation', () => ({
+vi.mock('../infrastructure/authContinuation', () => ({
   setPendingSearchAuthAction: mocks.setPendingSearchAuthAction,
   peekPendingSearchAuthAction: mocks.peekPendingSearchAuthAction,
 }))
 
-vi.mock('../infrastructure/searchLibraryCoordinator', () => ({
+vi.mock('../infrastructure/libraryCoordinator', () => ({
   createSearchLibraryCoordinator: () => mocks.libraryCoordinator,
   provideSearchLibraryCoordinator: vi.fn(),
 }))

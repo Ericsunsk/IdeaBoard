@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
-import { createSearchFeed, type SearchFeedDependencies } from './searchFeed'
-import type { SearchFeedPersistence } from '../ports/searchPersistence'
-import type { SearchPage, SearchResult } from '../domain/searchModels'
+import { createSearchFeed, type SearchFeedDependencies } from './feed'
+import type { SearchFeedPersistence } from '../ports/persistencePort'
+import type { SearchPage, SearchResult } from '../domain/models'
 
 const result = (id: string): SearchResult => ({
   provider: 'unsplash',

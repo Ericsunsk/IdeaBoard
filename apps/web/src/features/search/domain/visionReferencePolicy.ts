@@ -1,4 +1,4 @@
-import type { VisionReference } from './searchModels'
+import type { VisionReference } from './models'
 
 export const MAX_REFERENCE_COUNT = 4
 export const MAX_REFERENCE_BYTES = 10 * 1024 * 1024

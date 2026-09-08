@@ -1,6 +1,6 @@
-import type { CachedVisionReference } from '../ports/searchPersistence'
-import type { VisionReference } from '../domain/searchModels'
-import { searchScopedStorageKey, searchSessionStorage } from './searchBrowserPersistence'
+import type { CachedVisionReference } from '../ports/persistencePort'
+import type { VisionReference } from '../domain/models'
+import { searchScopedStorageKey, searchSessionStorage } from './browserPersistence'
 
 const VISION_REF_CACHE_KEY = 'ideaboard:search:vision_refs'
 

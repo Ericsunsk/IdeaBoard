@@ -1,4 +1,4 @@
-import type { SearchResult } from './searchModels'
+import type { SearchResult } from './models'
 
 export type LibrarySearchReference = Pick<
   SearchResult,

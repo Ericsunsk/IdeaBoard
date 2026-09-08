@@ -3,7 +3,7 @@ import type {
   SearchPage,
   VisionReference,
   VisionExtraction,
-} from '../domain/searchModels'
+} from '../domain/models'
 import { searchInspiration as searchPublicInspiration } from '../../../shared/api/generated-query/search/search'
 import {
   extractUserVisionSearch,

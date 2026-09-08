@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createSearchLibraryCoordinator } from './searchLibraryCoordinator'
+import { createSearchLibraryCoordinator } from './libraryCoordinator'
 
 const mocks = vi.hoisted(() => ({
   getLibraryFolders: vi.fn(),

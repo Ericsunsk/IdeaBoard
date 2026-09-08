@@ -12,7 +12,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import type { SearchResult } from '../../domain/searchModels'
+import type { SearchResult } from '../../domain/models'
 
 const props = withDefaults(
   defineProps<{

@@ -3,7 +3,7 @@ import { render } from '@testing-library/vue'
 import { page } from 'vitest/browser'
 import { describe, expect, it } from 'vitest'
 import SearchResultViewport from './SearchResultViewport.vue'
-import type { SearchResult } from '../../domain/searchModels'
+import type { SearchResult } from '../../domain/models'
 
 function results(count: number): SearchResult[] {
   return Array.from({ length: count }, (_, index) => ({

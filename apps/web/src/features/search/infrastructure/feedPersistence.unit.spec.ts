@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createBrowserSearchFeedPersistence } from './searchFeedPersistence'
-import type { SearchResult } from '../domain/searchModels'
+import { createBrowserSearchFeedPersistence } from './feedPersistence'
+import type { SearchResult } from '../domain/models'
 
 const result: SearchResult = {
   provider: 'unsplash',

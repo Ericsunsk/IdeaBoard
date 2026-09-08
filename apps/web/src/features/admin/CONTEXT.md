@@ -75,5 +75,5 @@ _Avoid_: polling-only monitor, snapshot as local state
 - **Pending order item**（`PendingOrders.vue`）：`checkout_open`（继续 + 放弃双钮）/ `async_payment_pending` / `paid_pending_credit`（`crediting` vs 超 60s `creditingDelayed`）/ `expired` / `cancelled` / `payment_failed` / `credited`；`expiryText` 5s ticker。
 - **Wallet dialog**（`credits-billing/wallets/AdminUserWalletDialog.vue`）：`wallet.status = frozen` 或用户停用即冻结态（列出 `activeRestrictions`）；`grant/deduction` 钮在 `commandPending`、无 wallet 或金额 < 1 时禁用；账本行按 `hold→冻结 / capture→消费 / grant→赠送 / deduction→扣减 / release→解冻 / refund→退款 / correction→修正` 呈现，`+` 仅 grant/release/refund。
 - **Order presentation**（`payments/orders/paymentOrderPresentation.ts`）：`creating→创建中 / checkout_open→待支付 / async_payment_pending→异步确认中 / paid_pending_credit→待到账 / credited→已到账 / cancelled→已取消 / expired→已过期 / payment_failed→支付失败`，附 stripe/credit 二级标签。
-- **Vision search billing**（`search/visionSearchBillingResource.ts`）：`sku=ai-search:vision` 纯询价展示 + `insufficient_credits/pricing_unavailable`；`hold/capture` 不在用户侧展示，只进 admin 账本。
+- **Vision search billing**（`search/infrastructure/visionBillingResource.ts`）：`sku=ai-search:vision` 纯询价展示 + `insufficient_credits/pricing_unavailable`；`hold/capture` 不在用户侧展示，只进 admin 账本。
 - Invariants：用户侧不得展示 `hold/capture` 中间态；金额颜色 `+` 仅三类（grant/release/refund）；`system_adjustment` 是账务域词汇，与图像 retouch 无关，不得改名。

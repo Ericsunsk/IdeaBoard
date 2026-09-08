@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { SearchResult } from '../domain/searchModels'
+import type { SearchResult } from '../domain/models'
 
 export function useSearchLightbox() {
   const visible = ref(false)

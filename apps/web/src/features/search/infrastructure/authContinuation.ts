@@ -1,5 +1,5 @@
-import type { LibrarySearchReference, SearchAuthAction } from '../domain/searchAuthAction'
-import { normalizeSearchQuery } from '../domain/searchQuery'
+import type { LibrarySearchReference, SearchAuthAction } from '../domain/authAction'
+import { normalizeSearchQuery } from '../domain/queryPolicy'
 
 const ANONYMOUS_QUERY_GATE_KEY = 'ideaboard:search:anonymous-query-gate'
 const PENDING_ACTION_KEY = 'ideaboard:search:pending-auth-action'
