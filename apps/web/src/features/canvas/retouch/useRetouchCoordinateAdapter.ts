@@ -6,6 +6,7 @@ import { useRafScheduler } from '../utils/interaction/useRafScheduler'
 import { waitForNextAnimationFrame } from '../utils/animationFrame'
 import { containImageRect } from '../utils/outpaintGeometry'
 import type { RetouchModeState } from './useRetouchMode'
+import type { CanvasFlowViewportControls } from '../vue-flow-adapter'
 
 type FlowViewport = { x: number; y: number; zoom: number }
 
@@ -31,18 +32,7 @@ type UseRetouchCoordinateAdapterOptions = {
   retouchState: Ref<RetouchModeState | null>
   getImageNodeDisplayPayload: (nodeId: string) => ImageDisplayPayload | null
   getImageStageElement: (nodeId: string) => HTMLElement | null
-  screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
-  getViewport: () => FlowViewport
-  setViewport: (
-    viewport: FlowViewport,
-    options?: { duration?: number; interpolate?: 'smooth' },
-  ) => Promise<unknown> | unknown
-  setCenter: (
-    x: number,
-    y: number,
-    options?: { zoom?: number; duration?: number; interpolate?: 'smooth' },
-  ) => Promise<unknown> | unknown
-}
+} & CanvasFlowViewportControls
 
 const RETOUCH_FOCUS_MAX_ZOOM = 2
 const RETOUCH_FOCUS_MIN_ZOOM = 0.1

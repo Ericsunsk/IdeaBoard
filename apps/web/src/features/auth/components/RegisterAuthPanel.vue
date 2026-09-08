@@ -291,20 +291,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import { Lock as LockIcon, Shield as ShieldIcon, User as UserIcon } from '@iconoir/vue'
-import { useUserStore } from '../session/authSession'
-import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
 import { PRIVACY_POLICY_PATH, TERMS_PATH } from '../../../shared/constants/routePaths'
 import IbFormField from '../../../shared/components/IbFormField.vue'
 import { getPasswordLengthError } from '../../../shared/auth/passwordPolicy'
-import { useAuthFeedback } from '../useAuthFeedback'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
+import { useAuthPanelControls } from './authPanelControls'
 import { AUTH_DISPLAY_NAME_LIMIT, getLengthError, getRequiredError } from './authFormUtils'
 import {
   authButtonPt,
@@ -331,16 +328,15 @@ const emit = defineEmits<{
   'update:busy': [busy: boolean]
 }>()
 
-const { t } = useI18n()
-const userStore = useUserStore()
-const authFeedback = useAuthFeedback()
-const { isPending: loading, runAsyncAction } = useAsyncAction()
-const submitControlState = computed(() =>
-  resolveInteractiveControlState({ pending: loading.value }),
-)
-const secondaryControlState = computed(() =>
-  resolveInteractiveControlState({ disabled: loading.value }),
-)
+const {
+  t,
+  userStore,
+  authFeedback,
+  loading,
+  runAsyncAction,
+  submitControlState,
+  secondaryControlState,
+} = useAuthPanelControls()
 
 type RegisterField = 'displayName' | 'email' | 'password' | 'confirmPassword'
 

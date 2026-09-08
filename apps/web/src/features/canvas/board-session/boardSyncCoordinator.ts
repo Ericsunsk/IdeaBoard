@@ -27,7 +27,6 @@ export type BoardSyncCoordinatorOptions = {
   isSavingBoard: ValueRef<boolean>
   boardSession: CanvasBoardSession
   readBoardAttachmentEpoch: () => number
-  canSaveBoard: () => boolean
   canApplyReconciliation: () => boolean
   onWarning: (text: string) => void
   onSuccess: (text: string) => void
@@ -35,6 +34,7 @@ export type BoardSyncCoordinatorOptions = {
 }
 
 export type BoardSyncCoordinator = {
+  canSaveBoard: () => boolean
   loadInitialOrRouteBoard: () => Promise<CanvasBoardLoadResult>
   saveCurrentBoardSnapshot: (
     options?: SaveCurrentBoardSnapshotOptions,
@@ -105,7 +105,7 @@ export function createBoardSyncCoordinator(
 
   function clearDirtyAfterImport() {
     options.isDirty.value = false
-    options.saveStatus.value = options.canSaveBoard() ? 'saved' : 'idle'
+    options.saveStatus.value = canSaveBoard() ? 'saved' : 'idle'
   }
 
   function applyLoadedSnapshot() {
@@ -359,7 +359,14 @@ export function createBoardSyncCoordinator(
     }
   }
 
+  function canSaveBoard(): boolean {
+    const boardId = options.boardSession.currentBoardId.value
+    if (!boardId) return false
+    return options.boardSession.exists(boardId) && !options.isLoadingBoardSnapshot.value
+  }
+
   return {
+    canSaveBoard,
     loadInitialOrRouteBoard,
     saveCurrentBoardSnapshot,
   }

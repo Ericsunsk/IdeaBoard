@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import type { AdminProviderConfigFeedback } from './useAdminProviderConfigFeedback'
-import type { AdminProviderConfigWorkspace } from './providerConfigWorkspace'
+import type { ProviderEndpointStore } from './providerConfigWorkspace'
 import {
   createEmptyProviderEndpointForm,
   inferProviderEndpointApiTypeFromUrl,
@@ -14,7 +14,7 @@ import type {
 } from './providerConfigTypes'
 
 export type ProviderEndpointEditorOptions = {
-  workspace: AdminProviderConfigWorkspace
+  store: ProviderEndpointStore
   feedback: AdminProviderConfigFeedback
 }
 
@@ -23,7 +23,7 @@ export type ProviderEndpointEditor = ReturnType<typeof createProviderEndpointEdi
 export function createProviderEndpointEditor(options: ProviderEndpointEditorOptions) {
   const visible = ref(false)
   const isEditing = ref(false)
-  const saveLoading = options.workspace.providerEndpointSaveLoading
+  const saveLoading = options.store.providerEndpointSaveLoading
   const currentProviderEndpointId = ref(0)
   const form = ref<ProviderEndpointFormData>(createEmptyProviderEndpointForm())
   const errors = ref<Record<ProviderEndpointFormField, string>>(
@@ -39,7 +39,7 @@ export function createProviderEndpointEditor(options: ProviderEndpointEditorOpti
   }
 
   function openEdit(target: ProviderEndpointCommandTarget) {
-    const row = options.workspace.resolveProviderEndpointTarget(target)
+    const row = options.store.resolveProviderEndpointTarget(target)
     if (!row) return
 
     isEditing.value = true
@@ -81,7 +81,7 @@ export function createProviderEndpointEditor(options: ProviderEndpointEditorOpti
       return
     }
 
-    await options.workspace.saveProviderEndpoint({
+    await options.store.saveProviderEndpoint({
       id: isEditing.value ? currentProviderEndpointId.value : undefined,
       data: { ...form.value },
       isEditing: isEditing.value,
@@ -122,8 +122,8 @@ export function createProviderEndpointEditor(options: ProviderEndpointEditorOpti
     saveLoading,
     form,
     errors,
-    apiTypeOptions: options.workspace.apiTypeOptions,
-    protocolRegistry: options.workspace.protocolRegistry,
+    apiTypeOptions: options.store.apiTypeOptions,
+    protocolRegistry: options.store.protocolRegistry,
     openCreate,
     openEdit,
     close,

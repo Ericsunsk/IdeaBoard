@@ -25,11 +25,11 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
   })
 
   const providerEndpointEditor = createProviderEndpointEditor({
-    workspace,
+    store: workspace,
     feedback: options.feedback,
   })
   const accountEditor = createAccountEditor({
-    workspace,
+    store: workspace,
     feedback: options.feedback,
   })
 

@@ -68,7 +68,7 @@ export function createImageToolChromeAdapter(
         selectedLayerId: session.retouchSession.selectedRetouchLayerId.value,
         selectedEffectLayer: session.retouchSession.selectedRetouchEffectLayer.value,
         histogramSource: retouchHistogramSource.value,
-        applyingRetouch: session.isApplyingRetouch.value,
+        applyingRetouch: session.applyScope.isApplying.value,
       },
     }
   })

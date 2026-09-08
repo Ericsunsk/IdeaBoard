@@ -1,4 +1,4 @@
-export type { CanvasVueFlowAdapter } from './types'
+export type { CanvasFlowViewportControls, CanvasVueFlowAdapter } from './types'
 export {
   createCanvasVueFlowRendererMetricsPort,
   type CanvasRendererDimensions,

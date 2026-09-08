@@ -89,8 +89,7 @@ export function createImageToolNodeBindings(
     const actionMenuVisible = ui.isImageActionPanelVisible(nodeId)
     const activeStrengthAction = ui.strengthControl.activeAction.value
     const directGenerating =
-      execution.isNodeExecutionActive(nodeId) ||
-      session.activeImageRetouchPendingNodeId.value === nodeId
+      execution.isNodeExecutionActive(nodeId) || session.applyScope.pendingNodeId.value === nodeId
     const nextBinding: ImageActionBinding = {
       actionMenuVisible,
       promptComposerVisible: ui.isImagePromptComposerVisible(nodeId),

@@ -3,7 +3,7 @@
  * Public classes: node-tool-surface, node-tool-button, node-tool-output-count,
  * node-tool-output-count-wrap, node-tool-output-count-option,
  * node-tool-output-count-popover, node-tool-popover-{grid,row},
- * node-tool-send. Canvas-wide tooltip presentation lives in canvas-tool-tooltip.css.
+ * node-tool-send, node-tool-icon-button--accent-hover, node-tool-glass-surface. Canvas-wide tooltip presentation lives in canvas-tool-tooltip.css.
  * Consumers may set --node-tool-* variables on node-tool-surface; they should
  * not style component-private descendants owned by a specific .vue file.
  */
@@ -48,6 +48,16 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+/*
+ * Accent-hover primary treatment for node-tool icon buttons. Use instead of
+ * repeating the primary-hover variable overrides per panel.
+ */
+.node-tool-icon-button--accent-hover {
+  --node-tool-icon-button-primary-hover-border: var(--canvas-accent-hover);
+  --node-tool-icon-button-primary-hover-bg: var(--canvas-accent-hover);
+  --node-tool-icon-button-primary-hover-color: #ffffff;
 }
 
 .node-tool-output-count-wrap {
@@ -119,6 +129,10 @@
   right: 0;
   bottom: calc(100% + var(--node-tool-button-gap));
   z-index: 43;
+}
+
+/* Shared glass surface for floating node-tool panels and popovers. */
+.node-tool-glass-surface {
   border: var(--node-tool-border-width) solid var(--canvas-glass-border);
   border-radius: var(--canvas-radius-xl);
   background: var(--canvas-glass-bg);

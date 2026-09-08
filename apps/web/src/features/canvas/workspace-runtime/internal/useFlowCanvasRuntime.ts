@@ -1,7 +1,11 @@
 import { computed, onScopeDispose, ref, shallowRef, type Ref } from 'vue'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { useCanvasGraphHistory } from '../../graph-runtime/application/useCanvasGraphHistory'
-import { useCanvasBoardAutosave, useCanvasBoardSync, type SaveStatus } from '../../board-session'
+import {
+  useCanvasBoardAutosave,
+  createBoardSyncCoordinator,
+  type SaveStatus,
+} from '../../board-session'
 import {
   useCanvasVueFlowGraphAdapter,
   type CanvasVueFlowGraphActions,
@@ -130,7 +134,7 @@ function useCanvasRuntimeBoardSync(
   localEditVersion: Ref<number>,
   canApplyReconciliation: () => boolean,
 ) {
-  return useCanvasBoardSync({
+  return createBoardSyncCoordinator({
     buildCurrentSnapshot: () =>
       requireGraphSessionRuntime().exportGraphSnapshot(options.boardBaseSnapshot.value),
     isDirty: options.isDirty,
@@ -330,7 +334,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   })
 
   function markDirty() {
-    if (!boardSync.canSaveBoard.value) return
+    if (!boardSync.canSaveBoard()) return
     localEditVersion.value += 1
     options.isDirty.value = true
     if (options.saveStatus.value === 'idle' || options.saveStatus.value === 'saved') {
@@ -451,7 +455,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
 
   return {
     persistence: {
-      currentBoardId: boardSync.currentBoardId,
+      currentBoardId: options.boardSession.currentBoardId,
       loadInitialOrRouteBoard,
       flushAutosave,
       history: canvasGraphHistory,

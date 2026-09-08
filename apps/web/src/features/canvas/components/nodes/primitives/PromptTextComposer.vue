@@ -137,7 +137,7 @@ type PromptTextComposerVariant = 'node' | 'floating'
 
 const promptTextComposerVariantClasses: Record<PromptTextComposerVariant, string> = {
   node: 'variant-node',
-  floating: 'variant-floating',
+  floating: 'variant-floating node-tool-glass-surface',
 }
 
 const maxVisibleImageInputs = computed(() =>
@@ -181,12 +181,6 @@ function onSubmit(prompt: string, outputCount: number, aspectRatio: PromptAspect
 .prompt-text-composer.variant-floating {
   gap: var(--node-tool-button-gap);
   padding: 9px;
-  border: var(--node-tool-border-width) solid var(--canvas-glass-border);
-  border-radius: var(--canvas-radius-xl);
-  background: var(--canvas-glass-bg);
-  box-shadow: none;
-  backdrop-filter: blur(var(--canvas-glass-blur));
-  -webkit-backdrop-filter: blur(var(--canvas-glass-blur));
 }
 
 .prompt-text-composer.variant-floating:focus-within,

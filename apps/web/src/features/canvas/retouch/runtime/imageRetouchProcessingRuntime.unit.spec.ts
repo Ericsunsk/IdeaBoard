@@ -8,19 +8,23 @@ import {
 import type { ImageRetouchPlanExecutionEventReporter } from './planExecutorTypes'
 import type { ImageProcessingBackend, ImageProcessingRuntime } from './types'
 
-const { createImageRetouchProcessingBackendMock, createImageProcessingRuntimeMock } = vi.hoisted(
-  () => ({
-    createImageRetouchProcessingBackendMock: vi.fn(),
+const { createHybridExecutorMock, createMainThreadBackendMock, createImageProcessingRuntimeMock } =
+  vi.hoisted(() => ({
+    createHybridExecutorMock: vi.fn(),
+    createMainThreadBackendMock: vi.fn(),
     createImageProcessingRuntimeMock: vi.fn(),
-  }),
-)
+  }))
 
 vi.mock('./ImageProcessingRuntime', () => ({
   createImageProcessingRuntime: createImageProcessingRuntimeMock,
 }))
 
-vi.mock('./imageProcessingBackends', () => ({
-  createImageRetouchProcessingBackend: createImageRetouchProcessingBackendMock,
+vi.mock('./hybridPlanExecutor', () => ({
+  createHybridImageRetouchPlanExecutor: createHybridExecutorMock,
+}))
+
+vi.mock('./mainThreadImageProcessingBackend', () => ({
+  createMainThreadImageProcessingBackend: createMainThreadBackendMock,
 }))
 
 type DiagnosticsWindow = Window & {
@@ -32,11 +36,45 @@ afterEach(async () => {
   runtimeModule.disposeImageRetouchProcessingRuntime()
   delete (window as DiagnosticsWindow)[RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_KEY]
   vi.restoreAllMocks()
-  createImageRetouchProcessingBackendMock.mockReset()
+  createHybridExecutorMock.mockReset()
+  createMainThreadBackendMock.mockReset()
   createImageProcessingRuntimeMock.mockReset()
 })
 
 describe('image retouch processing runtime', () => {
+  it('wires the main-thread backend to the hybrid plan executor', async () => {
+    const runtimeModule = await import('./imageRetouchProcessingRuntime')
+    const executor = { execute: vi.fn() }
+    const backend = createBackendStub()
+    const runtime = createRuntimeStub()
+    createHybridExecutorMock.mockReturnValue(executor)
+    createMainThreadBackendMock.mockReturnValue(backend)
+    createImageProcessingRuntimeMock.mockReturnValue(runtime)
+
+    expect(runtimeModule.getImageRetouchProcessingRuntime()).toBe(runtime)
+    expect(createHybridExecutorMock).toHaveBeenCalledWith({
+      onPlanExecutorEvent: expect.any(Function),
+    })
+    expect(createMainThreadBackendMock).toHaveBeenCalledWith({ planExecutor: executor })
+    expect(createImageProcessingRuntimeMock).toHaveBeenCalledWith({ backend })
+  })
+
+  it('returns the same runtime until disposed', async () => {
+    const runtimeModule = await import('./imageRetouchProcessingRuntime')
+    const runtime = createRuntimeStub()
+    createImageProcessingRuntimeMock.mockReturnValue(runtime)
+
+    const first = runtimeModule.getImageRetouchProcessingRuntime()
+    const second = runtimeModule.getImageRetouchProcessingRuntime()
+    expect(first).toBe(runtime)
+    expect(second).toBe(runtime)
+    expect(createImageProcessingRuntimeMock).toHaveBeenCalledTimes(1)
+
+    runtimeModule.disposeImageRetouchProcessingRuntime()
+    runtimeModule.getImageRetouchProcessingRuntime()
+    expect(createImageProcessingRuntimeMock).toHaveBeenCalledTimes(2)
+  })
+
   it('wires default plan executor diagnostics to browser-observable events', async () => {
     const runtimeModule = await import('./imageRetouchProcessingRuntime')
     const backend = createBackendStub()
@@ -45,20 +83,19 @@ describe('image retouch processing runtime', () => {
     const listener = vi.fn<EventListener>((event) => {
       eventDetails.push((event as CustomEvent<RetouchPlanExecutorBrowserDiagnostic>).detail)
     })
-    createImageRetouchProcessingBackendMock.mockReturnValue(backend)
+    createMainThreadBackendMock.mockReturnValue(backend)
     createImageProcessingRuntimeMock.mockReturnValue(runtime)
     window.addEventListener(RETOUCH_PLAN_EXECUTOR_DIAGNOSTICS_EVENT, listener)
 
     const resolvedRuntime = runtimeModule.getImageRetouchProcessingRuntime()
 
     expect(resolvedRuntime).toBe(runtime)
-    expect(createImageRetouchProcessingBackendMock).toHaveBeenCalledWith({
+    expect(createHybridExecutorMock).toHaveBeenCalledWith({
       onPlanExecutorEvent: expect.any(Function),
     })
-    expect(createImageProcessingRuntimeMock).toHaveBeenCalledWith({ backend })
 
-    const reporter = createImageRetouchProcessingBackendMock.mock.calls[0]?.[0]
-      ?.onPlanExecutorEvent as ImageRetouchPlanExecutionEventReporter | undefined
+    const reporter = createHybridExecutorMock.mock.calls[0]?.[0]?.onPlanExecutorEvent as
+      ImageRetouchPlanExecutionEventReporter | undefined
     reporter?.({
       kind: 'cpu-plan-completed',
       planLength: 4,

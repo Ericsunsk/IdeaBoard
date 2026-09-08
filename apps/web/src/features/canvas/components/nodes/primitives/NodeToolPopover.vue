@@ -1,6 +1,11 @@
 <template>
   <Transition v-bind="transientOverlayMotion">
-    <div v-if="visible" v-bind="$attrs" class="node-tool-output-count-popover" :class="layoutClass">
+    <div
+      v-if="visible"
+      v-bind="$attrs"
+      class="node-tool-output-count-popover node-tool-glass-surface"
+      :class="layoutClass"
+    >
       <slot />
     </div>
   </Transition>

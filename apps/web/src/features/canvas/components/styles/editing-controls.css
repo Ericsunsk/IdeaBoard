@@ -100,6 +100,16 @@
   white-space: nowrap;
 }
 
+.editing-controls-control,
+.editing-controls-toggle-button,
+.editing-controls-segmented-button {
+  transition:
+    background-color var(--motion-control-duration) var(--motion-control-easing),
+    border-color var(--motion-control-duration) var(--motion-control-easing),
+    color var(--motion-control-duration) var(--motion-control-easing),
+    opacity var(--motion-feedback-duration) var(--motion-feedback-easing);
+}
+
 .editing-controls-control {
   height: var(--editing-controls-compact-control-height);
   min-width: 0;
@@ -112,11 +122,6 @@
   font-variant-numeric: tabular-nums;
   outline: none;
   padding: 0 7px;
-  transition:
-    background-color var(--motion-control-duration) var(--motion-control-easing),
-    border-color var(--motion-control-duration) var(--motion-control-easing),
-    color var(--motion-control-duration) var(--motion-control-easing),
-    opacity var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .editing-controls-control:hover:not(:disabled) {
@@ -154,11 +159,6 @@
 .editing-controls-segmented-button {
   border-radius: calc(var(--editing-controls-control-radius) - 1px);
   cursor: pointer;
-  transition:
-    background-color var(--motion-control-duration) var(--motion-control-easing),
-    border-color var(--motion-control-duration) var(--motion-control-easing),
-    color var(--motion-control-duration) var(--motion-control-easing),
-    opacity var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .editing-controls-toggle-button {

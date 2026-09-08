@@ -136,10 +136,9 @@
   padding: 4px;
 }
 
-.canvas-chrome-board-icon-button {
+.canvas-chrome-board-icon-button,
+.canvas-chrome-status-button {
   display: flex;
-  width: 29px;
-  height: 29px;
   align-items: center;
   justify-content: center;
   border: 0;
@@ -151,6 +150,11 @@
   padding: 0;
   color: var(--ib-control-icon);
   cursor: pointer;
+}
+
+.canvas-chrome-board-icon-button {
+  width: 29px;
+  height: 29px;
   transition:
     background-color var(--motion-control-duration) var(--motion-control-easing),
     color var(--motion-control-duration) var(--motion-control-easing),
@@ -294,20 +298,8 @@
 }
 
 .canvas-chrome-status-button {
-  display: flex;
   width: 23px;
   height: 23px;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  padding: 0;
-  color: var(--ib-control-icon);
-  cursor: pointer;
   transition:
     background-color var(--motion-control-duration) var(--motion-control-easing),
     color var(--motion-control-duration) var(--motion-control-easing);

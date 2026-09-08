@@ -2,7 +2,7 @@
   <ImageToolChromeFrame mode="inpaint" :anchor-rect="anchorRect">
     <template #tools>
       <NodeToolIconButton
-        class="inpaint-tool-btn"
+        class="inpaint-tool-btn node-tool-icon-button--accent-hover"
         :active="drawMode === 'paint'"
         :aria-label="t('canvas.inpaint.brushTool')"
         :tooltip="t('canvas.inpaint.brushTool')"
@@ -11,7 +11,7 @@
         <EditPencil />
       </NodeToolIconButton>
       <NodeToolIconButton
-        class="inpaint-tool-btn"
+        class="inpaint-tool-btn node-tool-icon-button--accent-hover"
         :active="drawMode === 'erase'"
         :aria-label="t('canvas.inpaint.eraserTool')"
         :tooltip="t('canvas.inpaint.eraserTool')"
@@ -209,11 +209,6 @@ function onSubmit(prompt: string) {
 
 .inpaint-tool-btn {
   width: 100%;
-  --node-tool-icon-button-size: var(--node-tool-button-size);
-  --node-tool-icon-button-radius: var(--node-tool-button-radius);
-  --node-tool-icon-button-primary-hover-border: var(--canvas-accent-hover);
-  --node-tool-icon-button-primary-hover-bg: var(--canvas-accent-hover);
-  --node-tool-icon-button-primary-hover-color: #ffffff;
 }
 
 .inpaint-right-actions {

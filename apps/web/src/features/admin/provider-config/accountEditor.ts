@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import type { AdminProviderConfigFeedback } from './useAdminProviderConfigFeedback'
-import type { AdminProviderConfigWorkspace } from './providerConfigWorkspace'
+import type { ProviderAccountStore } from './providerConfigWorkspace'
 import { createModelSuggestions } from './providerModelOptions'
 import { isModellessProviderEndpoint, uniqueTrimmedModelValues } from './providerConfigPayload'
 import type {
@@ -13,7 +13,7 @@ import type {
 } from './providerConfigTypes'
 
 export type AccountEditorOptions = {
-  workspace: AdminProviderConfigWorkspace
+  store: ProviderAccountStore
   feedback: AdminProviderConfigFeedback
 }
 
@@ -22,18 +22,18 @@ export type AccountEditor = ReturnType<typeof createAccountEditor>
 export function createAccountEditor(options: AccountEditorOptions) {
   const visible = ref(false)
   const isEditing = ref(false)
-  const saveLoading = options.workspace.accountSaveLoading
+  const saveLoading = options.store.accountSaveLoading
   const currentAccountId = ref(0)
   const selectedProviderEndpoint = ref<ProviderEndpointRecord | null>(null)
   const selectedProviderEndpointView = computed(() =>
     selectedProviderEndpoint.value
-      ? options.workspace.getProviderEndpointView(selectedProviderEndpoint.value)
+      ? options.store.getProviderEndpointView(selectedProviderEndpoint.value)
       : null,
   )
-  const accountLimits = options.workspace.accountLimits
+  const accountLimits = options.store.accountLimits
   const form = ref(createEmptyAccountForm(accountLimits.value, 0))
   const errors = ref<Record<ProviderAccountFormField, string>>(createEmptyAccountFormErrors())
-  const detectModelsLoading = options.workspace.detectModelsLoading
+  const detectModelsLoading = options.store.detectModelsLoading
   const detectedModelValues = ref<string[]>([])
   const modelSuggestions = ref<string[]>([])
   const modelSearchInput = ref('')
@@ -41,7 +41,7 @@ export function createAccountEditor(options: AccountEditorOptions) {
   const hasShownApiKeyHint = ref(false)
 
   function openCreate(target: ProviderEndpointCommandTarget) {
-    const providerEndpoint = options.workspace.resolveProviderEndpointTarget(target)
+    const providerEndpoint = options.store.resolveProviderEndpointTarget(target)
     if (!providerEndpoint) return
 
     isEditing.value = false
@@ -52,7 +52,7 @@ export function createAccountEditor(options: AccountEditorOptions) {
       providerEndpoint.id,
       createUniqueAccountName(
         `${providerEndpoint.name} APIKey`,
-        options.workspace
+        options.store
           .getProviderEndpointAccounts(providerEndpoint.id)
           .map((account) => account.name),
       ),
@@ -63,12 +63,12 @@ export function createAccountEditor(options: AccountEditorOptions) {
   }
 
   function openEdit(target: ProviderAccountCommandTarget) {
-    const account = options.workspace.resolveAccountTarget(target)
+    const account = options.store.resolveAccountTarget(target)
     if (!account) return
 
     isEditing.value = true
     currentAccountId.value = account.id
-    selectedProviderEndpoint.value = options.workspace.findProviderEndpointById(
+    selectedProviderEndpoint.value = options.store.findProviderEndpointById(
       account.providerEndpointId,
     )
     form.value = {
@@ -158,7 +158,7 @@ export function createAccountEditor(options: AccountEditorOptions) {
     form.value.name = form.value.name.trim()
     form.value.modelValues = modelValues
 
-    await options.workspace.saveAccount({
+    await options.store.saveAccount({
       isEditing: isEditing.value,
       accountId: currentAccountId.value,
       form: form.value,
@@ -185,7 +185,7 @@ export function createAccountEditor(options: AccountEditorOptions) {
   }
 
   async function detectModelsOnSelectOpen() {
-    const result = await options.workspace.detectModels({
+    const result = await options.store.detectModels({
       providerEndpoint: selectedProviderEndpoint.value,
       secret: form.value.secret,
       detectedValues: detectedModelValues.value,
@@ -206,7 +206,7 @@ export function createAccountEditor(options: AccountEditorOptions) {
 
   function hasDuplicateAccountName(accountName: string) {
     const normalizedName = accountName.toLowerCase()
-    return options.workspace
+    return options.store
       .getProviderEndpointAccounts(form.value.providerEndpointId)
       .some(
         (account) =>

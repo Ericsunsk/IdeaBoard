@@ -1,148 +1,130 @@
 <template>
-  <AdminDialogShell
+  <AdminSettingsDialogFrame
     :visible="visible"
     header="Stripe 设置"
-    size="form"
     :busy="isBusy"
+    :loading="isLoading && !summary"
+    loading-label="加载 Stripe 设置"
+    :error="loadError"
     @reset="resetAndLoad"
     @update:visible="emit('update:visible', $event)"
+    @retry="load"
   >
-    <div v-if="isLoading && !summary" class="flex min-h-36 items-center justify-center">
-      <ProgressSpinner aria-label="加载 Stripe 设置" stroke-width="3" />
-    </div>
-
-    <template v-else>
-      <Message v-if="loadError" severity="error" :closable="false">
-        <div class="flex flex-wrap items-center gap-2">
-          <span>{{ loadError }}</span>
-          <Button
-            label="重新加载"
-            severity="secondary"
-            size="small"
-            text
-            :class="adminTextButtonClass"
-            :disabled="isBusy"
-            @click="load"
-          />
-        </div>
-      </Message>
-
-      <div
-        v-if="summary"
-        class="grid grid-cols-1 gap-2 rounded-xl border border-admin-border bg-admin-surface-muted p-3 sm:grid-cols-2"
-      >
-        <div class="min-w-0">
-          <div class="text-admin-caption text-admin-text-3">账户</div>
-          <div class="truncate text-admin-body font-semibold text-admin-title-color">
-            {{ summary.accountId || '尚未配置' }}
-          </div>
-        </div>
-        <div class="min-w-0">
-          <div class="text-admin-caption text-admin-text-3">模式</div>
-          <div class="text-admin-body font-semibold text-admin-title-color">
-            {{ modeLabel }}
-          </div>
-        </div>
-        <div class="flex items-center gap-1.5 text-admin-caption text-admin-text-2">
-          <span
-            class="size-1.5 rounded-full"
-            :class="summary.productReady ? 'bg-admin-success' : 'bg-admin-warning'"
-          />
-          {{ summary.productReady ? 'Product 已就绪' : 'Product 未就绪' }}
-        </div>
-        <div class="flex items-center gap-1.5 text-admin-caption text-admin-text-2">
-          <span
-            class="size-1.5 rounded-full"
-            :class="summary.webhookReady ? 'bg-admin-success' : 'bg-admin-warning'"
-          />
-          {{ summary.webhookReady ? 'Webhook 已就绪' : 'Webhook 未就绪' }}
+    <div
+      v-if="summary"
+      class="grid grid-cols-1 gap-2 rounded-xl border border-admin-border bg-admin-surface-muted p-3 sm:grid-cols-2"
+    >
+      <div class="min-w-0">
+        <div class="text-admin-caption text-admin-text-3">账户</div>
+        <div class="truncate text-admin-body font-semibold text-admin-title-color">
+          {{ summary.accountId || '尚未配置' }}
         </div>
       </div>
+      <div class="min-w-0">
+        <div class="text-admin-caption text-admin-text-3">模式</div>
+        <div class="text-admin-body font-semibold text-admin-title-color">
+          {{ modeLabel }}
+        </div>
+      </div>
+      <div class="flex items-center gap-1.5 text-admin-caption text-admin-text-2">
+        <span
+          class="size-1.5 rounded-full"
+          :class="summary.productReady ? 'bg-admin-success' : 'bg-admin-warning'"
+        />
+        {{ summary.productReady ? 'Product 已就绪' : 'Product 未就绪' }}
+      </div>
+      <div class="flex items-center gap-1.5 text-admin-caption text-admin-text-2">
+        <span
+          class="size-1.5 rounded-full"
+          :class="summary.webhookReady ? 'bg-admin-success' : 'bg-admin-warning'"
+        />
+        {{ summary.webhookReady ? 'Webhook 已就绪' : 'Webhook 未就绪' }}
+      </div>
+    </div>
 
-      <form class="flex flex-col gap-4" novalidate @submit.prevent="submit">
-        <AdminFormField
-          v-slot="{ describedbyId, invalid }"
-          label="Payment Method Configuration ID"
-          for="admin-stripe-payment-method-configuration-id"
-          :error="errors.paymentMethodConfigurationId"
-          required
+    <form class="flex flex-col gap-4" novalidate @submit.prevent="submit">
+      <AdminFormField
+        v-slot="{ describedbyId, invalid }"
+        label="Payment Method Configuration ID"
+        for="admin-stripe-payment-method-configuration-id"
+        :error="errors.paymentMethodConfigurationId"
+        required
+      >
+        <InputText
+          id="admin-stripe-payment-method-configuration-id"
+          v-model="form.paymentMethodConfigurationId"
+          class="w-full"
+          placeholder="pmc_..."
+          maxlength="255"
+          aria-label="Payment Method Configuration ID"
+          :disabled="isBusy"
+          :invalid="invalid"
+          :aria-describedby="describedbyId"
+          @update:model-value="clearError('paymentMethodConfigurationId')"
+        />
+      </AdminFormField>
+
+      <AdminFormField
+        v-slot="{ describedbyId, invalid }"
+        label="Stripe API Key"
+        for="admin-stripe-api-key"
+        :error="errors.apiKey"
+        hint="支持 sk_ 或 rk_ 格式。"
+        :required="!summary?.apiKeyConfigured"
+      >
+        <InputText
+          id="admin-stripe-api-key"
+          v-model="form.apiKey"
+          class="w-full"
+          type="password"
+          autocomplete="off"
+          aria-label="Stripe API Key"
+          :placeholder="apiKeyPlaceholder"
+          :disabled="isBusy"
+          :invalid="invalid"
+          :aria-describedby="describedbyId"
+          @update:model-value="clearError('apiKey')"
+        />
+      </AdminFormField>
+
+      <AdminFormField
+        v-slot="{ describedbyId, invalid }"
+        label="Product Tax Code"
+        for="admin-stripe-product-tax-code"
+        :error="errors.productTaxCode"
+        required
+      >
+        <InputText
+          id="admin-stripe-product-tax-code"
+          v-model="form.productTaxCode"
+          class="w-full"
+          placeholder="例如：txcd_10105001"
+          aria-label="Product Tax Code"
+          :disabled="isBusy"
+          :invalid="invalid"
+          :aria-describedby="describedbyId"
+          @update:model-value="clearError('productTaxCode')"
+        />
+      </AdminFormField>
+
+      <AdminFormField label="充值开放" for="admin-stripe-purchases-enabled">
+        <div
+          class="flex min-h-10 items-center justify-between rounded-xl border border-admin-border bg-admin-surface-muted px-3"
         >
-          <InputText
-            id="admin-stripe-payment-method-configuration-id"
-            v-model="form.paymentMethodConfigurationId"
-            class="w-full"
-            placeholder="pmc_..."
-            maxlength="255"
-            aria-label="Payment Method Configuration ID"
+          <span class="text-admin-body text-admin-text-2">
+            {{ form.purchasesEnabled ? '已开放' : '已关闭' }}
+          </span>
+          <ToggleSwitch
+            v-model="form.purchasesEnabled"
+            input-id="admin-stripe-purchases-enabled"
+            aria-label="充值开放"
             :disabled="isBusy"
-            :invalid="invalid"
-            :aria-describedby="describedbyId"
-            @update:model-value="clearError('paymentMethodConfigurationId')"
           />
-        </AdminFormField>
+        </div>
+      </AdminFormField>
 
-        <AdminFormField
-          v-slot="{ describedbyId, invalid }"
-          label="Stripe API Key"
-          for="admin-stripe-api-key"
-          :error="errors.apiKey"
-          hint="支持 sk_ 或 rk_ 格式。"
-          :required="!summary?.apiKeyConfigured"
-        >
-          <InputText
-            id="admin-stripe-api-key"
-            v-model="form.apiKey"
-            class="w-full"
-            type="password"
-            autocomplete="off"
-            aria-label="Stripe API Key"
-            :placeholder="apiKeyPlaceholder"
-            :disabled="isBusy"
-            :invalid="invalid"
-            :aria-describedby="describedbyId"
-            @update:model-value="clearError('apiKey')"
-          />
-        </AdminFormField>
-
-        <AdminFormField
-          v-slot="{ describedbyId, invalid }"
-          label="Product Tax Code"
-          for="admin-stripe-product-tax-code"
-          :error="errors.productTaxCode"
-          required
-        >
-          <InputText
-            id="admin-stripe-product-tax-code"
-            v-model="form.productTaxCode"
-            class="w-full"
-            placeholder="例如：txcd_10105001"
-            aria-label="Product Tax Code"
-            :disabled="isBusy"
-            :invalid="invalid"
-            :aria-describedby="describedbyId"
-            @update:model-value="clearError('productTaxCode')"
-          />
-        </AdminFormField>
-
-        <AdminFormField label="充值开放" for="admin-stripe-purchases-enabled">
-          <div
-            class="flex min-h-10 items-center justify-between rounded-xl border border-admin-border bg-admin-surface-muted px-3"
-          >
-            <span class="text-admin-body text-admin-text-2">
-              {{ form.purchasesEnabled ? '已开放' : '已关闭' }}
-            </span>
-            <ToggleSwitch
-              v-model="form.purchasesEnabled"
-              input-id="admin-stripe-purchases-enabled"
-              aria-label="充值开放"
-              :disabled="isBusy"
-            />
-          </div>
-        </AdminFormField>
-
-        <Message v-if="saveError" severity="error" :closable="false">{{ saveError }}</Message>
-      </form>
-    </template>
+      <Message v-if="saveError" severity="error" :closable="false">{{ saveError }}</Message>
+    </form>
 
     <template #footer="{ requestClose }">
       <Button
@@ -162,7 +144,7 @@
         @click="submit"
       />
     </template>
-  </AdminDialogShell>
+  </AdminSettingsDialogFrame>
 </template>
 
 <script setup lang="ts">
@@ -170,12 +152,11 @@ import { computed, reactive, ref } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
-import ProgressSpinner from 'primevue/progressspinner'
 import ToggleSwitch from 'primevue/toggleswitch'
-import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
+import AdminSettingsDialogFrame from '../../shared/components/AdminSettingsDialogFrame.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
-import { adminActionButtonClass, adminTextButtonClass } from '../../shared/lib/adminUiClasses'
+import { adminActionButtonClass } from '../../shared/lib/adminUiClasses'
 import { createAdminStripeSettingsResource } from './stripeSettingsResource'
 import type { AdminStripeSettingsResource, StripeConfigurationSummary } from './stripeSettingsTypes'
 

@@ -1,9 +1,9 @@
 <template>
-  <div class="retouch-retouch-actions node-tool-surface">
+  <div class="retouch-effect-actions node-tool-surface">
     <NodeToolIconButton
       v-for="item in actionItems"
       :key="item.kind"
-      class="retouch-retouch-actions__button"
+      class="retouch-effect-actions__button node-tool-icon-button--accent-hover"
       :active="selectedKind === item.kind"
       :aria-label="item.label"
       :tooltip="item.label"
@@ -55,10 +55,5 @@ const actionItems: Array<{
 .retouch-effect-actions__button {
   width: var(--node-tool-button-size);
   flex: 0 0 var(--node-tool-button-size);
-  --node-tool-icon-button-size: var(--node-tool-button-size);
-  --node-tool-icon-button-radius: var(--node-tool-button-radius);
-  --node-tool-icon-button-primary-hover-border: var(--canvas-accent-hover);
-  --node-tool-icon-button-primary-hover-bg: var(--canvas-accent-hover);
-  --node-tool-icon-button-primary-hover-color: #ffffff;
 }
 </style>

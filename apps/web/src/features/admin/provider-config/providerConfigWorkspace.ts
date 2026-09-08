@@ -532,3 +532,31 @@ function findAccountByTarget(
 }
 
 export type AdminProviderConfigWorkspace = ReturnType<typeof createAdminProviderConfigWorkspace>
+
+/**
+ * Narrow store ports for the dialog editors. Editors depend only on these
+ * members — never on the whole workspace — so workspace internals can change
+ * without touching editor code, and editors are unit-testable against stubs.
+ */
+export type ProviderEndpointStore = Pick<
+  AdminProviderConfigWorkspace,
+  | 'providerEndpointSaveLoading'
+  | 'apiTypeOptions'
+  | 'protocolRegistry'
+  | 'resolveProviderEndpointTarget'
+  | 'saveProviderEndpoint'
+>
+
+export type ProviderAccountStore = Pick<
+  AdminProviderConfigWorkspace,
+  | 'accountSaveLoading'
+  | 'detectModelsLoading'
+  | 'accountLimits'
+  | 'resolveProviderEndpointTarget'
+  | 'resolveAccountTarget'
+  | 'findProviderEndpointById'
+  | 'getProviderEndpointAccounts'
+  | 'getProviderEndpointView'
+  | 'saveAccount'
+  | 'detectModels'
+>

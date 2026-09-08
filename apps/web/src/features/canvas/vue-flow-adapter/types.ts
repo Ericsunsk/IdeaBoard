@@ -22,6 +22,15 @@ export type CanvasVueFlowGraphActions = Partial<
   >
 >
 
+/**
+ * Shared viewport-control contract for canvas features that drive the Flow
+ * pane camera (focus, recenter, coordinate conversion) without owning it.
+ */
+export type CanvasFlowViewportControls = Pick<
+  CanvasVueFlowAdapter,
+  'screenToFlowCoordinate' | 'getViewport' | 'setViewport' | 'setCenter'
+>
+
 export type CanvasVueFlowAdapter = {
   viewport: Readonly<Ref<CanvasFlowViewport>>
   getViewport: () => CanvasFlowViewport

@@ -1,9 +1,12 @@
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import type { Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import type { ImageNodeItem } from '../../canvas-board/domain'
 import type { CanvasInteractionKey } from '../workspace-ui/useFlowCanvasInteractionState'
-import type { CanvasVueFlowConnectionAdapter } from '../vue-flow-adapter'
+import type {
+  CanvasFlowViewportControls,
+  CanvasVueFlowConnectionAdapter,
+} from '../vue-flow-adapter'
 import type { CanvasNodeItem } from '../../canvas-board/domain'
 import { useRetouchMode } from '../retouch/useRetouchMode'
 import { useRetouchSession } from '../retouch/useRetouchSession'
@@ -15,6 +18,7 @@ import { useInpaintChromeState } from '../inpaint/useInpaintChromeState'
 import type { ImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import { createImageToolMaskOverlayState } from './maskOverlayAdapter'
+import { createImageToolApplyScopeHost } from './imageToolApplyScope'
 import type { ImageActionStrengthControlSource } from './imageToolTypes'
 
 type ValueRef<T> = {
@@ -22,8 +26,6 @@ type ValueRef<T> = {
 }
 
 type CanvasImageToolsFeedback = CanvasFeedback['imageTools']
-
-export type FlowViewport = { x: number; y: number; zoom: number }
 
 export type UseCanvasImageToolsOptions = {
   nodes: Ref<Node[]>
@@ -36,17 +38,6 @@ export type UseCanvasImageToolsOptions = {
   updateSnapshotNode?:
     ((nodeId: string, patcher: (previous: CanvasNodeItem) => CanvasNodeItem) => void) | undefined
   getImageStageElement: (nodeId: string) => HTMLElement | null
-  screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
-  getViewport: () => FlowViewport
-  setViewport: (
-    viewport: FlowViewport,
-    options?: { duration?: number; interpolate?: 'smooth' },
-  ) => Promise<unknown> | unknown
-  setCenter: (
-    x: number,
-    y: number,
-    options?: { zoom?: number; duration?: number; interpolate?: 'smooth' },
-  ) => Promise<unknown> | unknown
   createPendingRetouchNode: (sourceNode: ImageNodeItem) => string | null
   applyImageFileToImageNode: (nodeId: string, file: File) => Promise<boolean>
   removeNode: (nodeId: string) => void
@@ -71,7 +62,7 @@ export type UseCanvasImageToolsOptions = {
   startCanvasInteraction: (key: CanvasInteractionKey) => void
   stopCanvasInteraction: (key: CanvasInteractionKey) => void
   feedback: CanvasImageToolsFeedback
-}
+} & CanvasFlowViewportControls
 
 export type ImageToolSessionCapabilities = {
   board: {
@@ -135,10 +126,10 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
   })
 
   const retouchSession = useRetouchSession()
-  const isApplyingRetouch = ref(false)
-  const activeImageRetouchFinalScopeId = ref<string | null>(null)
-  const activeImageRetouchPendingNodeId = ref<string | null>(null)
-  let imageRetouchFinalApplyCleanup: (() => void) | null = null
+  const applyScope = createImageToolApplyScopeHost({
+    currentBoardId: () => options.currentBoardId.value,
+    isNodeAlive: (nodeId) => options.getImageNodeSnapshot(nodeId) != null,
+  })
   const isImageRetouchMode = computed(() => retouchMode.value === 'adjust')
 
   const maskChromeState = useInpaintChromeState({
@@ -146,22 +137,11 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
   })
 
   function cancelImageRetouchFinalTask(
-    nodeId: string | null = retouchNodeId.value ?? activeImageRetouchFinalScopeId.value,
+    nodeId: string | null = retouchNodeId.value ?? applyScope.scopeId.value,
   ) {
     if (!nodeId) return
     cancelImageRetouchFinalRender(nodeId)
-    if (activeImageRetouchFinalScopeId.value === nodeId) {
-      imageRetouchFinalApplyCleanup?.()
-      imageRetouchFinalApplyCleanup = null
-      activeImageRetouchFinalScopeId.value = null
-      activeImageRetouchPendingNodeId.value = null
-      isApplyingRetouch.value = false
-    }
-  }
-
-  function registerImageRetouchFinalApplyCleanup(cleanup: (() => void) | null) {
-    imageRetouchFinalApplyCleanup?.()
-    imageRetouchFinalApplyCleanup = cleanup
+    applyScope.cancel(nodeId)
   }
 
   function confirmRetouchExit(state: { nodeId: string; mode: RetouchMode }) {
@@ -228,9 +208,7 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
     retouchNodeId,
     retouchSession,
     isImageRetouchMode,
-    isApplyingRetouch,
-    activeImageRetouchPendingNodeId,
-    activeImageRetouchFinalScopeId,
+    applyScope,
     inpaint,
     maskChromeState,
     coordinates,
@@ -238,8 +216,6 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
     cancel,
     commitMask,
     exitRetouchMode,
-    cancelImageRetouchFinalTask,
-    registerImageRetouchFinalApplyCleanup,
     discardNodeEdits,
   }
 }

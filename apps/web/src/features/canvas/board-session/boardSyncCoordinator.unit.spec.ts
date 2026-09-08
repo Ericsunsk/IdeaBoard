@@ -56,7 +56,6 @@ function createHarness() {
     isSavingBoard,
     boardSession,
     readBoardAttachmentEpoch: () => 1,
-    canSaveBoard: () => routeBoardId.value.length > 0,
     canApplyReconciliation: () => true,
     onWarning,
     onSuccess,
@@ -86,7 +85,26 @@ describe('Board Sync Coordinator', () => {
     expect(result).toEqual({ status: 'loaded', snapshot: expect.any(Object) })
     expect(harness.boardSession.load).toHaveBeenCalledWith('board-a')
     expect(harness.isDirty.value).toBe(false)
-    expect(harness.saveStatus.value).toBe('saved')
+    // The loading flag is still set while the snapshot is applied, so the
+    // real canSaveBoard predicate reports false here — same as production.
+    expect(harness.saveStatus.value).toBe('idle')
+  })
+
+  it('gates saving on board identity, existence, and load state', () => {
+    const harness = createHarness()
+    expect(harness.coordinator.canSaveBoard()).toBe(true)
+
+    harness.routeBoardId.value = ''
+    expect(harness.coordinator.canSaveBoard()).toBe(false)
+    harness.routeBoardId.value = 'board-a'
+
+    vi.mocked(harness.boardSession.exists).mockReturnValueOnce(false)
+    expect(harness.coordinator.canSaveBoard()).toBe(false)
+
+    harness.isLoadingBoardSnapshot.value = true
+    expect(harness.coordinator.canSaveBoard()).toBe(false)
+    harness.isLoadingBoardSnapshot.value = false
+    expect(harness.coordinator.canSaveBoard()).toBe(true)
   })
 
   it('returns an empty snapshot for a route without a board', async () => {

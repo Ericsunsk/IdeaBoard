@@ -36,14 +36,13 @@ import { hasRetouchRasterEdits } from '../retouch/utils/retouchRasterTools'
 
 export function createImageToolCommands(session: ImageToolSession) {
   const { board, execution, ui, feedback } = session.capabilities
-  let latestRetouchApplyId = 0
 
   const reportGenerationFailure = () => {
     feedback.warning(i18n.global.t('canvas.feedback.imageGenerationFailed'))
   }
 
   function readApplySource(): RetouchApplySource | null {
-    if (session.isApplyingRetouch.value) return null
+    if (session.applyScope.isApplying.value) return null
 
     const nodeId = session.retouchNodeId.value
     if (!nodeId || session.retouchMode.value !== 'adjust') return null
@@ -82,7 +81,7 @@ export function createImageToolCommands(session: ImageToolSession) {
     pendingNodeId: CanvasGraphNodeId,
     cleanupPendingNode: () => void,
   ): boolean {
-    session.activeImageRetouchPendingNodeId.value = pendingNodeId
+    session.applyScope.notePendingNode(pendingNodeId)
     const didConnect = board.connectIntent({
       sourceNodeId: nodeId,
       sourcePort: 'image',
@@ -163,23 +162,14 @@ export function createImageToolCommands(session: ImageToolSession) {
     reportGenerationFailure()
   }
 
-  function releaseRetouchScope(scopeId: string): void {
-    if (session.activeImageRetouchFinalScopeId.value === scopeId) {
-      session.registerImageRetouchFinalApplyCleanup(null)
-      session.activeImageRetouchFinalScopeId.value = null
-      session.isApplyingRetouch.value = false
-    }
-  }
-
   async function applyRetouch() {
     const retouch = readApplySource()
     if (!retouch) return
     const { nodeId, boardId } = retouch
 
-    session.isApplyingRetouch.value = true
-    const applyId = ++latestRetouchApplyId
-    const scopeId = nodeId
-    session.activeImageRetouchFinalScopeId.value = scopeId
+    const scope = session.applyScope.begin(nodeId, boardId)
+    if (!scope) return
+    const scopeId = scope.scopeId
 
     // The editor is a configuration surface, not the processing surface. Exit
     // immediately so the derived node can reuse the standard AI generation UI.
@@ -188,25 +178,23 @@ export function createImageToolCommands(session: ImageToolSession) {
     session.exitRetouchMode({ runBeforeExit: false })
     session.retouchSession.resetRetouchSession()
 
+    // Generation-scoped guard: once this cleanup has run (or the apply never
+    // created a node), later invocations are inert. The host tracks the
+    // cross-generation pending node for readers; this local makes a stale
+    // closure unable to remove a newer apply's node. Do not merge the two.
     let pendingNodeId: CanvasGraphNodeId | null = null
     let pendingNodeMaterialized = false
 
-    const isCurrentScope = () =>
-      applyId === latestRetouchApplyId &&
-      board.currentBoardId.value === boardId &&
-      session.activeImageRetouchFinalScopeId.value === scopeId &&
-      !!board.getImageNodeSnapshot(nodeId)
+    const isCurrentScope = () => scope.isCurrent()
 
     const cleanupPendingNode = () => {
       if (!pendingNodeId) return
       const nodeIdToCleanup = pendingNodeId
       if (!pendingNodeMaterialized) board.removeNode(nodeIdToCleanup)
-      if (session.activeImageRetouchPendingNodeId.value === nodeIdToCleanup) {
-        session.activeImageRetouchPendingNodeId.value = null
-      }
+      session.applyScope.clearPendingNode(nodeIdToCleanup)
       pendingNodeId = null
     }
-    session.registerImageRetouchFinalApplyCleanup(cleanupPendingNode)
+    session.applyScope.onCleanup(cleanupPendingNode)
 
     try {
       const createdNodeId = createRetouchPendingNode(retouch.sourceNode)
@@ -242,8 +230,7 @@ export function createImageToolCommands(session: ImageToolSession) {
       cleanupPendingNode()
       reportRetouchError(error, isCurrentScope)
     } finally {
-      // Runtime scopes use node IDs, which can be reused by a newer apply.
-      if (applyId === latestRetouchApplyId) releaseRetouchScope(scopeId)
+      scope.release()
     }
   }
 
