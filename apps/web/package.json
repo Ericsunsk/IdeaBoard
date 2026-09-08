@@ -14,7 +14,7 @@
     "bundle:visualize": "ANALYZE=true vite build",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "lint": "eslint . && npm run test:guardrails && npm run lint:user-copy && npm run lint:locale-parity && npm run lint:style-governance && npm run lint:import-boundaries && npm run lint:dependencies && npm run lint:duplication && npm run lint:knip",
+    "lint": "eslint . && npm run test:guardrails && npm run lint:user-copy && npm run lint:locale-parity && npm run lint:style-governance && npm run lint:import-boundaries && npm run lint:dependencies && npm run lint:duplication && npm run lint:knip && npm run audit:complexity",
     "lint:user-copy": "tsx scripts/check-user-copy-locale.ts",
     "lint:locale-parity": "tsx scripts/check-locale-parity.ts",
     "lint:import-boundaries": "tsx scripts/check-eslint-import-boundaries.ts",

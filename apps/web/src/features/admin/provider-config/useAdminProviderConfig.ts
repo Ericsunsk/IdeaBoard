@@ -6,8 +6,26 @@ import type { AdminProviderConfigResource } from './providerConfigResource'
 import { createProviderEndpointEditor } from './providerEndpointEditor'
 import { createAccountEditor } from './accountEditor'
 
+import { inject, provide, type InjectionKey } from 'vue'
+
 export type { ProviderEndpointEditor } from './providerEndpointEditor'
 export type { AccountEditor } from './accountEditor'
+export type AdminProviderConfigContext = ReturnType<typeof useAdminProviderConfig>
+export type AdminProviderConfigCommands = AdminProviderConfigContext['commands']
+
+const ADMIN_PROVIDER_CONFIG_KEY: InjectionKey<AdminProviderConfigContext> = Symbol('AdminProviderConfigContext')
+
+export function provideAdminProviderConfig(context: AdminProviderConfigContext) {
+  provide(ADMIN_PROVIDER_CONFIG_KEY, context)
+}
+
+export function useAdminProviderConfigContext(): AdminProviderConfigContext {
+  const context = inject(ADMIN_PROVIDER_CONFIG_KEY)
+  if (!context) {
+    throw new Error('useAdminProviderConfigContext must be used within provideAdminProviderConfig')
+  }
+  return context
+}
 
 export type UseAdminProviderConfigOptions = {
   feedback: AdminProviderConfigFeedback
