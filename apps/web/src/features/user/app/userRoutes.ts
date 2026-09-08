@@ -94,7 +94,7 @@ export const userRoutes: RouteRecordRaw[] = [
       {
         path: 'search',
         name: 'UserSearch',
-        component: () => import('../../search/pages/SearchPage.vue'),
+        component: () => import('../../search/presentation/pages/SearchPage.vue'),
         meta: { public: true },
       },
       {

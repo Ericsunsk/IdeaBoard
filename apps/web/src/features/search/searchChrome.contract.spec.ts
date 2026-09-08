@@ -5,10 +5,10 @@ import { describe, expect, it } from 'vitest'
 const searchRoot = resolve(process.cwd(), 'src/features/search')
 const readSource = (relativePath: string) => readFileSync(resolve(searchRoot, relativePath), 'utf8')
 
-const searchPage = readSource('pages/SearchPage.vue')
-const searchStyles = readSource('search.css')
-const searchSavePopover = readSource('components/SearchSavePopover.vue')
-const searchBatchActionDock = readSource('components/SearchBatchActionDock.vue')
+const searchPage = readSource('presentation/pages/SearchPage.vue')
+const searchStyles = readSource('presentation/search.css')
+const searchSavePopover = readSource('presentation/components/SearchSavePopover.vue')
+const searchBatchActionDock = readSource('presentation/components/SearchBatchActionDock.vue')
 
 describe('Search page chrome contract', () => {
   it('uses the shared page chrome surface without a Search-only background layer', () => {

@@ -5,7 +5,7 @@ Search 是公共图文 Feed 与付费以图搜图的上下文，拥有分页 Fee
 ## Language
 
 **Search Feed**:
-Feed 事实主（`createSearchFeed`）：`results/nextCursor/hasMore/loading/loadingMore/hasError/savedKeys/failedImages`，`AbortController + generation` 排序取消旧请求。
+Feed 事实主（`application/createSearchFeed`）：`results/nextCursor/hasMore/loading/loadingMore/hasError/savedKeys/failedImages`，`AbortController + generation` 排序取消旧请求。
 _Avoid_: useQuery-cached feed, uncancelled pagination
 
 **Submitted Query**:
@@ -30,15 +30,16 @@ _Avoid_: cross-user cache read, anonymous query gate bypass
 
 ## Module Ownership
 
-| Module       | Responsibility                                                                                                | Public Interface                                                                                             | Implementation Detail Boundary                                  |
-| ------------ | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| `pages`      | 唯一的路由页 `SearchPage`（`meta.public`），纯装配。                                                          | 被 `userRoutes` 懒加载；`useSearchScreenRuntime` 组装一切。                                                  | Page 不得直调 resource 或 feed。                                |
-| `components` | 结果视口（虚拟化 masonry）、收藏弹窗、批量 dock。                                                             | 回调式 props（`load-next-page/scroll-position`），不拥有数据。                                               | 滚动位置与 active anchor 由 feed 拥有，viewport 只上报。        |
-| feed core    | `searchFeed.ts` + `searchFeedPersistence.ts`（30min TTL 快照 + scroll，快照写延后到 idle）。                  | `createSearchFeed`；`reload` 用 `keepResultsOnNextLoad` 保卡。                                               | `savedKeys` 手动回填必须带 `savedMutationRevision` 防旧写覆盖。 |
-| resource     | 唯一的 generated 调用处：灵感搜索、视觉抽取、失败上报、计费询价；`inFlightRequests` 去重，query 限 200 rune。 | `searchResource` / `visionSearchBillingResource`（`sku=ai-search:vision` 纯询价展示）。                      | `hold/capture` 不在 search 侧展示，只进 admin 账本。            |
-| lifecycle    | 会话装配（`useSearchSession`/`useSearchScreenRuntime`）、vision 生命周期、lightbox、引用集合。                | `requireLogin`（设 pending + 开 overlay）、`resumePendingAction`。                                           | `effectScope` 按 user 会话隔离；旧 scope 必须 dispose。         |
-| bridge       | Library 存/删与引用转换。                                                                                     | `searchLibraryBridge`（纯映射）、`searchLibraryCoordinator`（`provide/inject search:library-coordinator`）。 | 底层写仍走 `library/libraryResource`，桥接只做投影与回写。      |
-| persistence  | scope 隔离的 sessionStorage 原语、feed/island/vision/continuation 各自键。                                    | `searchScopedStorageKey(:scope)`；`anonymous-query-gate` 同 query 去重、上限 5。                             | vision 意图与 `File/blob` 只放内存，不得进 storage。            |
+| Module       | Responsibility                                                                                                          | Public Interface                                                                                                                           | Implementation Detail Boundary                                  |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| `index.ts`   | 统一公开出口：对外导出领域模型（`SearchResult`、`SearchPage` 等）与意图续行接口（`clearPendingSearchAuthAction` 等）。   | `features/search/index.ts`。                                                                                                               | 封装内部分层细节，禁止外部模块深层依赖 infrastructure。          |
+| `pages`      | 唯一的路由页 `SearchPage`（`meta.public`），纯装配。                                                                    | 被 `userRoutes` 懒加载；`useSearchScreenRuntime` 组装一切。                                                                                | Page 不得直调 resource 或 feed。                                |
+| `components` | 结果视口（虚拟化 masonry）、收藏弹窗、批量 dock。                                                                       | 回调式 props（`load-next-page/scroll-position`），不拥有数据。                                                                             | 滚动位置与 active anchor 由 feed 拥有，viewport 只上报。        |
+| feed core    | `application/searchFeed.ts` + `infrastructure/searchFeedPersistence.ts`（30min TTL 快照 + scroll，快照写延后到 idle）。 | `application/createSearchFeed`；`reload` 用 `keepResultsOnNextLoad` 保卡。                                                                 | `savedKeys` 手动回填必须带 `savedMutationRevision` 防旧写覆盖。 |
+| resource     | 唯一的 generated 调用处：灵感搜索、视觉抽取、失败上报、计费询价；`inFlightRequests` 去重，query 限 200 rune。           | `infrastructure/searchResource` / `infrastructure/visionSearchBillingResource`（`sku=ai-search:vision` 纯询价展示）。                      | `hold/capture` 不在 search 侧展示，只进 admin 账本。            |
+| lifecycle    | 会话装配（`application/useSearchSession`/`presentation/useSearchScreenRuntime`）、vision 生命周期、lightbox、引用集合。 | `requireLogin`（设 pending + 开 overlay）、`resumePendingAction`。                                                                         | `effectScope` 按 user 会话隔离；旧 scope 必须 dispose。         |
+| bridge       | Library 存/删与引用转换。                                                                                               | `infrastructure/searchLibraryBridge`（纯映射）、`infrastructure/searchLibraryCoordinator`（`provide/inject search:library-coordinator`）。 | 底层写仍走 `library/libraryResource`，桥接只做投影与回写。      |
+| persistence  | scope 隔离的 sessionStorage 原语、feed/island/vision/continuation 各自键。                                              | `infrastructure/searchBrowserPersistence` (`searchScopedStorageKey(:scope)`)；`anonymous-query-gate` 同 query 去重、上限 5。               | vision 意图与 `File/blob` 只放内存，不得进 storage。            |
 
 ## Rules
 

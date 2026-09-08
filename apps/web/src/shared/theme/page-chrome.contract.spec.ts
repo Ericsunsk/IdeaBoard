@@ -9,8 +9,8 @@ const readSource = (relativePath: string) => readFileSync(resolve(sourceRoot, re
 
 const consumers = {
   navigation: readSource('features/user-shell/components/UserWorkspaceNavigation.vue'),
-  searchPage: readSource('features/search/pages/SearchPage.vue'),
-  searchBatchDock: readSource('features/search/components/SearchBatchActionDock.vue'),
+  searchPage: readSource('features/search/presentation/pages/SearchPage.vue'),
+  searchBatchDock: readSource('features/search/presentation/components/SearchBatchActionDock.vue'),
   boardsSkin: readSource('features/board-catalog/lib/boardCatalogSkin.ts'),
   libraryIsland: readSource('features/library/components/LibraryFloatingIsland.vue'),
   canvasChrome: readSource('features/canvas/workspace-chrome/components/CanvasChrome.vue'),
@@ -39,7 +39,7 @@ describe('Cross-feature page chrome surface contract', () => {
 
   it('does not re-declare the shared surface inside feature styles', () => {
     const featureStyles = [
-      readSource('features/search/search.css'),
+      readSource('features/search/presentation/search.css'),
       readSource('features/canvas/components/styles/canvas-chrome.css'),
       readSource('features/canvas/components/styles/canvas-vue-flow-adapter-skin.css'),
     ]
