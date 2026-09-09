@@ -36,9 +36,16 @@ type Service struct {
 }
 
 func NewService(profileRepo ports.ProfileRepository, assetLocator ports.StoredUploadLocator, publicAPIOrigin string) *Service {
+	return NewServiceWithLocalRoot(profileRepo, assetLocator, publicAPIOrigin, "")
+}
+
+// NewServiceWithLocalRoot binds the builtin-local driver to a canonical
+// filesystem root. An empty root resolves the process working directory once
+// at construction; prefer passing the configured STORAGE_LOCAL_ROOT.
+func NewServiceWithLocalRoot(profileRepo ports.ProfileRepository, assetLocator ports.StoredUploadLocator, publicAPIOrigin, localRoot string) *Service {
 	origin := strings.TrimRight(strings.TrimSpace(publicAPIOrigin), "/")
 	s3Svc := s3.NewS3CompatibleService()
-	localDriver := local.NewLocalStorageDriver(origin)
+	localDriver := local.NewLocalStorageDriverWithRoot(origin, localRoot)
 	s3Driver := s3.NewS3CompatibleStorageDriver(s3Svc, remote.DownloadImage)
 
 	drivers := profiles.DriverResolverFunc(func(provider domain.StorageProvider) (ports.StorageDriver, error) {

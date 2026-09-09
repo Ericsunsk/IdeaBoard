@@ -21,6 +21,7 @@ import {
   type GenerationExecutionPlan,
 } from '../planning/ImageExecutionPlan'
 import { resolveTaskImageResultAtIndexDisplay } from '../result-nodes/flowImageDirectActionTaskResult'
+import type { TaskImageResult } from '../../../../shared/query/taskResult'
 import { usePendingImageResultExecution } from '../result-nodes/usePendingImageResultNodes'
 import { waitExistingOrLiveTaskImageResults } from '../task-runner/flowImageDirectActionExecutor'
 import { defaultCanvasTaskSubmissionAdapter } from '../workspace/canvasTaskSubmissionAdapter'
@@ -52,6 +53,10 @@ export type UseFlowImageWorkflowExecutionOptions = {
   executionWorkspace: CanvasExecutionWorkspace
   cancelTasks: (taskIds: readonly string[]) => void
   taskTransport?: PendingImageWorkflowTaskTransport
+  /** Shared task-result waiter. Defaults to the canonical waiter so every
+   * execution path reconciles completion through the same seam instead of
+   * fragmenting wait logic per workflow entrypoint (issue #676). */
+  waitTaskImageResults?: (taskId: string) => Promise<TaskImageResult[]>
 }
 
 export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecutionOptions) {
@@ -93,7 +98,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
         ),
       resolve: async (taskId, resultIndex, fallbackRatio) =>
         resolveTaskImageResultAtIndexDisplay(
-          await waitExistingOrLiveTaskImageResults(taskId),
+          await (options.waitTaskImageResults ?? waitExistingOrLiveTaskImageResults)(taskId),
           resultIndex,
           fallbackRatio,
           loadImageSizeFromUrl,

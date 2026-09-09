@@ -1,4 +1,8 @@
-import { extractImageResultsFromTaskPayload, type TaskImageResult } from '../query/taskResult'
+import {
+  extractImageResultsFromTaskPayload,
+  type TaskImageResult,
+  type TaskResultPayloadLike,
+} from '../query/taskResult'
 import { sanitizeApiErrorMessage } from '../utils/errorMessages'
 import { taskApi } from './task'
 import type { Task } from './task'
@@ -158,6 +162,17 @@ function waitWithEventSource(
       if (task.status === 'cancelled') {
         notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'cancelled' })
         settleReject(createTaskCancelledError(task))
+        return
+      }
+      const cancelledResults = resolveCancelledWithResults(task)
+      if (cancelledResults) {
+        notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'cancelled' })
+        settleResolve(cancelledResults)
+        return
+      }
+      if (task.status === 'cancelled_with_results') {
+        notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'cancelled' })
+        settleReject(createTaskCancelledError(task))
       }
     }
 
@@ -220,6 +235,17 @@ async function waitWithPolling(
       notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'cancelled' })
       throw createTaskCancelledError(task)
     }
+    if (task) {
+      const cancelledResults = resolveCancelledWithResults(task)
+      if (cancelledResults) {
+        notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'cancelled' })
+        return cancelledResults
+      }
+      if (task.status === 'cancelled_with_results') {
+        notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'cancelled' })
+        throw createTaskCancelledError(task)
+      }
+    }
 
     const remainingMs = deadlineAt - Date.now()
     if (remainingMs <= 0) break
@@ -260,4 +286,21 @@ export function createTaskCancelledError(
 
 function extractImageResultsFromTaskEvent(task: TaskEventPayload): TaskImageResult[] {
   return extractImageResultsFromTaskPayload(task)
+}
+
+/**
+ * Unified terminal-status reconciliation (issue #676): `cancelled_with_results`
+ * materializes like a completion when the receipt bundles image outputs, and
+ * surfaces a cancellation otherwise. Callers treat every terminal status
+ * through this single seam instead of fragmenting the mapping per transport.
+ * The payload is intentionally narrow (status + outputs) so fast-path task
+ * views without a full event envelope can share it.
+ */
+export function resolveCancelledWithResults(task: {
+  status: string
+  outputs?: TaskResultPayloadLike['outputs']
+}): TaskImageResult[] | null {
+  if (task.status !== 'cancelled_with_results') return null
+  const results = extractImageResultsFromTaskPayload({ outputs: task.outputs ?? [] })
+  return results.length > 0 ? results : null
 }

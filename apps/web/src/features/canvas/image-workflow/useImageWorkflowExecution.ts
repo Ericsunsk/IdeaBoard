@@ -14,6 +14,8 @@ import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasGraphStore } from '../graph-runtime'
 import type { CanvasRendererMetricsPort } from '../vue-flow-adapter'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
+import type { TaskImageResult } from '../../../shared/query/taskResult'
+import { waitExistingOrLiveTaskImageResults } from '../execution/task-runner/flowImageDirectActionExecutor'
 
 type CanvasTaskExecutionFeedback = CanvasFeedback['taskExecution']
 
@@ -28,6 +30,7 @@ export type UseImageWorkflowExecutionOptions = {
   feedback: CanvasTaskExecutionFeedback
   executionCore: PendingImageExecutionCore
   cancelTasks: (taskIds: readonly string[]) => void
+  waitTaskImageResults?: (taskId: string) => Promise<TaskImageResult[]>
 }
 
 export type ImageWorkflowExecution = ImageWorkflowCommands & {
@@ -50,6 +53,11 @@ export function useImageWorkflowExecution(
   const generationUnavailableUntilMs = ref(0)
   const generationUnavailableMessage = ref(defaultGenerationUnavailableMessage())
   let generationAvailabilityTimer: ReturnType<typeof setTimeout> | null = null
+  // Single task-result waiter shared by the execution workspace and the
+  // workflow entrypoint, so completion reconciliation cannot fragment (issue
+  // #676). Test doubles inject through the same option on both seams.
+  const waitTaskImageResults =
+    options.waitTaskImageResults ?? waitExistingOrLiveTaskImageResults
 
   function isGenerationAvailable(): boolean {
     return Date.now() >= generationUnavailableUntilMs.value
@@ -110,6 +118,7 @@ export function useImageWorkflowExecution(
     refreshNodeInternals: options.refreshNodeInternals,
     executionCore: options.executionCore,
     cancelTasks: options.cancelTasks,
+    waitTaskImageResults,
     onSuccess: options.feedback.succeeded,
     onWarning: handleWorkflowWarning,
     onError: handleWorkflowError,
@@ -127,6 +136,7 @@ export function useImageWorkflowExecution(
     onError: handleWorkflowError,
     executionWorkspace,
     cancelTasks: options.cancelTasks,
+    waitTaskImageResults,
   })
 
   const commands = createImageWorkflowCommands({

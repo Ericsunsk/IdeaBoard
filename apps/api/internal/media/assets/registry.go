@@ -36,11 +36,24 @@ type LibraryMaterializationRegistry interface {
 	GetByID(context.Context, int64, int64) (dbsqlc.MediaAsset, error)
 }
 
+// DerivativeRepairRegistry exposes the mutation used to requeue a missing
+// derivative without widening read-only asset dependencies.
+type DerivativeRepairRegistry interface {
+	RequestDerivativeRepair(context.Context, int64, dbsqlc.MediaDerivative) error
+}
+
 type ReadRegistry interface {
 	GetByID(context.Context, int64, int64) (dbsqlc.MediaAsset, error)
 	GetByAssetID(context.Context, int64, string) (dbsqlc.MediaAsset, error)
 	ListDerivatives(context.Context, int64, int64) ([]dbsqlc.MediaDerivative, error)
 	EnsureDerivative(context.Context, int64, int64, string) error
+}
+
+// ReadRepairRegistry is the composed capability required by the media asset
+// HTTP handler: read metadata and request durable derivative repair.
+type ReadRepairRegistry interface {
+	ReadRegistry
+	DerivativeRepairRegistry
 }
 
 type UploadRegistry interface {
@@ -53,4 +66,6 @@ var _ IngestionRegistry = (*MediaAssetRegistry)(nil)
 var _ PreparationRegistry = (*MediaAssetRegistry)(nil)
 var _ LibraryMaterializationRegistry = (*MediaAssetRegistry)(nil)
 var _ ReadRegistry = (*MediaAssetRegistry)(nil)
+var _ DerivativeRepairRegistry = (*MediaAssetRegistry)(nil)
+var _ ReadRepairRegistry = (*MediaAssetRegistry)(nil)
 var _ UploadRegistry = (*MediaAssetRegistry)(nil)

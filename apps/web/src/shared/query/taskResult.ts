@@ -19,7 +19,7 @@ type TaskImageResultInput = {
   resultIndex?: unknown
 }
 
-type TaskResultPayloadLike = {
+export type TaskResultPayloadLike = {
   outputs?: Array<{
     role?: string
     width?: unknown

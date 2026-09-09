@@ -58,13 +58,14 @@ type appDomainServices struct {
 func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepositories, appPool *pgxpool.Pool) (appDomainServices, error) {
 	runtimeSettings := settings.NewRuntimeSettingsService(repos.systemConfigRepo)
 	outbound.ConfigurePolicyProvider(runtimeSettings)
-	storageService := storage.NewService(
+	storageService := storage.NewServiceWithLocalRoot(
 		repos.storageProfileRepo,
 		repos.mediaAssetRegistry,
 		// Browser-visible upload references must resolve through the same-origin
 		// gateway. API_BASE_URL remains reserved for webhooks and server-side
 		// integrations; using it here would leak a separate API host into the SPA.
 		cfg.PublicOrigins.Web,
+		cfg.Storage.LocalRoot,
 	)
 	repos.mediaAssetRegistry.SetIntegrityVerifier(storageintegrity.NewIntegrityVerifier(storageService, storageintegrity.IntegrityConfig{}))
 	if err := storageService.EnsureDefaultProfiles(ctx); err != nil {

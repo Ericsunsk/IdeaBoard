@@ -3,6 +3,7 @@ import {
   normalizeTaskImageResults,
   type TaskImageResult,
 } from '../../../../shared/query/taskResult'
+import { getMediaAssetMetadata } from '../../../../shared/api/mediaAssetDelivery'
 import { i18n } from '../../../../shared/i18n'
 import type { ResolvedTaskImageResult } from './resolvedTaskImageResult'
 import { buildMediaBrowserURL, type MediaRef } from '../../../../shared/media/MediaRef'
@@ -15,6 +16,36 @@ export type ImageSize = {
 export type ImageSizeLoader = (url: string) => Promise<ImageSize | null>
 
 export type { ResolvedTaskImageResult }
+
+const RECEIPT_DERIVATIVE_WAIT_MS = 10_000
+const RECEIPT_DERIVATIVE_POLL_MS = 500
+
+/**
+ * Receipt/delivery reconciliation (issue #676): a `completed` task receipt
+ * can arrive before the preview derivative finishes materializing. Wait a
+ * bounded budget for the derivative to become servable before probing
+ * dimensions, so result nodes bind a complete MediaRef instead of racing the
+ * asset pipeline. Always resolves (never hangs): on timeout the display
+ * layer's own delivery retry takes over.
+ */
+async function awaitReceiptDerivativeReady(assetId: string): Promise<void> {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < RECEIPT_DERIVATIVE_WAIT_MS) {
+    try {
+      const metadata = await getMediaAssetMetadata(assetId)
+      const status = metadata.derivatives.preview?.status ?? metadata.status
+      if (status === 'ready' || status === 'failed') return
+    } catch (error) {
+      console.warn('[canvas] failed to await receipt derivative readiness', {
+        assetId,
+        operation: 'awaitReceiptDerivativeReady',
+        error,
+      })
+      return
+    }
+    await new Promise((resolve) => globalThis.setTimeout(resolve, RECEIPT_DERIVATIVE_POLL_MS))
+  }
+}
 
 function normalizePositiveImageSize(width: unknown, height: unknown): ImageSize | null {
   const widthNumber = Number(width)
@@ -73,6 +104,8 @@ export async function resolveTaskImageResultDisplay(
 ): Promise<ResolvedTaskImageResult | null> {
   const normalized = normalizeTaskImageResult(result)
   if (!normalized) return null
+
+  if (normalized.assetId) await awaitReceiptDerivativeReady(normalized.assetId)
 
   let size = normalizePositiveImageSize(normalized.width, normalized.height)
   if (!size) {

@@ -37,6 +37,7 @@ services:
       NATS_URL: nats://ideaboard:${NATS_PASSWORD:?Set NATS_PASSWORD}@nats:4222
       NATS_EVENT_BUS_ENABLED: ${NATS_EVENT_BUS_ENABLED:-true}
       RIVER_WORKER_CONCURRENCY: ${RIVER_WORKER_CONCURRENCY:-5}
+      STORAGE_LOCAL_ROOT: ${STORAGE_LOCAL_ROOT:-/app}
     volumes:
       - api-uploads:/app/uploads
     ports:

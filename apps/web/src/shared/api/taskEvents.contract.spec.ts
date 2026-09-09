@@ -329,6 +329,43 @@ describe('waitTaskImageResultsWithSse', () => {
     await expect(result).rejects.toThrow('账号已停用')
   })
 
+  it('materializes bundled outputs when a task ends cancelled with results', async () => {
+    vi.stubGlobal('EventSource', MockEventSource)
+    mocks.getTask.mockResolvedValueOnce(
+      makeTaskResponse('cancelled_with_results', {
+        outputs: [makeImageOutput('asset_cancelled_output')],
+      }),
+    )
+
+    const result = waitTaskImageResultsWithSse('task-1')
+    MockEventSource.instances[0]?.emit('task.updated', {
+      task_id: 'task-1',
+      status: 'cancelled_with_results',
+    })
+
+    await expect(result).resolves.toEqual([
+      {
+        url: '/api/user/media-assets/asset_cancelled_output/derivatives/preview/content',
+        assetId: 'asset_cancelled_output',
+        width: 1024,
+        height: 1024,
+        mimeType: 'image/png',
+        resultIndex: 0,
+      },
+    ])
+    expect(mocks.getTask).toHaveBeenCalledOnce()
+  })
+
+  it('rejects cancellation without outputs when polling observes cancelled with results', async () => {
+    vi.stubGlobal('EventSource', undefined)
+    mocks.getTask.mockResolvedValueOnce(
+      makeTaskResponse('cancelled_with_results', { cancel_reason: '用户取消' }),
+    )
+
+    const result = waitTaskImageResultsWithSse('task-1')
+    await expect(result).rejects.toThrow(TaskCancelledError)
+  })
+
   it('treats storage materialization failures from polling as pending retry', async () => {
     vi.stubGlobal('EventSource', undefined)
     mocks.getTask.mockResolvedValueOnce(

@@ -35,14 +35,57 @@ func (LocalStorageProfileConfig) Map() map[string]interface{} {
 
 type LocalStorageDriver struct {
 	publicAPIOrigin string
+	// root is the canonical filesystem root all object keys resolve under.
+	// It is fixed once at construction so file layout never depends on the
+	// mutable process working directory of the calling context.
+	root string
 }
 
 var _ ports.StorageDriver = (*LocalStorageDriver)(nil)
 
+// ResolveLocalStorageRoot canonicalizes the configured local storage root.
+// An empty configured value falls back to the process working directory,
+// resolved to an absolute path exactly once here instead of at every call.
+func ResolveLocalStorageRoot(configured string) string {
+	trimmed := strings.TrimSpace(configured)
+	if trimmed == "" {
+		if cwd, err := os.Getwd(); err == nil {
+			trimmed = cwd
+		}
+	}
+	absolute, err := filepath.Abs(trimmed)
+	if err != nil {
+		absolute = filepath.Clean(trimmed)
+	}
+	return absolute
+}
+
 func NewLocalStorageDriver(publicAPIOrigin string) *LocalStorageDriver {
+	return NewLocalStorageDriverWithRoot(publicAPIOrigin, "")
+}
+
+// NewLocalStorageDriverWithRoot binds the driver to a canonical storage root.
+// Pass "" to resolve the process working directory once at construction.
+func NewLocalStorageDriverWithRoot(publicAPIOrigin, root string) *LocalStorageDriver {
 	return &LocalStorageDriver{
 		publicAPIOrigin: strings.TrimRight(strings.TrimSpace(publicAPIOrigin), "/"),
+		root:            ResolveLocalStorageRoot(root),
 	}
+}
+
+// localPath joins a normalized object key onto the canonical root and
+// rejects any result escaping the root (defense in depth: normalized keys
+// already block traversal at the domain boundary).
+func (d *LocalStorageDriver) localPath(objectKey string) (string, error) {
+	full := filepath.Join(d.root, filepath.FromSlash(objectKey))
+	relative, err := filepath.Rel(d.root, full)
+	if err != nil {
+		return "", fmt.Errorf("本地存储路径无效: %w", err)
+	}
+	if relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("本地存储路径越界")
+	}
+	return full, nil
 }
 
 func (d *LocalStorageDriver) Provider() domain.StorageProvider {
@@ -154,7 +197,10 @@ func (d *LocalStorageDriver) SaveReaderLocalRef(ctx context.Context, filename st
 	if err != nil {
 		return nil, fmt.Errorf("上传对象路径无效: %w", err)
 	}
-	dst := filepath.FromSlash(objectKey)
+	dst, err := d.localPath(objectKey)
+	if err != nil {
+		return nil, err
+	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
 		return nil, fmt.Errorf("创建目录失败: %w", err)
 	}
@@ -202,7 +248,10 @@ func (d *LocalStorageDriver) PutObject(ctx context.Context, profile *domain.Stor
 	if err != nil {
 		return err
 	}
-	dst := filepath.FromSlash(normalized)
+	dst, err := d.localPath(normalized)
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
 		return fmt.Errorf("创建目录失败: %w", err)
 	}
@@ -225,7 +274,11 @@ func (d *LocalStorageDriver) Read(ctx context.Context, profile *domain.StoragePr
 	if err != nil {
 		return nil, err
 	}
-	file, err := os.Open(filepath.FromSlash(normalized))
+	localPath, err := d.localPath(normalized)
+	if err != nil {
+		return nil, err
+	}
+	file, err := os.Open(localPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, domain.ErrStoredObjectNotFound
@@ -253,14 +306,17 @@ func (d *LocalStorageDriver) Delete(ctx context.Context, profile *domain.Storage
 	if err != nil {
 		return err
 	}
-	localPath := filepath.FromSlash(normalized)
+	localPath, err := d.localPath(normalized)
+	if err != nil {
+		return err
+	}
 	if err := os.Remove(localPath); err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
 		return fmt.Errorf("删除文件失败: %w", err)
 	}
-	cleanupEmptyLocalUploadParentDirs(localPath)
+	d.cleanupEmptyParentDirs(localPath)
 	return nil
 }
 
@@ -272,11 +328,14 @@ func (d *LocalStorageDriver) DeleteByPrefix(ctx context.Context, profile *domain
 	if err != nil {
 		return err
 	}
-	localPath := filepath.FromSlash(strings.TrimSuffix(normalizedPrefix, "/"))
+	localPath, err := d.localPath(strings.TrimSuffix(normalizedPrefix, "/"))
+	if err != nil {
+		return err
+	}
 	if err := os.RemoveAll(localPath); err != nil {
 		return fmt.Errorf("按前缀删除本地文件失败: %w", err)
 	}
-	cleanupEmptyLocalUploadParentDirs(localPath)
+	d.cleanupEmptyParentDirs(localPath)
 	return nil
 }
 
@@ -288,9 +347,12 @@ func (d *LocalStorageDriver) ListObjectKeysByPrefix(ctx context.Context, profile
 	if prefix == "" {
 		return nil, fmt.Errorf("文件前缀不能为空")
 	}
-	root := filepath.FromSlash(prefix)
+	root, err := d.localPath(prefix)
+	if err != nil {
+		return nil, err
+	}
 	keys := make([]string, 0)
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+	err = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			if os.IsNotExist(err) {
 				return filepath.SkipDir
@@ -303,7 +365,7 @@ func (d *LocalStorageDriver) ListObjectKeysByPrefix(ctx context.Context, profile
 		if entry.IsDir() {
 			return nil
 		}
-		relative, err := filepath.Rel(".", path)
+		relative, err := filepath.Rel(d.root, path)
 		if err != nil {
 			return err
 		}
@@ -324,12 +386,26 @@ func (d *LocalStorageDriver) ProviderURL(_ *domain.StorageProfile, _ string) (st
 	return "", domain.ErrProviderHTTPSUnavailable
 }
 
+func (d *LocalStorageDriver) cleanupEmptyParentDirs(localPath string) {
+	dir := filepath.Clean(filepath.Dir(localPath))
+	for dir != d.root && strings.HasPrefix(dir, d.root) {
+		if err := os.Remove(dir); err != nil {
+			return
+		}
+		dir = filepath.Dir(dir)
+	}
+}
+
 func (d *LocalStorageDriver) VerifyObjectGeneration(ctx context.Context, profile *domain.StorageProfile, objectKey string, expected int64) error {
 	normalized, err := domain.NormalizeUploadObjectKey(objectKey)
 	if err != nil {
 		return err
 	}
-	if _, err := os.Stat(filepath.FromSlash(normalized)); err != nil {
+	localPath, err := d.localPath(normalized)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(localPath); err != nil {
 		if os.IsNotExist(err) {
 			return domain.ErrStoredObjectNotFound
 		}
@@ -344,21 +420,6 @@ func (d *LocalStorageDriver) PublicUploadURL(objectKey string) string {
 		return d.publicAPIOrigin + normalized
 	}
 	return normalized
-}
-
-func cleanupEmptyLocalUploadParentDirs(localPath string) {
-	root := filepath.Clean(domain.UploadObjectRoot)
-	dir := filepath.Clean(filepath.Dir(localPath))
-	for dir != "." && dir != string(filepath.Separator) && dir != root {
-		rel, err := filepath.Rel(root, dir)
-		if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
-			return
-		}
-		if err := os.Remove(dir); err != nil {
-			return
-		}
-		dir = filepath.Dir(dir)
-	}
 }
 
 type localCopyWriter struct {

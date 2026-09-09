@@ -1,10 +1,77 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   resolveTaskImageResultAtIndexDisplay,
   resolveTaskImageResultDisplay,
 } from './flowImageDirectActionTaskResult'
+import { getMediaAssetMetadata } from '../../../../shared/api/mediaAssetDelivery'
+
+vi.mock('../../../../shared/api/mediaAssetDelivery', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('../../../../shared/api/mediaAssetDelivery')>()
+  return { ...original, getMediaAssetMetadata: vi.fn() }
+})
+
+const metadataMock = vi.mocked(getMediaAssetMetadata)
+
+function readyMetadata(assetId = 'asset_1') {
+  return {
+    asset_id: assetId,
+    status: 'ready',
+    derivatives: { preview: { status: 'ready', url: '/api/preview' } },
+  } as never
+}
 
 describe('flowImageDirectActionTaskResult', () => {
+  beforeEach(() => {
+    metadataMock.mockReset()
+    metadataMock.mockResolvedValue(readyMetadata())
+  })
+
+  it('waits for the preview derivative before binding the receipt', async () => {
+    metadataMock
+      .mockResolvedValueOnce({
+        asset_id: 'asset_1',
+        status: 'ready',
+        derivatives: { preview: { status: 'pending' } },
+      } as never)
+      .mockResolvedValue(readyMetadata())
+    const loadImageSize = vi.fn(async () => ({ width: 400, height: 200 }))
+
+    await expect(
+      resolveTaskImageResultDisplay(
+        { url: 'https://example.com/output.png', assetId: 'asset_1' },
+        1,
+        loadImageSize,
+      ),
+    ).resolves.toMatchObject({
+      url: '/api/user/media-assets/asset_1/derivatives/preview/content',
+      ratio: 0.5,
+    })
+    expect(metadataMock).toHaveBeenCalledWith('asset_1')
+    expect(loadImageSize).toHaveBeenCalled()
+  })
+
+  it('warns and resolves when derivative readiness metadata fails', async () => {
+    const metadataError = new Error('metadata unavailable')
+    metadataMock.mockRejectedValueOnce(metadataError)
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await expect(
+      resolveTaskImageResultDisplay(
+        { url: 'https://example.com/output.png', assetId: 'asset_1' },
+        1,
+        vi.fn(async () => ({ width: 400, height: 200 })),
+      ),
+    ).resolves.toMatchObject({ ratio: 0.5 })
+    expect(warnSpy).toHaveBeenCalledWith('[canvas] failed to await receipt derivative readiness', {
+      assetId: 'asset_1',
+      operation: 'awaitReceiptDerivativeReady',
+      error: metadataError,
+    })
+
+    warnSpy.mockRestore()
+  })
+
   it('keeps resolved task image dimensions for display sizing', async () => {
     const loadImageSize = vi.fn()
 

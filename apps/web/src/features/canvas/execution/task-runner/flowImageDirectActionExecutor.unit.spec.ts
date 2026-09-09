@@ -114,6 +114,35 @@ describe('flowImageDirectActionExecutor', () => {
     ])
   })
 
+  it('materializes bundled outputs from a cancelled-with-results fast path', async () => {
+    mocks.get.mockResolvedValueOnce({
+      task: {
+        status: 'cancelled_with_results',
+        cancel_reason: '用户取消',
+        outputs: [
+          {
+            role: 'image',
+            url: '',
+            asset_id: 'asset_partial',
+            width: 800,
+            height: 600,
+            mime_type: 'image/png',
+          },
+        ],
+      },
+    })
+
+    await expect(waitExistingOrLiveTaskImageResults('task-partial')).resolves.toEqual([
+      {
+        url: '/api/user/media-assets/asset_partial/derivatives/preview/content',
+        assetId: 'asset_partial',
+        width: 800,
+        height: 600,
+        mimeType: 'image/png',
+      },
+    ])
+  })
+
   it('keeps storage materialization failures pending on the existing task fast path', async () => {
     mocks.get.mockResolvedValueOnce({
       task: {

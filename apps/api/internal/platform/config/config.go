@@ -23,6 +23,7 @@ type Config struct {
 	Worker        WorkerConfig
 	Credits       CreditsConfig
 	Rewards       RewardsConfig
+	Storage       StorageConfig
 }
 
 type CreditsConfig struct {
@@ -139,6 +140,13 @@ type AuthServiceConfig struct {
 	TimeoutSeconds int
 }
 
+type StorageConfig struct {
+	// LocalRoot is the canonical filesystem root for the builtin-local
+	// storage driver. Empty resolves to the process working directory,
+	// canonicalized once at startup.
+	LocalRoot string
+}
+
 type envConfig struct {
 	DBHost              string `env:"DB_HOST"`
 	DBPort              string `env:"DB_PORT"`
@@ -162,6 +170,7 @@ type envConfig struct {
 
 	AuthServiceBaseURL        string `env:"AUTH_SERVICE_BASE_URL"`
 	AuthServiceInternalAPIKey string `env:"AUTH_INTERNAL_KEY"`
+	StorageLocalRoot          string `env:"STORAGE_LOCAL_ROOT"`
 	CreditsWelcomeIdentityKey string `env:"CREDITS_WELCOME_IDENTITY_KEY"`
 	RewardsCodeHMACKeys       string `env:"REWARDS_CODE_HMAC_KEYS"`
 }
@@ -231,6 +240,7 @@ func Load() *Config {
 		)},
 		Credits: CreditsConfig{WelcomeIdentityKey: strings.TrimSpace(raw.CreditsWelcomeIdentityKey)},
 		Rewards: RewardsConfig{CodeHMACKeys: strings.TrimSpace(raw.RewardsCodeHMACKeys)},
+		Storage: StorageConfig{LocalRoot: strings.TrimSpace(raw.StorageLocalRoot)},
 	}
 }
 

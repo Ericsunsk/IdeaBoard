@@ -94,7 +94,7 @@ type UserRouteDeps struct {
 	RewardUserHandler      *rewards.UserHandler
 	PaymentUserHandler     *paymenthttp.UserCheckoutHandler
 	UserEventStreamHandler *UserEventStreamHandler
-	MediaAssetRegistry     assets.ReadRegistry
+	MediaAssetRegistry     assets.ReadRepairRegistry
 	MediaStorageService    *storage.Service
 	Uploads                UploadDeps
 	UploadDownloads        UploadDownloadDeps

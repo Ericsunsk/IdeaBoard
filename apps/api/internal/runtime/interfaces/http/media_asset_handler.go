@@ -1,9 +1,11 @@
 package httpapi
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -11,19 +13,31 @@ import (
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/media/assets"
 	derivativedomain "ideaboard/api/internal/media/derivatives/domain"
-	"ideaboard/api/internal/media/storage"
+	storagedomain "ideaboard/api/internal/media/storage/domain"
+	storageports "ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
 )
 
-type mediaAssetHandler struct {
-	assets  assets.ReadRegistry
-	storage *storage.Service
+// mediaObjectReader is the narrow storage seam the derivative gateway needs.
+// *storage.Service satisfies it in production; tests inject fakes.
+type mediaObjectReader interface {
+	ReadObjectAtProfile(ctx context.Context, profileID, objectKey string, maxBytes int64) (*storageports.StoredUploadObject, error)
 }
 
-func newMediaAssetHandler(registry assets.ReadRegistry, storageService *storage.Service) *mediaAssetHandler {
-	return &mediaAssetHandler{assets: registry, storage: storageService}
+type mediaAssetHandler struct {
+	assets           assets.ReadRegistry
+	derivativeRepair assets.DerivativeRepairRegistry
+	storage          mediaObjectReader
+}
+
+func newMediaAssetHandler(registry assets.ReadRepairRegistry, storageService mediaObjectReader) *mediaAssetHandler {
+	return &mediaAssetHandler{
+		assets:           registry,
+		derivativeRepair: registry,
+		storage:          storageService,
+	}
 }
 
 type mediaAssetDerivativeDTO struct {
@@ -290,16 +304,54 @@ func (h *mediaAssetHandler) serveReadyDerivative(c *gin.Context, ownerUserID int
 	}
 	if matchedRow != nil {
 		object, readErr := h.storage.ReadObjectAtProfile(c.Request.Context(), matchedRow.StorageProfileID, matchedRow.StorageKey, 50*1024*1024)
-		if readErr != nil {
+		if readErr == nil {
+			c.Header("Cache-Control", "private, max-age=3600")
+			c.Header("Content-Disposition", "inline")
+			c.Data(http.StatusOK, matchedRow.MimeType, object.Data)
+			return
+		}
+		if !errors.Is(readErr, storagedomain.ErrStoredObjectNotFound) {
 			response.InternalError(c, http.StatusInternalServerError, "读取媒体派生文件失败", readErr)
 			return
 		}
-		c.Header("Cache-Control", "private, max-age=3600")
-		c.Header("Content-Disposition", "inline")
-		c.Data(http.StatusOK, matchedRow.MimeType, object.Data)
+		h.serveOriginalFallback(c, ownerUserID, asset, *matchedRow)
 		return
 	}
 	response.Error(c, http.StatusAccepted, "图片预览正在准备中")
+}
+
+// serveOriginalFallback self-heals a ready derivative whose physical file is
+// missing: it requests regeneration through the durable outbox (best effort,
+// never failing the request) and serves the original image when available.
+// A missing original yields a user-safe 404 instead of a hard 500.
+func (h *mediaAssetHandler) serveOriginalFallback(c *gin.Context, ownerUserID int64, asset dbsqlc.MediaAsset, derivative dbsqlc.MediaDerivative) {
+	if repairErr := h.derivativeRepair.RequestDerivativeRepair(c.Request.Context(), ownerUserID, derivative); repairErr != nil {
+		slog.WarnContext(c.Request.Context(), "media derivative self-heal request failed",
+			"operation", "media.derivative.selfheal",
+			"media_asset_id", asset.AssetID,
+			"derivative_id", derivative.DerivativeID,
+			"tier", derivative.Tier,
+			"error", repairErr,
+		)
+	}
+	original, originalErr := h.storage.ReadObjectAtProfile(c.Request.Context(), asset.StorageProfileID, asset.StorageKey, 100*1024*1024)
+	if originalErr == nil {
+		mimeType := strings.TrimSpace(asset.MimeType)
+		if mimeType == "" {
+			mimeType = original.ContentType
+		}
+		// A derivative URL may temporarily serve the original while regeneration
+		// is queued; avoid caching that fallback as the derivative representation.
+		c.Header("Cache-Control", "private, no-store")
+		c.Header("Content-Disposition", "inline")
+		c.Data(http.StatusOK, mimeType, original.Data)
+		return
+	}
+	if errors.Is(originalErr, storagedomain.ErrStoredObjectNotFound) {
+		response.Error(c, http.StatusNotFound, "媒体不存在")
+		return
+	}
+	response.InternalError(c, http.StatusInternalServerError, "读取原图失败", originalErr)
 }
 
 func (h *mediaAssetHandler) Original(c *gin.Context) {

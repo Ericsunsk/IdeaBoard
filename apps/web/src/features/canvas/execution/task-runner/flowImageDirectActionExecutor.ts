@@ -7,6 +7,7 @@ import {
 import {
   createTaskResultFailureError,
   createTaskCancelledError,
+  resolveCancelledWithResults,
   waitTaskImageResultsWithSse,
 } from '../../../../shared/api/taskEvents'
 import {
@@ -43,12 +44,7 @@ export async function submitTaskRequest(
 export async function waitExistingOrLiveTaskImageResults(
   taskId: string,
 ): Promise<TaskImageResult[]> {
-  let task:
-    | Pick<
-        Task,
-        'status' | 'outputs' | 'result' | 'error_msg' | 'cancel_reason' | 'execution_metrics'
-      >
-    | undefined
+  let task: FastPathTerminalTask
   try {
     const taskData = await taskApi.get(taskId)
     task = taskData.task
@@ -58,19 +54,44 @@ export async function waitExistingOrLiveTaskImageResults(
     if (status === 404 || code === 404) throw error
     return waitTaskImageResultsWithSse(taskId)
   }
-  if (task?.status === 'completed') {
+  return settleFastPathTerminal(taskId, task) ?? waitTaskImageResultsWithSse(taskId)
+}
+
+type FastPathTerminalTask = Pick<
+  Task,
+  'status' | 'outputs' | 'result' | 'error_msg' | 'cancel_reason' | 'execution_metrics'
+> | null
+| undefined
+
+/**
+ * Single terminal-status settlement for the task fast path (issue #676).
+ * Returns the materialized results, throws the mapped terminal error, or
+ * returns null when the task is still live (caller continues to SSE wait).
+ */
+function settleFastPathTerminal(taskId: string, task: FastPathTerminalTask): TaskImageResult[] | null {
+  if (!task) return null
+  if (task.status === 'completed') {
     notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'completed' })
     const results = extractImageResultsFromTaskPayload(task)
     if (results.length > 0) return results
     throw new Error(i18n.global.t('canvas.execution.taskCompletedNoImage'))
   }
-  if (task?.status === 'failed') {
+  if (task.status === 'failed') {
     notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'failed' })
     throw createTaskResultFailureError(task)
   }
-  if (task?.status === 'cancelled') {
+  if (task.status === 'cancelled') {
     notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'cancelled' })
     throw createTaskCancelledError(task)
   }
-  return waitTaskImageResultsWithSse(taskId)
+  const cancelledResults = resolveCancelledWithResults(task)
+  if (cancelledResults) {
+    notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'cancelled' })
+    return cancelledResults
+  }
+  if (task.status === 'cancelled_with_results') {
+    notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'cancelled' })
+    throw createTaskCancelledError(task)
+  }
+  return null
 }
