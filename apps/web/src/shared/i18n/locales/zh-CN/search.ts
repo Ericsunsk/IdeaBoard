@@ -2,6 +2,14 @@
 export default {
   inputLabel: '搜索灵感',
   noResults: '未找到相关结果',
+  empty: {
+    noResultsTitle: '未找到相关灵感',
+    noResultsDescription: '尝试更换搜索关键词，或添加参考图进行以图搜图。',
+    clearQuery: '清空搜索',
+    emptyFeedTitle: '发现灵感',
+    emptyFeedDescription: '在上方输入关键词探索灵感素材，或进入画布开始创作。',
+    startCreating: '新建画布',
+  },
   fallbackTitle: '灵感图片',
   fallbackImageTitle: '图片',
   viewResult: '查看 {title}',

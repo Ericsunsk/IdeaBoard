@@ -271,18 +271,29 @@ func (h *mediaAssetHandler) Content(c *gin.Context) {
 		response.InternalError(c, http.StatusInternalServerError, "读取媒体派生信息失败", err)
 		return
 	}
+	var matchedRow *dbsqlc.MediaDerivative
 	for _, row := range rows {
-		if row.Tier != tier || row.Format != format || row.Status != "ready" {
+		if row.Tier != tier || row.Status != "ready" {
 			continue
 		}
-		object, readErr := h.storage.ReadObjectAtProfile(c.Request.Context(), row.StorageProfileID, row.StorageKey, 50*1024*1024)
+		if row.Format == format {
+			matchedRow = &row
+			break
+		}
+		if matchedRow == nil {
+			r := row
+			matchedRow = &r
+		}
+	}
+	if matchedRow != nil {
+		object, readErr := h.storage.ReadObjectAtProfile(c.Request.Context(), matchedRow.StorageProfileID, matchedRow.StorageKey, 50*1024*1024)
 		if readErr != nil {
 			response.InternalError(c, http.StatusInternalServerError, "读取媒体派生文件失败", readErr)
 			return
 		}
 		c.Header("Cache-Control", "private, max-age=3600")
 		c.Header("Content-Disposition", "inline")
-		c.Data(http.StatusOK, row.MimeType, object.Data)
+		c.Data(http.StatusOK, matchedRow.MimeType, object.Data)
 		return
 	}
 	response.Error(c, http.StatusAccepted, "图片预览正在准备中")

@@ -28,7 +28,7 @@ func (h *SearchHandler) Search(c *gin.Context) {
 	result, err := h.service.Search(c.Request.Context(), c.Query("q"), c.Query("cursor"), limit)
 	if err != nil {
 		if errors.Is(err, ErrNoSearchProviders) {
-			response.Error(c, http.StatusServiceUnavailable, "暂无可用的搜索供应商")
+			response.SuccessDTO(c, SearchResponse{Query: c.Query("q"), Results: []Result{}, HasMore: false})
 			return
 		}
 		if strings.Contains(err.Error(), "搜索关键词") || strings.Contains(err.Error(), "分页游标") {

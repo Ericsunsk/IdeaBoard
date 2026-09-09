@@ -2,6 +2,14 @@
 export default {
   inputLabel: '영감 검색',
   noResults: '검색 결과가 없습니다',
+  empty: {
+    noResultsTitle: '관련 영감을 찾을 수 없습니다',
+    noResultsDescription: '다른 검색어를 입력하거나 참조 이미지를 추가하여 시각적 검색을 시도해 보세요.',
+    clearQuery: '검색 지우기',
+    emptyFeedTitle: '영감 발견하기',
+    emptyFeedDescription: '상단에 키워드를 입력해 아이디어를 탐색하거나 새 캔버스에서 창작을 시작해 보세요.',
+    startCreating: '캔버스 만들기',
+  },
   fallbackTitle: '영감 이미지',
   fallbackImageTitle: '이미지',
   viewResult: '{title} 보기',

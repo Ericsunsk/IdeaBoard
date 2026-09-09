@@ -93,3 +93,20 @@ func TestFilterProviderResultsRejectsUntrustedURLs(t *testing.T) {
 		t.Fatalf("filterProviderResults() = %#v, want only safe result", results)
 	}
 }
+
+func TestSearchGracefullyDegradesWhenNoProvidersConfigured(t *testing.T) {
+	service := NewSearchService(nil)
+	resp, err := service.Search(t.Context(), "minimal art", "", 24)
+	if err != nil {
+		t.Fatalf("expected nil error on unconfigured providers, got: %v", err)
+	}
+	if resp.Query != "minimal art" {
+		t.Fatalf("expected query 'minimal art', got: %q", resp.Query)
+	}
+	if len(resp.Results) != 0 {
+		t.Fatalf("expected empty results, got %d items", len(resp.Results))
+	}
+	if resp.HasMore {
+		t.Fatalf("expected has_more=false, got true")
+	}
+}

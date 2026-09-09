@@ -177,7 +177,7 @@ async function loadImageSourceCanvas(
     if (!fetchUrl) throw createCacheError('invalid-url')
 
     const response = await fetch(fetchUrl, { credentials: 'include' })
-    if (!response.ok) throw createCacheError('fetch-failed')
+    if (!response.ok || response.status === 202) throw createCacheError('fetch-failed')
 
     const blob = await response.blob()
     if (!blob.type.startsWith('image/')) throw createCacheError('not-image')

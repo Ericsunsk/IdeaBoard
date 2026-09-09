@@ -305,8 +305,8 @@ func TestPublicSearchRouteDoesNotRequireAuthentication(t *testing.T) {
 	if res.Code == http.StatusUnauthorized {
 		t.Fatalf("public search route unexpectedly required authentication: status=%d body=%s", res.Code, res.Body.String())
 	}
-	if res.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d, want %d for an unconfigured public search service; body=%s", res.Code, http.StatusServiceUnavailable, res.Body.String())
+	if res.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d for an unconfigured public search service; body=%s", res.Code, http.StatusOK, res.Body.String())
 	}
 }
 

@@ -2,6 +2,14 @@
 export default {
   inputLabel: 'Search inspiration',
   noResults: 'No results found',
+  empty: {
+    noResultsTitle: 'No inspiration found',
+    noResultsDescription: 'Try different keywords or add reference images for visual search.',
+    clearQuery: 'Clear search',
+    emptyFeedTitle: 'Discover inspiration',
+    emptyFeedDescription: 'Type keywords above to explore creative assets, or start a new canvas.',
+    startCreating: 'Create canvas',
+  },
   fallbackTitle: 'Inspiration image',
   fallbackImageTitle: 'Image',
   viewResult: 'View {title}',

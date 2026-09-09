@@ -225,22 +225,97 @@
       </div>
       <section
         v-else-if="hasError && results.length === 0"
-        class="mt-6 grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-board-card-border bg-board-loading-bg/80 backdrop-blur-sm text-center"
+        class="mt-8 flex min-h-[320px] flex-col items-center justify-center rounded-3xl border border-dashed border-board-card-border/80 bg-board-loading-bg/40 px-6 py-14 text-center backdrop-blur-sm"
       >
-        <div>
-          <p class="m-0 font-semibold">{{ t('search.errors.unableToLoadInspiration') }}</p>
-          <Button
-            :label="t('search.actions.retry')"
-            class="!mt-4 !rounded-full !border-0 !bg-board-primary !text-ib-text-inverse"
-            @click="reload"
-          />
+        <div class="flex max-w-sm flex-col items-center">
+          <div
+            class="mb-4 flex size-14 items-center justify-center rounded-2xl bg-board-card-bg text-board-danger shadow-xs ring-1 ring-board-card-border/70"
+          >
+            <WarningTriangle class="size-6 stroke-[1.75]" aria-hidden="true" />
+          </div>
+          <h3 class="m-0 text-base font-semibold text-board-page-text tracking-tight">
+            {{ t('search.errors.unableToLoadInspiration') }}
+          </h3>
+          <p class="mt-2 mb-0 text-xs sm:text-[13px] text-board-page-text-muted leading-relaxed">
+            {{ t('search.errors.unableToLoadResults') }}
+          </p>
+          <div class="mt-6">
+            <Button
+              :label="t('search.actions.retry')"
+              class="!h-9 !rounded-full !border-0 !bg-board-primary !px-5 !text-xs !font-semibold !text-ib-text-inverse hover:!bg-board-primary-hover cursor-pointer shadow-xs"
+              @click="reload"
+            />
+          </div>
         </div>
       </section>
       <section
         v-else-if="results.length === 0"
-        class="mt-6 grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-board-card-border bg-board-loading-bg/80 backdrop-blur-sm"
+        class="mt-8 flex min-h-[320px] flex-col items-center justify-center rounded-3xl border border-dashed border-board-card-border/80 bg-board-loading-bg/40 px-6 py-14 text-center backdrop-blur-sm"
       >
-        <p class="m-0 text-sm text-board-page-text-muted">{{ t('search.noResults') }}</p>
+        <div class="flex max-w-sm flex-col items-center">
+          <div
+            class="mb-4 flex size-14 items-center justify-center rounded-2xl bg-board-card-bg shadow-xs ring-1 ring-board-card-border/70 transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105"
+          >
+            <Search
+              v-if="hasActiveSearch"
+              class="size-6 stroke-[1.75] text-board-page-text-muted"
+              aria-hidden="true"
+            />
+            <Compass
+              v-else
+              class="size-6 stroke-[1.75] text-board-primary"
+              aria-hidden="true"
+            />
+          </div>
+
+          <h3 class="m-0 text-base font-semibold text-board-page-text tracking-tight">
+            {{
+              hasActiveSearch
+                ? t('search.empty.noResultsTitle')
+                : t('search.empty.emptyFeedTitle')
+            }}
+          </h3>
+
+          <p class="mt-2 mb-0 text-xs sm:text-[13px] text-board-page-text-muted leading-relaxed">
+            {{
+              hasActiveSearch
+                ? t('search.empty.noResultsDescription')
+                : t('search.empty.emptyFeedDescription')
+            }}
+          </p>
+
+          <div class="mt-6 flex flex-wrap items-center justify-center gap-2.5">
+            <button
+              v-if="hasActiveSearch"
+              type="button"
+              class="h-9 px-4 rounded-full border border-board-card-border bg-board-card-bg text-xs font-medium text-board-page-text shadow-xs transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-board-primary hover:text-board-primary cursor-pointer flex items-center gap-1.5"
+              @click="handleClearSearch"
+            >
+              <Xmark class="size-3.5" aria-hidden="true" />
+              <span>{{ t('search.empty.clearQuery') }}</span>
+            </button>
+
+            <template v-else>
+              <button
+                type="button"
+                class="h-9 px-4 rounded-full border border-board-card-border bg-board-card-bg text-xs font-medium text-board-page-text shadow-xs transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-board-primary hover:text-board-primary cursor-pointer flex items-center gap-1.5 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="!canAddReference"
+                @click="openFilePicker"
+              >
+                <Camera class="size-3.5 text-board-primary" aria-hidden="true" />
+                <span>{{ t('search.fallbackImageTitle') }}</span>
+              </button>
+              <button
+                type="button"
+                class="h-9 px-4 rounded-full bg-board-primary text-xs font-semibold text-ib-text-inverse shadow-xs transition-[background-color,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-board-primary-hover hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-1.5"
+                @click="handleStartCreating"
+              >
+                <Plus class="size-3.5 stroke-[2.5]" aria-hidden="true" />
+                <span>{{ t('search.empty.startCreating') }}</span>
+              </button>
+            </template>
+          </div>
+        </div>
       </section>
 
       <!-- Virtualized responsive Masonry result viewport -->
@@ -521,16 +596,26 @@
 <script setup lang="ts">
 import '../search.css'
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
-import { Bookmark, BookmarkSolid, Camera, Check, Plus, Search, Xmark } from '@iconoir/vue'
+import {
+  Bookmark,
+  BookmarkSolid,
+  Camera,
+  Check,
+  Compass,
+  Plus,
+  Search,
+  WarningTriangle,
+  Xmark,
+} from '@iconoir/vue'
 import StudioName from '../../../../shared/components/StudioName.vue'
 import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
 import UserLocaleSelect from '../../../../shared/components/UserLocaleSelect.vue'
-import { HOME_PATH } from '../../../../shared/constants/routePaths'
+import { HOME_PATH, USER_BOARDS_PATH } from '../../../../shared/constants/routePaths'
 import { useUserStore } from '../../../auth/session/authSession'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
 import UserWorkspaceNavigation from '../../../user-shell/components/UserWorkspaceNavigation.vue'
@@ -540,20 +625,32 @@ import SearchResultViewport from '../components/SearchResultViewport.vue'
 import { libraryAssetKey } from '../../../library/libraryResource'
 import { searchReferenceKey } from '../../infrastructure/libraryBridge'
 import { useUserAccountControls } from '../../../user-shell/useUserAccountControls'
+import { useAuthOverlay } from '../../../auth/authOverlay'
 import {
   SearchLibraryFloatingIsland as LibraryFloatingIsland,
   useSearchScreenRuntime,
 } from '../useSearchScreenRuntime'
 
 const router = useRouter()
+const route = useRoute()
 const { t } = useI18n()
 const userStore = useUserStore()
+const authOverlay = useAuthOverlay()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const accountControls = useUserAccountControls({
   navigation: { navigate: (path) => router.push(path), logout: () => logoutAndRedirect(HOME_PATH) },
 })
 const pageScrollRef = ref<HTMLElement | null>(null)
 const userPublicID = computed(() => userStore.user?.public_id)
+
+async function handleStartCreating() {
+  const user = await userStore.ensureSession({ fresh: true }).catch(() => null)
+  if (user) {
+    await router.push(USER_BOARDS_PATH)
+    return
+  }
+  authOverlay.commands.open('login', USER_BOARDS_PATH)
+}
 const searchScreen = useSearchScreenRuntime({
   userPublicID,
   scrollContainer: pageScrollRef,
@@ -575,6 +672,10 @@ const {
   visionState,
   buttonTitle: searchButtonTitle,
 } = search
+const hasActiveSearch = computed(() => {
+  const queryFromRoute = String(route.query.q || '').trim()
+  return Boolean(draftQuery.value.trim() || queryFromRoute || references.value.length > 0)
+})
 const {
   items: results,
   hasMore,

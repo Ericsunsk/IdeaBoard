@@ -2,6 +2,14 @@
 export default {
   inputLabel: 'Buscar inspiración',
   noResults: 'No se encontraron resultados',
+  empty: {
+    noResultsTitle: 'No se encontró inspiración',
+    noResultsDescription: 'Prueba con otras palabras clave o añade imágenes de referencia para la búsqueda visual.',
+    clearQuery: 'Borrar búsqueda',
+    emptyFeedTitle: 'Descubre inspiración',
+    emptyFeedDescription: 'Escribe palabras clave arriba para explorar recursos o empieza un nuevo lienzo.',
+    startCreating: 'Crear lienzo',
+  },
   fallbackTitle: 'Imagen de inspiración',
   fallbackImageTitle: 'Imagen',
   viewResult: 'Ver {title}',

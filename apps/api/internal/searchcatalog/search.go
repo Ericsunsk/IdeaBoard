@@ -121,7 +121,7 @@ func (s *SearchService) Search(ctx context.Context, rawQuery, rawCursor string, 
 		return SearchResponse{}, err
 	}
 	if s == nil || s.configs == nil {
-		return SearchResponse{}, ErrNoSearchProviders
+		return SearchResponse{Query: query, Results: []Result{}, HasMore: false}, nil
 	}
 	active, keys, err := s.resolveProviders(ctx, cursor)
 	if err != nil {
@@ -213,7 +213,7 @@ func (s *SearchService) resolveProviders(ctx context.Context, cursor searchCurso
 		keys[config.Provider] = key
 	}
 	if availableProviders == 0 {
-		return nil, nil, ErrNoSearchProviders
+		return nil, nil, nil
 	}
 	return active, keys, nil
 }
