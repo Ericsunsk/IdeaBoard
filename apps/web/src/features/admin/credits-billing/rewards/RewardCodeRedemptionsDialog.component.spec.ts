@@ -4,7 +4,7 @@ import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import { adminPrimeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import RewardCodeRedemptionsDialog from './RewardCodeRedemptionsDialog.vue'
-import type { RewardCode } from './rewardCodeAdminResource'
+import type { RewardCode } from './resource'
 
 describe('RewardCodeRedemptionsDialog', () => {
   it('loads a dense Redemption page through the real feature resource HTTP seam', async () => {

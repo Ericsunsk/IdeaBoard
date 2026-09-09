@@ -17,7 +17,7 @@ import {
   adminSurfacePanelViewportClass,
   adminSurfaceRootViewportClass,
   adminSurfaceScrollContentClass,
-} from '../lib/adminUiClasses'
+} from '../lib/uiClasses'
 
 const props = defineProps<{
   contentClass?: string | undefined

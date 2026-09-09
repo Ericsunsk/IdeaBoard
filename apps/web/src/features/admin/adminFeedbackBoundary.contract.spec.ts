@@ -13,14 +13,14 @@ function isAdminModule(path: string) {
 }
 
 function isAdminToastAdapter(path: string) {
-  return path.endsWith('/shared/lib/adminToast.ts')
+  return path.endsWith('/shared/lib/toast.ts')
 }
 
 describe('admin feedback boundary', () => {
   it('scans the Admin source tree', () => {
     const adminPaths = Object.keys(sourceModules).filter(isAdminModule)
 
-    expect(adminPaths).toContainEqual(expect.stringMatching(/\/shared\/lib\/adminToast\.ts$/))
+    expect(adminPaths).toContainEqual(expect.stringMatching(/\/shared\/lib\/toast\.ts$/))
   })
 
   it('keeps direct app toast access inside the shared transport adapter', () => {

@@ -127,13 +127,13 @@ import Dialog from 'primevue/dialog'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { Cropper } from 'vue-advanced-cropper'
 import 'vue-advanced-cropper/dist/style.css'
-import { createAdminDialogPt } from '../lib/adminOverlayPt'
+import { createAdminDialogPt } from '../lib/overlayPt'
 import {
   adminActionButtonClass,
   adminDialogFooterActionsClass,
   adminDialogTitleClass,
   adminTextButtonClass,
-} from '../lib/adminUiClasses'
+} from '../lib/uiClasses'
 
 type CropperInstance = InstanceType<typeof Cropper>
 

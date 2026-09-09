@@ -1,8 +1,8 @@
 import { computed, ref, watch } from 'vue'
-import type { AdminProviderConfigFeedback } from './useAdminProviderConfigFeedback'
-import type { ProviderAccountStore } from './providerConfigWorkspace'
+import type { AdminProviderConfigFeedback } from './useProviderConfigFeedback'
+import type { ProviderAccountStore } from './workspace'
 import { createModelSuggestions } from './providerModelOptions'
-import { isModellessProviderEndpoint, uniqueTrimmedModelValues } from './providerConfigPayload'
+import { isModellessProviderEndpoint, uniqueTrimmedModelValues } from './payload'
 import type {
   AdminProviderAccountLimits,
   ProviderAccountCommandTarget,
@@ -10,7 +10,7 @@ import type {
   ProviderAccountFormField,
   ProviderEndpointCommandTarget,
   ProviderEndpointRecord,
-} from './providerConfigTypes'
+} from './types'
 
 export type AccountEditorOptions = {
   store: ProviderAccountStore

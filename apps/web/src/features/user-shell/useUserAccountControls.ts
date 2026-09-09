@@ -1,5 +1,5 @@
 import { computed } from 'vue'
-import { useUserStore } from '../auth/session/authSession'
+import { useUserStore } from '../auth/session/session'
 import { canAccessAdmin } from '../../shared/auth/adminAccess'
 import type {
   UserAccountMenuItem,
@@ -11,7 +11,7 @@ import { formatLocaleNumber } from '../../shared/i18n/formatters'
 import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
 import { formatIdeaAmount } from '../../shared/i18n/userIdeaCurrency'
 import { defaultAccountTab, useAccountOverlay, useCreditWallet, type AccountTab } from '../account'
-import { useAuthOverlay } from '../auth/authOverlay'
+import { useAuthOverlay } from '../auth/overlay'
 
 export type UserShellNavigationAdapter = {
   navigate: (path: string) => Promise<unknown> | unknown

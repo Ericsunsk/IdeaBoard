@@ -1,7 +1,7 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue'
 import { formatAdminDateTime } from '../../../shared/utils/dateTime'
 import type { AdminTaskResultFeedback } from './useAdminTaskMonitorFeedback'
-import type { AdminTaskMonitorDetailModel } from './taskMonitorResource'
+import type { AdminTaskMonitorDetailModel } from './resource'
 import {
   getSafeResultImageUrl,
   hasTaskResultImageCandidate,

@@ -20,9 +20,11 @@ import {
   type ImageInpaintExecutionPlan,
   type GenerationExecutionPlan,
 } from '../planning/imageExecutionPlan'
-import { resolveTaskImageResultAtIndexDisplay } from '../result-nodes/flowImageDirectActionTaskResult'
+import {
+  resolveTaskImageResultAtIndexDisplay,
+  usePendingImageResultExecution,
+} from '../result-nodes'
 import type { TaskImageResult } from '../../../../shared/query/taskResult'
-import { usePendingImageResultExecution } from '../result-nodes/usePendingImageResultNodes'
 import { waitExistingOrLiveTaskImageResults } from '../task-runner/imageDirectActionExecutor'
 import { defaultCanvasTaskSubmissionAdapter } from '../workspace/canvasTaskSubmissionAdapter'
 import { type CanvasExecutionWorkspace } from '../workspace/useCanvasExecutionWorkspace'

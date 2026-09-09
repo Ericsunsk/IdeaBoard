@@ -8,7 +8,7 @@ import {
   getAdminMonitorQueryKey,
   getAdminTaskDetailQueryKey,
   getAdminTaskListQueryKey,
-} from './taskMonitorResource'
+} from './resource'
 
 type UseAdminTaskCancelOptions = {
   confirm: AdminConfirmPort

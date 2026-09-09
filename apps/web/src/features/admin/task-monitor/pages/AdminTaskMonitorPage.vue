@@ -405,8 +405,8 @@ import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.v
 import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
-import { adminCards } from '../../shared/lib/adminCardMeta'
-import { adminChartPlugins } from '../../shared/lib/adminChart'
+import { adminCards } from '../../shared/lib/cardMeta'
+import { adminChartPlugins } from '../../shared/lib/chart'
 import {
   adminChartCanvasClass,
   adminChartGridClass,
@@ -414,7 +414,7 @@ import {
   adminFramedIconButtonClass,
   adminSummaryGridClass,
   adminTextButtonClass,
-} from '../../shared/lib/adminUiClasses'
+} from '../../shared/lib/uiClasses'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import {
   formatTaskCreatedAt,
@@ -428,16 +428,16 @@ import {
   getTaskResultImageUrl,
   getTaskSanitizedError,
   getTaskUserIdentifier,
-} from '../taskMonitorColumns'
+} from '../columns'
 import {
   adminTaskStatuses,
   getTaskStatusDefinition,
   taskStatusSelectOptions,
-} from '../taskMonitorStatus'
+} from '../status'
 import { useTaskMonitorCharts } from '../useTaskMonitorCharts'
 import { type AdminTaskRow, useAdminTaskList } from '../useAdminTaskList'
 import { useAdminTaskCancel } from '../useAdminTaskCancel'
-import { useAdminTaskDetailResource } from '../taskMonitorResource'
+import { useAdminTaskDetailResource } from '../resource'
 import { useAdminTaskRuntimeSnapshot } from '../useAdminTaskRuntimeSnapshot'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 

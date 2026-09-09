@@ -4,8 +4,8 @@ import {
   type AdminStatistics,
   type GetAdminStatisticsRangeValue,
   useAdminStatisticsResource,
-} from './statisticsResource'
-import { pickAdminTimeRangeOptions, type AdminTimeRangeOption } from '../shared/lib/adminTimeRange'
+} from './resource'
+import { pickAdminTimeRangeOptions, type AdminTimeRangeOption } from '../shared/lib/timeRange'
 
 const usageTrendRanges: readonly GetAdminStatisticsRangeValue[] = [
   GetAdminStatisticsRange['7d'],

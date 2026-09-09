@@ -1,17 +1,17 @@
 import { ref } from 'vue'
-import type { AdminProviderConfigFeedback } from './useAdminProviderConfigFeedback'
-import type { ProviderEndpointStore } from './providerConfigWorkspace'
+import type { AdminProviderConfigFeedback } from './useProviderConfigFeedback'
+import type { ProviderEndpointStore } from './workspace'
 import {
   createEmptyProviderEndpointForm,
   inferProviderEndpointApiTypeFromUrl,
   isModellessProviderCapability,
   isModellessProviderProtocol,
-} from './providerConfigPayload'
+} from './payload'
 import type {
   ProviderEndpointCommandTarget,
   ProviderEndpointFormData,
   ProviderEndpointFormField,
-} from './providerConfigTypes'
+} from './types'
 
 export type ProviderEndpointEditorOptions = {
   store: ProviderEndpointStore

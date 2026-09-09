@@ -2,7 +2,7 @@ import { computed, ref, watch } from 'vue'
 import { useGetAdminMonitor } from '../../../shared/api/generated-query/admin-monitor/admin-monitor'
 import type { MonitorResponse } from '../../../shared/api/generated-query/model'
 import { createApiDataSelector } from '../../../shared/api/apiResponse'
-import { useAdminQueryPolling } from '../shared/composables/useAdminQueryPolling'
+import { useQueryPolling } from '../shared/composables/useQueryPolling'
 import { useAdminTaskMonitorStream } from './useAdminTaskMonitorStream'
 
 const selectAdminMonitor = createApiDataSelector<MonitorResponse>('加载监控数据失败')
@@ -10,7 +10,7 @@ const selectAdminMonitor = createApiDataSelector<MonitorResponse>('加载监控�
 export function useAdminTaskRuntimeSnapshot() {
   const stream = useAdminTaskMonitorStream()
   const lastGoodSnapshot = ref<MonitorResponse | null>(null)
-  const polling = useAdminQueryPolling({
+  const polling = useQueryPolling({
     visibleInterval: 10_000,
     hiddenInterval: false,
     isEnabled: () => !stream.isConnected.value,

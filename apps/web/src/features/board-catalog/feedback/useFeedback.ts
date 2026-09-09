@@ -4,8 +4,8 @@ import type {
   CanvasBoardCreateResult,
   CanvasBoardDeleteResult,
   CanvasBoardDuplicateResult,
-} from '../../canvas-board/catalog/canvasBoardCommands'
-import type { CanvasBoardCatalogRenameResult } from '../../canvas-board/catalog/canvasBoardCatalog'
+} from '../../canvas-board/catalog/commands'
+import type { CanvasBoardCatalogRenameResult } from '../../canvas-board/catalog/catalog'
 
 type BoardToast = Pick<ReturnType<typeof useAppToast>, 'success' | 'warning' | 'error'>
 

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
-import { GetAdminStatisticsRange, type AdminStatistics } from './statisticsResource'
+import { GetAdminStatisticsRange, type AdminStatistics } from './resource'
 import { useUsageStatisticsCharts } from './useUsageStatisticsCharts'
 
 describe('useUsageStatisticsCharts', () => {

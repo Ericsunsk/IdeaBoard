@@ -1,5 +1,5 @@
 export { useCanvasImageTools } from './useCanvasImageTools'
-export { default as ImageToolPresentation } from './components/ImageToolPresentation.vue'
+export { default as ImageToolPresentation } from './components/Presentation.vue'
 export type { UseCanvasImageToolsOptions } from './useCanvasImageTools'
 export type {
   ImageActionBinding,

@@ -36,7 +36,7 @@ function renderImageStage(toolActive: boolean) {
     },
     global: {
       stubs: {
-        ImageToolStagePresentation: { template: '<div><slot /></div>' },
+        StagePresentation: { template: '<div><slot /></div>' },
         NodeStageFrame: {
           props: ['transparent'],
           template:

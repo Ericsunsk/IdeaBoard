@@ -6,13 +6,13 @@ import {
   createBoardSessionRepository,
   isBoardSessionRemoteSyncError,
   type BoardSessionRepository,
-} from './boardSessionRepository'
+} from './repository'
 import {
   defaultBoardSessionPreviewRenderer,
   refreshBoardSessionPreview,
   type BoardSessionPreviewRenderer,
-} from './boardSessionPreview'
-import { createBoardSessionUploadLifecycle } from './boardSessionUploadLifecycle'
+} from './preview'
+import { createBoardSessionUploadLifecycle } from './uploadLifecycle'
 
 type BoardSessionIdentity = {
   userId: number

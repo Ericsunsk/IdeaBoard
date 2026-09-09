@@ -5,7 +5,7 @@ import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../domain'
 import { makeCanvasBoardState } from '../testing'
 import { clearStoredAuth, setStoredAuth } from '../../../shared/utils/auth'
 import { getCanvasBoardState, replaceCanvasBoardStateMap } from '../persistence'
-import { listCanvasBoards, replaceCanvasBoards, subscribeCanvasBoardChanges } from './canvasBoards'
+import { listCanvasBoards, replaceCanvasBoards, subscribeCanvasBoardChanges } from './boards'
 import { hydrateCanvasBoardsFromServer, syncCanvasBoardToServer } from './boardSync'
 
 const mocks = vi.hoisted(() => {

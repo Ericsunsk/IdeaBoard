@@ -3,8 +3,8 @@ import {
   CANVAS_BOARD_STATE_SCHEMA_VERSION,
   type CanvasBoardSnapshot,
   type CanvasBoardState,
-} from './canvasNodes'
-import { canvasBoardSnapshotSchema, canvasBoardStateSchema } from './canvasBoardStateSchema'
+} from './nodes'
+import { canvasBoardSnapshotSchema, canvasBoardStateSchema } from './stateSchema'
 
 export type BoardStateValidationIssue = {
   path: string

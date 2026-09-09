@@ -16,8 +16,8 @@ const resource = vi.hoisted(() => ({
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 const confirm = vi.hoisted(() => ({ request: vi.fn() }))
 
-vi.mock('./rewardCodeAdminResource', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./rewardCodeAdminResource')>()),
+vi.mock('./resource', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./resource')>()),
   createAdminRewardCodeResource: () => resource,
 }))
 

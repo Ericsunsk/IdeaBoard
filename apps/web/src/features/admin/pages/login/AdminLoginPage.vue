@@ -86,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import { useUserStore } from '../../../auth/session/authSession'
+import { useUserStore } from '../../../auth/session/session'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -95,7 +95,7 @@ import {
   USER_LOGIN_PATH,
   isPathUnderRoute,
 } from '../../../../shared/constants/routePaths'
-import { ADMIN_DEFAULT_PATH } from '../../app/adminNavigationMeta'
+import { ADMIN_DEFAULT_PATH } from '../../app/navigationMeta'
 import { User } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
@@ -108,7 +108,7 @@ import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedir
 import { useSiteBranding } from '../../../../shared/composables/useSiteBranding'
 import { normalizeSafeInternalRedirectPath } from '../../../../shared/utils/auth'
 import { brandMarkClasses, createBrandMarkClass } from '../../../../shared/lib/brandMark'
-import { adminActionButtonClass, adminTextButtonClass } from '../../shared/lib/adminUiClasses'
+import { adminActionButtonClass, adminTextButtonClass } from '../../shared/lib/uiClasses'
 import { useAdminLoginFeedback } from './useAdminLoginFeedback'
 
 const router = useRouter()

@@ -32,10 +32,10 @@ _Avoid_: 在画廊列表全量拉取完整 board state 渲染缩略图
 
 | Module | Responsibility | Public Interface | Implementation Detail Boundary |
 | :--- | :--- | :--- | :--- |
-| `domain/` | 纯节点定义（`canvasNodes.ts`）、快照 Schema（`canvasBoardStateSchema.ts`）、信封契约、多图融合比例、媒体引用提取（`canvasBoardMediaRefs.ts`）。 | `domain/index.ts`（导出节点类型、Schema 解析器、`extractBoardStateMediaRefs`）。 | 严禁引入 Vue、Router 或运行时 DOM，纯函数驱动。 |
-| `persistence/` | 序列化/反序列化（`boardStateSerialization.ts`）、版本迁移适配。 | `serializeBoardState`、`parseBoardState`。 | 兼容旧字段与空默认值修补，输出稳定合规模型。 |
+| `domain/` | 纯节点定义（`nodes.ts`）、快照 Schema（`stateSchema.ts`）、信封契约、多图融合比例、媒体引用提取（`mediaRefs.ts`）。 | `domain/index.ts`（导出节点类型、Schema 解析器、`extractBoardStateMediaRefs`）。 | 严禁引入 Vue、Router 或运行时 DOM，纯函数驱动。 |
+| `persistence/` | 序列化/反序列化（`boardStateSerialization.ts`）、版本迁移适配；`state.ts` 持有内存快照 map。 | `serializeBoardState`、`parseBoardState`（经 `persistence/index.ts`）。 | 兼容旧字段与空默认值修补，输出稳定合规模型。 |
 | `preview/` | 预览图生成与刷新队列（`boardPreviewSerializer.ts`）。 | `renderBoardPreviewSvg`、`createBoardPreviewRefreshQueue`。 | 预览降级算法留在内部，对外输出稳定 Data URL。 |
-| `catalog/` | 看板 CRUD 命令、云端同步（`boardSync.ts`）、协作加入用例。 | `canvasBoardCatalog.ts`、`canvasBoardCommands.ts`、`saveCanvasBoardState`。 | 封装 generated API，向 UI 暴露安全命令与冲突解决契约。 |
+| `catalog/` | 看板 CRUD 命令、云端同步（`boardSync.ts`）、协作加入用例。 | `catalog.ts`、`commands.ts`、`saveCanvasBoardState`（经 `catalog/index.ts`）。 | 封装 generated API，向 UI 暴露安全命令与冲突解决契约。 |
 
 ## Rules
 

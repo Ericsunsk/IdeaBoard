@@ -7,15 +7,15 @@ import AdminLogoPickerPopover from './AdminLogoPickerPopover.vue'
 import {
   getAdminBrandLogoOverride,
   replaceAdminBrandLogoOverrides,
-} from '../shared/logos/adminBrandLogos'
+} from '../shared/logos/brandLogos'
 
 const logoResource = vi.hoisted(() => ({
   save: vi.fn().mockResolvedValue(undefined),
   remove: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('../shared/logos/adminBrandLogoResource', async () => {
-  const logos = await import('../shared/logos/adminBrandLogos')
+vi.mock('../shared/logos/brandLogoResource', async () => {
+  const logos = await import('../shared/logos/brandLogos')
   return {
     useAdminBrandLogoResource: () => ({
       save: async (scope: 'provider-endpoint', target: number, key: string) => {

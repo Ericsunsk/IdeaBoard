@@ -4,11 +4,11 @@ import { adminPrimeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen } from '../../../test/render'
 import { stripUndefined } from '../../../shared/api/stripUndefined'
 import AdminTaskResultDialog from './AdminTaskResultDialog.vue'
-import { adminTaskStatuses } from './taskMonitorStatus'
+import { adminTaskStatuses } from './status'
 import type {
   AdminTaskMonitorDetailModel,
   AdminTaskMonitorExecutionAttempt,
-} from './taskMonitorResource'
+} from './resource'
 
 const toast = vi.hoisted(() => ({
   success: vi.fn(),
@@ -16,7 +16,7 @@ const toast = vi.hoisted(() => ({
   error: vi.fn(),
 }))
 
-vi.mock('../shared/lib/adminToast', () => ({
+vi.mock('../shared/lib/toast', () => ({
   useAdminToast: () => toast,
 }))
 

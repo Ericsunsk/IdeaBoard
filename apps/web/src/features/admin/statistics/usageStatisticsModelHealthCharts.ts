@@ -5,7 +5,7 @@ import {
   type ChartOptions,
   type ChartTooltipItem,
 } from '../../../shared/lib/chartPrimitives'
-import type { AdminStatistics } from './statisticsResource'
+import type { AdminStatistics } from './resource'
 import {
   adminChartTheme,
   defineAdminChartBubbleDatasetStyle,
@@ -15,7 +15,7 @@ import {
   defineAdminChartOptions,
   getAdminChartBubbleHoverRadius,
   getAdminChartBubbleRadius,
-} from '../shared/lib/adminChart'
+} from '../shared/lib/chart'
 import {
   baseChartOptions,
   baseChartPlugins,

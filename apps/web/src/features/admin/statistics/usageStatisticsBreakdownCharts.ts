@@ -5,13 +5,13 @@ import {
   type ChartOptions,
   withAlpha,
 } from '../../../shared/lib/chartPrimitives'
-import type { AdminStatistics } from './statisticsResource'
+import type { AdminStatistics } from './resource'
 import {
   adminChartStrokeWidth,
   adminChartTheme,
   defineAdminChartRadialCountScale,
   defineAdminChartOptions,
-} from '../shared/lib/adminChart'
+} from '../shared/lib/chart'
 import {
   baseChartOptions,
   baseChartPlugins,

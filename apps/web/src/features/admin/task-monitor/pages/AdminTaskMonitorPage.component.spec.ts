@@ -77,7 +77,7 @@ vi.mock('../useTaskMonitorCharts', () => ({
   }),
 }))
 
-vi.mock('../taskMonitorResource', () => ({
+vi.mock('../resource', () => ({
   useAdminTaskDetailResource: () => ({
     data: ref(undefined),
     isError: ref(false),

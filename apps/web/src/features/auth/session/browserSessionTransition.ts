@@ -2,12 +2,12 @@ import { fetchCurrentUserInfo, type User } from '../../../shared/api/userSession
 import { clearAuthScopedQueryCache } from '../../../shared/query/queryClient'
 import { USER_BOARDS_PATH, USER_AUTH_CALLBACK_PATH } from '../../../shared/constants/routePaths'
 import { normalizeSafeInternalRedirectPath } from '../../../shared/auth/sessionPolicy'
-import { authTransport } from './authTransport'
+import { authTransport } from './transport'
 import {
   clearPersistedSession,
   persistSessionUser,
   readStoredSessionUser,
-} from './authSessionPersistence'
+} from './sessionPersistence'
 
 const SESSION_CACHE_TTL_MS = 30_000
 

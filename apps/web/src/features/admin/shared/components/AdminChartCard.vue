@@ -12,7 +12,7 @@
 <script setup lang="ts">
 import ChartCard from '../../../../shared/components/ChartCard.vue'
 import ChartPanel from '../../../../shared/components/ChartPanel.vue'
-import { adminCardPt } from '../lib/adminCardPt'
+import { adminCardPt } from '../lib/cardPt'
 
 type AdminChartPanelSize = 'hero' | 'standard' | 'compact' | 'monitor'
 

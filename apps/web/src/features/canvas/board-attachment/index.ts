@@ -1,1 +1,1 @@
-export type { CanvasBoardAttachment, CanvasBoardSessionIdentity } from './CanvasBoardAttachment'
+export type { CanvasBoardAttachment, CanvasBoardSessionIdentity } from './attachment'

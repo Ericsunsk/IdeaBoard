@@ -234,19 +234,19 @@ import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
-import { useAdminCollectionState } from '../../shared/composables/useAdminCollectionState'
-import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
+import { useCollectionState } from '../../shared/composables/useCollectionState'
+import { useCursorPagination } from '../../shared/composables/useCursorPagination'
 import {
   adminActionButtonClass,
   adminCompactTagClass,
   adminTextButtonClass,
-} from '../../shared/lib/adminUiClasses'
-import { formatAdminDateTime } from '../creditsBillingFormat'
+} from '../../shared/lib/uiClasses'
+import { formatAdminDateTime } from '../format'
 import {
   createAdminCreditFindingQueueResource,
   type AdminCreditFinding,
   type AdminCreditFindingStatus,
-} from './adminCreditFindingQueueResource'
+} from './findingQueueResource'
 import {
   formatFindingDetailsEntries,
   getFindingRiskPresentation,
@@ -261,15 +261,15 @@ const statusOptions = [
 const status = ref<AdminCreditFindingStatus>('open')
 const selectedFinding = ref<AdminCreditFinding | null>(null)
 const drawerVisible = ref(false)
-let pagination: ReturnType<typeof useAdminCursorPagination<number>>
+let pagination: ReturnType<typeof useCursorPagination<number>>
 const resource = createAdminCreditFindingQueueResource()
-const collection = useAdminCollectionState({
+const collection = useCollectionState({
   load: (signal) =>
     resource.list({ status: status.value, beforeId: pagination.cursor.value, signal }),
   isEmpty: (page) => page.findings.length === 0,
 })
 const { data: findingPage, loading, initialError, backgroundError } = collection
-pagination = useAdminCursorPagination<number>({ pending: loading })
+pagination = useCursorPagination<number>({ pending: loading })
 const findings = computed(() => findingPage.value?.findings ?? [])
 const currentPage = pagination.currentPage
 const knownPageCount = pagination.knownPageCount

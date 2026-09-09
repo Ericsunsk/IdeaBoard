@@ -44,8 +44,8 @@ import { computed, ref } from 'vue'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import AdminDialogShell from '../shared/components/AdminDialogShell.vue'
-import { adminActionButtonClass } from '../shared/lib/adminUiClasses'
-import { validateAdminActionReason } from '../shared/validation/adminActionReasonContract'
+import { adminActionButtonClass } from '../shared/lib/uiClasses'
+import { validateAdminActionReason } from '../shared/validation/actionReasonContract'
 import AdminActionReasonField from './AdminActionReasonField.vue'
 
 withDefaults(

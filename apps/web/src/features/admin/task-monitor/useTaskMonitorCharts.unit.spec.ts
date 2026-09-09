@@ -9,8 +9,8 @@ import {
 import {
   normalizeMonitorExecutionPressurePoints,
   type TaskExecutionSignalKey,
-} from './taskMonitorExecutionPressure'
-import { adminChartBubbleClipPadding, adminChartPointClipPadding } from '../shared/lib/adminChart'
+} from './executionPressure'
+import { adminChartBubbleClipPadding, adminChartPointClipPadding } from '../shared/lib/chart'
 
 describe('useTaskMonitorCharts builders', () => {
   it('keeps stable empty execution pressure buckets when monitor aggregation is empty', () => {

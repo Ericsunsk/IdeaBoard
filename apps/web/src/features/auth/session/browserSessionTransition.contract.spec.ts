@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../../shared/query/queryClient', () => ({
   clearAuthScopedQueryCache: mocks.clearAuthScopedQueryCache,
 }))
-vi.mock('./authSessionPersistence', () => ({
+vi.mock('./sessionPersistence', () => ({
   clearPersistedSession: mocks.clearPersistedSession,
   persistSessionUser: mocks.persistSessionUser,
   readStoredSessionUser: mocks.readStoredSessionUser,

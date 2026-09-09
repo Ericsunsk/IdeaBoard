@@ -41,8 +41,8 @@ import {
   adminPopoverSectionHeaderClass,
   adminPopoverTitleClass,
   adminFramedIconButtonClass,
-} from '../lib/adminUiClasses'
-import { createAdminPopoverPt } from '../lib/adminOverlayPt'
+} from '../lib/uiClasses'
+import { createAdminPopoverPt } from '../lib/overlayPt'
 
 type PrimePopupPanel = {
   toggle: (event: Event) => void

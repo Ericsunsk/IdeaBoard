@@ -440,6 +440,7 @@ function renderScreen(
         FlowCanvasNode: NodeStub,
         CanvasChromeMiniMap: MiniMapStub,
         ImageToolPresentation: ImageToolPresentationStub,
+        Presentation: ImageToolPresentationStub,
         CanvasNodeContextMenu: ContextMenuStub,
       },
     },

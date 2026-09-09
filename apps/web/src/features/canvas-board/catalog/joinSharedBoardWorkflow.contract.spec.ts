@@ -13,7 +13,7 @@ vi.mock('../../../shared/api/client', () => ({
   },
 }))
 
-vi.mock('./canvasBoardCatalog', () => ({
+vi.mock('./catalog', () => ({
   useCanvasBoardCatalog: () => ({
     commands: { hydrate: mocks.hydrateCanvasBoardsFromServer },
   }),

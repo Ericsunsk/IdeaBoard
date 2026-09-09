@@ -6,7 +6,7 @@ const webRoot = fileURLToPath(new URL('..', import.meta.url))
 const adminRoot = path.join(webRoot, 'src/features/admin')
 const canonicalCollectionState = path.join(
   adminRoot,
-  'shared/composables/useAdminCollectionState.ts',
+  'shared/composables/useCollectionState.ts',
 )
 
 async function listAdminSourceFiles(directory: string): Promise<string[]> {
@@ -36,7 +36,7 @@ async function main() {
       /(?:requestEpoch|pageRequestEpoch|listRequestEpoch|activeRequest)/.test(source) &&
       source.includes('AbortController')
     const ownsQueryRetainedCollectionLifecycle =
-      filePath.endsWith('Resource.ts') &&
+      /resource\.ts$/.test(filePath) &&
       source.includes('placeholderData') &&
       source.includes('refetchInterval') &&
       (source.includes('beforeId') || source.includes('before_id') || source.includes('cursor'))
@@ -55,7 +55,7 @@ async function main() {
   }
 
   console.error('Admin collection-state contract failed.')
-  console.error('Use features/admin/shared/composables/useAdminCollectionState for this lifecycle:')
+  console.error('Use features/admin/shared/composables/useCollectionState for this lifecycle:')
   for (const filePath of duplicateLifecycles) console.error(`- ${filePath}`)
   process.exitCode = 1
 }

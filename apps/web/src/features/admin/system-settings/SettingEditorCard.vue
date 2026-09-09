@@ -23,8 +23,8 @@
 <script setup lang="ts">
 import Card from 'primevue/card'
 import Tag from 'primevue/tag'
-import { adminCardPt } from '../shared/lib/adminCardPt'
-import { adminMasonryCardClass } from '../shared/lib/adminUiClasses'
+import { adminCardPt } from '../shared/lib/cardPt'
+import { adminMasonryCardClass } from '../shared/lib/uiClasses'
 
 withDefaults(
   defineProps<{

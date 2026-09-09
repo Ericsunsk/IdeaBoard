@@ -41,7 +41,7 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import AdminDialogShell from './AdminDialogShell.vue'
-import { adminTextButtonClass } from '../lib/adminUiClasses'
+import { adminTextButtonClass } from '../lib/uiClasses'
 
 defineProps<{
   visible: boolean

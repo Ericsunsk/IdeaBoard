@@ -27,7 +27,7 @@ import type { CanvasGraphInteractionBrowserAdapter } from './interactionBrowserA
 import {
   renderImageRetouchRecipeFile,
   type ImageRetouchRenderSource,
-} from '../retouch/services/retouchRenderer'
+} from '../retouch/services/renderer'
 import { resolveMediaAssetOriginalURL } from '../../../shared/api/mediaAssetDelivery'
 
 type MessageLoadingHandle = {

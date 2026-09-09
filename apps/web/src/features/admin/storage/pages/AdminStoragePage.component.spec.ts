@@ -7,11 +7,11 @@ import { adminPrimeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen } from '../../../../test/render'
 import AdminStoragePage from './AdminStoragePage.vue'
 
-vi.mock('../../shared/logos/adminBrandLogoResource', () => ({
+vi.mock('../../shared/logos/brandLogoResource', () => ({
   useAdminBrandLogoResource: () => ({ save: vi.fn(), remove: vi.fn() }),
 }))
 
-vi.mock('../storageResource', () => ({
+vi.mock('../resource', () => ({
   createAdminStorageResource: () => ({
     fetchProviders: vi.fn().mockResolvedValue([
       {

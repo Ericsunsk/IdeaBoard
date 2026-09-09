@@ -66,5 +66,5 @@
 
 <script setup lang="ts">
 import PublicLegalPage from '../components/PublicLegalPage.vue'
-import { LEGAL_CONTACTS, LEGAL_DOCUMENT_VERSIONS } from '../legalDocuments'
+import { LEGAL_CONTACTS, LEGAL_DOCUMENT_VERSIONS } from '../documents'
 </script>

@@ -307,16 +307,16 @@ import DataTableFrame from '../../../shared/components/DataTableFrame.vue'
 import AdminUserBanDialog from './AdminUserBanDialog.vue'
 import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
 import { AdminUserWalletDialog } from '../credits-billing/wallets'
-import { banDurationOptions } from './adminUserCommands'
-import { useAdminUsersContext } from './adminUsersContext'
+import { banDurationOptions } from './commands'
+import { useAdminUsersContext } from './context'
 import {
   getCountryFlag,
   getCountryLabel,
   type AdminUserRowView,
   type UserActionKey,
-} from './adminUserView'
-import { useAdminUsersFeedback } from './useAdminUsersFeedback'
-import { adminFramedIconButtonClass } from '../shared/lib/adminUiClasses'
+} from './view'
+import { useUsersFeedback } from './useUsersFeedback'
+import { adminFramedIconButtonClass } from '../shared/lib/uiClasses'
 
 const vTooltip = Tooltip
 
@@ -325,7 +325,7 @@ type PrimePopupPanel = {
   hide?: () => void
 }
 
-const feedback = useAdminUsersFeedback()
+const feedback = useUsersFeedback()
 const adminConfirm = useAdminConfirm()
 const userActionPopoverRef = ref<PrimePopupPanel | null>(null)
 const walletDialogUser = ref<AdminUserRowView | null>(null)

@@ -212,7 +212,7 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
-import { formatIdeaAmount } from '../../shared/lib/adminIdeaCurrency'
+import { formatIdeaAmount } from '../../shared/lib/ideaCurrency'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminRowActionsPopover from '../../shared/components/AdminRowActionsPopover.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
@@ -220,11 +220,11 @@ import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
-import { useAdminCollectionState } from '../../shared/composables/useAdminCollectionState'
-import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
+import { useCollectionState } from '../../shared/composables/useCollectionState'
+import { useCursorPagination } from '../../shared/composables/useCursorPagination'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
-import { adminActionButtonClass, adminFramedIconButtonClass } from '../../shared/lib/adminUiClasses'
+import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
+import { adminActionButtonClass, adminFramedIconButtonClass } from '../../shared/lib/uiClasses'
 import RewardCodeFormDialog, { type RewardCodeFormValue } from './RewardCodeFormDialog.vue'
 import RewardCodePlaintextDialog from './RewardCodePlaintextDialog.vue'
 import RewardCodeRedemptionsDialog from './RewardCodeRedemptionsDialog.vue'
@@ -232,7 +232,7 @@ import {
   createAdminRewardCodeResource,
   type RewardCode,
   type RewardCodeStatus,
-} from './rewardCodeAdminResource'
+} from './resource'
 
 const resource = createAdminRewardCodeResource()
 const toast = useAdminToast()
@@ -263,8 +263,8 @@ const rewardCodeActionItems = computed(() => [
   },
 ])
 const confirm = useAdminConfirm()
-let pagination: ReturnType<typeof useAdminCursorPagination<number>>
-const collection = useAdminCollectionState({
+let pagination: ReturnType<typeof useCursorPagination<number>>
+const collection = useCollectionState({
   load: (signal) =>
     resource.search({
       query: appliedSearchKeyword.value,
@@ -276,7 +276,7 @@ const collection = useAdminCollectionState({
   onInitialError: (error) => toast.error(formatAdminDisplayError(error, '兑换码加载失败')),
 })
 const { data: rewardCodePage, loading, initialError, backgroundError, updateData } = collection
-pagination = useAdminCursorPagination<number>({ pending: loading })
+pagination = useCursorPagination<number>({ pending: loading })
 const rewardCodes = computed(() => rewardCodePage.value?.rewardCodes ?? [])
 const totalRewardCodes = computed(() => rewardCodePage.value?.total ?? 0)
 const totalRewardCodesLabel = computed(() => '共 ' + totalRewardCodes.value + ' 个兑换码')

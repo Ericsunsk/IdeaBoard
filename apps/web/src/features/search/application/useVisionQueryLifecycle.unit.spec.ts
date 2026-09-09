@@ -19,7 +19,7 @@ vi.mock('../../../shared/composables/useAppToast', () => ({ useAppToast: () => m
 vi.mock('../infrastructure/visionBillingResource', () => ({
   fetchVisionSearchPrice: mocks.fetchPrice,
 }))
-vi.mock('../infrastructure/searchResource', () => ({
+vi.mock('../infrastructure/resource', () => ({
   extractVisionSearch: mocks.extractVisionSearch,
 }))
 vi.mock('../../library', async (importOriginal) => {

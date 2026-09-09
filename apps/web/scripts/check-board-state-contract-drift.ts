@@ -46,8 +46,8 @@ const webRoot = fileURLToPath(new URL('..', import.meta.url))
 const repoRoot = path.resolve(webRoot, '../..')
 
 const sourceFiles = {
-  frontendDomain: path.join(webRoot, 'src/features/canvas-board/domain/canvasNodes.ts'),
-  frontendSchema: path.join(webRoot, 'src/features/canvas-board/domain/canvasBoardStateSchema.ts'),
+  frontendDomain: path.join(webRoot, 'src/features/canvas-board/domain/nodes.ts'),
+  frontendSchema: path.join(webRoot, 'src/features/canvas-board/domain/stateSchema.ts'),
   backendState: path.join(repoRoot, 'apps/api/internal/boards/state.go'),
   openApi: path.join(repoRoot, 'apps/api/openapi.yaml'),
   generatedEnvelope: path.join(

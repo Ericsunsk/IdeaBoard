@@ -28,7 +28,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Circle } from '@iconoir/vue'
-import { clampMaskBrushSize } from '../config/inpaintConstants'
+import { clampMaskBrushSize } from '../config/constants'
 
 const props = defineProps<{
   canvasWidth: number

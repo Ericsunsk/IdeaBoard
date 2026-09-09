@@ -460,15 +460,15 @@ import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFra
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
-import { adminCardPt } from '../../shared/lib/adminCardPt'
+import { adminCardPt } from '../../shared/lib/cardPt'
 import {
   adminActionButtonClass,
   adminLogoButtonClass,
   adminMasonryCardClass,
   adminTextButtonClass,
-} from '../../shared/lib/adminUiClasses'
-import { storageVendorLogo, vendorIconMap, vendorPresetCatalog } from '../storageMeta'
-import { useAdminStorageContext } from '../useAdminStorageContext'
+} from '../../shared/lib/uiClasses'
+import { storageVendorLogo, vendorIconMap, vendorPresetCatalog } from '../meta'
+import { useStorageContext } from '../useStorageContext'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import AdminLogoPickerPopover from '../../provider-config/AdminLogoPickerPopover.vue'
 
@@ -519,7 +519,7 @@ const {
   requestRemoveProfile,
   loadData,
   refreshData,
-} = useAdminStorageContext({ confirm: adminConfirm })
+} = useStorageContext({ confirm: adminConfirm })
 const searchKeyword = cards.searchKeyword
 const hasStorageSearch = cards.hasSearch
 const filteredStorageCards = cards.items

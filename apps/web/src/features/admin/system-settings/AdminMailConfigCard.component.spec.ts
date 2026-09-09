@@ -8,8 +8,8 @@ import type { MailConfigSummary } from './mailConfigTypes'
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 
-vi.mock('../shared/lib/adminToast', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../shared/lib/adminToast')>()),
+vi.mock('../shared/lib/toast', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../shared/lib/toast')>()),
   useAdminToast: () => toast,
 }))
 

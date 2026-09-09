@@ -1,10 +1,10 @@
 import { ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { createAccountEditor } from './accountEditor'
-import type { ProviderAccountStore } from './providerConfigWorkspace'
-import { FALLBACK_ADMIN_ACCOUNT_LIMITS } from './providerConfigLimits'
-import type { AdminProviderConfigFeedback } from './useAdminProviderConfigFeedback'
-import type { ProviderAccountRecord, ProviderEndpointRecord } from './providerConfigTypes'
+import type { ProviderAccountStore } from './workspace'
+import { FALLBACK_ADMIN_ACCOUNT_LIMITS } from './limits'
+import type { AdminProviderConfigFeedback } from './useProviderConfigFeedback'
+import type { ProviderAccountRecord, ProviderEndpointRecord } from './types'
 
 function createEndpoint(overrides: Partial<ProviderEndpointRecord> = {}): ProviderEndpointRecord {
   return {

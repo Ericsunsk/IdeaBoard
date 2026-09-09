@@ -212,7 +212,7 @@ import InputNumber from 'primevue/inputnumber'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
-import { adminActionButtonClass } from '../../shared/lib/adminUiClasses'
+import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import {
   formatPaymentDateTime,
   formatPaymentMoney,

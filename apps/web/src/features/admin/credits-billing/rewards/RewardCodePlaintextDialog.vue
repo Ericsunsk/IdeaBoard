@@ -41,7 +41,7 @@ import { ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
-import { adminActionButtonClass } from '../../shared/lib/adminUiClasses'
+import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 
 const props = withDefaults(
   defineProps<{ visible: boolean; plaintext: string; header?: string }>(),

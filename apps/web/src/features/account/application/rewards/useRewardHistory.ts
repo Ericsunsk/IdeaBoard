@@ -3,7 +3,7 @@ import { useInfiniteQuery } from '@tanstack/vue-query'
 import {
   fetchRewardRedemptions,
   rewardRedemptionsQueryKeys,
-} from '../../infrastructure/rewards/rewardsResource'
+} from '../../infrastructure/rewards/resource'
 
 const pageSize = 20
 const initialPageParam = 0

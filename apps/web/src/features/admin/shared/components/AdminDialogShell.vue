@@ -40,7 +40,7 @@ import { computed, useSlots } from 'vue'
 import { Xmark } from '@iconoir/vue'
 import Dialog from 'primevue/dialog'
 import { usePrimeDialogOverlayLifecycle } from '../../../../shared/composables/usePrimeDialogOverlayLifecycle'
-import { createAdminDialogPt } from '../lib/adminOverlayPt'
+import { createAdminDialogPt } from '../lib/overlayPt'
 import {
   adminDialogContentClass,
   adminDialogFooterClass,
@@ -48,7 +48,7 @@ import {
   adminDialogFormBodyClass,
   adminDialogHeaderClass,
   adminDialogScrollableBodyClass,
-} from '../lib/adminUiClasses'
+} from '../lib/uiClasses'
 
 export type AdminDialogSize = 'compact' | 'form' | 'medium' | 'wide'
 export type AdminDialogContentLayout = 'form' | 'scrollable'

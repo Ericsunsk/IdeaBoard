@@ -1,4 +1,4 @@
-import type { CanvasBoardState } from './canvasNodes'
+import type { CanvasBoardState } from './nodes'
 import { normalizeLatestCanvasBoardState } from './latestBoardState'
 
 export type BoardStateEnvelopeContract = CanvasBoardState

@@ -29,7 +29,7 @@ const mocks = vi.hoisted(() => ({
     | null,
 }))
 
-vi.mock('../../auth/authOverlay', () => ({
+vi.mock('../../auth/overlay', () => ({
   useAuthOverlay: () => ({ commands: { open: mocks.authOpen } }),
 }))
 

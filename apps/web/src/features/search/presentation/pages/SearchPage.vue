@@ -616,7 +616,7 @@ import StudioName from '../../../../shared/components/StudioName.vue'
 import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
 import UserLocaleSelect from '../../../../shared/components/UserLocaleSelect.vue'
 import { HOME_PATH, USER_BOARDS_PATH } from '../../../../shared/constants/routePaths'
-import { useUserStore } from '../../../auth/session/authSession'
+import { useUserStore } from '../../../auth/session/session'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
 import UserWorkspaceNavigation from '../../../user-shell/components/UserWorkspaceNavigation.vue'
 import SearchSavePopover from '../components/SearchSavePopover.vue'
@@ -625,7 +625,7 @@ import SearchResultViewport from '../components/SearchResultViewport.vue'
 import { libraryAssetKey } from '../../../library'
 import { searchReferenceKey } from '../../infrastructure/libraryBridge'
 import { useUserAccountControls } from '../../../user-shell/useUserAccountControls'
-import { useAuthOverlay } from '../../../auth/authOverlay'
+import { useAuthOverlay } from '../../../auth/overlay'
 import {
   SearchLibraryFloatingIsland as LibraryFloatingIsland,
   useSearchScreenRuntime,

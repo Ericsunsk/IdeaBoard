@@ -13,7 +13,7 @@ function readSource(relativePath: string) {
 const nodeMotionSources = [
   'components/nodes/workflows/FusionStage.vue',
   'components/nodes/workflows/ImageNodeStage.vue',
-  'image-tools/components/ImageToolChromeFrame.vue',
+  'image-tools/components/ChromeFrame.vue',
   'components/nodes/primitives/NodeAspectRatioPicker.vue',
   'components/nodes/primitives/NodePromptComposer.vue',
   'components/nodes/primitives/NodeStageFrame.vue',

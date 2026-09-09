@@ -2,7 +2,7 @@ import {
   formatAdminDisplayError,
   type AdminToastPort,
   useAdminToast,
-} from '../../shared/lib/adminToast'
+} from '../../shared/lib/toast'
 
 export type AdminLoginFeedback = {
   succeeded: () => void

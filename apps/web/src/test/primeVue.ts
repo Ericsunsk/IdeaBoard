@@ -1,7 +1,7 @@
 import type { PrimeVueConfiguration } from 'primevue/config'
 import { ideaBoardPrimePt } from '../app/primePassThrough'
 import { userPrimeLocaleEn } from '../app/primeLocale'
-import { ideaBoardAdminPrimeLocale } from '../features/admin/app/adminPrimeLocale'
+import { ideaBoardAdminPrimeLocale } from '../features/admin/app/primeLocale'
 import { ideaBoardPrimePreset } from '../app/primeTheme'
 
 const sharedPrimeVueTestOptions = {

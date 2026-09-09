@@ -2,7 +2,7 @@ import { nextTick, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { useTaskResultDetail } from './useTaskResultDetail'
 import { getSafeResultImageUrl, getSafeTaskResultImageUrl } from './taskResultImages'
-import type { AdminTaskMonitorDetailModel } from './taskMonitorResource'
+import type { AdminTaskMonitorDetailModel } from './resource'
 
 describe('task result image URL validation', () => {
   it.each([

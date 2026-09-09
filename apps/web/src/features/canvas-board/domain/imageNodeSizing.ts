@@ -72,4 +72,4 @@ export function resolveImageNodeStageHeight(
   const safeWidth = Number.isFinite(width) && width > 0 ? width : IMAGE_NODE_EMPTY_SIZE
   return Math.max(1, Math.round(safeWidth * normalizeImageNodeRatio(ratioValue)))
 }
-import type { ImageNodeItem, ImageNodeOutputItem } from './canvasNodes'
+import type { ImageNodeItem, ImageNodeOutputItem } from './nodes'

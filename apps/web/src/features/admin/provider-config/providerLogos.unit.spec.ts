@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { adminBrandLogoMap, replaceAdminBrandLogoOverrides } from '../shared/logos/adminBrandLogos'
+import { adminBrandLogoMap, replaceAdminBrandLogoOverrides } from '../shared/logos/brandLogos'
 import { getProviderEndpointLogo, getSearchProviderLogo } from './providerLogos'
 
 describe('providerLogos', () => {

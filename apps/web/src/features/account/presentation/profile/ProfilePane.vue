@@ -107,7 +107,7 @@ import { useI18n } from 'vue-i18n'
 import { Camera } from '@iconoir/vue'
 import Avatar from 'primevue/avatar'
 import Tag from 'primevue/tag'
-import { useUserStore } from '../../../auth/session/authSession'
+import { useUserStore } from '../../../auth/session/session'
 import { useAvatarUpload } from '../../application/profile/useAvatarUpload'
 import AccountPane from '../common/AccountPane.vue'
 

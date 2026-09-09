@@ -9,7 +9,7 @@ import {
   type AccountOverlay,
   type CreditWalletState,
 } from '../account'
-import { createAuthOverlay, provideAuthOverlay, type AuthOverlay } from '../auth/authOverlay'
+import { createAuthOverlay, provideAuthOverlay, type AuthOverlay } from '../auth/overlay'
 import { useUserAccountControls } from './useUserAccountControls'
 
 const currentUser = ref<User | null>(null)
@@ -18,7 +18,7 @@ const walletState = ref<CreditWalletState>({
   availableCredits: 1280,
 })
 
-vi.mock('../auth/session/authSession', () => ({
+vi.mock('../auth/session/session', () => ({
   useUserStore: () => ({
     get user() {
       return currentUser.value

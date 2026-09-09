@@ -1,7 +1,7 @@
 import { joinBoardByShareToken } from '../../../shared/api/generated-query/boards/boards'
 import { resolveApiData } from '../../../shared/api/apiResponse'
 import { i18n } from '../../../shared/i18n'
-import { useCanvasBoardCatalog } from './canvasBoardCatalog'
+import { useCanvasBoardCatalog } from './catalog'
 
 export interface JoinSharedCanvasBoardResult {
   boardId: string

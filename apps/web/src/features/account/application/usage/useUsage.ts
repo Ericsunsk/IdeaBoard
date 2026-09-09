@@ -5,7 +5,7 @@ import {
   usageQueryKeys,
   type AccountUsage,
   type UsageRange,
-} from '../../infrastructure/usage/usageResource'
+} from '../../infrastructure/usage/resource'
 
 const USAGE_STALE_TIME_MS = 30_000
 

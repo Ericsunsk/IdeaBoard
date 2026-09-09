@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createCanvasBoardCatalog,
   type CanvasBoardCatalog,
-} from '../../canvas-board/catalog/canvasBoardCatalog'
-import { replaceCanvasBoards } from '../../canvas-board/catalog/canvasBoards'
+} from '../../canvas-board/catalog/catalog'
+import { replaceCanvasBoards } from '../../canvas-board/catalog/boards'
 import { clearStoredAuth, setStoredAuth } from '../../../shared/utils/auth'
 import { useBoardHeaderActions } from './useBoardHeaderActions'
 

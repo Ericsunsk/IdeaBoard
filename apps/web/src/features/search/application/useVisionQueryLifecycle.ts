@@ -24,7 +24,7 @@ import {
 } from '../infrastructure/libraryBridge'
 import { type SearchResult, type VisionReference } from '../domain/models'
 import { isSearchQueryWithinLimit, normalizeSearchQuery } from '../domain/queryPolicy'
-import { extractVisionSearch } from '../infrastructure/searchResource'
+import { extractVisionSearch } from '../infrastructure/resource'
 import { createVisionReferenceCollection } from './visionReferenceCollection'
 import { fetchVisionSearchPrice } from '../infrastructure/visionBillingResource'
 

@@ -3,12 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen, renderWithUser, waitFor } from '../../../../test/render'
 import { adminPrimeVueTestOptions } from '../../../../test/primeVue'
 import StripeSettingsDialog from './StripeSettingsDialog.vue'
-import type { AdminStripeSettingsResource, StripeConfigurationSummary } from './stripeSettingsTypes'
+import type { AdminStripeSettingsResource, StripeConfigurationSummary } from './types'
 
 const toast = vi.hoisted(() => ({ success: vi.fn() }))
 
-vi.mock('../../shared/lib/adminToast', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../shared/lib/adminToast')>()),
+vi.mock('../../shared/lib/toast', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../shared/lib/toast')>()),
   useAdminToast: () => toast,
 }))
 

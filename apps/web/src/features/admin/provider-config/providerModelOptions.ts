@@ -1,4 +1,4 @@
-import { uniqueTrimmedModelValues } from './providerConfigPayload'
+import { uniqueTrimmedModelValues } from './payload'
 
 export const MAX_DETECTED_MODELS = 100
 

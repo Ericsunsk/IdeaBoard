@@ -6,18 +6,18 @@ import {
   type ChartTooltipItem,
   withAlpha,
 } from '../../../shared/lib/chartPrimitives'
-import type { AdminStatistics, GetAdminStatisticsRangeValue } from './statisticsResource'
+import type { AdminStatistics, GetAdminStatisticsRangeValue } from './resource'
 import {
   adminChartStrokeWidth,
   adminChartTheme,
   defineAdminChartCountScale,
   defineAdminChartPointClipStyle,
   defineAdminChartOptions,
-} from '../shared/lib/adminChart'
+} from '../shared/lib/chart'
 import {
   buildAdminTimeRangeBuckets,
   shouldShowAdminTimeRangeTick,
-} from '../shared/lib/adminTimeRange'
+} from '../shared/lib/timeRange'
 import { useUsageStatisticsBreakdownCharts } from './usageStatisticsBreakdownCharts'
 import {
   baseChartOptions,

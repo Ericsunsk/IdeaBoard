@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AdminTaskMonitorListItemModel } from './taskMonitorResource'
+import type { AdminTaskMonitorListItemModel } from './resource'
 import {
   formatTaskDuration,
   formatTaskResultDebug,
@@ -10,7 +10,7 @@ import {
   getTaskResultImageUrl,
   getTaskSanitizedError,
 } from './taskResultPresentation'
-import { adminTaskStatuses } from './taskMonitorStatus'
+import { adminTaskStatuses } from './status'
 
 describe('task result presentation', () => {
   it('summarizes result payloads without exposing sensitive debug fields', () => {

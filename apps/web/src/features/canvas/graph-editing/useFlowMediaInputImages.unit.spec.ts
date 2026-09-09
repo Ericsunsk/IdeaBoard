@@ -14,7 +14,7 @@ import { CanvasGraphSession } from '../graph-runtime'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
 import { useFlowMediaInputImages } from './useFlowMediaInputImages'
 import { useCanvasVueFlowGraphAdapter } from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
-import type { MediaRef } from '../../../shared/media/MediaRef'
+import type { MediaRef } from '../../../shared/media/mediaRef'
 
 function makeImageSnapshot(overrides: Partial<ImageNodeItem> = {}): ImageNodeItem {
   return {

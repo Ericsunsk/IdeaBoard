@@ -9,7 +9,7 @@ Account 是用户端管理个人凭据、额度钱包、充值收银台、用量
 _Avoid_: 用户可见文案直露 `Credit`，领域层随意改名 `Idea`
 
 **Wallet Balance**:
-用户的额度账户状态（`balance`、`held`、`available = balance - held`）。事实源为服务端 PostgreSQL 账本，前端通过 `creditsResource` 轮询与事件同步。
+用户的额度账户状态（`balance`、`held`、`available = balance - held`）。事实源为服务端 PostgreSQL 账本，前端通过 `fetchCreditWallet` / `creditsQueryKeys`（`infrastructure/credits/resource.ts`）轮询与事件同步。
 _Avoid_: 客户端本地自行加减计算永久余额，无服务端回包时乐观修改
 
 **Recharge Session**:
@@ -29,7 +29,7 @@ _Avoid_: 各路由分散自建 AccountDialog 实例
 | Layer / Module | Responsibility | Public Interface | Implementation Detail Boundary |
 | :--- | :--- | :--- | :--- |
 | `domain/` | 纯数学计算、金额格式化（`formatCurrencyMinor`）、用量图表数据整形、Tab 注册表。 | `domain/index.ts`（`formatCredits`、`centsToDollars`、`createUsageChartConfig`、`accountTabs`）。 | 零 Vue 响应式与网络传输依赖，全量 deterministic 单测覆盖。 |
-| `infrastructure/` | 传输适配层：封装 `creditsResource`、`paymentsResource`、`rewardsResource`、`usageResource`、`billingResource`。 | 各 `*Resource.ts` 导出工厂函数或命名对象。 | 隔离 generated DTO，完成 snake_case 到 camelCase 的归一化。 |
+| `infrastructure/` | 传输适配层：封装 `credits`、`payments`、`rewards`、`usage`、`billing` 等子领域的资源传输。 | 各子目录下的 `resource.ts`（经 `infrastructure/index.ts` 统一导出）。 | 隔离 generated DTO，完成 snake_case 到 camelCase 的归一化。 |
 | `application/` | 用例编排 Composables：`useRecharge`、`useCreditWallet`、`useCreditsSync`、`useRewardRedemption`、`useUsage`、`useAvatarUpload`、`accountOverlay`。 | `application/index.ts` 导出各用例 Hook。 | 协调加载态、错误反馈与 Query Cache 失效，不负责 UI 模板渲染。 |
 | `presentation/` | 视图呈现层：各 Tab Pane（`RechargePane`、`UsagePane`、`RewardsPane`、`SecurityPane`、`BillingPane`）及全局 `AccountDialogHost`。 | `presentation/index.ts` 导出 `AccountDialogHost` 与组件。 | 纯展示与事件分发，所有异步动作委派给 `application`。 |
 

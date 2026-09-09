@@ -1,2 +1,2 @@
-export * from './canvasBoardState'
+export * from './state'
 export * from './boardStateSerialization'

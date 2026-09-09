@@ -1,4 +1,4 @@
-import { buildMediaBrowserURL } from '../media/MediaRef'
+import { buildMediaBrowserURL } from '../media/mediaRef'
 
 export type TaskImageResult = {
   url: string

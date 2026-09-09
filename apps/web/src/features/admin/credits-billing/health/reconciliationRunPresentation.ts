@@ -1,4 +1,4 @@
-import type { AdminCreditRun } from './adminCreditRunHistoryResource'
+import type { AdminCreditRun } from './runHistoryResource'
 
 export function formatReconciliationRunDuration(run: AdminCreditRun): string {
   if (!run.started_at) return '—'

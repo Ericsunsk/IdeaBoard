@@ -164,16 +164,16 @@ import type { DataTableRowCollapseEvent, DataTableRowExpandEvent } from 'primevu
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
-import { formatIdeaAmount } from '../../shared/lib/adminIdeaCurrency'
+import { formatIdeaAmount } from '../../shared/lib/ideaCurrency'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
-import { useAdminCollectionState } from '../../shared/composables/useAdminCollectionState'
-import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
-import { formatAdminDateTime } from '../creditsBillingFormat'
-import { adminTextButtonClass } from '../../shared/lib/adminUiClasses'
-import type { RewardCode } from './rewardCodeAdminResource'
+import { useCollectionState } from '../../shared/composables/useCollectionState'
+import { useCursorPagination } from '../../shared/composables/useCursorPagination'
+import { formatAdminDateTime } from '../format'
+import { adminTextButtonClass } from '../../shared/lib/uiClasses'
+import type { RewardCode } from './resource'
 import {
   createRewardCodeRedemptionResource,
   type RewardCodeRedemption,
@@ -197,8 +197,8 @@ const detailLoading = ref(false)
 const detailError = ref(false)
 let activeDetailRequest: AbortController | undefined
 let detailRequestEpoch = 0
-let pagination: ReturnType<typeof useAdminCursorPagination<number>>
-const collection = useAdminCollectionState({
+let pagination: ReturnType<typeof useCursorPagination<number>>
+const collection = useCollectionState({
   load: (signal) =>
     resource.list(props.rewardCode.id, {
       beforeId: pagination.cursor.value,
@@ -207,7 +207,7 @@ const collection = useAdminCollectionState({
   isEmpty: (page) => page.redemptions.length === 0,
 })
 const { data: redemptionPage, loading, initialError, backgroundError } = collection
-pagination = useAdminCursorPagination<number>({ pending: loading })
+pagination = useCursorPagination<number>({ pending: loading })
 const redemptions = computed(() => redemptionPage.value?.redemptions ?? [])
 
 watch(

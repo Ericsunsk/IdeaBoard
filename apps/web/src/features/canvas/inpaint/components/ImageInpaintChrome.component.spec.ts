@@ -12,7 +12,7 @@ function renderChrome() {
     },
     global: {
       stubs: {
-        ImageToolChromeFrame: { template: '<div><slot name="tools" /><slot name="dock" /></div>' },
+        ChromeFrame: { template: '<div><slot name="tools" /><slot name="dock" /></div>' },
         NodeToolIconButton: { template: '<button><slot /></button>' },
         PromptTextComposer: true,
       },

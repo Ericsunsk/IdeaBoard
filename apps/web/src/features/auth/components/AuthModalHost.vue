@@ -22,7 +22,7 @@
 <script setup lang="ts">
 import Dialog from 'primevue/dialog'
 import { usePrimeDialogOverlayLifecycle } from '../../../shared/composables/usePrimeDialogOverlayLifecycle'
-import { createAuthDialogPt } from './authModalUi'
+import { createAuthDialogPt } from './modalUi'
 
 const props = defineProps<{
   busy: boolean

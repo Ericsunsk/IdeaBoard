@@ -6,7 +6,7 @@ import {
   createBoardPreviewRefreshQueue,
   type BoardPreviewRefreshQueueDependencies,
 } from './boardPreviewRefreshQueue'
-import type { CanvasBoardMeta } from '../catalog/canvasBoards'
+import type { CanvasBoardMeta } from '../catalog/boards'
 
 function makeBoard(id: string): CanvasBoardMeta {
   return {

@@ -236,16 +236,16 @@ import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFra
 import {
   RATE_LIMIT_MAX_REQUESTS,
   RATE_LIMIT_MAX_WINDOW_SECONDS,
-} from '../useAdminAccessSettings'
+} from '../useAccessSettings'
 import {
   MEDIA_UPLOAD_MAX_CONCURRENT,
   MEDIA_UPLOAD_MIN_CONCURRENT,
-} from '../useAdminMediaUploadSettings'
-import { useAdminSystemSettings } from '../useAdminSystemSettings'
+} from '../useMediaUploadSettings'
+import { useSystemSettings } from '../useSystemSettings'
 import {
   adminActionButtonClass,
   adminTwoColumnMasonryGridClass,
-} from '../../shared/lib/adminUiClasses'
+} from '../../shared/lib/uiClasses'
 import SiteBrandLogo from '../../../../shared/components/SiteBrandLogo.vue'
 import { brandMarkClasses, createBrandMarkClass } from '../../../../shared/lib/brandMark'
 
@@ -258,7 +258,7 @@ const brandingLogoButtonClass = createBrandMarkClass(
   'hover:border-admin-border-hover hover:bg-admin-surface-muted focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60',
 )
 
-const { access, branding, mediaUpload, unsupportedLogoFileFeedback } = useAdminSystemSettings()
+const { access, branding, mediaUpload, unsupportedLogoFileFeedback } = useSystemSettings()
 const logoFileInputRef = ref<HTMLInputElement | null>(null)
 const logoCropDialogVisible = ref(false)
 const pendingLogoFile = ref<File | null>(null)

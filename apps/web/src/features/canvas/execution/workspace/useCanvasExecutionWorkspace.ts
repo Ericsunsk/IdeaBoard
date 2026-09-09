@@ -11,11 +11,9 @@ import {
   resolveFirstTaskImageResultDisplay,
   resolveTaskImageResultAtIndexDisplay,
   type ImageSizeLoader,
-} from '../result-nodes/flowImageDirectActionTaskResult'
-import {
   type PendingImageResultExecution,
   usePendingImageResultExecution,
-} from '../result-nodes/usePendingImageResultNodes'
+} from '../result-nodes'
 import { waitExistingOrLiveTaskImageResults } from '../task-runner/imageDirectActionExecutor'
 import {
   createCanvasTaskClientActionId,

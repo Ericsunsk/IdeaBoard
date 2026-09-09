@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { MASK_PAINTING_COLOR } from '../config/inpaintConstants'
+import { MASK_PAINTING_COLOR } from '../config/constants'
 import { maskStrokeEngine } from './maskBrushEngine'
 
 function createCanvasFixture() {

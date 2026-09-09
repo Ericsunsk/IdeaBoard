@@ -22,7 +22,7 @@
     @contextmenu.prevent.stop="onStageContextMenu"
   >
     <template v-if="stageDisplayImage && renderedStageUrl">
-      <ImageToolStagePresentation
+      <StagePresentation
         v-if="imageToolStageBinding && stageDisplayUrl"
         :binding="imageToolStageBinding"
       >
@@ -39,7 +39,7 @@
           @keydown.enter.prevent="emit('open-preview')"
           @keydown.space.prevent="emit('append-to-canvas')"
         />
-      </ImageToolStagePresentation>
+      </StagePresentation>
       <img
         v-else
         :src="renderedStageUrl"
@@ -136,7 +136,7 @@ import type { LibraryImportFact } from '../../../../canvas-board/domain'
 import type { FlowLocalUploadState } from '../../../types/flowTypes'
 import { useCanvasImagePreviewQuality } from '../../../vue-flow-adapter/useCanvasImagePreviewQuality'
 import { useDisplayImagePreview } from '../../../vue-flow-adapter/useDisplayImagePreview'
-import ImageToolStagePresentation from '../../../image-tools/components/ImageToolStagePresentation.vue'
+import StagePresentation from '../../../image-tools/components/StagePresentation.vue'
 import ImageOutpaintOverlay from '../../../image-workflow/components/ImageOutpaintOverlay.vue'
 import ComposingOrb from './ComposingOrb.vue'
 import NodeActionButton from '../primitives/NodeActionButton.vue'

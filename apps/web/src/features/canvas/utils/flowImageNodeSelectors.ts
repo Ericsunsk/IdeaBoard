@@ -3,7 +3,7 @@ import {
   resolveImageNodeLatestOutput,
   type ImageNodeItem,
 } from '../../canvas-board/domain'
-import { buildMediaBrowserURL, type MediaRef } from '../../../shared/media/MediaRef'
+import { buildMediaBrowserURL, type MediaRef } from '../../../shared/media/mediaRef'
 
 export type ImageNodeDisplayPayload = {
   url: string

@@ -9,7 +9,7 @@ import {
 } from '../../../shared/utils/imageUploadSupport'
 import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
 import { preloadImage } from '../../../shared/media/preloadImage'
-import { buildMediaBrowserURL, type MediaRef } from '../../../shared/media/MediaRef'
+import { buildMediaBrowserURL, type MediaRef } from '../../../shared/media/mediaRef'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
 import { resolveImageNodeFrameSize } from '../../canvas-board/domain'

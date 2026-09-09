@@ -284,9 +284,9 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import { Plus, Xmark } from '@iconoir/vue'
 import AdminDialogShell from '../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
-import { adminActionButtonClass } from '../shared/lib/adminUiClasses'
-import { isModellessProviderEndpoint } from './providerConfigPayload'
-import { useAdminProviderConfigContext } from './useAdminProviderConfig'
+import { adminActionButtonClass } from '../shared/lib/uiClasses'
+import { isModellessProviderEndpoint } from './payload'
+import { useAdminProviderConfigContext } from './useProviderConfig'
 
 const { accountEditor, commands } = useAdminProviderConfigContext()
 

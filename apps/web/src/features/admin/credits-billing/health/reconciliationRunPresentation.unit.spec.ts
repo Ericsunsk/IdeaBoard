@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { stripUndefined } from '../../../../shared/api/stripUndefined'
-import type { AdminCreditRun } from './adminCreditRunHistoryResource'
+import type { AdminCreditRun } from './runHistoryResource'
 import {
   formatReconciliationRunDuration,
   formatReconciliationRunResult,

@@ -2,7 +2,7 @@ import {
   MASK_PAINTING_EMPTY_ALPHA_THRESHOLD,
   MASK_PAINTING_RGB,
   MASK_PAINTING_PREVIEW_ALPHA,
-} from '../config/inpaintConstants'
+} from '../config/constants'
 
 export type MaskCommitResult = {
   executionMaskDataUrl: string

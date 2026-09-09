@@ -57,10 +57,10 @@ import {
   ADMIN_REWARD_CODES_PATH,
   isPathUnderRoute,
 } from '../../../shared/constants/routePaths'
-import { useAdminCreditHealthResource } from './health/adminCreditHealthResource'
+import { useAdminCreditHealthResource } from './health/resource'
 import { getCreditHealthPresentation } from './health/creditHealthPresentation'
 import StripeSettingsDialog from '../payments/stripe-settings/StripeSettingsDialog.vue'
-import { adminFramedIconButtonClass } from '../shared/lib/adminUiClasses'
+import { adminFramedIconButtonClass } from '../shared/lib/uiClasses'
 
 const vTooltip = Tooltip
 

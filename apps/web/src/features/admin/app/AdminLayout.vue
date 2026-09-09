@@ -259,7 +259,7 @@
 </template>
 
 <script setup lang="ts">
-import { useUserStore } from '../../auth/session/authSession'
+import { useUserStore } from '../../auth/session/session'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
@@ -284,20 +284,20 @@ import {
   ADMIN_LOGIN_PATH,
   findAdminNavigationItemByPath,
   resolveAdminPageTitle,
-} from './adminNavigation'
+} from './navigation'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
 import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
 import { brandMarkClasses, createBrandMarkClass } from '../../../shared/lib/brandMark'
-import { useAdminAnomalyRadar } from '../shared/composables/useAdminAnomalyRadar'
-import { useAdminToast } from '../shared/lib/adminToast'
-import { useAdminBrandLogoOverrides } from '../shared/logos/useAdminBrandLogoOverrides'
-import type { AdminAnomalyItem } from '../shared/lib/adminAnomalyRules'
-import { createAdminPopoverPt } from '../shared/lib/adminOverlayPt'
-import { adminAnomalyPopoverClass } from '../shared/lib/adminUiClasses'
+import { useAnomalyRadar } from '../shared/composables/useAnomalyRadar'
+import { useAdminToast } from '../shared/lib/toast'
+import { useBrandLogoOverrides } from '../shared/logos/useBrandLogoOverrides'
+import type { AdminAnomalyItem } from '../shared/lib/anomalyRules'
+import { createAdminPopoverPt } from '../shared/lib/overlayPt'
+import { adminAnomalyPopoverClass } from '../shared/lib/uiClasses'
 import { getActiveUserPrimeLocale } from '../../../shared/i18n'
-import { ideaBoardAdminPrimeLocale } from './adminPrimeLocale'
+import { ideaBoardAdminPrimeLocale } from './primeLocale'
 
 const vTooltip = Tooltip
 const toast = useAdminToast()
@@ -323,13 +323,13 @@ const anomalyRadarPopoverRef = ref<PrimePopupPanel | null>(null)
 const isLoginRoute = computed(() => route.path === ADMIN_LOGIN_PATH)
 const isAdminShellRoute = computed(() => !isLoginRoute.value)
 const isAnomalyRadarEnabled = computed(() => isAdminShellRoute.value)
-const { anomalies, anomalyCount, hasAnomalies } = useAdminAnomalyRadar({
+const { anomalies, anomalyCount, hasAnomalies } = useAnomalyRadar({
   enabled: isAnomalyRadarEnabled,
 })
 const { fallbackText, logoURL, projectName } = useSiteBranding({
   enabled: isAdminShellRoute,
 })
-const adminBrandLogoOverridesQuery = useAdminBrandLogoOverrides(isAdminShellRoute)
+const adminBrandLogoOverridesQuery = useBrandLogoOverrides(isAdminShellRoute)
 const brandAriaLabel = computed(() => `${projectName.value} Admin`)
 
 // PrimeVue has one app-level locale. Admin deliberately retains its established Chinese date UI.

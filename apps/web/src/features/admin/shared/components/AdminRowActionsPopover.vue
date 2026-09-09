@@ -21,7 +21,7 @@
 import { ref } from 'vue'
 import Button from 'primevue/button'
 import Popover from 'primevue/popover'
-import { createAdminPopoverPt } from '../lib/adminOverlayPt'
+import { createAdminPopoverPt } from '../lib/overlayPt'
 
 export type AdminRowActionItem = {
   key: string

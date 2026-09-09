@@ -6,7 +6,7 @@ import {
   adminSurfacePanelViewportClass,
   adminSurfaceRootViewportClass,
   adminSurfaceScrollContentClass,
-} from '../lib/adminUiClasses'
+} from '../lib/uiClasses'
 import AdminResourceGridFrame from './AdminResourceGridFrame.vue'
 import AdminSurfaceFrame from './AdminSurfaceFrame.vue'
 import AdminTablePanel from './AdminTablePanel.vue'

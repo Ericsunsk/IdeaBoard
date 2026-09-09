@@ -12,8 +12,8 @@ vi.mock('../../shared/composables/useAdminConfirm', () => ({
   useAdminConfirm: () => ({ request: confirmRequestMock }),
 }))
 
-vi.mock('../../shared/lib/adminToast', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../shared/lib/adminToast')>()),
+vi.mock('../../shared/lib/toast', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../shared/lib/toast')>()),
   useAdminToast: () => toast,
 }))
 

@@ -1,4 +1,4 @@
-import { adminBrandLogoMap, getAdminBrandLogo } from '../shared/logos/adminBrandLogos'
+import { adminBrandLogoMap, getAdminBrandLogo } from '../shared/logos/brandLogos'
 
 const searchProviderLogoMap: Record<string, string | undefined> = {
   unsplash: adminBrandLogoMap['unsplash'],

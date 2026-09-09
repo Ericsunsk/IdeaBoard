@@ -1,6 +1,6 @@
 import type { ImageMaskDrawMode } from '../types'
 import getStroke from 'perfect-freehand'
-import { clampMaskBrushSize, MASK_PAINTING_COLOR } from '../config/inpaintConstants'
+import { clampMaskBrushSize, MASK_PAINTING_COLOR } from '../config/constants'
 
 export type MaskPaintBrushState = {
   brushSize: number

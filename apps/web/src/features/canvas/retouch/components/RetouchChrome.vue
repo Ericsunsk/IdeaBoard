@@ -1,5 +1,5 @@
 <template>
-  <ImageToolChromeFrame mode="adjust" :anchor-rect="anchorRect">
+  <ChromeFrame mode="adjust" :anchor-rect="anchorRect">
     <template #dock>
       <RetouchEffectActions
         :selected-kind="selectedEffectLayer?.kind ?? null"
@@ -30,7 +30,7 @@
         @apply-retouch="emit('apply-retouch')"
       />
     </template>
-  </ImageToolChromeFrame>
+  </ChromeFrame>
 </template>
 
 <script setup lang="ts">
@@ -44,11 +44,11 @@ import type {
   RetouchParamValue,
 } from '../types'
 import RetouchEffectActions from './RetouchEffectActions.vue'
-import ImageToolChromeFrame from '../../image-tools/components/ImageToolChromeFrame.vue'
+import ChromeFrame from '../../image-tools/components/ChromeFrame.vue'
 import RetouchLayerActions from './RetouchLayerActions.vue'
 import RetouchLayersPanel from './RetouchLayersPanel.vue'
 import RetouchPropertiesPanel from './RetouchPropertiesPanel.vue'
-import { hasRenderableRetouchLayerStack } from '../services/retouchRenderer'
+import { hasRenderableRetouchLayerStack } from '../services/renderer'
 
 const props = defineProps<{
   anchorRect: {

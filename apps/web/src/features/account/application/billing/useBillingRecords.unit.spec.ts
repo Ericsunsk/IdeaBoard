@@ -9,9 +9,9 @@ import { useBillingRecords } from './useBillingRecords'
 
 const fetchBillingRecordsMock = vi.hoisted(() => vi.fn())
 
-vi.mock('../../infrastructure/billing/billingResource', async (importOriginal) => {
+vi.mock('../../infrastructure/billing/resource', async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import('../../infrastructure/billing/billingResource')>()
+    await importOriginal<typeof import('../../infrastructure/billing/resource')>()
   return { ...actual, fetchBillingRecords: fetchBillingRecordsMock }
 })
 

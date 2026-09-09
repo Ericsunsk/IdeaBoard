@@ -21,7 +21,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
-import { useUserStore } from '../session/authSession'
+import { useUserStore } from '../session/session'
 import { USER_LOGIN_PATH } from '../../../shared/constants/routePaths'
 import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
 

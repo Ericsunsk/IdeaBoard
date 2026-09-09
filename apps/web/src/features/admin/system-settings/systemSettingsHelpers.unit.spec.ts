@@ -3,14 +3,14 @@ import {
   RATE_LIMIT_MAX_REQUESTS,
   RATE_LIMIT_MAX_WINDOW_SECONDS,
   validateRateLimitSettings,
-} from './useAdminAccessSettings'
+} from './useAccessSettings'
 import {
   DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING,
   MEDIA_UPLOAD_MAX_CONCURRENT,
   MEDIA_UPLOAD_MIN_CONCURRENT,
   normalizeMediaUploadSetting,
   validateMediaUploadSetting,
-} from './useAdminMediaUploadSettings'
+} from './useMediaUploadSettings'
 
 describe('admin access settings validation', () => {
   it('accepts valid integer rate limit settings', () => {

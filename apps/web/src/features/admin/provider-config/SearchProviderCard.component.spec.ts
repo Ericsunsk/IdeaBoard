@@ -13,7 +13,7 @@ vi.mock('./searchProviderResource', () => ({
   testSearchProvider: vi.fn(),
 }))
 
-vi.mock('../shared/logos/adminBrandLogoResource', () => ({
+vi.mock('../shared/logos/brandLogoResource', () => ({
   useAdminBrandLogoResource: () => ({ save: vi.fn(), remove: vi.fn() }),
 }))
 

@@ -1,5 +1,5 @@
 import { onMounted, onScopeDispose } from 'vue'
-import { useCanvasBoardCatalog } from '../canvas-board/catalog/canvasBoardCatalog'
+import { useCanvasBoardCatalog } from '../canvas-board/catalog/catalog'
 import { createBoardPreviewRefreshQueue } from '../canvas-board/preview'
 import {
   createController,

@@ -155,10 +155,10 @@ import Message from 'primevue/message'
 import ToggleSwitch from 'primevue/toggleswitch'
 import AdminSettingsDialogFrame from '../../shared/components/AdminSettingsDialogFrame.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
-import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
-import { adminActionButtonClass } from '../../shared/lib/adminUiClasses'
-import { createAdminStripeSettingsResource } from './stripeSettingsResource'
-import type { AdminStripeSettingsResource, StripeConfigurationSummary } from './stripeSettingsTypes'
+import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
+import { adminActionButtonClass } from '../../shared/lib/uiClasses'
+import { createAdminStripeSettingsResource } from './resource'
+import type { AdminStripeSettingsResource, StripeConfigurationSummary } from './types'
 
 const props = withDefaults(
   defineProps<{

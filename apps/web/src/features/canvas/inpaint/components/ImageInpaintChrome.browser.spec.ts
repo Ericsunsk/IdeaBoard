@@ -29,7 +29,7 @@ describe('ImageInpaintChrome browser smoke', () => {
       },
       global: {
         stubs: {
-          ImageToolChromeFrame: ChromeFrameStub,
+          ChromeFrame: ChromeFrameStub,
           NodeToolIconButton: IconButtonStub,
           PromptTextComposer: PromptComposerStub,
         },

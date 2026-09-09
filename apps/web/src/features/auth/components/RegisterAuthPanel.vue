@@ -301,8 +301,8 @@ import { PRIVACY_POLICY_PATH, TERMS_PATH } from '../../../shared/constants/route
 import IbFormField from '../../../shared/components/IbFormField.vue'
 import { getPasswordLengthError } from '../../../shared/auth/passwordPolicy'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
-import { useAuthPanelControls } from './authPanelControls'
-import { AUTH_DISPLAY_NAME_LIMIT, getLengthError, getRequiredError } from './authFormUtils'
+import { useAuthPanelControls } from './panelControls'
+import { AUTH_DISPLAY_NAME_LIMIT, getLengthError, getRequiredError } from './formUtils'
 import {
   authButtonPt,
   authCompactModalShellClass,
@@ -319,7 +319,7 @@ import {
   authPasswordPt,
   authPrimaryButtonClass,
   authSwitchButtonClass,
-} from './authModalUi'
+} from './modalUi'
 
 const emit = defineEmits<{
   close: []

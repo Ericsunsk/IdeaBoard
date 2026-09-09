@@ -280,13 +280,13 @@ import { CheckCircle, Search, WarningTriangle } from '@iconoir/vue'
 import AdminDialogShell from '../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
 import AdminStatusPill from '../shared/components/AdminStatusPill.vue'
-import { useAdminToast } from '../shared/lib/adminToast'
-import { adminCardPt } from '../shared/lib/adminCardPt'
+import { useAdminToast } from '../shared/lib/toast'
+import { adminCardPt } from '../shared/lib/cardPt'
 import {
   adminActionButtonClass,
   adminLogoButtonClass,
   adminMasonryCardClass,
-} from '../shared/lib/adminUiClasses'
+} from '../shared/lib/uiClasses'
 import {
   fetchSearchProviders,
   saveSearchProvider,

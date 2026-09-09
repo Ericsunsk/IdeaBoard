@@ -18,7 +18,7 @@ import {
   publishCanvasBoardCatalogChange,
   replaceCanvasBoards,
   type CanvasBoardMeta,
-} from './canvasBoards'
+} from './boards'
 import {
   getCanvasBoardState,
   normalizeCanvasBoardState,

@@ -1,5 +1,5 @@
 import type { Ref } from 'vue'
-import type { CanvasBoardCatalog } from '../../canvas-board/catalog/canvasBoardCatalog'
+import type { CanvasBoardCatalog } from '../../canvas-board/catalog/catalog'
 import type { BoardCatalogEntry, BoardCatalogNavigation } from '../contract'
 import type { BoardFeedback } from '../feedback/useFeedback'
 

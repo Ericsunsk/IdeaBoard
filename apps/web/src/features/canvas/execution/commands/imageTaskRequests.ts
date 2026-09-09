@@ -15,7 +15,7 @@ import {
   EXECUTION_PARTIAL_EDIT_META,
   EXECUTION_META,
 } from '../contracts/executionContract'
-import { buildExecutionSizeParams, type ExecutionImageSize } from '../contracts/executionSizeParams'
+import { buildExecutionSizeParams, type ExecutionImageSize } from '../contracts/sizeParams'
 import { buildPromptAspectRatioTaskParams } from '../contracts/promptAspectRatioTaskParams'
 import { assertRequestedOutputCount } from '../../../../shared/domain/generationContract'
 import type { OutputResolution } from '../../../../shared/domain/generationContract'

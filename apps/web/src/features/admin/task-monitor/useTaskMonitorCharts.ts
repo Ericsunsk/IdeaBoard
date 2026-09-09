@@ -21,13 +21,13 @@ import {
   defineAdminChartRadialPercentScale,
   defineAdminChartOptions,
   getAdminChartBubbleRadius,
-} from '../shared/lib/adminChart'
-import { getTaskStatusDefinition, taskStatusOrder } from './taskMonitorStatus'
+} from '../shared/lib/chart'
+import { getTaskStatusDefinition, taskStatusOrder } from './status'
 import {
   normalizeMonitorExecutionPressurePoints,
   type TaskExecutionPressurePoint,
   type TaskExecutionSignalKey,
-} from './taskMonitorExecutionPressure'
+} from './executionPressure'
 
 export type TaskStatusSnapshot = Record<ListAdminTasksStatusValue, number>
 

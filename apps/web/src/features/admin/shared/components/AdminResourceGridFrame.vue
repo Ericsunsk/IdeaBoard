@@ -35,7 +35,7 @@ import {
   adminEmptyStateClass,
   adminLoadingStateClass,
   adminMasonryGridClass,
-} from '../lib/adminUiClasses'
+} from '../lib/uiClasses'
 
 const props = defineProps<{
   contentClass?: string | undefined

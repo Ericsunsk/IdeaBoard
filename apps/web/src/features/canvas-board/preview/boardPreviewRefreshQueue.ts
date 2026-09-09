@@ -4,7 +4,7 @@ import { getCanvasBoardState, setCanvasBoardPreviewSnapshot } from '../persisten
 import { renderBoardPreviewDataUrl } from './boardPreviewSerializer'
 import { BOARD_PREVIEW_RENDERER_VERSION } from './boardPreviewVersion'
 import { isBoardNameConflictError, syncCanvasBoardToServer } from '../catalog/boardSync'
-import type { CanvasBoardMeta } from '../catalog/canvasBoards'
+import type { CanvasBoardMeta } from '../catalog/boards'
 
 export interface BoardPreviewRefreshQueueDependencies {
   getBoardState: (boardId: string) => CanvasBoardState | null

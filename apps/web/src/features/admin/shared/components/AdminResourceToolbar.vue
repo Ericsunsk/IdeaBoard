@@ -31,7 +31,7 @@ import {
   adminSurfaceToolbarClass,
   adminFramedIconButtonClass,
   adminToolbarMetricClass,
-} from '../lib/adminUiClasses'
+} from '../lib/uiClasses'
 
 const slots = useSlots()
 

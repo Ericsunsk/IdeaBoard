@@ -33,7 +33,7 @@ import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
 import { Search, Xmark } from '@iconoir/vue'
-import { adminTextButtonClass, adminToolbarSearchInputClass } from '../lib/adminUiClasses'
+import { adminTextButtonClass, adminToolbarSearchInputClass } from '../lib/uiClasses'
 
 withDefaults(
   defineProps<{

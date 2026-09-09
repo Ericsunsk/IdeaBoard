@@ -44,8 +44,8 @@ import { useI18n } from 'vue-i18n'
 import { Compass, ViewGrid } from '@iconoir/vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { USER_BOARDS_PATH, USER_SEARCH_PATH } from '../../../shared/constants/routePaths'
-import { useUserStore } from '../../auth/session/authSession'
-import { useAuthOverlay } from '../../auth/authOverlay'
+import { useUserStore } from '../../auth/session/session'
+import { useAuthOverlay } from '../../auth/overlay'
 
 const route = useRoute()
 const router = useRouter()

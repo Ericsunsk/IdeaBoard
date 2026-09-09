@@ -390,20 +390,20 @@ import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import { adminActionButtonClass, adminCompactTagClass } from '../../shared/lib/adminUiClasses'
+import { adminActionButtonClass, adminCompactTagClass } from '../../shared/lib/uiClasses'
 import AdminActionReasonField from '../AdminActionReasonField.vue'
-import { useAdminCreditsBillingOperationsFeedback } from '../creditsBillingFeedback'
+import { useAdminCreditsBillingOperationsFeedback } from '../feedback'
 import {
   formatAdminDateTime,
   formatCredits,
   getCreditCommandLabel,
   getCreditCommandSeverity,
   getCreditCommandSign,
-} from '../creditsBillingFormat'
+} from '../format'
 import {
   useAdminCreditWalletResource,
   type AdminCreditLedgerTransaction,
-} from './adminCreditWalletResource'
+} from './resource'
 import { type AdminCreditCommandKind, validateAdminCreditCommand } from './creditCommandContract'
 
 type AdminUserWalletTarget = {

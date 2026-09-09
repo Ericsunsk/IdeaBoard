@@ -5,7 +5,7 @@ import {
   generateRandomInspirationCursor,
   reportSearchImageFailure,
   searchInspiration,
-} from '../infrastructure/searchResource'
+} from '../infrastructure/resource'
 import { createBrowserSearchFeedPersistence } from '../infrastructure/feedPersistence'
 import type { SearchFeedPersistence, SearchFeedSnapshot } from '../ports/persistencePort'
 

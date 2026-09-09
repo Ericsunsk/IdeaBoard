@@ -30,7 +30,7 @@ const fixtureCases: BoundaryFixtureCase[] = [
     name: 'prohibits shared modules from importing concrete feature modules',
     expectedRule: 'shared-not-to-features',
     fixtureFilePath: path.join(webRoot, 'src/shared/.boundary-shared-to-feature.fixture.ts'),
-    content: `import { adminRoutes } from '../features/admin/app/adminRoutes'; console.log(adminRoutes);`,
+    content: `import { adminRoutes } from '../features/admin/app/routes'; console.log(adminRoutes);`,
   },
   {
     name: 'prohibits route pages from importing generated-query directly',

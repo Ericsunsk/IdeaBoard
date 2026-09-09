@@ -1,5 +1,5 @@
 <template>
-  <ImageToolChromeFrame mode="inpaint" :anchor-rect="anchorRect">
+  <ChromeFrame mode="inpaint" :anchor-rect="anchorRect">
     <template #tools>
       <NodeToolIconButton
         class="inpaint-tool-btn node-tool-icon-button--accent-hover"
@@ -125,7 +125,7 @@
         @submit="onSubmit"
       />
     </template>
-  </ImageToolChromeFrame>
+  </ChromeFrame>
 </template>
 
 <script setup lang="ts">
@@ -140,8 +140,8 @@ import {
   INPAINT_MAX_LAYER_OPACITY,
   INPAINT_MIN_BRUSH_SIZE,
   INPAINT_MIN_LAYER_OPACITY,
-} from '../config/inpaintConstants'
-import ImageToolChromeFrame from '../../image-tools/components/ImageToolChromeFrame.vue'
+} from '../config/constants'
+import ChromeFrame from '../../image-tools/components/ChromeFrame.vue'
 import { NodeToolIconButton, PromptTextComposer } from '../../components/nodes/primitives'
 import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 import { useCanvasBillingQuote } from '../../execution'

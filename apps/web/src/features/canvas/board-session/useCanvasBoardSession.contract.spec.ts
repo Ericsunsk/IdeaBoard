@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CanvasBoardSnapshot, CanvasBoardState } from '../../canvas-board/domain'
 import { makeCanvasBoardSnapshot, makeCanvasBoardState } from '../../canvas-board/testing'
-import type { BoardSessionPreviewRenderer } from './boardSessionPreview'
-import { BoardSessionRemoteSyncError, type BoardSessionRepository } from './boardSessionRepository'
+import type { BoardSessionPreviewRenderer } from './preview'
+import { BoardSessionRemoteSyncError, type BoardSessionRepository } from './repository'
 import { useCanvasBoardSession } from './useCanvasBoardSession'
 
 function makeSnapshot(marker: string | number): CanvasBoardSnapshot {

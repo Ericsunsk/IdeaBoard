@@ -150,14 +150,14 @@ import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import AdminDialogShell from '../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
-import { adminActionButtonClass } from '../shared/lib/adminUiClasses'
-import { useAdminProviderConfigContext } from './useAdminProviderConfig'
+import { adminActionButtonClass } from '../shared/lib/uiClasses'
+import { useAdminProviderConfigContext } from './useProviderConfig'
 import {
   getAdminProviderEndpointProtocolLabel,
   isImageFillProtocol,
   isImagePipelineProtocol,
   isModellessProviderProtocol,
-} from './providerConfigPayload'
+} from './payload'
 
 const { providerEndpointEditor: editor } = useAdminProviderConfigContext()
 

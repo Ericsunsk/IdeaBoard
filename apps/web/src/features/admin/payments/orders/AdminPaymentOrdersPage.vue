@@ -244,11 +244,11 @@ import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
-import { useAdminCollectionState } from '../../shared/composables/useAdminCollectionState'
-import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
+import { useCollectionState } from '../../shared/composables/useCollectionState'
+import { useCursorPagination } from '../../shared/composables/useCursorPagination'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
-import { adminActionButtonClass, adminFramedIconButtonClass } from '../../shared/lib/adminUiClasses'
+import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
+import { adminActionButtonClass, adminFramedIconButtonClass } from '../../shared/lib/uiClasses'
 import PaymentOrderDetailDialog from './PaymentOrderDetailDialog.vue'
 import {
   formatPaymentDateTime,
@@ -267,7 +267,7 @@ const userSearch = ref('')
 const appliedUser = ref('')
 const statusFilter = ref<AdminPaymentOrderStatus>()
 const anomalyOnly = ref(false)
-let pagination: ReturnType<typeof useAdminCursorPagination<string>>
+let pagination: ReturnType<typeof useCursorPagination<string>>
 const detailVisible = ref(false)
 const selectedOrderNumber = ref('')
 const detail = ref<AdminPaymentOrderDetail | null>(null)
@@ -282,7 +282,7 @@ const refundIdempotencyKeys = new Map<string, string>()
 let detailRequestEpoch = 0
 let activeDetailRequest: AbortController | undefined
 
-const collection = useAdminCollectionState({
+const collection = useCollectionState({
   load: (signal) =>
     resource.search({
       orderNumber: appliedOrderNumber.value,
@@ -295,7 +295,7 @@ const collection = useAdminCollectionState({
   isEmpty: (page) => page.orders.length === 0,
 })
 const { data: orderPage, loading, initialError, backgroundError, hasLoadedResult } = collection
-pagination = useAdminCursorPagination<string>({ pending: loading })
+pagination = useCursorPagination<string>({ pending: loading })
 const orders = computed(() => orderPage.value?.orders ?? [])
 const total = computed(() => orderPage.value?.total ?? 0)
 

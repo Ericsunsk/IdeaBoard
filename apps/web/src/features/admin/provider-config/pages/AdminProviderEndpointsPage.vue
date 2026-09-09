@@ -88,23 +88,23 @@ import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFra
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import { adminActionButtonClass } from '../../shared/lib/adminUiClasses'
+import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import {
   provideAdminProviderConfig,
-  useAdminProviderConfig,
-} from '../useAdminProviderConfig'
-import { useAdminProviderConfigFeedback } from '../useAdminProviderConfigFeedback'
+  useProviderConfig,
+} from '../useProviderConfig'
+import { useProviderConfigFeedback } from '../useProviderConfigFeedback'
 import SearchProviderCard from '../SearchProviderCard.vue'
 import AdminLogoPickerPopover from '../AdminLogoPickerPopover.vue'
 import AdminProviderEndpointCard from '../AdminProviderEndpointCard.vue'
 import AdminProviderEndpointDialog from '../AdminProviderEndpointDialog.vue'
 import AdminProviderAccountDialog from '../AdminProviderAccountDialog.vue'
-import type { ProviderEndpointCard } from '../providerConfigTypes'
+import type { ProviderEndpointCard } from '../types'
 
-const feedback = useAdminProviderConfigFeedback()
+const feedback = useProviderConfigFeedback()
 const adminConfirm = useAdminConfirm()
 
-const providerConfig = useAdminProviderConfig({
+const providerConfig = useProviderConfig({
   feedback,
   confirm: adminConfirm,
 })

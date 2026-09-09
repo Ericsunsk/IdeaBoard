@@ -1,10 +1,10 @@
 import { computed, nextTick, ref, type Ref } from 'vue'
 import type { Router } from 'vue-router'
-import { normalizeCanvasBoardName } from '../../canvas-board/catalog/canvasBoards'
+import { normalizeCanvasBoardName } from '../../canvas-board/catalog/boards'
 import {
   useCanvasBoardCatalog,
   type CanvasBoardCatalog,
-} from '../../canvas-board/catalog/canvasBoardCatalog'
+} from '../../canvas-board/catalog/catalog'
 import { USER_CANVAS_PATH } from '../../../shared/constants/routePaths'
 import { i18n } from '../../../shared/i18n'
 

@@ -64,7 +64,7 @@ import InputNumber from 'primevue/inputnumber'
 import Message from 'primevue/message'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
-import { adminActionButtonClass } from '../../shared/lib/adminUiClasses'
+import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import type { AdminBillableItemCard, PricingVariant } from './billableCatalogTypes'
 
 const props = withDefaults(

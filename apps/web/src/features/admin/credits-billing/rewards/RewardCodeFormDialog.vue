@@ -225,9 +225,9 @@ import AdminFormField from '../../shared/components/AdminFormField.vue'
 import {
   adminDateTimePickerActionClass,
   adminDateTimePickerPt,
-} from '../../shared/lib/adminDateTimePickerPt'
-import { adminActionButtonClass } from '../../shared/lib/adminUiClasses'
-import type { RewardCode, UpdateRewardCodeInput } from './rewardCodeAdminResource'
+} from '../../shared/lib/dateTimePickerPt'
+import { adminActionButtonClass } from '../../shared/lib/uiClasses'
+import type { RewardCode, UpdateRewardCodeInput } from './resource'
 import { generateRewardCode } from './rewardCodeGenerator'
 import {
   isoToShanghaiDateTimeInput,

@@ -16,7 +16,7 @@ import {
   clampMaskBrushSize,
   INPAINT_DEFAULT_BRUSH_SIZE,
   INPAINT_HISTORY_LIMIT,
-} from './config/inpaintConstants'
+} from './config/constants'
 import type { RetouchImageRect } from '../retouch'
 
 type MaskHistoryEntry = {

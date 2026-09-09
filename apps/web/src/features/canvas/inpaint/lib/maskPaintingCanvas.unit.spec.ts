@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MASK_PAINTING_RGB, MASK_PAINTING_PREVIEW_ALPHA } from '../config/inpaintConstants'
+import { MASK_PAINTING_RGB, MASK_PAINTING_PREVIEW_ALPHA } from '../config/constants'
 import { buildMaskCommitResult, drawMaskRasterPreviewToCanvas } from './maskPaintingCanvas'
 
 type PixelSnapshot = {

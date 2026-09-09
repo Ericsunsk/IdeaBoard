@@ -3,7 +3,7 @@ import type {
   AdminCreditGrantRequest,
   AdminCreditRefundRequest,
 } from '../../../../shared/api/generated-query/model'
-import { formatIdeaAmount } from '../../shared/lib/adminIdeaCurrency'
+import { formatIdeaAmount } from '../../shared/lib/ideaCurrency'
 
 export type AdminCreditCommandKind = 'grant' | 'deduction' | 'refund'
 

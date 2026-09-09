@@ -85,13 +85,13 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     },
     reason: 'Shared panel Card pass-through owns the cross-surface panel shadow contract.',
   },
-  'src/features/admin/shared/lib/adminOverlayPt.ts': {
+  'src/features/admin/shared/lib/overlayPt.ts': {
     counts: {
       'raw-shadow': 2,
     },
     reason: 'Admin overlay pass-through owns the menu and dialog overlay shadow contracts.',
   },
-  'src/features/admin/shared/lib/adminUiClasses.ts': {
+  'src/features/admin/shared/lib/uiClasses.ts': {
     counts: {
       'raw-color': 1,
       'raw-shadow': 2,
@@ -104,7 +104,7 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     },
     reason: 'Avatar CSS contract keeps a fallback color for the cross-feature avatar bridge.',
   },
-  'src/features/admin/task-monitor/taskMonitorStatus.ts': {
+  'src/features/admin/task-monitor/status.ts': {
     counts: {
       'raw-color': 8,
       'raw-shadow': 4,

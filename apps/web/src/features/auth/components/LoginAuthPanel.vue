@@ -328,13 +328,13 @@ import Password from 'primevue/password'
 import { Lock as LockIcon, User as UserIcon } from '@iconoir/vue'
 import googleLogoUrl from '../../../shared/assets/oauth/google.svg'
 import discordLogoUrl from '../../../shared/assets/oauth/discord.svg'
-import { authTransport } from '../session/authTransport'
+import { authTransport } from '../session/transport'
 import { getPasswordLengthError } from '../../../shared/auth/passwordPolicy'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
 import IbFormField from '../../../shared/components/IbFormField.vue'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
-import { getRequiredError } from './authFormUtils'
-import { useAuthPanelControls } from './authPanelControls'
+import { getRequiredError } from './formUtils'
+import { useAuthPanelControls } from './panelControls'
 import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../shared/auth/oauthProviders'
 import {
   authButtonPt,
@@ -353,7 +353,7 @@ import {
   authPrimaryButtonClass,
   authSocialIconButtonClass,
   authSwitchButtonClass,
-} from './authModalUi'
+} from './modalUi'
 
 const props = defineProps<{
   oauthRedirectPath?: string | undefined

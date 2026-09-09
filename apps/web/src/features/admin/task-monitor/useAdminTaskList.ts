@@ -3,15 +3,15 @@ import type {
   ListAdminTasksParams,
   ListAdminTasksStatus as ListAdminTasksStatusValue,
 } from '../../../shared/api/generated-query/model'
-import { useAdminPagePagination } from '../shared/composables/useAdminPagePagination'
+import { usePagePagination } from '../shared/composables/usePagePagination'
 import { stripUndefined } from '../../../shared/api/stripUndefined'
-import { useAdminQueryPolling } from '../shared/composables/useAdminQueryPolling'
-import { useAdminTaskListResource, type AdminTaskMonitorListItemModel } from './taskMonitorResource'
+import { useQueryPolling } from '../shared/composables/useQueryPolling'
+import { useAdminTaskListResource, type AdminTaskMonitorListItemModel } from './resource'
 import {
   ADMIN_TASK_MONITOR_PAGE_SIZE,
   ADMIN_TASK_MONITOR_REFRESH_INTERVAL_MS,
   ADMIN_TASK_MONITOR_RESULT_PREVIEW_ENABLED,
-} from './taskMonitorDisplayPolicy'
+} from './displayPolicy'
 
 type TaskStatusStats = {
   running: number
@@ -49,7 +49,7 @@ export function useAdminTaskList() {
     return params
   }
 
-  const polling = useAdminQueryPolling({
+  const polling = useQueryPolling({
     visibleInterval: ADMIN_TASK_MONITOR_REFRESH_INTERVAL_MS,
     hiddenInterval: false,
     isEnabled: () => hasActiveTasks.value,
@@ -71,7 +71,7 @@ export function useAdminTaskList() {
   const paginationPending = computed(
     () => tasksQuery.isLoading.value || tasksQuery.isFetching.value,
   )
-  const pagination = useAdminPagePagination({
+  const pagination = usePagePagination({
     currentPage: pageState,
     totalRecords: paginationTotalRecords,
     pageSize,

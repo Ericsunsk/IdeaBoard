@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
-import { useAdminStorageFeedback } from './useAdminStorageFeedback'
-import { buildVendorPresets, type VendorPresetOption } from './storageMeta'
+import { useStorageFeedback } from './useStorageFeedback'
+import { buildVendorPresets, type VendorPresetOption } from './meta'
 import {
   buildPayload,
   canApply as canApplyProfile,
@@ -20,7 +20,7 @@ import {
   type StorageProfilePayload,
   type StorageProvider,
   type StorageProviderMeta,
-} from './storageHelpers'
+} from './helpers'
 
 type SaveStorageProfile = (input: {
   id?: string | undefined
@@ -42,7 +42,7 @@ type StorageProfileEditorOptions = {
 }
 
 export function useStorageProfileEditor(options: StorageProfileEditorOptions) {
-  const storageFeedback = useAdminStorageFeedback()
+  const storageFeedback = useStorageFeedback()
   const { runAsyncAction } = useAsyncAction()
   const saving = ref(false)
   const savingAndApplying = ref(false)

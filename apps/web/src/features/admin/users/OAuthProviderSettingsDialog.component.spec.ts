@@ -4,7 +4,7 @@ import { adminPrimeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen, waitFor, within } from '../../../test/render'
 import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
 
-vi.mock('../shared/logos/adminBrandLogoResource', () => ({
+vi.mock('../shared/logos/brandLogoResource', () => ({
   useAdminBrandLogoResource: () => ({ save: vi.fn(), remove: vi.fn() }),
 }))
 import type {
@@ -14,8 +14,8 @@ import type {
 
 const toast = vi.hoisted(() => ({ success: vi.fn() }))
 
-vi.mock('../shared/lib/adminToast', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../shared/lib/adminToast')>()),
+vi.mock('../shared/lib/toast', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../shared/lib/toast')>()),
   useAdminToast: () => toast,
 }))
 

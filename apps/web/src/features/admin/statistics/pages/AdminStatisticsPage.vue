@@ -98,14 +98,14 @@ import RangedLineChartCard from '../../../../shared/components/RangedLineChartCa
 import AdminChartCard from '../../shared/components/AdminChartCard.vue'
 import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
-import { adminCards } from '../../shared/lib/adminCardMeta'
-import { adminChartPlugins, useAdminChartReady } from '../../shared/lib/adminChart'
+import { adminCards } from '../../shared/lib/cardMeta'
+import { adminChartPlugins, useAdminChartReady } from '../../shared/lib/chart'
 import {
   adminChartCanvasClass,
   adminChartGridClass,
   adminDashboardRootClass,
   adminSummaryGridClass,
-} from '../../shared/lib/adminUiClasses'
+} from '../../shared/lib/uiClasses'
 import { useUsageStatisticsCharts } from '../useUsageStatisticsCharts'
 import { useUsageStatisticsData } from '../useUsageStatisticsData'
 

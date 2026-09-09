@@ -300,7 +300,7 @@ import {
   ibPasswordPt,
 } from '../../../../shared/theme/formControls'
 import IbFormField from '../../../../shared/components/IbFormField.vue'
-import { useUserStore } from '../../../auth/session/authSession'
+import { useUserStore } from '../../../auth/session/session'
 import { useAsyncAction } from '../../../../shared/composables/useAsyncAction'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'

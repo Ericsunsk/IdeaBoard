@@ -87,12 +87,12 @@ import {
   getAdminWorkflowFeatureGroupMeta,
   getAdminWorkflowFeatureMeta,
 } from '../../shared/lib/workflowFeatureAdminMeta'
-import { adminCardPt } from '../../shared/lib/adminCardPt'
+import { adminCardPt } from '../../shared/lib/cardPt'
 import {
   adminActionButtonClass,
   adminCompactTagClass,
   adminMasonryCardClass,
-} from '../../shared/lib/adminUiClasses'
+} from '../../shared/lib/uiClasses'
 import type {
   AdminBillableItemCard,
   AdminBillableItemStatus,

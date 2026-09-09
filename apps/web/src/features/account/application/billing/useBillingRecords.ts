@@ -4,7 +4,7 @@ import { useCreditsSync } from '../recharge/useCreditsSync'
 import {
   billingRecordsQueryKeys,
   fetchBillingRecords,
-} from '../../infrastructure/billing/billingResource'
+} from '../../infrastructure/billing/resource'
 
 const pageSize = 20
 const initialPageParam = 0

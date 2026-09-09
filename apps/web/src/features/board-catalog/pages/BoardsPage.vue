@@ -226,7 +226,7 @@ import { usePrimeDialogOverlayLifecycle } from '../../../shared/composables/useP
 import { usePrimePopupMenuOverlayLifecycle } from '../../../shared/composables/usePrimePopupMenuOverlayLifecycle'
 import { HOME_PATH, USER_CANVAS_PATH } from '../../../shared/constants/routePaths'
 import { appOverlayMenuItemClass } from '../../../shared/theme/appOverlayMenu'
-import { useUserStore } from '../../auth/session/authSession'
+import { useUserStore } from '../../auth/session/session'
 import UserAccountMenu from '../../../shared/components/UserAccountMenu.vue'
 import UserLocaleSelect from '../../../shared/components/UserLocaleSelect.vue'
 import StudioName from '../../../shared/components/StudioName.vue'

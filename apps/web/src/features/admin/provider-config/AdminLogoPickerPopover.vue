@@ -60,7 +60,7 @@
 import { computed, ref, watch } from 'vue'
 import Popover from 'primevue/popover'
 import Tooltip from 'primevue/tooltip'
-import { createAdminPopoverPt } from '../shared/lib/adminOverlayPt'
+import { createAdminPopoverPt } from '../shared/lib/overlayPt'
 import {
   ADMIN_BRAND_CATEGORIES,
   ALL_ADMIN_BRAND_LOGOS,
@@ -69,9 +69,9 @@ import {
   type AdminBrandLogoKey,
   type AdminBrandLogoScope,
   type AdminBrandCategoryKey,
-} from '../shared/logos/adminBrandLogos'
-import { useAdminBrandLogoResource } from '../shared/logos/adminBrandLogoResource'
-import { useAdminToast } from '../shared/lib/adminToast'
+} from '../shared/logos/brandLogos'
+import { useAdminBrandLogoResource } from '../shared/logos/brandLogoResource'
+import { useAdminToast } from '../shared/lib/toast'
 
 const props = withDefaults(
   defineProps<{

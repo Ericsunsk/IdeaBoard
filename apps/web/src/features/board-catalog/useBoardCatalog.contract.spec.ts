@@ -7,7 +7,7 @@ function makeBoard(id: string, name = id, updatedAt = 1) {
 
 describe('Boards Catalog public interface', () => {
   afterEach(() => {
-    vi.doUnmock('../canvas-board/catalog/canvasBoardCatalog')
+    vi.doUnmock('../canvas-board/catalog/catalog')
     vi.doUnmock('../canvas-board/preview')
     vi.doUnmock('./feedback/useFeedback')
     vi.resetModules()
@@ -65,7 +65,7 @@ describe('Boards Catalog public interface', () => {
     }
     const navigation = { openBoard: vi.fn() }
 
-    vi.doMock('../canvas-board/catalog/canvasBoardCatalog', () => ({
+    vi.doMock('../canvas-board/catalog/catalog', () => ({
       useCanvasBoardCatalog: () => ({
         viewModel: {
           boards,

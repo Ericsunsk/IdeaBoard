@@ -8,8 +8,8 @@ import { useUsage } from './useUsage'
 
 const fetchUsageMock = vi.hoisted(() => vi.fn())
 
-vi.mock('../../infrastructure/usage/usageResource', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../infrastructure/usage/usageResource')>()
+vi.mock('../../infrastructure/usage/resource', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../infrastructure/usage/resource')>()
   return { ...actual, fetchUsage: fetchUsageMock }
 })
 

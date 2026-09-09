@@ -197,40 +197,40 @@ import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
-import { useAdminCollectionState } from '../../shared/composables/useAdminCollectionState'
-import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
+import { useCollectionState } from '../../shared/composables/useCollectionState'
+import { useCursorPagination } from '../../shared/composables/useCursorPagination'
 import {
   formatAdminDateTime,
   formatReconciliationRunError,
   getRunStatusLabel,
   getRunStatusSeverity,
-} from '../creditsBillingFormat'
-import { adminActionButtonClass, adminTextButtonClass } from '../../shared/lib/adminUiClasses'
+} from '../format'
+import { adminActionButtonClass, adminTextButtonClass } from '../../shared/lib/uiClasses'
 import {
   createAdminCreditRunHistoryResource,
   type AdminCreditRun,
-} from './adminCreditRunHistoryResource'
+} from './runHistoryResource'
 import {
   formatReconciliationRunDuration,
   formatReconciliationRunResult,
   getReconciliationTriggerLabel,
 } from './reconciliationRunPresentation'
-import { useAdminCreditRunDetail } from './useAdminCreditRunDetail'
+import { useCreditRunDetail } from './useCreditRunDetail'
 
 const props = defineProps<{ visible: boolean }>()
 defineEmits<{ 'update:visible': [visible: boolean] }>()
 
 const expandedRows = ref<Record<string, boolean>>({})
 const resource = createAdminCreditRunHistoryResource()
-let pagination: ReturnType<typeof useAdminCursorPagination<number>>
-const collection = useAdminCollectionState({
+let pagination: ReturnType<typeof useCursorPagination<number>>
+const collection = useCollectionState({
   load: (signal) => resource.list({ beforeId: pagination.cursor.value, signal }),
   isEmpty: (page) => page.runs.length === 0,
 })
 const { data: runPage, loading: runsLoading, initialError, backgroundError } = collection
-pagination = useAdminCursorPagination<number>({ pending: runsLoading })
+pagination = useCursorPagination<number>({ pending: runsLoading })
 const runs = computed(() => runPage.value?.runs ?? [])
-const runDetail = useAdminCreditRunDetail<AdminCreditRun>(resource.get)
+const runDetail = useCreditRunDetail<AdminCreditRun>(resource.get)
 const selectedRunId = runDetail.selectedRunId
 const selectedRun = runDetail.run
 const runDetailLoading = runDetail.loading

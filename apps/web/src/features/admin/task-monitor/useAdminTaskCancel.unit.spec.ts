@@ -22,7 +22,7 @@ vi.mock('@tanstack/vue-query', () => ({
   }),
 }))
 
-vi.mock('./taskMonitorResource', () => ({
+vi.mock('./resource', () => ({
   cancelAdminTaskByID: mocks.cancelAdminTaskByID,
   getAdminMonitorQueryKey: () => ['admin', 'monitor'],
   getAdminTaskDetailQueryKey: (taskID: string) => ['admin', 'tasks', taskID],

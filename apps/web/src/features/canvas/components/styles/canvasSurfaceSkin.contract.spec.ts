@@ -17,7 +17,7 @@ const nodeSkin = readSource('components/nodes/styles/node-shared.css')
 const nodeToolSkin = readSource('components/nodes/styles/node-tool-buttons.css')
 const nodeStageFrame = readSource('components/nodes/primitives/NodeStageFrame.vue')
 const imageToolStagePresentation = readSource(
-  'image-tools/components/ImageToolStagePresentation.vue',
+  'image-tools/components/StagePresentation.vue',
 )
 const vueFlowAdapterSkin = readSource('components/styles/canvas-vue-flow-adapter-skin.css')
 const canvasMiniMap = readSource('components/CanvasMiniMap.vue')

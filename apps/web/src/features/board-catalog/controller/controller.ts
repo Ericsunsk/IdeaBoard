@@ -1,6 +1,6 @@
 import { computed, readonly, ref, watch } from 'vue'
 import { formatLocaleDate } from '../../../shared/i18n/formatters'
-import type { CanvasBoardCatalog } from '../../canvas-board/catalog/canvasBoardCatalog'
+import type { CanvasBoardCatalog } from '../../canvas-board/catalog/catalog'
 import type { BoardPreviewRefreshQueue } from '../../canvas-board/preview'
 import type {
   BoardCatalogEntry,

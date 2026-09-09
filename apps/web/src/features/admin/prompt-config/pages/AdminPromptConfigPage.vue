@@ -201,22 +201,22 @@ import Panel from 'primevue/panel'
 import Tag from 'primevue/tag'
 import type { TagPassThroughOptions } from 'primevue/tag'
 import Textarea from 'primevue/textarea'
-import { useAdminPromptConfigFeedback } from '../useAdminPromptConfigFeedback'
+import { usePromptConfigFeedback } from '../usePromptConfigFeedback'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminSurfaceFrame from '../../shared/components/AdminSurfaceFrame.vue'
-import { adminCardPt } from '../../shared/lib/adminCardPt'
-import { adminPanelPt } from '../../shared/lib/adminPanelPt'
+import { adminCardPt } from '../../shared/lib/cardPt'
+import { adminPanelPt } from '../../shared/lib/panelPt'
 import {
   adminDialogHeaderContentClass,
   adminDialogHeaderSplitClass,
   adminDialogTitleClass,
   adminActionButtonClass,
-} from '../../shared/lib/adminUiClasses'
-import { useAdminPromptConfigWorkspace } from '../promptConfigWorkspace'
+} from '../../shared/lib/uiClasses'
+import { useAdminPromptConfigWorkspace } from '../workspace'
 import type {
   FeaturePromptVariable,
   FeaturePromptVariableTone,
-} from '../promptConfigWorkspace'
+} from '../workspace'
 import {
   featureMap,
   groupedFeatureGroups,
@@ -224,7 +224,7 @@ import {
   type FeatureSlug,
 } from '../featurePromptMeta'
 
-const feedback = useAdminPromptConfigFeedback()
+const feedback = usePromptConfigFeedback()
 const promptConfigWorkspace = useAdminPromptConfigWorkspace({
   feedback,
   getFeatureTitle: (slug) => featureMap[slug as FeatureSlug]?.title ?? slug,

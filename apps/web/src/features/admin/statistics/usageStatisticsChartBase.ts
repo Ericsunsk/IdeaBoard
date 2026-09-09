@@ -1,5 +1,5 @@
 import type { ChartOptions } from '../../../shared/lib/chartPrimitives'
-import { adminChartLegend, adminChartTheme } from '../shared/lib/adminChart'
+import { adminChartLegend, adminChartTheme } from '../shared/lib/chart'
 
 export const defaultModelColors = [
   adminChartTheme.brand,

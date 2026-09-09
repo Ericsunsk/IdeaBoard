@@ -2,7 +2,7 @@ import type { Node } from '@vue-flow/core'
 import { createApp, defineComponent, nextTick, ref, shallowRef, type Ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../canvas-board/domain'
-import { renderRetouchLayerStackFile } from '../retouch/services/retouchRenderer'
+import { renderRetouchLayerStackFile } from '../retouch/services/renderer'
 import { IMAGE_STRENGTH_ACTIONS, type ImageStrengthAction } from '../execution'
 import type { UseCanvasImageToolsOptions } from './session'
 import { useCanvasImageTools, type CanvasImageTools } from '.'
@@ -11,8 +11,8 @@ import { loadLocaleMessages } from '../../../shared/i18n/userLocale'
 import { deserializeRetouchStack } from '../retouch/utils/stackPersistence'
 import * as mediaAssetDelivery from '../../../shared/api/mediaAssetDelivery'
 
-vi.mock('../retouch/services/retouchRenderer', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../retouch/services/retouchRenderer')>()
+vi.mock('../retouch/services/renderer', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../retouch/services/renderer')>()
   return {
     ...actual,
     renderRetouchLayerStackFile: vi.fn(),

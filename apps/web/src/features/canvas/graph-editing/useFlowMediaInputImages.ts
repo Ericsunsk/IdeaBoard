@@ -20,7 +20,7 @@ import {
   type CanvasGraphStore,
 } from '../graph-runtime'
 import { canvasBoardSnapshotToFlow } from '../utils/flowSnapshotAdapter'
-import type { MediaRef } from '../../../shared/media/MediaRef'
+import type { MediaRef } from '../../../shared/media/mediaRef'
 
 export type MediaInputImage = {
   id: string

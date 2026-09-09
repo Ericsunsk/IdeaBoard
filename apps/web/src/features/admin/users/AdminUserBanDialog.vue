@@ -90,7 +90,7 @@ import {
   adminDialogHeaderContentClass,
   adminDialogTitleClass,
   adminActionButtonClass,
-} from '../shared/lib/adminUiClasses'
+} from '../shared/lib/uiClasses'
 
 type BanDurationOption = {
   label: string

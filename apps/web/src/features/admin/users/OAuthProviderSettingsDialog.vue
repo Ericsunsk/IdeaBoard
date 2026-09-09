@@ -217,11 +217,11 @@ import AdminSettingsDialogFrame from '../shared/components/AdminSettingsDialogFr
 import AdminFormField from '../shared/components/AdminFormField.vue'
 import AdminStatusPill from '../shared/components/AdminStatusPill.vue'
 import AdminLogoPickerPopover from '../provider-config/AdminLogoPickerPopover.vue'
-import { formatAdminDisplayError, useAdminToast } from '../shared/lib/adminToast'
-import { adminActionButtonClass } from '../shared/lib/adminUiClasses'
+import { formatAdminDisplayError, useAdminToast } from '../shared/lib/toast'
+import { adminActionButtonClass } from '../shared/lib/uiClasses'
 import googleLogoUrl from '../../../shared/assets/oauth/google.svg'
 import discordLogoUrl from '../../../shared/assets/oauth/discord.svg'
-import { getAdminBrandLogo } from '../shared/logos/adminBrandLogos'
+import { getAdminBrandLogo } from '../shared/logos/brandLogos'
 import {
   createOAuthProviderSettingsResource,
   type OAuthProviderSettingsResource,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from './canvasNodes'
+import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from './nodes'
 import { parseBoardStateEnvelopeContract } from './boardStateEnvelopeContract'
 import { makeCanvasBoardState } from '../testing'
 

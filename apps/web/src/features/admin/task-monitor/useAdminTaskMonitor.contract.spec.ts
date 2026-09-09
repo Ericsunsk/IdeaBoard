@@ -32,8 +32,8 @@ vi.mock('../../../shared/api/generated-query/admin-monitor/admin-monitor', () =>
   useGetAdminMonitor: vi.fn(() => mockState.getAdminMonitorReturn),
 }))
 
-vi.mock('../shared/composables/useAdminQueryPolling', () => ({
-  useAdminQueryPolling: vi.fn(
+vi.mock('../shared/composables/useQueryPolling', () => ({
+  useQueryPolling: vi.fn(
     (options: {
       isEnabled?: () => boolean
       visibleInterval: number | false | (() => number | false)

@@ -10,7 +10,7 @@ import {
   type Ref,
 } from 'vue'
 import { useAppToast } from '../../../shared/composables/useAppToast'
-import { useAuthOverlay } from '../../auth/authOverlay'
+import { useAuthOverlay } from '../../auth/overlay'
 import { useRoute, useRouter } from 'vue-router'
 import { libraryAssetKey, loadLibraryFloatingIsland } from '../../library'
 import {

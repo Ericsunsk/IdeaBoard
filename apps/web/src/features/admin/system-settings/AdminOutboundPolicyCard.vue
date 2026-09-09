@@ -68,14 +68,14 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Textarea from 'primevue/textarea'
 import AdminFormField from '../shared/components/AdminFormField.vue'
-import { adminActionButtonClass } from '../shared/lib/adminUiClasses'
+import { adminActionButtonClass } from '../shared/lib/uiClasses'
 import SettingEditorCard from './SettingEditorCard.vue'
-import { useAdminOutboundPolicy } from './useAdminOutboundPolicy'
-import { useAdminOutboundPolicyFeedback } from './useAdminSystemSettingsFeedback'
+import { useOutboundPolicy } from './useOutboundPolicy'
+import { useAdminOutboundPolicyFeedback } from './useSystemSettingsFeedback'
 
 const feedback = useAdminOutboundPolicyFeedback()
 const { error, form, loading, refetch, reset, save, saving, setting, validationError } =
-  useAdminOutboundPolicy({ feedback })
+  useOutboundPolicy({ feedback })
 
 const controlsDisabled = computed(() => loading.value || saving.value || Boolean(error.value))
 const statusLabel = computed(() => {

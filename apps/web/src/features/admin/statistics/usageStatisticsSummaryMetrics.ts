@@ -1,5 +1,5 @@
 import { computed, type Ref } from 'vue'
-import type { AdminStatistics } from './statisticsResource'
+import type { AdminStatistics } from './resource'
 import {
   buildDeltaFoot,
   formatPercentValue,

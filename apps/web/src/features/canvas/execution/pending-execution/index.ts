@@ -4,7 +4,7 @@ export {
   type PendingImageMutationRejectReason,
   type PendingImageResolvedResult,
   type PendingImageResultNodeId,
-} from './CanvasBoardGraphSession'
+} from './boardGraphSession'
 export {
   createPendingImageExecutionCore,
   PendingImageMaterializationError,
@@ -24,9 +24,9 @@ export {
   type PendingImageMaterializationOutcome,
   type PendingImageMaterializationResult,
   type PendingImageSupersededExecution,
-} from './PendingImageExecutionCore'
+} from './core'
 export {
   projectPendingImageExecutionEdges,
   type PendingImageExecutionEdgeProjection,
-} from './pendingImageExecutionEdgeProjection'
-export { collectPendingImageTasks, type PendingImageTaskSnapshot } from './pendingImageTaskSnapshot'
+} from './edgeProjection'
+export { collectPendingImageTasks, type PendingImageTaskSnapshot } from './taskSnapshot'

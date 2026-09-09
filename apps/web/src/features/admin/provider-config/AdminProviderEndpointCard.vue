@@ -264,16 +264,16 @@ import Card from 'primevue/card'
 import ProgressBar from 'primevue/progressbar'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { Plus } from '@iconoir/vue'
-import { adminCardPt } from '../shared/lib/adminCardPt'
+import { adminCardPt } from '../shared/lib/cardPt'
 import {
   adminLogoButtonClass,
   adminMasonryCardClass,
-} from '../shared/lib/adminUiClasses'
-import type { ProviderEndpointCard } from './providerConfigTypes'
+} from '../shared/lib/uiClasses'
+import type { ProviderEndpointCard } from './types'
 import type { ProviderEndpointEditor } from './providerEndpointEditor'
 import type { AccountEditor } from './accountEditor'
-import type { AdminProviderConfigCommands } from './useAdminProviderConfig'
-import { isImagePipelineProtocol } from './providerConfigPayload'
+import type { AdminProviderConfigCommands } from './useProviderConfig'
+import { isImagePipelineProtocol } from './payload'
 import { getProviderEndpointLogo } from './providerLogos'
 
 defineProps<{
