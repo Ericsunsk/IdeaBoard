@@ -4,6 +4,7 @@ import type {
   ImageToolStageBinding,
 } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
+import type { ZeroCopyStageHandle } from '../retouch/useRetouchZeroCopyStage'
 import { i18n } from '../../../shared/i18n'
 
 function areBindingObjectsEqual<T extends object>(
@@ -57,7 +58,10 @@ function reuseCachedBinding<T>(
 
 export function createImageToolNodeBindings(
   session: ImageToolSession,
-  renderedPreview: { readonly value: ImageToolStageBinding['renderedPreview'] },
+  retouchStage?: Pick<
+    ZeroCopyStageHandle,
+    'canvasRef' | 'setCanvasRef' | 'isGpuActive' | 'stageStatus'
+  > | null,
 ) {
   const { execution, ui } = session.capabilities
   const stageBindingCache = new Map<string, ImageToolStageBinding>()
@@ -68,15 +72,10 @@ export function createImageToolNodeBindings(
       nodeId,
       active: mode != null,
       mode,
-      // Keep the preview reactive after Vue Flow has mounted the node. The
-      // node slot is not re-evaluated for every editor parameter change, so a
-      // snapshot of renderedPreview.value would stay stale until another node
-      // update (for example, clicking Generate) happened to trigger a render.
-      get renderedPreview() {
-        return session.retouchNodeId.value === nodeId && session.retouchMode.value === 'adjust'
-          ? renderedPreview.value
-          : null
-      },
+      retouchStage:
+        session.retouchNodeId.value === nodeId && session.retouchMode.value === 'adjust'
+          ? (retouchStage ?? null)
+          : null,
       session,
     }
     return reuseCachedBinding(stageBindingCache, nodeId, nextBinding, (left, right) =>

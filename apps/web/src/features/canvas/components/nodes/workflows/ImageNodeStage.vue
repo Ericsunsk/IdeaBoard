@@ -148,7 +148,7 @@ const props = defineProps<{
   flowNodeId?: string | undefined
   stageWidth: number
   stageHeight: number
-  displayImage: { url: string; mediaAssetId?: number | undefined } | null
+  displayImage: { url: string; assetId?: string | undefined } | null
   libraryImport?: LibraryImportFact | undefined
   localUpload?: FlowLocalUploadState | undefined
   inputLocked?: boolean
@@ -215,7 +215,7 @@ const { maxSide: previewMaxSide } = useCanvasImagePreviewQuality({
 })
 const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, {
   maxSide: previewMaxSide,
-  mediaAssetId: () => stageDisplayImage.value?.mediaAssetId,
+  assetId: () => stageDisplayImage.value?.assetId,
   isVisible: isStageVisible,
   keepPreviousOnSourceChange: true,
 })
@@ -225,11 +225,11 @@ const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl,
 // authenticated delivery metadata resolves. Local and external sources retain
 // the immediate optimistic fallback behavior.
 const renderedStageUrl = computed(() => {
-  if (stageDisplayImage.value?.mediaAssetId) return stageDisplayUrl.value
+  if (stageDisplayImage.value?.assetId) return stageDisplayUrl.value
   return stageDisplayUrl.value || sourceDisplayUrl.value
 })
 const mediaAssetPending = computed(
-  () => !!stageDisplayImage.value?.mediaAssetId && !stageDisplayUrl.value,
+  () => !!stageDisplayImage.value?.assetId && !stageDisplayUrl.value,
 )
 const { t } = useI18n()
 const emptyStateLabel = computed(() =>

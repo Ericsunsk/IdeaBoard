@@ -25,7 +25,14 @@ function createImageSnapshot(): ImageNodeItem {
     sourceMediaAssetId: 101,
     sourceImageRatio: 1,
     outputStatus: 'ready',
-    outputImages: [{ url: 'https://example.test/output.png', ratio: 0.75, mediaAssetId: 201 }],
+    outputImages: [
+      {
+        url: 'https://example.test/output.png',
+        ratio: 0.75,
+        mediaAssetId: 201,
+        mediaRef: { assetId: 'asset_201', derivativeTier: 'preview' },
+      },
+    ],
   }
 }
 
@@ -117,7 +124,7 @@ describe('useCanvasGraphInteractions', () => {
 
     expect(harness.downloadImage).toHaveBeenCalledWith({
       url: 'https://example.test/output.png',
-      mediaAssetId: 201,
+      assetId: 'asset_201',
       fileName: 'Domain image.png',
     })
     expect(harness.loading.destroy).toHaveBeenCalledOnce()
@@ -147,7 +154,8 @@ describe('useCanvasGraphInteractions', () => {
     expect(harness.openNodeImage).toHaveBeenCalledWith(harness.image, 'latest-output')
     expect(harness.nodes.value[1]?.data?.snapshotNode).toMatchObject({
       sourceImageUrl: 'https://example.test/output.png',
-      sourceMediaAssetId: 201,
+      sourceMediaAssetId: 101,
+      sourceMediaRef: { assetId: 'asset_201', derivativeTier: 'preview' },
     })
   })
 

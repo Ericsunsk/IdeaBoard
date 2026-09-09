@@ -19,7 +19,7 @@ func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	userAPI.POST("/media-assets/delivery/batch", mediaAssetHandler.MetadataBatch)
 	userAPI.GET("/media-assets/:asset_id", mediaAssetHandler.Metadata)
 	userAPI.GET("/media-assets/:asset_id/original/content", mediaAssetHandler.Original)
-	userAPI.GET("/media-assets/:asset_id/derivatives/:tier/:format/content", mediaAssetHandler.Content)
+	userAPI.GET("/media-assets/:asset_id/derivatives/:tier/content", mediaAssetHandler.Content)
 	userAPI.POST("/billing/quotes", h.BillingHandler.Quote)
 	userAPI.GET("/billing/records", h.BillingRecords.List)
 	userAPI.GET("/credits/wallet", h.CreditUserHandler.GetCurrentWallet)

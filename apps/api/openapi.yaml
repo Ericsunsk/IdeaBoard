@@ -711,7 +711,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseBase' }
-  /user/media-assets/{asset_id}/derivatives/{tier}/{format}/content:
+  /user/media-assets/{asset_id}/derivatives/{tier}/content:
     get:
       tags: [UserAssets]
       operationId: getUserMediaAssetDerivativeContent
@@ -726,10 +726,6 @@ paths:
           in: path
           required: true
           schema: { type: string, enum: [thumb, preview, large-preview, processing, processing-input] }
-        - name: format
-          in: path
-          required: true
-          schema: { type: string, enum: [webp, jpeg, png] }
       responses:
         '200':
           description: Media derivative content

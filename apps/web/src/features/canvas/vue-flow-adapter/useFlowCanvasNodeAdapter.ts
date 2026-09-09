@@ -56,14 +56,14 @@ export function useFlowCanvasNodeAdapter({
     return resolveSnapshotNode<FusionNodeItem>(data())
   })
 
-  const displayImage = computed<{ url: string; mediaAssetId?: number | undefined } | null>(() => {
+  const displayImage = computed<{ url: string; assetId?: string | undefined } | null>(() => {
     if (!imageSnapshot.value) return null
     const pendingPreview = data().libraryImportPreviewUrl?.trim()
     if (imageSnapshot.value.libraryImport && pendingPreview) return { url: pendingPreview }
     const localUploadPreview = data().localUpload?.previewUrl.trim()
     if (localUploadPreview) return { url: localUploadPreview }
     const payload = resolveImageNodeDisplayPayload(imageSnapshot.value)
-    return payload ? { url: payload.url, mediaAssetId: payload.mediaAssetId } : null
+    return payload ? { url: payload.url, ...(payload.assetId ? { assetId: payload.assetId } : {}) } : null
   })
   const libraryImport = computed(() => imageSnapshot.value?.libraryImport)
   const localUpload = computed(() => data().localUpload)

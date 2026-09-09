@@ -16,7 +16,6 @@ import {
   getGetUserMediaAssetMetadataUrl,
   getGetUserMediaAssetMetadataBatchUrl,
   getGetUserMediaAssetOriginalContentUrl,
-  getGetUserMediaAssetDerivativeContentUrl,
 } from './generated-query/user-assets/user-assets'
 import type {
   ApiResponseMediaAssetMetadata,
@@ -29,6 +28,9 @@ export type MediaAssetDeliveryTier =
   'thumb' | 'preview' | 'large-preview' | 'processing' | 'processing-input' | 'original'
 export type MediaAssetDeliveryStatus =
   'idle' | 'loading' | 'pending' | 'processing' | 'ready' | 'failed' | 'error'
+
+/** Canonical delivery identity: string `asset_...`. No numeric legacy. */
+export type MediaAssetId = string
 
 export type MediaAssetDeliveryMetadata = MediaAssetMetadata
 export type MediaAssetDeliveryVariant = GeneratedMediaAssetDeliveryVariant
@@ -53,15 +55,25 @@ type CachedMetadata = {
 const METADATA_CACHE_TTL_MS = 5 * 60 * 1000
 const SIGNED_URL_REFRESH_SKEW_MS = 2 * 60 * 1000
 
-const metadataCache = new Map<number, CachedMetadata>()
+const metadataCache = new Map<string, CachedMetadata>()
 const metadataRequests = new Map<string, Promise<MediaAssetDeliveryMetadata>>()
 const metadataBatchRequests = new Map<
   string,
-  Promise<ReadonlyMap<number, MediaAssetDeliveryMetadata>>
+  Promise<ReadonlyMap<string, MediaAssetDeliveryMetadata>>
 >()
 const ensuredTiers = new Set<string>()
-const invalidationListeners = new Map<number, Set<() => void>>()
+const invalidationListeners = new Map<string, Set<() => void>>()
 let stopMediaEventSubscription: (() => void) | null = null
+
+export function normalizeMediaAssetId(value: MediaAssetId | null | undefined): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function normalizeMediaAssetKey(value: MediaAssetId): string {
+  return value.trim()
+}
 
 function parseSignedURLExpiry(url: string): number | null {
   try {
@@ -100,9 +112,10 @@ function resolveMetadataExpiry(metadata: MediaAssetDeliveryMetadata): number {
   return Math.min(Date.now() + METADATA_CACHE_TTL_MS, signedURLExpiry - SIGNED_URL_REFRESH_SKEW_MS)
 }
 
-function notifyAssetInvalidated(assetId: number) {
-  metadataCache.delete(assetId)
-  for (const listener of invalidationListeners.get(assetId) ?? []) listener()
+function notifyAssetInvalidated(assetId: MediaAssetId) {
+  const key = normalizeMediaAssetKey(assetId)
+  metadataCache.delete(key)
+  for (const listener of invalidationListeners.get(key) ?? []) listener()
 }
 
 function ensureMediaEventSubscription() {
@@ -110,25 +123,27 @@ function ensureMediaEventSubscription() {
   stopMediaEventSubscription = subscribeUserEvent('media.derivative.updated', (event) => {
     try {
       const payload = JSON.parse(event.data) as { media_asset_id?: unknown }
-      const assetId = Number(payload.media_asset_id)
-      if (Number.isInteger(assetId) && assetId > 0) notifyAssetInvalidated(assetId)
+      const raw = payload.media_asset_id
+      const assetId = typeof raw === 'string' ? raw.trim() : ''
+      if (assetId.length > 0) notifyAssetInvalidated(assetId)
     } catch {
       return
     }
   })
 }
 
-function subscribeAssetInvalidation(assetId: number, listener: () => void): () => void {
+function subscribeAssetInvalidation(assetId: MediaAssetId, listener: () => void): () => void {
   ensureMediaEventSubscription()
-  let listeners = invalidationListeners.get(assetId)
+  const key = normalizeMediaAssetKey(assetId)
+  let listeners = invalidationListeners.get(key)
   if (!listeners) {
     listeners = new Set()
-    invalidationListeners.set(assetId, listeners)
+    invalidationListeners.set(key, listeners)
   }
   listeners.add(listener)
   return () => {
     listeners?.delete(listener)
-    if (listeners?.size === 0) invalidationListeners.delete(assetId)
+    if (listeners?.size === 0) invalidationListeners.delete(key)
     if (invalidationListeners.size === 0 && stopMediaEventSubscription) {
       stopMediaEventSubscription()
       stopMediaEventSubscription = null
@@ -136,17 +151,18 @@ function subscribeAssetInvalidation(assetId: number, listener: () => void): () =
   }
 }
 
-function getCachedMetadata(assetId: number): MediaAssetDeliveryMetadata | null {
-  const cached = metadataCache.get(assetId)
+function getCachedMetadata(assetId: MediaAssetId): MediaAssetDeliveryMetadata | null {
+  const key = normalizeMediaAssetKey(assetId)
+  const cached = metadataCache.get(key)
   if (!cached) return null
   if (cached.expiresAt <= Date.now()) {
-    metadataCache.delete(assetId)
+    metadataCache.delete(key)
     return null
   }
   return cached.value
 }
 
-export function invalidateMediaAssetMetadata(assetId?: number) {
+export function invalidateMediaAssetMetadata(assetId?: MediaAssetId) {
   if (assetId === undefined) {
     metadataCache.clear()
     ensuredTiers.clear()
@@ -156,17 +172,17 @@ export function invalidateMediaAssetMetadata(assetId?: number) {
 }
 
 export async function getMediaAssetMetadata(
-  assetId: number,
+  assetId: MediaAssetId,
   options: {
     signal?: AbortSignal | undefined
     force?: boolean | undefined
     ensureTier?: MediaAssetDeliveryTier | undefined
   } = {},
 ): Promise<MediaAssetDeliveryMetadata> {
-  if (!Number.isInteger(assetId) || assetId <= 0)
-    throw new Error(i18n.global.t('common.errors.mediaInvalid'))
-  const ensureKey = options.ensureTier ? `${assetId}:${options.ensureTier}` : ''
-  const requestKey = ensureKey || String(assetId)
+  const normalized = normalizeMediaAssetId(assetId)
+  if (!normalized) throw new Error(i18n.global.t('common.errors.mediaInvalid'))
+  const ensureKey = options.ensureTier ? `${normalized}:${options.ensureTier}` : ''
+  const requestKey = ensureKey || normalized
   const needsEnsure = Boolean(ensureKey && !ensuredTiers.has(ensureKey))
   if (!options.force && !needsEnsure) {
     const cached = getCachedMetadata(assetId)
@@ -177,7 +193,7 @@ export async function getMediaAssetMetadata(
 
   const request = api
     .request<ApiResponseMediaAssetMetadata>(
-      `${getGetUserMediaAssetMetadataUrl(String(assetId))}${
+      `${getGetUserMediaAssetMetadataUrl(normalized)}${
         options.ensureTier ? `?ensure_tier=${encodeURIComponent(options.ensureTier)}` : ''
       }`,
       { method: 'GET', signal: options.signal },
@@ -186,7 +202,7 @@ export async function getMediaAssetMetadata(
       requireApiData(response, i18n.global.t('common.errors.mediaInfoLoadFailed')),
     )
     .then((metadata) => {
-      metadataCache.set(assetId, { value: metadata, expiresAt: resolveMetadataExpiry(metadata) })
+      metadataCache.set(normalized, { value: metadata, expiresAt: resolveMetadataExpiry(metadata) })
       if (ensureKey) ensuredTiers.add(ensureKey)
       return metadata
     })
@@ -199,11 +215,11 @@ export async function getMediaAssetMetadata(
 
 /**
  * Fetch metadata for multiple assets in one round trip and hydrate the same
- * cache used by useMediaAssetDelivery. Results are keyed by numeric media ID;
+ * cache used by useMediaAssetDelivery. Results are keyed by string asset ID;
  * assets the user cannot access are omitted by the API and therefore absent.
  */
 export async function getMediaAssetMetadataBatch(
-  assetIds: readonly number[],
+  assetIds: readonly MediaAssetId[],
   options: {
     signal?: AbortSignal | undefined
     force?: boolean | undefined
@@ -211,14 +227,20 @@ export async function getMediaAssetMetadataBatch(
       | Extract<MediaAssetDeliveryTier, 'large-preview' | 'processing' | 'processing-input'>
       | undefined
   } = {},
-): Promise<ReadonlyMap<number, MediaAssetDeliveryMetadata>> {
-  const ids = Array.from(new Set(assetIds.filter((value) => Number.isInteger(value) && value > 0)))
+): Promise<ReadonlyMap<string, MediaAssetDeliveryMetadata>> {
+  const ids = Array.from(
+    new Set(
+      assetIds
+        .map((value) => normalizeMediaAssetId(value))
+        .filter((value): value is string => value !== null),
+    ),
+  )
   if (ids.length === 0) return new Map()
   if (ids.length > 100) throw new Error('Too many media assets requested')
-  const sortedIDs = [...ids].sort((a, b) => a - b)
+  const sortedIDs = [...ids].sort()
   const requestKey = `${sortedIDs.join(',')}:${options.ensureTier ?? ''}`
   if (!options.force) {
-    const cached = new Map<number, MediaAssetDeliveryMetadata>()
+    const cached = new Map<string, MediaAssetDeliveryMetadata>()
     for (const id of ids) {
       const metadata = getCachedMetadata(id)
       if (metadata) cached.set(id, metadata)
@@ -232,7 +254,7 @@ export async function getMediaAssetMetadataBatch(
       method: 'POST',
       signal: options.signal,
       body: JSON.stringify({
-        asset_ids: ids.map(String),
+        asset_ids: sortedIDs,
         ...(options.ensureTier ? { ensure_tier: options.ensureTier } : {}),
       }),
     })
@@ -240,15 +262,15 @@ export async function getMediaAssetMetadataBatch(
       requireApiData(response, i18n.global.t('common.errors.mediaInfoLoadFailed')),
     )
     .then((data) => {
-      const result = new Map<number, MediaAssetDeliveryMetadata>()
+      const result = new Map<string, MediaAssetDeliveryMetadata>()
       for (const metadata of data.items ?? []) {
-        const id = Number(metadata.asset_id)
-        if (!Number.isInteger(id) || id <= 0) continue
+        const id = normalizeMediaAssetId(metadata.asset_id)
+        if (!id) continue
         metadataCache.set(id, { value: metadata, expiresAt: resolveMetadataExpiry(metadata) })
         if (options.ensureTier) ensuredTiers.add(`${id}:${options.ensureTier}`)
         result.set(id, metadata)
       }
-      return result as ReadonlyMap<number, MediaAssetDeliveryMetadata>
+      return result as ReadonlyMap<string, MediaAssetDeliveryMetadata>
     })
     .finally(() => {
       if (metadataBatchRequests.get(requestKey) === request)
@@ -258,19 +280,25 @@ export async function getMediaAssetMetadataBatch(
   return request
 }
 
-export function resolveMediaAssetOriginalURL(assetId: number): string {
-  return resolveApiUrl(getGetUserMediaAssetOriginalContentUrl(String(assetId)))
+export function resolveMediaAssetOriginalURL(assetId: MediaAssetId): string {
+  return resolveApiUrl(getGetUserMediaAssetOriginalContentUrl(assetId.trim()))
 }
 
+/**
+ * Format-agnostic derivative delivery URL. The backend negotiates the ready
+ * physical encoding server-side; callers never specify a format.
+ */
 export function resolveMediaAssetDerivativeURL(
-  assetId: string | number,
+  assetId: MediaAssetId,
   tier: 'thumb' | 'preview' | 'large-preview' | 'processing' | 'processing-input' = 'large-preview',
-  format: 'webp' | 'jpeg' | 'png' = 'webp',
 ): string {
-  return resolveApiUrl(getGetUserMediaAssetDerivativeContentUrl(String(assetId), tier, format))
+  const normalized = assetId.trim()
+  return resolveApiUrl(
+    `/user/media-assets/${encodeURIComponent(normalized)}/derivatives/${encodeURIComponent(tier)}/content`,
+  )
 }
 
-export async function resolveMediaAssetProcessingURL(assetId: number): Promise<string> {
+export async function resolveMediaAssetProcessingURL(assetId: MediaAssetId): Promise<string> {
   const maxWaitMs = 15_000
   const initialPollIntervalMs = 400
   const maxPollIntervalMs = 2_000
@@ -315,14 +343,11 @@ function resolveVariant(metadata: MediaAssetDeliveryMetadata, tier: MediaAssetDe
 }
 
 export function useMediaAssetDelivery(
-  assetId: MaybeRefOrGetter<number | null | undefined>,
+  assetId: MaybeRefOrGetter<MediaAssetId | null | undefined>,
   tier: MaybeRefOrGetter<MediaAssetDeliveryTier>,
   options: { enabled?: MaybeRefOrGetter<boolean> } = {},
 ) {
-  const resolvedAssetId = computed(() => {
-    const value = Number(toValue(assetId))
-    return Number.isInteger(value) && value > 0 ? value : null
-  })
+  const resolvedAssetId = computed(() => normalizeMediaAssetId(toValue(assetId)))
   const resolvedTier = computed(() => normalizeTier(toValue(tier)))
   const isEnabled = computed(() => toValue(options.enabled) !== false)
   const metadata = ref<MediaAssetDeliveryMetadata | null>(null)
@@ -349,7 +374,7 @@ export function useMediaAssetDelivery(
 
   function scheduleRefresh(
     nextUrl: string,
-    currentAssetId: number,
+    currentAssetId: string,
     currentTier: MediaAssetDeliveryTier,
   ) {
     window.clearTimeout(refreshTimer)
@@ -383,7 +408,7 @@ export function useMediaAssetDelivery(
   )
 
   function scheduleDeliveryRetry(
-    currentAssetId: number,
+    currentAssetId: string,
     currentTier: MediaAssetDeliveryTier,
   ): void {
     window.clearTimeout(retryTimer)
@@ -397,7 +422,7 @@ export function useMediaAssetDelivery(
   function settleDeliveryUrl(
     variant: ReturnType<typeof resolveVariant> | undefined,
     nextStatus: MediaAssetDeliveryStatus,
-    currentAssetId: number,
+    currentAssetId: string,
     currentTier: MediaAssetDeliveryTier,
   ): void {
     status.value = nextStatus
@@ -410,7 +435,7 @@ export function useMediaAssetDelivery(
     }
   }
 
-  async function load(currentAssetId: number, currentTier: MediaAssetDeliveryTier, force = false) {
+  async function load(currentAssetId: string, currentTier: MediaAssetDeliveryTier, force = false) {
     const token = requestToken
     abortController?.abort()
     const controller = new AbortController()

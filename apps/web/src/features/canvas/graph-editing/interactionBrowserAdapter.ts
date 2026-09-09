@@ -4,18 +4,18 @@ import { resolveMediaAssetOriginalURL } from '../../../shared/api/mediaAssetDeli
 export type CanvasGraphInteractionBrowserAdapter = {
   downloadImage: (request: {
     url: string
-    mediaAssetId?: number
+    assetId?: string
     fileName: string
   }) => Promise<void> | void
 }
 
 function buildDownloadHref(
   rawUrl: string,
-  mediaAssetId: number | undefined,
+  assetId: string | undefined,
   ownerDocument: Document,
 ): string {
-  if (mediaAssetId && Number.isInteger(mediaAssetId) && mediaAssetId > 0) {
-    return resolveMediaAssetOriginalURL(mediaAssetId)
+  if (assetId && assetId.trim().length > 0) {
+    return resolveMediaAssetOriginalURL(assetId.trim())
   }
   const url = rawUrl.trim()
   if (!url) return ''
@@ -49,8 +49,8 @@ export function createCanvasGraphInteractionBrowserAdapter(
   ownerDocument: Document = document,
 ): CanvasGraphInteractionBrowserAdapter {
   return {
-    downloadImage: async ({ url, mediaAssetId, fileName }) => {
-      const href = buildDownloadHref(url, mediaAssetId, ownerDocument)
+    downloadImage: async ({ url, assetId, fileName }) => {
+      const href = buildDownloadHref(url, assetId, ownerDocument)
       if (!href) throw new Error('Image URL is empty')
       const response = await fetch(href, { credentials: 'include' })
       if (!response.ok) throw new Error(`Image download failed (${response.status})`)

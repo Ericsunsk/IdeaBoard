@@ -7,11 +7,11 @@ import type {
   RetouchMode,
   RetouchParamKey,
   RetouchParamValue,
-  RetouchRenderedPreview,
 } from '../retouch/types'
 import type { ImageMaskDrawMode } from '../inpaint/types'
 import type { ImageStrengthAction } from '../execution'
 import type { ImageToolSession } from './imageToolSession'
+import type { ZeroCopyStageHandle } from '../retouch/useRetouchZeroCopyStage'
 
 export type ImageToolAnchorRect = {
   top: number
@@ -24,7 +24,11 @@ export type ImageToolStageBinding = {
   nodeId: string
   active: boolean
   mode: RetouchMode | null
-  renderedPreview: RetouchRenderedPreview | null
+  /** Zero-copy GPU stage. Null outside adjust mode or before adapter setup. */
+  retouchStage: Pick<
+    ZeroCopyStageHandle,
+    'canvasRef' | 'setCanvasRef' | 'isGpuActive' | 'stageStatus'
+  > | null
   session: ImageToolSession
 }
 

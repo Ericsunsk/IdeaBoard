@@ -55,7 +55,7 @@ function resolveResultIndexValue(result: TaskImageResultInput): number | undefin
 export function normalizeTaskImageResult(result: TaskImageResultInput): TaskImageResult | null {
   const assetId = `${result?.assetId ?? result?.asset_id ?? ''}`.trim()
   if (!assetId) return null
-  const url = buildMediaBrowserURL({ assetId, derivativeTier: 'preview', derivativeFormat: 'webp' })
+  const url = buildMediaBrowserURL({ assetId, derivativeTier: 'preview' })
   const mimeType = `${result?.mimeType ?? ''}`.trim()
   const resultIndex = resolveResultIndexValue(result)
   return {

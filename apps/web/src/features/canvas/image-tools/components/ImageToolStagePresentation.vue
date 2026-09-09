@@ -1,7 +1,12 @@
 <template>
   <div class="image-tool-stage-presentation">
-    <RenderedImagePreviewCanvas v-if="binding.renderedPreview" :preview="binding.renderedPreview" />
-    <slot v-else />
+    <slot />
+    <canvas
+      v-if="showZeroCopyCanvas"
+      :ref="(element) => zeroCopyCanvas?.setCanvasRef(element)"
+      class="image-node-stage-image image-node-stage-image--preview image-tool-stage-zero-copy"
+      aria-hidden="true"
+    />
   </div>
   <ImageInpaintOverlay
     v-if="binding.mode === 'inpaint' && maskOverlayStyle"
@@ -21,9 +26,18 @@
 import { computed, onBeforeUnmount, watch } from 'vue'
 import type { ImageToolStageBinding } from '../imageToolBindings'
 import { ImageInpaintOverlay } from '../../inpaint'
-import RenderedImagePreviewCanvas from './RenderedImagePreviewCanvas.vue'
+import { isWebGLRetouchSupported } from '../../retouch/utils/retouchWebglEngine'
 
 const props = defineProps<{ binding: ImageToolStageBinding }>()
+// Zero-copy GPU stage (issue #672): the mounted canvas IS the render target
+// and stays mounted for the whole adjust session, so the GL context survives
+// slider drags. Before the first GPU draw (or when the GPU is unavailable)
+// it is transparent and the CPU preview / slot beneath shows through.
+const zeroCopyCanvas = computed(() =>
+  props.binding.mode === 'adjust' ? (props.binding.retouchStage ?? null) : null,
+)
+const showZeroCopyCanvas = computed(() => zeroCopyCanvas.value !== null && gpuSupported)
+const gpuSupported = isWebGLRetouchSupported()
 const maskOverlayStyle = computed(() =>
   props.binding.session.inpaint.inpaintNodeId.value === props.binding.nodeId
     ? props.binding.session.inpaint.inpaintOverlayStyle.value
@@ -58,6 +72,7 @@ onBeforeUnmount(() => {
 
 function releaseCanvasRefs(binding: ImageToolStageBinding) {
   binding.session.inpaint.setMaskCanvasRef(binding.nodeId, null)
+  binding.retouchStage?.setCanvasRef(null)
 }
 function readMaskCanvasSize(style: Record<string, string> | null, key: 'width' | 'height') {
   return Math.max(1, Math.round(parseFloat(style?.[key] ?? '') || 0))
@@ -72,5 +87,16 @@ function readMaskCanvasSize(style: Record<string, string> | null, key: 'width' |
 .image-tool-stage-presentation :slotted(.image-tool-stage-media) {
   width: 100%;
   height: 100%;
+}
+.image-node-stage-image--preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.image-tool-stage-zero-copy {
+  position: absolute;
+  inset: 0;
 }
 </style>

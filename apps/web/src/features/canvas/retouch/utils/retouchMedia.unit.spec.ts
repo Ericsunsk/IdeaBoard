@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isAnimatedImageBlob } from './imageRetouchMedia'
+import { isAnimatedImageBlob } from './retouchMedia'
 
 const ANIMATED_WEBP_BYTES = new Uint8Array([
   0x52, 0x49, 0x46, 0x46, 0x12, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50, 0x41, 0x4e, 0x49, 0x4d,

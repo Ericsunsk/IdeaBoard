@@ -35,6 +35,8 @@ export interface ResolvedFlowInputImage {
   url: string
   ratio: number
   mediaAssetId?: number | undefined
+  /** String delivery identity resolved from the source node's MediaRef. */
+  assetId?: string | undefined
 }
 
 export type FlowConnectedInputPort = 'image' | 'prompt'
@@ -134,6 +136,20 @@ export function resolveSourceImageFromNode(
   return (latestOutput?.url || '').trim()
 }
 
+function resolveSourceAssetIdFromNode(
+  nodeType: CanvasConnectionNodeType,
+  snapshotNode: FlowSnapshotNodeLike,
+): string | undefined {
+  const ref =
+    nodeType === 'image'
+      ? isImageNodeSnapshot(snapshotNode)
+        ? snapshotNode.sourceMediaRef
+        : undefined
+      : readLatestOutputImage(snapshotNode)?.mediaRef
+  const assetId = ref?.assetId?.trim()
+  return assetId ? assetId : undefined
+}
+
 function resolveSourceMediaAssetIdFromNode(
   nodeType: CanvasConnectionNodeType,
   snapshotNode: FlowSnapshotNodeLike,
@@ -211,6 +227,7 @@ type SnapshotInputRecord = {
   url?: unknown
   ratio?: unknown
   mediaAssetId?: unknown
+  mediaRef?: unknown
 }
 
 function readSnapshotInputIdentity(record: SnapshotInputRecord):
@@ -234,15 +251,21 @@ function readSnapshotInputIdentity(record: SnapshotInputRecord):
 
 function readSnapshotInputMedia(
   record: SnapshotInputRecord,
-): (Pick<ResolvedFlowInputImage, 'url' | 'ratio'> & { mediaAssetId?: number }) | null {
+): (Pick<ResolvedFlowInputImage, 'url' | 'ratio'> & {
+  mediaAssetId?: number
+  assetId?: string
+}) | null {
   const url = typeof record.url === 'string' ? record.url.trim() : ''
   const ratio = Number(record.ratio)
   const mediaAssetId = Number(record.mediaAssetId)
+  const mediaRef = record.mediaRef as { assetId?: unknown } | undefined
+  const assetId = typeof mediaRef?.assetId === 'string' ? mediaRef.assetId.trim() : ''
   if (!url || !Number.isFinite(ratio) || ratio <= 0) return null
   return {
     url,
     ratio,
     ...(Number.isInteger(mediaAssetId) && mediaAssetId > 0 ? { mediaAssetId } : {}),
+    ...(assetId ? { assetId } : {}),
   }
 }
 
@@ -294,6 +317,9 @@ export function resolveConnectedImageInputs(
       ratio: resolveFlowSourceImageRatio(sourceKind, snapshotNode),
       ...(resolveSourceMediaAssetIdFromNode(sourceKind, snapshotNode)
         ? { mediaAssetId: resolveSourceMediaAssetIdFromNode(sourceKind, snapshotNode) }
+        : {}),
+      ...(resolveSourceAssetIdFromNode(sourceKind, snapshotNode)
+        ? { assetId: resolveSourceAssetIdFromNode(sourceKind, snapshotNode) }
         : {}),
     })
   })

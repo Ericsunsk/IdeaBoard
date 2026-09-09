@@ -1,5 +1,5 @@
 import type { RetouchEditableLayer, RetouchLayer, RetouchRasterContent } from '../types'
-import { applyImageRetouchInPlace } from './imageRetouchEngine'
+import { applyImageRetouchInPlace } from './retouchEngine'
 import { cloneImageData } from './imageDataUtils'
 
 export type RetouchRasterLayerImageProvider = (content: RetouchRasterContent) => ImageData | null

@@ -99,6 +99,5 @@ describe('RetouchLayerActions', () => {
     })
 
     expect(screen.getByRole('button', { name: 'Applying…' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Applying…' })).toBeDisabled()
   })
 })

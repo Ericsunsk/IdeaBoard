@@ -1,7 +1,7 @@
 import {
   hasRenderableRetouchLayerStack,
   renderRetouchLayerStackFile,
-} from '../retouch/services/imageRetouchRenderer'
+} from '../retouch/services/retouchRenderer'
 import {
   MediaAssetDerivativeNotReadyError,
   resolveMediaAssetProcessingURL,
@@ -23,15 +23,17 @@ type RetouchApplySource = {
   source: ImageNodeDisplayPayload
   sourceNode: ImageNodeItem
   layers: RetouchEffectLayers
+  selectedLayerId: string
 }
 import { i18n } from '../../../shared/i18n'
 import type { ImageToolChromeCommands } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
-import { buildImageRetouchPlan } from '../retouch/utils/imageRetouchPlanPipeline'
+import { buildImageRetouchPlan } from '../retouch/utils/retouchPlanPipeline'
 import {
   deserializeImageRetouchPlan,
   serializeImageRetouchPlan,
-} from '../retouch/utils/imageRetouchRecipe'
+} from '../retouch/utils/retouchRecipe'
+import { serializeRetouchStack } from '../retouch/utils/retouchStackPersistence'
 import { hasRetouchRasterEdits } from '../retouch/utils/retouchRasterTools'
 
 export function createImageToolCommands(session: ImageToolSession) {
@@ -64,7 +66,10 @@ export function createImageToolCommands(session: ImageToolSession) {
       feedback.warning(i18n.global.t('canvas.tools.noEditableLayers'))
       return null
     }
-    return { nodeId, boardId, source, sourceNode, layers }
+    // Capture the selection now: apply exits and resets the session before
+    // the async render completes, so late persistence must use this snapshot.
+    const selectedLayerId = session.retouchSession.selectedRetouchLayerId.value
+    return { nodeId, boardId, source, sourceNode, layers, selectedLayerId }
   }
 
   function createRetouchPendingNode(sourceNode: ImageNodeItem): CanvasGraphNodeId | null {
@@ -96,16 +101,30 @@ export function createImageToolCommands(session: ImageToolSession) {
     return true
   }
 
+  /**
+   * Resolve the full-resolution export source. When assetId is present, the
+   * processing derivative URL is required; failures throw directly.
+   */
+  async function resolveExportSourceUrl(
+    retouch: RetouchApplySource,
+    isCurrentScope: () => boolean,
+  ): Promise<string> {
+    // Keep image processing same-origin. The API endpoint resolves storage
+    // access server-side, avoiding CORS failures from direct signed URLs.
+    if (!retouch.source.assetId) return retouch.source.url
+    const url = await resolveMediaAssetProcessingURL(retouch.source.assetId)
+    if (!isCurrentScope()) throw processingCancelledError()
+    return url
+  }
+
   async function renderRetouchFile(
     retouch: RetouchApplySource,
     scopeId: string,
     isCurrentScope: () => boolean,
   ): Promise<File> {
-    // Keep image processing same-origin. The API endpoint resolves storage
-    // access server-side, avoiding CORS failures from direct signed URLs.
-    const sourceUrl = retouch.source.mediaAssetId
-      ? await resolveMediaAssetProcessingURL(retouch.source.mediaAssetId)
-      : retouch.source.url
+    // Full-resolution export stays on the background network path (issue
+    // #673): the processing derivative, not the interactive preview texture.
+    const sourceUrl = await resolveExportSourceUrl(retouch, isCurrentScope)
     // A late URL response must not supersede the current latestOnly render.
     if (!isCurrentScope()) throw processingCancelledError()
     return renderRetouchLayerStackFile(
@@ -125,26 +144,32 @@ export function createImageToolCommands(session: ImageToolSession) {
     retouch: RetouchApplySource,
   ): void {
     const currentPlan = buildImageRetouchPlan(retouch.layers)
-    const recipeSourceMediaAssetId =
-      retouch.sourceNode.retouchRecipe?.sourceMediaAssetId ?? retouch.source.mediaAssetId
-    if (
-      recipeSourceMediaAssetId &&
-      currentPlan.length > 0 &&
-      !hasRetouchRasterEdits(retouch.layers) &&
-      session.capabilities.board.updateSnapshotNode
-    ) {
+    const recipeSourceAssetId =
+      retouch.sourceNode.retouchRecipe?.sourceAssetId ?? retouch.source.assetId
+    if (!session.capabilities.board.updateSnapshotNode) return
+    // Always persist the non-destructive adjustment stack so the result node
+    // can be re-edited (issue #671). Board serialization clones it through
+    // undo/redo and duplication.
+    const retouchStack = serializeRetouchStack(retouch.layers, retouch.selectedLayerId)
+    if (recipeSourceAssetId && currentPlan.length > 0 && !hasRetouchRasterEdits(retouch.layers)) {
       const previousPlan = retouch.sourceNode.retouchRecipe
         ? deserializeImageRetouchPlan(retouch.sourceNode.retouchRecipe)
         : []
       const recipe = serializeImageRetouchPlan(
-        recipeSourceMediaAssetId,
+        recipeSourceAssetId,
         [...previousPlan, ...currentPlan],
         retouch.sourceNode.retouchRecipe?.sourceMimeType,
       )
       session.capabilities.board.updateSnapshotNode(resultNodeId, (previous) =>
-        previous.type === 'image-node' ? { ...previous, retouchRecipe: recipe } : previous,
+        previous.type === 'image-node'
+          ? { ...previous, retouchRecipe: recipe, retouchStack }
+          : previous,
       )
+      return
     }
+    session.capabilities.board.updateSnapshotNode(resultNodeId, (previous) =>
+      previous.type === 'image-node' ? { ...previous, retouchStack } : previous,
+    )
   }
 
   function reportRetouchError(error: unknown, isCurrentScope: () => boolean): void {

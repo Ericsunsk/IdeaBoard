@@ -144,13 +144,13 @@ export function useCanvasExecutionWorkspace(
     const attachment = requireAttachment()
     const resolvedReferences = await Promise.all(
       plan.referenceImages.map(async (image) =>
-        image.mediaAssetId
-          ? { ...image, url: await resolveMediaAssetProcessingURL(image.mediaAssetId) }
+        image.assetId
+          ? { ...image, url: await resolveMediaAssetProcessingURL(image.assetId) }
           : image,
       ),
     )
-    const source = plan.source.mediaAssetId
-      ? { ...plan.source, url: await resolveMediaAssetProcessingURL(plan.source.mediaAssetId) }
+    const source = plan.source.assetId
+      ? { ...plan.source, url: await resolveMediaAssetProcessingURL(plan.source.assetId) }
       : plan.source
     const resolvedPlan = { ...plan, source, referenceImages: resolvedReferences }
     const taskRequest = buildImageExecutionTaskRequest(resolvedPlan)

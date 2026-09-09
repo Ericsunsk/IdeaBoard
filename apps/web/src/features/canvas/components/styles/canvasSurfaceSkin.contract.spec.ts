@@ -16,9 +16,6 @@ const toolTooltipSkin = readSource('components/styles/canvas-tool-tooltip.css')
 const nodeSkin = readSource('components/nodes/styles/node-shared.css')
 const nodeToolSkin = readSource('components/nodes/styles/node-tool-buttons.css')
 const nodeStageFrame = readSource('components/nodes/primitives/NodeStageFrame.vue')
-const renderedImagePreviewCanvas = readSource(
-  'image-tools/components/RenderedImagePreviewCanvas.vue',
-)
 const imageToolStagePresentation = readSource(
   'image-tools/components/ImageToolStagePresentation.vue',
 )
@@ -110,7 +107,7 @@ describe('Canvas surface skin contract', () => {
   })
 
   it('contains rendered retouch previews within the existing image stage geometry', () => {
-    const previewRule = renderedImagePreviewCanvas.match(
+    const previewRule = imageToolStagePresentation.match(
       /\.image-node-stage-image--preview\s*\{([\s\S]*?)\}/,
     )?.[1]
 
@@ -120,10 +117,8 @@ describe('Canvas surface skin contract', () => {
     expect(previewRule).toContain('height: 100%')
     expect(previewRule).toContain('object-fit: contain')
     expect(previewRule).toContain('pointer-events: none')
-    expect(imageToolStagePresentation).toContain(
-      '<RenderedImagePreviewCanvas v-if="binding.renderedPreview"',
-    )
-    expect(imageToolStagePresentation).toContain('<slot v-else />')
+    expect(imageToolStagePresentation).toContain('image-tool-stage-zero-copy')
+    expect(imageToolStagePresentation).toContain('<slot />')
     expect(imageToolStagePresentation).not.toContain('has-rendered-preview')
     expect(imageToolStagePresentation).not.toContain('visibility: hidden')
   })

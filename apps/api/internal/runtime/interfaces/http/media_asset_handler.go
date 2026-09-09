@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
@@ -234,13 +233,17 @@ func (h *mediaAssetHandler) buildMetadata(c *gin.Context, ownerUserID int64, ass
 	for _, row := range rows {
 		item := mediaAssetDerivativeDTO{Status: row.Status, Format: row.Format, Width: row.Width, Height: row.Height, SizeBytes: row.SizeBytes, ErrorCode: row.ErrorCode}
 		if row.Status == "ready" {
-			item.URL = fmt.Sprintf("/api/user/media-assets/%s/derivatives/%s/%s/content", asset.AssetID, row.Tier, row.Format)
+			item.URL = fmt.Sprintf("/api/user/media-assets/%s/derivatives/%s/content", asset.AssetID, row.Tier)
 		}
 		result.Derivatives[row.Tier] = item
 	}
 	return result, nil
 }
 
+// Content serves the ready derivative for a tier. Callers never guess the
+// physical encoded format: the handler negotiates among ready rows,
+// preferring the canonical webp encoding. Pending tiers return HTTP 202 so
+// progressive loaders can fall back to the original.
 func (h *mediaAssetHandler) Content(c *gin.Context) {
 	identity, ok := principal.Require(c)
 	if !ok || h == nil || h.assets == nil || h.storage == nil {
@@ -248,16 +251,15 @@ func (h *mediaAssetHandler) Content(c *gin.Context) {
 	}
 	assetID := strings.TrimSpace(c.Param("asset_id"))
 	tier := strings.TrimSpace(c.Param("tier"))
-	format := strings.TrimSpace(c.Param("format"))
 	if _, exists := derivativedomain.TierSpecs[tier]; !exists {
 		response.Error(c, http.StatusBadRequest, "图片派生规格无效")
 		return
 	}
-	if format != derivativedomain.FormatWebP && format != derivativedomain.FormatJPEG && format != derivativedomain.FormatPNG {
-		response.Error(c, http.StatusBadRequest, "图片派生格式无效")
-		return
-	}
-	asset, err := h.lookupAsset(c, identity.UserID(), assetID)
+	h.serveReadyDerivative(c, identity.UserID(), assetID, tier)
+}
+
+func (h *mediaAssetHandler) serveReadyDerivative(c *gin.Context, ownerUserID int64, assetID, tier string) {
+	asset, err := h.lookupAsset(c, ownerUserID, assetID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			response.Error(c, http.StatusNotFound, "媒体不存在")
@@ -266,7 +268,7 @@ func (h *mediaAssetHandler) Content(c *gin.Context) {
 		response.InternalError(c, http.StatusInternalServerError, "读取媒体信息失败", err)
 		return
 	}
-	rows, err := h.assets.ListDerivatives(c.Request.Context(), identity.UserID(), asset.ID)
+	rows, err := h.assets.ListDerivatives(c.Request.Context(), ownerUserID, asset.ID)
 	if err != nil {
 		response.InternalError(c, http.StatusInternalServerError, "读取媒体派生信息失败", err)
 		return
@@ -276,11 +278,12 @@ func (h *mediaAssetHandler) Content(c *gin.Context) {
 		if row.Tier != tier || row.Status != "ready" {
 			continue
 		}
-		if row.Format == format {
-			matchedRow = &row
-			break
-		}
 		if matchedRow == nil {
+			r := row
+			matchedRow = &r
+		} else if matchedRow.Format != derivativedomain.FormatWebP && row.Format == derivativedomain.FormatWebP {
+			// Prefer the canonical webp encoding when several ready
+			// physical formats exist for the same tier.
 			r := row
 			matchedRow = &r
 		}
@@ -333,8 +336,7 @@ func (h *mediaAssetHandler) Original(c *gin.Context) {
 }
 
 func (h *mediaAssetHandler) lookupAsset(c *gin.Context, ownerUserID int64, raw string) (dbsqlc.MediaAsset, error) {
-	if id, err := strconv.ParseInt(raw, 10, 64); err == nil && id > 0 {
-		return h.assets.GetByID(c.Request.Context(), ownerUserID, id)
-	}
-	return h.assets.GetByAssetID(c.Request.Context(), ownerUserID, raw)
+	// String asset identifiers (`asset_...`) are the only accepted identity.
+	// Numeric database IDs are never exposed over this gateway.
+	return h.assets.GetByAssetID(c.Request.Context(), ownerUserID, strings.TrimSpace(raw))
 }

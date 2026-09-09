@@ -46,7 +46,16 @@ describe('useMediaAssetDelivery', () => {
 
   it('resolves a stable API content URL for an asset', async () => {
     const { resolveMediaAssetOriginalURL } = await import('./mediaAssetDelivery')
-    expect(resolveMediaAssetOriginalURL(42)).toBe('/api/user/media-assets/42/original/content')
+    expect(resolveMediaAssetOriginalURL('asset-42')).toBe(
+      '/api/user/media-assets/asset-42/original/content',
+    )
+  })
+
+  it('resolves a format-agnostic derivative URL', async () => {
+    const { resolveMediaAssetDerivativeURL } = await import('./mediaAssetDelivery')
+    expect(resolveMediaAssetDerivativeURL('asset-42', 'preview')).toBe(
+      '/api/user/media-assets/asset-42/derivatives/preview/content',
+    )
   })
 
   it('loads the selected tier and refreshes it from a media derivative event', async () => {
@@ -56,7 +65,7 @@ describe('useMediaAssetDelivery', () => {
     const { useMediaAssetDelivery, invalidateMediaAssetMetadata } =
       await import('./mediaAssetDelivery')
     invalidateMediaAssetMetadata()
-    const assetId = ref(42)
+    const assetId = ref('asset-42')
     const tier = ref<'preview'>('preview')
     const scope = effectScope()
     const delivery = scope.run(() => useMediaAssetDelivery(assetId, tier))
@@ -67,7 +76,7 @@ describe('useMediaAssetDelivery', () => {
     const listener = mocks.subscribe.mock.calls[0]?.[1] as (event: MessageEvent<string>) => void
     listener(
       new MessageEvent('media.derivative.updated', {
-        data: JSON.stringify({ media_asset_id: 42 }),
+        data: JSON.stringify({ media_asset_id: 'asset-42' }),
       }),
     )
 
@@ -82,7 +91,7 @@ describe('useMediaAssetDelivery', () => {
     const { useMediaAssetDelivery } = await import('./mediaAssetDelivery')
     const scope = effectScope()
     const delivery = scope.run(() =>
-      useMediaAssetDelivery(ref(42), ref<'thumb'>('thumb'), { enabled: visibility }),
+      useMediaAssetDelivery(ref('asset-42'), ref<'thumb'>('thumb'), { enabled: visibility }),
     )
     if (!delivery) throw new Error('delivery composable was not created')
     await Promise.resolve()
@@ -100,13 +109,13 @@ describe('useMediaAssetDelivery', () => {
     invalidateMediaAssetMetadata()
     const scope = effectScope()
     const delivery = scope.run(() =>
-      useMediaAssetDelivery(ref(42), ref<'large-preview'>('large-preview')),
+      useMediaAssetDelivery(ref('asset-42'), ref<'large-preview'>('large-preview')),
     )
     if (!delivery) throw new Error('delivery composable was not created')
 
     await vi.waitFor(() => expect(delivery.url.value).toBe('/api/large.webp'))
     expect(mocks.request).toHaveBeenCalledWith(
-      '/user/media-assets/42?ensure_tier=large-preview',
+      '/user/media-assets/asset-42?ensure_tier=large-preview',
       expect.objectContaining({ method: 'GET' }),
     )
     scope.stop()
@@ -120,13 +129,15 @@ describe('useMediaAssetDelivery', () => {
       await import('./mediaAssetDelivery')
     invalidateMediaAssetMetadata()
 
-    await expect(resolveMediaAssetProcessingURL(42)).resolves.toBe('/api/processing-input.webp')
+    await expect(resolveMediaAssetProcessingURL('asset-42')).resolves.toBe(
+      '/api/processing-input.webp',
+    )
     expect(mocks.request).toHaveBeenCalledWith(
-      '/user/media-assets/42',
+      '/user/media-assets/asset-42',
       expect.objectContaining({ method: 'GET' }),
     )
     expect(mocks.request).toHaveBeenCalledWith(
-      '/user/media-assets/42?ensure_tier=processing-input',
+      '/user/media-assets/asset-42?ensure_tier=processing-input',
       expect.objectContaining({ method: 'GET' }),
     )
   })
@@ -137,24 +148,24 @@ describe('useMediaAssetDelivery', () => {
       msg: '',
       data: {
         items: [
-          { ...metadata('ready').data, asset_id: '42' },
-          { ...metadata('ready').data, asset_id: '43' },
+          { ...metadata('ready').data, asset_id: 'asset-42' },
+          { ...metadata('ready').data, asset_id: 'asset-43' },
         ],
       },
     })
     const { getMediaAssetMetadataBatch, getMediaAssetMetadata, invalidateMediaAssetMetadata } =
       await import('./mediaAssetDelivery')
     invalidateMediaAssetMetadata()
-    const result = await getMediaAssetMetadataBatch([43, 42, 42])
-    expect([...result.keys()]).toEqual([42, 43])
+    const result = await getMediaAssetMetadataBatch(['asset-43', 'asset-42', 'asset-42'])
+    expect([...result.keys()]).toEqual(['asset-42', 'asset-43'])
     expect(mocks.request).toHaveBeenCalledWith(
       '/user/media-assets/delivery/batch',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ asset_ids: ['43', '42'] }),
+        body: JSON.stringify({ asset_ids: ['asset-42', 'asset-43'] }),
       }),
     )
-    await getMediaAssetMetadata(42)
+    await getMediaAssetMetadata('asset-42')
     expect(mocks.request).toHaveBeenCalledTimes(1)
   })
 })

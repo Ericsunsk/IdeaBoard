@@ -3,12 +3,12 @@ import { canvasToBlob } from '../../services/flowMediaIO'
 import type { ImageRetouchRecipe } from '../../../canvas-board/domain'
 import type { RetouchEffectLayer, RetouchLayer, RetouchRasterContent } from '../types'
 import { createImageProcessingOutputFileName } from '../runtime/imageOutputPolicy'
-import { getImageRetouchProcessingRuntime } from '../runtime/imageRetouchProcessingRuntime'
+import { getImageRetouchProcessingRuntime } from '../runtime/retouchRuntime'
 import type { ImageProcessingProgress, RenderFinalInput } from '../runtime/types'
 import { createImageSourceCache, readImageSourceImageData } from '../runtime/imageSourceCache'
 import { compositeRetouchLayerStack } from '../utils/retouchRasterComposite'
-import { buildImageRetouchPlan } from '../utils/imageRetouchPlanPipeline'
-import { deserializeImageRetouchPlan } from '../utils/imageRetouchRecipe'
+import { buildImageRetouchPlan } from '../utils/retouchPlanPipeline'
+import { deserializeImageRetouchPlan } from '../utils/retouchRecipe'
 import {
   flattenVisibleRetouchEffectLayers,
   hasEffectiveRetouchEffectLayers,

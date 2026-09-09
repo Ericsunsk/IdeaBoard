@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import type { ImageRetouchStack } from '../../canvas-board/domain'
 import type {
   ImageRetouchKind,
   RetouchEffectLayer,
@@ -15,7 +16,8 @@ import {
   SOURCE_LAYER_ID,
   type RetouchLayerCommand,
 } from './utils/retouchLayerStack'
-import { getImageRetouchDefaultParams } from './utils/imageRetouchDefinitions'
+import { deserializeRetouchStack } from './utils/retouchStackPersistence'
+import { getImageRetouchDefaultParams } from './utils/retouchDefinitions'
 
 export function useRetouchSession() {
   const stack = ref(createInitialLayerStack())
@@ -43,6 +45,21 @@ export function useRetouchSession() {
   function resetRetouchSession() {
     stack.value = createInitialLayerStack()
     pendingRetouch.value = createDefaultImageEffectLayer('hsl')
+  }
+
+  function restoreRetouchStack(persisted: ImageRetouchStack | null | undefined) {
+    const restored = deserializeRetouchStack(persisted)
+    if (!restored || restored.layers.length === 0) {
+      resetRetouchSession()
+      return false
+    }
+    const base = createInitialLayerStack()
+    stack.value = {
+      layers: [...base.layers, ...restored.layers],
+      selectedLayerId: restored.selectedLayerId || restored.layers[0]?.id || base.selectedLayerId,
+    }
+    pendingRetouch.value = null
+    return true
   }
 
   function selectLayer(layerId: string) {
@@ -157,6 +174,7 @@ export function useRetouchSession() {
     selectedRetouchLayerId: selectedLayerId,
     selectedRetouchEffectLayer: selectedEffectLayer,
     resetRetouchSession,
+    restoreRetouchStack,
     selectRetouchLayer: selectLayer,
     setRetouchLayerVisible: setLayerVisible,
     addRetouchLayer: addLayer,

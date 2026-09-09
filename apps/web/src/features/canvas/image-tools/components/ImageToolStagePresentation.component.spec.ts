@@ -16,6 +16,14 @@ import { render } from '../../../../test/render'
 import type { ImageToolStageBinding } from '../imageToolBindings'
 import ImageToolStagePresentation from './ImageToolStagePresentation.vue'
 
+vi.mock('../../retouch/utils/retouchWebglEngine', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../retouch/utils/retouchWebglEngine')>()
+  return {
+    ...actual,
+    isWebGLRetouchSupported: () => true,
+  }
+})
+
 type CanvasRefSetter = (element: Element | null) => void
 
 function createCanvasOverlayStub(className: string) {
@@ -48,33 +56,38 @@ function createCanvasOverlayStub(className: string) {
 }
 
 const MaskOverlayStub = createCanvasOverlayStub('inpaint-overlay')
-const RenderedPreviewStub = defineComponent({
-  props: {
-    preview: { type: Object, required: true },
-  },
-  setup() {
-    return () => h('canvas', { 'data-rendered-preview': '' })
-  },
-})
-
 function createBinding(
   mode: ImageToolStageBinding['mode'],
   nodeId = 'node-1',
   options: {
     inpaintNodeId?: string
     maskOverlayStyle?: Record<string, string>
-    renderedPreview?: ImageToolStageBinding['renderedPreview']
+    retouchStage?: ImageToolStageBinding['retouchStage']
   } = {},
 ) {
   const setMaskCanvasRef = vi.fn()
+  const setRetouchCanvasRef = vi.fn()
   const onCanvasPointerDown = vi.fn()
   const inpaintNodeId = options.inpaintNodeId ?? nodeId
+
+  const retouchStage =
+    options.retouchStage !== undefined
+      ? options.retouchStage
+      : mode === 'adjust'
+        ? {
+            canvasRef: ref<HTMLCanvasElement | null>(null),
+            setCanvasRef: setRetouchCanvasRef,
+            isGpuActive: computed(() => true),
+            stageStatus: computed(() => 'ready' as const),
+          }
+        : null
 
   return {
     binding: {
       nodeId,
+      active: mode != null,
       mode,
-      renderedPreview: options.renderedPreview ?? null,
+      retouchStage,
       session: {
         inpaint: {
           inpaintNodeId: ref(inpaintNodeId),
@@ -90,6 +103,7 @@ function createBinding(
     } as unknown as ImageToolStageBinding,
     onCanvasPointerDown,
     setMaskCanvasRef,
+    setRetouchCanvasRef,
   }
 }
 
@@ -112,7 +126,6 @@ function renderPresentation(binding: ImageToolStageBinding) {
     global: {
       stubs: {
         ImageInpaintOverlay: MaskOverlayStub,
-        RenderedImagePreviewCanvas: RenderedPreviewStub,
       },
     },
   })
@@ -140,23 +153,17 @@ describe('ImageToolStagePresentation', () => {
     expect(current.setMaskCanvasRef).toHaveBeenCalledExactlyOnceWith('node-1', null)
   })
 
-  it('replaces source media with the rendered retouch preview', () => {
-    const source = createBinding('adjust', 'node-1')
-    const rendered = createBinding('adjust', 'node-2', {
-      renderedPreview: {
-        type: 'rendered-image',
-        imageData: new ImageData(2, 2),
-        width: 2,
-        height: 2,
-      },
-    })
+  it('mounts zero-copy WebGL canvas in adjust mode and binds the canvas ref', () => {
+    const source = createBinding(null, 'node-1')
+    const adjust = createBinding('adjust', 'node-2')
     const sourceView = renderPresentation(source.binding)
-    const renderedView = renderPresentation(rendered.binding)
+    const adjustView = renderPresentation(adjust.binding)
 
     expect(sourceView.container.querySelector('[data-stage-image]')).toBeTruthy()
-    expect(sourceView.container.querySelector('[data-rendered-preview]')).toBeNull()
-    expect(renderedView.container.querySelector('[data-stage-image]')).toBeNull()
-    expect(renderedView.container.querySelector('[data-rendered-preview]')).toBeTruthy()
+    expect(sourceView.container.querySelector('.image-tool-stage-zero-copy')).toBeNull()
+    expect(adjustView.container.querySelector('[data-stage-image]')).toBeTruthy()
+    expect(adjustView.container.querySelector('.image-tool-stage-zero-copy')).toBeTruthy()
+    expect(adjust.setRetouchCanvasRef).toHaveBeenCalledWith(expect.any(HTMLCanvasElement))
   })
 
   it('renders the inpaint canvas at its derived mask dimensions and forwards its pointer event', () => {

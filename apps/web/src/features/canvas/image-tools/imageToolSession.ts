@@ -11,7 +11,7 @@ import type { CanvasNodeItem } from '../../canvas-board/domain'
 import { useRetouchMode } from '../retouch/useRetouchMode'
 import { useRetouchSession } from '../retouch/useRetouchSession'
 import { useRetouchCoordinateAdapter } from '../retouch'
-import { cancelImageRetouchFinalRender } from '../retouch/services/imageRetouchRenderer'
+import { cancelImageRetouchFinalRender } from '../retouch/services/retouchRenderer'
 import type { RetouchMode } from '../retouch/types'
 import { useImageInpaintOverlay } from '../inpaint/useImageInpaintOverlay'
 import { useInpaintChromeState } from '../inpaint/useInpaintChromeState'
@@ -69,6 +69,7 @@ export type ImageToolSessionCapabilities = {
     currentBoardId: ValueRef<string | null | undefined>
     getImageNodeDisplayPayload: UseCanvasImageToolsOptions['getImageNodeDisplayPayload']
     getImageNodeSnapshot: UseCanvasImageToolsOptions['getImageNodeSnapshot']
+    getImageStageElement: UseCanvasImageToolsOptions['getImageStageElement']
     updateSnapshotNode?: UseCanvasImageToolsOptions['updateSnapshotNode']
     createPendingRetouchNode: UseCanvasImageToolsOptions['createPendingRetouchNode']
     applyImageFileToImageNode: UseCanvasImageToolsOptions['applyImageFileToImageNode']
@@ -156,7 +157,14 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
       exitRetouchMode({ runBeforeExit: false })
       return false
     }
-    if (mode === 'adjust') retouchSession.resetRetouchSession()
+    if (mode === 'adjust') {
+      // Non-destructive editing (issue #671): re-entering Retouch on a node
+      // with a persisted stack reconstructs sliders/curves exactly.
+      const snapshot = options.getImageNodeSnapshot(nodeId)
+      if (!retouchSession.restoreRetouchStack(snapshot?.retouchStack)) {
+        retouchSession.resetRetouchSession()
+      }
+    }
     return true
   }
 
@@ -182,6 +190,7 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
         currentBoardId: options.currentBoardId,
         getImageNodeDisplayPayload: options.getImageNodeDisplayPayload,
         getImageNodeSnapshot: options.getImageNodeSnapshot,
+        getImageStageElement: options.getImageStageElement,
         updateSnapshotNode: options.updateSnapshotNode,
         createPendingRetouchNode: options.createPendingRetouchNode,
         applyImageFileToImageNode: options.applyImageFileToImageNode,

@@ -48,7 +48,7 @@ import ImageToolChromeFrame from '../../image-tools/components/ImageToolChromeFr
 import RetouchLayerActions from './RetouchLayerActions.vue'
 import RetouchLayersPanel from './RetouchLayersPanel.vue'
 import RetouchPropertiesPanel from './RetouchPropertiesPanel.vue'
-import { hasRenderableRetouchLayerStack } from '../services/imageRetouchRenderer'
+import { hasRenderableRetouchLayerStack } from '../services/retouchRenderer'
 
 const props = defineProps<{
   anchorRect: {

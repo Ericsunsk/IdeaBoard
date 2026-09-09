@@ -121,12 +121,12 @@ describe('createBoardSessionUploadLifecycle', () => {
     }).stabilizeSnapshotForSave(snapshot)
 
     expect(snapshot.imageNodes[0]?.outputImages[0]).toMatchObject({
-      url: '/api/user/media-assets/asset_201/derivatives/preview/webp/content',
-      mediaRef: { assetId: 'asset_201', derivativeTier: 'preview', derivativeFormat: 'webp' },
+      url: '/api/user/media-assets/asset_201/derivatives/preview/content',
+      mediaRef: { assetId: 'asset_201', derivativeTier: 'preview', },
     })
     expect(snapshot.fusionNodes[0]?.outputImages[0]).toMatchObject({
-      url: '/api/user/media-assets/asset_202/derivatives/preview/webp/content',
-      mediaRef: { assetId: 'asset_202', derivativeTier: 'preview', derivativeFormat: 'webp' },
+      url: '/api/user/media-assets/asset_202/derivatives/preview/content',
+      mediaRef: { assetId: 'asset_202', derivativeTier: 'preview', },
     })
     expect(snapshot.mediaRefs).toBeUndefined()
   })
@@ -200,12 +200,12 @@ describe('createBoardSessionUploadLifecycle', () => {
     }).stabilizeSnapshotForSave(snapshot)
 
     expect(snapshot.promptNodes[0]?.inputImages[0]).toMatchObject({
-      url: '/api/user/media-assets/asset_301/derivatives/preview/webp/content',
-      mediaRef: { assetId: 'asset_301', derivativeTier: 'preview', derivativeFormat: 'webp' },
+      url: '/api/user/media-assets/asset_301/derivatives/preview/content',
+      mediaRef: { assetId: 'asset_301', derivativeTier: 'preview', },
     })
     expect(snapshot.fusionNodes[0]?.inputImages[0]).toMatchObject({
-      url: '/api/user/media-assets/asset_302/derivatives/preview/webp/content',
-      mediaRef: { assetId: 'asset_302', derivativeTier: 'preview', derivativeFormat: 'webp' },
+      url: '/api/user/media-assets/asset_302/derivatives/preview/content',
+      mediaRef: { assetId: 'asset_302', derivativeTier: 'preview', },
     })
     expect(snapshot.mediaRefs).toBeUndefined()
   })
@@ -223,7 +223,6 @@ describe('createBoardSessionUploadLifecycle', () => {
           sourceMediaRef: {
             assetId: 'asset_401',
             derivativeTier: 'preview',
-            derivativeFormat: 'webp',
           },
           sourceImageRatio: 1,
           outputStatus: 'ready',
@@ -233,7 +232,6 @@ describe('createBoardSessionUploadLifecycle', () => {
               mediaRef: {
                 assetId: 'asset_402',
                 derivativeTier: 'preview',
-                derivativeFormat: 'webp',
               },
               ratio: 1,
             },
@@ -249,19 +247,17 @@ describe('createBoardSessionUploadLifecycle', () => {
     }).stabilizeSnapshotForSave(snapshot)
 
     expect(snapshot.imageNodes[0]).toMatchObject({
-      sourceImageUrl: '/api/user/media-assets/asset_401/derivatives/preview/webp/content',
+      sourceImageUrl: '/api/user/media-assets/asset_401/derivatives/preview/content',
       sourceMediaRef: {
         assetId: 'asset_401',
         derivativeTier: 'preview',
-        derivativeFormat: 'webp',
       },
     })
     expect(snapshot.imageNodes[0]?.outputImages[0]).toMatchObject({
-      url: '/api/user/media-assets/asset_402/derivatives/preview/webp/content',
+      url: '/api/user/media-assets/asset_402/derivatives/preview/content',
       mediaRef: {
         assetId: 'asset_402',
         derivativeTier: 'preview',
-        derivativeFormat: 'webp',
       },
     })
   })

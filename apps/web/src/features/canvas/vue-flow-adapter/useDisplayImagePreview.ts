@@ -16,13 +16,15 @@ import {
 } from '../utils/displayImagePreviewEncoding'
 import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../shared/config/runtimeUrls'
 import {
+  normalizeMediaAssetId,
   useMediaAssetDelivery,
   type MediaAssetDeliveryTier,
+  type MediaAssetId,
 } from '../../../shared/api/mediaAssetDelivery'
 
 interface PreviewOptions {
   maxSide?: MaybeRefOrGetter<number | null | undefined>
-  mediaAssetId?: MaybeRefOrGetter<number | null | undefined>
+  assetId?: MaybeRefOrGetter<MediaAssetId | null | undefined>
   isVisible?: MaybeRefOrGetter<boolean>
   keepPreviousOnSourceChange?: boolean
 }
@@ -187,9 +189,8 @@ export function useDisplayImagePreview(
     return canonicalSourceUrl.value ? resolveAssetUrl(canonicalSourceUrl.value) : ''
   })
   const resolvedMaxSide = computed(() => resolvePreviewMaxSide(toValue(options.maxSide)))
-  const resolvedMediaAssetId = computed(() => {
-    const raw = toValue(options.mediaAssetId)
-    return typeof raw === 'number' && Number.isInteger(raw) && raw > 0 ? raw : null
+  const resolvedAssetId = computed(() => {
+    return normalizeMediaAssetId(toValue(options.assetId))
   })
   const isVisible = computed(() => toValue(options.isVisible) !== false)
   const resolvedMediaTier = computed<MediaAssetDeliveryTier>(() => {
@@ -200,7 +201,7 @@ export function useDisplayImagePreview(
     // durable edit-quality source; preview is reserved for editor controls.
     return 'processing'
   })
-  const mediaDelivery = useMediaAssetDelivery(resolvedMediaAssetId, resolvedMediaTier, {
+  const mediaDelivery = useMediaAssetDelivery(resolvedAssetId, resolvedMediaTier, {
     enabled: isVisible,
   })
   const previewUrl = ref<string | null>(null)
@@ -215,10 +216,10 @@ export function useDisplayImagePreview(
     [
       () => resolvedSourceUrl.value,
       () => resolvedMaxSide.value,
-      () => resolvedMediaAssetId.value,
+      () => resolvedAssetId.value,
       isVisible,
     ],
-    ([currentSource, maxSide, mediaAssetId, visible]) => {
+    ([currentSource, maxSide, assetId, visible]) => {
       requestToken += 1
       const token = requestToken
       if (currentSource !== activeSource) previewUrl.value = null
@@ -231,7 +232,7 @@ export function useDisplayImagePreview(
         return
       }
 
-      if (mediaAssetId !== null) return
+      if (assetId !== null) return
 
       const cacheKey = buildPreviewCacheKey(currentSource, maxSide)
       const cached = getCachedPreviewUrl(cacheKey)
@@ -258,7 +259,22 @@ export function useDisplayImagePreview(
   }
 
   const candidateUrl = computed(() => {
-    if (resolvedMediaAssetId.value !== null) {
+    if (resolvedAssetId.value !== null) {
+      if (mediaDelivery.url.value) return mediaDelivery.url.value
+      // While the derivative is genuinely not ready (HTTP 202 pending /
+      // processing), fall back to the persisted source URL so nodes never
+      // hang on blank — unless the source itself is an authenticated API
+      // content URL, which must never bind optimistically (CORS + the stage
+      // guard relies on an empty candidate while delivery loads).
+      // Transient loading/idle keeps the previous frame so zoom-tier
+      // switches don't flash the source.
+      if (
+        (mediaDelivery.status.value === 'pending' ||
+          mediaDelivery.status.value === 'processing') &&
+        !resolvedSourceUrl.value.startsWith('/api/')
+      ) {
+        return resolvedSourceUrl.value
+      }
       return mediaDelivery.url.value
     }
     if (previewUrl.value) return previewUrl.value

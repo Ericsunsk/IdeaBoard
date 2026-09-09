@@ -3,6 +3,7 @@ import { computed, ref, type Ref } from 'vue'
 import { i18n } from '../../../shared/i18n'
 import {
   resolveImageNodeFrameSize,
+  resolveImageNodeLatestOutput,
   type CanvasNodeItem,
   type ImageNodeItem,
   type ImageNodeOutputItem,
@@ -26,7 +27,7 @@ import type { CanvasGraphInteractionBrowserAdapter } from './interactionBrowserA
 import {
   renderImageRetouchRecipeFile,
   type ImageRetouchRenderSource,
-} from '../retouch/services/imageRetouchRenderer'
+} from '../retouch/services/retouchRenderer'
 import { resolveMediaAssetOriginalURL } from '../../../shared/api/mediaAssetDelivery'
 
 type MessageLoadingHandle = {
@@ -58,7 +59,7 @@ type UseCanvasGraphInteractionsOptions = {
 
 type ExportImageEntry = {
   url: string
-  mediaAssetId?: number | undefined
+  assetId?: string | undefined
   title: string
   retouchRecipe?: ImageNodeItem['retouchRecipe'] | undefined
 }
@@ -117,21 +118,24 @@ function resolveExportEntries(snapshot: CanvasNodeItem): ExportImageEntry[] {
           outputs.at(-1)
             ? {
                 url: outputs.at(-1)!.url,
-                mediaAssetId: outputs.at(-1)!.mediaAssetId,
+                assetId: outputs.at(-1)!.mediaRef?.assetId?.trim() || undefined,
                 retouchRecipe: snapshot.retouchRecipe,
               }
             : {
                 url: snapshot.sourceImageUrl,
-                mediaAssetId: snapshot.sourceMediaAssetId,
+                assetId: snapshot.sourceMediaRef?.assetId?.trim() || undefined,
                 retouchRecipe: snapshot.retouchRecipe,
               },
         ]
-      : outputs.map((item) => ({ url: item.url, mediaAssetId: item.mediaAssetId }))
+      : outputs.map((item) => ({
+          url: item.url,
+          assetId: item.mediaRef?.assetId?.trim() || undefined,
+        }))
   return entries
-    .filter((entry) => !!entry.url?.trim() || Number.isInteger(entry.mediaAssetId))
+    .filter((entry) => !!entry.url?.trim() || !!entry.assetId)
     .map((entry) => ({
       url: entry.url.trim(),
-      ...(Number.isInteger(entry.mediaAssetId) ? { mediaAssetId: entry.mediaAssetId } : {}),
+      ...(entry.assetId ? { assetId: entry.assetId } : {}),
       ...(entry.retouchRecipe ? { retouchRecipe: entry.retouchRecipe } : {}),
       title: snapshot.title?.trim() || 'image',
     }))
@@ -219,8 +223,14 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
       y: source.y + 18,
     })
     image.sourceImageUrl = payload.url
-    image.sourceMediaAssetId = payload.mediaAssetId
+    image.sourceMediaAssetId = source.sourceMediaAssetId
+    image.sourceMediaRef = payload.mediaRef ? { ...payload.mediaRef } : undefined
+    // The duplicated node keeps the durable persisted URL; the delivery URL
+    // in the payload is a runtime detail and is never persisted.
+    const latestOutput = resolveImageNodeLatestOutput(source)
+    if (latestOutput?.url?.trim()) image.sourceImageUrl = latestOutput.url.trim()
     image.retouchRecipe = source.retouchRecipe ? structuredClone(source.retouchRecipe) : undefined
+    image.retouchStack = source.retouchStack ? structuredClone(source.retouchStack) : undefined
     image.sourceImageRatio = payload.ratio
     image.outputCount = source.outputCount ?? image.outputCount
     image.width = resolveImageNodeFrameSize(payload.ratio, true).width
@@ -270,7 +280,7 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
           let downloadUrl = entry.url
           if (entry.retouchRecipe) {
             const source: ImageRetouchRenderSource = {
-              url: resolveMediaAssetOriginalURL(entry.retouchRecipe.sourceMediaAssetId),
+              url: resolveMediaAssetOriginalURL(entry.retouchRecipe.sourceAssetId),
               title: entry.title,
             }
             const rendered = await renderImageRetouchRecipeFile(source, entry.retouchRecipe)
@@ -285,9 +295,7 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
           }
           await options.browser.downloadImage({
             url: downloadUrl,
-            ...(!entry.retouchRecipe && entry.mediaAssetId
-              ? { mediaAssetId: entry.mediaAssetId }
-              : {}),
+            ...(!entry.retouchRecipe && entry.assetId ? { assetId: entry.assetId } : {}),
             fileName: exportFileName,
           })
         } catch {

@@ -3,13 +3,16 @@ import { i18n } from '../../../../shared/i18n'
 import { canvasToBlob } from '../../services/flowMediaIO'
 import { detectCanvasTransparency } from '../../utils/displayImagePreviewEncoding'
 import { resolveImageExportEncoding } from './imageOutputPolicy'
-import { createCpuImageRetouchPlanExecutor } from './cpuPlanExecutor'
 import {
   createImageSourceCache,
   readImageSourceImageData,
   type ImageSourceCache,
 } from './imageSourceCache'
-import type { ImageRetouchPlanExecutor } from './planExecutorTypes'
+import {
+  bakeWebGLRetouchUniforms,
+  createWebGLRetouchRenderer,
+  type WebGLRetouchRenderer,
+} from '../utils/retouchWebglEngine'
 import type {
   ImageProcessingBackend,
   ImageProcessingBackendFinalInput,
@@ -22,7 +25,7 @@ const DEFAULT_PREVIEW_MAX_SIDE = 960
 
 export type MainThreadImageProcessingBackendOptions = {
   sourceCache?: ImageSourceCache | undefined
-  planExecutor?: ImageRetouchPlanExecutor | undefined
+  rendererFactory?: (canvas: HTMLCanvasElement) => WebGLRetouchRenderer | null
 }
 
 export function createMainThreadImageProcessingBackend(
@@ -30,17 +33,20 @@ export function createMainThreadImageProcessingBackend(
 ): ImageProcessingBackend {
   return new MainThreadImageProcessingBackend(
     options.sourceCache ?? createImageSourceCache(),
-    options.planExecutor ?? createCpuImageRetouchPlanExecutor(),
+    options.rendererFactory ?? createWebGLRetouchRenderer,
   )
 }
 
 class MainThreadImageProcessingBackend implements ImageProcessingBackend {
   private readonly sourceCache: ImageSourceCache
-  private readonly planExecutor: ImageRetouchPlanExecutor
+  private readonly rendererFactory: (canvas: HTMLCanvasElement) => WebGLRetouchRenderer | null
 
-  constructor(sourceCache: ImageSourceCache, planExecutor: ImageRetouchPlanExecutor) {
+  constructor(
+    sourceCache: ImageSourceCache,
+    rendererFactory: (canvas: HTMLCanvasElement) => WebGLRetouchRenderer | null,
+  ) {
     this.sourceCache = sourceCache
-    this.planExecutor = planExecutor
+    this.rendererFactory = rendererFactory
   }
 
   async renderFinal(input: ImageProcessingBackendFinalInput): Promise<RenderFinalOutput> {
@@ -55,17 +61,21 @@ class MainThreadImageProcessingBackend implements ImageProcessingBackend {
     })
     if (!source) throw new Error(i18n.global.t('canvas.retouch.errors.readImageFailed'))
 
+    const outputCanvas = document.createElement('canvas')
+    outputCanvas.width = source.width
+    outputCanvas.height = source.height
+    const renderer = this.rendererFactory(outputCanvas)
+    if (!renderer || renderer.isContextLost()) {
+      this.sourceCache.releaseSource(source)
+      throw new Error(i18n.global.t('canvas.retouch.errors.unsupportedCanvas'))
+    }
+
     try {
       input.context.reportProgress({ phase: 'render' })
-      const imageData = readImageSourceImageData(source)
-      const adjustedImageData = await this.planExecutor.execute({
-        imageData,
-        plan: input.plan,
-        signal: input.context.signal,
-        onProgress: input.context.reportProgress,
-      })
+      renderer.updateSourceImage(source.canvas, source.width, source.height)
+      renderer.updateUniforms(bakeWebGLRetouchUniforms(input.plan))
+      renderer.render()
       if (input.context.signal.aborted) throw processingCancelledError()
-      source.context.putImageData(adjustedImageData, 0, 0)
 
       input.context.reportProgress({ phase: 'encode' })
       const hasTransparentPixels = detectCanvasTransparency(
@@ -79,7 +89,7 @@ class MainThreadImageProcessingBackend implements ImageProcessingBackend {
             sourceMimeType: source.mimeType,
             hasTransparentPixels,
           })
-      const blob = await canvasToBlob(source.canvas, encoding.mimeType, encoding.quality)
+      const blob = await canvasToBlob(outputCanvas, encoding.mimeType, encoding.quality)
       const outputMime = blob.type || encoding.mimeType
       const fileName = input.context.outputPolicy.resolveFileName({
         title: input.source.title,
@@ -95,6 +105,7 @@ class MainThreadImageProcessingBackend implements ImageProcessingBackend {
         mimeType: outputMime,
       }
     } finally {
+      renderer.dispose()
       this.sourceCache.releaseSource(source)
     }
   }
@@ -108,38 +119,45 @@ class MainThreadImageProcessingBackend implements ImageProcessingBackend {
     })
     if (!source) throw new Error(i18n.global.t('canvas.retouch.errors.readImageFailed'))
 
-    input.context.reportProgress({ phase: 'render' })
-    const sourceImageData = readImageSourceImageData(source)
-    const previewImageData =
-      input.plan.length > 0
-        ? await this.planExecutor.execute({
-            imageData: cloneImageDataForPreview(sourceImageData),
-            plan: input.plan,
-            signal: input.context.signal,
-            onProgress: input.context.reportProgress,
-          })
-        : cloneImageDataForPreview(sourceImageData)
-    if (input.context.signal.aborted) throw processingCancelledError()
+    const previewCanvas = document.createElement('canvas')
+    previewCanvas.width = source.width
+    previewCanvas.height = source.height
+    const renderer = this.rendererFactory(previewCanvas)
+    if (!renderer || renderer.isContextLost()) {
+      this.sourceCache.releaseSource(source)
+      throw new Error(i18n.global.t('canvas.retouch.errors.unsupportedCanvas'))
+    }
 
-    input.context.reportProgress({ phase: 'complete' })
-    return {
-      sourceImageData,
-      previewImageData,
-      width: source.width,
-      height: source.height,
+    try {
+      input.context.reportProgress({ phase: 'render' })
+      renderer.updateSourceImage(source.canvas, source.width, source.height)
+      if (input.plan.length > 0) {
+        renderer.updateUniforms(bakeWebGLRetouchUniforms(input.plan))
+      }
+      renderer.render()
+      if (input.context.signal.aborted) throw processingCancelledError()
+
+      const previewImageData = renderer.readPixels() ?? readImageSourceImageData(source)
+      const sourceImageData = readImageSourceImageData(source)
+
+      input.context.reportProgress({ phase: 'complete' })
+      return {
+        sourceImageData,
+        previewImageData,
+        width: source.width,
+        height: source.height,
+      }
+    } finally {
+      renderer.dispose()
+      this.sourceCache.releaseSource(source)
     }
   }
 
   dispose() {
     this.sourceCache.dispose()
-    this.planExecutor.dispose?.()
   }
 }
 
 function resolvePreviewMaxSide(input: ImageProcessingBackendPreviewInput['sizeStrategy']) {
   return Math.max(1, Math.floor(input?.maxSide ?? DEFAULT_PREVIEW_MAX_SIDE))
-}
-
-function cloneImageDataForPreview(imageData: ImageData): ImageData {
-  return new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height)
 }

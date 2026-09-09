@@ -1,9 +1,28 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RetouchEffectLayer } from '../types'
 import type { ImageProcessingRuntime } from '../runtime/types'
-import * as runtimeModule from '../runtime/imageRetouchProcessingRuntime'
-import { buildImageRetouchPlan } from '../utils/imageRetouchPlanPipeline'
-import { cancelImageRetouchFinalRender, renderImageRetouchFile } from './imageRetouchRenderer'
+import * as runtimeModule from '../runtime/retouchRuntime'
+import { buildImageRetouchPlan } from '../utils/retouchPlanPipeline'
+import { cancelImageRetouchFinalRender, renderImageRetouchFile } from './retouchRenderer'
+
+const rendererMocks = vi.hoisted(() => ({
+  updateSourceImage: vi.fn(),
+  updateUniforms: vi.fn(),
+  render: vi.fn(),
+  readPixels: vi.fn(),
+  readHistogramSample: vi.fn(),
+  dispose: vi.fn(),
+  isContextLost: vi.fn(() => false),
+}))
+
+vi.mock('../utils/retouchWebglEngine', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../utils/retouchWebglEngine')>()
+  return {
+    ...original,
+    isWebGLRetouchSupported: () => true,
+    createWebGLRetouchRenderer: () => ({ ...rendererMocks }),
+  }
+})
 
 const IMAGE_RETOUCH_FINAL_TASK_ID = 'image-retouch-final'
 
@@ -85,6 +104,13 @@ afterEach(() => {
   vi.restoreAllMocks()
   fetchMock.mockReset()
   createImageBitmapMock.mockReset()
+  rendererMocks.updateSourceImage.mockReset()
+  rendererMocks.updateUniforms.mockReset()
+  rendererMocks.render.mockReset()
+  rendererMocks.readPixels.mockReset()
+  rendererMocks.readHistogramSample.mockReset()
+  rendererMocks.dispose.mockReset()
+  rendererMocks.isContextLost.mockReset().mockReturnValue(false)
 })
 
 function installCanvasMocks() {
@@ -228,7 +254,7 @@ describe('renderImageRetouchFile', () => {
   })
 
   it('renders visible retouch layers to an uploadable file', async () => {
-    const { contexts } = installCanvasMocks()
+    installCanvasMocks()
     fetchMock.mockResolvedValue({
       ok: true,
       blob: async () => new Blob(['source'], { type: 'image/png' }),
@@ -252,7 +278,8 @@ describe('renderImageRetouchFile', () => {
     )
     expect(result.name).toBe('Sample-adjusted.webp')
     expect(result.type).toBe('image/webp')
-    expect(contexts.at(-1)?.putImageData).toHaveBeenCalled()
+    expect(rendererMocks.render).toHaveBeenCalled()
+    expect(rendererMocks.dispose).toHaveBeenCalled()
   })
 
   it('rejects empty visible retouch stacks', async () => {

@@ -155,7 +155,7 @@ describe('waitTaskImageResultsWithSse', () => {
 
     await expect(waitTaskImageResultsWithSse('task-1')).resolves.toEqual([
       {
-        url: '/api/user/media-assets/asset_image/derivatives/preview/webp/content',
+        url: '/api/user/media-assets/asset_image/derivatives/preview/content',
         assetId: 'asset_image',
         width: 1024,
         height: 1024,
@@ -180,7 +180,7 @@ describe('waitTaskImageResultsWithSse', () => {
 
     await expect(result).resolves.toEqual([
       {
-        url: '/api/user/media-assets/asset_sse_output/derivatives/preview/webp/content',
+        url: '/api/user/media-assets/asset_sse_output/derivatives/preview/content',
         assetId: 'asset_sse_output',
         width: 1024,
         height: 1024,
@@ -276,7 +276,7 @@ describe('waitTaskImageResultsWithSse', () => {
 
     await expect(result).resolves.toEqual([
       {
-        url: '/api/user/media-assets/asset_done/derivatives/preview/webp/content',
+        url: '/api/user/media-assets/asset_done/derivatives/preview/content',
         assetId: 'asset_done',
         width: 1024,
         height: 1024,

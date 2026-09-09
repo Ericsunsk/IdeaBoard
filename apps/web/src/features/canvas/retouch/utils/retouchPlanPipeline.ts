@@ -3,7 +3,7 @@ import {
   compileNormalizedImageRetouchPlan,
   normalizeImageRetouchStack,
   type ImageRetouchPlan,
-} from './imageRetouchEngine'
+} from './retouchEngine'
 import { flattenVisibleRetouchEffectLayers } from './retouchLayerEffects'
 
 export function buildImageRetouchPlan(layers: readonly RetouchLayer[]): ImageRetouchPlan {

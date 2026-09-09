@@ -18,7 +18,7 @@ interface ImageNaturalSize {
 interface LightboxCandidate {
   src: string
   ratio: number
-  mediaAssetId?: number
+  assetId?: string
 }
 
 interface LightboxDataSourceItem {
@@ -128,9 +128,9 @@ async function createLightboxItem(candidate: LightboxCandidate): Promise<Lightbo
 async function resolveOriginalCandidateSource(
   candidate: LightboxCandidate,
 ): Promise<string | null> {
-  if (!candidate.mediaAssetId) return candidate.src
+  if (!candidate.assetId) return candidate.src
   try {
-    const metadata = await getMediaAssetMetadata(candidate.mediaAssetId)
+    const metadata = await getMediaAssetMetadata(candidate.assetId)
     if (metadata.original.status === 'ready' && metadata.original.url) {
       return normalizeImageUrl(metadata.original.url)
     }
@@ -150,11 +150,8 @@ async function resolveOriginalCandidateSource(
 function collectOutputItems(outputImages: ImageNodeItem['outputImages']): ImageNodeOutputItem[] {
   return Array.isArray(outputImages)
     ? outputImages.filter((item) => {
-        const mediaAssetId = Number(item?.mediaAssetId)
-        return (
-          normalizeImageUrl(item?.url).length > 0 ||
-          (Number.isInteger(mediaAssetId) && mediaAssetId > 0)
-        )
+        const assetId = `${item?.mediaRef?.assetId ?? ''}`.trim()
+        return normalizeImageUrl(item?.url).length > 0 || assetId.length > 0
       })
     : []
 }
@@ -178,40 +175,49 @@ export function useFlowImagePreviewLightbox() {
     return lightbox
   }
 
+function toAssetCandidate(src: string, ratio: number, assetId?: string): LightboxCandidate {
+  const trimmed = assetId?.trim()
+  return {
+    src: trimmed ? resolveMediaAssetOriginalURL(trimmed) : src,
+    ratio,
+    ...(trimmed ? { assetId: trimmed } : {}),
+  }
+}
+
+function collectLightboxCandidates(node: ImageNodeItem): {
+  candidates: LightboxCandidate[]
+  hasSourceCandidate: boolean
+  outputCount: number
+} {
+  const sourceUrl = normalizeImageUrl(node.sourceImageUrl)
+  const outputItems = collectOutputItems(node.outputImages)
+  const candidates: LightboxCandidate[] = []
+  const hasSourceCandidate = Boolean(sourceUrl || node.sourceMediaRef?.assetId)
+  if (hasSourceCandidate) {
+    candidates.push(
+      toAssetCandidate(sourceUrl, node.sourceImageRatio, node.sourceMediaRef?.assetId),
+    )
+  }
+  for (const item of outputItems) {
+    const outputUrl = normalizeImageUrl(item.url)
+    const outputAssetId = item.mediaRef?.assetId?.trim()
+    if (!outputUrl && !outputAssetId) continue
+    candidates.push(toAssetCandidate(outputUrl, item.ratio, outputAssetId))
+  }
+  return { candidates, hasSourceCandidate, outputCount: outputItems.length }
+}
+
   async function openNodeImagePreview(
     node: ImageNodeItem,
     target: PreviewTarget = 'latest-output',
   ) {
     const requestId = ++previewRequestId
-    const sourceUrl = normalizeImageUrl(node.sourceImageUrl)
-    const outputItems = collectOutputItems(node.outputImages)
-
-    const hasSourceCandidate = Boolean(sourceUrl || node.sourceMediaAssetId)
-    const candidates: LightboxCandidate[] = []
-    if (hasSourceCandidate) {
-      candidates.push({
-        src: node.sourceMediaAssetId
-          ? resolveMediaAssetOriginalURL(node.sourceMediaAssetId)
-          : sourceUrl,
-        ratio: node.sourceImageRatio,
-        ...(node.sourceMediaAssetId ? { mediaAssetId: node.sourceMediaAssetId } : {}),
-      })
-    }
-    outputItems.forEach((item) => {
-      const outputUrl = normalizeImageUrl(item.url)
-      if (!outputUrl && !item.mediaAssetId) return
-      candidates.push({
-        src: item.mediaAssetId ? resolveMediaAssetOriginalURL(item.mediaAssetId) : outputUrl,
-        ratio: item.ratio,
-        ...(item.mediaAssetId ? { mediaAssetId: item.mediaAssetId } : {}),
-      })
-    })
-
+    const { candidates, hasSourceCandidate, outputCount } = collectLightboxCandidates(node)
     if (candidates.length === 0) return
 
     const sourceOffset = hasSourceCandidate ? 1 : 0
     const latestOutputIndex =
-      outputItems.length > 0 ? sourceOffset + outputItems.length - 1 : Math.max(0, sourceOffset - 1)
+      outputCount > 0 ? sourceOffset + outputCount - 1 : Math.max(0, sourceOffset - 1)
     const requestedIndex = target === 'source' ? 0 : Math.max(0, latestOutputIndex)
     const resolvedCandidates = await Promise.all(
       candidates.map(async (candidate) => {
@@ -246,11 +252,11 @@ export function useFlowImagePreviewLightbox() {
     instance.loadAndOpen(index, dataSource)
   }
 
-  async function openImageUrlPreview(src: string, ratio = 1, mediaAssetId?: number) {
+  async function openImageUrlPreview(src: string, ratio = 1, assetId?: string) {
     const candidate: LightboxCandidate = {
       src: normalizeImageUrl(src),
       ratio,
-      ...(mediaAssetId ? { mediaAssetId } : {}),
+      ...(assetId ? { assetId } : {}),
     }
     const url = await resolveOriginalCandidateSource(candidate)
     if (!url) return

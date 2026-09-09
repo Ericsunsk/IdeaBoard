@@ -33,7 +33,7 @@
             :key="slot.key"
             class="fusion-node-slot fusion-node-slot-item"
             :src="slot.image.url"
-            :media-asset-id="slot.image.mediaAssetId"
+            :asset-id="slot.image.mediaRef?.assetId"
             removable
             :style="getSlotStyle(index)"
             :data-image-id="slot.image.id"

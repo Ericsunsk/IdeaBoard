@@ -2,29 +2,20 @@ import type { Node } from '@vue-flow/core'
 import { createApp, defineComponent, nextTick, ref, shallowRef, type Ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../canvas-board/domain'
-import { renderRetouchLayerStackFile } from '../retouch/services/imageRetouchRenderer'
+import { renderRetouchLayerStackFile } from '../retouch/services/retouchRenderer'
 import { IMAGE_STRENGTH_ACTIONS, type ImageStrengthAction } from '../execution'
 import type { UseCanvasImageToolsOptions } from './imageToolSession'
 import { useCanvasImageTools, type CanvasImageTools } from '.'
 import { i18n } from '../../../shared/i18n'
 import { loadLocaleMessages } from '../../../shared/i18n/userLocale'
+import { deserializeRetouchStack } from '../retouch/utils/retouchStackPersistence'
 import * as mediaAssetDelivery from '../../../shared/api/mediaAssetDelivery'
 
-vi.mock('../retouch/services/imageRetouchRenderer', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../retouch/services/imageRetouchRenderer')>()
+vi.mock('../retouch/services/retouchRenderer', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../retouch/services/retouchRenderer')>()
   return {
     ...actual,
     renderRetouchLayerStackFile: vi.fn(),
-  }
-})
-
-vi.mock('../retouch/useImageRetouchRenderedPreview', async () => {
-  const { computed } = await import('vue')
-  return {
-    useImageRetouchRenderedPreview: vi.fn(() => ({
-      retouchRenderedPreview: computed(() => null),
-      retouchPreviewSource: computed(() => null),
-    })),
   }
 })
 
@@ -52,7 +43,12 @@ vi.mock('../../../shared/api/userEventStream', () => ({
 const imageNodeFixtures: Record<
   string,
   {
-    display: { url: string; ratio: number; mediaAssetId?: number } | null
+    display: {
+      url: string
+      ratio: number
+      assetId?: string
+      mediaRef?: { assetId: string; derivativeTier: 'preview' }
+    } | null
     snapshot: ImageNodeItem
   }
 > = {
@@ -121,7 +117,12 @@ const imageNodeFixtures: Record<
     },
   },
   'image-5': {
-    display: { url: '/api/user/media-assets/3/original/content', ratio: 1, mediaAssetId: 3 },
+    display: {
+      url: '/api/user/media-assets/asset-3/original/content',
+      ratio: 1,
+      assetId: 'asset-3',
+      mediaRef: { assetId: 'asset-3', derivativeTier: 'preview' },
+    },
     snapshot: {
       id: 5,
       type: 'image-node',
@@ -130,6 +131,7 @@ const imageNodeFixtures: Record<
       y: 60,
       width: 280,
       sourceImageUrl: 'https://cdn.example.com/library-preview.jpg',
+      sourceMediaRef: { assetId: 'asset-3', derivativeTier: 'preview' },
       sourceMediaAssetId: 3,
       sourceImageRatio: 1,
       outputCount: 1,
@@ -167,6 +169,9 @@ function mountCanvasImageTools() {
     NonNullable<UseCanvasImageToolsOptions['applyImageFileToImageNode']>
   >(async () => true)
   const removeNode = vi.fn<NonNullable<UseCanvasImageToolsOptions['removeNode']>>()
+  const updateSnapshotNode = vi.fn<
+    NonNullable<UseCanvasImageToolsOptions['updateSnapshotNode']>
+  >()
   const setViewport = vi.fn()
   const setCenter = vi.fn()
   const runInpaintAction = vi.fn()
@@ -200,6 +205,7 @@ function mountCanvasImageTools() {
           createPendingRetouchNode,
           applyImageFileToImageNode,
           removeNode,
+          updateSnapshotNode,
           connectionAdapter,
           uploadImageToBoard: async () => ({ url: 'https://example.com/ref.png', ratio: 1 }),
           openImageUrlPreview: vi.fn(),
@@ -240,6 +246,7 @@ function mountCanvasImageTools() {
     createPendingRetouchNode,
     applyImageFileToImageNode,
     removeNode,
+    updateSnapshotNode,
     currentBoardId,
     directActionRunningNodeIds,
     generationAvailable,
@@ -450,6 +457,58 @@ describe('useCanvasImageTools image retouch final apply', () => {
     }
   })
 
+  it('persists the adjustment stack on the newly spawned node for re-editing', async () => {
+    mediaAssetRequestMock.mockResolvedValue({
+      code: 0,
+      msg: '',
+      data: {
+        asset_id: 'asset-3',
+        status: 'ready',
+        mime_type: 'image/jpeg',
+        width: 2048,
+        height: 1024,
+        size_bytes: 100,
+        original: { status: 'ready', url: '/api/original.jpg' },
+        derivatives: {
+          'processing-input': {
+            status: 'ready',
+            format: 'webp',
+            url: '/api/processing-input.webp',
+          },
+        },
+      },
+    })
+    renderLayerStackFileMock.mockResolvedValue(
+      new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
+    )
+    const harness = mountCanvasImageTools()
+    harness.updateSnapshotNode.mockClear()
+
+    try {
+      expect(harness.runtime.commands.lifecycle.enter('image-5', 'adjust')).toBe(true)
+      harness.runtime.commands.chrome.selectEffectLayer('threshold')
+      harness.runtime.commands.chrome.updateEditorRetouchParams({ threshold: 128, invert: true })
+
+      await harness.runtime.commands.editor.apply()
+
+      expect(harness.updateSnapshotNode).toHaveBeenCalledTimes(1)
+      const [nodeId, patcher] = harness.updateSnapshotNode.mock.calls[0] as [
+        string,
+        (previous: ImageNodeItem) => ImageNodeItem,
+      ]
+      expect(nodeId).toBe('image-3')
+      const next = patcher({ ...imageNodeFixtures['image-5']!.snapshot })
+      expect(next.retouchStack?.layers.map((layer) => layer.kind)).toEqual(['threshold'])
+      // The persisted stack round-trips back into an editable session.
+      expect(deserializeRetouchStack(next.retouchStack)?.layers[0]).toMatchObject({
+        kind: 'threshold',
+        params: { threshold: 128, invert: true },
+      })
+    } finally {
+      harness.unmount()
+    }
+  })
+
   it.each(['board-1', 'board-other'])(
     'ignores a cancelled apply URL response while the same node renders on %s',
     async (nextBoardId) => {
@@ -619,6 +678,29 @@ describe('useCanvasImageTools image retouch final apply', () => {
 
       expect(harness.feedback.warning).toHaveBeenCalledOnce()
       expect(harness.feedback.warning).toHaveBeenCalledWith('图片生成失败')
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('fails directly without fallback when media asset processing URL resolution fails', async () => {
+    vi.spyOn(mediaAssetDelivery, 'resolveMediaAssetProcessingURL').mockRejectedValueOnce(
+      new Error('derivative not found'),
+    )
+    const harness = mountCanvasImageTools()
+    harness.createPendingRetouchNode.mockReturnValueOnce('image-3')
+
+    try {
+      expect(harness.runtime.commands.lifecycle.enter('image-5', 'adjust')).toBe(true)
+      harness.runtime.commands.chrome.selectEffectLayer('threshold')
+      harness.runtime.commands.chrome.updateEditorRetouchParams({ threshold: 128, invert: true })
+
+      await harness.runtime.commands.editor.apply()
+
+      expect(harness.feedback.warning).toHaveBeenCalledWith('Image generation failed')
+      expect(harness.feedback.succeeded).not.toHaveBeenCalled()
+      expect(renderLayerStackFileMock).not.toHaveBeenCalled()
+      expect(harness.removeNode).toHaveBeenCalledWith('image-3')
     } finally {
       harness.unmount()
     }

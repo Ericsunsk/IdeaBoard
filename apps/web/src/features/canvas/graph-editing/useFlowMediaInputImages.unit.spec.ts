@@ -28,7 +28,6 @@ function makeImageSnapshot(overrides: Partial<ImageNodeItem> = {}): ImageNodeIte
     sourceMediaRef: {
       assetId: 'asset_101',
       derivativeTier: 'preview',
-      derivativeFormat: 'webp',
     },
     sourceImageRatio: 1,
     outputStatus: 'ready',
@@ -136,7 +135,6 @@ function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
     mediaRef: {
       assetId: 'asset_501',
       derivativeTier: 'preview',
-      derivativeFormat: 'webp',
     } satisfies MediaRef,
   }))
   const api = useFlowMediaInputImages({
@@ -262,7 +260,6 @@ describe('useFlowMediaInputImages', () => {
         mediaRef: {
           assetId: 'asset_101',
           derivativeTier: 'preview',
-          derivativeFormat: 'webp',
         },
       },
     ])
@@ -288,7 +285,6 @@ describe('useFlowMediaInputImages', () => {
         mediaRef: {
           assetId: 'asset_501',
           derivativeTier: 'preview',
-          derivativeFormat: 'webp',
         },
       }),
     ])

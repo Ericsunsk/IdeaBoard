@@ -15,7 +15,7 @@
         :key="item.id"
         class="prompt-text-composer-image-thumb aspect-square h-[var(--node-input-thumbnail-size)] w-[var(--node-input-thumbnail-size)]"
         :src="item.url"
-        :media-asset-id="item.mediaAssetId"
+        :asset-id="item.mediaRef?.assetId"
         :removable="!disabled"
         :data-image-id="item.id"
         @mousedown.stop
@@ -131,6 +131,7 @@ type PromptTextComposerImageInput = {
   url: string
   ratio?: number
   mediaAssetId?: number
+  mediaRef?: { assetId: string } | undefined
 }
 
 type PromptTextComposerVariant = 'node' | 'floating'

@@ -9,8 +9,8 @@ export type ImageNodeDisplayPayload = {
   url: string
   ratio: number
   mediaRef?: MediaRef | undefined
-  /** Internal snapshot migration field; public API uses MediaRef.assetId. */
-  mediaAssetId?: number
+  /** String delivery identity resolved from the node's MediaRef. */
+  assetId?: string | undefined
 }
 
 export type ImageNodeLayoutAnchor = ImageNodeDisplayPayload & {
@@ -42,30 +42,31 @@ export function resolveImageNodeDisplayUrl(
   return `${latestOutput?.url || imageNode.sourceImageUrl || ''}`.trim()
 }
 
-function resolveImageNodeMediaIdentity(
-  imageNode: Pick<ImageNodeItem, 'sourceMediaRef' | 'sourceMediaAssetId' | 'outputImages'>,
-): { mediaRef?: MediaRef; mediaAssetId?: number } {
-  const latestOutput = resolveImageNodeLatestOutput(imageNode)
-  const mediaRef = latestOutput ? latestOutput.mediaRef : imageNode.sourceMediaRef
-  if (mediaRef) return { mediaRef }
-
-  const legacyID = Number(latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId)
-  return Number.isInteger(legacyID) && legacyID > 0 ? { mediaAssetId: legacyID } : {}
-}
-
 export function resolveImageNodeDisplayPayload(
   imageNode: Pick<
     ImageNodeItem,
-    'sourceImageUrl' | 'sourceMediaRef' | 'sourceMediaAssetId' | 'sourceImageRatio' | 'outputImages'
+    'sourceImageUrl' | 'sourceMediaRef' | 'sourceImageRatio' | 'outputImages'
   >,
 ): ImageNodeDisplayPayload | null {
   const url = resolveImageNodeDisplayUrl(imageNode)
   if (!url) return null
+  const latestOutput = resolveImageNodeLatestOutput(imageNode)
+  const mediaRef = latestOutput?.mediaRef ?? imageNode.sourceMediaRef
+  const assetId = mediaRef?.assetId?.trim()
   return {
     url,
     ratio: resolveImageNodeDisplayRatio(imageNode),
-    ...resolveImageNodeMediaIdentity(imageNode),
+    ...(mediaRef ? { mediaRef } : {}),
+    ...(assetId ? { assetId } : {}),
   }
+}
+
+function resolveAnchorWidth(imageNode: ImageNodeItem, fallbackWidth: number | undefined): number {
+  const width = Number(imageNode.width)
+  if (Number.isFinite(width) && width > 0) return width
+  const fallback = Number(fallbackWidth)
+  if (Number.isFinite(fallback) && fallback > 0) return fallback
+  return DEFAULT_IMAGE_NODE_LAYOUT_WIDTH
 }
 
 export function resolveImageNodeLayoutAnchor(
@@ -75,20 +76,15 @@ export function resolveImageNodeLayoutAnchor(
 ): ImageNodeLayoutAnchor | null {
   const url = resolveImageNodeDisplayUrl(imageNode)
   if (options.requireUrl && !url) return null
+  const payload = resolveImageNodeDisplayPayload(imageNode)
 
-  const width = Number(imageNode.width)
-  const fallbackWidth = Number(options.fallbackWidth)
   return {
     url,
     ratio: resolveImageNodeDisplayRatio(imageNode),
-    ...resolveImageNodeMediaIdentity(imageNode),
+    ...(payload?.mediaRef ? { mediaRef: payload.mediaRef } : {}),
+    ...(payload?.assetId ? { assetId: payload.assetId } : {}),
     x: Number(node.position?.x ?? imageNode.x ?? 0),
     y: Number(node.position?.y ?? imageNode.y ?? 0),
-    width:
-      Number.isFinite(width) && width > 0
-        ? width
-        : Number.isFinite(fallbackWidth) && fallbackWidth > 0
-          ? fallbackWidth
-          : DEFAULT_IMAGE_NODE_LAYOUT_WIDTH,
+    width: resolveAnchorWidth(imageNode, options.fallbackWidth),
   }
 }

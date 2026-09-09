@@ -1,14 +1,14 @@
 import type { ImageRetouchRecipe, ImageRetouchRecipeStep } from '../../../canvas-board/domain'
-import type { ImageRetouchPlan, ImageRetouchPlanStep } from './imageRetouchEngine'
+import type { ImageRetouchPlan, ImageRetouchPlanStep } from './retouchEngine'
 
 export function serializeImageRetouchPlan(
-  sourceMediaAssetId: number,
+  sourceAssetId: string,
   plan: ImageRetouchPlan,
   sourceMimeType?: string,
 ): ImageRetouchRecipe {
   return {
     version: 1,
-    sourceMediaAssetId,
+    sourceAssetId,
     ...(sourceMimeType ? { sourceMimeType } : {}),
     plan: plan.map(serializeStep),
   }

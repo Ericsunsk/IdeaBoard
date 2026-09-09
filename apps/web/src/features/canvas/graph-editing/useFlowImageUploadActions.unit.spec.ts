@@ -115,14 +115,13 @@ describe('useFlowImageUploadActions', () => {
     await expect(firstUpload).resolves.toBe(false)
 
     expect(snapshots.get('node-1')?.sourceImageUrl).toBe(
-      '/api/user/media-assets/asset_22/derivatives/preview/webp/content',
+      '/api/user/media-assets/asset_22/derivatives/preview/content',
     )
     expect(snapshots.get('node-1')?.sourceMediaRef).toEqual({
       assetId: 'asset_22',
       derivativeTier: 'preview',
-      derivativeFormat: 'webp',
     })
-    expect(updates).toEqual(['/api/user/media-assets/asset_22/derivatives/preview/webp/content'])
+    expect(updates).toEqual(['/api/user/media-assets/asset_22/derivatives/preview/content'])
     expect(warnings).toEqual([])
   })
 
@@ -364,11 +363,10 @@ describe('useFlowImageUploadActions', () => {
 
     await expect(task).resolves.toEqual({ kind: 'ready', nodeId: 'image-1' })
     expect(snapshots.get('image-1')).toMatchObject({
-      sourceImageUrl: '/api/user/media-assets/asset_61/derivatives/preview/webp/content',
+      sourceImageUrl: '/api/user/media-assets/asset_61/derivatives/preview/content',
       sourceMediaRef: {
         assetId: 'asset_61',
         derivativeTier: 'preview',
-        derivativeFormat: 'webp',
       },
       sourceImageRatio: 1,
     })
@@ -470,7 +468,7 @@ describe('useFlowImageUploadActions', () => {
 
     await expect(actions.retryLocalUpload('image-1')).resolves.toBe(true)
     expect(snapshots.get('image-1')?.sourceImageUrl).toBe(
-      '/api/user/media-assets/asset_62/derivatives/preview/webp/content',
+      '/api/user/media-assets/asset_62/derivatives/preview/content',
     )
     expect(runtimeStates).toEqual([
       { previewUrl: 'blob:retry-image' },

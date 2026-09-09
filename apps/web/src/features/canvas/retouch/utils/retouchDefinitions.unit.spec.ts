@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getImageRetouchDefaultParams, normalizeImageEffectLayer } from './imageRetouchDefinitions'
+import { getImageRetouchDefaultParams, normalizeImageEffectLayer } from './retouchDefinitions'
 import type { RetouchEffectLayer } from '../types'
 
 describe('imageRetouchDefinitions', () => {

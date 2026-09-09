@@ -143,7 +143,7 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
     const mediaRef: MediaRef = {
       assetId,
       derivativeTier: 'preview',
-      derivativeFormat: 'webp',
+
     }
     return { url: buildMediaBrowserURL(mediaRef), mediaRef }
   }

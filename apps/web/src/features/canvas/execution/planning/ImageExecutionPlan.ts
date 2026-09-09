@@ -2,6 +2,7 @@ import {
   getCanvasNodeImageInputLimit,
   normalizePromptAspectRatio,
   resolveImageNodeFrameSize,
+  resolveImageNodeLatestOutput,
   type FusionBlendPoint,
   type FusionNodeItem,
   type ImageNodeItem,
@@ -160,12 +161,19 @@ function normalizeExecutionRatio(value: unknown): number {
 }
 
 function toImageExecutionInput(
-  anchor: Pick<ImageNodeLayoutAnchor, 'url' | 'ratio' | 'mediaAssetId'>,
+  anchor: Pick<ImageNodeLayoutAnchor, 'url' | 'ratio' | 'assetId'>,
+  imageNode: Pick<ImageNodeItem, 'sourceMediaAssetId' | 'outputImages'>,
 ): ImageExecutionInput {
+  // Submission still addresses numeric board asset IDs (backend int64
+  // contract); delivery uses the string asset identity from the MediaRef.
+  const latestOutput = resolveImageNodeLatestOutput(imageNode)
+  const rawNumeric = latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId
+  const numericId = Number(rawNumeric)
   return {
     url: anchor.url.trim(),
     ratio: normalizeExecutionRatio(anchor.ratio),
-    ...(anchor.mediaAssetId ? { mediaAssetId: anchor.mediaAssetId } : {}),
+    ...(Number.isInteger(numericId) && numericId > 0 ? { mediaAssetId: numericId } : {}),
+    ...(anchor.assetId ? { assetId: anchor.assetId } : {}),
   }
 }
 
@@ -219,7 +227,7 @@ function resolveImageExecutionImage(
   const anchor = resolveImageNodeLayoutAnchor(node, imageNode, options)
   if (!anchor) return null
   return {
-    input: toImageExecutionInput(anchor),
+    input: toImageExecutionInput(anchor, imageNode),
     resultAnchor: toImageResultAnchor(anchor),
   }
 }
@@ -406,6 +414,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       url: `${image.url ?? ''}`.trim(),
       ratio: normalizeExecutionRatio(image.ratio),
       ...(image.mediaAssetId ? { mediaAssetId: image.mediaAssetId } : {}),
+      ...(image.assetId ? { assetId: image.assetId } : {}),
     }))
     if (normalizedReferences.some((image) => !image.url))
       failPlanning(i18n.global.t('canvas.execution.referenceImageMissingUrl'))
@@ -482,6 +491,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       source: {
         url: firstInput.url,
         ratio: firstInput.ratio,
+        ...(firstInput.assetId ? { assetId: firstInput.assetId } : {}),
       },
       taskPrompt,
       outputCount: requireRequestedOutputCount(outputCount),

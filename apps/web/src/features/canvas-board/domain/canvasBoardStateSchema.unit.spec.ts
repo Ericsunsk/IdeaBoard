@@ -288,7 +288,7 @@ describe('canvasBoardStateSchema', () => {
     expect(parsed).toBeNull()
   })
 
-  it('migrates v3 adjustmentRecipe to retouchRecipe during latest-state normalization', () => {
+  it('drops the v3 adjustmentRecipe during latest-state normalization', () => {
     const recipe = {
       version: 1,
       sourceMediaAssetId: 42,
@@ -308,7 +308,8 @@ describe('canvasBoardStateSchema', () => {
           sourceImageRatio: 1,
           outputStatus: 'ready',
           outputImages: [{ url: 'https://example.com/output.png', ratio: 1 }],
-          // Intentionally legacy: v3 payloads carry the pre-rename field.
+          // Intentionally legacy: v3 payloads carry the pre-rename field with
+          // a numeric asset identity that no longer exists.
           adjustmentRecipe: recipe,
         },
       ],
@@ -317,7 +318,7 @@ describe('canvasBoardStateSchema', () => {
     expect(parsed).not.toBeNull()
     const imageNode = parsed?.imageNodes[0]
     expect(parsed?.schemaVersion).toBe(CANVAS_BOARD_STATE_SCHEMA_VERSION)
-    expect(imageNode).toMatchObject({ retouchRecipe: recipe })
+    expect(imageNode).not.toHaveProperty('retouchRecipe')
     expect(imageNode).not.toHaveProperty('adjustmentRecipe')
   })
 

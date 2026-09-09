@@ -48,7 +48,7 @@ import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'
 import { ColorFilter } from '@iconoir/vue'
 import type { RetouchSharpenParams } from '../types'
-import { IMAGE_RETOUCH_DEFINITIONS } from '../utils/imageRetouchDefinitions'
+import { IMAGE_RETOUCH_DEFINITIONS } from '../utils/retouchDefinitions'
 import RetouchSlider from './RetouchSlider.vue'
 
 const props = defineProps<{

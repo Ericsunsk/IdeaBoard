@@ -8,7 +8,7 @@ import {
   type NormalizedHslEffect,
   type NormalizedImageRetouch,
   type NormalizedSharpenEffect,
-} from './imageRetouchDefinitions'
+} from './retouchDefinitions'
 import { createCurvesLuts, type RetouchCurvesLuts } from './retouchCurves'
 import { createLevelsLut } from './retouchLevels'
 
@@ -27,8 +27,6 @@ export type ImageRetouchPlanStepExecutionState = {
   sourceData: Uint8ClampedArray
   blurredRgb: Float32Array
 } | null
-
-const SHARPEN_WORK_FACTOR = 3
 
 export function applyImageRetouchInPlace(
   imageData: ImageData,
@@ -131,27 +129,6 @@ export function createImageRetouchPlanStepExecutionState(
   }
 }
 
-export function estimateImageRetouchPlanWorkUnits(
-  imageData: Pick<ImageData, 'data'>,
-  plan: ImageRetouchPlan,
-) {
-  return plan.reduce(
-    (total, step) => total + imageData.data.length * getImageRetouchPlanStepWorkFactor(step),
-    0,
-  )
-}
-
-export function estimateImageRetouchPlanStepRangeWorkUnits(
-  data: Uint8ClampedArray,
-  step: ImageRetouchPlanStep,
-  startByte: number,
-  endByte: number,
-) {
-  const start = alignPixelByteOffset(startByte)
-  const end = alignPixelByteOffset(Math.min(endByte, data.length))
-  return Math.max(0, end - start) * getImageRetouchPlanStepWorkFactor(step)
-}
-
 export function executeImageRetouchPlanStepRange(
   data: Uint8ClampedArray,
   step: ImageRetouchPlanStep,
@@ -177,10 +154,6 @@ export function executeImageRetouchPlanStepRange(
       applySharpenRetouch(data, step.params, start, end, state)
       break
   }
-}
-
-function getImageRetouchPlanStepWorkFactor(step: ImageRetouchPlanStep) {
-  return step.kind === 'sharpen' ? SHARPEN_WORK_FACTOR : 1
 }
 
 function appendChannelLut(

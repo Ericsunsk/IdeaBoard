@@ -55,7 +55,6 @@ const mediaRefSchema = v.strictObject({
     'processing',
     'processing-input',
   ]),
-  derivativeFormat: v.picklist(['webp', 'jpeg', 'png']),
 })
 
 const imageNodeOutputItemSchema = v.strictObject({
@@ -112,9 +111,23 @@ const imageRetouchRecipeStepSchema = v.union([
 
 const imageRetouchRecipeSchema = v.strictObject({
   version: v.literal(1),
-  sourceMediaAssetId: positiveIntegerSchema,
+  sourceAssetId: nonEmptyStringSchema,
   sourceMimeType: v.optional(nonEmptyStringSchema),
   plan: v.array(imageRetouchRecipeStepSchema),
+})
+
+const retouchStackEffectLayerSchema = v.strictObject({
+  id: nonEmptyStringSchema,
+  kind: v.picklist(['hsl', 'threshold', 'curves', 'levels', 'sharpen']),
+  name: v.string(),
+  visible: v.boolean(),
+  params: v.unknown(),
+})
+
+const imageRetouchStackSchema = v.strictObject({
+  version: v.literal(1),
+  layers: v.array(retouchStackEffectLayerSchema),
+  selectedLayerId: v.optional(nonEmptyStringSchema),
 })
 
 const boardStateMediaRefSchema = v.strictObject({
@@ -159,6 +172,7 @@ const imageNodeItemSchema = v.strictObject({
   sourceMediaRef: v.optional(mediaRefSchema),
   sourceMediaAssetId: v.optional(positiveIntegerSchema),
   retouchRecipe: v.optional(imageRetouchRecipeSchema),
+  retouchStack: v.optional(imageRetouchStackSchema),
   sourceImageRatio: positiveFiniteNumberSchema,
   outputCount: v.optional(outputCountSchema, DEFAULT_IMAGE_NODE_OUTPUT_COUNT),
   outputResolution: v.optional(outputResolutionSchema),

@@ -105,7 +105,7 @@ describe('flowImageDirectActionExecutor', () => {
 
     await expect(waitExistingOrLiveTaskImageResults('task-done')).resolves.toEqual([
       {
-        url: '/api/user/media-assets/asset_done/derivatives/preview/webp/content',
+        url: '/api/user/media-assets/asset_done/derivatives/preview/content',
         assetId: 'asset_done',
         width: 1000,
         height: 750,

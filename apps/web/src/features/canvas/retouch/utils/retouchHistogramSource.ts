@@ -1,6 +1,6 @@
 import type { RetouchEffectLayer, RetouchLayer } from '../types'
-import { executeImageRetouchPlan } from './imageRetouchEngine'
-import { buildImageRetouchPlanFromEffectLayers } from './imageRetouchPlanPipeline'
+import { executeImageRetouchPlan } from './retouchEngine'
+import { buildImageRetouchPlanFromEffectLayers } from './retouchPlanPipeline'
 import { flattenVisibleRetouchEffectLayersBeforeLayer } from './retouchLayerEffects'
 import { cloneImageData } from './imageDataUtils'
 

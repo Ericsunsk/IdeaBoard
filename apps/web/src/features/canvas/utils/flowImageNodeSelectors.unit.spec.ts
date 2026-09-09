@@ -28,7 +28,12 @@ describe('flowImageNodeSelectors', () => {
       sourceMediaAssetId: 100,
       outputImages: [
         { url: 'https://example.com/old.png', ratio: 1 },
-        { url: 'https://example.com/latest.png', ratio: 1.4, mediaAssetId: 200 },
+        {
+          url: 'https://example.com/latest.png',
+          ratio: 1.4,
+          mediaAssetId: 200,
+          mediaRef: { assetId: 'asset_latest', derivativeTier: 'preview' },
+        },
       ],
     })
 
@@ -36,18 +41,36 @@ describe('flowImageNodeSelectors', () => {
       url: 'https://example.com/latest.png',
       ratio: 1.4,
       mediaAssetId: 200,
+      mediaRef: { assetId: 'asset_latest', derivativeTier: 'preview' },
     })
     expect(resolveImageNodeDisplayPayload(imageNode)).toEqual({
-      url: 'https://example.com/latest.png',
+      url: '/api/user/media-assets/asset_latest/derivatives/preview/content',
       ratio: 1.4,
-      mediaAssetId: 200,
+      mediaRef: { assetId: 'asset_latest', derivativeTier: 'preview' },
+      assetId: 'asset_latest',
     })
   })
 
   it('falls back to source image data when no output image exists', () => {
     const imageNode = makeImageNode({
       sourceImageUrl: ' https://example.com/source-only.png ',
+      sourceMediaRef: { assetId: 'asset_source', derivativeTier: 'preview' },
       sourceMediaAssetId: 100,
+      sourceImageRatio: 0.5,
+      outputImages: [],
+    })
+
+    expect(resolveImageNodeDisplayPayload(imageNode)).toEqual({
+      url: '/api/user/media-assets/asset_source/derivatives/preview/content',
+      ratio: 0.5,
+      mediaRef: { assetId: 'asset_source', derivativeTier: 'preview' },
+      assetId: 'asset_source',
+    })
+  })
+
+  it('omits delivery identity when no media ref exists', () => {
+    const imageNode = makeImageNode({
+      sourceImageUrl: 'https://example.com/source-only.png',
       sourceImageRatio: 0.5,
       outputImages: [],
     })
@@ -55,7 +78,6 @@ describe('flowImageNodeSelectors', () => {
     expect(resolveImageNodeDisplayPayload(imageNode)).toEqual({
       url: 'https://example.com/source-only.png',
       ratio: 0.5,
-      mediaAssetId: 100,
     })
   })
 

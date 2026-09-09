@@ -199,7 +199,6 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
         const mediaRef: MediaRef = {
           assetId,
           derivativeTier: 'preview',
-          derivativeFormat: 'webp',
         }
         return {
           url: buildMediaBrowserURL(mediaRef),

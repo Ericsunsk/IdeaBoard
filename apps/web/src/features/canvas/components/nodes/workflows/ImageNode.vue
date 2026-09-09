@@ -115,7 +115,7 @@ const props = defineProps<{
   dragging: boolean
   copyMode: boolean
   stageHeight: number
-  displayImage: { url: string; mediaAssetId?: number | undefined } | null
+  displayImage: { url: string; assetId?: string | undefined } | null
   libraryImport?: LibraryImportFact | undefined
   localUpload?: FlowLocalUploadState | undefined
   emptyIconVariant?: 'image' | 'fusion'

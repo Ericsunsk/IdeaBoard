@@ -48,7 +48,7 @@ describe('useDisplayImagePreview', () => {
       'fetch',
       vi.fn(async (input: RequestInfo | URL) => {
         const url = typeof input === 'string' ? input : input.toString()
-        if (url.includes('/user/media-assets/42')) {
+        if (url.includes('/user/media-assets/asset-42')) {
           return new Response(
             JSON.stringify({
               code: 0,
@@ -182,13 +182,13 @@ describe('useDisplayImagePreview', () => {
     const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
     const scope = effectScope()
     const preview = scope.run(() =>
-      useDisplayImagePreview(sourceUrl, { maxSide: 640, mediaAssetId: 42 }),
+      useDisplayImagePreview(sourceUrl, { maxSide: 640, assetId: 'asset-42' }),
     )
     if (!preview) throw new Error('preview composable was not created')
 
     await vi.waitFor(() => expect(preview.displayUrl.value).toBe('/api/preview.webp'))
     expect(fetch).toHaveBeenCalledWith(
-      '/api/user/media-assets/42',
+      '/api/user/media-assets/asset-42',
       expect.objectContaining({ credentials: 'include', signal: expect.any(AbortSignal) }),
     )
     scope.stop()
@@ -200,7 +200,7 @@ describe('useDisplayImagePreview', () => {
     const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
     const scope = effectScope()
     const preview = scope.run(() =>
-      useDisplayImagePreview(sourceUrl, { maxSide, mediaAssetId: 42 }),
+      useDisplayImagePreview(sourceUrl, { maxSide, assetId: 'asset-42' }),
     )
     if (!preview) throw new Error('preview composable was not created')
 
@@ -253,7 +253,7 @@ describe('useDisplayImagePreview', () => {
     const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
     const scope = effectScope()
     const preview = scope.run(() =>
-      useDisplayImagePreview(sourceUrl, { maxSide: 640, mediaAssetId: 42, isVisible }),
+      useDisplayImagePreview(sourceUrl, { maxSide: 640, assetId: 'asset-42', isVisible }),
     )
     if (!preview) throw new Error('preview composable was not created')
 

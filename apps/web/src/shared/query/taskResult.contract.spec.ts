@@ -17,7 +17,7 @@ describe('taskResult image result helpers', () => {
       }),
     ).toEqual([
       {
-        url: '/api/user/media-assets/asset_42/derivatives/preview/webp/content',
+        url: '/api/user/media-assets/asset_42/derivatives/preview/content',
         assetId: 'asset_42',
         width: 1024,
         height: 768,

@@ -8,8 +8,8 @@ import {
   executeImageRetouchPlanStepRange,
   hasEffectiveImageRetouch,
   type ImageRetouchPlan,
-} from './imageRetouchEngine'
-import { normalizeImageEffectLayer } from './imageRetouchDefinitions'
+} from './retouchEngine'
+import { normalizeImageEffectLayer } from './retouchDefinitions'
 
 function makeImageData(values: number[], width = values.length / 4, height = 1) {
   class TestImageData {

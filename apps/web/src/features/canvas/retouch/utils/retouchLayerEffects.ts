@@ -1,5 +1,5 @@
 import type { RetouchEffectLayer, RetouchEditableLayer, RetouchLayer } from '../types'
-import { hasEffectiveImageRetouch } from './imageRetouchEngine'
+import { hasEffectiveImageRetouch } from './retouchEngine'
 
 export function flattenVisibleRetouchEffectLayers(
   layers: readonly RetouchLayer[],

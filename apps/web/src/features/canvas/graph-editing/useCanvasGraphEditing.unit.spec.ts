@@ -184,11 +184,10 @@ describe('useCanvasGraphEditing', () => {
     expect(harness.upload).toHaveBeenCalledWith(expect.any(File), 'board-a')
     expect(snapshot).toMatchObject({
       title: 'picked.png',
-      sourceImageUrl: '/api/user/media-assets/asset_42/derivatives/preview/webp/content',
+      sourceImageUrl: '/api/user/media-assets/asset_42/derivatives/preview/content',
       sourceMediaRef: {
         assetId: 'asset_42',
         derivativeTier: 'preview',
-        derivativeFormat: 'webp',
       },
       sourceImageRatio: 0.5,
       outputStatus: 'ready',
@@ -221,11 +220,10 @@ describe('useCanvasGraphEditing', () => {
     expect(promptSnapshot.inputImages).toEqual([
       expect.objectContaining({
         sourceType: 'external',
-        url: '/api/user/media-assets/asset_42/derivatives/preview/webp/content',
+        url: '/api/user/media-assets/asset_42/derivatives/preview/content',
         mediaRef: {
           assetId: 'asset_42',
           derivativeTier: 'preview',
-          derivativeFormat: 'webp',
         },
       }),
     ])

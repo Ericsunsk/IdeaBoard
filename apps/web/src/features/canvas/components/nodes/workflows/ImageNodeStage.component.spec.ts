@@ -14,10 +14,10 @@ afterEach(() => {
 vi.mock('../../../vue-flow-adapter/useDisplayImagePreview', () => ({
   useDisplayImagePreview: (
     sourceUrl: Parameters<typeof toValue>[0],
-    options?: { mediaAssetId?: Parameters<typeof toValue>[0] },
+    options?: { assetId?: Parameters<typeof toValue>[0] },
   ) => ({
     displayUrl: computed(() => {
-      if (toValue(options?.mediaAssetId)) return previewState.displayUrl ?? ''
+      if (toValue(options?.assetId)) return previewState.displayUrl ?? ''
       return previewState.displayUrl ?? toValue(sourceUrl) ?? ''
     }),
   }),
@@ -207,7 +207,7 @@ describe('ImageNodeStage Library import recovery', () => {
         nodeId: 'image-1',
         stageWidth: 280,
         stageHeight: 280,
-        displayImage: { url: '/api/user/media-assets/5/original/content', mediaAssetId: 5 },
+        displayImage: { url: '/api/user/media-assets/asset_5/original/content', assetId: 'asset_5' },
         active: false,
         dragging: false,
       },

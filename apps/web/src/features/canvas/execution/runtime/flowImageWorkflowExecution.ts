@@ -124,10 +124,10 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
   }
 
   async function resolveExecutionSource<
-    T extends { url: string; mediaAssetId?: number | undefined },
+    T extends { url: string; assetId?: string | undefined },
   >(source: T): Promise<T> {
-    if (!source.mediaAssetId) return source
-    const url = await resolveMediaAssetProcessingURL(source.mediaAssetId)
+    if (!source.assetId) return source
+    const url = await resolveMediaAssetProcessingURL(source.assetId)
     return { ...source, url }
   }
 

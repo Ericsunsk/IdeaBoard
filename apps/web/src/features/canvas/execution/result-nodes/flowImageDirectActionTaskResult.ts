@@ -85,7 +85,7 @@ export async function resolveTaskImageResultDisplay(
 
   const ratio = size ? size.height / size.width : fallbackRatio > 0 ? fallbackRatio : 1
   const mediaRef: MediaRef | undefined = normalized.assetId
-    ? { assetId: normalized.assetId, derivativeTier: 'preview', derivativeFormat: 'webp' }
+    ? { assetId: normalized.assetId, derivativeTier: 'preview' }
     : undefined
   return {
     url: mediaRef ? buildMediaBrowserURL(mediaRef) : normalized.url,

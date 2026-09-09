@@ -142,9 +142,11 @@ function isMigrationRecord(value: unknown): value is Record<string, unknown> {
 function migrateV3ImageNode(node: unknown): unknown {
   // Legacy v3 key — intentionally not renamed.
   if (!isMigrationRecord(node) || !('adjustmentRecipe' in node)) return node
-  const { adjustmentRecipe, ...rest } = node
-  if (adjustmentRecipe === undefined) return rest
-  return { ...rest, retouchRecipe: adjustmentRecipe }
+  // The v3 recipe carries a numeric asset identity that no longer exists.
+  // Without backward compatibility the recipe is dropped; the board itself
+  // stays loadable and the user can re-edit from the current image.
+  const { adjustmentRecipe: _dropped, ...rest } = node
+  return rest
 }
 
 /**

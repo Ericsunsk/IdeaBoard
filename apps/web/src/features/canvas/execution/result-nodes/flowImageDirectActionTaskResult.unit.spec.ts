@@ -15,8 +15,8 @@ describe('flowImageDirectActionTaskResult', () => {
         loadImageSize,
       ),
     ).resolves.toEqual({
-      url: '/api/user/media-assets/asset_1/derivatives/preview/webp/content',
-      mediaRef: { assetId: 'asset_1', derivativeTier: 'preview', derivativeFormat: 'webp' },
+      url: '/api/user/media-assets/asset_1/derivatives/preview/content',
+      mediaRef: { assetId: 'asset_1', derivativeTier: 'preview', },
       ratio: 0.5,
       width: 400,
       height: 200,
@@ -34,8 +34,8 @@ describe('flowImageDirectActionTaskResult', () => {
         loadImageSize,
       ),
     ).resolves.toMatchObject({
-      url: '/api/user/media-assets/asset_42/derivatives/preview/webp/content',
-      mediaRef: { assetId: 'asset_42', derivativeTier: 'preview', derivativeFormat: 'webp' },
+      url: '/api/user/media-assets/asset_42/derivatives/preview/content',
+      mediaRef: { assetId: 'asset_42', derivativeTier: 'preview', },
     })
   })
 
@@ -49,12 +49,12 @@ describe('flowImageDirectActionTaskResult', () => {
         loadImageSize,
       ),
     ).resolves.toEqual({
-      url: '/api/user/media-assets/asset_1/derivatives/preview/webp/content',
-      mediaRef: { assetId: 'asset_1', derivativeTier: 'preview', derivativeFormat: 'webp' },
+      url: '/api/user/media-assets/asset_1/derivatives/preview/content',
+      mediaRef: { assetId: 'asset_1', derivativeTier: 'preview', },
       ratio: 1.25,
     })
     expect(loadImageSize).toHaveBeenCalledWith(
-      '/api/user/media-assets/asset_1/derivatives/preview/webp/content',
+      '/api/user/media-assets/asset_1/derivatives/preview/content',
     )
   })
 
@@ -70,7 +70,7 @@ describe('flowImageDirectActionTaskResult', () => {
         vi.fn(async () => ({ width: 100, height: 100 })),
       ),
     ).resolves.toMatchObject({
-      url: '/api/user/media-assets/asset_1/derivatives/preview/webp/content',
+      url: '/api/user/media-assets/asset_1/derivatives/preview/content',
       resultIndex: 0,
     })
   })

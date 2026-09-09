@@ -11,7 +11,7 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions): Canvas
   const session = createImageToolSession(options)
   const commands = createImageToolCommands(session)
   const chrome = createImageToolChromeAdapter(session, commands.chromeCommands)
-  const nodeBindings = createImageToolNodeBindings(session, chrome.retouchRenderedPreview)
+  const nodeBindings = createImageToolNodeBindings(session, chrome.retouchStage)
 
   const isChromeHidden = computed(() => !!session.retouchNodeId.value)
   const isCanvasLocked = computed(

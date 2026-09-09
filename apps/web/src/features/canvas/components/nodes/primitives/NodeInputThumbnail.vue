@@ -37,7 +37,7 @@ import { useDisplayImagePreview } from '../../../vue-flow-adapter/useDisplayImag
 const props = withDefaults(
   defineProps<{
     src: string
-    mediaAssetId?: number | undefined
+    assetId?: string | undefined
     alt?: string
     draggable?: boolean
     removable?: boolean
@@ -47,7 +47,7 @@ const props = withDefaults(
   }>(),
   {
     alt: '',
-    mediaAssetId: undefined,
+    assetId: undefined,
     draggable: false,
     removable: false,
     previewMaxSide: 128,
@@ -73,7 +73,7 @@ const isThumbnailVisible = useElementVisibility(thumbnailRef)
 
 const { displayUrl } = useDisplayImagePreview(() => props.src, {
   maxSide: () => props.previewMaxSide,
-  mediaAssetId: () => props.mediaAssetId,
+  assetId: () => props.assetId,
   isVisible: isThumbnailVisible,
 })
 

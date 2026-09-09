@@ -16,7 +16,7 @@ import type {
   RetouchSharpenParams,
   RetouchThresholdParams,
 } from '../types'
-import { IMAGE_RETOUCH_DEFINITIONS, getImageRetouchDefaultParams } from './imageRetouchDefinitions'
+import { IMAGE_RETOUCH_DEFINITIONS, getImageRetouchDefaultParams } from './retouchDefinitions'
 import { normalizeCurvesParams } from './retouchCurves'
 import { clampLevelsHandles } from './retouchLevels'
 import { normalizeThresholdEffect } from './retouchThreshold'

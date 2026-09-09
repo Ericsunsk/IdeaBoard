@@ -287,19 +287,17 @@ export function useGetUserMediaAssetMetadataBatch<
 export const getGetUserMediaAssetDerivativeContentUrl = (
   assetId: string,
   tier: 'thumb' | 'preview' | 'large-preview' | 'processing' | 'processing-input',
-  format: 'webp' | 'jpeg' | 'png',
 ) => {
-  return `/user/media-assets/${encodeURIComponent(String(assetId))}/derivatives/${encodeURIComponent(String(tier))}/${encodeURIComponent(String(format))}/content`
+  return `/user/media-assets/${encodeURIComponent(String(assetId))}/derivatives/${encodeURIComponent(String(tier))}/content`
 }
 
 export const getUserMediaAssetDerivativeContent = async (
   assetId: string,
   tier: 'thumb' | 'preview' | 'large-preview' | 'processing' | 'processing-input',
-  format: 'webp' | 'jpeg' | 'png',
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<Blob | ApiResponseBase> => {
   return orvalMutator<Blob | ApiResponseBase>(
-    getGetUserMediaAssetDerivativeContentUrl(assetId, tier, format),
+    getGetUserMediaAssetDerivativeContentUrl(assetId, tier),
     {
       ...options,
       method: 'GET',
@@ -310,9 +308,8 @@ export const getUserMediaAssetDerivativeContent = async (
 export const getGetUserMediaAssetDerivativeContentQueryKey = (
   assetId: MaybeRefOrGetter<string>,
   tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview' | 'processing' | 'processing-input'>,
-  format: MaybeRefOrGetter<'webp' | 'jpeg' | 'png'>,
 ) => {
-  return ['user', 'media-assets', assetId, 'derivatives', tier, format, 'content'] as const
+  return ['user', 'media-assets', assetId, 'derivatives', tier, 'content'] as const
 }
 
 export const getGetUserMediaAssetDerivativeContentQueryOptions = <
@@ -321,7 +318,6 @@ export const getGetUserMediaAssetDerivativeContentQueryOptions = <
 >(
   assetId: MaybeRefOrGetter<string>,
   tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview' | 'processing' | 'processing-input'>,
-  format: MaybeRefOrGetter<'webp' | 'jpeg' | 'png'>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getUserMediaAssetDerivativeContent>>, TError, TData>
@@ -331,12 +327,12 @@ export const getGetUserMediaAssetDerivativeContentQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getGetUserMediaAssetDerivativeContentQueryKey(assetId, tier, format)
+  const queryKey = getGetUserMediaAssetDerivativeContentQueryKey(assetId, tier)
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserMediaAssetDerivativeContent>>> = ({
     signal,
   }) =>
-    getUserMediaAssetDerivativeContent(toValue(assetId), toValue(tier), toValue(format), {
+    getUserMediaAssetDerivativeContent(toValue(assetId), toValue(tier), {
       signal,
       ...requestOptions,
     })
@@ -349,9 +345,7 @@ export const getGetUserMediaAssetDerivativeContentQueryOptions = <
         toValue(assetId) !== null &&
         toValue(assetId) !== undefined &&
         toValue(tier) !== null &&
-        toValue(tier) !== undefined &&
-        toValue(format) !== null &&
-        toValue(format) !== undefined,
+        toValue(tier) !== undefined,
     ),
     ...queryOptions,
   } as UseQueryOptions<
@@ -372,7 +366,6 @@ export function useGetUserMediaAssetDerivativeContent<
 >(
   assetId: MaybeRefOrGetter<string>,
   tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview' | 'processing' | 'processing-input'>,
-  format: MaybeRefOrGetter<'webp' | 'jpeg' | 'png'>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getUserMediaAssetDerivativeContent>>, TError, TData>
@@ -381,12 +374,7 @@ export function useGetUserMediaAssetDerivativeContent<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getGetUserMediaAssetDerivativeContentQueryOptions(
-    assetId,
-    tier,
-    format,
-    options,
-  )
+  const queryOptions = getGetUserMediaAssetDerivativeContentQueryOptions(assetId, tier, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createImageProcessingRuntime } from './ImageProcessingRuntime'
+import { createImageProcessingRuntime } from './imageProcessingRuntime'
 import type { ImageProcessingBackend } from './types'
 
 describe('ImageProcessingRuntime', () => {
