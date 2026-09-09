@@ -13,11 +13,11 @@ import {
 import { describe, expect, it, vi } from 'vitest'
 import { cleanup } from '@testing-library/vue'
 import { render } from '../../../../test/render'
-import type { ImageToolStageBinding } from '../imageToolBindings'
+import type { ImageToolStageBinding } from '../bindings'
 import ImageToolStagePresentation from './ImageToolStagePresentation.vue'
 
-vi.mock('../../retouch/utils/retouchWebglEngine', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../retouch/utils/retouchWebglEngine')>()
+vi.mock('../../retouch/utils/webglEngine', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../retouch/utils/webglEngine')>()
   return {
     ...actual,
     isWebGLRetouchSupported: () => true,

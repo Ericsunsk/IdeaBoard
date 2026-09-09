@@ -42,7 +42,7 @@ vi.mock('../execution', async (importOriginal) => {
   return {
     ...actual,
     createImageExecutionPlanner: vi.fn(() => mocks.planner),
-    useFlowImageWorkflowExecution: vi.fn((options) => {
+    useImageWorkflowExecution: vi.fn((options) => {
       mocks.executionOptions = options as {
         onWarning: (message: string) => void
         onError?: (error: unknown) => void

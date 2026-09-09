@@ -6,7 +6,7 @@ import {
   type CanvasGraphPatchDirection,
   type CanvasGraphTransactionOptions,
   type CanvasGraphTransactionSummary,
-} from './CanvasGraphStore'
+} from './canvasGraphStore'
 
 /**
  * Owns the canonical graph for exactly one attached Canvas Board.  Flow is a

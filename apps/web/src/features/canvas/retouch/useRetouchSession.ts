@@ -15,9 +15,9 @@ import {
   getSelectedEffect,
   SOURCE_LAYER_ID,
   type RetouchLayerCommand,
-} from './utils/retouchLayerStack'
-import { deserializeRetouchStack } from './utils/retouchStackPersistence'
-import { getImageRetouchDefaultParams } from './utils/retouchDefinitions'
+} from './utils/layerStack'
+import { deserializeRetouchStack } from './utils/stackPersistence'
+import { getImageRetouchDefaultParams } from './utils/definitions'
 
 export function useRetouchSession() {
   const stack = ref(createInitialLayerStack())

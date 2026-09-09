@@ -6,7 +6,7 @@ import {
   createIdentityCurvePoints,
   normalizeCurveChannelPoints,
   type NormalizedCurveChannelPoint,
-} from '../utils/retouchCurves'
+} from '../utils/curves'
 import RetouchCurveGraph from './RetouchCurveGraph.vue'
 
 function renderCurveGraph(

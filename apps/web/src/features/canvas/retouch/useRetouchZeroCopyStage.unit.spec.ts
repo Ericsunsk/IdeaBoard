@@ -16,8 +16,8 @@ const rendererMocks = vi.hoisted(() => ({
   isContextLost: vi.fn(() => false),
 }))
 
-vi.mock('./utils/retouchWebglEngine', async (importOriginal) => {
-  const original = await importOriginal<typeof import('./utils/retouchWebglEngine')>()
+vi.mock('./utils/webglEngine', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./utils/webglEngine')>()
   return {
     ...original,
     isWebGLRetouchSupported: () => true,

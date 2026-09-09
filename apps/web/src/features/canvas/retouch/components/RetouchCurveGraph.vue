@@ -50,7 +50,7 @@ import { useI18n } from 'vue-i18n'
 import { nextTick, ref, useId, watch, type ComponentPublicInstance } from 'vue'
 import { usePointerDragSession } from '../../utils/interaction/usePointerDragSession'
 import type { RetouchCurveChannel } from '../types'
-import type { NormalizedCurveChannelPoint } from '../utils/retouchCurves'
+import type { NormalizedCurveChannelPoint } from '../utils/curves'
 
 const props = defineProps<{
   activeCurvePath: string

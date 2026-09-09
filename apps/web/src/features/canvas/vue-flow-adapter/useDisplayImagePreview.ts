@@ -7,7 +7,7 @@ import {
   watch,
   type MaybeRefOrGetter,
 } from 'vue'
-import { canvasToBlob, resolveFetchUrl } from '../services/flowMediaIO'
+import { canvasToBlob, resolveFetchUrl } from '../services/canvasMediaIO'
 import {
   detectCanvasTransparency,
   resolvePreviewMimeType,

@@ -20,7 +20,7 @@ import { useCanvasGraphEditing } from './useCanvasGraphEditing'
 import {
   writeCanvasLibraryImportTransfer,
   type CanvasLibraryImportDescriptor,
-} from '../../library/libraryTransfer'
+} from '../../library'
 
 const mocks = vi.hoisted(() => ({
   prepareImageAssetForUpload: vi.fn(),

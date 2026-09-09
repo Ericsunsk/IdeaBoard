@@ -6,7 +6,7 @@ import { i18n } from '../../../../shared/i18n'
 import type { CanvasGraphStore } from '../../graph-runtime'
 import type { CanvasRendererMetricsPort } from '../../vue-flow-adapter'
 import { loadImageSizeFromUrl } from '../media/imageSize'
-import type { ActivatedImageExecutionPlan } from '../planning/ImageExecutionPlan'
+import type { ActivatedImageExecutionPlan } from '../planning/imageExecutionPlan'
 import {
   resolveFirstTaskImageResultDisplay,
   resolveTaskImageResultAtIndexDisplay,
@@ -16,13 +16,13 @@ import {
   type PendingImageResultExecution,
   usePendingImageResultExecution,
 } from '../result-nodes/usePendingImageResultNodes'
-import { waitExistingOrLiveTaskImageResults } from '../task-runner/flowImageDirectActionExecutor'
+import { waitExistingOrLiveTaskImageResults } from '../task-runner/imageDirectActionExecutor'
 import {
   createCanvasTaskClientActionId,
   type ClientActionIdFactory,
   withTaskClientActionId,
 } from '../task-runner/taskClientActionIds'
-import { buildImageExecutionTaskRequest } from '../commands/flowImageTaskRequests'
+import { buildImageExecutionTaskRequest } from '../commands/imageTaskRequests'
 import { createPendingImageWorkflowRunner } from '../runtime/pendingImageWorkflowRunner'
 import type { PendingImageExecutionCore } from '../pending-execution'
 import { createCanvasExecutionRecoveryCoordinator } from '../application/canvasExecutionRecoveryCoordinator'

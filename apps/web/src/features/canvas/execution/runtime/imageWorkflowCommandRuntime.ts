@@ -5,7 +5,7 @@ import {
   type ActivatedImageExecutionPlan,
   type ImageExecutionInput,
   type ImageExecutionPlan,
-} from '../planning/ImageExecutionPlan'
+} from '../planning/imageExecutionPlan'
 import type { OutpaintRect } from '../../utils/outpaintGeometry'
 import { createCanvasActivationId } from '../task-runner/taskClientActionIds'
 import { i18n } from '../../../../shared/i18n'

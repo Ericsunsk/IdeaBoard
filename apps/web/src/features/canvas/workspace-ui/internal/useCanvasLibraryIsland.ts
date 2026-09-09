@@ -2,7 +2,7 @@ import { onScopeDispose, ref } from 'vue'
 import {
   createLibraryFolderFacts,
   createLibraryMutationPublisher,
-} from '../../../library/libraryFolderFacts'
+} from '../../../library'
 
 /** Owns Canvas-local Library visibility and its shared Library coordination facts. */
 export function useCanvasLibraryIsland() {

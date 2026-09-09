@@ -63,8 +63,8 @@ import {
   moveLevelsOutputHandle,
   type RetouchLevelsConstraint,
   type RetouchLevelsOutputHandleId,
-} from '../utils/retouchLevels'
-import { RETOUCH_CHANNEL_MAX, RETOUCH_CHANNEL_MIN } from '../utils/retouchChannelScale'
+} from '../utils/levels'
+import { RETOUCH_CHANNEL_MAX, RETOUCH_CHANNEL_MIN } from '../utils/channelScale'
 import { readFiniteNumberInputValue } from '../utils/readFiniteNumberInputValue'
 
 const props = defineProps<{

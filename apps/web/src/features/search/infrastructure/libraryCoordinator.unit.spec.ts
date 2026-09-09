@@ -7,12 +7,19 @@ const mocks = vi.hoisted(() => ({
   removeSearchReference: vi.fn(),
 }))
 
-vi.mock('../../library/libraryResource', () => ({
-  getLibraryFolders: mocks.getLibraryFolders,
-  saveSearchReference: mocks.saveSearchReference,
-  removeSearchReference: mocks.removeSearchReference,
-  libraryAssetKey: (provider: string, sourceID: string) => `${provider}:${sourceID}`,
-}))
+vi.mock('../../library', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../library')>()
+  return {
+    ...actual,
+    // Route the shared Folder facts through the stubbed loader so refresh
+    // behavior is observable without reaching past the public entrypoint.
+    createLibraryFolderFacts: () => actual.createLibraryFolderFacts(mocks.getLibraryFolders),
+    getLibraryFolders: mocks.getLibraryFolders,
+    saveSearchReference: mocks.saveSearchReference,
+    removeSearchReference: mocks.removeSearchReference,
+    libraryAssetKey: (provider: string, sourceID: string) => `${provider}:${sourceID}`,
+  }
+})
 
 const reference = {
   provider: 'unsplash' as const,

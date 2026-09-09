@@ -20,14 +20,14 @@
 import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'
 import type { RetouchThresholdParams } from '../types'
-import { createRetouchHistogram, sampleHistogramPath } from '../utils/retouchHistogram'
-import { retouchChannelToPlotPercent } from '../utils/retouchChannelScale'
+import { createRetouchHistogram, sampleHistogramPath } from '../utils/histogram'
+import { retouchChannelToPlotPercent } from '../utils/channelScale'
 import {
   RETOUCH_THRESHOLD_MARKER_ID,
   createThresholdMarker,
   moveThresholdHandle,
   normalizeThresholdEffect,
-} from '../utils/retouchThreshold'
+} from '../utils/threshold'
 import RetouchHistogramPlot, { type RetouchHistogramPlotMarker } from './RetouchHistogramPlot.vue'
 import RetouchThresholdFields from './RetouchThresholdFields.vue'
 import './styles/retouch-histogram-controls.css'

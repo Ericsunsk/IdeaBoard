@@ -4,7 +4,7 @@ import { USER_SEARCH_PATH } from '../../../shared/constants/routePaths'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
-import { libraryAssetKey, type LibrarySearchReference } from '../../library/libraryResource'
+import { libraryAssetKey, type LibrarySearchReference } from '../../library'
 import {
   getLibraryIslandState,
   setLibraryIslandState,

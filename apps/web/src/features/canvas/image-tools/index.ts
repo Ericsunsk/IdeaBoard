@@ -9,4 +9,4 @@ export type {
   ImageToolPresentationBinding,
   ImageToolStageBinding,
   CanvasImageTools,
-} from './imageToolBindings'
+} from './bindings'

@@ -30,7 +30,7 @@ import {
   moveLevelsHandle,
   type RetouchLevelsConstraint,
   type RetouchLevelsInputHandleId,
-} from '../utils/retouchLevels'
+} from '../utils/levels'
 import { readFiniteNumberInputValue } from '../utils/readFiniteNumberInputValue'
 
 const props = defineProps<{

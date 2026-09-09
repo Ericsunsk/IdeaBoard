@@ -7,7 +7,7 @@ import {
   isCanvasBillingPreflightError,
   type ImageWorkflowCommands,
   useCanvasExecutionWorkspace,
-  useFlowImageWorkflowExecution,
+  useImageWorkflowExecution as useRuntimeImageWorkflowExecution,
   type PendingImageExecutionCore,
 } from '../execution'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
@@ -15,7 +15,7 @@ import type { CanvasGraphStore } from '../graph-runtime'
 import type { CanvasRendererMetricsPort } from '../vue-flow-adapter'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { TaskImageResult } from '../../../shared/query/taskResult'
-import { waitExistingOrLiveTaskImageResults } from '../execution/task-runner/flowImageDirectActionExecutor'
+import { waitExistingOrLiveTaskImageResults } from '../execution/task-runner/imageDirectActionExecutor'
 
 type CanvasTaskExecutionFeedback = CanvasFeedback['taskExecution']
 
@@ -123,7 +123,7 @@ export function useImageWorkflowExecution(
     onWarning: handleWorkflowWarning,
     onError: handleWorkflowError,
   })
-  const workflow = useFlowImageWorkflowExecution({
+  const workflow = useRuntimeImageWorkflowExecution({
     nodes: options.nodes,
     edges: options.edges,
     readCanvasGraphStore: options.readCanvasGraphStore,

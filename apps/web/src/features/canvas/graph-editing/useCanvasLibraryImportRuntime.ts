@@ -15,8 +15,8 @@ import {
 import { createFlowGraphCommandOptions } from '../vue-flow-adapter/flowGraphAdapterCommandSideEffects'
 import type { CanvasVueFlowGraphAdapter } from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
-import type { CanvasLibraryImportDescriptor } from '../../library/libraryTransfer'
-import type { LibraryAssetMaterializer } from '../../library/libraryResource'
+import type { CanvasLibraryImportDescriptor } from '../../library'
+import type { LibraryAssetMaterializer } from '../../library'
 import { preloadImage } from '../../../shared/media/preloadImage'
 
 type UseCanvasLibraryImportRuntimeOptions = {

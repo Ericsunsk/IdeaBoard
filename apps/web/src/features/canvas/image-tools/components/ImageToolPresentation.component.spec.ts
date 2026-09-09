@@ -6,7 +6,7 @@ import type {
   ImageToolChromeCommands,
   ImageToolChromeModel,
   ImageToolPresentationBinding,
-} from '../imageToolBindings'
+} from '../bindings'
 import ImageToolPresentation from './ImageToolPresentation.vue'
 
 const MaskChromeStub = defineComponent({

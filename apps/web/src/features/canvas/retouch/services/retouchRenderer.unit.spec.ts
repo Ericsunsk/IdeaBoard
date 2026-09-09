@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RetouchEffectLayer } from '../types'
 import type { ImageProcessingRuntime } from '../runtime/types'
 import * as runtimeModule from '../runtime/retouchRuntime'
-import { buildImageRetouchPlan } from '../utils/retouchPlanPipeline'
+import { buildImageRetouchPlan } from '../utils/planPipeline'
 import { cancelImageRetouchFinalRender, renderImageRetouchFile } from './retouchRenderer'
 
 const rendererMocks = vi.hoisted(() => ({
@@ -15,8 +15,8 @@ const rendererMocks = vi.hoisted(() => ({
   isContextLost: vi.fn(() => false),
 }))
 
-vi.mock('../utils/retouchWebglEngine', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../utils/retouchWebglEngine')>()
+vi.mock('../utils/webglEngine', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../utils/webglEngine')>()
   return {
     ...original,
     isWebGLRetouchSupported: () => true,

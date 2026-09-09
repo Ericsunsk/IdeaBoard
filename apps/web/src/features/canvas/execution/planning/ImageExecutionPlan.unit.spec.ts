@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ImageNodeItem } from '../../../canvas-board/domain'
-import { createImageExecutionPlanner, prepareFusionExecutionPlan } from './ImageExecutionPlan'
+import { createImageExecutionPlanner, prepareFusionExecutionPlan } from './imageExecutionPlan'
 import {
   resolveFlowSourceImageRatio,
   resolveSourceImageFromNode,

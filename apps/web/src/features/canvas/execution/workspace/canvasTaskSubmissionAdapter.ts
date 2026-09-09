@@ -2,7 +2,7 @@ import type { SubmitTaskData, SubmitTaskReadinessRequestData } from '../../../..
 import {
   assertTaskRequestReady,
   submitTaskRequest,
-} from '../task-runner/flowImageDirectActionExecutor'
+} from '../task-runner/imageDirectActionExecutor'
 
 export type CanvasTaskSubmission = {
   taskId: string

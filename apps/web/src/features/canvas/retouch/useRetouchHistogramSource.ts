@@ -3,7 +3,7 @@ import type { RetouchEffectLayer, RetouchLayer, RetouchRenderedPreview } from '.
 import {
   resolveRetouchHistogramSource,
   type RetouchHistogramSourceResolution,
-} from './utils/retouchHistogramSource'
+} from './utils/histogramSource'
 
 type UseRetouchHistogramSourceOptions = {
   isAdjustMode: Ref<boolean> | ComputedRef<boolean>

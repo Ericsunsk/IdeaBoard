@@ -64,14 +64,15 @@ vi.mock('../application/useSearchSession', () => ({
   },
 }))
 
-vi.mock('../../library/libraryResource', () => ({
-  libraryAssetKey: (provider: string, id: string) => `${provider}:${id}`,
-}))
-
-vi.mock('../../library/libraryTransfer', () => ({
-  readSearchReferenceTransfer: vi.fn(),
-  writeSearchReferenceTransfer: vi.fn(),
-}))
+vi.mock('../../library', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../library')>()
+  return {
+    ...actual,
+    libraryAssetKey: (provider: string, id: string) => `${provider}:${id}`,
+    readSearchReferenceTransfer: vi.fn(),
+    writeSearchReferenceTransfer: vi.fn(),
+  }
+})
 
 function createSession() {
   const references = ref<{ key: string }[]>([])

@@ -38,7 +38,7 @@ _Avoid_: cross-user cache read, anonymous query gate bypass
 | feed core    | `application/feed.ts` + `infrastructure/feedPersistence.ts`（30min TTL 快照 + scroll，快照写延后到 idle）。             | `application/createSearchFeed`；`reload` 用 `keepResultsOnNextLoad` 保卡。                                                                 | `savedKeys` 手动回填必须带 `savedMutationRevision` 防旧写覆盖。 |
 | resource     | 唯一的 generated 调用处：灵感搜索、视觉抽取、失败上报、计费询价；`inFlightRequests` 去重，query 限 200 rune。           | `infrastructure/searchResource` / `infrastructure/visionBillingResource`（`sku=ai-search:vision` 纯询价展示）。                            | `hold/capture` 不在 search 侧展示，只进 admin 账本。            |
 | lifecycle    | 会话装配（`application/useSearchSession`/`presentation/useSearchScreenRuntime`）、vision 生命周期、lightbox、引用集合。 | `requireLogin`（设 pending + 开 overlay）、`resumePendingAction`。                                                                         | `effectScope` 按 user 会话隔离；旧 scope 必须 dispose。         |
-| bridge       | Library 存/删与引用转换。                                                                                               | `infrastructure/libraryBridge`（纯映射）、`infrastructure/libraryCoordinator`（`provide/inject search:library-coordinator`）。             | 底层写仍走 `library/libraryResource`，桥接只做投影与回写。      |
+| bridge       | Library 存/删与引用转换。                                                                                               | `infrastructure/libraryBridge`（纯映射）、`infrastructure/libraryCoordinator`（`provide/inject search:library-coordinator`）。             | 底层写经 `features/library` 公开出口，桥接只做投影与回写。      |
 | persistence  | scope 隔离的 sessionStorage 原语、feed/island/vision/continuation 各自键。                                              | `infrastructure/browserPersistence` (`searchScopedStorageKey(:scope)`)；`anonymous-query-gate` 同 query 去重、上限 5。                      | vision 意图与 `File/blob` 只放内存，不得进 storage。            |
 
 ## Rules
@@ -46,7 +46,7 @@ _Avoid_: cross-user cache read, anonymous query gate bypass
 - `?q` 是唯一真源：draft 只用于输入框，提交即写 URL，feed 只响应 URL。
 - 不用 `useQuery` 存 feed/server 派生；`savedKeys` 手动回填且必须过 revision。
 - 视觉引用上限 4、单文件 10MB、batch 上限 8；`blob:` URL revoke 责任在引用集合。
-- 跨 feature 只碰 `auth/authOverlay`（`requireLogin`）与 `library/*Resource`（桥接），不拥有 gallery，不碰 Canvas。
+- 跨 feature 只碰 `auth/authOverlay`（`requireLogin`）与 `features/library` 公开出口（桥接），不拥有 gallery，不碰 Canvas。
 
 ## State Machines and Invariants
 

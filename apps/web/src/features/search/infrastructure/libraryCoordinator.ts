@@ -3,13 +3,13 @@ import { inject, provide, type InjectionKey } from 'vue'
 import {
   createLibraryFolderFacts,
   createLibraryMutationPublisher,
-} from '../../library/libraryFolderFacts'
+} from '../../library'
 import {
   removeSearchReference,
   saveSearchReference,
   libraryAssetKey,
   type LibrarySearchReference,
-} from '../../library/libraryResource'
+} from '../../library'
 
 /**
  * The Search screen's one coordination boundary for Library Folder facts and

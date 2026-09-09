@@ -1,4 +1,4 @@
-import type { ImageRetouchPlan } from '../utils/retouchEngine'
+import type { ImageRetouchPlan } from '../utils/engine'
 
 export type ImageProcessingErrorCode =
   'backend-failed' | 'cancelled' | 'encode-failed' | 'invalid-source' | 'stale' | 'unknown'

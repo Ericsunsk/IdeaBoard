@@ -22,9 +22,13 @@ vi.mock('../infrastructure/visionBillingResource', () => ({
 vi.mock('../infrastructure/searchResource', () => ({
   extractVisionSearch: mocks.extractVisionSearch,
 }))
-vi.mock('../../library/libraryResource', () => ({
-  libraryAssetKey: (provider: string, sourceID: string) => `${provider}:${sourceID}`,
-}))
+vi.mock('../../library', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../library')>()
+  return {
+    ...actual,
+    libraryAssetKey: (provider: string, sourceID: string) => `${provider}:${sourceID}`,
+  }
+})
 
 function createLifecycle(options: { authenticated?: boolean; scope?: string } = {}) {
   const authenticated = ref(options.authenticated ?? true)

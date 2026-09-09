@@ -93,7 +93,7 @@ import { useImageInputSlots } from '../primitives/useImageInputSlots'
 import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../../canvas-board/domain'
 import { WORKFLOW_FEATURE } from '../../../../../shared/domain/workflowFeatures'
 import { useCanvasBillingQuote } from '../../../execution'
-import { buildGenerationTaskRequest } from '../../../execution/commands/flowImageTaskRequests'
+import { buildGenerationTaskRequest } from '../../../execution/commands/imageTaskRequests'
 
 const props = defineProps<{
   node: PromptNodeItem

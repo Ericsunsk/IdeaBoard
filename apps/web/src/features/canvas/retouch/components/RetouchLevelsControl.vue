@@ -23,11 +23,11 @@
 import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'
 import type { RetouchLevelsParams } from '../types'
-import { createRetouchHistogram, sampleHistogramPath } from '../utils/retouchHistogram'
+import { createRetouchHistogram, sampleHistogramPath } from '../utils/histogram'
 import {
   retouchChannelToPlotPercent,
   retouchPlotPercentToChannel,
-} from '../utils/retouchChannelScale'
+} from '../utils/channelScale'
 import {
   clampLevelsHandles,
   createLevelsInputConstraints,
@@ -35,7 +35,7 @@ import {
   createLevelsOutputConstraints,
   moveLevelsHandle,
   type RetouchLevelsInputHandleId,
-} from '../utils/retouchLevels'
+} from '../utils/levels'
 import RetouchHistogramPlot, { type RetouchHistogramPlotMarker } from './RetouchHistogramPlot.vue'
 import RetouchLevelsFields from './RetouchLevelsFields.vue'
 import RetouchLevelsOutputControl from './RetouchLevelsOutputControl.vue'

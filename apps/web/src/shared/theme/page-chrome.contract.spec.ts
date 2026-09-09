@@ -11,7 +11,7 @@ const consumers = {
   navigation: readSource('features/user-shell/components/UserWorkspaceNavigation.vue'),
   searchPage: readSource('features/search/presentation/pages/SearchPage.vue'),
   searchBatchDock: readSource('features/search/presentation/components/SearchBatchActionDock.vue'),
-  boardsSkin: readSource('features/board-catalog/lib/boardCatalogSkin.ts'),
+  boardsSkin: readSource('features/board-catalog/lib/skin.ts'),
   libraryIsland: readSource('features/library/components/LibraryFloatingIsland.vue'),
   canvasChrome: readSource('features/canvas/workspace-chrome/components/CanvasChrome.vue'),
   canvasBoardHeader: readSource(
@@ -32,7 +32,7 @@ describe('Cross-feature page chrome surface contract', () => {
   it('uses a command menu instead of a form select for Boards sorting', () => {
     const boardsPage = readSource('features/board-catalog/pages/BoardsPage.vue')
 
-    expect(boardsPage).toContain(':class="boardCatalogClasses.sortMenuTrigger"')
+    expect(boardsPage).toContain(':class="catalogClasses.sortMenuTrigger"')
     expect(boardsPage).toContain('<Menu')
     expect(boardsPage).not.toContain("from 'primevue/select'")
   })

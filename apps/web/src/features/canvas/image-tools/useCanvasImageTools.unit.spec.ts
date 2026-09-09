@@ -4,11 +4,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../canvas-board/domain'
 import { renderRetouchLayerStackFile } from '../retouch/services/retouchRenderer'
 import { IMAGE_STRENGTH_ACTIONS, type ImageStrengthAction } from '../execution'
-import type { UseCanvasImageToolsOptions } from './imageToolSession'
+import type { UseCanvasImageToolsOptions } from './session'
 import { useCanvasImageTools, type CanvasImageTools } from '.'
 import { i18n } from '../../../shared/i18n'
 import { loadLocaleMessages } from '../../../shared/i18n/userLocale'
-import { deserializeRetouchStack } from '../retouch/utils/retouchStackPersistence'
+import { deserializeRetouchStack } from '../retouch/utils/stackPersistence'
 import * as mediaAssetDelivery from '../../../shared/api/mediaAssetDelivery'
 
 vi.mock('../retouch/services/retouchRenderer', async (importOriginal) => {

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useLibraryWorkspace } from './useLibraryWorkspace'
-import { createLibraryFolderFacts } from './libraryFolderFacts'
+import { createLibraryFolderFacts } from './folderFacts'
 
 const mocks = vi.hoisted(() => ({
   route: { query: {} as Record<string, string> },
@@ -24,7 +24,7 @@ vi.mock('../../shared/composables/useAppToast', () => ({
   useAppToast: () => ({ success: mocks.toastSuccess, error: mocks.toastError }),
 }))
 
-vi.mock('./libraryResource', () => ({
+vi.mock('./resource', () => ({
   createFolder: mocks.createFolder,
   getLibraryAssets: mocks.getLibraryAssets,
   getLibraryFolders: mocks.getLibraryFolders,

@@ -4,8 +4,8 @@ import {
   readCanvasGraphNodeBounds,
   resolveCanvasGraphNodeDimensions,
   resolveCanvasGraphNodesBounds,
-} from './CanvasGraphGeometry'
-import { createCanvasGraphStore } from './CanvasGraphStore'
+} from './canvasGraphGeometry'
+import { createCanvasGraphStore } from './canvasGraphStore'
 
 describe('CanvasGraphGeometry', () => {
   it('uses the canonical image ratio and header policy', () => {

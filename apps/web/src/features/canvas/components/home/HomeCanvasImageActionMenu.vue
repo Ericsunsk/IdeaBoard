@@ -81,7 +81,7 @@ import type { ImageActionStrengthControl } from '../../image-tools'
 import {
   buildImageActionReadinessRequest,
   buildInpaintReadinessRequest,
-} from '../../execution/commands/flowImageTaskRequests'
+} from '../../execution/commands/imageTaskRequests'
 import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import ImageActionMenuIcon from './ImageActionMenuIcon.vue'
 import { NodeToolIconButton } from '../nodes/primitives'

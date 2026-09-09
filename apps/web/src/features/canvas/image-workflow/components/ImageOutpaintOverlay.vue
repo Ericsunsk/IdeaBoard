@@ -45,7 +45,7 @@ import { NodePromptComposer } from '../../components/nodes/primitives'
 import { OUTPAINT_DRAG_ANCHORS, type OutpaintDragAnchor } from '../useImageOutpaintOverlay'
 import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 import { useCanvasBillingQuote } from '../../execution'
-import { buildOutpaintReadinessRequest } from '../../execution/commands/flowImageTaskRequests'
+import { buildOutpaintReadinessRequest } from '../../execution/commands/imageTaskRequests'
 import { i18n } from '../../../../shared/i18n'
 
 const props = defineProps<{

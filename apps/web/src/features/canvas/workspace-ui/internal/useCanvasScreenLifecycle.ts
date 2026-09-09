@@ -1,8 +1,8 @@
 import { onBeforeUnmount, onMounted, watch, type Ref } from 'vue'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { CanvasConnectionPort } from '../../../canvas-board/domain'
-import { useFlowKeyboardShortcuts } from '../useFlowKeyboardShortcuts'
-import { useFlowLeaveGuard } from '../useFlowLeaveGuard'
+import { useCanvasKeyboardShortcuts } from '../useCanvasKeyboardShortcuts'
+import { useCanvasLeaveGuard } from '../useCanvasLeaveGuard'
 import type { CanvasGraphNodeId } from '../../graph-runtime'
 import type { CanvasWorkspaceRuntime } from '../../workspace-runtime'
 
@@ -43,7 +43,7 @@ export function useCanvasScreenLifecycle(options: {
 
   watch(() => options.route.query.boardId, loadBoardSession)
 
-  useFlowKeyboardShortcuts({
+  useCanvasKeyboardShortcuts({
     onSave: () => {
       void options.persistence.flushAutosave({ silent: false })
     },
@@ -60,7 +60,7 @@ export function useCanvasScreenLifecycle(options: {
     },
   })
 
-  useFlowLeaveGuard({
+  useCanvasLeaveGuard({
     onLeave: () => options.persistence.flushAutosave(),
   })
 

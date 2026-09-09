@@ -103,8 +103,8 @@ import {
   appOverlayMenuDangerItemClass,
   appOverlayMenuItemClass,
 } from '../../../shared/theme/appOverlayMenu'
-import type { BoardCatalogEntry } from '../boardCatalogContract'
-import { blankBoardPreviewSurfaceClass } from '../lib/boardCatalogSkin'
+import type { BoardCatalogEntry } from '../contract'
+import { blankBoardPreviewSurfaceClass } from '../lib/skin'
 
 type RenameInputRef = HTMLInputElement | { $el?: HTMLInputElement } | null
 

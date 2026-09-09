@@ -1,6 +1,6 @@
 import { processingCancelledError } from './processingCancelled'
 import { i18n } from '../../../../shared/i18n'
-import { canvasToBlob } from '../../services/flowMediaIO'
+import { canvasToBlob } from '../../services/canvasMediaIO'
 import { detectCanvasTransparency } from '../../utils/displayImagePreviewEncoding'
 import { resolveImageExportEncoding } from './imageOutputPolicy'
 import {
@@ -12,7 +12,7 @@ import {
   bakeWebGLRetouchUniforms,
   createWebGLRetouchRenderer,
   type WebGLRetouchRenderer,
-} from '../utils/retouchWebglEngine'
+} from '../utils/webglEngine'
 import type {
   ImageProcessingBackend,
   ImageProcessingBackendFinalInput,

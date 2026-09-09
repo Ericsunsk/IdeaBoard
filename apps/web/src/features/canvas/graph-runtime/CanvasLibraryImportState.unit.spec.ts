@@ -5,7 +5,7 @@ import {
   failLibraryImport,
   materializeLibraryImport,
   retryLibraryImport,
-} from './CanvasLibraryImportState'
+} from './canvasLibraryImportState'
 
 function pendingImage(): ImageNodeItem {
   return {

@@ -137,11 +137,11 @@
 
 阶段二新增 `features/library` feature context，最小拆分如下：
 
-- `libraryResource.ts`：API adapter、cursor、Folder/Asset commands、batch lookup。
+- `resource.ts`：API adapter、cursor、Folder/Asset commands、batch lookup。
 - `useLibraryWorkspace.ts`：浮岛的 Folder、分页、Lightbox 和 mutation 状态。
 - `LibraryFloatingIsland.vue`：浮岛布局、Folder commands、分页状态和 Lightbox orchestration。
 
-Search feature 只通过 `libraryResource` 的明确 seam 参与保存和 lookup；不直接依赖 generated API。
+Search feature 只通过 `features/library` 的明确 seam 参与保存和 lookup；不直接依赖 generated API。
 
 状态要求：
 

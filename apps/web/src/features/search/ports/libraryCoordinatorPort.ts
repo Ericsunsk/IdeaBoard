@@ -1,5 +1,5 @@
-import type { LibraryFolderFacts, LibraryMutationPublisher } from '../../library/libraryFolderFacts'
-import type { LibraryAssetView } from '../../library/libraryResource'
+import type { LibraryFolderFacts, LibraryMutationPublisher } from '../../library'
+import type { LibraryAssetView } from '../../library'
 import type { LibrarySearchReference } from '../domain/authAction'
 
 export type SearchLibraryCoordinator = LibraryMutationPublisher & {

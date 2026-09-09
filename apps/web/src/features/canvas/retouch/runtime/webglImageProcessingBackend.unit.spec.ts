@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ImageRetouchPlan } from '../utils/retouchEngine'
+import type { ImageRetouchPlan } from '../utils/engine'
 import type { ImageSourceCache, ImageSourceCacheEntry } from './imageSourceCache'
 import { releaseImageSourceCanvas } from './imageSourceCache'
 import { createImageProcessingOutputPolicy } from './imageOutputPolicy'

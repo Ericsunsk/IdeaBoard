@@ -73,7 +73,7 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     },
     reason: 'Login first-screen card composition keeps a one-off Admin entry shadow.',
   },
-  'src/features/admin/pages/system-settings/AdminSystemSettingsPage.vue': {
+  'src/features/admin/system-settings/pages/AdminSystemSettingsPage.vue': {
     counts: {
       'raw-shadow': 1,
     },

@@ -6,7 +6,7 @@ import {
   CANVAS_LIBRARY_IMPORT_MIME,
   readCanvasLibraryImportTransfer,
   type CanvasLibraryImportDescriptor,
-} from '../../library/libraryTransfer'
+} from '../../library'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
 import type { CanvasImageNodeCreationResult } from './useFlowImageUploadActions'

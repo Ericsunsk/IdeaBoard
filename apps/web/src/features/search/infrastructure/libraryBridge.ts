@@ -1,4 +1,4 @@
-import { libraryAssetKey, type LibraryAssetView } from '../../library/libraryResource'
+import { libraryAssetKey, type LibraryAssetView } from '../../library'
 import type { SearchResult, VisionReference } from '../domain/models'
 
 export function searchReferenceKey(provider: string, sourceID: string): string {

@@ -95,8 +95,8 @@ import {
   removeCurvePoint,
   resolveCurvePresetId,
   sampleCurvePointsPath,
-} from '../utils/retouchCurves'
-import { createRetouchHistogram, sampleHistogramPath } from '../utils/retouchHistogram'
+} from '../utils/curves'
+import { createRetouchHistogram, sampleHistogramPath } from '../utils/histogram'
 import { readFiniteNumberInputValue } from '../utils/readFiniteNumberInputValue'
 import RetouchCurveGraph from './RetouchCurveGraph.vue'
 

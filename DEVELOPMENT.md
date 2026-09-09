@@ -222,7 +222,7 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 
 | 入口                                                                                                     | 用途               |
 | -------------------------------------------------------------------------------------------------------- | ------------------ |
-| [AdminPromptConfigPage.vue](./apps/web/src/features/admin/pages/prompt-config/AdminPromptConfigPage.vue) | Admin prompt UI    |
+| [AdminPromptConfigPage.vue](./apps/web/src/features/admin/prompt-config/pages/AdminPromptConfigPage.vue) | Admin prompt UI    |
 | [engine.go](./apps/api/internal/prompts/engine.go)                                                       | Prompt rendering   |
 | [docs/runbooks/system-prompts.md](./docs/runbooks/system-prompts.md)                                     | 运营模板和变量规则 |
 

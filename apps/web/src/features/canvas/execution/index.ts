@@ -11,12 +11,12 @@ export {
   type ImageStrengthAction,
   type ImageTaskAction,
 } from './contracts/imageActionExecution'
-export { createImageExecutionPlanner } from './planning/ImageExecutionPlan'
+export { createImageExecutionPlanner } from './planning/imageExecutionPlan'
 export {
   resolvePendingImageResultPosition,
   type PendingImageResultLookup,
 } from './result-nodes/pendingImageResultPlanning'
-export { useFlowImageWorkflowExecution } from './runtime/flowImageWorkflowExecution'
+export { useImageWorkflowExecution } from './runtime/imageWorkflowExecution'
 export {
   createImageWorkflowCommands,
   type ImageWorkflowCommands,

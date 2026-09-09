@@ -56,14 +56,14 @@ vi.mock('../vue-flow-adapter', () => ({
   }),
 }))
 
-vi.mock('./useFlowKeyboardShortcuts', () => ({
-  useFlowKeyboardShortcuts: (options: KeyboardOptions) => {
+vi.mock('./useCanvasKeyboardShortcuts', () => ({
+  useCanvasKeyboardShortcuts: (options: KeyboardOptions) => {
     mocks.keyboardOptions = options
   },
 }))
 
-vi.mock('./useFlowLeaveGuard', () => ({
-  useFlowLeaveGuard: (options: LeaveGuardOptions) => {
+vi.mock('./useCanvasLeaveGuard', () => ({
+  useCanvasLeaveGuard: (options: LeaveGuardOptions) => {
     mocks.leaveGuardOptions = options
   },
 }))
@@ -75,8 +75,8 @@ vi.mock('./useFlowNodeDragInteractions', () => ({
   }),
 }))
 
-vi.mock('./useFlowImagePreviewLightbox', () => ({
-  useFlowImagePreviewLightbox: () => ({
+vi.mock('./useCanvasImageLightbox', () => ({
+  useCanvasImageLightbox: () => ({
     openNodeImagePreview: vi.fn(),
     openImageUrlPreview: vi.fn(),
   }),

@@ -1,9 +1,9 @@
 <template>
-  <div :class="boardCatalogClasses.page">
-    <div :class="boardCatalogClasses.pageBackground"></div>
+  <div :class="catalogClasses.page">
+    <div :class="catalogClasses.pageBackground"></div>
 
-    <header :class="boardCatalogClasses.header">
-      <div :class="boardCatalogClasses.brand">
+    <header :class="catalogClasses.header">
+      <div :class="catalogClasses.brand">
         <StudioName />
       </div>
       <UserWorkspaceNavigation />
@@ -18,25 +18,25 @@
       </UserAccountMenu>
     </header>
 
-    <main :class="boardCatalogClasses.main">
-      <h1 :class="boardCatalogClasses.pageTitle">Welcome to IdeaBoard!</h1>
-      <p :class="boardCatalogClasses.pageSubtitle">{{ t('workspace.boards.subtitle') }}</p>
+    <main :class="catalogClasses.main">
+      <h1 :class="catalogClasses.pageTitle">Welcome to IdeaBoard!</h1>
+      <p :class="catalogClasses.pageSubtitle">{{ t('workspace.boards.subtitle') }}</p>
 
-      <section :class="boardCatalogClasses.toolbar">
+      <section :class="catalogClasses.toolbar">
         <Button
           type="button"
           :label="t('workspace.boards.newCanvas')"
-          :class="boardCatalogClasses.createButton"
+          :class="catalogClasses.createButton"
           @click="createAndOpenBoard"
         />
-        <label :class="boardCatalogClasses.searchWrap">
-          <Search :class="boardCatalogClasses.searchIcon" />
+        <label :class="catalogClasses.searchWrap">
+          <Search :class="catalogClasses.searchIcon" />
           <InputText
             :model-value="searchKeyword"
             unstyled
             type="text"
             :placeholder="t('workspace.boards.searchPlaceholder')"
-            :class="boardCatalogClasses.searchInput"
+            :class="catalogClasses.searchInput"
             @update:model-value="onSearchInput"
           />
         </label>
@@ -44,7 +44,7 @@
           ref="sortMenuTriggerRef"
           unstyled
           type="button"
-          :class="boardCatalogClasses.sortMenuTrigger"
+          :class="catalogClasses.sortMenuTrigger"
           :aria-label="t('workspace.boards.sortLabel')"
           aria-haspopup="menu"
           :aria-expanded="isSortMenuOpen"
@@ -62,7 +62,7 @@
           :model="sortMenuItems"
           popup
           append-to="body"
-          :pt="boardCatalogSortMenuPt"
+          :pt="catalogSortMenuPt"
           @show="handleSortMenuShow"
           @hide="handleSortMenuHide"
         >
@@ -83,8 +83,8 @@
         </Menu>
       </section>
 
-      <div v-if="catalogRecoveryBoardId" :class="boardCatalogClasses.recoveryState" role="alert">
-        <span :class="boardCatalogClasses.recoveryText">{{
+      <div v-if="catalogRecoveryBoardId" :class="catalogClasses.recoveryState" role="alert">
+        <span :class="catalogClasses.recoveryText">{{
           t('workspace.catalog.reloadRequired')
         }}</span>
         <Button
@@ -96,30 +96,30 @@
               : t('workspace.catalog.reload')
           "
           :disabled="isCatalogReloadPending"
-          :class="boardCatalogClasses.recoveryButton"
+          :class="catalogClasses.recoveryButton"
           @click="reloadCatalog"
         />
       </div>
 
-      <section v-if="isBoardsLoading" :class="boardCatalogClasses.loadingState" aria-live="polite">
-        <ProgressSpinner :class="boardCatalogClasses.loadingSpinner" stroke-width="4" />
+      <section v-if="isBoardsLoading" :class="catalogClasses.loadingState" aria-live="polite">
+        <ProgressSpinner :class="catalogClasses.loadingSpinner" stroke-width="4" />
       </section>
 
-      <section v-else :class="boardCatalogClasses.boardsGrid">
+      <section v-else :class="catalogClasses.boardsGrid">
         <Button
           unstyled
           type="button"
-          :class="boardCatalogClasses.createCard"
+          :class="catalogClasses.createCard"
           @click="createAndOpenBoard"
         >
-          <div :class="boardCatalogClasses.createPreview">
-            <div :class="boardCatalogClasses.createPreviewIcon" aria-hidden="true"></div>
+          <div :class="catalogClasses.createPreview">
+            <div :class="catalogClasses.createPreviewIcon" aria-hidden="true"></div>
           </div>
-          <div :class="boardCatalogClasses.createMeta">
-            <div :class="boardCatalogClasses.createTitle">
+          <div :class="catalogClasses.createMeta">
+            <div :class="catalogClasses.createTitle">
               {{ t('workspace.boards.createNewCanvas') }}
             </div>
-            <div :class="boardCatalogClasses.createDate">
+            <div :class="catalogClasses.createDate">
               {{ t('workspace.boards.startFromEmpty') }}
             </div>
           </div>
@@ -134,7 +134,7 @@
             :is-renaming="renamingBoardId === board.id"
             :rename-draft="renameDraft"
             :is-menu-open="activeMenuBoardId === board.id"
-            :display-date="formatBoardCatalogDate(board.updatedAt)"
+            :display-date="formatCatalogDate(board.updatedAt)"
             @click-board="openBoardFromCard(board.id)"
             @toggle-menu="toggleBoardMenu(board.id)"
             @rename-action="startRename(board)"
@@ -150,7 +150,7 @@
 
       <p
         v-if="!isBoardsLoading && visibleBoards.length === 0 && searchKeyword"
-        :class="boardCatalogClasses.emptyTip"
+        :class="catalogClasses.emptyTip"
       >
         {{ t('workspace.boards.noMatchingCanvas') }}
       </p>
@@ -165,19 +165,19 @@
       :close-on-escape="canDismissDeleteDialog('escape')"
       :draggable="false"
       :show-header="false"
-      :style="boardCatalogDeleteDialogStyle"
-      :pt="boardCatalogDeleteDialogPt"
+      :style="catalogDeleteDialogStyle"
+      :pt="catalogDeleteDialogPt"
       :aria-busy="deleteDialogAriaBusy"
       aria-labelledby="board-delete-dialog-title"
       @update:visible="handleDeleteDialogVisibilityChange"
       @hide="disableDeleteDialogVendorFocusRestore"
       @after-hide="handleDeleteDialogAfterHide"
     >
-      <div :class="boardCatalogClasses.deleteDialogShell">
-        <h2 id="board-delete-dialog-title" :class="boardCatalogClasses.deleteDialogTitle">
+      <div :class="catalogClasses.deleteDialogShell">
+        <h2 id="board-delete-dialog-title" :class="catalogClasses.deleteDialogTitle">
           {{ t('workspace.deleteDialog.title') }}
         </h2>
-        <p :class="boardCatalogClasses.deleteDialogDescription">
+        <p :class="catalogClasses.deleteDialogDescription">
           {{
             t('workspace.deleteDialog.description', {
               name: pendingDeleteBoard?.name || t('workspace.boards.untitledCanvas'),
@@ -185,13 +185,13 @@
           }}
         </p>
 
-        <div :class="boardCatalogClasses.deleteDialogFooter">
+        <div :class="catalogClasses.deleteDialogFooter">
           <Button
             unstyled
             type="button"
             :label="t('common.actions.cancel')"
             :disabled="isDeletePending"
-            :class="boardCatalogClasses.deleteCancelButton"
+            :class="catalogClasses.deleteCancelButton"
             @click="requestDeleteDialogClose('close-control')"
           />
           <Button
@@ -201,7 +201,7 @@
               isDeletePending ? t('workspace.deleteDialog.deleting') : t('common.actions.delete')
             "
             :disabled="isDeletePending"
-            :class="boardCatalogClasses.deleteConfirmButton"
+            :class="catalogClasses.deleteConfirmButton"
             @click="confirmDelete"
           />
         </div>
@@ -216,11 +216,11 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import BoardCard from '../components/BoardCard.vue'
 import {
-  boardCatalogClasses,
-  boardCatalogDeleteDialogPt,
-  boardCatalogDeleteDialogStyle,
-  boardCatalogSortMenuPt,
-} from '../lib/boardCatalogSkin'
+  catalogClasses,
+  catalogDeleteDialogPt,
+  catalogDeleteDialogStyle,
+  catalogSortMenuPt,
+} from '../lib/skin'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { usePrimeDialogOverlayLifecycle } from '../../../shared/composables/usePrimeDialogOverlayLifecycle'
 import { usePrimePopupMenuOverlayLifecycle } from '../../../shared/composables/usePrimePopupMenuOverlayLifecycle'
@@ -240,16 +240,16 @@ import type { MenuItem } from 'primevue/menuitem'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useUserAccountControls } from '../../user-shell/useUserAccountControls'
 import {
-  formatBoardCatalogDate,
-  useBoardsCatalog,
+  formatCatalogDate,
+  useBoardCatalog,
   type BoardCatalogSortMode,
-} from '../boardsCatalog'
+} from '../useBoardCatalog'
 
 const router = useRouter()
 const { t } = useI18n()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
-const boardCatalogController = useBoardsCatalog({
+const controller = useBoardCatalog({
   navigation: {
     openBoard(boardId) {
       void router.push({ path: USER_CANVAS_PATH, query: { boardId } })
@@ -270,7 +270,7 @@ const {
   deleteDialogVisible,
   pendingDeleteBoard,
   isDeletePending,
-} = boardCatalogController.viewModel
+} = controller.viewModel
 const {
   setSearchKeyword: onSearchInput,
   setSortMode,
@@ -288,7 +288,7 @@ const {
   closeDeleteDialog,
   handleDeleteDialogHidden,
   confirmDelete,
-} = boardCatalogController.commands
+} = controller.commands
 
 const {
   ariaBusy: deleteDialogAriaBusy,

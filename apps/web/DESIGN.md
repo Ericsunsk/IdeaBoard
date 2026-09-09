@@ -97,6 +97,17 @@ Admin local shared is different: `src/features/admin/shared/*` may serve all Adm
 
 DO NOT promote a component just because two places look similar. Similar visuals with different behavior stay local.
 
+## Directory Structure & File Naming Governance
+
+Follow the system architecture contract in [../../DESIGN.md](../../DESIGN.md) for full DDD details. In `apps/web`, all modules MUST adhere to:
+
+- **Directories**: `kebab-case` (e.g., `board-catalog/`, `image-tools/`, `workspace-runtime/`).
+- **Vue SFC Components**: `PascalCase.vue` (e.g., `BoardCard.vue`, `CanvasScreen.vue`).
+- **Non-component TS Modules**: `camelCase.ts` (e.g., `useBoardCatalog.ts`, `contract.ts`, `feed.ts`; do NOT use PascalCase for non-component files).
+- **Anti-Stuttering Rule**: MUST NOT repeat the parent directory name inside filenames (e.g., use `resource.ts` instead of `libraryResource.ts`, use `curves.ts` instead of `retouchCurves.ts`). Use named exports from the feature's root `index.ts` to disambiguate.
+- **Public API & Boundary Isolation**: Features that expose cross-feature APIs MUST use a root `index.ts`; route- or parent-owned internal features may keep explicit internal entrypoints. Outside modules MUST NOT deep-import private files or internal components across feature boundaries.
+- **Tiered DDD**: Complex core domains (`canvas`, `search`, `account`, `admin`) use layered structures (`domain/`, `application/`, `infrastructure/`, `presentation/` or `ui/`). Lightweight features stay flat.
+
 ## State, Responsive, Accessibility
 
 - Focus visible must be clear and must not cause layout shift.

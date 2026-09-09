@@ -10,5 +10,7 @@
     "src/features/canvas/components/nodes/workflows/index.ts",
     "src/features/canvas/execution/index.ts",
     "src/features/canvas/vue-flow-adapter/index.ts",
+    "src/features/board-catalog/index.ts",
+    "src/features/library/index.ts",
   ],
 }

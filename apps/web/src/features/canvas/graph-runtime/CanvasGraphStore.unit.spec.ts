@@ -13,8 +13,8 @@ import {
   toCanvasGraphEdgeId,
   toCanvasGraphGroupId,
   toCanvasGraphNodeId,
-} from './CanvasGraphStore'
-import { CanvasGraphSession } from './CanvasGraphSession'
+} from './canvasGraphStore'
+import { CanvasGraphSession } from './canvasGraphSession'
 import {
   commitCanvasGraphConnectIntent,
   commitCanvasGraphDeleteGroupIntent,

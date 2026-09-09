@@ -11,7 +11,7 @@ import {
   type CanvasGraphTransaction,
   type CanvasGraphTransactionReason,
   type CanvasGraphTransactionSummary,
-} from './CanvasGraphStore'
+} from './canvasGraphStore'
 
 export type CanvasGraphConnectionTargetPolicy = {
   allowsMultipleTargetConnections: boolean

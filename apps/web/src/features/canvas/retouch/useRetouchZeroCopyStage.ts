@@ -7,14 +7,14 @@ import {
   type ComputedRef,
   type Ref,
 } from 'vue'
-import { compileImageRetouchPlan } from './utils/retouchEngine'
+import { compileImageRetouchPlan } from './utils/engine'
 import {
   bakeWebGLRetouchUniforms,
   createWebGLRetouchRenderer,
   isWebGLRetouchSupported,
   type WebGLRetouchRenderer,
-} from './utils/retouchWebglEngine'
-import { flattenVisibleRetouchEffectLayers } from './utils/retouchLayerEffects'
+} from './utils/webglEngine'
+import { flattenVisibleRetouchEffectLayers } from './utils/layerEffects'
 import type { RetouchLayer } from './types'
 
 export type ZeroCopyStageStatus = 'ready' | 'error' | 'idle'

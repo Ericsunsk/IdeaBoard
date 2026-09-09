@@ -7,7 +7,7 @@ import {
 } from '../../../canvas-board/domain'
 import { HOME_PATH, USER_BOARDS_PATH } from '../../../../shared/constants/routePaths'
 import { useCanvasBoardSession, type SaveStatus } from '../../board-session'
-import { useFlowBoardHeaderActions } from '../../workspace-chrome/useFlowBoardHeaderActions'
+import { useBoardHeaderActions } from '../../workspace-chrome/useBoardHeaderActions'
 import { useFlowCanvasRuntime } from './useFlowCanvasRuntime'
 import type { CanvasVueFlowGraphActions } from '../../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import type { CanvasFeedback } from '../../feedback/useCanvasFeedback'
@@ -75,7 +75,7 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions) {
     vueFlowGraphActions: options.vueFlowGraphActions,
   })
 
-  const boardHeader = useFlowBoardHeaderActions({
+  const boardHeader = useBoardHeaderActions({
     currentBoardId: flowRuntime.persistence.currentBoardId,
     message,
     router: options.router,

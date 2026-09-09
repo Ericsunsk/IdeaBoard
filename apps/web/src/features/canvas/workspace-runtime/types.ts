@@ -13,7 +13,7 @@ import type {
   CanvasGraphEditingNodeInteractionsOptions,
 } from '../graph-editing'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
-import type { CanvasLibraryImportDescriptor } from '../../library/libraryTransfer'
+import type { CanvasLibraryImportDescriptor } from '../../library'
 
 export type CanvasRendererSelectableElement = (Node | Edge) & {
   selected?: boolean

@@ -4,7 +4,7 @@ import {
   type CanvasNodeItem,
   type ImageNodeItem,
 } from '../../canvas-board/domain'
-import type { CanvasGraphNodeId, CanvasGraphNodeKind, CanvasGraphStore } from './CanvasGraphStore'
+import type { CanvasGraphNodeId, CanvasGraphNodeKind, CanvasGraphStore } from './canvasGraphStore'
 
 const CANVAS_NODE_HEADER_HEIGHT = 22
 

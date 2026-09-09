@@ -1,5 +1,5 @@
 import { nextTick, ref, type Ref } from 'vue'
-import { libraryAssetKey, lookupSavedAssetKeys } from '../../library/libraryResource'
+import { libraryAssetKey, lookupSavedAssetKeys } from '../../library'
 import { type SearchResult } from '../domain/models'
 import {
   generateRandomInspirationCursor,

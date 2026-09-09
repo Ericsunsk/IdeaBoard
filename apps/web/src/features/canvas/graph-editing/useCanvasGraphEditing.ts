@@ -22,7 +22,7 @@ import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations
 import type { CanvasGraphEditingBrowserAdapter } from './browserAdapter'
 import { useCanvasLibraryImportRuntime } from './useCanvasLibraryImportRuntime'
 import type { CanvasBoardAttachment } from '../board-attachment'
-import type { LibraryAssetMaterializer } from '../../library/libraryResource'
+import type { LibraryAssetMaterializer } from '../../library'
 import type { FlowLocalUploadState, FlowNodeData } from '../types/flowTypes'
 import { createFlowGraphCommandOptions } from '../vue-flow-adapter/flowGraphAdapterCommandSideEffects'
 import { createCanvasGraphEditingNodeRuntime } from './createCanvasGraphEditingNodeRuntime'

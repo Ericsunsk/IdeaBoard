@@ -10,7 +10,7 @@ import { formatIdeaAmount } from '../../../shared/i18n/userIdeaCurrency'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
-import type { LibraryAssetView } from '../../library/libraryResource'
+import type { LibraryAssetView } from '../../library'
 import type { SearchAuthAction } from '../domain/authAction'
 import {
   clearCachedVisionReferences,

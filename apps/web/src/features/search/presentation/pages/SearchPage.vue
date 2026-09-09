@@ -622,7 +622,7 @@ import UserWorkspaceNavigation from '../../../user-shell/components/UserWorkspac
 import SearchSavePopover from '../components/SearchSavePopover.vue'
 import SearchBatchActionDock from '../components/SearchBatchActionDock.vue'
 import SearchResultViewport from '../components/SearchResultViewport.vue'
-import { libraryAssetKey } from '../../../library/libraryResource'
+import { libraryAssetKey } from '../../../library'
 import { searchReferenceKey } from '../../infrastructure/libraryBridge'
 import { useUserAccountControls } from '../../../user-shell/useUserAccountControls'
 import { useAuthOverlay } from '../../../auth/authOverlay'

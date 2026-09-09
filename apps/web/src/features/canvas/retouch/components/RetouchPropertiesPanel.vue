@@ -77,7 +77,7 @@ import RetouchLevelsControl from './RetouchLevelsControl.vue'
 import RetouchSharpenControl from './RetouchSharpenControl.vue'
 import RetouchSlider from './RetouchSlider.vue'
 import RetouchThresholdControl from './RetouchThresholdControl.vue'
-import { IMAGE_RETOUCH_DEFINITIONS } from '../utils/retouchDefinitions'
+import { IMAGE_RETOUCH_DEFINITIONS } from '../utils/definitions'
 
 defineProps<{
   effectLayer: RetouchEffectLayer | null

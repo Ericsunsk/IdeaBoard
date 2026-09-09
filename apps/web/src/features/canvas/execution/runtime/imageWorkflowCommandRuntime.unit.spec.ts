@@ -3,7 +3,7 @@ import type { PromptAspectRatio } from '../../../canvas-board/domain'
 import type {
   ActivatedImageExecutionPlan,
   ImageExecutionPlan,
-} from '../planning/ImageExecutionPlan'
+} from '../planning/imageExecutionPlan'
 import {
   createImageWorkflowCommands,
   type ImageWorkflowExecutionPort,

@@ -9,7 +9,7 @@ import {
   buildImageActionReadinessRequest,
   buildInpaintReadinessRequest,
   buildGenerationTaskRequest,
-} from '../commands/flowImageTaskRequests'
+} from '../commands/imageTaskRequests'
 import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import {
   createCanvasTaskClientActionId,

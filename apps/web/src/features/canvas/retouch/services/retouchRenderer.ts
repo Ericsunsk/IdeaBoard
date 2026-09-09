@@ -1,19 +1,19 @@
 import { i18n } from '../../../../shared/i18n'
-import { canvasToBlob } from '../../services/flowMediaIO'
+import { canvasToBlob } from '../../services/canvasMediaIO'
 import type { ImageRetouchRecipe } from '../../../canvas-board/domain'
 import type { RetouchEffectLayer, RetouchLayer, RetouchRasterContent } from '../types'
 import { createImageProcessingOutputFileName } from '../runtime/imageOutputPolicy'
 import { getImageRetouchProcessingRuntime } from '../runtime/retouchRuntime'
 import type { ImageProcessingProgress, RenderFinalInput } from '../runtime/types'
 import { createImageSourceCache, readImageSourceImageData } from '../runtime/imageSourceCache'
-import { compositeRetouchLayerStack } from '../utils/retouchRasterComposite'
-import { buildImageRetouchPlan } from '../utils/retouchPlanPipeline'
-import { deserializeImageRetouchPlan } from '../utils/retouchRecipe'
+import { compositeRetouchLayerStack } from '../utils/rasterComposite'
+import { buildImageRetouchPlan } from '../utils/planPipeline'
+import { deserializeImageRetouchPlan } from '../utils/recipe'
 import {
   flattenVisibleRetouchEffectLayers,
   hasEffectiveRetouchEffectLayers,
-} from '../utils/retouchLayerEffects'
-import { flattenRetouchRasterContents, hasRetouchRasterEdits } from '../utils/retouchRasterTools'
+} from '../utils/layerEffects'
+import { flattenRetouchRasterContents, hasRetouchRasterEdits } from '../utils/rasterTools'
 
 export type ImageRetouchRenderSource = {
   url: string

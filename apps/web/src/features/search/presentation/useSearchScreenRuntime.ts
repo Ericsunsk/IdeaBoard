@@ -12,11 +12,11 @@ import {
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useAuthOverlay } from '../../auth/authOverlay'
 import { useRoute, useRouter } from 'vue-router'
-import { libraryAssetKey } from '../../library/libraryResource'
+import { libraryAssetKey, loadLibraryFloatingIsland } from '../../library'
 import {
   readSearchReferenceTransfer,
   writeSearchReferenceTransfer,
-} from '../../library/libraryTransfer'
+} from '../../library'
 import { type SearchAuthAction } from '../domain/authAction'
 import {
   peekPendingSearchAuthAction,
@@ -32,8 +32,6 @@ import {
   type SearchSavePopoverController,
   type SearchSavePopoverRequest,
 } from './components/SearchSavePopover.vue'
-
-const loadLibraryFloatingIsland = () => import('../../library/components/LibraryFloatingIsland.vue')
 
 export const SearchLibraryFloatingIsland = defineAsyncComponent(loadLibraryFloatingIsland)
 

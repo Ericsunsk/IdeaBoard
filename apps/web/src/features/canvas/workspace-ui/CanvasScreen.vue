@@ -115,7 +115,7 @@ import { USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
 import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
-import { useFlowImagePreviewLightbox } from './useFlowImagePreviewLightbox'
+import { useCanvasImageLightbox } from './useCanvasImageLightbox'
 import { provideCanvasHandleProximityCoordinator } from '../vue-flow-adapter/useCanvasHandleProximity'
 import { provideCanvasViewportContext } from '../vue-flow-adapter/useCanvasViewportContext'
 import { CanvasGroupPresentation } from '../group-presentation'
@@ -148,8 +148,8 @@ import { useCanvasScreenSurfaceInteractions } from './internal/useCanvasScreenSu
 import { createCanvasScreenNodePresentation } from './internal/createCanvasScreenNodePresentation'
 import { useCanvasScreenLifecycle } from './internal/useCanvasScreenLifecycle'
 import { useCanvasLibraryIsland } from './internal/useCanvasLibraryIsland'
-import { materializeLibraryAssetForCanvas } from '../../library/libraryResource'
-import type { CanvasLibraryImportDescriptor } from '../../library/libraryTransfer'
+import { loadLibraryFloatingIsland, materializeLibraryAssetForCanvas } from '../../library'
+import type { CanvasLibraryImportDescriptor } from '../../library'
 
 const props = defineProps<{
   route: RouteLocationNormalizedLoaded
@@ -160,9 +160,7 @@ const props = defineProps<{
 
 const { route, router, getUserIdentity, logoutAndRedirect } = props
 
-const CanvasLibraryFloatingIsland = defineAsyncComponent(
-  () => import('../../library/components/LibraryFloatingIsland.vue'),
-)
+const CanvasLibraryFloatingIsland = defineAsyncComponent(loadLibraryFloatingIsland)
 
 function openRecharge() {
   accountControls.commands.openAccount('recharge')
@@ -179,7 +177,7 @@ const isCanvasMinimapEnabled = ref(false)
 const duplicateModifierPressed = ref(false)
 const canvasLibrary = useCanvasLibraryIsland()
 const imageToolUi = useCanvasScreenImageToolUi({ activeTool, canvasWrapRef })
-const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbox()
+const { openNodeImagePreview, openImageUrlPreview } = useCanvasImageLightbox()
 const graphEditingBrowser = createCanvasGraphEditingBrowserAdapter()
 const graphInteractionBrowser = createCanvasGraphInteractionBrowserAdapter()
 

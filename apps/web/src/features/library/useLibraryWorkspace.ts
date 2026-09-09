@@ -13,13 +13,13 @@ import {
   renameFolder,
   type LibraryAssetView,
   type LibraryFolderView,
-} from './libraryResource'
+} from './resource'
 import {
   createLibraryFolderFacts,
   createLibraryMutationPublisher,
   type LibraryFolderFacts,
   type LibraryMutationPublisher,
-} from './libraryFolderFacts'
+} from './folderFacts'
 import { stripUndefined } from '../../shared/api/stripUndefined'
 
 export type LibraryFolderTab = {

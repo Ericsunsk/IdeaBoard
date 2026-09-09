@@ -3,7 +3,7 @@ import {
   CANVAS_LIBRARY_IMPORT_MIME,
   writeCanvasLibraryImportTransfer,
   type CanvasLibraryImportDescriptor,
-} from '../../library/libraryTransfer'
+} from '../../library'
 import { useFlowCanvasDrop } from './useFlowCanvasDrop'
 import type { CanvasImageNodeCreationResult } from './useFlowImageUploadActions'
 

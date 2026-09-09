@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, nextTick, ref } from 'vue'
 
-const flowMediaIOMocks = vi.hoisted(() => ({
+const canvasMediaIOMocks = vi.hoisted(() => ({
   canvasToBlob: vi.fn(),
   resolveFetchUrl: vi.fn((url: string) => url),
 }))
 
-vi.mock('../services/flowMediaIO', () => ({
-  canvasToBlob: flowMediaIOMocks.canvasToBlob,
-  resolveFetchUrl: flowMediaIOMocks.resolveFetchUrl,
+vi.mock('../services/canvasMediaIO', () => ({
+  canvasToBlob: canvasMediaIOMocks.canvasToBlob,
+  resolveFetchUrl: canvasMediaIOMocks.resolveFetchUrl,
 }))
 
 function createCanvasMock() {
@@ -90,8 +90,8 @@ describe('useDisplayImagePreview', () => {
       object instanceof Blob ? `blob:${object.size}` : 'blob:media-source',
     )
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
-    flowMediaIOMocks.canvasToBlob.mockResolvedValue(new Blob(['preview'], { type: 'image/webp' }))
-    flowMediaIOMocks.resolveFetchUrl.mockImplementation((url: string) => url)
+    canvasMediaIOMocks.canvasToBlob.mockResolvedValue(new Blob(['preview'], { type: 'image/webp' }))
+    canvasMediaIOMocks.resolveFetchUrl.mockImplementation((url: string) => url)
   })
 
   afterEach(() => {
@@ -115,24 +115,24 @@ describe('useDisplayImagePreview', () => {
       expect(preview.displayUrl.value).toBe('blob:7')
     })
 
-    expect(flowMediaIOMocks.canvasToBlob).toHaveBeenCalledTimes(1)
+    expect(canvasMediaIOMocks.canvasToBlob).toHaveBeenCalledTimes(1)
 
     maxSide.value = 320
     await nextTick()
     await waitForPreviewWork()
-    expect(flowMediaIOMocks.canvasToBlob).toHaveBeenCalledTimes(1)
+    expect(canvasMediaIOMocks.canvasToBlob).toHaveBeenCalledTimes(1)
 
     maxSide.value = 640
     await nextTick()
     await vi.waitFor(() => {
-      expect(flowMediaIOMocks.canvasToBlob).toHaveBeenCalledTimes(2)
+      expect(canvasMediaIOMocks.canvasToBlob).toHaveBeenCalledTimes(2)
     })
     scope.stop()
     await waitForPreviewWork()
   })
 
   it('uses the source URL directly when preview max side is null', async () => {
-    flowMediaIOMocks.canvasToBlob.mockClear()
+    canvasMediaIOMocks.canvasToBlob.mockClear()
     vi.mocked(fetch).mockClear()
     const sourceUrl = ref('https://example.com/full.jpg')
     const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
@@ -148,7 +148,7 @@ describe('useDisplayImagePreview', () => {
 
     expect(preview.displayUrl.value).toBe('https://example.com/full.jpg')
     expect(fetch).not.toHaveBeenCalled()
-    expect(flowMediaIOMocks.canvasToBlob).not.toHaveBeenCalled()
+    expect(canvasMediaIOMocks.canvasToBlob).not.toHaveBeenCalled()
     scope.stop()
   })
 
@@ -173,7 +173,7 @@ describe('useDisplayImagePreview', () => {
       credentials: 'include',
     })
     expect(createImageBitmap).toHaveBeenCalled()
-    expect(flowMediaIOMocks.canvasToBlob).toHaveBeenCalled()
+    expect(canvasMediaIOMocks.canvasToBlob).toHaveBeenCalled()
     scope.stop()
   })
 

@@ -1,11 +1,11 @@
 import { computed } from 'vue'
-import type { CanvasImageTools } from './imageToolBindings'
-import { createImageToolChromeAdapter } from './imageToolChromeAdapter'
-import { createImageToolCommands } from './imageToolCommands'
-import { createImageToolNodeBindings } from './imageToolNodeBindings'
-import { createImageToolSession, type UseCanvasImageToolsOptions } from './imageToolSession'
+import type { CanvasImageTools } from './bindings'
+import { createImageToolChromeAdapter } from './chromeAdapter'
+import { createImageToolCommands } from './commands'
+import { createImageToolNodeBindings } from './nodeBindings'
+import { createImageToolSession, type UseCanvasImageToolsOptions } from './session'
 
-export type { UseCanvasImageToolsOptions } from './imageToolSession'
+export type { UseCanvasImageToolsOptions } from './session'
 
 export function useCanvasImageTools(options: UseCanvasImageToolsOptions): CanvasImageTools {
   const session = createImageToolSession(options)

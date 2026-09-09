@@ -518,13 +518,13 @@ import {
   Xmark,
 } from '@iconoir/vue'
 import { useLibraryWorkspace, type LibraryFolderTab } from '../useLibraryWorkspace'
-import type { LibraryFolderFacts, LibraryMutationPublisher } from '../libraryFolderFacts'
+import type { LibraryFolderFacts, LibraryMutationPublisher } from '../folderFacts'
 import {
   libraryAssetKey,
   resolveLibraryAssetCardURL,
   saveSearchReference,
   type LibraryAssetView,
-} from '../libraryResource'
+} from '../resource'
 import {
   toCanvasLibraryImportDescriptor,
   getLibraryDropEffect,
@@ -533,7 +533,7 @@ import {
   writeCanvasLibraryImportTransfer,
   writeLibraryFolderMoveTransfer,
   type CanvasLibraryImportDescriptor,
-} from '../libraryTransfer'
+} from '../transfer'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import UserConfirmDialog from '../../../shared/components/UserConfirmDialog.vue'
 import { useUserConfirmDialog } from '../../../shared/composables/useUserConfirmDialog'
@@ -543,7 +543,7 @@ import {
   appOverlayMenuItemClass,
   appOverlayMenuSurfaceClass,
 } from '../../../shared/theme/appOverlayMenu'
-import { deleteFolderConfirmation, removeAssetConfirmation } from '../libraryConfirmations'
+import { deleteFolderConfirmation, removeAssetConfirmation } from '../confirmations'
 
 const props = defineProps<{
   open: boolean

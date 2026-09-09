@@ -277,6 +277,35 @@ Vue UI -> application use case -> resource/adapter -> generated API
 5. 核心状态机转换（Task 生命周期、支付收银台、Board 同步等）拥有确定性测试覆盖。
 6. 特性通过根目录 `index.ts` 或明确的 public subpath 暴露清晰公共 API，移除所有废弃旧门面（Facade）和无引用的兼容路径。
 
+### 6. 目录结构与命名治理契约 (Directory & Naming Governance Contract)
+
+为保持工程架构一致性、可预测性与长期整洁度，全库执行统一的目录组织、文件命名与边界导出治理标准：
+
+1. **分级架构范式 (Tiered DDD Architecture)**：
+   - **重度核心子域**（如 `canvas`, `search`, `account`, `admin`）：必须严格落地标准 4 层或职责清晰分层（`domain/`, `application/`, `infrastructure/`, `presentation/` 或 `ui/`）。
+   - **轻量特性模块**（如 `legal`, `user`, `board-catalog`）：保持轻量扁平结构（`components/`, `useXxx.ts`, `types.ts` 等），严禁为了套用模板引入空目录或无意义的空抽象。
+
+2. **文件与目录命名规范 (Naming Conventions)**：
+   - **目录命名**：全小写短横线 `kebab-case`（如 `board-catalog/`, `image-tools/`, `workspace-runtime/`）。
+   - **Vue SFC 组件**：大驼峰 `PascalCase.vue`（如 `BoardCard.vue`, `CanvasScreen.vue`）。
+   - **非组件 TS 模块**：小驼峰 `camelCase.ts`（包括 composable、store、contract、utils、adapter、types，例如 `useBoardCatalog.ts`, `contract.ts`, `feed.ts`；禁止非组件模块使用 `PascalCase.ts`）。
+   - **测试文件**：保持与被测模块同名并追加测试类型后缀（如 `curves.ts` 对应 `curves.unit.spec.ts`；组件对应 `CanvasScreen.component.spec.ts`；契约对应 `*.contract.spec.ts`）。
+
+3. **消除前缀冗余守则 (Anti-Stuttering Rule)**：
+   - **严禁在子文件/子目录内重复父级目录名前缀**。
+   - 错误范式（Stuttering）：`features/library/libraryResource.ts`、`features/canvas/retouch/utils/retouchCurves.ts`、`boardCatalog/boardCatalog.ts`。
+   - 正确范式（Clean）：`features/library/resource.ts`、`features/canvas/retouch/utils/curves.ts`、`board-catalog/contract.ts`。
+   - **防命名冲突机制**：跨模块向外暴露能力时，必须通过特性的根 `index.ts` 进行语义清晰的 Named Export（例如 `export { createLibraryResource } from './resource'`），在消费方上下文保证语义清晰，无需在内部文件名冗余堆叠前缀。
+
+4. **公共 API 出口与边界隔离 (Public API Seams & Boundary Enforcement)**：
+   - 需要向其他 Feature 暴露公共 API 的 Feature 必须在根目录提供 `index.ts` 作为唯一合法出口；仅由路由或父 Feature 装配的内部 Feature 可保留显式内部入口。
+   - **禁止穿透导入**：外部特性严禁跨边界通过深层相对路径导入另一特性的内部私有实现（禁止 `import ... from '../canvas/workspace-ui/internal/...'` 或 `import ... from '../library/components/LibraryFloatingIsland.vue'`）。
+   - 模块依赖关系由 `dependency-cruiser` 做自动化门禁拦截。
+
+5. **渐进收敛治理推进策略 (Ratchet Governance Pattern)**：
+   - **增量零容忍**：新增特性或新增文件必须 100% 遵守本规范。
+   - **存量渐进收敛**：结合日常特性演进与业务迭代按模块分批治理，由各模块统一提供 `index.ts`，消除命名冗余与深层引用。
+
 UI 实现细节遵循 [apps/web/DESIGN.md](./apps/web/DESIGN.md)。
 
 ## Operational Invariants

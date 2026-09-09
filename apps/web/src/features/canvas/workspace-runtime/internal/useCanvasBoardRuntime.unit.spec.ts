@@ -7,7 +7,7 @@ import { createPendingImageExecutionCore } from '../../execution/pending-executi
 
 const mocks = vi.hoisted(() => ({
   useCanvasBoardSession: vi.fn(),
-  useFlowBoardHeaderActions: vi.fn(),
+  useBoardHeaderActions: vi.fn(),
   useFlowCanvasRuntime: vi.fn(),
 }))
 
@@ -15,8 +15,8 @@ vi.mock('../../board-session', () => ({
   useCanvasBoardSession: mocks.useCanvasBoardSession,
 }))
 
-vi.mock('../../workspace-chrome/useFlowBoardHeaderActions', () => ({
-  useFlowBoardHeaderActions: mocks.useFlowBoardHeaderActions,
+vi.mock('../../workspace-chrome/useBoardHeaderActions', () => ({
+  useBoardHeaderActions: mocks.useBoardHeaderActions,
 }))
 
 vi.mock('./useFlowCanvasRuntime', () => ({
@@ -67,7 +67,7 @@ describe('useCanvasBoardRuntime', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.useCanvasBoardSession.mockReturnValue({})
-    mocks.useFlowBoardHeaderActions.mockReturnValue(createBoardHeaderRuntime())
+    mocks.useBoardHeaderActions.mockReturnValue(createBoardHeaderRuntime())
   })
 
   it('flushes autosave before navigation and logout leave the board', async () => {

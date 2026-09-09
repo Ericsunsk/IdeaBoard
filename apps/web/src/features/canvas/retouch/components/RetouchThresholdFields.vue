@@ -32,7 +32,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { FlipReverse } from '@iconoir/vue'
-import { clampThresholdValue } from '../utils/retouchThreshold'
+import { clampThresholdValue } from '../utils/threshold'
 import { readFiniteNumberInputValue } from '../utils/readFiniteNumberInputValue'
 
 defineProps<{

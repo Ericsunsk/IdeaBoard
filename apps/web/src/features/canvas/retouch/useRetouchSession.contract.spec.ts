@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { useRetouchSession } from './useRetouchSession'
-import { flattenVisibleRetouchEffectLayers } from './utils/retouchLayerEffects'
+import { flattenVisibleRetouchEffectLayers } from './utils/layerEffects'
 
 describe('useRetouchSession', () => {
   it('keeps retouch selection transient until a parameter changes', () => {

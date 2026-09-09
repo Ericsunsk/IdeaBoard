@@ -18,7 +18,7 @@ import { createCanvasWorkspaceGraphRuntime } from './createCanvasWorkspaceGraphR
 import { createCanvasWorkspaceImageWorkflow } from './createCanvasWorkspaceImageWorkflow'
 import { createCanvasWorkspaceRuntimeFacade } from './createCanvasWorkspaceRuntimeFacade'
 import { createPendingImageExecutionCore } from '../../execution/pending-execution'
-import type { LibraryAssetMaterializer } from '../../../library/libraryResource'
+import type { LibraryAssetMaterializer } from '../../../library'
 
 export type UseCanvasWorkspaceRuntimeOptions = {
   route: RouteLocationNormalizedLoaded

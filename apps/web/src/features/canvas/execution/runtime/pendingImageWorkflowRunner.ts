@@ -8,7 +8,7 @@ import type { SubmitTaskData } from '../../../../shared/api/task'
 import type {
   ImageExecutionInput,
   ImageExecutionResultOptions,
-} from '../planning/ImageExecutionPlan'
+} from '../planning/imageExecutionPlan'
 import type { ResolvedTaskImageResult } from '../result-nodes/resolvedTaskImageResult'
 import type { PendingImageResultExecution } from '../result-nodes/usePendingImageResultNodes'
 import {
