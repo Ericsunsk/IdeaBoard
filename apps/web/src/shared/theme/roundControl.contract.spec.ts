@@ -9,7 +9,7 @@ const readSource = (relativePath: string) => readFileSync(resolve(sourceRoot, re
 
 const roundControl = readSource('shared/theme/round-control.css')
 const pageChrome = readSource('shared/theme/page-chrome.css')
-const canvasChromeSkin = readSource('features/canvas/components/styles/canvas-chrome.css')
+const canvasChromeSkin = readSource('features/canvas/presentation/styles/canvas-chrome.css')
 
 describe('Round Control surface ownership contract', () => {
   it('exposes one geometry-neutral page chrome surface', () => {

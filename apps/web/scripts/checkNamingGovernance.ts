@@ -31,7 +31,7 @@ import { basename, join } from 'node:path'
  *    `index.ts` only for a documented public boundary. Specs mirroring their
  *    subject are exempt.
  * 6. Generic names (`common`, `misc`, `utils`, `manager`, `service`,
- *    `handler`) are forbidden by default for files and directories. Scope
+ *    `handler`, `helpers`) are forbidden by default for files and directories. Scope
  *    exemptions: locale `common.ts` files (externally canonical locale keys)
  *    and the documented `keptGenericOwnership` narrow leaves below.
  * 7. Acronym normalization: camelCase module stems must not contain uppercase
@@ -112,7 +112,7 @@ const VUE_RESPONSIBILITY_SUFFIXES = new Set([
 // Documented extension (see rule 4): Pane as the Panel-equivalent tab-surface
 // suffix. Requires vocabulary ratification; renaming now would change behavior.
 const VUE_SUFFIX_EXTENSION = new Set(['Pane'])
-const GENERIC_NAMES = new Set(['common', 'misc', 'utils', 'manager', 'service', 'handler'])
+const GENERIC_NAMES = new Set(['common', 'misc', 'utils', 'manager', 'service', 'handler', 'helpers'])
 const ACRONYM_RUNS = ['API', 'SSE', 'URL', 'DTO', 'HTTP', 'IO']
 const VAGUE_VUE_SUFFIXES = ['View', 'Manager', 'Service']
 
@@ -120,34 +120,6 @@ const legacyAllowances: Record<string, string> = {}
 
 /** Temporary migration baseline: src-relative path -> owning phase. */
 const migrationBaseline: Record<string, string> = {
-  // Phase 3 (Canvas): cleaned during the Canvas internal reorganization.
-  'features/canvas/retouch/runtime/runtime.ts': 'phase-3-canvas',
-  'features/canvas/utils': 'phase-3-canvas',
-  'features/canvas/retouch/utils': 'phase-3-canvas',
-  'features/canvas/retouch/components/RetouchChrome.vue': 'phase-3-canvas',
-  'features/canvas/retouch/components/RetouchCurveGraph.vue': 'phase-3-canvas',
-  'features/canvas/retouch/components/RetouchCurvesControl.vue': 'phase-3-canvas',
-  'features/canvas/retouch/components/RetouchEffectActions.vue': 'phase-3-canvas',
-  'features/canvas/retouch/components/RetouchHistogramPlot.vue': 'phase-3-canvas',
-  'features/canvas/retouch/components/RetouchLayerActions.vue': 'phase-3-canvas',
-  'features/canvas/retouch/components/RetouchLayersPanel.vue': 'phase-3-canvas',
-  'features/canvas/retouch/components/RetouchLevelsControl.vue': 'phase-3-canvas',
-  'features/canvas/retouch/components/RetouchLevelsFields.vue': 'phase-3-canvas',
-  'features/canvas/retouch/components/RetouchLevelsOutputControl.vue': 'phase-3-canvas',
-  'features/canvas/retouch/components/RetouchPropertiesPanel.vue': 'phase-3-canvas',
-  'features/canvas/retouch/components/RetouchSharpenControl.vue': 'phase-3-canvas',
-  'features/canvas/retouch/components/RetouchSlider.vue': 'phase-3-canvas',
-  'features/canvas/retouch/components/RetouchThresholdControl.vue': 'phase-3-canvas',
-  'features/canvas/retouch/components/RetouchThresholdFields.vue': 'phase-3-canvas',
-  'features/canvas/components/home/HomeCanvasImageActionMenu.vue': 'phase-3-canvas',
-  'features/canvas/services/canvasMediaIO.ts': 'phase-3-canvas',
-  'features/canvas/execution/result-nodes/useResultNodes.ts': 'phase-3-canvas',
-  'features/canvas/execution/billing/useCanvasBillingReadiness.ts': 'phase-3-canvas',
-  'features/canvas/retouch/useRetouchZeroCopyStage.ts': 'phase-3-canvas',
-  'features/canvas/retouch/types.ts': 'phase-3-canvas',
-  'features/canvas/image-tools/types.ts': 'phase-3-canvas',
-  'features/canvas/inpaint/types.ts': 'phase-3-canvas',
-  'features/canvas/workspace-runtime/types.ts': 'phase-3-canvas',
   // Admin storage touchpoint: rename to a storage-profile responsibility file
   // when the Admin storage vertical is touched (plan first-pass classification).
   'features/admin/storage/helpers.ts': 'admin-storage-touchpoint',
@@ -589,7 +561,7 @@ function runSelfTest(): void {
     [
       'vue-prefix-flagged',
       checkAntiStutterStem(
-        'features/canvas/retouch/components/RetouchChrome.vue',
+        'features/canvas/tools/retouch/components/Chrome.vue',
         'RetouchChrome',
         'anti-stutter',
       )?.kind,
@@ -634,7 +606,7 @@ function runSelfTest(): void {
       checkStyleAsset('shared/motion/dialogMotion.css', 'dialogMotion.css')?.kind,
       'style-asset',
     ],
-    ['baseline-exact', isBaselined('features/canvas/retouch/components/RetouchChrome.vue'), true],
+    ['baseline-exact', isBaselined('features/admin/storage/helpers.ts'), true],
     ['baseline-miss', isBaselined('features/board/domain/document.ts'), false],
     [
       'stale-user-prefix',

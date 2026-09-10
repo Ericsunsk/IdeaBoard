@@ -6,10 +6,10 @@
   // off deep imports, so they are audited as entry surface, not dead code.
   "entry": [
     "src/features/account/presentation/index.ts",
-    "src/features/canvas/components/nodes/primitives/index.ts",
-    "src/features/canvas/components/nodes/workflows/index.ts",
-    "src/features/canvas/execution/index.ts",
-    "src/features/canvas/vue-flow-adapter/index.ts",
+    "src/features/canvas/presentation/nodes/primitives/index.ts",
+    "src/features/canvas/presentation/nodes/workflows/index.ts",
+    "src/features/canvas/application/execution/index.ts",
+    "src/features/canvas/infrastructure/vue-flow-adapter/index.ts",
     "src/features/board/index.ts",
     "src/features/library/index.ts",
     "src/features/auth/index.ts",

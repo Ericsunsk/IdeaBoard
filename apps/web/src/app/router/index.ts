@@ -16,7 +16,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: HOME_PATH,
     name: 'Home',
-    component: () => import('../../features/canvas/pages/CanvasLandingPage.vue'),
+    component: () => import('../../features/canvas/presentation/pages/CanvasLandingPage.vue'),
     meta: { public: true, seoKey: 'home' },
   },
   ...workspaceRoutes,

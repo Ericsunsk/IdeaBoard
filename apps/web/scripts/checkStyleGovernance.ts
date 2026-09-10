@@ -145,13 +145,13 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
     },
     reason: 'Admin route typography and tooltip bridge for PrimeVue vendor DOM.',
   },
-  'src/features/canvas/components/nodes/primitives/NodeToolIconButton.vue': {
+  'src/features/canvas/presentation/nodes/primitives/NodeToolIconButton.vue': {
     counts: {
       'deep-selector': 1,
     },
     reason: 'Slot icon contract: external icon components render SVGs inside this slot.',
   },
-  'src/features/canvas/components/styles/canvas-vue-flow-adapter-skin.css': {
+  'src/features/canvas/presentation/styles/canvas-vue-flow-adapter-skin.css': {
     counts: {
       'vue-flow-internal-selector': 40,
     },

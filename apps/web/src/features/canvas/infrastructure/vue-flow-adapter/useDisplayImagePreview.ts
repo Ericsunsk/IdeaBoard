@@ -1,0 +1,331 @@
+import {
+  computed,
+  getCurrentScope,
+  onScopeDispose,
+  ref,
+  toValue,
+  watch,
+  type MaybeRefOrGetter,
+} from 'vue'
+import { canvasToBlob, resolveFetchUrl } from '../../infrastructure/media/canvasMediaIo.ts'
+import {
+  detectCanvasTransparency,
+  resolvePreviewMimeType,
+  WEBP_PREVIEW_MIME_TYPE,
+  WEBP_PREVIEW_QUALITY,
+} from '../../infrastructure/media/displayImagePreviewEncoding.ts'
+import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../../shared/config/runtimeUrls'
+import {
+  normalizeMediaAssetId,
+  useMediaAssetDelivery,
+  type MediaAssetDeliveryTier,
+  type MediaAssetId,
+} from '../../../../shared/api/mediaAssetDelivery'
+
+interface PreviewOptions {
+  maxSide?: MaybeRefOrGetter<number | null | undefined>
+  assetId?: MaybeRefOrGetter<MediaAssetId | null | undefined>
+  isVisible?: MaybeRefOrGetter<boolean>
+  keepPreviousOnSourceChange?: boolean
+}
+
+const DEFAULT_MAX_SIDE = 1280
+const PREVIEW_CACHE_LIMIT = 80
+const PREVIEW_CONCURRENCY = 2
+const previewCache = new Map<string, string>()
+const inFlightPreviewTasks = new Map<string, Promise<string | null>>()
+const pendingPreviewTasks: Array<() => void> = []
+let activePreviewTasks = 0
+
+function buildPreviewCacheKey(sourceUrl: string, maxSide: number) {
+  return `${maxSide}::${sourceUrl}`
+}
+
+function resolvePreviewMaxSide(value: unknown): number | null {
+  // null is the explicit full-quality tier: keep the original URL and skip canvas work.
+  if (value === null) return null
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : DEFAULT_MAX_SIDE
+}
+
+function touchCache(cacheKey: string, previewObjectUrl: string) {
+  if (previewCache.has(cacheKey)) previewCache.delete(cacheKey)
+  previewCache.set(cacheKey, previewObjectUrl)
+  trimPreviewCache()
+}
+
+function trimPreviewCache() {
+  while (previewCache.size > PREVIEW_CACHE_LIMIT) {
+    const oldestEntry = previewCache.entries().next().value as [string, string] | undefined
+    if (!oldestEntry) break
+    previewCache.delete(oldestEntry[0])
+    URL.revokeObjectURL(oldestEntry[1])
+  }
+}
+
+function getCachedPreviewUrl(cacheKey: string): string | null {
+  const cached = previewCache.get(cacheKey)
+  if (!cached) return null
+  touchCache(cacheKey, cached)
+  return cached
+}
+
+function runNextPreviewTask() {
+  while (activePreviewTasks < PREVIEW_CONCURRENCY && pendingPreviewTasks.length > 0) {
+    const task = pendingPreviewTasks.shift()
+    if (!task) break
+    task()
+  }
+}
+
+function enqueuePreviewTask<T>(taskFactory: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const run = () => {
+      activePreviewTasks += 1
+      void taskFactory()
+        .then(resolve)
+        .catch(reject)
+        .finally(() => {
+          activePreviewTasks = Math.max(0, activePreviewTasks - 1)
+          runNextPreviewTask()
+        })
+    }
+    pendingPreviewTasks.push(run)
+    runNextPreviewTask()
+  })
+}
+
+async function createPreviewObjectUrl(sourceUrl: string, maxSide: number): Promise<string | null> {
+  const fetchUrl = resolveFetchUrl(sourceUrl)
+  if (!fetchUrl) return null
+  const response = await fetch(fetchUrl, { credentials: 'include' })
+  if (!response) return null
+  if (!response.ok) return null
+  const sourceBlob = await response.blob()
+  if (!sourceBlob.type.startsWith('image/')) return null
+
+  const bitmap = await createImageBitmap(sourceBlob)
+  const longestSide = Math.max(bitmap.width, bitmap.height)
+  if (longestSide <= 0 || longestSide <= maxSide) {
+    bitmap.close()
+    return null
+  }
+
+  const scale = maxSide / longestSide
+  const width = Math.max(1, Math.round(bitmap.width * scale))
+  const height = Math.max(1, Math.round(bitmap.height * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  if (!ctx) {
+    bitmap.close()
+    return null
+  }
+
+  ctx.drawImage(bitmap, 0, 0, width, height)
+  bitmap.close()
+
+  const hasTransparentPixels = detectCanvasTransparency(ctx, width, height)
+  const previewMime = resolvePreviewMimeType(sourceBlob.type, hasTransparentPixels)
+  const previewBlob = await canvasToBlob(
+    canvas,
+    previewMime,
+    previewMime === WEBP_PREVIEW_MIME_TYPE ? WEBP_PREVIEW_QUALITY : undefined,
+  )
+  return URL.createObjectURL(previewBlob)
+}
+
+async function getOrCreatePreviewUrl(sourceUrl: string, maxSide: number): Promise<string | null> {
+  const cacheKey = buildPreviewCacheKey(sourceUrl, maxSide)
+  const cached = getCachedPreviewUrl(cacheKey)
+  if (cached) return cached
+
+  const inFlight = inFlightPreviewTasks.get(cacheKey)
+  if (inFlight) return inFlight
+
+  const task = enqueuePreviewTask(() => createPreviewObjectUrl(sourceUrl, maxSide))
+    .then((previewUrl) => {
+      if (previewUrl) touchCache(cacheKey, previewUrl)
+      return previewUrl
+    })
+    .catch(() => null)
+    .finally(() => {
+      inFlightPreviewTasks.delete(cacheKey)
+    })
+
+  inFlightPreviewTasks.set(cacheKey, task)
+  return task
+}
+
+function supportsImageDecode() {
+  return typeof Image !== 'undefined' && typeof Image.prototype.decode === 'function'
+}
+
+async function canDisplayImage(url: string): Promise<boolean> {
+  if (!supportsImageDecode()) return true
+  const image = new Image()
+  image.src = url
+  try {
+    await image.decode()
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function useDisplayImagePreview(
+  sourceUrl: MaybeRefOrGetter<string | null | undefined>,
+  options: PreviewOptions = {},
+) {
+  const canonicalSourceUrl = computed(() => {
+    const raw = toValue(sourceUrl)
+    return raw ? canonicalizeRuntimeUploadRef(raw.trim()).trim() : ''
+  })
+  const isManagedUpload = computed(() => canonicalSourceUrl.value.startsWith('/uploads/'))
+  const resolvedSourceUrl = computed(() => {
+    return canonicalSourceUrl.value ? resolveAssetUrl(canonicalSourceUrl.value) : ''
+  })
+  const resolvedMaxSide = computed(() => resolvePreviewMaxSide(toValue(options.maxSide)))
+  const resolvedAssetId = computed(() => {
+    return normalizeMediaAssetId(toValue(options.assetId))
+  })
+  const isVisible = computed(() => toValue(options.isVisible) !== false)
+  const resolvedMediaTier = computed<MediaAssetDeliveryTier>(() => {
+    if (resolvedMaxSide.value === null) return 'original'
+    if (resolvedMaxSide.value <= 256) return 'thumb'
+    if (resolvedMaxSide.value <= 640) return 'preview'
+    // Canvas nodes stay backed by the processing derivative. It is the
+    // durable edit-quality source; preview is reserved for editor controls.
+    return 'processing'
+  })
+  const mediaDelivery = useMediaAssetDelivery(resolvedAssetId, resolvedMediaTier, {
+    enabled: isVisible,
+  })
+  const previewUrl = ref<string | null>(null)
+  const isResolved = ref(false)
+  const displayedUrl = ref('')
+  const displayedSource = ref('')
+  let requestToken = 0
+  let activeSource = ''
+  let displayRequestToken = 0
+
+  watch(
+    [
+      () => resolvedSourceUrl.value,
+      () => resolvedMaxSide.value,
+      () => resolvedAssetId.value,
+      isVisible,
+    ],
+    ([currentSource, maxSide, assetId, visible]) => {
+      requestToken += 1
+      const token = requestToken
+      if (currentSource !== activeSource) previewUrl.value = null
+      activeSource = currentSource
+      isResolved.value = false
+
+      if (!currentSource || !visible) return
+      if (maxSide === null) {
+        previewUrl.value = null
+        return
+      }
+
+      if (assetId !== null) return
+
+      const cacheKey = buildPreviewCacheKey(currentSource, maxSide)
+      const cached = getCachedPreviewUrl(cacheKey)
+      if (cached) {
+        previewUrl.value = cached
+        isResolved.value = true
+        return
+      }
+
+      void getOrCreatePreviewUrl(currentSource, maxSide).then((generatedPreviewUrl) => {
+        if (token !== requestToken) return
+        previewUrl.value = generatedPreviewUrl
+        isResolved.value = true
+      })
+    },
+    { immediate: true },
+  )
+
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      requestToken += 1
+      displayRequestToken += 1
+    })
+  }
+
+  const candidateUrl = computed(() => {
+    if (resolvedAssetId.value !== null) {
+      if (mediaDelivery.url.value) return mediaDelivery.url.value
+      // While the derivative is genuinely not ready (HTTP 202 pending /
+      // processing), fall back to the persisted source URL so nodes never
+      // hang on blank — unless the source itself is an authenticated API
+      // content URL, which must never bind optimistically (CORS + the stage
+      // guard relies on an empty candidate while delivery loads).
+      // Transient loading/idle keeps the previous frame so zoom-tier
+      // switches don't flash the source.
+      if (
+        (mediaDelivery.status.value === 'pending' ||
+          mediaDelivery.status.value === 'processing') &&
+        !resolvedSourceUrl.value.startsWith('/api/')
+      ) {
+        return resolvedSourceUrl.value
+      }
+      return mediaDelivery.url.value
+    }
+    if (previewUrl.value) return previewUrl.value
+    if (isManagedUpload.value && resolvedMaxSide.value !== null && !isResolved.value) {
+      return ''
+    }
+    return resolvedSourceUrl.value
+  })
+
+  watch(
+    [resolvedSourceUrl, candidateUrl],
+    ([currentSource, nextUrl]) => {
+      displayRequestToken += 1
+      const token = displayRequestToken
+
+      if (!currentSource) {
+        displayedSource.value = ''
+        displayedUrl.value = ''
+        return
+      }
+
+      if (currentSource !== displayedSource.value) {
+        displayedSource.value = currentSource
+        if (!options.keepPreviousOnSourceChange) displayedUrl.value = ''
+      }
+      if (!nextUrl || nextUrl === displayedUrl.value) return
+
+      // A new external/blob source is already the optimistic preview. Commit it immediately;
+      // derived previews and delivery URLs wait for decode so a zoom never flashes a placeholder.
+      if (nextUrl === currentSource && !isManagedUpload.value && !displayedUrl.value) {
+        displayedUrl.value = nextUrl
+        return
+      }
+
+      void canDisplayImage(nextUrl).then((isDisplayable) => {
+        if (
+          !isDisplayable ||
+          token !== displayRequestToken ||
+          currentSource !== displayedSource.value
+        ) {
+          return
+        }
+        displayedUrl.value = nextUrl
+      })
+    },
+    { immediate: true, flush: 'sync' },
+  )
+
+  const displayUrl = computed(() => displayedUrl.value)
+
+  return {
+    displayUrl,
+  }
+}

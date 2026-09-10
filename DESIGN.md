@@ -82,7 +82,7 @@ Contract rules:
 
 实现入口：
 
-- [executionContract.ts](./apps/web/src/features/canvas/execution/contracts/executionContract.ts)
+- [executionContract.ts](./apps/web/src/features/canvas/domain/execution-contracts/executionContract.ts)
 - [features.go](./apps/api/internal/workflow/features.go)
 
 ### 3. Tasking 的事实源是 PostgreSQL + River
@@ -292,12 +292,12 @@ Vue UI -> application use case -> resource/adapter -> generated API
 3. **消除前缀冗余守则 (Anti-Stuttering Rule)**：
    - **严禁在子文件/子目录内重复父级目录名前缀**。
    - 错误范式（Stuttering）：`features/library/libraryResource.ts`、`features/canvas/retouch/utils/retouchCurves.ts`、`features/board/catalog/boardCatalog.ts`。
-   - 正确范式（Clean）：`features/library/resource.ts`、`features/canvas/retouch/utils/curves.ts`、`features/board/presentation/catalog/contract.ts`。
+    - 正确范式（Clean）：`features/library/resource.ts`、`features/canvas/tools/retouch/processing/curves.ts`、`features/board/presentation/catalog/contract.ts`。
    - **防命名冲突机制**：跨模块向外暴露能力时，必须通过特性的根 `index.ts` 进行语义清晰的 Named Export（例如 `export { createLibraryResource } from './resource'`），在消费方上下文保证语义清晰，无需在内部文件名冗余堆叠前缀。
 
 4. **公共 API 出口与边界隔离 (Public API Seams & Boundary Enforcement)**：
    - 需要向其他 Feature 暴露公共 API 的 Feature 必须在根目录提供 `index.ts` 作为唯一合法出口；仅由路由或父 Feature 装配的内部 Feature 可保留显式内部入口。
-   - **禁止穿透导入**：外部特性严禁跨边界通过深层相对路径导入另一特性的内部私有实现（禁止 `import ... from '../canvas/workspace-ui/internal/...'` 或 `import ... from '../library/components/LibraryFloatingIsland.vue'`）。
+    - **禁止穿透导入**：外部特性严禁跨边界通过深层相对路径导入另一特性的内部私有实现（禁止 `import ... from '../canvas/application/workspace/internal/...'` 或 `import ... from '../library/components/LibraryFloatingIsland.vue'`）。
    - 模块依赖关系由 `dependency-cruiser` 做自动化门禁拦截。
 
 5. **渐进收敛治理推进策略 (Ratchet Governance Pattern)**：

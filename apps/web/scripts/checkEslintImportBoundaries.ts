@@ -25,7 +25,7 @@ const restrictedBoundaryCases: BoundaryCase[] = [
   },
   {
     name: 'Canvas route page cannot deep-import its overlay implementation',
-    filePath: path.join(webRoot, 'src/features/canvas/pages/import-boundary.fixture.ts'),
+    filePath: path.join(webRoot, 'src/features/canvas/presentation/pages/import-boundary.fixture.ts'),
     code: `
       import { useCanvasCustomLayerOverlay } from '../overlay-lifecycle/useCanvasCustomLayerOverlay'
 
@@ -37,7 +37,7 @@ const restrictedBoundaryCases: BoundaryCase[] = [
 const allowedBoundaryCases: BoundaryCase[] = [
   {
     name: 'Canvas route page can use Prime adapters and the Canvas overlay public barrel',
-    filePath: path.join(webRoot, 'src/features/canvas/pages/import-boundary.fixture.ts'),
+    filePath: path.join(webRoot, 'src/features/canvas/presentation/pages/import-boundary.fixture.ts'),
     code: `
       import { usePrimeDialogOverlayLifecycle } from '../../../shared/composables/usePrimeDialogOverlayLifecycle'
       import { useCanvasCustomLayerOverlay } from '../overlay-lifecycle'

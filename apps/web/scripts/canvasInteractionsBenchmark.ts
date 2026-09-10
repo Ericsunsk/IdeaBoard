@@ -16,7 +16,7 @@ import {
   type ImageNodeItem,
   type PromptNodeItem,
 } from '../src/features/board/domain'
-import type { CanvasGraphNodeId } from '../src/features/canvas/graph-runtime'
+import type { CanvasGraphNodeId } from '../src/features/canvas/domain/graph'
 import type {
   BoardStateEnvelope,
   User,

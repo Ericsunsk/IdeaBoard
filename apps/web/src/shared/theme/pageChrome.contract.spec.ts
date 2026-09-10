@@ -13,11 +13,11 @@ const consumers = {
   searchBatchDock: readSource('features/search/presentation/components/SearchBatchActionDock.vue'),
   boardsSkin: readSource('features/board/presentation/catalog/skin.ts'),
   libraryIsland: readSource('features/library/components/LibraryFloatingIsland.vue'),
-  canvasChrome: readSource('features/canvas/workspace-chrome/components/CanvasChrome.vue'),
+  canvasChrome: readSource('features/canvas/presentation/chrome/components/CanvasChrome.vue'),
   boardHeader: readSource(
-    'features/canvas/workspace-chrome/components/CanvasChromeBoardHeader.vue',
+    'features/canvas/presentation/chrome/components/CanvasChromeBoardHeader.vue',
   ),
-  canvasMiniMap: readSource('features/canvas/components/CanvasMiniMap.vue'),
+  canvasMiniMap: readSource('features/canvas/presentation/chrome/CanvasMiniMap.vue'),
   userAccountMenu: readSource('shared/components/UserAccountMenu.vue'),
   creditBalance: readSource('shared/components/UserCreditBalanceButton.vue'),
 }
@@ -40,8 +40,8 @@ describe('Cross-feature page chrome surface contract', () => {
   it('does not re-declare the shared surface inside feature styles', () => {
     const featureStyles = [
       readSource('features/search/presentation/search.css'),
-      readSource('features/canvas/components/styles/canvas-chrome.css'),
-      readSource('features/canvas/components/styles/canvas-vue-flow-adapter-skin.css'),
+      readSource('features/canvas/presentation/styles/canvas-chrome.css'),
+      readSource('features/canvas/presentation/styles/canvas-vue-flow-adapter-skin.css'),
     ]
 
     featureStyles.forEach((source) => {

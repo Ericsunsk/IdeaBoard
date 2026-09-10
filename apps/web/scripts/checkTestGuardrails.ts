@@ -56,7 +56,7 @@ const allowedSpecSuffixes = [
 ] as const
 
 const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
-  'src/features/canvas/components/home/HomeCanvasImageActionMenu.component.spec.ts': [
+  'src/features/canvas/presentation/nodes/home/ImageActionMenu.component.spec.ts': [
     {
       rule: 'raw-unmount-call',
       reason:
@@ -115,44 +115,44 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
       reason: 'Verifies the shared Admin dialog footer layout contract.',
     },
   ],
-  'src/features/canvas/components/home/HomeCanvasImageActionMenu.component.spec.ts': [
+  'src/features/canvas/presentation/nodes/home/ImageActionMenu.component.spec.ts': [
     {
       reason:
         'Verifies the visual active/hidden state class that coordinates the strength control overlay.',
     },
   ],
-  'src/features/canvas/components/nodes/primitives/PromptComposerControls.options.component.spec.ts':
+  'src/features/canvas/presentation/nodes/primitives/PromptComposerControls.options.component.spec.ts':
     [
       {
         reason:
           'Verifies the stable count-picker style hooks preserved by the generic output option picker refactor.',
       },
     ],
-  'src/features/canvas/retouch/components/RetouchHistogramPlot.component.spec.ts': [
+  'src/features/canvas/tools/retouch/components/HistogramPlot.component.spec.ts': [
     {
       reason:
         'Verifies the active marker visual state for the reusable SVG histogram interaction surface.',
     },
   ],
-  'src/features/canvas/retouch/components/RetouchLevelsControl.component.spec.ts': [
+  'src/features/canvas/tools/retouch/components/LevelsControl.component.spec.ts': [
     {
       reason:
         'Verifies SVG marker, guide-line, and numeric control visual classes for the levels editor.',
     },
   ],
-  'src/features/canvas/retouch/components/RetouchSharpenControl.component.spec.ts': [
+  'src/features/canvas/tools/retouch/components/SharpenControl.component.spec.ts': [
     {
       reason:
         'Verifies the tonal track class contract that keeps the radius and threshold sliders visible.',
     },
   ],
-  'src/features/canvas/retouch/components/RetouchThresholdControl.component.spec.ts': [
+  'src/features/canvas/tools/retouch/components/ThresholdControl.component.spec.ts': [
     {
       reason:
         'Verifies SVG threshold marker, guide-line, and control visual classes for the threshold editor.',
     },
   ],
-  'src/features/canvas/inpaint/components/ImageInpaintOverlay.component.spec.ts': [
+  'src/features/canvas/tools/inpaint/components/ImageInpaintOverlay.component.spec.ts': [
     {
       reason:
         'Verifies the brush cursor visibility class after pointer movement in the mask overlay.',

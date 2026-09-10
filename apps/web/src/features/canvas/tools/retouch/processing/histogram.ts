@@ -1,0 +1,94 @@
+import type { RetouchCurveChannel } from '../model.ts'
+
+const CHANNEL_MAX = 255
+const PERCENT_SCALE = 100
+
+export type RetouchHistogram = {
+  channel: RetouchCurveChannel
+  bins: Uint32Array
+  normalizedBins: Float32Array
+  maxBin: number
+  total: number
+}
+
+export function createRetouchHistogram(
+  imageData: ImageData | null | undefined,
+  channel: RetouchCurveChannel,
+): RetouchHistogram {
+  const bins = new Uint32Array(256)
+  const data = imageData?.data
+  if (!data || data.length < 4) return createHistogramResult(channel, bins)
+
+  for (let index = 0; index < data.length; index += 4) {
+    const value = resolveHistogramValue(data, index, channel)
+    bins[value] = (bins[value] ?? 0) + 1
+  }
+
+  return createHistogramResult(channel, bins)
+}
+
+export function sampleHistogramPath(histogram: RetouchHistogram, sampleCount = 128) {
+  if (histogram.maxBin <= 0) return ''
+
+  const count = Math.max(2, Math.round(sampleCount))
+  const points: string[] = [`M 0 ${PERCENT_SCALE}`]
+  for (let index = 0; index < count; index += 1) {
+    const binIndex = Math.round((index / (count - 1)) * CHANNEL_MAX)
+    const x = (binIndex / CHANNEL_MAX) * PERCENT_SCALE
+    const y = PERCENT_SCALE - (histogram.normalizedBins[binIndex] ?? 0) * PERCENT_SCALE
+    points.push(`L ${formatPathNumber(x)} ${formatPathNumber(y)}`)
+  }
+  points.push(`L ${PERCENT_SCALE} ${PERCENT_SCALE} Z`)
+  return points.join(' ')
+}
+
+function createHistogramResult(channel: RetouchCurveChannel, bins: Uint32Array): RetouchHistogram {
+  const normalizedBins = new Float32Array(256)
+  let maxBin = 0
+  let total = 0
+  for (const value of bins) {
+    if (value > maxBin) maxBin = value
+    total += value
+  }
+
+  if (maxBin > 0) {
+    for (let index = 0; index < bins.length; index += 1) {
+      normalizedBins[index] = Math.sqrt((bins[index] ?? 0) / maxBin)
+    }
+  }
+
+  return {
+    channel,
+    bins,
+    normalizedBins,
+    maxBin,
+    total,
+  }
+}
+
+function resolveHistogramValue(
+  data: Uint8ClampedArray,
+  index: number,
+  channel: RetouchCurveChannel,
+) {
+  switch (channel) {
+    case 'red':
+      return data[index] ?? 0
+    case 'green':
+      return data[index + 1] ?? 0
+    case 'blue':
+      return data[index + 2] ?? 0
+    case 'rgb':
+      return Math.round(
+        0.2126 * (data[index] ?? 0) +
+          0.7152 * (data[index + 1] ?? 0) +
+          0.0722 * (data[index + 2] ?? 0),
+      )
+  }
+}
+
+function formatPathNumber(value: number) {
+  return Number.isInteger(value)
+    ? String(value)
+    : value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')
+}
