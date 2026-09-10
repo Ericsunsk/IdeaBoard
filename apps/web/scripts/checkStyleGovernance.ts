@@ -380,7 +380,7 @@ async function checkStyleGovernance(files: readonly SourceFile[]): Promise<Viola
 
   violations.push(
     ...findStaleMotionAllowances(contents).map((violation) => ({
-      file: 'motion-policy-guard',
+      file: 'motionPolicyGuard',
       ...violation,
     })),
     ...checkStaleAllowances(

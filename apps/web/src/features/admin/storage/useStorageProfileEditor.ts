@@ -20,7 +20,7 @@ import {
   type StorageProfilePayload,
   type StorageProvider,
   type StorageProviderMeta,
-} from './helpers'
+} from './profiles'
 
 type SaveStorageProfile = (input: {
   id?: string | undefined

@@ -95,7 +95,7 @@
         class="canvas-chrome-catalog-recovery-action"
         :aria-label="t('canvas.chrome.reloadCatalog')"
         :disabled="board.catalogRecovery.status === 'reloading'"
-        @click="emit('reload-board-catalog')"
+        @click="emit('reload-catalog')"
       >
         {{ t('canvas.chrome.reload') }}
       </button>
@@ -124,7 +124,7 @@ const emit = defineEmits<{
   'start-board-rename': []
   'cancel-board-rename': []
   'confirm-board-rename': []
-  'reload-board-catalog': []
+  'reload-catalog': []
   'select-board': [boardId: string]
   'navigate-back': []
 }>()

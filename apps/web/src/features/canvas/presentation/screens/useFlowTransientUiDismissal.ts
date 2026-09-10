@@ -1,12 +1,9 @@
-export type DismissTransientCanvasUiOptions = {
-  closeOutpaint?: boolean
-  closeBoardHeader?: boolean
-  closeContextMenu?: boolean
-  clearNodePanel?: boolean
-  hideStrength?: boolean
-}
+import type {
+  DismissTransientCanvasUi,
+  DismissTransientCanvasUiOptions,
+} from '../../infrastructure/vue-flow-adapter/useVueFlowSelectionAdapter'
 
-export type DismissTransientCanvasUi = (options?: DismissTransientCanvasUiOptions) => void
+export type { DismissTransientCanvasUi, DismissTransientCanvasUiOptions }
 
 type UseFlowTransientUiDismissalOptions = {
   cancelFlowOutpaintMode: () => void

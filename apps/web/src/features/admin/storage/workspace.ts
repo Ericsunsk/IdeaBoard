@@ -22,7 +22,7 @@ import {
   toProviderMetaMap,
   type StorageCard,
   type StorageProviderMeta,
-} from './helpers'
+} from './profiles'
 import type { AdminStorageFeedback } from './useStorageFeedback'
 
 type RunAsyncAction = ReturnType<typeof useAsyncAction>['runAsyncAction']

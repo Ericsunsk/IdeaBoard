@@ -376,8 +376,7 @@ apps/web/src/
 │   ├── legal/                # legal pages
 │   ├── library/              # asset library
 │   ├── search/               # search features
-│   ├── user/                 # user routes and layout
-│   └── user-shell/           # user navigation and shell controls
+│   ├── workspace/            # workspace routes, layout, shell (/user/* URLs)
 └── shared/                   # cross-feature API/auth/types/utils/assets
 
 apps/api/

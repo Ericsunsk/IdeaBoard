@@ -20,6 +20,11 @@ This is the first-pass manifest for the clean-break reorganization. Each phase m
 | 3 | `features/canvas/*` legacy layout | `features/canvas/domain`, `application`, `infrastructure`, `presentation` (+`screens/` screen assembly, `styles/`), `tools` | Separate domain, use-case, adapter, UI, and tool responsibilities | Internal Canvas imports | Preserve execution/editing/media contracts | Canvas contract suite; dependency-direction checks |
 | 3 | Canvas Vue Flow concrete imports | `features/canvas/infrastructure/vue-flow-adapter` | Third-party adapter belongs behind infrastructure | Canvas application/presentation | Preserve node/viewport behavior | Adapter contract tests; no deep vendor imports |
 | 3 | Canvas retouch/inpaint/image-tools roots | `features/canvas/tools/*` | Tool semantics remain Canvas-internal | Canvas application/presentation | Preserve tool state and workflow slugs | Tool tests; execution contract tests |
+| 4 | `features/admin/storage/helpers.ts` | `features/admin/storage/profiles.ts` | Admin storage profile helpers renamed to specific responsibility | Admin storage components, resource, workspace, specs | None | Full test suite; checkNamingGovernance; legacyAllowances empty |
+| 4 | `checkNamingGovernance.ts` (`migrationBaseline`) | Retired / removed | Phase-aware migration baseline retired; permanent guardrails remain | CI, local lint | None | Naming self-test; lint:naming-governance |
+| 4 | `Pane` vocabulary extension | `docs/architecture/frontend-vocabulary.yml` | Ratified as Panel-equivalent tab-surface suffix | Account presentation panes, naming governance | None | Vocabulary check; checkNamingGovernance |
+| 4 | Canvas Chrome `reload-board-catalog` event | `reload-catalog` | Anti-stuttering vocabulary alignment | Canvas Chrome and Canvas Screen | None | CanvasChrome component specs, CanvasScreen |
+| 4 | Stale doc paths in `DEVELOPMENT.md`, `CONTEXT.md`, `DESIGN.md`, `seo-aeo-geo-ideaboard.md` | Updated to `workspace` / canonical DDD paths | Keep documentation in sync with directory structure | Docs | None | Stale doc scan |
 
 ## Manifest rules
 

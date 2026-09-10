@@ -17,7 +17,7 @@
       @start-board-rename="startBoardRename"
       @cancel-board-rename="cancelBoardRename"
       @confirm-board-rename="confirmBoardRename"
-      @reload-board-catalog="reloadCatalog"
+      @reload-catalog="reloadCatalog"
       @select-board="selectBoard"
       @export="exportSelectedImages"
       @navigate-back="navigateBack"

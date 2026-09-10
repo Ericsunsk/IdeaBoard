@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import { DatabaseExport } from '@iconoir/vue'
-import type { StorageCard, StorageProvider, StorageProviderMeta } from './helpers'
+import type { StorageCard, StorageProvider, StorageProviderMeta } from './profiles'
 import { getAdminBrandLogo } from '../shared/logos/brandLogos'
 import logoAlibabaCloud from '../../../shared/assets/storage-vendors/alibabacloud.svg'
 import logoAmazonS3 from '../../../shared/assets/storage-vendors/amazons3.svg'

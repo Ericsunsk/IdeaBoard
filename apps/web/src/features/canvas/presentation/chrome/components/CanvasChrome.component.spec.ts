@@ -133,7 +133,7 @@ describe('CanvasChrome', () => {
 
     screen.getByRole('button', { name: 'Reload canvas list' }).click()
 
-    expect(emitted()['reload-board-catalog']).toHaveLength(1)
+    expect(emitted()['reload-catalog']).toHaveLength(1)
   })
 
   it('starts Board rename from the keyboard before confirming the draft', async () => {
@@ -294,7 +294,7 @@ describe('CanvasChrome', () => {
     await user.click(screen.getByRole('button', { name: 'Reload canvas list' }))
 
     expect(emitted()['select-board']).toEqual([['board-b']])
-    expect(emitted()['reload-board-catalog']).toHaveLength(1)
+    expect(emitted()['reload-catalog']).toHaveLength(1)
   })
 
   it('places an active Library control immediately above the minimap control', async () => {

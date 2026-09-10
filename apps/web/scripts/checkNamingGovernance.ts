@@ -20,7 +20,8 @@ import { basename, join } from 'node:path'
  *    and Vue SFCs. A single trailing responsibility suffix (`Contract`,
  *    `Ref`, `Upload`, `Persistence` for TS; `Page`, `Layout`, `Dialog`,
  *    `Drawer`, `Card`, `Panel`, `Toolbar`, `Navigation`, `Form` for Vue) is
- *    allowed. `Pane` is accepted as the Panel-equivalent tab-surface suffix:
+ *    allowed. `Pane` is the vocabulary-ratified Panel-equivalent tab-surface
+ *    suffix (see `Pane` in `docs/architecture/frontend-vocabulary.yml`):
  *    the plan itself endorses the ancestor+suffix shape (`admin/users/
  *    UsersPage.vue`), and renaming the account tab panes to bare `Pane.vue`
  *    would collapse six distinct KeepAlive component names into one, changing
@@ -46,7 +47,12 @@ import { basename, join } from 'node:path'
  *     only for multiple related type families; single-concept types use the
  *     concept name. Multi-family keeps are recorded in `keptMultiFamilyTypes`.
  * 12. Symbol alignment: `useX.ts` must export `useX` or a clearly related
- *     composable family recorded in `keptComposableFamilies`.
+ *     composable family recorded in `keptComposableFamilies`. `index.ts`
+ *     coverage is rule 14. Deeper role-keyword checks (e.g. `resource.ts`
+ *     must export `*Resource`) are intentionally out of scope: query-key
+ *     helpers and DTOs colocate in `resource.ts` by established
+ *     architecture (see shared/CONTEXT.md API Boundary and the contract
+ *     inventory), so keyword matching would flag legitimate seams.
  * 13. Stale internal vocabulary: `User[A-Z]*` basenames under
  *    `features/user/`, `features/user-shell/`, or `features/workspace/` belong to the Workspace
  *     bounded context and are retired; use Workspace terminology. `User*` names
@@ -57,14 +63,13 @@ import { basename, join } from 'node:path'
  *     one-line lazy `() => import()` wrappers, nothing executable may remain.
  *     Documented boundaries live in `keptBarrelBoundaries`.
  *
- * Temporary Graph (`migrationBaseline`, phase-aware): explicitly tracked
- * violations in contexts whose owning migration phase has not run yet. Every
- * entry carries the owning phase; all entries must be empty when the final
- * migration phase completes (issue #696). Contexts with no migration phase
- * (auth/account/admin/shared) are renamed or classified immediately instead.
+ * Migration machinery removed (issue #696): the phase-aware `migrationBaseline`
+ * is gone with the final migration phase. Only permanent documented keeps
+ * (`kept*` maps with owner + reason) and the empty `legacyAllowances`
+ * ratchet remain.
  *
- * Ratchet: `legacyAllowances` tracks pre-existing violations outside the two
- * lists above. Any violation NOT in the maps fails the check; an allowance
+ * Ratchet: `legacyAllowances` tracks pre-existing violations outside the
+ * documented keeps. Any violation NOT allowed fails the check; an allowance
  * whose file no longer violates prints a stale warning so it can be removed.
  */
 
@@ -97,7 +102,9 @@ type Violation = {
 const SPEC_SUFFIX_PATTERN = /\.(unit|contract|component|browser)\.spec$/
 const SPEC_FILE_PATTERN = /\.(unit|contract|component|browser)\.spec\.ts$/
 const KIND_REMAINDER_ALLOWLIST = new Set(['Contract', 'Ref', 'Upload', 'Persistence'])
-// Plan section 20.6 responsibility suffixes (stable meanings).
+// Plan section 20.6 responsibility suffixes (stable meanings), plus `Pane`
+// ratified as the Panel-equivalent tab-surface suffix in
+// docs/architecture/frontend-vocabulary.yml.
 const VUE_RESPONSIBILITY_SUFFIXES = new Set([
   'Page',
   'Layout',
@@ -105,25 +112,16 @@ const VUE_RESPONSIBILITY_SUFFIXES = new Set([
   'Drawer',
   'Card',
   'Panel',
+  'Pane',
   'Toolbar',
   'Navigation',
   'Form',
 ])
-// Documented extension (see rule 4): Pane as the Panel-equivalent tab-surface
-// suffix. Requires vocabulary ratification; renaming now would change behavior.
-const VUE_SUFFIX_EXTENSION = new Set(['Pane'])
 const GENERIC_NAMES = new Set(['common', 'misc', 'utils', 'manager', 'service', 'handler', 'helpers'])
 const ACRONYM_RUNS = ['API', 'SSE', 'URL', 'DTO', 'HTTP', 'IO']
 const VAGUE_VUE_SUFFIXES = ['View', 'Manager', 'Service']
 
 const legacyAllowances: Record<string, string> = {}
-
-/** Temporary migration baseline: src-relative path -> owning phase. */
-const migrationBaseline: Record<string, string> = {
-  // Admin storage touchpoint: rename to a storage-profile responsibility file
-  // when the Admin storage vertical is touched (plan first-pass classification).
-  'features/admin/storage/helpers.ts': 'admin-storage-touchpoint',
-}
 
 /** Permanent documented keeps: src-relative dir path -> ownership reason. */
 const keptGenericOwnership: Record<string, string> = {
@@ -160,10 +158,6 @@ function splitWords(value: string): string[] {
     .split(/(?=[A-Z])|\s+/)
     .filter(Boolean)
     .map((word) => word.toLowerCase())
-}
-
-function isBaselined(relativePath: string): boolean {
-  return Object.hasOwn(migrationBaseline, relativePath)
 }
 
 function siblingVueExists(dir: string, prefix: string): boolean {
@@ -225,8 +219,7 @@ function checkAntiStutterStem(
       const capitalized = head[0]?.toUpperCase() + head.slice(1)
       if (
         KIND_REMAINDER_ALLOWLIST.has(capitalized) ||
-        VUE_RESPONSIBILITY_SUFFIXES.has(capitalized) ||
-        VUE_SUFFIX_EXTENSION.has(capitalized)
+        VUE_RESPONSIBILITY_SUFFIXES.has(capitalized)
       ) {
         continue
       }
@@ -606,8 +599,8 @@ function runSelfTest(): void {
       checkStyleAsset('shared/motion/dialogMotion.css', 'dialogMotion.css')?.kind,
       'style-asset',
     ],
-    ['baseline-exact', isBaselined('features/admin/storage/helpers.ts'), true],
-    ['baseline-miss', isBaselined('features/board/domain/document.ts'), false],
+    ['kept-generic-dir', checkGenericName('features/account/presentation/common', 'common', true), null],
+    ['generic-flagged', checkGenericName('features/x/utils.ts', 'utils.ts', false)?.kind, 'generic-name'],
     [
       'stale-user-prefix',
       checkStaleWorkspacePrefix('features/user/layout/UserLayout.vue', 'UserLayout.vue')?.kind,
@@ -651,7 +644,6 @@ function main() {
   let failed = false
 
   for (const violation of violations) {
-    if (isBaselined(violation.path)) continue
     if (remainingAllowances.has(violation.path)) {
       remainingAllowances.delete(violation.path)
       continue

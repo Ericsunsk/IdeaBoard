@@ -281,7 +281,7 @@ Vue UI -> application use case -> resource/adapter -> generated API
 
 1. **分级架构范式 (Tiered DDD Architecture)**：
    - **重度核心子域**（如 `board`, `canvas`, `search`, `account`, `admin`）：必须严格落地标准 4 层或职责清晰分层（`domain/`, `application/`, `infrastructure/`, `presentation/` 或 `ui/`）。
-   - **轻量特性模块**（如 `legal`, `user`）：保持轻量扁平结构（`components/`, `useXxx.ts`, `types.ts` 等），严禁为了套用模板引入空目录或无意义的空抽象。
+   - **轻量特性模块**（如 `legal`, `public-site`）：保持轻量扁平结构（`components/`, `useXxx.ts`, `types.ts` 等），严禁为了套用模板引入空目录或无意义的空抽象。
 
 2. **文件与目录命名规范 (Naming Conventions)**：
    - **目录命名**：全小写短横线 `kebab-case`（如 `board/`, `image-tools/`, `workspace-runtime/`）。

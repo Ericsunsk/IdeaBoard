@@ -7,7 +7,7 @@ import {
   type StorageCard,
   type StorageProfilePayload,
   type StorageProviderMeta,
-} from './helpers'
+} from './profiles'
 
 vi.mock('../../../shared/composables/useAppToast', () => ({
   useAppToast: () => ({

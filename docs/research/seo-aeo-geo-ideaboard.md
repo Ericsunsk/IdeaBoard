@@ -18,7 +18,7 @@
 以下为仓库事实，不是外部规则：
 
 - [`apps/web/index.html`](../../apps/web/index.html) 只有全局 `Idea Board` title；没有 description、canonical、Open Graph、robots meta 或 JSON-LD。所有 SPA route 初始都依赖同一份 HTML。
-- [`router/index.ts`](../../apps/web/src/app/router/index.ts) 使用 `createWebHistory()`，且 `/` client redirect 到 `/user/home`；[`userRoutes.ts`](../../apps/web/src/features/user/app/userRoutes.ts) 显示 `/user/home`、`/user/login`、`/user/register`，并将 `/user/boards`、`/user/canvas` 标记为 `requiresAuth`。
+- [`router/index.ts`](../../apps/web/src/app/router/index.ts) 使用 `createWebHistory()`，且 `/` client redirect 到 `/user/home`；[`workspaceRoutes.ts`](../../apps/web/src/features/workspace/routes/workspaceRoutes.ts) 显示 `/user/home`、`/user/login`、`/user/register`，并将 `/user/boards`、`/user/canvas` 标记为 `requiresAuth`。
 - 未跟踪的 [`apps/web/public/sitemap.xml`](../../apps/web/public/sitemap.xml) 列出 `/boards`、`/login`、`/register`，但它们并非当前 router URL；它还把 Login/Register 放入 sitemap。当前真实认证路径 `/user/boards`、`/user/canvas` 不应出现在 sitemap。
 - 未跟踪的 [`apps/web/public/robots.txt`](../../apps/web/public/robots.txt) 已排除 `/admin/`、`/api/`、`/auth/`、`/canvas/`、`/share/`，但实际私有应用路径是 `/user/boards` 与 `/user/canvas`，因此覆盖不完整。它没有针对 `Googlebot`、`Bingbot` 或 AI bot 的策略。
 - sitemap 中的 `lastmod=2026-08-12`、`changefreq` 和 `priority` 不应例行伪造或用作排序信号：Google 说明 `lastmod` 只应在页面有显著更新时使用，且会忽略 `priority` 与 `changefreq`。[Google build sitemap](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap)

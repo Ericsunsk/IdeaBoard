@@ -1,7 +1,16 @@
 import type { Ref } from 'vue'
 import { useVueFlow, type EdgeChange, type Elements } from '@vue-flow/core'
-import type { DismissTransientCanvasUi } from '../../presentation/screens/useFlowTransientUiDismissal.ts'
 import { createCanvasSelectionController } from './canvasSelectionController'
+
+export type DismissTransientCanvasUiOptions = {
+  closeOutpaint?: boolean
+  closeBoardHeader?: boolean
+  closeContextMenu?: boolean
+  clearNodePanel?: boolean
+  hideStrength?: boolean
+}
+
+export type DismissTransientCanvasUi = (options?: DismissTransientCanvasUiOptions) => void
 
 type UseVueFlowSelectionAdapterOptions = {
   activeTool: Ref<string>

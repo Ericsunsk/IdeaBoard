@@ -56,3 +56,8 @@
   context: view-model/presentation transformation
   forbidden: [presenter, viewManager, presentationService]
   applies_to: [paths, symbols, exports, docs]
+
+- term: Pane
+  context: presentation tab-surface (Panel-equivalent responsibility suffix)
+  forbidden: [paneService, paneManager]
+  applies_to: [paths, symbols, exports, docs]

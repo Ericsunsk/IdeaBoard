@@ -14,7 +14,7 @@ import type {
   StorageProviderMeta as GeneratedStorageProviderMeta,
 } from '../../../shared/api/generated-query/model'
 import { resolveApiData } from '../../../shared/api/apiResponse'
-import type { StorageProfile, StorageProfilePayload, StorageProviderMeta } from './helpers'
+import type { StorageProfile, StorageProfilePayload, StorageProviderMeta } from './profiles'
 
 export type SaveStorageProfileInput =
   | {
