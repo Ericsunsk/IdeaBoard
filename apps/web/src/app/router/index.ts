@@ -4,7 +4,10 @@ import { useUserStore } from '../../features/auth/session/userSession'
 import { dismissAppToasts } from '../../shared/composables/useAppToast'
 import { ADMIN_DEFAULT_PATH } from '../../features/admin/app/navigationMeta'
 import { adminRoutes } from '../../features/admin/app/routes'
-import { USER_DEFAULT_PATH, userRoutes } from '../../features/user/app/routes'
+import {
+  WORKSPACE_DEFAULT_PATH,
+  workspaceRoutes,
+} from '../../features/workspace/routes/workspaceRoutes'
 import { ADMIN_ROOT_PATH, HOME_PATH, isPathUnderRoute } from '../../shared/constants/routePaths'
 import { buildLoginRedirectPath } from '../../shared/auth/sessionPolicy'
 import { applyRouteSeo } from '../../shared/seo/routeSeo'
@@ -16,7 +19,7 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../../features/canvas/pages/CanvasLandingPage.vue'),
     meta: { public: true, seoKey: 'home' },
   },
-  ...userRoutes,
+  ...workspaceRoutes,
   ...adminRoutes,
 ]
 
@@ -46,14 +49,14 @@ router.beforeEach(async (to) => {
 
   if (to.meta.guest && isLoggedIn) {
     if (isAdminRoute) {
-      return user?.role === 'admin' ? ADMIN_DEFAULT_PATH : USER_DEFAULT_PATH
+      return user?.role === 'admin' ? ADMIN_DEFAULT_PATH : WORKSPACE_DEFAULT_PATH
     } else {
-      return USER_DEFAULT_PATH
+      return WORKSPACE_DEFAULT_PATH
     }
   }
 
   if (isAdminRoute && user && user.role !== 'admin') {
-    return USER_DEFAULT_PATH
+    return WORKSPACE_DEFAULT_PATH
   }
 
   return true

@@ -1,25 +1,30 @@
 import { computed } from 'vue'
-import { useUserStore } from '../auth/session/userSession'
-import { canAccessAdmin } from '../../shared/auth/adminAccess'
+import { useUserStore } from '../../auth/session/userSession'
+import { canAccessAdmin } from '../../../shared/auth/adminAccess'
 import type {
   UserAccountMenuItem,
   UserIdeaBalanceControl,
-} from '../../shared/components/userAccountMenu.types'
-import { ADMIN_ROOT_PATH, HOME_PATH } from '../../shared/constants/routePaths'
-import { i18n } from '../../shared/i18n'
-import { formatLocaleNumber } from '../../shared/i18n/formatters'
-import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
-import { formatIdeaAmount } from '../../shared/i18n/userIdeaCurrency'
-import { defaultAccountTab, useAccountOverlay, useCreditWallet, type AccountTab } from '../account'
-import { useAuthOverlay } from '../auth/overlay'
+} from '../../../shared/components/userAccountMenu.types'
+import { ADMIN_ROOT_PATH, HOME_PATH } from '../../../shared/constants/routePaths'
+import { i18n } from '../../../shared/i18n'
+import { formatLocaleNumber } from '../../../shared/i18n/formatters'
+import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
+import { formatIdeaAmount } from '../../../shared/i18n/userIdeaCurrency'
+import {
+  defaultAccountTab,
+  useAccountOverlay,
+  useCreditWallet,
+  type AccountTab,
+} from '../../account'
+import { useAuthOverlay } from '../../auth/overlay'
 
-export type UserShellNavigationAdapter = {
+export type WorkspaceNavigationAdapter = {
   navigate: (path: string) => Promise<unknown> | unknown
   logout: () => Promise<unknown> | unknown
 }
 
-type UseUserAccountControlsOptions = {
-  navigation: UserShellNavigationAdapter
+type UseWorkspaceAccountControlsOptions = {
+  navigation: WorkspaceNavigationAdapter
   showHome?: boolean
 }
 
@@ -27,7 +32,7 @@ function formatIdeaValue(value: number): string {
   return formatLocaleNumber(value)
 }
 
-export function useUserAccountControls(options: UseUserAccountControlsOptions) {
+export function useWorkspaceAccountControls(options: UseWorkspaceAccountControlsOptions) {
   const userStore = useUserStore()
   const wallet = useCreditWallet(() => Boolean(userStore.user))
   const accountOverlay = useAccountOverlay()

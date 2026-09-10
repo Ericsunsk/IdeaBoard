@@ -139,10 +139,7 @@ import {
   type CanvasChromeBoardState,
 } from '../workspace-chrome'
 import { CANVAS_VIEWPORT_MAX_ZOOM, CANVAS_VIEWPORT_MIN_ZOOM } from '../utils/canvasViewportStorage'
-import {
-  useUserAccountControls,
-  type UserShellNavigationAdapter,
-} from '../../user-shell/useUserAccountControls'
+import { useWorkspaceAccountControls, type WorkspaceNavigationAdapter } from '../../workspace'
 import { useCanvasScreenImageToolUi } from './internal/useCanvasScreenImageToolUi'
 import { useCanvasScreenSurfaceInteractions } from './internal/useCanvasScreenSurfaceInteractions'
 import { createCanvasScreenNodePresentation } from './internal/createCanvasScreenNodePresentation'
@@ -247,11 +244,11 @@ const {
   onLogoutRequest,
 } = commands.boardSession
 
-const canvasNavigationAdapter: UserShellNavigationAdapter = {
+const canvasNavigationAdapter: WorkspaceNavigationAdapter = {
   navigate: onNavigateRequest,
   logout: onLogoutRequest,
 }
-const accountControls = useUserAccountControls({
+const accountControls = useWorkspaceAccountControls({
   navigation: canvasNavigationAdapter,
   showHome: false,
 })

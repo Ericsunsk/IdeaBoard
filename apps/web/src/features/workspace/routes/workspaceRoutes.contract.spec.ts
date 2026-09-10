@@ -1,13 +1,13 @@
 import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
 import { describe, expect, it, vi } from 'vitest'
-import { userRoutes } from './routes'
+import { workspaceRoutes } from './workspaceRoutes'
 
 const routeComponents = vi.hoisted(() => ({
-  layout: { name: 'UserLayoutRouteTarget' },
+  layout: { name: 'WorkspaceLayoutRouteTarget' },
 }))
 
-vi.mock('../layout/UserLayout.vue', () => ({ default: routeComponents.layout }))
+vi.mock('../layout/WorkspaceLayout.vue', () => ({ default: routeComponents.layout }))
 
 type LazyRouteModule = {
   default?: Component
@@ -25,14 +25,14 @@ async function loadRouteComponent(route: RouteRecordRaw): Promise<Component> {
   return (loaded as LazyRouteModule).default ?? (loaded as Component)
 }
 
-describe('userRoutes contract', () => {
+describe('workspaceRoutes contract', () => {
   it('preserves route paths, names, and access metadata', () => {
-    const termsRoute = requireRoute(userRoutes, '/terms')
-    const refundPolicyRoute = requireRoute(userRoutes, '/refund-policy')
-    const privacyPolicyRoute = requireRoute(userRoutes, '/privacy-policy')
-    const acceptableUseRoute = requireRoute(userRoutes, '/acceptable-use')
-    const shareRoute = requireRoute(userRoutes, '/share')
-    const userRootRoute = requireRoute(userRoutes, '/user')
+    const termsRoute = requireRoute(workspaceRoutes, '/terms')
+    const refundPolicyRoute = requireRoute(workspaceRoutes, '/refund-policy')
+    const privacyPolicyRoute = requireRoute(workspaceRoutes, '/privacy-policy')
+    const acceptableUseRoute = requireRoute(workspaceRoutes, '/acceptable-use')
+    const shareRoute = requireRoute(workspaceRoutes, '/share')
+    const userRootRoute = requireRoute(workspaceRoutes, '/user')
 
     expect({
       path: shareRoute.path,
@@ -96,16 +96,18 @@ describe('userRoutes contract', () => {
     })
   })
 
-  it('lazy-loads the real User layout and route page modules', async () => {
-    const loadedTerms = await loadRouteComponent(requireRoute(userRoutes, '/terms'))
-    const loadedRefundPolicy = await loadRouteComponent(requireRoute(userRoutes, '/refund-policy'))
+  it('lazy-loads the real Workspace layout and route page modules', async () => {
+    const loadedTerms = await loadRouteComponent(requireRoute(workspaceRoutes, '/terms'))
+    const loadedRefundPolicy = await loadRouteComponent(
+      requireRoute(workspaceRoutes, '/refund-policy'),
+    )
     const loadedPrivacyPolicy = await loadRouteComponent(
-      requireRoute(userRoutes, '/privacy-policy'),
+      requireRoute(workspaceRoutes, '/privacy-policy'),
     )
     const loadedAcceptableUse = await loadRouteComponent(
-      requireRoute(userRoutes, '/acceptable-use'),
+      requireRoute(workspaceRoutes, '/acceptable-use'),
     )
-    const userRootRoute = requireRoute(userRoutes, '/user')
+    const userRootRoute = requireRoute(workspaceRoutes, '/user')
     const children = userRootRoute.children ?? []
 
     const loadedLayout = await loadRouteComponent(userRootRoute)

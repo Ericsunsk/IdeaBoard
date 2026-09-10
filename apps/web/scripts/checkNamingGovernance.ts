@@ -48,8 +48,8 @@ import { basename, join } from 'node:path'
  * 12. Symbol alignment: `useX.ts` must export `useX` or a clearly related
  *     composable family recorded in `keptComposableFamilies`.
  * 13. Stale internal vocabulary: `User[A-Z]*` basenames under
- *     `features/user/` or `features/user-shell/` belong to the Workspace
- *     bounded context and are tracked for the Phase 2 rename. `User*` names
+ *    `features/user/`, `features/user-shell/`, or `features/workspace/` belong to the Workspace
+ *     bounded context and are retired; use Workspace terminology. `User*` names
  *     in auth/shared refer to the user-identity concept, not the Workspace
  *     shell boundary, and are out of scope.
  * 14. `index.ts` is a barrel or documented module boundary only: after
@@ -148,10 +148,6 @@ const migrationBaseline: Record<string, string> = {
   'features/canvas/image-tools/types.ts': 'phase-3-canvas',
   'features/canvas/inpaint/types.ts': 'phase-3-canvas',
   'features/canvas/workspace-runtime/types.ts': 'phase-3-canvas',
-  // Phase 2 (Workspace): User* shell names become Workspace* (plan section 4.4).
-  'features/user/layout/UserLayout.vue': 'phase-2-workspace',
-  'features/user/pages/UserShareJoinPage.vue': 'phase-2-workspace',
-  'features/user-shell/components/UserWorkspaceNavigation.vue': 'phase-2-workspace',
   // Admin storage touchpoint: rename to a storage-profile responsibility file
   // when the Admin storage vertical is touched (plan first-pass classification).
   'features/admin/storage/helpers.ts': 'admin-storage-touchpoint',
@@ -404,7 +400,9 @@ function checkTypesPlacement(
 function checkStaleWorkspacePrefix(relativePath: string, fileName: string): Violation | null {
   if (fileName.endsWith('.spec.ts')) return null
   const underWorkspace =
-    relativePath.startsWith('features/user/') || relativePath.startsWith('features/user-shell/')
+    relativePath.startsWith('features/workspace/') ||
+    relativePath.startsWith('features/user/') ||
+    relativePath.startsWith('features/user-shell/')
   if (!underWorkspace) return null
   const stem = fileName.split('.')[0] ?? ''
   if (/^User[A-Z]/.test(stem) || stem === 'User') {
@@ -641,6 +639,11 @@ function runSelfTest(): void {
     [
       'stale-user-prefix',
       checkStaleWorkspacePrefix('features/user/layout/UserLayout.vue', 'UserLayout.vue')?.kind,
+      'stale-prefix',
+    ],
+    [
+      'stale-workspace-user-prefix',
+      checkStaleWorkspacePrefix('features/workspace/layout/UserLayout.vue', 'UserLayout.vue')?.kind,
       'stale-prefix',
     ],
     [

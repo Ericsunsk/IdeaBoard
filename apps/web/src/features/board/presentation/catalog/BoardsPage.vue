@@ -6,7 +6,7 @@
       <div :class="catalogClasses.brand">
         <StudioName />
       </div>
-      <UserWorkspaceNavigation />
+      <WorkspaceNavigation />
       <UserAccountMenu
         :avatar-url="accountControls.viewModel.avatarUrl.value"
         :balance="accountControls.viewModel.balance.value"
@@ -230,7 +230,7 @@ import { useUserStore } from '../../../auth/session/userSession'
 import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
 import UserLocaleSelect from '../../../../shared/components/UserLocaleSelect.vue'
 import StudioName from '../../../../shared/components/StudioName.vue'
-import UserWorkspaceNavigation from '../../../user-shell/components/UserWorkspaceNavigation.vue'
+import { WorkspaceNavigation, useWorkspaceAccountControls } from '../../../workspace'
 import { NavArrowDown, Search } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
@@ -238,12 +238,7 @@ import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import ProgressSpinner from 'primevue/progressspinner'
-import { useUserAccountControls } from '../../../user-shell/useUserAccountControls'
-import {
-  formatCatalogDate,
-  useCatalog,
-  type CatalogSortMode,
-} from './useCatalog'
+import { formatCatalogDate, useCatalog, type CatalogSortMode } from './useCatalog'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -344,7 +339,7 @@ function toggleSortMenu(event: Event) {
   toggleSortMenuOverlay(event, target)
 }
 
-const accountControls = useUserAccountControls({
+const accountControls = useWorkspaceAccountControls({
   navigation: {
     navigate: (path) => router.push(path),
     logout: () => logoutAndRedirect(HOME_PATH),

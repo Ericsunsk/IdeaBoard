@@ -8,7 +8,7 @@ const sourceRoot = resolve(process.cwd(), 'src')
 const readSource = (relativePath: string) => readFileSync(resolve(sourceRoot, relativePath), 'utf8')
 
 const consumers = {
-  navigation: readSource('features/user-shell/components/UserWorkspaceNavigation.vue'),
+  navigation: readSource('features/workspace/shell/components/WorkspaceNavigation.vue'),
   searchPage: readSource('features/search/presentation/pages/SearchPage.vue'),
   searchBatchDock: readSource('features/search/presentation/components/SearchBatchActionDock.vue'),
   boardsSkin: readSource('features/board/presentation/catalog/skin.ts'),

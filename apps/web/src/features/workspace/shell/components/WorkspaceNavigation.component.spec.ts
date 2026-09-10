@@ -1,18 +1,18 @@
 import { defineComponent, h } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { renderWithUser, waitFor } from '../../../test/render'
-import type { User } from '../../../shared/api/userSession'
-import { USER_BOARDS_PATH, USER_SEARCH_PATH } from '../../../shared/constants/routePaths'
-import { createAuthOverlay, provideAuthOverlay, type AuthOverlay } from '../../auth/overlay'
-import UserWorkspaceNavigation from './UserWorkspaceNavigation.vue'
+import { renderWithUser, waitFor } from '../../../../test/render'
+import type { User } from '../../../../shared/api/userSession'
+import { USER_BOARDS_PATH, USER_SEARCH_PATH } from '../../../../shared/constants/routePaths'
+import { createAuthOverlay, provideAuthOverlay, type AuthOverlay } from '../../../auth/overlay'
+import WorkspaceNavigation from './WorkspaceNavigation.vue'
 
 const session = vi.hoisted(() => ({
   user: null as User | null,
   ensureSession: vi.fn(),
 }))
 
-vi.mock('../../auth/session/userSession', () => ({
+vi.mock('../../../auth/session/userSession', () => ({
   useUserStore: () => ({
     get user() {
       return session.user
@@ -54,7 +54,7 @@ async function renderNavigation(path = USER_SEARCH_PATH): Promise<{
     setup() {
       overlay = createAuthOverlay()
       provideAuthOverlay(overlay)
-      return () => h(UserWorkspaceNavigation)
+      return () => h(WorkspaceNavigation)
     },
   })
   const view = renderWithUser(Harness, { global: { plugins: [router] } })
@@ -63,7 +63,7 @@ async function renderNavigation(path = USER_SEARCH_PATH): Promise<{
   return { overlay, router, view }
 }
 
-describe('UserWorkspaceNavigation', () => {
+describe('WorkspaceNavigation', () => {
   beforeEach(() => {
     session.user = null
     session.ensureSession.mockReset()

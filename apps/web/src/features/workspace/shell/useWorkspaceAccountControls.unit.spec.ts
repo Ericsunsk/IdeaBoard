@@ -1,16 +1,16 @@
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render } from '../../test/render'
-import type { User } from '../../shared/api/userSession'
-import { ADMIN_ROOT_PATH, HOME_PATH } from '../../shared/constants/routePaths'
+import { render } from '../../../test/render'
+import type { User } from '../../../shared/api/userSession'
+import { ADMIN_ROOT_PATH, HOME_PATH } from '../../../shared/constants/routePaths'
 import {
   createAccountOverlay,
   provideAccountOverlay,
   type AccountOverlay,
   type CreditWalletState,
-} from '../account'
-import { createAuthOverlay, provideAuthOverlay, type AuthOverlay } from '../auth/overlay'
-import { useUserAccountControls } from './useUserAccountControls'
+} from '../../account'
+import { createAuthOverlay, provideAuthOverlay, type AuthOverlay } from '../../auth/overlay'
+import { useWorkspaceAccountControls } from './useWorkspaceAccountControls'
 
 const currentUser = ref<User | null>(null)
 const walletState = ref<CreditWalletState>({
@@ -18,7 +18,7 @@ const walletState = ref<CreditWalletState>({
   availableCredits: 1280,
 })
 
-vi.mock('../auth/session/userSession', () => ({
+vi.mock('../../auth/session/userSession', () => ({
   useUserStore: () => ({
     get user() {
       return currentUser.value
@@ -26,8 +26,8 @@ vi.mock('../auth/session/userSession', () => ({
   }),
 }))
 
-vi.mock('../account', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../account')>()
+vi.mock('../../account', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../account')>()
   return {
     ...actual,
     useCreditWallet: () => ({ state: walletState }),
@@ -47,19 +47,19 @@ function makeUser(role: 'admin' | 'user' = 'user'): User {
   }
 }
 
-function renderAccountControls(options: Parameters<typeof useUserAccountControls>[0]): {
-  controls: ReturnType<typeof useUserAccountControls>
+function renderAccountControls(options: Parameters<typeof useWorkspaceAccountControls>[0]): {
+  controls: ReturnType<typeof useWorkspaceAccountControls>
   overlay: AccountOverlay
   authOverlay: AuthOverlay
 } {
-  let controls: ReturnType<typeof useUserAccountControls> | undefined
+  let controls: ReturnType<typeof useWorkspaceAccountControls> | undefined
   let overlay: AccountOverlay | undefined
   let authOverlay: AuthOverlay | undefined
   // The consumer must be a descendant because Vue does not expose a component's own provides to it.
   // eslint-disable-next-line vue/one-component-per-file
   const Consumer = defineComponent({
     setup() {
-      controls = useUserAccountControls(options)
+      controls = useWorkspaceAccountControls(options)
       return () => h('div')
     },
   })
@@ -88,7 +88,7 @@ function renderAccountControls(options: Parameters<typeof useUserAccountControls
   return { controls, overlay, authOverlay }
 }
 
-describe('useUserAccountControls', () => {
+describe('useWorkspaceAccountControls', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/')
     currentUser.value = makeUser()

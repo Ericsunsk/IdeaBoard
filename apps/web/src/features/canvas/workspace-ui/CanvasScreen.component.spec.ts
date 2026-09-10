@@ -106,8 +106,8 @@ vi.mock('../group-presentation', async (importOriginal) => {
 
 vi.mock('../overlay-lifecycle', () => ({ useCanvasCustomLayerOverlay: vi.fn() }))
 
-vi.mock('../../user-shell/useUserAccountControls', () => ({
-  useUserAccountControls: () => ({
+vi.mock('../../workspace/shell/useWorkspaceAccountControls', () => ({
+  useWorkspaceAccountControls: () => ({
     viewModel: { avatarUrl: ref(null), balance: ref({}), menuItems: ref([]) },
     commands: { openAccount: vi.fn() },
   }),

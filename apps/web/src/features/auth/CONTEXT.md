@@ -21,7 +21,7 @@ _Avoid_: perpetual cache, fetch on every render
 _Avoid_: localStorage redirect, open redirect
 
 **Auth Overlay**:
-全局登录/注册弹窗（`mode: login|register|null`），由 `createAuthOverlay/provideAuthOverlay` 安装在 `UserLayout`，各 surface 按需 `open`。
+全局登录/注册弹窗（`mode: login|register|null`），由 `createAuthOverlay/provideAuthOverlay` 安装在 `WorkspaceLayout`，各 surface 按需 `open`。
 _Avoid_: per-page login modal, route-only auth gate
 
 **OTP**:
@@ -29,7 +29,7 @@ _Avoid_: per-page login modal, route-only auth gate
 _Avoid_: single-form auth, silent OTP failure
 
 **Impersonation**:
-管理员冒充横幅态：`Better Auth useSession()` 的 `impersonatedBy` 只在 `UserLayout` 读取展示；退出走 `stopImpersonating`。
+管理员冒充横幅态：`Better Auth useSession()` 的 `impersonatedBy` 只在 `WorkspaceLayout` 读取展示；退出走 `stopImpersonating`。
 _Avoid_: impersonation flags in session store, hidden impersonation
 
 ## Module Ownership
@@ -38,7 +38,7 @@ _Avoid_: impersonation flags in session store, hidden impersonation
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | `session`         | 会话事实与传输：store 单例、transport、transition 状态机、persistence 薄封装。                                            | `useUserStore()`、`authTransport`（来自 `session/transport.ts`）。无 barrel，直连相对导入。 | Better Auth client 实例不出 transport；`localStorage['user']` 只经 `shared/utils/auth.ts`。 |
 | `components`      | 弹窗 chrome：`UserAuthModals` 路由器、`Login/Register` 面板、`AuthModalHost` 壳、共享 `useAuthPanelControls` 与表单工具。 | 无 barrel；`UserAuthModals` 按 route path 或 overlay mode 挂载面板。 | 面板提交态（pending 禁关）与字段校验留在面板内，不得上浮到 modal 宿主。                     |
-| `pages`           | 唯一的路由页 `UserAuthCallbackPage`（OAuth 回调，`loading/failed` 两态）。                                                | 被 `userRoutes` 懒加载。                                             | 回调失败必须清会话并回到无 query 的 callback 页，不得残留 provider error 参数。             |
+| `pages`           | 唯一的路由页 `UserAuthCallbackPage`（OAuth 回调，`loading/failed` 两态）。                                                | 被 `workspaceRoutes` 懒加载。                                             | 回调失败必须清会话并回到无 query 的 callback 页，不得残留 provider error 参数。             |
 | `useAuthFeedback` | 登录/注册/退出冒充三组 toast，基于 `useAppToast + errorCatalog + i18n`，无状态。                                          | `login/register/stopImpersonating` 三组 success/error。              | 文案 key 收敛到 errorCatalog，禁止散写。                                                    |
 
 ## Rules

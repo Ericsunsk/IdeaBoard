@@ -14,7 +14,6 @@
     "src/features/library/index.ts",
     "src/features/auth/index.ts",
     "src/features/legal/index.ts",
-    "src/features/user/index.ts",
-    "src/features/user-shell/index.ts",
+    "src/features/workspace/index.ts",
   ],
 }

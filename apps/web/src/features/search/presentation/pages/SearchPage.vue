@@ -6,7 +6,7 @@
     <div class="ib-board-page-background ib-page-dot-bg"></div>
     <header class="sticky top-0 z-40 flex items-center justify-between pointer-events-none pb-2">
       <StudioName class="pointer-events-auto" />
-      <UserWorkspaceNavigation class="pointer-events-auto" />
+      <WorkspaceNavigation class="pointer-events-auto" />
       <UserAccountMenu
         class="pointer-events-auto"
         :avatar-url="accountControls.viewModel.avatarUrl.value"
@@ -261,18 +261,12 @@
               class="size-6 stroke-[1.75] text-board-page-text-muted"
               aria-hidden="true"
             />
-            <Compass
-              v-else
-              class="size-6 stroke-[1.75] text-board-primary"
-              aria-hidden="true"
-            />
+            <Compass v-else class="size-6 stroke-[1.75] text-board-primary" aria-hidden="true" />
           </div>
 
           <h3 class="m-0 text-base font-semibold text-board-page-text tracking-tight">
             {{
-              hasActiveSearch
-                ? t('search.empty.noResultsTitle')
-                : t('search.empty.emptyFeedTitle')
+              hasActiveSearch ? t('search.empty.noResultsTitle') : t('search.empty.emptyFeedTitle')
             }}
           </h3>
 
@@ -618,13 +612,12 @@ import UserLocaleSelect from '../../../../shared/components/UserLocaleSelect.vue
 import { HOME_PATH, USER_BOARDS_PATH } from '../../../../shared/constants/routePaths'
 import { useUserStore } from '../../../auth/session/userSession'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
-import UserWorkspaceNavigation from '../../../user-shell/components/UserWorkspaceNavigation.vue'
+import { WorkspaceNavigation, useWorkspaceAccountControls } from '../../../workspace'
 import SearchSavePopover from '../components/SearchSavePopover.vue'
 import SearchBatchActionDock from '../components/SearchBatchActionDock.vue'
 import SearchResultViewport from '../components/SearchResultViewport.vue'
 import { libraryAssetKey } from '../../../library'
 import { searchReferenceKey } from '../../infrastructure/libraryBridge'
-import { useUserAccountControls } from '../../../user-shell/useUserAccountControls'
 import { useAuthOverlay } from '../../../auth/overlay'
 import {
   SearchLibraryFloatingIsland as LibraryFloatingIsland,
@@ -637,7 +630,7 @@ const { t } = useI18n()
 const userStore = useUserStore()
 const authOverlay = useAuthOverlay()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
-const accountControls = useUserAccountControls({
+const accountControls = useWorkspaceAccountControls({
   navigation: { navigate: (path) => router.push(path), logout: () => logoutAndRedirect(HOME_PATH) },
 })
 const pageScrollRef = ref<HTMLElement | null>(null)

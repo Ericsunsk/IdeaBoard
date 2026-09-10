@@ -10,9 +10,9 @@ import {
   USER_ROOT_PATH,
 } from '../../../shared/constants/routePaths'
 
-export const USER_DEFAULT_PATH = USER_BOARDS_PATH
+export const WORKSPACE_DEFAULT_PATH = USER_BOARDS_PATH
 
-export const userRoutes: RouteRecordRaw[] = [
+export const workspaceRoutes: RouteRecordRaw[] = [
   {
     path: TERMS_PATH,
     name: 'Terms',
@@ -40,12 +40,12 @@ export const userRoutes: RouteRecordRaw[] = [
   {
     path: SHARE_JOIN_PATH,
     name: 'ShareJoin',
-    component: () => import('../pages/UserShareJoinPage.vue'),
+    component: () => import('../pages/WorkspaceShareJoinPage.vue'),
     meta: { requiresAuth: true },
   },
   {
     path: USER_ROOT_PATH,
-    component: () => import('../layout/UserLayout.vue'),
+    component: () => import('../layout/WorkspaceLayout.vue'),
     children: [
       {
         path: 'login',
