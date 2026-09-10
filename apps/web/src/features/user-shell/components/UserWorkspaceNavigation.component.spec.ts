@@ -12,7 +12,7 @@ const session = vi.hoisted(() => ({
   ensureSession: vi.fn(),
 }))
 
-vi.mock('../../auth/session/session', () => ({
+vi.mock('../../auth/session/userSession', () => ({
   useUserStore: () => ({
     get user() {
       return session.user

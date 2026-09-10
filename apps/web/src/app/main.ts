@@ -13,7 +13,7 @@ import { ideaBoardPrimePt } from './primePassThrough'
 import { ideaBoardPrimePreset } from './primeTheme'
 import router from './router'
 import App from './App.vue'
-import { useUserStore } from '../features/auth/session/session'
+import { useUserStore } from '../features/auth/session/userSession'
 import './style.css'
 import 'vue-sonner/style.css'
 

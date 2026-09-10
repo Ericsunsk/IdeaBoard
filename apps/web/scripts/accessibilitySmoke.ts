@@ -6,8 +6,8 @@ import type {
   UserBoardItem,
 } from '../src/shared/api/generated-query/model'
 import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../src/features/canvas-board/domain'
-import { createBrowserSmokeRuntime } from './browser-smoke-runtime'
-import { assertNoConsoleErrors } from './mock-smoke-utils'
+import { createBrowserSmokeRuntime } from './browserSmokeRuntime'
+import { assertNoConsoleErrors } from './mockSmokeUtils'
 
 const smoke = createBrowserSmokeRuntime({
   hostEnvName: 'A11Y_SMOKE_HOST',

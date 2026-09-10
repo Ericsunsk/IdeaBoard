@@ -6,7 +6,7 @@ import {
   USER_REGISTER_PATH,
   USER_BOARDS_PATH,
   isPathUnderRoute,
-} from '../../../../shared/constants/routePaths'
+} from '../../../shared/constants/routePaths'
 import {
   defaultAccountTab,
   parsePaymentReturnQuery,
@@ -14,7 +14,7 @@ import {
   stripPaymentReturnQuery,
   type AccountTab,
   type PaymentReturnContext,
-} from '../../domain'
+} from '../domain'
 
 export type AccountOverlayRoute = {
   fullPath: string

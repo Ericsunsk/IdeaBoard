@@ -45,7 +45,7 @@ async function getFreshUserStore() {
   }))
 
   const [{ useUserStore }, { queryClient }] = await Promise.all([
-    import('./session'),
+    import('./userSession'),
     import('../../../shared/query/queryClient'),
   ])
   return {

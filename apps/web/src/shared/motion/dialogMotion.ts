@@ -1,6 +1,6 @@
 import type { DialogPassThroughOptions } from 'primevue/dialog'
 import { getMotionPreference } from './motionPolicy'
-import './dialogMotion.css'
+import './dialog-motion.css'
 
 export const dialogMotionTransitionName = 'ib-dialog-motion'
 

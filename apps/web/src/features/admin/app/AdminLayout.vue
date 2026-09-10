@@ -259,7 +259,7 @@
 </template>
 
 <script setup lang="ts">
-import { useUserStore } from '../../auth/session/session'
+import { useUserStore } from '../../auth/session/userSession'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'

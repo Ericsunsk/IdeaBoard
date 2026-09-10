@@ -27,7 +27,7 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mocks.routerPush, replace: mocks.routerReplace }),
 }))
 
-vi.mock('../session/session', () => ({
+vi.mock('../session/userSession', () => ({
   useUserStore: () => ({
     isAdmin: false,
     login: mocks.login,

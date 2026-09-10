@@ -10,7 +10,7 @@
 
 <script setup lang="ts">
 import AccountDialog from './AccountDialog.vue'
-import { useAccountOverlay } from '../../application/overlay/overlay'
+import { useAccountOverlay } from '../../application/overlay'
 
 const overlay = useAccountOverlay()
 const { allowed: isHostAllowed, initialTab, paymentReturn, visible } = overlay.viewModel

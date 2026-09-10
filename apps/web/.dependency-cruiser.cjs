@@ -5,7 +5,7 @@
  *
  * File-local Overlay adapter conventions live in eslint.config.js
  * (no-restricted-imports) and are smoke-tested by
- * scripts/check-eslint-import-boundaries.ts. Do not mirror direction
+ * scripts/checkEslintImportBoundaries.ts. Do not mirror direction
  * rules in both systems.
  *
  * @type {import('dependency-cruiser').IConfiguration}

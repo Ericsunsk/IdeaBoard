@@ -1,5 +1,5 @@
 import { computed } from 'vue'
-import { useUserStore } from '../auth/session/session'
+import { useUserStore } from '../auth/session/userSession'
 import { canAccessAdmin } from '../../shared/auth/adminAccess'
 import type {
   UserAccountMenuItem,

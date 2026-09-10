@@ -18,7 +18,7 @@ const walletState = ref<CreditWalletState>({
   availableCredits: 1280,
 })
 
-vi.mock('../auth/session/session', () => ({
+vi.mock('../auth/session/userSession', () => ({
   useUserStore: () => ({
     get user() {
       return currentUser.value

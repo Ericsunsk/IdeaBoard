@@ -1,6 +1,6 @@
 import type { PopoverPassThroughOptions } from 'primevue/popover'
 import { getMotionPreference } from './motionPolicy'
-import './popoverMotion.css'
+import './popover-motion.css'
 
 export const popoverMotionTransitionName = 'ib-popover-motion'
 

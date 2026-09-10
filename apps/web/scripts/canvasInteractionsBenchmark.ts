@@ -22,7 +22,7 @@ import type {
   User,
   UserBoardItem,
 } from '../src/shared/api/generated-query/model'
-import { createMockSmokeRuntime } from './mock-smoke-utils'
+import { createMockSmokeRuntime } from './mockSmokeUtils'
 
 type BenchmarkPath =
   'initial-load' | 'node-drag' | 'viewport-pan' | 'viewport-zoom' | 'connect-delete'

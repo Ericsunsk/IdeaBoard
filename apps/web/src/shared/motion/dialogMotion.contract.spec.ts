@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const dialogMotionStyles = readFileSync(
-  resolve(process.cwd(), 'src/shared/motion/dialogMotion.css'),
+  resolve(process.cwd(), 'src/shared/motion/dialog-motion.css'),
   'utf8',
 )
 

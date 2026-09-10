@@ -4,13 +4,13 @@ import { computed, defineComponent, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '../../../../test/render'
-import { useUserStore } from '../../../auth/session/session'
+import { useUserStore } from '../../../auth/session/userSession'
 import type { User } from '../../../../shared/api/userSession'
 import {
   createAccountOverlay,
   provideAccountOverlay,
   type AccountOverlay,
-} from '../../application/overlay/overlay'
+} from '../../application/overlay'
 import AccountDialogHost from './AccountDialogHost.vue'
 
 const routes: RouteRecordRaw[] = [

@@ -9,7 +9,7 @@
 
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
-import { useUserStore } from '../../auth/session/session'
+import { useUserStore } from '../../auth/session/userSession'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { CanvasScreen } from '../workspace-ui'
 

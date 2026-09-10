@@ -103,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { useUserStore } from '../../../auth/session/session'
+import { useUserStore } from '../../../auth/session/userSession'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'

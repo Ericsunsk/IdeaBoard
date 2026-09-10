@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 
 const featureRoot = path.resolve(process.cwd(), 'src/features')
 const accountRoot = path.join(featureRoot, 'account')
-const overlaySourcePath = path.join(accountRoot, 'application/overlay/overlay.ts')
+const overlaySourcePath = path.join(accountRoot, 'application/overlay.ts')
 const legacyControllerPath = path.join(accountRoot, 'useAccountManagementDialogController.ts')
 const userLayoutSourcePath = path.join(featureRoot, 'user/layout/UserLayout.vue')
 const userAccountControlsSourcePath = path.join(featureRoot, 'user-shell/useUserAccountControls.ts')

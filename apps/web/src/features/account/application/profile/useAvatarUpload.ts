@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue'
-import { useUserStore } from '../../../auth/session/session'
+import { useUserStore } from '../../../auth/session/userSession'
 import { uploadApi } from '../../../../shared/api/upload'
 import {
   type AsyncActionFeedback,

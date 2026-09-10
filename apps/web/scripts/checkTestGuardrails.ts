@@ -68,7 +68,7 @@ const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
 const componentRenderHelperExceptions: ExceptionMap<Exception> = {}
 
 const componentClassAssertionExceptions: ExceptionMap<Exception> = {
-  'src/features/auth/pages/OAuthFlow.component.spec.ts': [
+  'src/features/auth/pages/oauthFlow.component.spec.ts': [
     {
       reason:
         'Verifies the one-provider OAuth layout contract that makes a single login button span the full row.',
@@ -602,7 +602,7 @@ function printViolations(violations: readonly Violation[]) {
 
   console.error('')
   console.error(
-    'Fix the test, rename it, or add a narrow exception with a reason in apps/web/scripts/check-test-guardrails.ts.',
+    'Fix the test, rename it, or add a narrow exception with a reason in apps/web/scripts/checkTestGuardrails.ts.',
   )
 }
 

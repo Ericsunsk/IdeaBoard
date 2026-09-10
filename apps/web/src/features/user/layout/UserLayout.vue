@@ -53,7 +53,7 @@ import { Shield, Xmark } from '@iconoir/vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
-import { useAuthSession, useUserStore } from '../../auth/session/session'
+import { useAuthSession, useUserStore } from '../../auth/session/userSession'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import {
   ADMIN_USERS_PATH,

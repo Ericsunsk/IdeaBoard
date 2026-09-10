@@ -1,7 +1,7 @@
 /* eslint-disable vue/one-component-per-file -- Local stubs expose public auth behavior without PrimeVue portal mechanics. */
 import { defineComponent } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useUserStore } from '../session/session'
+import { useUserStore } from '../session/userSession'
 import { renderWithUser, screen, waitFor } from '../../../test/render'
 import AuthModalHost from './AuthModalHost.vue'
 import LoginAuthPanel from './LoginAuthPanel.vue'

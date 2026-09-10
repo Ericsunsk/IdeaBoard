@@ -8,7 +8,7 @@ import {
 } from '../../../shared/theme/formControls'
 import { ibDialogMaskPt } from '../../../shared/theme/dialogMask'
 import { createDialogMotionPt } from '../../../shared/motion/dialogMotion'
-import './authModalMotion.css'
+import './auth-modal-motion.css'
 
 export function createAuthDialogPt() {
   return {

@@ -86,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import { useUserStore } from '../../../auth/session/session'
+import { useUserStore } from '../../../auth/session/userSession'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {

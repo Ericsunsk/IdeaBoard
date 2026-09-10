@@ -7,9 +7,9 @@ import type {
   UserBoardItem,
 } from '../src/shared/api/generated-query/model'
 import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../src/features/canvas-board/domain'
-import { assertNoConsoleErrors } from './mock-smoke-utils'
-import { createBrowserSmokeRuntime } from './browser-smoke-runtime'
-import { pageChromeBrowserAssertionHelpers } from './page-chrome-smoke-helpers'
+import { assertNoConsoleErrors } from './mockSmokeUtils'
+import { createBrowserSmokeRuntime } from './browserSmokeRuntime'
+import { pageChromeBrowserAssertionHelpers } from './pageChromeSmokeHelpers'
 
 type SmokePage = {
   label: string

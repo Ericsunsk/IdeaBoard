@@ -4,7 +4,7 @@ const events: string[] = []
 const clearAuth = vi.fn(() => events.push('clearAuth'))
 const impersonateAdminUser = vi.fn()
 
-vi.mock('../../auth/session/session', () => ({
+vi.mock('../../auth/session/userSession', () => ({
   useUserStore: () => ({
     clearAuth,
   }),

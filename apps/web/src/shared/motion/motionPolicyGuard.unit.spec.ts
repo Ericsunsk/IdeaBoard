@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findMotionPolicyViolations } from '../../../scripts/motion-policy-guard'
+import { findMotionPolicyViolations } from '../../../scripts/motionPolicyGuard'
 
 describe('Motion Policy style guard', () => {
   it('accepts semantic Motion Policy consumers', () => {

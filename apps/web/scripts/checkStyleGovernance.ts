@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { readdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { findMotionPolicyViolations, findStaleMotionAllowances } from './motion-policy-guard'
+import { findMotionPolicyViolations, findStaleMotionAllowances } from './motionPolicyGuard'
 
 type Violation = {
   file: string
@@ -414,7 +414,7 @@ function printViolations(violations: readonly Violation[]) {
 
   console.error('')
   console.error(
-    'Move styling behind the appropriate token/helper/adapter, or add a narrow allowance with a reason in apps/web/scripts/check-style-governance.ts.',
+    'Move styling behind the appropriate token/helper/adapter, or add a narrow allowance with a reason in apps/web/scripts/checkStyleGovernance.ts.',
   )
 }
 
