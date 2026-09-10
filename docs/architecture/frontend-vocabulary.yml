@@ -1,0 +1,58 @@
+# Canonical frontend vocabulary. Apply to paths, symbols, exports, and docs.
+# This file is intentionally small: add a term only when it resolves a real
+# ownership ambiguity or prevents a recurring synonym from returning.
+
+- term: Board
+  context: board
+  forbidden: [canvasBoard, boardCatalog, boards]
+  applies_to: [paths, symbols, exports, docs]
+
+- term: Workspace
+  context: workspace
+  forbidden: [user, userShell, userWorkspace, userLayout]
+  applies_to: [paths, symbols, exports, docs]
+
+- term: Canvas
+  context: canvas
+  forbidden: [canvasWorkspaceFeature, canvasExecutionFeature]
+  applies_to: [paths, symbols, exports, docs]
+
+- term: Catalog
+  context: board
+  forbidden: [boardCatalog]
+  applies_to: [paths, symbols, exports, docs]
+
+- term: Repository
+  context: owning context
+  forbidden: [store, dataManager, persistenceService]
+  applies_to: [symbols, exports, docs]
+
+- term: Coordinator
+  context: application boundary
+  forbidden: [manager, service, handler]
+  applies_to: [paths, symbols, exports, docs]
+
+- term: Lifecycle
+  context: stateful domain/application flow
+  forbidden: [manager, controllerService]
+  applies_to: [paths, symbols, exports, docs]
+
+- term: Retouch
+  context: canvas.tools
+  forbidden: [adjustment]
+  applies_to: [paths, symbols, exports, docs]
+
+- term: Resource
+  context: transport/query adapter
+  forbidden: [resourceService, apiService]
+  applies_to: [paths, symbols, exports, docs]
+
+- term: Policy
+  context: decision or policy rules
+  forbidden: [policyService, policyManager, policyHandler]
+  applies_to: [paths, symbols, exports, docs]
+
+- term: Presentation
+  context: view-model/presentation transformation
+  forbidden: [presenter, viewManager, presentationService]
+  applies_to: [paths, symbols, exports, docs]

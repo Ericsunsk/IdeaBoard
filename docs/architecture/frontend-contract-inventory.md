@@ -1,0 +1,24 @@
+# Frontend contract inventory
+
+This inventory defines what the directory reorganization may rename and what it must not silently change. Each row names the current source of truth and the verification gate required after every migration phase.
+
+| Contract | Owner | Current source | Change policy | Verification |
+| --- | --- | --- | --- | --- |
+| Persisted Board schema and migrations | `board` + backend Boards | Backend: `apps/api/internal/boards/model.go`, `state.go`, `repository.go`, `apps/api/internal/db/migrations/20260902051519_baseline.sql`; Frontend: `apps/web/src/features/canvas-board/domain/stateSchema.ts`, `boardStateEnvelopeContract.ts`, `mediaRefs.ts`, `persistence/boardStateSerialization.ts` | Preserve shape and migration behavior; schema changes require a separate migration spec and ADR | Board schema/serialization contract tests (`stateSchema.unit.spec.ts`, `boardStateEnvelopeContract.unit.spec.ts`); backend board tests |
+| API endpoints and request/response payloads | Backend API boundary | Generated client: `apps/web/src/shared/api/generated-query/` (e.g. `boards/`, `billing/`, `admin-*`); feature adapters: `features/*/resource.ts`, `features/admin/*/resource.ts`, `features/board-catalog/controller/` | Internal adapter paths may move; endpoint and payload semantics may not change | `api:check-generated`, frontend contract tests, API tests |
+| Backend error codes | Backend API boundary | Backend: `apps/api/internal/tasking/interfaces/http/task/handler.go` (task `ErrorCode`), `apps/api/internal/media/errors/codes.go`; Frontend mapping: feature `feedback/` and `resource.ts` error mapping | Preserve codes and meanings | API/error mapping tests |
+| Workflow feature slugs | Canvas execution | Frontend: `apps/web/src/shared/domain/workflowFeatures.ts`, `workflowFeatureRegistry.ts`, `features/canvas/execution/contracts/`; Backend: `apps/api/internal/workflow/` | Preserve slugs and execution fields | Execution contract tests (`workflowFeatureSlug.contract.spec.ts`) and stale-slug scan |
+| `localStorage` keys | Owning feature | `apps/web/src/shared/i18n/localeCore.ts` (`ideaboard.user-locale`), `shared/utils/auth.ts` (`USER_KEY`, `LAST_AUTH_STORAGE_SCOPE_KEY`), `features/canvas-board/persistence/state.ts` (`ideaboard.canvas.boardStates.v2`), `features/canvas-board/catalog/boards.ts` (`ideaboard.canvas.boards.v2`), `features/canvas/utils/canvasViewportStorage.ts` (`ideaboard:canvas:view`) | Preserve keys and serialized meaning | Storage contract tests and key scan |
+| `sessionStorage` keys | Owning feature | `features/auth/overlay.ts` (`ideaboard:auth:post-auth-path`), `features/search/infrastructure/browserPersistence.ts`, `authContinuation.ts` (`ideaboard:search:pending-auth-action`, `anonymous-query-gate`), `feedPersistence.ts`, `visionReferencePersistence.ts`, `libraryIslandPersistence.ts` | Preserve keys and serialized meaning | Storage contract tests and key scan |
+| Query keys and invalidation | Owning feature/resource | Generated helpers: `get*QueryKey()` from `shared/api/generated-query/`; feature-local keys: `features/account/application/**/ *QueryKeys`, `features/admin/credits-billing/**/resource.ts`; invalidation in `resource.ts`/`commands.ts` (e.g. `features/admin/users/commands.ts`) | Helpers may move; cache scope and invalidation semantics must remain stable | Query/resource tests and invalidation tests (`commandsInvalidation.contract.spec.ts`) |
+| Public route URLs | Router/public product | `apps/web/src/app/router/index.ts`, `apps/web/src/app/router/types.d.ts`, `features/user/app/routes.ts`, `features/user/pages/UserShareJoinPage.vue` | Preserve URLs, including `/user/*`; internal component names may change | Router contract tests (`routes.contract.spec.ts`) and route scan |
+| Media references | `board` | `apps/web/src/features/canvas-board/domain/mediaRefs.ts` (+ `mediaRefs.unit.spec.ts`), `features/canvas/board-session/boardSyncMediaReconciliation.ts` | Preserve reference identity and resolution semantics | Board/media serialization tests |
+| Serialized Board state | `board` | `apps/web/src/features/canvas-board/domain/boardStateEnvelopeContract.ts`, `persistence/boardStateSerialization.ts`, `preview/boardPreviewSerializer.ts`, `preview/boardPreviewVersion.ts` | Preserve envelope semantics; no silent version bump | Snapshot/round-trip tests (`boardSync.contract.spec.ts`, `useCanvasBoardSession.contract.spec.ts`) |
+
+## Non-contract internals that may be renamed
+
+TypeScript filenames, Vue component names, feature-local DTOs, adapters, composables, and internal query-key helper filenames may be renamed when all consumers are updated and the relevant tests pass. Generated API wrappers remain generated and must not be hand-edited.
+
+## Change gate
+
+If a change touches a protected contract, stop the directory migration and create a separate migration specification plus ADR. Do not hide semantic changes inside a move or rename.
