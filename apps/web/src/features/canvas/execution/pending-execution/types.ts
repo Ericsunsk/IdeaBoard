@@ -1,10 +1,10 @@
 import type {
-  CanvasBoardGraphSession,
+  BoardGraphSession,
   PendingImageMutationRejectReason,
   PendingImageResolvedResult,
   PendingImageResultNodeId,
 } from './boardGraphSession'
-import type { CanvasBoardAttachment } from '../../board-attachment'
+import type { BoardAttachment } from '../../board-attachment'
 
 declare const pendingImageExecutionLeaseBrand: unique symbol
 
@@ -19,7 +19,7 @@ export type PendingImageExecutionFact = Readonly<{
 }>
 
 export type PendingImageExecutionLease = Readonly<{
-  attachment: CanvasBoardAttachment
+  attachment: BoardAttachment
   resultNodeId: PendingImageResultNodeId
   sequence: number
   [pendingImageExecutionLeaseBrand]: true
@@ -108,20 +108,20 @@ export type PendingImageExecutionCoreOptions = Readonly<{
 export type PendingImageExecutionCore = {
   snapshot: () => PendingImageExecutionSnapshot
   subscribe: (listener: (snapshot: PendingImageExecutionSnapshot) => void) => () => void
-  attachBoard: (session: CanvasBoardGraphSession) => CanvasBoardAttachment
+  attachBoard: (session: BoardGraphSession) => BoardAttachment
   detachBoard: () => void
-  currentAttachment: () => CanvasBoardAttachment | null
-  isAttachmentCurrent: (attachment: CanvasBoardAttachment) => boolean
+  currentAttachment: () => BoardAttachment | null
+  isAttachmentCurrent: (attachment: BoardAttachment) => boolean
   begin: (
-    attachment: CanvasBoardAttachment,
+    attachment: BoardAttachment,
     resultNodeId: PendingImageResultNodeId,
   ) => PendingImageExecutionStartResult
   hydratePendingLease: (
-    attachment: CanvasBoardAttachment,
+    attachment: BoardAttachment,
     pending: PendingImageHydrationIdentity,
   ) => PendingImageExecutionStartResult
   claimHydratedLease: (
-    attachment: CanvasBoardAttachment,
+    attachment: BoardAttachment,
     pending: PendingImageHydrationIdentity,
   ) => PendingImageExecutionLease | null
   markSubmitted: (

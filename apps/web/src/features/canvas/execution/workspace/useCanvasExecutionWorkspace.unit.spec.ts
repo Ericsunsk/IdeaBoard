@@ -1,9 +1,9 @@
 import { ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { createEmptyCanvasBoardSnapshot } from '../../../canvas-board/domain'
+import { createEmptyBoardSnapshot } from '../../../board/domain'
 import { CanvasGraphSession } from '../../graph-runtime'
 import {
-  CanvasBoardGraphSession,
+  BoardGraphSession,
   collectPendingImageTasks,
   createPendingImageExecutionCore,
 } from '../pending-execution'
@@ -12,7 +12,7 @@ import { useCanvasExecutionWorkspace } from './useCanvasExecutionWorkspace'
 const rendererMetrics = { readNodeMetrics: () => null }
 
 function createStore(taskId = 'task-1') {
-  const snapshot = createEmptyCanvasBoardSnapshot()
+  const snapshot = createEmptyBoardSnapshot()
   snapshot.imageNodes.push({
     id: 1,
     type: 'image-node',
@@ -81,7 +81,7 @@ describe('useCanvasExecutionWorkspace', () => {
   it('executes a prepared prompt intent through the real Runner and flushes persisted task identity', async () => {
     const store = createStore()
     const core = createPendingImageExecutionCore()
-    core.attachBoard(CanvasBoardGraphSession.create('board-a', { graphSession: store }))
+    core.attachBoard(BoardGraphSession.create('board-a', { graphSession: store }))
     const flushAutosave = vi.fn(async () => undefined)
     const attachPendingTaskIds = vi.fn()
     const workspace = useCanvasExecutionWorkspace({
@@ -89,7 +89,7 @@ describe('useCanvasExecutionWorkspace', () => {
       edges: ref([]),
       readCanvasGraphStore: () => store.store,
       rendererMetrics,
-      boardBaseSnapshot: ref(createEmptyCanvasBoardSnapshot()),
+      boardBaseSnapshot: ref(createEmptyBoardSnapshot()),
       pendingResults: {
         reservePendingResults: () => ({ resultNodeIds: ['image-1'] }),
         attachPendingTaskIds,
@@ -146,7 +146,7 @@ describe('useCanvasExecutionWorkspace', () => {
       })
       .commit()
     const core = createPendingImageExecutionCore()
-    core.attachBoard(CanvasBoardGraphSession.create('board-a', { graphSession: store }))
+    core.attachBoard(BoardGraphSession.create('board-a', { graphSession: store }))
     const workspace = createReattachWorkspace(store, core, async () => [
       {
         assetId: 'asset_recovered',
@@ -165,7 +165,7 @@ describe('useCanvasExecutionWorkspace', () => {
   it('hydrates a pending lease as part of the recovery flow', async () => {
     const store = createStore()
     const core = createPendingImageExecutionCore()
-    core.attachBoard(CanvasBoardGraphSession.create('board-a', { graphSession: store }))
+    core.attachBoard(BoardGraphSession.create('board-a', { graphSession: store }))
     const waitTaskImageResults = vi.fn(async () => [
       {
         assetId: 'asset_recovered',
@@ -184,7 +184,7 @@ describe('useCanvasExecutionWorkspace', () => {
   it('claims one hydration lease only once across concurrent reattach drivers', async () => {
     const store = createStore()
     const core = createPendingImageExecutionCore()
-    core.attachBoard(CanvasBoardGraphSession.create('board-a', { graphSession: store }))
+    core.attachBoard(BoardGraphSession.create('board-a', { graphSession: store }))
     const deferred = createDeferred<Array<{ url: string; resultIndex: number; assetId?: string }>>()
     const waitTaskImageResults = vi.fn(() => deferred.promise)
     const workspace = createReattachWorkspace(store, core, waitTaskImageResults)
@@ -209,7 +209,7 @@ describe('useCanvasExecutionWorkspace', () => {
     const store = createStore('task-old')
     const core = createPendingImageExecutionCore()
     const attachment = core.attachBoard(
-      CanvasBoardGraphSession.create('board-a', { graphSession: store }),
+      BoardGraphSession.create('board-a', { graphSession: store }),
     )
     const deferred = createDeferred<Array<{ url: string; resultIndex: number; assetId?: string }>>()
     const workspace = createReattachWorkspace(store, core, () => deferred.promise)
@@ -234,14 +234,14 @@ describe('useCanvasExecutionWorkspace', () => {
   it('does not let an old-board poll materialize after a board switch', async () => {
     const store = createStore()
     const core = createPendingImageExecutionCore()
-    core.attachBoard(CanvasBoardGraphSession.create('board-a', { graphSession: store }))
+    core.attachBoard(BoardGraphSession.create('board-a', { graphSession: store }))
     const deferred = createDeferred<Array<{ url: string; resultIndex: number; assetId?: string }>>()
     const workspace = createReattachWorkspace(store, core, () => deferred.promise)
 
     const reattach = workspace.commands.reattachPendingImageResults()
     await vi.waitFor(() => expect(core.factFor('image-1')).toMatchObject({ status: 'running' }))
-    const boardBStore = CanvasGraphSession.hydrate('board-b', createEmptyCanvasBoardSnapshot())
-    core.attachBoard(CanvasBoardGraphSession.create('board-b', { graphSession: boardBStore }))
+    const boardBStore = CanvasGraphSession.hydrate('board-b', createEmptyBoardSnapshot())
+    core.attachBoard(BoardGraphSession.create('board-b', { graphSession: boardBStore }))
     deferred.resolve([
       {
         assetId: 'asset_old_board',
@@ -262,7 +262,7 @@ describe('useCanvasExecutionWorkspace', () => {
   it('turns a reattach poll for a deleted domain node into a rejected materialization', async () => {
     const store = createStore()
     const core = createPendingImageExecutionCore()
-    core.attachBoard(CanvasBoardGraphSession.create('board-a', { graphSession: store }))
+    core.attachBoard(BoardGraphSession.create('board-a', { graphSession: store }))
     const deferred = createDeferred<Array<{ url: string; resultIndex: number; assetId?: string }>>()
     const workspace = createReattachWorkspace(store, core, () => deferred.promise)
 

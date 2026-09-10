@@ -1,15 +1,15 @@
 import { computed, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import {
-  createEmptyCanvasBoardSnapshot,
+  createEmptyBoardSnapshot,
   InvalidBoardStateError,
-  type CanvasBoardSnapshot,
-} from '../../canvas-board/domain'
-import type { CanvasBoardSession, CanvasBoardSessionSaveResult } from './useCanvasBoardSession'
+  type BoardSnapshot,
+} from '../../board/domain'
+import type { BoardSession, BoardSessionSaveResult } from './useBoardSession'
 import { createBoardSyncCoordinator, type SaveStatus } from './boardSyncCoordinator'
 
-function makeSnapshot(marker: string): CanvasBoardSnapshot {
-  const snapshot = createEmptyCanvasBoardSnapshot()
+function makeSnapshot(marker: string): BoardSnapshot {
+  const snapshot = createEmptyBoardSnapshot()
   snapshot.promptNodes = [
     {
       id: 1,
@@ -37,11 +37,11 @@ function createHarness() {
   const onWarning = vi.fn()
   const onSuccess = vi.fn()
   const onError = vi.fn()
-  const boardSession: CanvasBoardSession = {
+  const boardSession: BoardSession = {
     currentBoardId: computed(() => routeBoardId.value),
     exists: vi.fn(() => true),
     load: vi.fn(async () => makeSnapshot('loaded')),
-    save: vi.fn(async (snapshot: CanvasBoardSnapshot) => ({
+    save: vi.fn(async (snapshot: BoardSnapshot) => ({
       snapshot,
       remoteSync: { ok: true as const },
     })),
@@ -161,7 +161,7 @@ describe('Board Sync Coordinator', () => {
 
   it('does not return a stale reconciliation after a route switch', async () => {
     const harness = createHarness()
-    let resolveSave!: (result: CanvasBoardSessionSaveResult) => void
+    let resolveSave!: (result: BoardSessionSaveResult) => void
     vi.mocked(harness.boardSession.save).mockImplementationOnce(
       () =>
         new Promise((resolve) => {
@@ -196,7 +196,7 @@ describe('Board Sync Coordinator', () => {
       },
     ]
     harness.currentSnapshot.value = captured
-    let resolveSave!: (result: CanvasBoardSessionSaveResult) => void
+    let resolveSave!: (result: BoardSessionSaveResult) => void
     vi.mocked(harness.boardSession.save).mockImplementationOnce(
       () =>
         new Promise((resolve) => {

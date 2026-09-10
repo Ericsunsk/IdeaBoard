@@ -29,11 +29,11 @@ export {
   type CanvasExecutionRecoveryResult,
 } from './application/canvasExecutionRecoveryCoordinator'
 export {
-  CanvasBoardGraphSession,
+  BoardGraphSession,
   createPendingImageExecutionCore,
   PendingImageMaterializationError,
   PendingImageMutationContractError,
-  type CanvasBoardGraphSessionOptions,
+  type BoardGraphSessionOptions,
   type PendingImageExecutionCore,
   type PendingImageExecutionEdgeProjection,
   type PendingImageExecutionCoreOptions,

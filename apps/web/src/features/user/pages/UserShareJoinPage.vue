@@ -35,7 +35,7 @@ import Button from 'primevue/button'
 import Card from 'primevue/card'
 import ProgressSpinner from 'primevue/progressspinner'
 import { USER_BOARDS_PATH, USER_CANVAS_PATH } from '../../../shared/constants/routePaths'
-import { joinSharedCanvasBoardByToken } from '../../canvas-board/catalog/joinSharedBoardWorkflow'
+import { joinSharedBoardByToken } from '../../board'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -70,7 +70,7 @@ function goBoards() {
 }
 
 async function joinSharedBoard() {
-  const { boardId } = await joinSharedCanvasBoardByToken(getTokenFromQuery())
+  const { boardId } = await joinSharedBoardByToken(getTokenFromQuery())
   await router.replace({
     path: USER_CANVAS_PATH,
     query: { boardId },

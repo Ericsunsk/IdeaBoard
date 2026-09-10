@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  createEmptyCanvasBoardSnapshot,
-  type CanvasBoardSnapshot,
+  createEmptyBoardSnapshot,
+  type BoardSnapshot,
   type CanvasConnection,
   type CanvasGroup,
   type CanvasNodeItem,
   type ImageNodeItem,
   type PromptNodeItem,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 import {
   CanvasGraphStore,
   toCanvasGraphEdgeId,
@@ -85,8 +85,8 @@ function createConnection(id: number, fromNodeId: number, toNodeId: number): Can
   }
 }
 
-function createSampleSnapshot(): CanvasBoardSnapshot {
-  const snapshot = createEmptyCanvasBoardSnapshot()
+function createSampleSnapshot(): BoardSnapshot {
+  const snapshot = createEmptyBoardSnapshot()
   snapshot.imageNodes = [createImageNode(1, 40, 80)]
   snapshot.promptNodes = [createPromptNode(1, 420, 80), createPromptNode(2, 820, 80)]
   snapshot.connections = [createConnection(1, 1, 1)]
@@ -96,8 +96,8 @@ function createSampleSnapshot(): CanvasBoardSnapshot {
   return snapshot
 }
 
-function createLargeSnapshot(nodeCount: number): CanvasBoardSnapshot {
-  const snapshot = createEmptyCanvasBoardSnapshot()
+function createLargeSnapshot(nodeCount: number): BoardSnapshot {
+  const snapshot = createEmptyBoardSnapshot()
   const pairCount = Math.floor(nodeCount / 2)
   for (let id = 1; id <= pairCount; id += 1) {
     snapshot.imageNodes.push(createImageNode(id, id * 8, 40))
@@ -116,14 +116,14 @@ describe('CanvasGraphStore', () => {
     window.__canvasInteractionBenchmarkCounters = {}
     const store = CanvasGraphStore.fromSnapshot(createSampleSnapshot())
 
-    store.hydrate(createEmptyCanvasBoardSnapshot())
+    store.hydrate(createEmptyBoardSnapshot())
 
     expect(window.__canvasInteractionBenchmarkCounters.runtimeTimingMs).toMatchObject({
       'graph-store.hydrate': { count: 2 },
     })
   })
 
-  it('hydrates and exports a CanvasBoardSnapshot without changing the schema shape', () => {
+  it('hydrates and exports a BoardSnapshot without changing the schema shape', () => {
     const snapshot = createSampleSnapshot()
     const store = CanvasGraphStore.fromSnapshot(snapshot)
 

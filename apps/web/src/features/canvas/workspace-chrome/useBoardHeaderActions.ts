@@ -1,10 +1,10 @@
 import { computed, nextTick, ref, type Ref } from 'vue'
 import type { Router } from 'vue-router'
-import { normalizeCanvasBoardName } from '../../canvas-board/catalog/boards'
+import { normalizeBoardName } from '../../board/application/catalog/boards'
 import {
-  useCanvasBoardCatalog,
-  type CanvasBoardCatalog,
-} from '../../canvas-board/catalog/catalog'
+  useBoardRepository,
+  type BoardRepository,
+} from '../../board/application/catalog/repository'
 import { USER_CANVAS_PATH } from '../../../shared/constants/routePaths'
 import { i18n } from '../../../shared/i18n'
 
@@ -18,30 +18,30 @@ type UseBoardHeaderActionsOptions = {
   router: Router
   route: { query: Record<string, unknown> }
   flushAutosave: () => Promise<void>
-  catalog?: Pick<CanvasBoardCatalog, 'viewModel' | 'commands'>
+  catalog?: Pick<BoardRepository, 'viewModel' | 'commands'>
 }
 
-export type CanvasBoardCatalogRecoveryState =
+export type CatalogRecoveryState =
   { status: 'idle' } | { status: 'reload-required' | 'reloading'; boardId: string }
 
 export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
   const { t } = i18n.global
-  const boardCatalog = options.catalog ?? useCanvasBoardCatalog()
+  const boardRepository = options.catalog ?? useBoardRepository()
   const isBoardMenuOpen = ref(false)
   const isRenamingBoard = ref(false)
   const boardNameDraft = ref('')
   const boardNameInputRef = ref<HTMLElement | null>(null)
   const isRenamePending = ref(false)
-  const catalogRecovery = ref<CanvasBoardCatalogRecoveryState>({ status: 'idle' })
+  const catalogRecovery = ref<CatalogRecoveryState>({ status: 'idle' })
 
   const currentBoardName = computed(() => {
     const boardId = `${options.currentBoardId.value ?? ''}`.trim()
     if (!boardId) return t('canvas.chrome.noCanvas')
-    return boardCatalog.viewModel.byId.value.get(boardId)?.name ?? boardId
+    return boardRepository.viewModel.byId.value.get(boardId)?.name ?? boardId
   })
 
   const boardOptions = computed(() =>
-    boardCatalog.viewModel.boards.value.map((board) => ({ id: board.id, name: board.name })),
+    boardRepository.viewModel.boards.value.map((board) => ({ id: board.id, name: board.name })),
   )
 
   function setBoardNameInputRef(el: HTMLElement | null) {
@@ -85,7 +85,7 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
     cancelBoardRename()
   }
 
-  type BoardRenameOutcome = Awaited<ReturnType<typeof boardCatalog.commands.rename>>
+  type BoardRenameOutcome = Awaited<ReturnType<typeof boardRepository.commands.rename>>
 
   function selectRenameRestoreErrorMessage(reason: string, rollbackSucceeded: boolean): string {
     if (reason === 'remote-name-conflict' && rollbackSucceeded) {
@@ -130,8 +130,8 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
     if (isRenamePending.value) return
     const boardId = `${options.currentBoardId.value ?? ''}`.trim()
     if (!boardId) return
-    const normalized = normalizeCanvasBoardName(boardNameDraft.value)
-    const currentName = normalizeCanvasBoardName(currentBoardName.value)
+    const normalized = normalizeBoardName(boardNameDraft.value)
+    const currentName = normalizeBoardName(currentBoardName.value)
     isRenamingBoard.value = false
     boardNameDraft.value = ''
     if (!normalized) {
@@ -141,7 +141,7 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
     if (normalized === currentName) return
 
     isRenamePending.value = true
-    const result = await boardCatalog.commands
+    const result = await boardRepository.commands
       .rename({ boardId, nextName: normalized })
       .finally(() => {
         isRenamePending.value = false
@@ -157,7 +157,7 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
     const recovery = catalogRecovery.value
     if (recovery.status !== 'reload-required') return
     catalogRecovery.value = { status: 'reloading', boardId: recovery.boardId }
-    const result = await boardCatalog.commands.hydrate({
+    const result = await boardRepository.commands.hydrate({
       preserveLocalNewer: false,
       rollbackBoardIds: [recovery.boardId],
     })

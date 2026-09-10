@@ -1,6 +1,6 @@
 import type { NodeChange } from '@vue-flow/core'
 import { describe, expect, it } from 'vitest'
-import { createEmptyCanvasBoardSnapshot } from '../../canvas-board/domain'
+import { createEmptyBoardSnapshot } from '../../board/domain'
 import { createCanvasGraphStore } from '../graph-runtime'
 import { createCanvasNodeDragLifecycle } from './nodeDragLifecycle'
 
@@ -13,7 +13,7 @@ function createTerminalPositionChange(nodeId: string): NodeChange {
 }
 
 function createHarness() {
-  const snapshot = createEmptyCanvasBoardSnapshot()
+  const snapshot = createEmptyBoardSnapshot()
   snapshot.promptNodes = [
     {
       id: 1,

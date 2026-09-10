@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UserBoardItem } from '../../../shared/api/generated-query/model'
 import { clearStoredAuth, setStoredAuth } from '../../../shared/utils/auth'
-import { createCanvasBoard, getCanvasBoardById } from '../../canvas-board/catalog/boards'
-import { getCanvasBoardState, replaceCanvasBoardStateMap } from '../../canvas-board/persistence'
-import type { CanvasBoardSnapshot, CanvasBoardState } from '../../canvas-board/domain'
-import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../../canvas-board/domain'
-import { makeCanvasBoardSnapshot, makeCanvasBoardState } from '../../canvas-board/testing'
+import { createBoard, getBoardById } from '../../board/application/catalog/boards'
+import { getBoardState, replaceBoardStateMap } from '../../board/infrastructure/persistence'
+import type { BoardSnapshot, BoardState } from '../../board/domain'
+import { BOARD_STATE_SCHEMA_VERSION } from '../../board/domain'
+import { makeBoardSnapshot, makeBoardState } from '../../board/testing'
 import {
   createBoardSessionRepository,
   isBoardSessionRemoteSyncError,
@@ -29,8 +29,8 @@ vi.mock('../../../shared/api/client', () => ({
   },
 }))
 
-function makeSnapshot(promptText: string): CanvasBoardSnapshot {
-  return makeCanvasBoardSnapshot({
+function makeSnapshot(promptText: string): BoardSnapshot {
+  return makeBoardSnapshot({
     promptNodes: [
       {
         id: 1,
@@ -47,8 +47,8 @@ function makeSnapshot(promptText: string): CanvasBoardSnapshot {
   })
 }
 
-function makeState(updatedAt: number, promptText: string): CanvasBoardState {
-  return makeCanvasBoardState({
+function makeState(updatedAt: number, promptText: string): BoardState {
+  return makeBoardState({
     ...makeSnapshot(promptText),
     previewSnapshotDataUrl: 'data:image/webp;base64,preview',
     previewSnapshotUpdatedAt: updatedAt,
@@ -78,8 +78,8 @@ describe('createBoardSessionRepository', () => {
   })
 
   it('drops preview data and still syncs remotely when localStorage write throws', async () => {
-    const board = createCanvasBoard('Quota Test')
-    replaceCanvasBoardStateMap({ [board.id]: makeState(1_000, 'initial') })
+    const board = createBoard('Quota Test')
+    replaceBoardStateMap({ [board.id]: makeState(1_000, 'initial') })
     const repository = createBoardSessionRepository()
     const originalSetItem = localStorage.setItem.bind(localStorage)
     let setItemCalls = 0
@@ -101,7 +101,7 @@ describe('createBoardSessionRepository', () => {
       warnSpy.mockRestore()
     }
 
-    const savedState = getCanvasBoardState(board.id)
+    const savedState = getBoardState(board.id)
     expect(savedState?.promptNodes[0]?.text).toBe('saved')
     expect(savedState).not.toHaveProperty('viewport')
     expect(savedState?.previewSnapshotDataUrl).toBeUndefined()
@@ -115,8 +115,8 @@ describe('createBoardSessionRepository', () => {
   it('keeps the local state and reports recoverable remote sync failure', async () => {
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1_000)
     try {
-      const board = createCanvasBoard('Remote Failure')
-      replaceCanvasBoardStateMap({ [board.id]: makeState(1_000, 'initial') })
+      const board = createBoard('Remote Failure')
+      replaceBoardStateMap({ [board.id]: makeState(1_000, 'initial') })
       const repository = createBoardSessionRepository()
       const remoteError = new Error('network down')
       mocks.request.mockRejectedValueOnce(remoteError)
@@ -129,11 +129,11 @@ describe('createBoardSessionRepository', () => {
         thrown = error
       }
 
-      const savedState = getCanvasBoardState(board.id)
+      const savedState = getBoardState(board.id)
       expect(savedState?.promptNodes[0]?.text).toBe('saved-after-remote-failure')
       expect(savedState).not.toHaveProperty('viewport')
       expect(savedState?.updatedAt).toBe(2_000)
-      expect(getCanvasBoardById(board.id)?.updatedAt).toBe(2_000)
+      expect(getBoardById(board.id)?.updatedAt).toBe(2_000)
       expect(isBoardSessionRemoteSyncError(thrown)).toBe(true)
       if (!isBoardSessionRemoteSyncError(thrown)) return
       expect(thrown.boardId).toBe(board.id)
@@ -146,12 +146,12 @@ describe('createBoardSessionRepository', () => {
   })
 
   it('migrates v3 local state to the current schema version on load', async () => {
-    const board = createCanvasBoard('Migrated Local Snapshot')
+    const board = createBoard('Migrated Local Snapshot')
     localStorage.setItem(
       'ideaboard.canvas.boardStates.v2.public_00000000-0000-0000-0000-000000000001',
       JSON.stringify({
         [board.id]: {
-          schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION - 1,
+          schemaVersion: BOARD_STATE_SCHEMA_VERSION - 1,
           imageNodes: [],
           promptNodes: [
             {
@@ -174,12 +174,12 @@ describe('createBoardSessionRepository', () => {
 
     const loaded = await repository.load(board.id)
 
-    expect(loaded?.schemaVersion).toBe(CANVAS_BOARD_STATE_SCHEMA_VERSION)
+    expect(loaded?.schemaVersion).toBe(BOARD_STATE_SCHEMA_VERSION)
   })
 
   it('keeps saving local board drafts when stored auth is temporarily missing', async () => {
-    const board = createCanvasBoard('Session Recovery')
-    replaceCanvasBoardStateMap({ [board.id]: makeState(1_000, 'initial') })
+    const board = createBoard('Session Recovery')
+    replaceBoardStateMap({ [board.id]: makeState(1_000, 'initial') })
     clearStoredAuth()
     const repository = createBoardSessionRepository()
 
@@ -190,14 +190,14 @@ describe('createBoardSessionRepository', () => {
 
     expect(repository.exists(board.id)).toBe(true)
     expect(savedState.promptNodes[0]?.text).toBe('saved-without-stored-auth')
-    expect(getCanvasBoardState(board.id)?.promptNodes[0]?.text).toBe('saved-without-stored-auth')
+    expect(getBoardState(board.id)?.promptNodes[0]?.text).toBe('saved-without-stored-auth')
     expect(mocks.request).not.toHaveBeenCalled()
   })
 
   it('loads a session snapshot without preview or local metadata', async () => {
-    const board = createCanvasBoard('Load Snapshot')
-    replaceCanvasBoardStateMap({
-      [board.id]: makeCanvasBoardState({
+    const board = createBoard('Load Snapshot')
+    replaceBoardStateMap({
+      [board.id]: makeBoardState({
         ...makeSnapshot('loaded'),
         updatedAt: 2_000,
         mediaRefs: [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1' }],
@@ -220,12 +220,12 @@ describe('createBoardSessionRepository', () => {
   })
 
   it('rejects pre-migration local state instead of normalizing across schema versions', async () => {
-    const board = createCanvasBoard('Older Local Snapshot')
+    const board = createBoard('Older Local Snapshot')
     localStorage.setItem(
       'ideaboard.canvas.boardStates.v2.public_00000000-0000-0000-0000-000000000001',
       JSON.stringify({
         [board.id]: {
-          schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION - 2,
+          schemaVersion: BOARD_STATE_SCHEMA_VERSION - 2,
           imageNodes: [],
           promptNodes: [
             {
@@ -268,12 +268,12 @@ describe('createBoardSessionRepository', () => {
   })
 
   it('rejects invalid local state with recoverable validation context instead of returning an empty session snapshot', async () => {
-    const board = createCanvasBoard('Invalid Local Snapshot')
+    const board = createBoard('Invalid Local Snapshot')
     localStorage.setItem(
       'ideaboard.canvas.boardStates.v2.public_00000000-0000-0000-0000-000000000001',
       JSON.stringify({
         [board.id]: {
-          ...makeCanvasBoardState(),
+          ...makeBoardState(),
           imageNodes: [
             {
               id: 1,
@@ -310,7 +310,7 @@ describe('createBoardSessionRepository', () => {
   })
 
   it('rejects invalid remote hydration state with recoverable validation context', async () => {
-    const board = createCanvasBoard('Invalid Remote Snapshot')
+    const board = createBoard('Invalid Remote Snapshot')
     mocks.state.listResponse = {
       data: {
         list: [
@@ -320,9 +320,9 @@ describe('createBoardSessionRepository', () => {
             created_at: board.createdAt,
             updated_at: board.updatedAt,
             revision: 1,
-            state_schema_version: CANVAS_BOARD_STATE_SCHEMA_VERSION,
+            state_schema_version: BOARD_STATE_SCHEMA_VERSION,
             state: {
-              ...makeCanvasBoardState(),
+              ...makeBoardState(),
               imageNodes: [
                 {
                   id: 1,
@@ -361,10 +361,10 @@ describe('createBoardSessionRepository', () => {
   })
 
   it('rejects invalid save snapshots with recoverable validation context', async () => {
-    const board = createCanvasBoard('Invalid Save')
+    const board = createBoard('Invalid Save')
     const repository = createBoardSessionRepository()
     const invalidSnapshot = {
-      ...makeCanvasBoardSnapshot(),
+      ...makeBoardSnapshot(),
       imageNodes: [
         {
           id: 1,
@@ -376,9 +376,9 @@ describe('createBoardSessionRepository', () => {
           sourceImageRatio: 1,
           outputStatus: 'not-a-status',
           outputImages: [],
-        } as unknown as CanvasBoardSnapshot['imageNodes'][number],
+        } as unknown as BoardSnapshot['imageNodes'][number],
       ],
-    } as CanvasBoardSnapshot
+    } as BoardSnapshot
 
     await expect(repository.save(board.id, invalidSnapshot)).rejects.toMatchObject({
       code: 'INVALID_BOARD_STATE',
@@ -402,7 +402,7 @@ function mockBoardApiRequest(url: string, config?: { method?: string }) {
   return Promise.reject(new Error(`Unexpected board API request: ${method} ${url}`))
 }
 
-function readUpsertBoardPayload(boardId: string): { state?: CanvasBoardState } {
+function readUpsertBoardPayload(boardId: string): { state?: BoardState } {
   const call = mocks.request.mock.calls.find(
     ([url, config]) =>
       url === `/user/boards/${boardId}` &&
@@ -414,5 +414,5 @@ function readUpsertBoardPayload(boardId: string): { state?: CanvasBoardState } {
   if (!call) throw new Error(`Missing upsert call for ${boardId}`)
   const body = call[1]?.body
   if (typeof body !== 'string') throw new Error(`Missing upsert body for ${boardId}`)
-  return JSON.parse(body) as { state?: CanvasBoardState }
+  return JSON.parse(body) as { state?: BoardState }
 }

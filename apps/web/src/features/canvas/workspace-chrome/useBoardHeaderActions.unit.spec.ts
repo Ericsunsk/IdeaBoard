@@ -2,19 +2,19 @@ import { computed, ref } from 'vue'
 import type { Router } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  createCanvasBoardCatalog,
-  type CanvasBoardCatalog,
-} from '../../canvas-board/catalog/catalog'
-import { replaceCanvasBoards } from '../../canvas-board/catalog/boards'
+  createBoardRepository,
+  type BoardRepository,
+} from '../../board/application/catalog/repository'
+import { replaceBoards } from '../../board/application/catalog/boards'
 import { clearStoredAuth, setStoredAuth } from '../../../shared/utils/auth'
 import { useBoardHeaderActions } from './useBoardHeaderActions'
 
 function createCatalog(
-  rename: CanvasBoardCatalog['commands']['rename'] = vi.fn(async () => ({
+  rename: BoardRepository['commands']['rename'] = vi.fn(async () => ({
     ok: true as const,
     board: board('board-a', 'New Board'),
   })),
-  hydrate: CanvasBoardCatalog['commands']['hydrate'] = vi.fn(async () => ({ ok: true as const })),
+  hydrate: BoardRepository['commands']['hydrate'] = vi.fn(async () => ({ ok: true as const })),
 ) {
   const boards = ref([board('board-a', 'Old Board'), board('board-b', 'Taken')])
   return {
@@ -29,14 +29,14 @@ function createCatalog(
       duplicate: vi.fn(),
       delete: vi.fn(),
     },
-  } as unknown as Pick<CanvasBoardCatalog, 'viewModel' | 'commands'>
+  } as unknown as Pick<BoardRepository, 'viewModel' | 'commands'>
 }
 
 function board(id: string, name: string) {
   return { id, name, createdAt: 100, updatedAt: 200 }
 }
 
-function createHeader(catalog: Pick<CanvasBoardCatalog, 'viewModel' | 'commands'>) {
+function createHeader(catalog: Pick<BoardRepository, 'viewModel' | 'commands'>) {
   const message = { warning: vi.fn(), success: vi.fn(), error: vi.fn() }
   const router = { push: vi.fn(async () => undefined) } as unknown as Router
   const header = useBoardHeaderActions({
@@ -141,11 +141,11 @@ describe('useBoardHeaderActions', () => {
 
   it('keeps rename visibly pending and blocks another rename until sync completes', async () => {
     let resolveRename!: (
-      value: Awaited<ReturnType<CanvasBoardCatalog['commands']['rename']>>,
+      value: Awaited<ReturnType<BoardRepository['commands']['rename']>>,
     ) => void
     const rename = vi.fn(
       () =>
-        new Promise<Awaited<ReturnType<CanvasBoardCatalog['commands']['rename']>>>((resolve) => {
+        new Promise<Awaited<ReturnType<BoardRepository['commands']['rename']>>>((resolve) => {
           resolveRename = resolve
         }),
     )
@@ -203,8 +203,8 @@ describe('useBoardHeaderActions', () => {
 
   it('resets the shared catalog across A logout B before Canvas Header is opened directly', async () => {
     setStoredAuth(authUser(1, 'USERA1'))
-    replaceCanvasBoards([board('board-a', 'User A Board')])
-    const catalog = createCanvasBoardCatalog()
+    replaceBoards([board('board-a', 'User A Board')])
+    const catalog = createBoardRepository()
     const currentBoardId = ref<string | null>('board-a')
     const message = { warning: vi.fn(), success: vi.fn(), error: vi.fn() }
     const header = useBoardHeaderActions({
@@ -221,7 +221,7 @@ describe('useBoardHeaderActions', () => {
     expect(header.boardOptions.value).toEqual([])
 
     setStoredAuth(authUser(2, 'USERB2'))
-    replaceCanvasBoards([board('board-b', 'User B Board')])
+    replaceBoards([board('board-b', 'User B Board')])
     currentBoardId.value = 'board-b'
 
     expect(header.currentBoardName.value).toBe('User B Board')

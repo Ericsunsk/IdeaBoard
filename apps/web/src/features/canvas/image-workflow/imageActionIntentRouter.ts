@@ -11,7 +11,7 @@ import {
   type ImageStrengthAction,
   type ImageTaskAction,
 } from '../execution'
-import type { PromptAspectRatio } from '../../canvas-board/domain'
+import type { PromptAspectRatio } from '../../board/domain'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 import { i18n } from '../../../shared/i18n'
 import {

@@ -7,7 +7,7 @@ import {
   type CanvasNodeItem,
   type ImageNodeItem,
   type ImageNodeOutputItem,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import {
   isCanvasGraphNodeId,

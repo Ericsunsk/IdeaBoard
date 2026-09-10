@@ -1,8 +1,8 @@
-declare const canvasBoardAttachmentBrand: unique symbol
-declare const canvasBoardSessionIdentityBrand: unique symbol
+declare const boardAttachmentBrand: unique symbol
+declare const boardSessionIdentityBrand: unique symbol
 
-export type CanvasBoardSessionIdentity = Readonly<{
-  [canvasBoardSessionIdentityBrand]: true
+export type BoardSessionIdentity = Readonly<{
+  [boardSessionIdentityBrand]: true
 }>
 
 /**
@@ -11,9 +11,9 @@ export type CanvasBoardSessionIdentity = Readonly<{
  * It guards every asynchronous Board mutation, independent of the feature
  * which initiated the work (Task execution, Library materialization, etc.).
  */
-export type CanvasBoardAttachment = Readonly<{
+export type BoardAttachment = Readonly<{
   boardId: string
   epoch: number
-  sessionIdentity: CanvasBoardSessionIdentity
-  [canvasBoardAttachmentBrand]: true
+  sessionIdentity: BoardSessionIdentity
+  [boardAttachmentBrand]: true
 }>

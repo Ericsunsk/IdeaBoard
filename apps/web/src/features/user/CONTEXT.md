@@ -22,9 +22,9 @@ _Avoid_: 在通用页面中无序散落协作加入逻辑
 | :--- | :--- | :--- | :--- |
 | `app/routes.ts` | 导出用户端所有路由记录数组（`userRoutes`），供全局 Vue Router 统一挂载。 | `userRoutes: RouteRecordRaw[]`。 | 内部使用动态 `import()` 懒加载对应页面。 |
 | `layout/UserLayout.vue` | 页面外壳：注入 `UserWorkspaceNavigation`，管理主要内容区域的视口高宽与滚动条。 | 默认布局组件。 | 纯布局结构，不承载特定页面的业务状态。 |
-| `pages/UserShareJoinPage.vue` | 协同邀请落脚点：校验 Token、展示确认界面并执行加入。 | 路由页面。 | 调用 `canvas-board` 域的 `joinSharedBoardWorkflow`，不自建传输。 |
+| `pages/UserShareJoinPage.vue` | 协同邀请落脚点：校验 Token、展示确认界面并执行加入。 | 路由页面。 | 调用 `board` 域的 `joinSharedBoardWorkflow`，不自建传输。 |
 
 ## Rules
 
 - 所有 `/user/*` 下的路由均必须具备登录态守卫校验。
-- 业务内容由子模块（如 `board-catalog`、`canvas-board`）提供，`user` 域只负责装配与外壳。
+- 业务内容由子模块（如 `board`）提供，`user` 域只负责装配与外壳。

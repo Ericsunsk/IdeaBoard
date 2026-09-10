@@ -11,7 +11,7 @@ import {
   type CanvasGraphStore,
   type CanvasGraphTransactionSummary,
 } from '../graph-runtime'
-import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
+import type { BoardSnapshot } from '../../board/domain'
 import {
   createFlowEdgeProjectionIndex,
   resolveFlowEdgeProjectionReplacement,
@@ -21,7 +21,7 @@ import { createCanvasVueFlowConnectionAdapter } from './vueFlowConnectionBinding
 export type CanvasConnectionCommandLifecycleOptions = {
   readNodes: () => Node[]
   readEdges: () => Edge[]
-  readBoardBaseSnapshot: () => CanvasBoardSnapshot | undefined
+  readBoardBaseSnapshot: () => BoardSnapshot | undefined
   readGraphStore: () => CanvasGraphStore
   isValidConnection: (connection: Connection) => boolean
   normalizeConnection?: (

@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  rebuildCanvasBoardMediaRefs,
+  rebuildBoardMediaRefs,
   type CanvasNodeItem,
   type ImageNodeItem,
-} from '../../canvas-board/domain'
-import { makeCanvasBoardSnapshot } from '../../canvas-board/testing'
+} from '../../board/domain'
+import { makeBoardSnapshot } from '../../board/testing'
 import { useFlowNodeMediaInputs } from './useFlowNodeMediaInputs'
 
 describe('useFlowNodeMediaInputs', () => {
   it('releases the source media ref when resetting an image node', () => {
-    const snapshot = makeCanvasBoardSnapshot({
+    const snapshot = makeBoardSnapshot({
       imageNodes: [
         {
           id: 1,
@@ -48,7 +48,7 @@ describe('useFlowNodeMediaInputs', () => {
     })
 
     inputs.onFlowImageReset('image-1')
-    rebuildCanvasBoardMediaRefs(snapshot)
+    rebuildBoardMediaRefs(snapshot)
 
     expect(snapshot.imageNodes[0]?.sourceImageUrl).toBe('')
     expect(snapshot.imageNodes[0]?.sourceMediaAssetId).toBeUndefined()

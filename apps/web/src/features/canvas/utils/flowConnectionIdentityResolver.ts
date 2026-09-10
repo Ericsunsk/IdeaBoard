@@ -1,4 +1,4 @@
-import type { CanvasConnection, CanvasConnectionEndpoint } from '../../canvas-board/domain'
+import type { CanvasConnection, CanvasConnectionEndpoint } from '../../board/domain'
 import { toCanvasConnectionEndpointKey } from '../graph-runtime'
 
 const CANVAS_CONNECTION_EDGE_ID_PATTERN = /^connection-(\d+)$/

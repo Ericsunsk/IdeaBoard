@@ -2,10 +2,10 @@ import type { Edge, Elements, Node } from '@vue-flow/core'
 import { shallowRef } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  createEmptyCanvasBoardSnapshot,
-  type CanvasBoardSnapshot,
+  createEmptyBoardSnapshot,
+  type BoardSnapshot,
   type ImageNodeItem,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 import { i18n } from '../../../shared/i18n'
 import { loadLocaleMessages } from '../../../shared/i18n/userLocale'
 import { CanvasGraphSession } from '../graph-runtime'
@@ -52,7 +52,7 @@ function createFlowImage(snapshot: ImageNodeItem): Node<FlowNodeData> {
 }
 
 function createHarness() {
-  const snapshot: CanvasBoardSnapshot = createEmptyCanvasBoardSnapshot()
+  const snapshot: BoardSnapshot = createEmptyBoardSnapshot()
   const image = createImageSnapshot()
   snapshot.imageNodes.push(image)
   const graphSession = CanvasGraphSession.hydrate('board-a', snapshot)

@@ -10,7 +10,7 @@ import {
   type CanvasViewportPersistence,
   type CanvasViewportPersistenceIdentity,
 } from '../utils/canvasViewportPersistence'
-import type { CanvasBoardLoadResult } from '../board-session'
+import type { BoardLoadResult } from '../board-session'
 
 export type CanvasFlowViewport = {
   x: number
@@ -63,7 +63,7 @@ export type UseCanvasViewportRuntimeOptions = {
   zoomIn: () => Promise<unknown> | unknown
   zoomOut: () => Promise<unknown> | unknown
   panBy: (delta: { x: number; y: number }) => boolean
-  loadInitialOrRouteBoard: () => Promise<CanvasBoardLoadResult>
+  loadInitialOrRouteBoard: () => Promise<BoardLoadResult>
   closeBoardHeaderEditing: () => void
   startCanvasInteraction: (key: CanvasViewportRuntimeInteraction) => void
   stopCanvasInteraction: (key: CanvasViewportRuntimeInteraction) => void
@@ -357,7 +357,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     options.stopCanvasInteraction('viewport-pan')
   }
 
-  async function loadCanvasBoardAndProbe() {
+  async function loadBoardAndProbe() {
     if (!isCanvasFrameProbeEnabled()) {
       await options.loadInitialOrRouteBoard()
       await restoreViewportForCurrentBoard()
@@ -448,6 +448,6 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     onNodeDragStart,
     onNodeDragStop,
     flushViewportPersistence: viewportPersistence.flush,
-    loadCanvasBoardAndProbe,
+    loadBoardAndProbe,
   }
 }

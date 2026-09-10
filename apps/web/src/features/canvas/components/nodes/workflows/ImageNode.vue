@@ -93,7 +93,7 @@ import {
   requireImageNodeOutputCount,
   type ImageNodeItem,
   type LibraryImportFact,
-} from '../../../../canvas-board/domain'
+} from '../../../../board/domain'
 import type { ImageNodeAction } from '../../../config/imageActionRegistry'
 import type { OutputResolution } from '../../../../../shared/domain/generationContract'
 import type { OutpaintDragAnchor } from '../../../image-workflow/useImageOutpaintOverlay'

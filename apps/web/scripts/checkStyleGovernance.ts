@@ -228,7 +228,7 @@ function isSearchTokenAllowedFile(file: SourceFile): boolean {
 function isPageDotBackgroundAllowedFile(file: SourceFile): boolean {
   return (
     file.sourcePath === 'src/app/style.css' ||
-    file.sourcePath.startsWith('src/features/canvas-board/preview/')
+    file.sourcePath.startsWith('src/features/board/infrastructure/preview/')
   )
 }
 
@@ -345,7 +345,7 @@ function checkPageDotBackgroundUtilityBoundary(file: SourceFile, content: string
       file: file.sourcePath,
       rule: 'page-dot-background-utility',
       message:
-        'User page dot backgrounds must use ib-page-dot-bg; board preview dots stay in canvas-board/preview because previews mirror the serialized canvas thumbnail surface.',
+        'User page dot backgrounds must use ib-page-dot-bg; board preview dots stay in board/infrastructure/preview because previews mirror the serialized canvas thumbnail surface.',
       details: matchDetails(content, pattern),
     },
   ]

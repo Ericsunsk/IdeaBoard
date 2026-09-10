@@ -7,8 +7,8 @@ import type {
   ImageNodeItem,
   PromptNodeInputImage,
   PromptNodeItem,
-} from '../../canvas-board/domain'
-import { createEmptyCanvasBoardSnapshot } from '../../canvas-board/domain'
+} from '../../board/domain'
+import { createEmptyBoardSnapshot } from '../../board/domain'
 import type { FlowNodeData } from '../types/flowTypes'
 import { CanvasGraphSession } from '../graph-runtime'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
@@ -71,7 +71,7 @@ function makeFlowNode(
 }
 
 function createGraphSession(nodes: Node[], edges: Edge[]) {
-  const snapshot = createEmptyCanvasBoardSnapshot()
+  const snapshot = createEmptyBoardSnapshot()
   for (const node of nodes) {
     const snapshotNode = node.data?.snapshotNode as CanvasNodeItem | undefined
     if (!snapshotNode) continue

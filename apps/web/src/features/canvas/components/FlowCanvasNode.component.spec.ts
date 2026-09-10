@@ -1,7 +1,7 @@
 import { fireEvent } from '@testing-library/vue'
 import { describe, expect, it, vi } from 'vitest'
 import FlowCanvasNode from './FlowCanvasNode.vue'
-import type { FusionNodeItem, ImageNodeItem, PromptNodeItem } from '../../canvas-board/domain'
+import type { FusionNodeItem, ImageNodeItem, PromptNodeItem } from '../../board/domain'
 import { IMAGE_NODE_ACTION } from '../config/imageActionRegistry'
 import type { ImageActionBinding } from '../image-tools'
 import { createImageNodePresentationResolver } from '../node-presentation'

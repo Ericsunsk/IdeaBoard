@@ -1,7 +1,7 @@
 import { uploadApi } from '../../../shared/api/upload'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
-import { rebuildCanvasBoardMediaRefs, type CanvasBoardSnapshot } from '../../canvas-board/domain'
+import { rebuildBoardMediaRefs, type BoardSnapshot } from '../../board/domain'
 import { filenameFromImageUrl, isDataUrl, resolveFetchUrl } from '../services/canvasMediaIO'
 import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
 import { buildMediaBrowserURL, type MediaRef } from '../../../shared/media/mediaRef'
@@ -90,7 +90,7 @@ function appendImageItemRefs(
   })
 }
 
-function collectStableRefs(snapshot: CanvasBoardSnapshot): StableRef[] {
+function collectStableRefs(snapshot: BoardSnapshot): StableRef[] {
   const refs: StableRef[] = []
   snapshot.imageNodes.forEach((node, index) => {
     refs.push({
@@ -187,8 +187,8 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
   }
 
   async function stabilizeSnapshotForSave(
-    snapshot: CanvasBoardSnapshot,
-  ): Promise<CanvasBoardSnapshot> {
+    snapshot: BoardSnapshot,
+  ): Promise<BoardSnapshot> {
     let unstableRefCount = 0
     return measureCanvasPerfAsync(
       'board.save.stabilizeSnapshot',
@@ -231,7 +231,7 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
             })
           }
         }
-        rebuildCanvasBoardMediaRefs(snapshot)
+        rebuildBoardMediaRefs(snapshot)
         return snapshot
       },
       50,

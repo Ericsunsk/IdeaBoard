@@ -1,6 +1,6 @@
 export {
-  CanvasBoardGraphSession,
-  type CanvasBoardGraphSessionOptions,
+  BoardGraphSession,
+  type BoardGraphSessionOptions,
   type PendingImageMutationRejectReason,
   type PendingImageResolvedResult,
   type PendingImageResultNodeId,

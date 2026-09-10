@@ -1,6 +1,6 @@
 import { i18n } from '../../../../shared/i18n'
 import { canvasToBlob } from '../../services/canvasMediaIO'
-import type { ImageRetouchRecipe } from '../../../canvas-board/domain'
+import type { ImageRetouchRecipe } from '../../../board/domain'
 import type { RetouchEffectLayer, RetouchLayer, RetouchRasterContent } from '../types'
 import { createImageProcessingOutputFileName } from '../runtime/imageOutputPolicy'
 import { getImageRetouchProcessingRuntime } from '../runtime/runtime'

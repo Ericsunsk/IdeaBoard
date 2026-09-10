@@ -1,4 +1,4 @@
-import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
+import type { BoardSnapshot } from '../../board/domain'
 import {
   CanvasGraphStore,
   type CanvasGraphCommitEvent,
@@ -19,14 +19,14 @@ export class CanvasGraphSession {
   readonly #unsubscribeCommitListeners = new Set<() => void>()
   #disposed = false
 
-  private constructor(boardId: string, snapshot: CanvasBoardSnapshot) {
+  private constructor(boardId: string, snapshot: BoardSnapshot) {
     const normalizedBoardId = boardId.trim()
     if (!normalizedBoardId) throw new Error('Canvas Graph Session boardId is required')
     this.boardId = normalizedBoardId
     this.#store = CanvasGraphStore.fromSnapshot(snapshot)
   }
 
-  static hydrate(boardId: string, snapshot: CanvasBoardSnapshot): CanvasGraphSession {
+  static hydrate(boardId: string, snapshot: BoardSnapshot): CanvasGraphSession {
     return new CanvasGraphSession(boardId, snapshot)
   }
 
@@ -35,12 +35,12 @@ export class CanvasGraphSession {
     return this.#store
   }
 
-  replace(snapshot: CanvasBoardSnapshot): void {
+  replace(snapshot: BoardSnapshot): void {
     this.assertActive()
     this.#store.hydrate(snapshot)
   }
 
-  exportSnapshot(base?: CanvasBoardSnapshot): CanvasBoardSnapshot {
+  exportSnapshot(base?: BoardSnapshot): BoardSnapshot {
     this.assertActive()
     return this.#store.exportSnapshot(base)
   }

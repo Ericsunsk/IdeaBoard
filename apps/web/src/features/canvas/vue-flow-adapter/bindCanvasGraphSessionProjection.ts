@@ -1,5 +1,5 @@
 import type { CanvasGraphNodeId, CanvasGraphSession } from '../graph-runtime'
-import type { CanvasGroup } from '../../canvas-board/domain'
+import type { CanvasGroup } from '../../board/domain'
 import type { Node } from '@vue-flow/core'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import {

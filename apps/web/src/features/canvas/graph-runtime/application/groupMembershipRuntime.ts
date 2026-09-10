@@ -1,6 +1,6 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import type { Node, NodeChange } from '@vue-flow/core'
-import type { CanvasGroup } from '../../../canvas-board/domain'
+import type { CanvasGroup } from '../../../board/domain'
 import {
   CanvasGraphStaleTransactionError,
   isCanvasGraphNodeId,

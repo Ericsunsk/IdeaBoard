@@ -2,7 +2,7 @@ import type {
   CanvasCreatableNodeKind,
   CanvasNodeItem,
   ImageNodeItem,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 import {
   isSupportedUploadImageFile,
   unsupportedUploadImageMessage,
@@ -12,7 +12,7 @@ import { preloadImage } from '../../../shared/media/preloadImage'
 import { buildMediaBrowserURL, type MediaRef } from '../../../shared/media/mediaRef'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
-import { resolveImageNodeFrameSize } from '../../canvas-board/domain'
+import { resolveImageNodeFrameSize } from '../../board/domain'
 import { readCurrentBoardIdRef } from '../utils/currentBoardId'
 import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 import type { FlowLocalUploadState } from '../types/flowTypes'

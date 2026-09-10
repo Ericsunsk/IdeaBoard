@@ -46,8 +46,8 @@ const webRoot = fileURLToPath(new URL('..', import.meta.url))
 const repoRoot = path.resolve(webRoot, '../..')
 
 const sourceFiles = {
-  frontendDomain: path.join(webRoot, 'src/features/canvas-board/domain/nodes.ts'),
-  frontendSchema: path.join(webRoot, 'src/features/canvas-board/domain/stateSchema.ts'),
+  frontendDomain: path.join(webRoot, 'src/features/board/domain/document/nodes.ts'),
+  frontendSchema: path.join(webRoot, 'src/features/board/domain/schema/stateSchema.ts'),
   backendState: path.join(repoRoot, 'apps/api/internal/boards/state.go'),
   openApi: path.join(repoRoot, 'apps/api/openapi.yaml'),
   generatedEnvelope: path.join(
@@ -336,12 +336,12 @@ function addSchemaVersionChecks(sources: ContractSources, violations: Violation[
   )
   const sourceValues: SourceValues<number>[] = [
     {
-      label: 'frontend domain CANVAS_BOARD_STATE_SCHEMA_VERSION',
+      label: 'frontend domain BOARD_STATE_SCHEMA_VERSION',
       file: repoPath(sourceFiles.frontendDomain),
       values: [
         extractNumberConst(
           sources.frontendDomain,
-          'CANVAS_BOARD_STATE_SCHEMA_VERSION',
+          'BOARD_STATE_SCHEMA_VERSION',
           sourceFiles.frontendDomain,
         ),
       ],
@@ -411,14 +411,14 @@ function addSchemaVersionChecks(sources: ContractSources, violations: Violation[
 
   const frontendSchemaVersionLiteralCount = [
     ...sources.frontendSchema.matchAll(
-      /schemaVersion:\s*v\.literal\(CANVAS_BOARD_STATE_SCHEMA_VERSION\)/g,
+      /schemaVersion:\s*v\.literal\(BOARD_STATE_SCHEMA_VERSION\)/g,
     ),
   ].length
   if (frontendSchemaVersionLiteralCount < 2) {
     violations.push({
       check: 'frontend schemaVersion literal',
       message:
-        'Frontend snapshot and state schemas must use CANVAS_BOARD_STATE_SCHEMA_VERSION literals.',
+        'Frontend snapshot and state schemas must use BOARD_STATE_SCHEMA_VERSION literals.',
       details: [
         `${repoPath(sourceFiles.frontendSchema)} has ${frontendSchemaVersionLiteralCount} literal reference(s).`,
       ],

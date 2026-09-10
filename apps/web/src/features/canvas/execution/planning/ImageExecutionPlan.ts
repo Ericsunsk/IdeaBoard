@@ -8,7 +8,7 @@ import {
   type ImageNodeItem,
   type PromptAspectRatio,
   type PromptNodeItem,
-} from '../../../canvas-board/domain'
+} from '../../../board/domain'
 import { parseRequestedOutputCount } from '../../../../shared/domain/generationContract'
 import {
   normalizeOutputResolution,

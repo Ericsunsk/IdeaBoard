@@ -1,9 +1,9 @@
 import {
-  createEmptyCanvasBoardSnapshot,
+  createEmptyBoardSnapshot,
   InvalidBoardStateError,
-  type CanvasBoardSnapshot,
-} from '../../canvas-board/domain'
-import type { CanvasBoardSession } from './useCanvasBoardSession'
+  type BoardSnapshot,
+} from '../../board/domain'
+import type { BoardSession } from './useBoardSession'
 import { i18n } from '../../../shared/i18n'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { measureCanvasPerf, measureCanvasPerfAsync } from '../utils/canvasPerfProbe'
@@ -19,13 +19,13 @@ export type SaveCurrentBoardSnapshotOptions = {
 }
 
 export type BoardSyncCoordinatorOptions = {
-  buildCurrentSnapshot: () => CanvasBoardSnapshot
+  buildCurrentSnapshot: () => BoardSnapshot
   isDirty: ValueRef<boolean>
   saveStatus: ValueRef<SaveStatus>
   graphRevision: ValueRef<number>
   isLoadingBoardSnapshot: ValueRef<boolean>
   isSavingBoard: ValueRef<boolean>
-  boardSession: CanvasBoardSession
+  boardSession: BoardSession
   readBoardAttachmentEpoch: () => number
   canApplyReconciliation: () => boolean
   onWarning: (text: string) => void
@@ -35,33 +35,33 @@ export type BoardSyncCoordinatorOptions = {
 
 export type BoardSyncCoordinator = {
   canSaveBoard: () => boolean
-  loadInitialOrRouteBoard: () => Promise<CanvasBoardLoadResult>
+  loadInitialOrRouteBoard: () => Promise<BoardLoadResult>
   saveCurrentBoardSnapshot: (
     options?: SaveCurrentBoardSnapshotOptions,
-  ) => Promise<CanvasBoardSaveResult>
+  ) => Promise<BoardSaveResult>
 }
 
-export type CanvasBoardLoadResult =
-  | { status: 'empty'; snapshot: CanvasBoardSnapshot }
-  | { status: 'loaded'; snapshot: CanvasBoardSnapshot }
+export type BoardLoadResult =
+  | { status: 'empty'; snapshot: BoardSnapshot }
+  | { status: 'loaded'; snapshot: BoardSnapshot }
   | { status: 'not-found' }
   | { status: 'stale' }
   | { status: 'failed' }
 
-export type CanvasBoardSaveReconciliation = {
-  snapshot: CanvasBoardSnapshot
+export type BoardSaveReconciliation = {
+  snapshot: BoardSnapshot
   hasLocalDraftAdvanced: boolean
 }
 
-export type CanvasBoardSaveResult = {
+export type BoardSaveResult = {
   saved: boolean
-  reconciliation?: CanvasBoardSaveReconciliation | undefined
+  reconciliation?: BoardSaveReconciliation | undefined
 }
 
-function cloneCanvasBoardSnapshot(snapshot: CanvasBoardSnapshot): CanvasBoardSnapshot {
+function cloneBoardSnapshot(snapshot: BoardSnapshot): BoardSnapshot {
   // Canvas snapshots are JSON domain data. JSON serialization also unwraps any Vue
   // proxies that reached this boundary without retaining references to live state.
-  return JSON.parse(JSON.stringify(snapshot)) as CanvasBoardSnapshot
+  return JSON.parse(JSON.stringify(snapshot)) as BoardSnapshot
 }
 
 function isRecoverableSaveStatus(status: SaveStatus): boolean {
@@ -74,8 +74,8 @@ export function createBoardSyncCoordinator(
   let saveSequence = 0
   let loadSequence = 0
   let deferredMediaStabilization: {
-    captured: CanvasBoardSnapshot
-    stabilized: CanvasBoardSnapshot
+    captured: BoardSnapshot
+    stabilized: BoardSnapshot
   } | null = null
   let lastNotifiedSaveFailure: { boardId: string; kind: SaveFailureKind } | null = null
 
@@ -114,7 +114,7 @@ export function createBoardSyncCoordinator(
   }
 
   function importEmptyBoardSnapshot() {
-    const snapshot = createEmptyCanvasBoardSnapshot()
+    const snapshot = createEmptyBoardSnapshot()
     applyLoadedSnapshot()
     return snapshot
   }
@@ -127,7 +127,7 @@ export function createBoardSyncCoordinator(
     options.onError(i18n.global.t('canvas.session.importSnapshotFailed'))
   }
 
-  async function importBoardSnapshot(): Promise<CanvasBoardLoadResult> {
+  async function importBoardSnapshot(): Promise<BoardLoadResult> {
     const boardId = readBoardIdFromQuery()
     if (!boardId) {
       loadSequence += 1
@@ -170,10 +170,10 @@ export function createBoardSyncCoordinator(
     if (boardId) {
       return importBoardSnapshot()
     }
-    return { status: 'empty', snapshot: importEmptyBoardSnapshot() } satisfies CanvasBoardLoadResult
+    return { status: 'empty', snapshot: importEmptyBoardSnapshot() } satisfies BoardLoadResult
   }
 
-  function buildCurrentBoardSnapshot(): CanvasBoardSnapshot {
+  function buildCurrentBoardSnapshot(): BoardSnapshot {
     return measureCanvasPerf(
       'board.save.buildSnapshot',
       () => ({
@@ -203,7 +203,7 @@ export function createBoardSyncCoordinator(
     options.onWarning(i18n.global.t('canvas.session.savedLocallySyncFailed'))
   }
 
-  type BoardSaveStep = Awaited<ReturnType<CanvasBoardSession['save']>>
+  type BoardSaveStep = Awaited<ReturnType<BoardSession['save']>>
 
   function reportSaveSyncOutcome(
     boardId: string,
@@ -234,12 +234,12 @@ export function createBoardSyncCoordinator(
     saveOptions: SaveCurrentBoardSnapshotOptions
     saveToken: number
     saveGraphRevision: number
-    capturedSnapshot: CanvasBoardSnapshot
-    stabilizedSnapshot: CanvasBoardSnapshot
+    capturedSnapshot: BoardSnapshot
+    stabilizedSnapshot: BoardSnapshot
     remoteSync: BoardSaveStep['remoteSync']
     previousSaveStatus: SaveStatus
     isSaveStillCurrent: () => boolean
-  }): CanvasBoardSaveReconciliation | undefined {
+  }): BoardSaveReconciliation | undefined {
     if (!args.isSaveStillCurrent()) {
       if (
         args.saveToken === saveSequence &&
@@ -295,7 +295,7 @@ export function createBoardSyncCoordinator(
 
   async function saveCurrentBoardSnapshot(
     saveOptions: SaveCurrentBoardSnapshotOptions = {},
-  ): Promise<CanvasBoardSaveResult> {
+  ): Promise<BoardSaveResult> {
     const boardId = options.boardSession.currentBoardId.value
     if (!boardId) {
       options.onWarning(i18n.global.t('canvas.session.missingBoardIdSave'))
@@ -315,7 +315,7 @@ export function createBoardSyncCoordinator(
       : 'pending'
     try {
       const snapshot = buildCurrentBoardSnapshot()
-      const capturedSnapshot = cloneCanvasBoardSnapshot(snapshot)
+      const capturedSnapshot = cloneBoardSnapshot(snapshot)
       const { snapshot: stabilizedSnapshot, remoteSync } = await measureCanvasPerfAsync(
         'board.save.session',
         () => ({

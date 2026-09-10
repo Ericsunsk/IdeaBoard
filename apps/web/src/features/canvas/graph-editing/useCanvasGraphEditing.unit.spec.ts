@@ -2,19 +2,19 @@ import type { Edge, Node } from '@vue-flow/core'
 import { ref, shallowRef } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  createEmptyCanvasBoardSnapshot,
+  createEmptyBoardSnapshot,
   resolveImageNodeStageHeight,
   type CanvasNodeItem,
   type ImageNodeItem,
   type PromptNodeItem,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 import { CanvasGraphSession } from '../graph-runtime'
 import {
   useCanvasVueFlowGraphAdapter,
   type CanvasVueFlowGraphAdapter,
 } from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import { bindCanvasGraphSessionProjection } from '../vue-flow-adapter/bindCanvasGraphSessionProjection'
-import { canvasBoardSnapshotToFlow } from '../utils/flowSnapshotAdapter'
+import { boardSnapshotToFlow } from '../utils/flowSnapshotAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
 import { useCanvasGraphEditing } from './useCanvasGraphEditing'
 import {
@@ -66,7 +66,7 @@ function createHarness(initialNodes: Node[] = []) {
     operationLoading: vi.fn(),
   }
   const graphAdapter: CanvasVueFlowGraphAdapter = useCanvasVueFlowGraphAdapter({ nodes, edges })
-  const graphSnapshot = createEmptyCanvasBoardSnapshot()
+  const graphSnapshot = createEmptyBoardSnapshot()
   for (const node of initialNodes) {
     const snapshotNode = node.data?.snapshotNode as CanvasNodeItem | undefined
     if (!snapshotNode) continue
@@ -80,7 +80,7 @@ function createHarness(initialNodes: Node[] = []) {
     graphAdapter,
     readCurrent: () => ({ nodes: nodes.value, edges: edges.value }),
     projectFull: () => {
-      const flow = canvasBoardSnapshotToFlow(graphSession.exportSnapshot(graphSnapshot))
+      const flow = boardSnapshotToFlow(graphSession.exportSnapshot(graphSnapshot))
       return { nodes: flow.nodes, edges: flow.edges }
     },
     isCurrentAttachment: () => true,
@@ -91,7 +91,7 @@ function createHarness(initialNodes: Node[] = []) {
     width: 200,
     height: 100,
   }))
-  const libraryImportAttachment = {} as import('../board-attachment').CanvasBoardAttachment
+  const libraryImportAttachment = {} as import('../board-attachment').BoardAttachment
   const markDropAsCopy = vi.fn()
   const editing = useCanvasGraphEditing({
     nodes,

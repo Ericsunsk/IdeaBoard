@@ -27,17 +27,17 @@ Baseline 证据来自 `apps/web/.benchmark-reports/` 的本地 report，汇总�
 
 ## Non-Goals
 
-- 不迁移 `CanvasBoardSnapshot` schema。
+- 不迁移 `BoardSnapshot` schema。
 - 不改变 route 或持久化 schema；Board Session 与 workflow execution 通过 attachment/lease contract 协作。
 - 不承诺 `10000 nodes + media-heavy` 60fps；`5000/10000` 是 torture/ceiling probes。
 - 不把 progressive/degraded rendering 作为默认体验。
 
 ## Preserved Contracts
 
-- `CanvasBoardSnapshot` 继续是 persistence schema 和 import/export contract。
+- `BoardSnapshot` 继续是 persistence schema 和 import/export contract。
 - Canvas route 保持不变；支持打开 board、拖拽节点、创建/删除连线、undo/redo、autosave 和运行 workflow。已创建连线的 endpoints 不可变，调整位置必须删除后重新创建。
 - Execution Plan、Task submission 与 Pending Result materialization 继续使用 feature boundaries；runtime state 由单一 `PendingImageExecutionCore` attachment/lease seam 拥有。
-- `features/canvas-board/domain` 继续拥有 shared snapshot schema/core module。
+- `features/board/domain` 继续拥有 shared snapshot schema/core module。
 - Benchmark report artifacts 继续只写入 ignored local directory，不能进入 git。
 
 ## Module Shape
@@ -48,7 +48,7 @@ Baseline 证据来自 `apps/web/.benchmark-reports/` 的本地 report，汇总�
 
 Responsibilities:
 
-- hydrate from `CanvasBoardSnapshot`
+- hydrate from `BoardSnapshot`
 - export to snapshot-compatible graph
 - read node/edge by id in O(1)
 - expose stable ordered ids for projection
@@ -109,7 +109,7 @@ Responsibilities:
 - establish running leases from persisted pending tasks only during hydration
 - allow the reattach driver to claim each hydration lease once, but never recreate it
 - retain serializer-omitted nodes and edges only while an active execution lease owns them
-- keep animation out of `CanvasBoardSnapshot` and graph dirty/history accounting
+- keep animation out of `BoardSnapshot` and graph dirty/history accounting
 
 Flow runtime applies execution projection synchronously after semantic graph reconciliation and before replacing Vue Flow arrays. Save reconciliation is revision-gated; upload stabilization rebases only media fields whose captured values are still current, preserves newer groups/media refs, and never treats saved `outputStatus` as live execution state.
 
@@ -146,7 +146,7 @@ Non-canonical node ids, non-canonical edge ids, or corrupt edge snapshots are no
 
 Required coverage:
 
-- `CanvasGraphStore` hydrate/export roundtrip against `CanvasBoardSnapshot`
+- `CanvasGraphStore` hydrate/export roundtrip against `BoardSnapshot`
 - node add/update/remove、edge add/remove、connect/disconnect 和 batch delete transaction tests
 - transaction cancel/commit and dirty summary tests
 - node-drag commit and cancel tests

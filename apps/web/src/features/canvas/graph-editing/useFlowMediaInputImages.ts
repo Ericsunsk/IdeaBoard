@@ -8,8 +8,8 @@ import type {
   FusionNodeItem,
   PromptNodeInputImage,
   PromptNodeItem,
-} from '../../canvas-board/domain'
-import { getCanvasNodeImageInputLimit } from '../../canvas-board/domain'
+} from '../../board/domain'
+import { getCanvasNodeImageInputLimit } from '../../board/domain'
 import { type ImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
 import type { CanvasVueFlowGraphAdapter } from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions } from '../vue-flow-adapter/flowGraphAdapterCommandSideEffects'
@@ -19,7 +19,7 @@ import {
   type CanvasGraphReadPort,
   type CanvasGraphStore,
 } from '../graph-runtime'
-import { canvasBoardSnapshotToFlow } from '../utils/flowSnapshotAdapter'
+import { boardSnapshotToFlow } from '../utils/flowSnapshotAdapter'
 import type { MediaRef } from '../../../shared/media/mediaRef'
 
 export type MediaInputImage = {
@@ -348,7 +348,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
       options.onWarning(i18n.global.t('canvas.session.removeInputImageFailed'))
       return
     }
-    const projection = canvasBoardSnapshotToFlow(writeGraphStore().exportSnapshot())
+    const projection = boardSnapshotToFlow(writeGraphStore().exportSnapshot())
     options.graphAdapter.replaceGraph(
       { nodes: projection.nodes as Node[], edges: projection.edges as Edge[] },
       createFlowGraphCommandOptions(),

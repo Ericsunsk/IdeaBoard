@@ -1,5 +1,5 @@
-import type { ImageNodeItem } from '../../../canvas-board/domain'
-import type { useCanvasBoardRuntime } from './useCanvasBoardRuntime'
+import type { ImageNodeItem } from '../../../board/domain'
+import type { useBoardRuntime } from './useBoardRuntime'
 import type { CanvasFeedback } from '../../feedback/useCanvasFeedback'
 import type { CanvasVueFlowAdapter } from '../../vue-flow-adapter'
 import {
@@ -12,7 +12,7 @@ import {
 import type { PendingImageExecutionCore } from '../../execution/pending-execution'
 import type { LibraryAssetMaterializer } from '../../../library'
 
-type CanvasWorkspaceBoardRuntime = ReturnType<typeof useCanvasBoardRuntime>
+type CanvasWorkspaceBoardRuntime = ReturnType<typeof useBoardRuntime>
 
 type CreateCanvasWorkspaceGraphRuntimeOptions = {
   board: CanvasWorkspaceBoardRuntime

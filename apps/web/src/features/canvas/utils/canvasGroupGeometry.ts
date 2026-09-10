@@ -1,5 +1,5 @@
 import type { Node } from '@vue-flow/core'
-import type { CanvasGroup } from '../../canvas-board/domain'
+import type { CanvasGroup } from '../../board/domain'
 import {
   isCanvasGraphNodeId,
   type CanvasGraphGroupId,

@@ -1,6 +1,6 @@
 import { isTaskResultPendingError, TaskCancelledError } from '../../../../shared/api/taskEvents'
 import { i18n } from '../../../../shared/i18n'
-import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
+import type { BoardSnapshot } from '../../../board/domain'
 import {
   PendingImageMaterializationError,
   collectPendingImageTasks,
@@ -21,7 +21,7 @@ export type CanvasExecutionRecoveryResult = Readonly<{
 
 export type CanvasExecutionRecoveryCoordinatorOptions = Readonly<{
   executionCore: PendingImageExecutionCore
-  readBoardSnapshot: () => CanvasBoardSnapshot
+  readBoardSnapshot: () => BoardSnapshot
   resolveResult: (pending: PendingImageTaskSnapshot) => Promise<PendingImageResolvedResult>
   flushAutosave: () => Promise<void>
   cancelTasks: (taskIds: readonly string[]) => void
@@ -30,7 +30,7 @@ export type CanvasExecutionRecoveryCoordinatorOptions = Readonly<{
 }>
 
 export type CanvasExecutionRecoveryCoordinator = Readonly<{
-  hydratePendingLeases: (snapshot?: CanvasBoardSnapshot) => number
+  hydratePendingLeases: (snapshot?: BoardSnapshot) => number
   recover: () => Promise<CanvasExecutionRecoveryResult | null>
 }>
 
@@ -67,7 +67,7 @@ export function createCanvasExecutionRecoveryCoordinator(
     options.onWarning(i18n.global.t('canvas.execution.recoveryFailed'))
   }
 
-  function hydratePendingLeases(snapshot?: CanvasBoardSnapshot): number {
+  function hydratePendingLeases(snapshot?: BoardSnapshot): number {
     const attachment = options.executionCore.currentAttachment()
     if (!attachment) return 0
     const pending = collectPendingImageTasks(snapshot ?? options.readBoardSnapshot())

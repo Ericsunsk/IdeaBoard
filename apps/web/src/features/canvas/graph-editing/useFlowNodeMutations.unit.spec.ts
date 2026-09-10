@@ -2,12 +2,12 @@ import type { Edge, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
 import { shallowRef } from 'vue'
 import {
-  createEmptyCanvasBoardSnapshot,
+  createEmptyBoardSnapshot,
   type CanvasNodeItem,
   type FusionNodeItem,
   type ImageNodeItem,
   type PromptNodeItem,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 import { CanvasGraphSession } from '../graph-runtime'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
 import { bindCanvasGraphSessionProjection } from '../vue-flow-adapter/bindCanvasGraphSessionProjection'
@@ -95,7 +95,7 @@ function makeEdge(
 }
 
 function createGraphSession(initialNodes: Node[], initialEdges: Edge[]) {
-  const snapshot = createEmptyCanvasBoardSnapshot()
+  const snapshot = createEmptyBoardSnapshot()
   for (const node of initialNodes) {
     const snapshotNode = node.data?.snapshotNode as CanvasNodeItem | undefined
     if (!snapshotNode) continue

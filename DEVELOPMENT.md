@@ -368,13 +368,14 @@ scripts/                     # packaging, deployment and release scripts
 apps/web/src/
 ├── app/                      # app startup, router, theme wiring
 ├── features/                 # business modules
-│   ├── account-management/   # user account settings
+│   ├── account/              # user account and billing settings
 │   ├── admin/                # Admin vertical contexts
 │   ├── auth/                 # login/register views
-│   ├── board-catalog/        # board list and previews
+│   ├── board/                # Board bounded context: domain, sync, persistence, catalog
 │   ├── canvas/               # Canvas Workspace
-│   ├── canvas-board/         # board domain and persistence
 │   ├── legal/                # legal pages
+│   ├── library/              # asset library
+│   ├── search/               # search features
 │   ├── user/                 # user routes and layout
 │   └── user-shell/           # user navigation and shell controls
 └── shared/                   # cross-feature API/auth/types/utils/assets

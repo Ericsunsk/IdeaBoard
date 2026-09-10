@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
-  canvasBoardSnapshotToFlow,
-  flowToCanvasBoardSnapshot,
+  boardSnapshotToFlow,
+  flowToBoardSnapshot,
   type FlowAdapterEdge,
   type FlowAdapterNode,
 } from './flowSnapshotAdapter'
 import {
-  CANVAS_BOARD_STATE_SCHEMA_VERSION,
-  createEmptyCanvasBoardSnapshot,
+  BOARD_STATE_SCHEMA_VERSION,
+  createEmptyBoardSnapshot,
   type CanvasGroup,
   type ImageNodeItem,
   type PromptNodeInputImage,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 import type { FlowNodeData } from '../types/flowTypes'
 
 const GROUP_GEOMETRY = {
@@ -138,13 +138,13 @@ describe('flowSnapshotAdapter', () => {
       }),
     ]
 
-    const snapshot = flowToCanvasBoardSnapshot({ nodes, edges: [] })
+    const snapshot = flowToBoardSnapshot({ nodes, edges: [] })
     expect(snapshot.imageNodes.length).toBe(1)
     expect(snapshot.imageNodes[0]?.id).toBe(2)
     expect(snapshot.imageNodes[0]?.pendingTaskId).toBe('task_pending_2')
 
-    const flow = canvasBoardSnapshotToFlow(snapshot)
-    const savedAgain = flowToCanvasBoardSnapshot(flow)
+    const flow = boardSnapshotToFlow(snapshot)
+    const savedAgain = flowToBoardSnapshot(flow)
     expect(savedAgain.imageNodes[0]?.pendingTaskId).toBe('task_pending_2')
     expect(savedAgain.imageNodes[0]?.outputStatus).toBe('running')
   })
@@ -169,7 +169,7 @@ describe('flowSnapshotAdapter', () => {
       },
     ]
 
-    const snapshot = flowToCanvasBoardSnapshot({ nodes, edges })
+    const snapshot = flowToBoardSnapshot({ nodes, edges })
 
     expect(snapshot.imageNodes.map((node) => node.id)).toEqual([2])
     expect(snapshot.promptNodes.map((node) => node.id)).toEqual([1])
@@ -208,7 +208,7 @@ describe('flowSnapshotAdapter', () => {
       },
     ]
 
-    const snapshot = flowToCanvasBoardSnapshot({ nodes, edges })
+    const snapshot = flowToBoardSnapshot({ nodes, edges })
     expect(snapshot.imageNodes.length).toBe(1)
     expect(snapshot.imageNodes[0]?.id).toBe(1)
     expect(snapshot.connections.length).toBe(0)
@@ -223,8 +223,8 @@ describe('flowSnapshotAdapter', () => {
     })
     ;(localNode.data as FlowNodeData).localUpload = { previewUrl: 'blob:local-image' }
 
-    const persisted = flowToCanvasBoardSnapshot({ nodes: [localNode], edges: [] })
-    const runtime = flowToCanvasBoardSnapshot({ nodes: [localNode], edges: [] }, undefined, {
+    const persisted = flowToBoardSnapshot({ nodes: [localNode], edges: [] })
+    const runtime = flowToBoardSnapshot({ nodes: [localNode], edges: [] }, undefined, {
       projection: 'runtime',
     })
 
@@ -257,7 +257,7 @@ describe('flowSnapshotAdapter', () => {
       },
     ]
 
-    const snapshot = flowToCanvasBoardSnapshot({ nodes, edges }, undefined, {
+    const snapshot = flowToBoardSnapshot({ nodes, edges }, undefined, {
       projection: 'runtime',
     })
     expect(snapshot.imageNodes.map((node) => node.id)).toEqual([1, 2])
@@ -282,7 +282,7 @@ describe('flowSnapshotAdapter', () => {
       libraryAssetId: 7,
     }
 
-    const snapshot = flowToCanvasBoardSnapshot({ nodes: [pending], edges: [] })
+    const snapshot = flowToBoardSnapshot({ nodes: [pending], edges: [] })
 
     expect(snapshot.imageNodes).toEqual([
       expect.objectContaining({
@@ -293,7 +293,7 @@ describe('flowSnapshotAdapter', () => {
     ])
     expect(snapshot.imageNodes[0]?.sourceMediaAssetId).toBeUndefined()
     expect(snapshot.mediaRefs).toBeUndefined()
-    expect(canvasBoardSnapshotToFlow(snapshot).nodes[0]?.data).toMatchObject({
+    expect(boardSnapshotToFlow(snapshot).nodes[0]?.data).toMatchObject({
       snapshotNode: { libraryImport: { state: 'pending', libraryAssetId: 7 } },
     })
   })
@@ -323,7 +323,7 @@ describe('flowSnapshotAdapter', () => {
       },
     ]
 
-    const snapshot = flowToCanvasBoardSnapshot({ nodes, edges })
+    const snapshot = flowToBoardSnapshot({ nodes, edges })
     expect(snapshot.imageNodes.length).toBe(2)
     expect(snapshot.connections.length).toBe(1)
     expect(snapshot.connections[0]?.fromNodeType).toBe('image')
@@ -358,7 +358,7 @@ describe('flowSnapshotAdapter', () => {
       },
     ]
 
-    const snapshot = flowToCanvasBoardSnapshot({ nodes, edges })
+    const snapshot = flowToBoardSnapshot({ nodes, edges })
     expect(snapshot.connections.length).toBe(2)
     expect(
       snapshot.connections.some(
@@ -387,7 +387,7 @@ describe('flowSnapshotAdapter', () => {
         sourceImageUrl: 'https://example.com/result.png',
       }),
     ]
-    const snapshot = flowToCanvasBoardSnapshot({
+    const snapshot = flowToBoardSnapshot({
       nodes,
       edges: [
         {
@@ -399,8 +399,8 @@ describe('flowSnapshotAdapter', () => {
         },
       ],
     })
-    const flow = canvasBoardSnapshotToFlow(snapshot)
-    const savedAgain = flowToCanvasBoardSnapshot(flow)
+    const flow = boardSnapshotToFlow(snapshot)
+    const savedAgain = flowToBoardSnapshot(flow)
 
     expect(savedAgain.connections.length).toBe(1)
     expect(savedAgain.connections[0]?.fromNodeId).toBe(1)
@@ -423,7 +423,7 @@ describe('flowSnapshotAdapter', () => {
       }),
       makePromptFlowNode({ flowId: 'prompt-3', id: 3, text: 'studio light' }),
     ]
-    const snapshot = flowToCanvasBoardSnapshot({
+    const snapshot = flowToBoardSnapshot({
       nodes,
       edges: [
         {
@@ -465,7 +465,7 @@ describe('flowSnapshotAdapter', () => {
       }),
       makeFusionFlowNode({ flowId: 'fusion-3', id: 3, prompt: 'blend two references' }),
     ]
-    const snapshot = flowToCanvasBoardSnapshot({
+    const snapshot = flowToBoardSnapshot({
       nodes,
       edges: [
         {
@@ -507,7 +507,7 @@ describe('flowSnapshotAdapter', () => {
       }),
       makePromptFlowNode({ flowId: 'prompt-3', id: 3, text: 'studio light' }),
     ]
-    const base = createEmptyCanvasBoardSnapshot()
+    const base = createEmptyBoardSnapshot()
     base.connections.push({
       id: 42,
       fromNodeType: 'image',
@@ -518,7 +518,7 @@ describe('flowSnapshotAdapter', () => {
       toPort: 'image',
     })
 
-    const snapshot = flowToCanvasBoardSnapshot(
+    const snapshot = flowToBoardSnapshot(
       {
         nodes,
         edges: [
@@ -556,7 +556,7 @@ describe('flowSnapshotAdapter', () => {
       }),
       makePromptFlowNode({ flowId: 'prompt-3', id: 3, text: 'studio light' }),
     ]
-    const base = createEmptyCanvasBoardSnapshot()
+    const base = createEmptyBoardSnapshot()
     base.connections.push({
       id: 42,
       fromNodeType: 'image',
@@ -567,7 +567,7 @@ describe('flowSnapshotAdapter', () => {
       toPort: 'image',
     })
 
-    const snapshot = flowToCanvasBoardSnapshot(
+    const snapshot = flowToBoardSnapshot(
       {
         nodes,
         edges: [
@@ -614,7 +614,7 @@ describe('flowSnapshotAdapter', () => {
       }),
     ]
 
-    const snapshot = flowToCanvasBoardSnapshot({
+    const snapshot = flowToBoardSnapshot({
       nodes,
       edges: [
         {
@@ -646,8 +646,8 @@ describe('flowSnapshotAdapter', () => {
   })
 
   it('preserves fusion blend points across round trips', () => {
-    const flow = canvasBoardSnapshotToFlow({
-      schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
+    const flow = boardSnapshotToFlow({
+      schemaVersion: BOARD_STATE_SCHEMA_VERSION,
       imageNodes: [],
       promptNodes: [],
       fusionNodes: [
@@ -669,19 +669,19 @@ describe('flowSnapshotAdapter', () => {
       connections: [],
       groups: [],
     })
-    const restored = flowToCanvasBoardSnapshot(flow)
+    const restored = flowToBoardSnapshot(flow)
     expect(restored.fusionNodes[0]?.blendPoint.x).toBe(0.62)
     expect(restored.fusionNodes[0]?.blendPoint.y).toBe(0.41)
   })
 
   it('preserves current groups while exporting flow state', () => {
-    const base = createEmptyCanvasBoardSnapshot()
+    const base = createEmptyBoardSnapshot()
     base.groups = [
       makeGroup('group-1', ['image-1', 'prompt-1']),
       makeGroup('group-2', ['image-1', 'prompt-2']),
     ]
 
-    const snapshot = flowToCanvasBoardSnapshot(
+    const snapshot = flowToBoardSnapshot(
       {
         nodes: [
           makeImageFlowNode({
@@ -705,10 +705,10 @@ describe('flowSnapshotAdapter', () => {
   })
 
   it('drops stale board node media refs while exporting flow state', () => {
-    const base = createEmptyCanvasBoardSnapshot()
+    const base = createEmptyBoardSnapshot()
     base.mediaRefs = [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'source' }]
 
-    const snapshot = flowToCanvasBoardSnapshot(
+    const snapshot = flowToBoardSnapshot(
       {
         nodes: [makePromptFlowNode({ flowId: 'prompt-1', id: 1, text: 'prompt' })],
         edges: [],
@@ -720,14 +720,14 @@ describe('flowSnapshotAdapter', () => {
   })
 
   it('rebuilds current image node media refs while exporting flow state', () => {
-    const base = createEmptyCanvasBoardSnapshot()
+    const base = createEmptyBoardSnapshot()
     base.mediaRefs = [
       { mediaAssetId: 99, refType: 'board', refId: 'cover', role: 'preview' },
       { mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'result' },
       { mediaAssetId: 13, refType: 'board_node', refId: 'image-2', role: 'source' },
     ]
 
-    const snapshot = flowToCanvasBoardSnapshot(
+    const snapshot = flowToBoardSnapshot(
       {
         nodes: [
           makeImageFlowNode({
@@ -751,7 +751,7 @@ describe('flowSnapshotAdapter', () => {
   })
 
   it('rebuilds current input and output media refs and drops refs for removed images', () => {
-    const current = flowToCanvasBoardSnapshot({
+    const current = flowToBoardSnapshot({
       nodes: [
         makeImageFlowNode({
           flowId: 'image-1',
@@ -791,7 +791,7 @@ describe('flowSnapshotAdapter', () => {
       { mediaAssetId: 31, refType: 'board_node', refId: 'fusion-2', role: 'output:0' },
     ])
 
-    const afterDelete = flowToCanvasBoardSnapshot(
+    const afterDelete = flowToBoardSnapshot(
       {
         nodes: [
           makeImageFlowNode({
@@ -816,8 +816,8 @@ describe('flowSnapshotAdapter', () => {
   })
 
   it('adds stable node dimensions for minimap geometry before nodes are rendered', () => {
-    const flow = canvasBoardSnapshotToFlow({
-      schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
+    const flow = boardSnapshotToFlow({
+      schemaVersion: BOARD_STATE_SCHEMA_VERSION,
       imageNodes: [
         {
           id: 1,
@@ -873,7 +873,7 @@ describe('flowSnapshotAdapter', () => {
       nodes[0]?.data as { snapshotNode: { outputImages: Array<{ url: string }> } }
     ).snapshotNode
 
-    const snapshot = flowToCanvasBoardSnapshot({ nodes, edges: [] })
+    const snapshot = flowToBoardSnapshot({ nodes, edges: [] })
     snapshot.imageNodes[0]!.outputImages[0]!.url = 'https://example.com/stabilized.png'
 
     expect(sourceSnapshotNode.outputImages[0]?.url).toBe('https://example.com/output.png')

@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
-import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
+import type { BoardSnapshot } from '../../../board/domain'
 import type { TaskImageResult } from '../../../../shared/query/taskResult'
 import { i18n } from '../../../../shared/i18n'
 import type { CanvasGraphStore } from '../../graph-runtime'
@@ -37,7 +37,7 @@ export type CanvasExecutionWorkspaceState = {
 
 export type CanvasExecutionWorkspaceCommands = {
   runGeneration: (plan: ActivatedImageExecutionPlan & { kind: 'generation' }) => Promise<void>
-  hydratePendingImageLeases: (snapshot?: CanvasBoardSnapshot) => number
+  hydratePendingImageLeases: (snapshot?: BoardSnapshot) => number
   reattachPendingImageResults: () => Promise<void>
 }
 
@@ -51,7 +51,7 @@ export type UseCanvasExecutionWorkspaceOptions = {
   edges: Ref<Edge[]>
   readCanvasGraphStore: () => CanvasGraphStore
   rendererMetrics: CanvasRendererMetricsPort
-  boardBaseSnapshot: Ref<CanvasBoardSnapshot>
+  boardBaseSnapshot: Ref<BoardSnapshot>
   refreshNodeInternals?: (nodeIds: string[]) => void
   flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
   pendingResults?: PendingImageResultExecution

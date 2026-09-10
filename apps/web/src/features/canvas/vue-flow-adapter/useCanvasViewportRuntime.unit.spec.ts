@@ -269,7 +269,7 @@ describe('useCanvasViewportRuntime', () => {
     }
     const harness = createViewportRuntimeHarness({ viewportPersistence })
 
-    await harness.runtime.loadCanvasBoardAndProbe()
+    await harness.runtime.loadBoardAndProbe()
     harness.runtime.onZoomIn()
     await flushPromises()
     harness.runtime.onPanViewport({ x: 8, y: 4 })
@@ -523,7 +523,7 @@ describe('useCanvasViewportRuntime', () => {
   it('loads without waiting for an extra frame when frame probes are disabled', async () => {
     const harness = createViewportRuntimeHarness()
 
-    await harness.runtime.loadCanvasBoardAndProbe()
+    await harness.runtime.loadBoardAndProbe()
 
     expect(harness.loadInitialOrRouteBoard).toHaveBeenCalledOnce()
     expect(harness.setViewport).toHaveBeenCalledWith({ x: 0, y: 0, zoom: 1 }, { duration: 0 })
@@ -539,7 +539,7 @@ describe('useCanvasViewportRuntime', () => {
     )
     const harness = createViewportRuntimeHarness()
 
-    await harness.runtime.loadCanvasBoardAndProbe()
+    await harness.runtime.loadBoardAndProbe()
 
     expect(harness.setViewport).toHaveBeenCalledWith({ x: 12, y: -24, zoom: 1.75 }, { duration: 0 })
     expect(harness.viewport.value).toEqual({ x: 12, y: -24, zoom: 1.75 })
@@ -553,7 +553,7 @@ describe('useCanvasViewportRuntime', () => {
     )
     const harness = createViewportRuntimeHarness()
 
-    await harness.runtime.loadCanvasBoardAndProbe()
+    await harness.runtime.loadBoardAndProbe()
 
     expect(harness.setViewport).toHaveBeenCalledWith({ x: 0, y: 0, zoom: 1 }, { duration: 0 })
     expect(harness.viewport.value).toEqual({ x: 0, y: 0, zoom: 1 })

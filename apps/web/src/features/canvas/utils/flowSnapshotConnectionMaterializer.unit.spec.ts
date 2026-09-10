@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  createEmptyCanvasBoardSnapshot,
+  createEmptyBoardSnapshot,
   type CanvasConnectionNodeType,
   type CanvasNodeItem,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 import type { FlowNodeData } from '../types/flowTypes'
 import {
   materializeFlowSnapshotConnections,
@@ -91,7 +91,7 @@ function createHarness() {
 describe('flowSnapshotConnectionMaterializer', () => {
   it('reuses the base connection id for a generated edge with matching endpoints', () => {
     const harness = createHarness()
-    const base = createEmptyCanvasBoardSnapshot()
+    const base = createEmptyBoardSnapshot()
     base.connections.push({
       id: 42,
       fromNodeType: 'image',
@@ -127,7 +127,7 @@ describe('flowSnapshotConnectionMaterializer', () => {
 
   it('prefers a canonical Flow Edge id over a matching base endpoint', () => {
     const harness = createHarness()
-    const base = createEmptyCanvasBoardSnapshot()
+    const base = createEmptyBoardSnapshot()
     base.connections.push({
       id: 42,
       fromNodeType: 'image',
@@ -157,7 +157,7 @@ describe('flowSnapshotConnectionMaterializer', () => {
 
   it('restores one duplicate connection id and generates the collision after base ids', () => {
     const harness = createHarness()
-    const base = createEmptyCanvasBoardSnapshot()
+    const base = createEmptyBoardSnapshot()
     base.connections.push({
       id: 42,
       fromNodeType: 'image',
@@ -196,7 +196,7 @@ describe('flowSnapshotConnectionMaterializer', () => {
 
   it('keeps repeated restored-id materialization stable against endpoint base ids', () => {
     const harness = createHarness()
-    const base = createEmptyCanvasBoardSnapshot()
+    const base = createEmptyBoardSnapshot()
     base.connections.push(
       {
         id: 7,
@@ -246,7 +246,7 @@ describe('flowSnapshotConnectionMaterializer', () => {
 
   it('reserves a later explicit id before an earlier generated edge claims its base endpoint', () => {
     const harness = createHarness()
-    const base = createEmptyCanvasBoardSnapshot()
+    const base = createEmptyBoardSnapshot()
     base.connections.push({
       id: 7,
       fromNodeType: 'image',

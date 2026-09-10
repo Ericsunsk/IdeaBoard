@@ -1,5 +1,5 @@
-import { normalizePromptAspectRatio } from '../../canvas-board/domain'
-import type { PromptAspectRatio } from '../../canvas-board/domain'
+import { normalizePromptAspectRatio } from '../../board/domain'
+import type { PromptAspectRatio } from '../../board/domain'
 import type { MediaInputImage } from '../graph-editing/useFlowMediaInputImages'
 import type { MediaRef } from '../../../shared/media/mediaRef'
 

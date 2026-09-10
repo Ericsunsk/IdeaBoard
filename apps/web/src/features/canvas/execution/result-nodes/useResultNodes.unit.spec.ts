@@ -1,10 +1,10 @@
 import { shallowRef } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
-import { createEmptyCanvasBoardSnapshot } from '../../../canvas-board/domain'
+import { createEmptyBoardSnapshot } from '../../../board/domain'
 import { CanvasGraphStore, CanvasGraphSession } from '../../graph-runtime'
 import { bindCanvasGraphSessionProjection } from '../../vue-flow-adapter/bindCanvasGraphSessionProjection'
-import { canvasBoardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
+import { boardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
 import { usePendingImageResultExecution } from './useResultNodes'
 
 function imageNode(id: number, x: number, sourceImageUrl = 'source'): Node {
@@ -31,7 +31,7 @@ function imageNode(id: number, x: number, sourceImageUrl = 'source'): Node {
 function createHarness(activeNodeIds: readonly string[] = []) {
   const nodes = shallowRef<Node[]>([imageNode(1, 10)])
   const edges = shallowRef<Edge[]>([])
-  const snapshot = createEmptyCanvasBoardSnapshot()
+  const snapshot = createEmptyBoardSnapshot()
   snapshot.imageNodes.push(nodes.value[0]!.data.snapshotNode)
   const session = CanvasGraphSession.hydrate('board-a', snapshot)
   const store = session.store
@@ -51,7 +51,7 @@ function createHarness(activeNodeIds: readonly string[] = []) {
       },
     },
     readCurrent: () => ({ nodes: nodes.value, edges: edges.value }),
-    projectFull: () => canvasBoardSnapshotToFlow(session.exportSnapshot(snapshot)),
+    projectFull: () => boardSnapshotToFlow(session.exportSnapshot(snapshot)),
     isCurrentAttachment: () => isAttachmentCurrent,
   })
   const actions = usePendingImageResultExecution({
@@ -80,7 +80,7 @@ function createHarness(activeNodeIds: readonly string[] = []) {
 }
 
 function createSnapshotFromFlow(nodes: readonly Node[], edges: readonly Edge[]) {
-  const snapshot = createEmptyCanvasBoardSnapshot()
+  const snapshot = createEmptyBoardSnapshot()
   nodes.forEach((node) => {
     const snapshotNode = node.data?.snapshotNode
     if (!snapshotNode) return

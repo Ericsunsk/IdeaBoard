@@ -48,7 +48,7 @@ const fixtureCases: BoundaryFixtureCase[] = [
       webRoot,
       'src/features/admin/.boundary-cross-feature-deep.fixture.ts',
     ),
-    content: `import { useCanvasBoardRuntime } from '../canvas/workspace-runtime/internal/useCanvasBoardRuntime'; console.log(useCanvasBoardRuntime);`,
+    content: `import { useBoardRuntime } from '../canvas/workspace-runtime/internal/useBoardRuntime'; console.log(useBoardRuntime);`,
   },
 ]
 

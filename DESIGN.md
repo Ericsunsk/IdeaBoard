@@ -206,8 +206,7 @@ Dependency direction:
 | Context / Feature   | Directory                     | Business Ownership                                                                                                | Key Models & State Machines                                               |
 | ------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | Canvas Workspace    | `features/canvas`             | AI 画布交互面、节点运行时、工具链（Retouch/Inpaint/Brush/Select）、命令编排与任务生命周期                         | Canvas Node/Edge runtime, Tool State Machine, Execution Plan, Task Runner |
-| Canvas Board Schema | `features/canvas-board`       | 画布持久化文档模型、快照 Schema、媒体引用提取与反序列化验证（纯领域模型 + 持久化适配）                            | `CanvasBoardStateSchema`, `boardStateEnvelopeContract`, serialization     |
-| Board Catalog       | `features/board-catalog`      | 看板画廊与列表、筛选排序、新建/重命名/删除看板、封面缩略图                                                        | Board metadata, pagination, board mutation use cases                      |
+| Board               | `features/board`              | 看板全生命周期事实源：持久化文档模型、快照 Schema、媒体引用提取、看板 CRUD 与画廊列表、协作加入、revision/乐观锁同步、持久化与预览适配器 | `BoardState`, Valibot `stateSchema`, `boardRepository`, `boardSync`, `previewSerializer` |
 | Account             | `features/account`            | 用户额度（Idea/Credits）查看与刷新、Stripe 充值收银台、兑换码兑换、账单记录与用量统计明细                         | Wallet balance, Recharge session state machine, Redemption, Usage trend   |
 | Admin Verticals     | `features/admin`              | 管理端独立垂直子域（用户运营、模型/通道配置、提示词模板管理、存储配置、任务调度监控、统计分析、额度计费 Catalog） | Vertical context view models, Admin resources, Policy inspection          |
 | Auth & Identity     | `features/auth`               | 认证与会话状态（Better Auth 集成、登录/注册弹窗与路由拦截、凭据校验、Auth Bridge）                                | Session state, Auth token lifecycle, Login/Register workflows             |
@@ -282,19 +281,19 @@ Vue UI -> application use case -> resource/adapter -> generated API
 为保持工程架构一致性、可预测性与长期整洁度，全库执行统一的目录组织、文件命名与边界导出治理标准：
 
 1. **分级架构范式 (Tiered DDD Architecture)**：
-   - **重度核心子域**（如 `canvas`, `search`, `account`, `admin`）：必须严格落地标准 4 层或职责清晰分层（`domain/`, `application/`, `infrastructure/`, `presentation/` 或 `ui/`）。
-   - **轻量特性模块**（如 `legal`, `user`, `board-catalog`）：保持轻量扁平结构（`components/`, `useXxx.ts`, `types.ts` 等），严禁为了套用模板引入空目录或无意义的空抽象。
+   - **重度核心子域**（如 `board`, `canvas`, `search`, `account`, `admin`）：必须严格落地标准 4 层或职责清晰分层（`domain/`, `application/`, `infrastructure/`, `presentation/` 或 `ui/`）。
+   - **轻量特性模块**（如 `legal`, `user`）：保持轻量扁平结构（`components/`, `useXxx.ts`, `types.ts` 等），严禁为了套用模板引入空目录或无意义的空抽象。
 
 2. **文件与目录命名规范 (Naming Conventions)**：
-   - **目录命名**：全小写短横线 `kebab-case`（如 `board-catalog/`, `image-tools/`, `workspace-runtime/`）。
+   - **目录命名**：全小写短横线 `kebab-case`（如 `board/`, `image-tools/`, `workspace-runtime/`）。
    - **Vue SFC 组件**：大驼峰 `PascalCase.vue`（如 `BoardCard.vue`, `CanvasScreen.vue`）。
-   - **非组件 TS 模块**：小驼峰 `camelCase.ts`（包括 composable、store、contract、utils、adapter、types，例如 `useBoardCatalog.ts`, `contract.ts`, `feed.ts`；禁止非组件模块使用 `PascalCase.ts`）。
+   - **非组件 TS 模块**：小驼峰 `camelCase.ts`（包括 composable、store、contract、utils、adapter、types，例如 `useCatalog.ts`, `contract.ts`, `feed.ts`；禁止非组件模块使用 `PascalCase.ts`）。
    - **测试文件**：保持与被测模块同名并追加测试类型后缀（如 `curves.ts` 对应 `curves.unit.spec.ts`；组件对应 `CanvasScreen.component.spec.ts`；契约对应 `*.contract.spec.ts`）。
 
 3. **消除前缀冗余守则 (Anti-Stuttering Rule)**：
    - **严禁在子文件/子目录内重复父级目录名前缀**。
-   - 错误范式（Stuttering）：`features/library/libraryResource.ts`、`features/canvas/retouch/utils/retouchCurves.ts`、`boardCatalog/boardCatalog.ts`。
-   - 正确范式（Clean）：`features/library/resource.ts`、`features/canvas/retouch/utils/curves.ts`、`board-catalog/contract.ts`。
+   - 错误范式（Stuttering）：`features/library/libraryResource.ts`、`features/canvas/retouch/utils/retouchCurves.ts`、`features/board/catalog/boardCatalog.ts`。
+   - 正确范式（Clean）：`features/library/resource.ts`、`features/canvas/retouch/utils/curves.ts`、`features/board/presentation/catalog/contract.ts`。
    - **防命名冲突机制**：跨模块向外暴露能力时，必须通过特性的根 `index.ts` 进行语义清晰的 Named Export（例如 `export { createLibraryResource } from './resource'`），在消费方上下文保证语义清晰，无需在内部文件名冗余堆叠前缀。
 
 4. **公共 API 出口与边界隔离 (Public API Seams & Boundary Enforcement)**：

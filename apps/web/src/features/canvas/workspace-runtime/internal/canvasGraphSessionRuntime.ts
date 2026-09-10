@@ -1,25 +1,25 @@
 import type { Edge, Node } from '@vue-flow/core'
 import { onScopeDispose, type Ref } from 'vue'
-import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
-import type { CanvasBoardSession } from '../../board-session'
+import type { BoardSnapshot } from '../../../board/domain'
+import type { BoardSession } from '../../board-session'
 import type { CanvasGraphHistory } from '../../graph-runtime/application/useCanvasGraphHistory'
 import type { CanvasVueFlowGraphAdapter } from '../../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import { bindCanvasGraphSessionProjection } from '../../vue-flow-adapter/bindCanvasGraphSessionProjection'
-import { canvasBoardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
+import { boardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
 import { CanvasGraphSession, type CanvasGraphStore } from '../../graph-runtime'
 import {
-  CanvasBoardGraphSession,
+  BoardGraphSession,
   type PendingImageExecutionCore,
 } from '../../execution/pending-execution'
 
 type CanvasGraphSessionRuntimeOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  boardBaseSnapshot: Ref<CanvasBoardSnapshot>
-  boardSession: CanvasBoardSession
+  boardBaseSnapshot: Ref<BoardSnapshot>
+  boardSession: BoardSession
   graphAdapter: CanvasVueFlowGraphAdapter
   executionCore: PendingImageExecutionCore
-  hydratePendingImageLeases?: ((snapshot: CanvasBoardSnapshot) => void) | undefined
+  hydratePendingImageLeases?: ((snapshot: BoardSnapshot) => void) | undefined
   history: CanvasGraphHistory
   markDirty: () => void
   isNodeExecutionActive: (nodeId: string) => boolean
@@ -29,7 +29,7 @@ type CanvasGraphSessionRuntimeOptions = {
   }
   projectCurrentGroupNodeLayers: (nodes: Node[]) => Node[]
   projectCommittedGroupNodeLayer: (node: Node) => Node
-  onGroupsChanged: (groups: CanvasBoardSnapshot['groups']) => void
+  onGroupsChanged: (groups: BoardSnapshot['groups']) => void
   scheduleMicrotask?: ((callback: () => void) => void) | undefined
 }
 
@@ -37,10 +37,10 @@ export type CanvasGraphSessionRuntime = {
   isAttached: () => boolean
   readCanvasGraphStore: () => CanvasGraphStore
   replaceGraphSnapshot: (
-    snapshot: CanvasBoardSnapshot,
+    snapshot: BoardSnapshot,
     reason: 'hydrate' | 'save-reconcile',
   ) => void
-  exportGraphSnapshot: (baseSnapshot: CanvasBoardSnapshot) => CanvasBoardSnapshot
+  exportGraphSnapshot: (baseSnapshot: BoardSnapshot) => BoardSnapshot
   commitGraph: (
     graph: { nodes: Node[]; edges: Edge[] },
     source: 'hydrate-replace' | 'save-reconcile',
@@ -127,7 +127,7 @@ export function createCanvasGraphSessionRuntime(
   }
 
   function replaceGraphSnapshot(
-    snapshot: CanvasBoardSnapshot,
+    snapshot: BoardSnapshot,
     reason: 'hydrate' | 'save-reconcile',
   ) {
     const boardId = options.boardSession.currentBoardId.value
@@ -156,7 +156,7 @@ export function createCanvasGraphSessionRuntime(
       graphAdapter: options.graphAdapter,
       readCurrent: () => ({ nodes: options.nodes.value, edges: options.edges.value }),
       projectFull: () => {
-        const flow = canvasBoardSnapshotToFlow(
+        const flow = boardSnapshotToFlow(
           session.exportSnapshot(options.boardBaseSnapshot.value),
         )
         return {
@@ -180,12 +180,12 @@ export function createCanvasGraphSessionRuntime(
       unsubscribeHistory()
     }
     options.executionCore.attachBoard(
-      CanvasBoardGraphSession.create(boardId, { graphSession: session }),
+      BoardGraphSession.create(boardId, { graphSession: session }),
     )
     options.hydratePendingImageLeases?.(snapshot)
   }
 
-  function exportGraphSnapshot(baseSnapshot: CanvasBoardSnapshot): CanvasBoardSnapshot {
+  function exportGraphSnapshot(baseSnapshot: BoardSnapshot): BoardSnapshot {
     return requireGraphSession().exportSnapshot(baseSnapshot)
   }
 

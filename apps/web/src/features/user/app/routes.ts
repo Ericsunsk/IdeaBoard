@@ -68,7 +68,7 @@ export const userRoutes: RouteRecordRaw[] = [
       {
         path: 'boards',
         name: 'UserBoards',
-        component: () => import('../../board-catalog/pages/BoardsPage.vue'),
+        component: () => import('../../board').then((module) => module.BoardsPage),
         meta: { requiresAuth: true },
       },
       {

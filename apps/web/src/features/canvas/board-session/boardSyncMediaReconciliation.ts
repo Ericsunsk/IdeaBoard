@@ -1,9 +1,9 @@
 import {
-  rebuildCanvasBoardMediaRefs,
-  type CanvasBoardSnapshot,
+  rebuildBoardMediaRefs,
+  type BoardSnapshot,
   type ImageNodeOutputItem,
   type PromptNodeInputImage,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 
 type MediaAssetReference = Pick<ImageNodeOutputItem, 'url' | 'mediaAssetId'>
 
@@ -56,10 +56,10 @@ function rebaseInputMediaAssets(
 
 /** Reconciles server-normalized media URLs while preserving concurrent local edits. */
 export function rebaseStabilizedMedia(
-  captured: CanvasBoardSnapshot,
-  current: CanvasBoardSnapshot,
-  stabilized: CanvasBoardSnapshot,
-): CanvasBoardSnapshot {
+  captured: BoardSnapshot,
+  current: BoardSnapshot,
+  stabilized: BoardSnapshot,
+): BoardSnapshot {
   const capturedImageNodes = new Map(captured.imageNodes.map((node) => [node.id, node] as const))
   const stabilizedImageNodes = new Map(
     stabilized.imageNodes.map((node) => [node.id, node] as const),
@@ -72,7 +72,7 @@ export function rebaseStabilizedMedia(
   const stabilizedFusionNodes = new Map(
     stabilized.fusionNodes.map((node) => [node.id, node] as const),
   )
-  const rebased: CanvasBoardSnapshot = {
+  const rebased: BoardSnapshot = {
     ...current,
     imageNodes: current.imageNodes.map((node) => {
       const capturedNode = capturedImageNodes.get(node.id)
@@ -129,6 +129,6 @@ export function rebaseStabilizedMedia(
     }),
     mediaRefs: current.mediaRefs?.map((ref) => ({ ...ref })),
   }
-  rebuildCanvasBoardMediaRefs(rebased, current)
+  rebuildBoardMediaRefs(rebased, current)
   return rebased
 }

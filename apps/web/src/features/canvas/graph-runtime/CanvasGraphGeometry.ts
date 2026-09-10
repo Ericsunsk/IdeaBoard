@@ -3,7 +3,7 @@ import {
   resolveImageNodeDisplayRatio,
   type CanvasNodeItem,
   type ImageNodeItem,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 import type { CanvasGraphNodeId, CanvasGraphNodeKind, CanvasGraphStore } from './canvasGraphStore'
 
 const CANVAS_NODE_HEADER_HEIGHT = 22

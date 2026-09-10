@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveImageNodeLatestOutput, type ImageNodeItem } from '../../canvas-board/domain'
+import { resolveImageNodeLatestOutput, type ImageNodeItem } from '../../board/domain'
 import {
   DEFAULT_IMAGE_NODE_LAYOUT_WIDTH,
   resolveImageNodeDisplayPayload,

@@ -1,12 +1,12 @@
 import type { Connection } from '@vue-flow/core'
 import {
   getCanvasNodePortInputLimit,
-  type CanvasBoardSnapshot,
+  type BoardSnapshot,
   type CanvasConnection,
   type CanvasConnectionEndpoint,
   type CanvasConnectionNodeType,
   type CanvasConnectionPort,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 import type { FlowNodeData } from '../types/flowTypes'
 import { normalizeFlowConnection } from './flowConnectionAdapter'
 import {
@@ -48,7 +48,7 @@ function parsePortFromHandle(
 }
 
 export function resolveNextCanvasConnectionId(
-  base: CanvasBoardSnapshot | undefined,
+  base: BoardSnapshot | undefined,
   edges: readonly FlowSnapshotConnectionEdge[],
 ) {
   return resolveNextFlowConnectionId(base?.connections, edges)

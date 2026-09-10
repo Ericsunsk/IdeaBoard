@@ -1,4 +1,4 @@
-import type { ImageRetouchRecipe, ImageRetouchRecipeStep } from '../../../canvas-board/domain'
+import type { ImageRetouchRecipe, ImageRetouchRecipeStep } from '../../../board/domain'
 import type { ImageRetouchPlan, ImageRetouchPlanStep } from './engine'
 
 export function serializeImageRetouchPlan(

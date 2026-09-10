@@ -1,5 +1,5 @@
 import type { Connection } from '@vue-flow/core'
-import type { CanvasConnectionPort } from '../../canvas-board/domain'
+import type { CanvasConnectionPort } from '../../board/domain'
 import type { CanvasGraphNodeId } from '../graph-runtime'
 
 export type CanvasVueFlowConnectIntent = {

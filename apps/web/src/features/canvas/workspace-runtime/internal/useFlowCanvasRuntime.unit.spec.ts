@@ -1,20 +1,20 @@
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { computed, nextTick, ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import type { CanvasBoardSession, SaveStatus } from '../../board-session'
+import type { BoardSession, SaveStatus } from '../../board-session'
 import {
-  assertLatestCanvasBoardState,
-  createEmptyCanvasBoardSnapshot,
-  type CanvasBoardSnapshot,
+  assertLatestBoardState,
+  createEmptyBoardSnapshot,
+  type BoardSnapshot,
   type CanvasGroup,
-} from '../../../canvas-board/domain'
+} from '../../../board/domain'
 import { CanvasGraphSession, type CanvasGraphTransaction } from '../../graph-runtime'
-import { canvasBoardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
+import { boardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
 import { useCanvasGraphEditing } from '../../graph-editing'
 import { useFlowCanvasRuntime, type UseFlowCanvasRuntimeOptions } from './useFlowCanvasRuntime'
 import { createFlowGraphCommandOptions } from '../../vue-flow-adapter/flowGraphAdapterCommandSideEffects'
 import {
-  CanvasBoardGraphSession,
+  BoardGraphSession,
   collectPendingImageTasks,
   createPendingImageExecutionCore,
 } from '../../execution/pending-execution'
@@ -54,8 +54,8 @@ function createGroup(
   }
 }
 
-function createSnapshot(): CanvasBoardSnapshot {
-  const snapshot = createEmptyCanvasBoardSnapshot()
+function createSnapshot(): BoardSnapshot {
+  const snapshot = createEmptyBoardSnapshot()
   snapshot.imageNodes = [
     {
       id: 1,
@@ -107,8 +107,8 @@ function createSnapshot(): CanvasBoardSnapshot {
   return snapshot
 }
 
-function createSingleInputReplacementSnapshot(): CanvasBoardSnapshot {
-  const snapshot = createEmptyCanvasBoardSnapshot()
+function createSingleInputReplacementSnapshot(): BoardSnapshot {
+  const snapshot = createEmptyBoardSnapshot()
   snapshot.promptNodes = [
     {
       id: 1,
@@ -246,8 +246,8 @@ function createExecutionRuntimeHarness() {
     },
     attachBoard(boardId: string) {
       return executionCore.attachBoard(
-        CanvasBoardGraphSession.create(boardId, {
-          graphSession: CanvasGraphSession.hydrate(boardId, createEmptyCanvasBoardSnapshot()),
+        BoardGraphSession.create(boardId, {
+          graphSession: CanvasGraphSession.hydrate(boardId, createEmptyBoardSnapshot()),
         }),
       )
     },
@@ -309,9 +309,9 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   const fullEdges = shallowRef<Edge[]>([])
   const nodes = fullNodes
   const edges = fullEdges
-  const boardBaseSnapshot = shallowRef(createEmptyCanvasBoardSnapshot())
+  const boardBaseSnapshot = shallowRef(createEmptyBoardSnapshot())
   const routeBoardId = ref('board-a')
-  const savedSnapshots: CanvasBoardSnapshot[] = []
+  const savedSnapshots: BoardSnapshot[] = []
   const scheduledMicrotasks: Array<() => void> = []
   const onWarning = vi.fn()
   const onError = vi.fn()
@@ -332,12 +332,12 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   const isDirty = ref(false)
   const saveStatus = ref<SaveStatus>('idle')
   const { executionCore, executionRuntime } = createExecutionRuntimeHarness()
-  const boardSession: CanvasBoardSession = {
+  const boardSession: BoardSession = {
     currentBoardId: computed(() => routeBoardId.value),
     exists: vi.fn(() => true),
     load: vi.fn(async () => snapshot),
-    save: vi.fn(async (nextSnapshot: CanvasBoardSnapshot) => {
-      assertLatestCanvasBoardState({ ...nextSnapshot, updatedAt: Date.now() }, 'board-save')
+    save: vi.fn(async (nextSnapshot: BoardSnapshot) => {
+      assertLatestBoardState({ ...nextSnapshot, updatedAt: Date.now() }, 'board-save')
       savedSnapshots.push(nextSnapshot)
       return { snapshot: nextSnapshot, remoteSync: { ok: true as const } }
     }),
@@ -493,7 +493,7 @@ function projectCanonicalGraph(
 ) {
   const snapshot = exportCurrentBoardSnapshot(harness)
   harness.boardBaseSnapshot.value = snapshot
-  const flow = canvasBoardSnapshotToFlow(snapshot)
+  const flow = boardSnapshotToFlow(snapshot)
   harness.runtime.graphEditing.adapter.replaceGraph(
     { nodes: flow.nodes as Node[], edges: flow.edges as Edge[] },
     commandOptions,
@@ -615,10 +615,10 @@ describe('useFlowCanvasRuntime', () => {
     const harness = createRuntimeHarness()
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     const attachmentA = harness.executionCore.currentAttachment()
-    let resolveBoardB!: (snapshot: CanvasBoardSnapshot) => void
+    let resolveBoardB!: (snapshot: BoardSnapshot) => void
     vi.mocked(harness.boardSession.load).mockImplementationOnce(
       () =>
-        new Promise<CanvasBoardSnapshot>((resolve) => {
+        new Promise<BoardSnapshot>((resolve) => {
           resolveBoardB = resolve
         }),
     )
@@ -632,7 +632,7 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.persistence.flushAutosave()
     expect(harness.boardSession.save).not.toHaveBeenCalled()
 
-    resolveBoardB(createEmptyCanvasBoardSnapshot())
+    resolveBoardB(createEmptyBoardSnapshot())
     await loadingBoardB
 
     expect(harness.executionCore.currentAttachment()?.boardId).toBe('board-b')
@@ -1288,7 +1288,7 @@ describe('useFlowCanvasRuntime', () => {
   })
 
   it('saves groups that reference decimal canvas node ids from active drafts', async () => {
-    const snapshot = createEmptyCanvasBoardSnapshot()
+    const snapshot = createEmptyBoardSnapshot()
     snapshot.promptNodes = [
       {
         id: 1000.25,
@@ -2408,9 +2408,9 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
 
-    let resolveSave: ((result: Awaited<ReturnType<CanvasBoardSession['save']>>) => void) | undefined
+    let resolveSave: ((result: Awaited<ReturnType<BoardSession['save']>>) => void) | undefined
     let shouldDeferSave = true
-    harness.boardSession.save = vi.fn((nextSnapshot: CanvasBoardSnapshot) => {
+    harness.boardSession.save = vi.fn((nextSnapshot: BoardSnapshot) => {
       harness.savedSnapshots.push(nextSnapshot)
       if (!shouldDeferSave) {
         return Promise.resolve({
@@ -2419,7 +2419,7 @@ describe('useFlowCanvasRuntime', () => {
         })
       }
       shouldDeferSave = false
-      return new Promise<Awaited<ReturnType<CanvasBoardSession['save']>>>((resolve) => {
+      return new Promise<Awaited<ReturnType<BoardSession['save']>>>((resolve) => {
         resolveSave = resolve
       })
     })
@@ -2452,7 +2452,7 @@ describe('useFlowCanvasRuntime', () => {
     })
 
     resolveSave?.({
-      snapshot: harness.savedSnapshots[0] as CanvasBoardSnapshot,
+      snapshot: harness.savedSnapshots[0] as BoardSnapshot,
       remoteSync: { ok: true },
     })
     await savePromise

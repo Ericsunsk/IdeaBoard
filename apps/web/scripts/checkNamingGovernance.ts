@@ -118,12 +118,8 @@ const VAGUE_VUE_SUFFIXES = ['View', 'Manager', 'Service']
 
 const legacyAllowances: Record<string, string> = {}
 
-/** Temporary migration baseline: path (src-relative, `*` suffix = prefix) -> owning phase. */
+/** Temporary migration baseline: src-relative path -> owning phase. */
 const migrationBaseline: Record<string, string> = {
-  // Phase 1 (Board): cleaned when canvas-board/board-catalog move into board.
-  'features/board-catalog/controller/controller.ts': 'phase-1-board',
-  'features/canvas-board/catalog/catalog.ts': 'phase-1-board',
-  'features/board-catalog/feedback/useFeedback.ts': 'phase-1-board',
   // Phase 3 (Canvas): cleaned during the Canvas internal reorganization.
   'features/canvas/retouch/runtime/runtime.ts': 'phase-3-canvas',
   'features/canvas/utils': 'phase-3-canvas',
@@ -152,8 +148,6 @@ const migrationBaseline: Record<string, string> = {
   'features/canvas/image-tools/types.ts': 'phase-3-canvas',
   'features/canvas/inpaint/types.ts': 'phase-3-canvas',
   'features/canvas/workspace-runtime/types.ts': 'phase-3-canvas',
-  // Phase 1 (Board): cleaned when canvas-board testing helpers move into board.
-  'features/canvas-board/testing/index.ts': 'phase-1-board',
   // Phase 2 (Workspace): User* shell names become Workspace* (plan section 4.4).
   'features/user/layout/UserLayout.vue': 'phase-2-workspace',
   'features/user/pages/UserShareJoinPage.vue': 'phase-2-workspace',

@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import type { ImageRetouchStack } from '../../canvas-board/domain'
+import type { ImageRetouchStack } from '../../board/domain'
 import type {
   ImageRetouchKind,
   RetouchEffectLayer,

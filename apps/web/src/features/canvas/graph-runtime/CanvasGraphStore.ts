@@ -1,6 +1,6 @@
 import {
-  createEmptyCanvasBoardSnapshot,
-  type CanvasBoardSnapshot,
+  createEmptyBoardSnapshot,
+  type BoardSnapshot,
   type CanvasConnection,
   type CanvasConnectionNodeType,
   type CanvasGroup,
@@ -8,7 +8,7 @@ import {
   type FusionNodeItem,
   type ImageNodeItem,
   type PromptNodeItem,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 import { measureCanvasPerf } from '../utils/canvasPerfProbe'
 import { recordCanvasInteractionCount } from '../utils/canvasInteractionMetrics'
 
@@ -262,7 +262,7 @@ function getNodeKind(node: CanvasNodeItem): CanvasGraphNodeKind {
 }
 
 function getNodeCollection(
-  snapshot: CanvasBoardSnapshot,
+  snapshot: BoardSnapshot,
   kind: CanvasGraphNodeKind,
 ): CanvasNodeItem[] {
   if (kind === 'image') return snapshot.imageNodes
@@ -436,7 +436,7 @@ function cloneGroupRecord(record: CanvasGraphGroupRecord): CanvasGraphGroupRecor
   }
 }
 
-function createStateFromSnapshot(snapshot: CanvasBoardSnapshot): CanvasGraphStoreState {
+function createStateFromSnapshot(snapshot: BoardSnapshot): CanvasGraphStoreState {
   const nodesById = new Map<CanvasGraphNodeId, CanvasGraphNodeRecord>()
   const edgesById = new Map<CanvasGraphEdgeId, CanvasGraphEdgeRecord>()
   const groupsById = new Map<CanvasGraphGroupId, CanvasGraphGroupRecord>()
@@ -502,7 +502,7 @@ function createStateFromSnapshot(snapshot: CanvasBoardSnapshot): CanvasGraphStor
   return createState(nodesById, edgesById, groupsById, nodeOrder, edgeOrder, groupOrder)
 }
 
-function createMeasuredStateFromSnapshot(snapshot: CanvasBoardSnapshot): CanvasGraphStoreState {
+function createMeasuredStateFromSnapshot(snapshot: BoardSnapshot): CanvasGraphStoreState {
   return measureCanvasPerf(
     'graph-store.hydrate',
     () => ({
@@ -516,9 +516,9 @@ function createMeasuredStateFromSnapshot(snapshot: CanvasBoardSnapshot): CanvasG
 
 function exportSnapshotFromState(
   state: CanvasGraphStoreState,
-  base?: CanvasBoardSnapshot,
-): CanvasBoardSnapshot {
-  const snapshot = createEmptyCanvasBoardSnapshot()
+  base?: BoardSnapshot,
+): BoardSnapshot {
+  const snapshot = createEmptyBoardSnapshot()
   if (base?.mediaRefs) {
     snapshot.mediaRefs = base.mediaRefs.map((ref) => ({ ...ref }))
   }
@@ -988,15 +988,15 @@ export class CanvasGraphStore {
   private revision = 0
   private readonly commitListeners = new Set<(event: CanvasGraphCommitEvent) => void>()
 
-  constructor(snapshot: CanvasBoardSnapshot = createEmptyCanvasBoardSnapshot()) {
+  constructor(snapshot: BoardSnapshot = createEmptyBoardSnapshot()) {
     this.state = createMeasuredStateFromSnapshot(snapshot)
   }
 
-  static fromSnapshot(snapshot: CanvasBoardSnapshot): CanvasGraphStore {
+  static fromSnapshot(snapshot: BoardSnapshot): CanvasGraphStore {
     return new CanvasGraphStore(snapshot)
   }
 
-  hydrate(snapshot: CanvasBoardSnapshot) {
+  hydrate(snapshot: BoardSnapshot) {
     this.state = createMeasuredStateFromSnapshot(snapshot)
     this.revision += 1
   }
@@ -1068,7 +1068,7 @@ export class CanvasGraphStore {
     return summary
   }
 
-  exportSnapshot(base?: CanvasBoardSnapshot): CanvasBoardSnapshot {
+  exportSnapshot(base?: BoardSnapshot): BoardSnapshot {
     return exportSnapshotFromState(this.state, base)
   }
 
@@ -1642,6 +1642,6 @@ export class CanvasGraphTransaction {
   }
 }
 
-export function createCanvasGraphStore(snapshot?: CanvasBoardSnapshot): CanvasGraphStore {
+export function createCanvasGraphStore(snapshot?: BoardSnapshot): CanvasGraphStore {
   return new CanvasGraphStore(snapshot)
 }

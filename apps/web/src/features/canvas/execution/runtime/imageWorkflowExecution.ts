@@ -2,7 +2,7 @@ import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { CanvasGraphStore } from '../../graph-runtime'
 import type { CanvasRendererMetricsPort } from '../../vue-flow-adapter'
-import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
+import type { BoardSnapshot } from '../../../board/domain'
 import { i18n } from '../../../../shared/i18n'
 import {
   buildImageActionReadinessRequest,
@@ -32,7 +32,7 @@ import {
   createPendingImageWorkflowRunner,
   type PendingImageWorkflowTaskTransport,
 } from './pendingImageWorkflowRunner'
-import type { CanvasBoardAttachment } from '../../board-attachment'
+import type { BoardAttachment } from '../../board-attachment'
 import {
   createCanvasTaskClientActionId,
   withTaskClientActionId,
@@ -46,7 +46,7 @@ export type UseImageWorkflowExecutionOptions = {
   edges: Ref<Edge[]>
   readCanvasGraphStore: () => CanvasGraphStore
   rendererMetrics: CanvasRendererMetricsPort
-  boardBaseSnapshot: Ref<CanvasBoardSnapshot>
+  boardBaseSnapshot: Ref<BoardSnapshot>
   refreshNodeInternals?: (nodeIds: string[]) => void
   flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
   onSuccess: (message: string) => void
@@ -122,7 +122,7 @@ export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOpti
     return executionWorkspace.state.isNodeRunning(nodeId)
   }
 
-  function requireCurrentAttachment(): CanvasBoardAttachment {
+  function requireCurrentAttachment(): BoardAttachment {
     const attachment = executionCore.currentAttachment()
     if (!attachment) {
       throw new Error('Canvas execution requires the current Board attachment')

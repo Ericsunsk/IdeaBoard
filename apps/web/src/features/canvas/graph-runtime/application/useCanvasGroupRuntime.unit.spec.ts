@@ -2,9 +2,9 @@ import type { Edge, Node } from '@vue-flow/core'
 import { ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import {
-  createEmptyCanvasBoardSnapshot,
-  type CanvasBoardSnapshot,
-} from '../../../canvas-board/domain'
+  createEmptyBoardSnapshot,
+  type BoardSnapshot,
+} from '../../../board/domain'
 import { CanvasGraphSession } from '..'
 import { useCanvasGroupRuntime } from './useCanvasGroupRuntime'
 import type { CanvasVueFlowGraphAdapter } from '../../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
@@ -42,8 +42,8 @@ function createPromptNode(
   }
 }
 
-function createSnapshot(): CanvasBoardSnapshot {
-  const snapshot = createEmptyCanvasBoardSnapshot()
+function createSnapshot(): BoardSnapshot {
+  const snapshot = createEmptyBoardSnapshot()
   snapshot.promptNodes = [
     {
       id: 1,

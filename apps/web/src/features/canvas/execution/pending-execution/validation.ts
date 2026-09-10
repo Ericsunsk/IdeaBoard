@@ -1,13 +1,13 @@
-import type { CanvasBoardAttachment, CanvasBoardSessionIdentity } from '../../board-attachment'
+import type { BoardAttachment, BoardSessionIdentity } from '../../board-attachment'
 import type {
   PendingImageExecutionFact,
   PendingImageExecutionLease,
 } from './types'
 
 export function attachmentRejection(
-  candidate: CanvasBoardAttachment,
-  currentAttachment: CanvasBoardAttachment | null,
-  currentSessionIdentity: CanvasBoardSessionIdentity | null,
+  candidate: BoardAttachment,
+  currentAttachment: BoardAttachment | null,
+  currentSessionIdentity: BoardSessionIdentity | null,
 ): 'stale-attachment' | 'wrong-board' | null {
   if (!currentAttachment || candidate.boardId !== currentAttachment.boardId) {
     return 'wrong-board'
@@ -18,17 +18,17 @@ export function attachmentRejection(
 }
 
 export function isAttachmentCurrent(
-  candidate: CanvasBoardAttachment,
-  currentAttachment: CanvasBoardAttachment | null,
-  currentSessionIdentity: CanvasBoardSessionIdentity | null,
+  candidate: BoardAttachment,
+  currentAttachment: BoardAttachment | null,
+  currentSessionIdentity: BoardSessionIdentity | null,
 ): boolean {
   return candidate === currentAttachment && candidate.sessionIdentity === currentSessionIdentity
 }
 
 export function leaseRejection(
   lease: PendingImageExecutionLease,
-  currentAttachment: CanvasBoardAttachment | null,
-  currentSessionIdentity: CanvasBoardSessionIdentity | null,
+  currentAttachment: BoardAttachment | null,
+  currentSessionIdentity: BoardSessionIdentity | null,
   leasesByNodeId: ReadonlyMap<PendingImageLeaseNodeId, PendingImageExecutionLease>,
   factsByNodeId: ReadonlyMap<PendingImageLeaseNodeId, PendingImageExecutionFact>,
   isActive: (fact: PendingImageExecutionFact | undefined) => boolean,

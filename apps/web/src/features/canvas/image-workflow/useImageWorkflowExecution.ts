@@ -10,7 +10,7 @@ import {
   useImageWorkflowExecution as useRuntimeImageWorkflowExecution,
   type PendingImageExecutionCore,
 } from '../execution'
-import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
+import type { BoardSnapshot } from '../../board/domain'
 import type { CanvasGraphStore } from '../graph-runtime'
 import type { CanvasRendererMetricsPort } from '../vue-flow-adapter'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
@@ -24,7 +24,7 @@ export type UseImageWorkflowExecutionOptions = {
   edges: Ref<Edge[]>
   readCanvasGraphStore: () => CanvasGraphStore
   rendererMetrics: CanvasRendererMetricsPort
-  boardBaseSnapshot: Ref<CanvasBoardSnapshot>
+  boardBaseSnapshot: Ref<BoardSnapshot>
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>
   refreshNodeInternals: (nodeIds: string[]) => void
   feedback: CanvasTaskExecutionFeedback

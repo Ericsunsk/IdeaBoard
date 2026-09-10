@@ -2,15 +2,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TaskCancelledError, TaskResultPendingError } from '../../../../shared/api/taskEvents'
 import { i18n } from '../../../../shared/i18n'
 import { loadLocaleMessages } from '../../../../shared/i18n/userLocale'
-import { createEmptyCanvasBoardSnapshot, type ImageNodeItem } from '../../../canvas-board/domain'
+import { createEmptyBoardSnapshot, type ImageNodeItem } from '../../../board/domain'
 import { CanvasGraphSession } from '../../graph-runtime'
-import { CanvasBoardGraphSession, createPendingImageExecutionCore } from '../pending-execution'
+import { BoardGraphSession, createPendingImageExecutionCore } from '../pending-execution'
 import { CanvasBillingPreflightError } from '../task-runner/canvasBillingPreflight'
 import { createPendingImageWorkflowRunner } from './pendingImageWorkflowRunner'
 import type { PendingImageWorkflowTaskTransport } from './pendingImageWorkflowRunner'
 
 function createHarness(taskIds: readonly string[] = ['task-1']) {
-  const snapshot = createEmptyCanvasBoardSnapshot()
+  const snapshot = createEmptyBoardSnapshot()
   snapshot.imageNodes = taskIds.map(
     (taskId, index) =>
       ({
@@ -30,7 +30,7 @@ function createHarness(taskIds: readonly string[] = ['task-1']) {
   const store = CanvasGraphSession.hydrate('board-a', snapshot)
   const core = createPendingImageExecutionCore()
   const attachment = core.attachBoard(
-    CanvasBoardGraphSession.create('board-a', { graphSession: store }),
+    BoardGraphSession.create('board-a', { graphSession: store }),
   )
   const pendingResults = {
     reservePendingResults: vi.fn(() => ({

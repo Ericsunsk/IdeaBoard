@@ -3,10 +3,10 @@ import { onScopeDispose, watch, type Ref } from 'vue'
 import {
   resolveImageNodeDisplayRatio,
   resolveImageNodeFrameSize,
-  type CanvasBoardSnapshot,
+  type BoardSnapshot,
   type CanvasNodeItem,
   type ImageNodeItem,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { CanvasVueFlowGraphAdapter } from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import type { CanvasGraphStore } from '../graph-runtime'
@@ -21,7 +21,7 @@ import { useFlowNodeMutations } from './useFlowNodeMutations'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 import type { CanvasGraphEditingBrowserAdapter } from './browserAdapter'
 import { useCanvasLibraryImportRuntime } from './useCanvasLibraryImportRuntime'
-import type { CanvasBoardAttachment } from '../board-attachment'
+import type { BoardAttachment } from '../board-attachment'
 import type { LibraryAssetMaterializer } from '../../library'
 import type { FlowLocalUploadState, FlowNodeData } from '../types/flowTypes'
 import { createFlowGraphCommandOptions } from '../vue-flow-adapter/flowGraphAdapterCommandSideEffects'
@@ -61,7 +61,7 @@ export type CanvasGraphEditingNodeInteractions = {
 type UseCanvasGraphEditingOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  boardBaseSnapshot: Ref<CanvasBoardSnapshot>
+  boardBaseSnapshot: Ref<BoardSnapshot>
   currentBoardId: ValueRef<string | null | undefined>
   graphAdapter: CanvasVueFlowGraphAdapter
   readCanvasGraphStore: () => CanvasGraphStore
@@ -71,7 +71,7 @@ type UseCanvasGraphEditingOptions = {
   browser: CanvasGraphEditingBrowserAdapter
   upload: CanvasGraphEditingUploadAdapter
   materializeLibraryAsset: LibraryAssetMaterializer
-  readLibraryImportAttachment: () => CanvasBoardAttachment | null
+  readLibraryImportAttachment: () => BoardAttachment | null
   selectOnlyNode: (nodeId: string) => boolean
   preview: {
     openImageUrl: (src: string, ratio?: number) => Promise<void>

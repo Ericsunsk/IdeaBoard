@@ -67,7 +67,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Plus } from '@iconoir/vue'
-import type { PromptAspectRatio } from '../../../../canvas-board/domain'
+import type { PromptAspectRatio } from '../../../../board/domain'
 import type { OutputResolution } from '../../../../../shared/domain/generationContract'
 import type { CanvasBillingQuoteState } from '../../../execution'
 import NodeInputThumbnail from './NodeInputThumbnail.vue'

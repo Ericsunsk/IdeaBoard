@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  createEmptyCanvasBoardSnapshot,
-  type CanvasBoardSnapshot,
+  createEmptyBoardSnapshot,
+  type BoardSnapshot,
   type ImageNodeItem,
-} from '../../../canvas-board/domain'
+} from '../../../board/domain'
 import { CanvasGraphSession } from '../../graph-runtime'
 import {
-  CanvasBoardGraphSession,
+  BoardGraphSession,
   createPendingImageExecutionCore,
   PendingImageMaterializationError,
   PendingImageMutationContractError,
@@ -15,9 +15,9 @@ import {
   type PendingImageExecutionStartResult,
   type PendingImageResultNodeId,
 } from './index'
-import type { CanvasBoardAttachment } from '../../board-attachment'
+import type { BoardAttachment } from '../../board-attachment'
 import {
-  bindCanvasBoardGraphSession,
+  bindBoardGraphSession,
   type PendingImageDomainMutationResult,
 } from './boardGraphSession'
 
@@ -43,7 +43,7 @@ function createPendingImageNode(id: number, taskId: string): ImageNodeItem {
 }
 
 function createPendingResultStore(taskIds: readonly string[]): CanvasGraphSession {
-  const snapshot: CanvasBoardSnapshot = createEmptyCanvasBoardSnapshot()
+  const snapshot: BoardSnapshot = createEmptyBoardSnapshot()
   snapshot.imageNodes = taskIds.map((taskId, index) => createPendingImageNode(index + 1, taskId))
   return CanvasGraphSession.hydrate('board-a', snapshot)
 }
@@ -58,16 +58,16 @@ function attachCore(
   boardId = 'board-a',
 ): {
   core: PendingImageExecutionCore
-  attachment: CanvasBoardAttachment
+  attachment: BoardAttachment
 } {
   const core = createPendingImageExecutionCore()
-  const attachment = core.attachBoard(CanvasBoardGraphSession.create(boardId, { graphSession }))
+  const attachment = core.attachBoard(BoardGraphSession.create(boardId, { graphSession }))
   return { core, attachment }
 }
 
 function hydrateLease(
   core: PendingImageExecutionCore,
-  attachment: CanvasBoardAttachment,
+  attachment: BoardAttachment,
   resultNodeId: PendingImageResultNodeId,
   taskId: string,
   clientActionId = `action-${taskId}`,
@@ -173,7 +173,7 @@ describe('PendingImageExecutionCore', () => {
     const snapshots = [core.snapshot()]
     const unsubscribe = core.subscribe((snapshot) => snapshots.push(snapshot))
     const attachment = core.attachBoard(
-      CanvasBoardGraphSession.create('board-a', { graphSession: store }),
+      BoardGraphSession.create('board-a', { graphSession: store }),
     )
     const lease = requireLease(hydrateLease(core, attachment, imageNodeId(1), 'task-1'))
     core.fail(lease)
@@ -214,7 +214,7 @@ describe('PendingImageExecutionCore', () => {
     core.subscribe(laterSubscriber)
 
     expect(() => {
-      core.attachBoard(CanvasBoardGraphSession.create('board-a', { graphSession: store }))
+      core.attachBoard(BoardGraphSession.create('board-a', { graphSession: store }))
     }).not.toThrow()
 
     expect(onSubscriberError).toHaveBeenCalledOnce()
@@ -228,7 +228,7 @@ describe('PendingImageExecutionCore', () => {
     const firstStore = createPendingResultStore(['task-first'])
     const nextStore = createPendingResultStore(['task-next'])
     const core = createPendingImageExecutionCore()
-    const firstSession = CanvasBoardGraphSession.create('board-a', {
+    const firstSession = BoardGraphSession.create('board-a', {
       graphSession: firstStore,
     })
     const firstAttachment = core.attachBoard(firstSession)
@@ -254,7 +254,7 @@ describe('PendingImageExecutionCore', () => {
     const previousSessionLease = requireLease(
       hydrateLease(core, nextEpochAttachment, imageNodeId(1), 'task-first'),
     )
-    const nextSession = CanvasBoardGraphSession.create('board-a', {
+    const nextSession = BoardGraphSession.create('board-a', {
       graphSession: nextStore,
     })
     core.attachBoard(nextSession)
@@ -282,10 +282,10 @@ describe('PendingImageExecutionCore', () => {
     const boardBStore = createPendingResultStore(['task-b'])
     const core = createPendingImageExecutionCore()
     const boardAAttachment = core.attachBoard(
-      CanvasBoardGraphSession.create('board-a', { graphSession: boardAStore }),
+      BoardGraphSession.create('board-a', { graphSession: boardAStore }),
     )
     const boardALease = requireLease(hydrateLease(core, boardAAttachment, imageNodeId(1), 'task-a'))
-    core.attachBoard(CanvasBoardGraphSession.create('board-b', { graphSession: boardBStore }))
+    core.attachBoard(BoardGraphSession.create('board-b', { graphSession: boardBStore }))
 
     expect(
       core.materializeBatch([
@@ -409,7 +409,7 @@ describe('PendingImageExecutionCore', () => {
       throw mutationError
     })
     const attachment = core.attachBoard(
-      CanvasBoardGraphSession.create('board-a', { graphSession: store }),
+      BoardGraphSession.create('board-a', { graphSession: store }),
     )
     const firstLease = requireLease(hydrateLease(core, attachment, imageNodeId(1), 'task-1'))
     const secondLease = requireLease(hydrateLease(core, attachment, imageNodeId(2), 'task-2'))
@@ -440,11 +440,11 @@ describe('PendingImageExecutionCore', () => {
     'fails closed when the mutation port returns $name',
     ({ result }) => {
       const store = createPendingResultStore(['task-1'])
-      const session = CanvasBoardGraphSession.create('board-a', { graphSession: store })
-      const bindSession = session[bindCanvasBoardGraphSession]
+      const session = BoardGraphSession.create('board-a', { graphSession: store })
+      const bindSession = session[bindBoardGraphSession]
       const bindSpy = vi
-        .spyOn(CanvasBoardGraphSession.prototype, bindCanvasBoardGraphSession)
-        .mockImplementationOnce(function (this: CanvasBoardGraphSession, epoch: number) {
+        .spyOn(BoardGraphSession.prototype, bindBoardGraphSession)
+        .mockImplementationOnce(function (this: BoardGraphSession, epoch: number) {
           const binding = bindSession.call(this, epoch)
           return Object.freeze({
             ...binding,

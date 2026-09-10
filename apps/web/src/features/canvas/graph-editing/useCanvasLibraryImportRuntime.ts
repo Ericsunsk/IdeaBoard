@@ -1,9 +1,9 @@
 import type { Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
-import { resolveImageNodeFrameSize, type ImageNodeItem } from '../../canvas-board/domain'
+import { resolveImageNodeFrameSize, type ImageNodeItem } from '../../board/domain'
 import { i18n } from '../../../shared/i18n'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
-import type { CanvasBoardAttachment } from '../board-attachment'
+import type { BoardAttachment } from '../board-attachment'
 import {
   createPendingLibraryImportFact,
   failLibraryImport,
@@ -21,7 +21,7 @@ import { preloadImage } from '../../../shared/media/preloadImage'
 
 type UseCanvasLibraryImportRuntimeOptions = {
   nodes: Ref<Node[]>
-  readAttachment: () => CanvasBoardAttachment | null
+  readAttachment: () => BoardAttachment | null
   graphAdapter: CanvasVueFlowGraphAdapter
   updateImageSnapshot: (nodeId: string, mutate: (snapshot: ImageNodeItem) => ImageNodeItem) => void
   createImageNodeAtPosition: (
@@ -87,9 +87,9 @@ function isValidMaterialization(value: {
  */
 export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRuntimeOptions) {
   let addSequence = 0
-  const activeNodeIdsByAttachment = new WeakMap<CanvasBoardAttachment, Set<string>>()
+  const activeNodeIdsByAttachment = new WeakMap<BoardAttachment, Set<string>>()
 
-  function isCurrentAttachment(attachment: CanvasBoardAttachment): boolean {
+  function isCurrentAttachment(attachment: BoardAttachment): boolean {
     return options.readAttachment() === attachment
   }
 
@@ -127,7 +127,7 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
   function clearFactWithMaterializedMedia(
     nodeId: string,
     libraryAssetId: number,
-    attachment: CanvasBoardAttachment,
+    attachment: BoardAttachment,
     materialized: Awaited<ReturnType<LibraryAssetMaterializer>>,
     fallbackRatio: number,
   ) {
@@ -159,7 +159,7 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
   function failImport(
     nodeId: string,
     libraryAssetId: number,
-    attachment: CanvasBoardAttachment,
+    attachment: BoardAttachment,
     error: unknown,
     notify: boolean,
   ) {
@@ -184,7 +184,7 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
     nodeId: string,
     libraryAssetId: number,
     fallbackRatio: number,
-    attachment: CanvasBoardAttachment,
+    attachment: BoardAttachment,
     notifyFailure: boolean,
   ): boolean {
     const activeNodeIds = activeNodeIdsByAttachment.get(attachment) ?? new Set<string>()

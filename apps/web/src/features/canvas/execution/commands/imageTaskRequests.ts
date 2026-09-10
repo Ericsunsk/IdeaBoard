@@ -19,7 +19,7 @@ import { buildExecutionSizeParams, type ExecutionImageSize } from '../contracts/
 import { buildPromptAspectRatioTaskParams } from '../contracts/promptAspectRatioTaskParams'
 import { assertRequestedOutputCount } from '../../../../shared/domain/generationContract'
 import type { OutputResolution } from '../../../../shared/domain/generationContract'
-import type { PromptAspectRatio } from '../../../canvas-board/domain'
+import type { PromptAspectRatio } from '../../../board/domain'
 import { i18n } from '../../../../shared/i18n'
 import {
   IMAGE_OUTPAINT_ACTION,

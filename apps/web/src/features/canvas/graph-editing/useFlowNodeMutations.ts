@@ -20,17 +20,17 @@ import {
 import {
   getCanvasNodePortInputLimit,
   isCanvasExecutionOutputNodeType,
-  type CanvasBoardSnapshot,
+  type BoardSnapshot,
   type CanvasCreatableNodeKind,
   type CanvasNodeItem,
   type CanvasNodeItemByKind,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 type UseFlowNodeMutationsOptions = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node/edge data is an open Record; narrowing here breaks vue-flow's internal type expectations
   nodes: Ref<Array<Record<string, any>>>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node/edge data is an open Record; narrowing here breaks vue-flow's internal type expectations
   edges: Ref<Array<Record<string, any>>>
-  boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
+  boardBaseSnapshot?: Ref<BoardSnapshot>
   readCanvasGraphStore: () => CanvasGraphStore
   graphAdapter: CanvasVueFlowGraphAdapter
   onWarning: (message: string) => void

@@ -25,7 +25,7 @@ _Avoid_: persisted provider URL, tier-less asset ref
 _Avoid_: per-component disabled logic, missing busy semantics
 
 **Theme Contract**:
-PrimeVue PT 与 CSS token 的单源（`shared/theme`）。overlay/dialog/round-control 等样式必须消费 token；contract spec 反向校验 canvas/search/board-catalog/library/user-shell 的消费。
+PrimeVue PT 与 CSS token 的单源（`shared/theme`）。overlay/dialog/round-control 等样式必须消费 token；contract spec 反向校验 canvas/search/board/library/user-shell 的消费。
 _Avoid_: hand-authored overlay CSS, hardcoded motion durations
 
 **Locale Parity**:

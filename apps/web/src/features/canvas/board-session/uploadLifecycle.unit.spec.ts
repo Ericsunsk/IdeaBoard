@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { uploadApi } from '../../../shared/api/upload'
-import { makeCanvasBoardSnapshot } from '../../canvas-board/testing'
+import { makeBoardSnapshot } from '../../board/testing'
 import { createBoardSessionUploadLifecycle } from './uploadLifecycle'
 
 const mocks = vi.hoisted(() => ({
@@ -31,7 +31,7 @@ describe('createBoardSessionUploadLifecycle', () => {
   })
 
   it('stabilizes the save-owned snapshot without cloning it', async () => {
-    const snapshot = makeCanvasBoardSnapshot({
+    const snapshot = makeBoardSnapshot({
       imageNodes: [
         {
           id: 1,
@@ -82,7 +82,7 @@ describe('createBoardSessionUploadLifecycle', () => {
         url: '/uploads/canvas/user-uid/board-a/content/fusion-output.png',
         asset_id: 'asset_202',
       })
-    const snapshot = makeCanvasBoardSnapshot({
+    const snapshot = makeBoardSnapshot({
       imageNodes: [
         {
           id: 1,
@@ -145,7 +145,7 @@ describe('createBoardSessionUploadLifecycle', () => {
         url: '/uploads/canvas/user-uid/board-a/content/fusion-input.png',
         asset_id: 'asset_302',
       })
-    const snapshot = makeCanvasBoardSnapshot({
+    const snapshot = makeBoardSnapshot({
       promptNodes: [
         {
           id: 1,
@@ -211,7 +211,7 @@ describe('createBoardSessionUploadLifecycle', () => {
   })
 
   it('rewrites an existing provider URL to the stable media asset content URL', async () => {
-    const snapshot = makeCanvasBoardSnapshot({
+    const snapshot = makeBoardSnapshot({
       imageNodes: [
         {
           id: 1,

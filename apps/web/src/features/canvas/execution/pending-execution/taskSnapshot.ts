@@ -1,4 +1,4 @@
-import type { CanvasBoardSnapshot, ImageNodeItem } from '../../../canvas-board/domain'
+import type { BoardSnapshot, ImageNodeItem } from '../../../board/domain'
 
 export type PendingImageTaskSnapshot = Readonly<{
   resultNodeId: `image-${number}`
@@ -25,7 +25,7 @@ function readPendingImageTask(node: ImageNodeItem): PendingImageTaskSnapshot | n
 }
 
 export function collectPendingImageTasks(
-  snapshot: CanvasBoardSnapshot,
+  snapshot: BoardSnapshot,
 ): PendingImageTaskSnapshot[] {
   return snapshot.imageNodes.flatMap((node) => {
     const pending = readPendingImageTask(node)

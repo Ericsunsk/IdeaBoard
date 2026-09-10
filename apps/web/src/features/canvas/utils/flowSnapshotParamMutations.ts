@@ -5,7 +5,7 @@ import type {
   PromptAspectRatio,
   PromptNodeInputImage,
   PromptNodeItem,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 import {
   normalizeOutputResolution,
   type OutputResolution,
@@ -18,7 +18,7 @@ import {
   normalizePromptAspectRatio,
   normalizeFusionBlendPoint,
   type FusionBlendPoint,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 
 export type FlowSnapshotParamPatch =
   | { key: 'title'; value: string }

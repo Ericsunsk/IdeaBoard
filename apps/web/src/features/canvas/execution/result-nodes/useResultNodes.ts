@@ -1,9 +1,9 @@
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { createCanvasNodeAt } from '../../utils/canvasNodeFactory'
-import { requireImageNodeOutputCount, type ImageNodeItem } from '../../../canvas-board/domain'
+import { requireImageNodeOutputCount, type ImageNodeItem } from '../../../board/domain'
 import type { FlowNodeData } from '../../types/flowTypes'
-import { resolveImageNodeFrameSize } from '../../../canvas-board/domain'
+import { resolveImageNodeFrameSize } from '../../../board/domain'
 import type {
   ImageExecutionInput,
   ImageExecutionResultOptions,
@@ -13,7 +13,7 @@ import type {
   CanvasGraphReadPort,
   CanvasGraphStore,
 } from '../../graph-runtime'
-import type { CanvasBoardAttachment } from '../../board-attachment'
+import type { BoardAttachment } from '../../board-attachment'
 import { flowConnectionToCanvasConnection } from '../../utils/flowConnectionAdapter'
 import { canvasNodeToFlowNode } from '../../utils/flowSnapshotAdapter'
 import type { CanvasRendererMetricsPort } from '../../vue-flow-adapter'
@@ -31,8 +31,8 @@ type UsePendingImageResultNodesOptions = {
   readCanvasGraphStore: () => CanvasGraphReadPort
   writeCanvasGraphStore?: (() => CanvasGraphStore) | undefined
   rendererMetrics?: CanvasRendererMetricsPort | undefined
-  readCurrentAttachment: () => CanvasBoardAttachment | null
-  isAttachmentCurrent: (attachment: CanvasBoardAttachment) => boolean
+  readCurrentAttachment: () => BoardAttachment | null
+  isAttachmentCurrent: (attachment: BoardAttachment) => boolean
   refreshNodeInternals?: ((nodeIds: string[]) => void) | undefined
   isNodeExecutionActive: (nodeId: string) => boolean
 }

@@ -1,7 +1,7 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import { i18n } from '../../../../shared/i18n'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
-import type { CanvasBoardSnapshot, CanvasGroup } from '../../../canvas-board/domain'
+import type { BoardSnapshot, CanvasGroup } from '../../../board/domain'
 import type { PendingImageExecutionLease } from '../../execution/pending-execution'
 import {
   commitCanvasGraphDeleteGroupIntent,
@@ -105,7 +105,7 @@ export type CanvasGroupRuntimeControls = {
 export type UseCanvasGroupRuntimeOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  boardBaseSnapshot: Ref<CanvasBoardSnapshot>
+  boardBaseSnapshot: Ref<BoardSnapshot>
   graphAdapter: CanvasVueFlowGraphAdapter
   readCanvasGraphStore: () => CanvasGraphStore
   isGraphSessionAttached: () => boolean

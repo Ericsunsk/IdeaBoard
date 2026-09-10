@@ -3,7 +3,7 @@ import type {
   CanvasConnectionNodeType,
   CanvasConnectionPort,
   CanvasExecutionOutputNodeType,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 import { i18n } from '../../../shared/i18n'
 
 export type ExecutionActionLabels = { ready: string; running: string }

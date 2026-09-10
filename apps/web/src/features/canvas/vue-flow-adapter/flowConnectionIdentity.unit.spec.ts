@@ -1,12 +1,12 @@
 import type { Edge } from '@vue-flow/core'
 import { describe, expect, it } from 'vitest'
-import { createEmptyCanvasBoardSnapshot } from '../../canvas-board/domain'
+import { createEmptyBoardSnapshot } from '../../board/domain'
 import { createCanvasGraphStore, toCanvasGraphEdgeId } from '../graph-runtime'
 import { createFlowEdgeProjectionIndex } from './flowConnectionIdentity'
 
 describe('flowConnectionIdentity', () => {
   it('resolves generated projection edges in both directions through one index', () => {
-    const snapshot = createEmptyCanvasBoardSnapshot()
+    const snapshot = createEmptyBoardSnapshot()
     snapshot.imageNodes.push({
       id: 1,
       type: 'image-node',
@@ -55,7 +55,7 @@ describe('flowConnectionIdentity', () => {
   })
 
   it('maps restored id collisions to the connections materialized for each endpoint', () => {
-    const snapshot = createEmptyCanvasBoardSnapshot()
+    const snapshot = createEmptyBoardSnapshot()
     snapshot.imageNodes.push(
       {
         id: 1,

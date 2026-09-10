@@ -1,10 +1,10 @@
-export { useCanvasBoardSession, type CanvasBoardSession } from './useCanvasBoardSession'
-export { useCanvasBoardAutosave } from './useCanvasBoardAutosave'
+export { useBoardSession, type BoardSession } from './useBoardSession'
+export { useBoardAutosave } from './useBoardAutosave'
 export {
   createBoardSyncCoordinator,
   type BoardSyncCoordinator,
-  type CanvasBoardLoadResult,
-  type CanvasBoardSaveResult,
-  type CanvasBoardSaveReconciliation,
+  type BoardLoadResult,
+  type BoardSaveResult,
+  type BoardSaveReconciliation,
   type SaveStatus,
 } from './boardSyncCoordinator'

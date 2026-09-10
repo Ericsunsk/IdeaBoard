@@ -1,7 +1,7 @@
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
-import type { CanvasBoardSnapshot, ImageNodeItem } from '../../../canvas-board/domain'
+import type { BoardSnapshot, ImageNodeItem } from '../../../board/domain'
 import { useCanvasViewportRuntime } from '../../vue-flow-adapter/useCanvasViewportRuntime'
-import { useCanvasBoardRuntime } from './useCanvasBoardRuntime'
+import { useBoardRuntime } from './useBoardRuntime'
 import { useCanvasFeedback } from '../../feedback/useCanvasFeedback'
 import type { CanvasVueFlowAdapter } from '../../vue-flow-adapter'
 import {
@@ -40,9 +40,9 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
   const feedback = useCanvasFeedback(options.openRecharge)
   const taskLifecycle = createCanvasTaskLifecycle({ cancel: taskApi.cancel })
   const executionCore = createPendingImageExecutionCore()
-  let hydratePendingImageLeases = (_snapshot?: CanvasBoardSnapshot) => 0
+  let hydratePendingImageLeases = (_snapshot?: BoardSnapshot) => 0
 
-  const board = useCanvasBoardRuntime({
+  const board = useBoardRuntime({
     route: options.route,
     router: options.router,
     getUserIdentity: options.getUserIdentity,
@@ -111,7 +111,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
   hydratePendingImageLeases = imageWorkflow.hydratePendingImageLeases ?? (() => 0)
 
   async function recoverBoardSession(): Promise<void> {
-    await viewport.loadCanvasBoardAndProbe()
+    await viewport.loadBoardAndProbe()
     await imageWorkflow.reattachPendingImageResults()
     graph.recoveryPort.resumePendingLibraryImports()
   }

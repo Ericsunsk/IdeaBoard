@@ -1,12 +1,12 @@
 import {
-  bindCanvasBoardGraphSession,
-  type CanvasBoardGraphSession,
+  bindBoardGraphSession,
+  type BoardGraphSession,
   type PendingImageDomainMutationPort,
   type PendingImageDomainMutationResult,
   type PendingImageResolvedResult,
   type PendingImageResultNodeId,
 } from './boardGraphSession'
-import type { CanvasBoardAttachment, CanvasBoardSessionIdentity } from '../../board-attachment'
+import type { BoardAttachment, BoardSessionIdentity } from '../../board-attachment'
 import { createPendingImageExecutionPublisher } from './publisher'
 import {
   assertPendingImageMutationContract,
@@ -111,9 +111,9 @@ function reportSubscriberErrorByDefault(error: unknown): void {
 export function createPendingImageExecutionCore(
   options: PendingImageExecutionCoreOptions = {},
 ): PendingImageExecutionCore {
-  let attachment: CanvasBoardAttachment | null = null
+  let attachment: BoardAttachment | null = null
   let mutationPort: PendingImageDomainMutationPort | null = null
-  let sessionIdentity: CanvasBoardSessionIdentity | null = null
+  let sessionIdentity: BoardSessionIdentity | null = null
   let attachmentEpoch = 0
   let leaseSequence = 0
   let factsByNodeId = new Map<PendingImageResultNodeId, PendingImageExecutionFact>()
@@ -133,9 +133,9 @@ export function createPendingImageExecutionCore(
     },
     onSubscriberError: reportSubscriberError,
   })
-  const checkAttachmentCurrent = (candidate: CanvasBoardAttachment): boolean =>
+  const checkAttachmentCurrent = (candidate: BoardAttachment): boolean =>
     isAttachmentCurrent(candidate, attachment, sessionIdentity)
-  const checkAttachmentRejection = (candidate: CanvasBoardAttachment) =>
+  const checkAttachmentRejection = (candidate: BoardAttachment) =>
     attachmentRejection(candidate, attachment, sessionIdentity)
   const checkLeaseRejection = (lease: PendingImageExecutionLease) =>
     leaseRejection(lease, attachment, sessionIdentity, leasesByNodeId, factsByNodeId, isActive)
@@ -145,9 +145,9 @@ export function createPendingImageExecutionCore(
     leasesByNodeId.clear()
   }
 
-  function attachBoard(session: CanvasBoardGraphSession): CanvasBoardAttachment {
+  function attachBoard(session: BoardGraphSession): BoardAttachment {
     const nextEpoch = ++attachmentEpoch
-    const binding = session[bindCanvasBoardGraphSession](nextEpoch)
+    const binding = session[bindBoardGraphSession](nextEpoch)
     const nextAttachment = binding.attachment
     const nextMutationPort = binding.mutations
     if (
@@ -177,7 +177,7 @@ export function createPendingImageExecutionCore(
     publisher.publish()
   }
 
-  function currentAttachment(): CanvasBoardAttachment | null {
+  function currentAttachment(): BoardAttachment | null {
     return attachment
   }
 
@@ -190,7 +190,7 @@ export function createPendingImageExecutionCore(
   }
 
   function start(
-    targetAttachment: CanvasBoardAttachment,
+    targetAttachment: BoardAttachment,
     rawResultNodeId: PendingImageResultNodeId,
     status: 'submitting' | 'running',
     taskId?: string,
@@ -238,14 +238,14 @@ export function createPendingImageExecutionCore(
   }
 
   function begin(
-    targetAttachment: CanvasBoardAttachment,
+    targetAttachment: BoardAttachment,
     resultNodeId: PendingImageResultNodeId,
   ): PendingImageExecutionStartResult {
     return start(targetAttachment, resultNodeId, 'submitting')
   }
 
   function hydratePendingLease(
-    targetAttachment: CanvasBoardAttachment,
+    targetAttachment: BoardAttachment,
     pending: PendingImageHydrationIdentity,
   ): PendingImageExecutionStartResult {
     return start(
@@ -258,7 +258,7 @@ export function createPendingImageExecutionCore(
   }
 
   function claimHydratedLease(
-    targetAttachment: CanvasBoardAttachment,
+    targetAttachment: BoardAttachment,
     pending: PendingImageHydrationIdentity,
   ): PendingImageExecutionLease | null {
     if (checkAttachmentRejection(targetAttachment)) return null

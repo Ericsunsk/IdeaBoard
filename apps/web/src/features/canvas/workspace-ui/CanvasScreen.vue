@@ -17,7 +17,7 @@
       @start-board-rename="startBoardRename"
       @cancel-board-rename="cancelBoardRename"
       @confirm-board-rename="confirmBoardRename"
-      @reload-board-catalog="reloadBoardCatalog"
+      @reload-board-catalog="reloadCatalog"
       @select-board="selectBoard"
       @export="exportSelectedImages"
       @navigate-back="navigateBack"
@@ -421,10 +421,6 @@ function updateBoardNameDraft(value: string) {
 
 function confirmBoardRename() {
   void onConfirmBoardRename()
-}
-
-function reloadBoardCatalog() {
-  void reloadCatalog()
 }
 
 function selectBoard(boardId: string) {

@@ -1,16 +1,16 @@
 import {
   CANVAS_NODE_REGISTRY_LIST,
-  createEmptyCanvasBoardSnapshot,
+  createEmptyBoardSnapshot,
   isCanvasConnectionNodeType,
-  rebuildCanvasBoardMediaRefs,
+  rebuildBoardMediaRefs,
   type CanvasSnapshotNodeCollectionKey,
-  type CanvasBoardSnapshot,
+  type BoardSnapshot,
   type CanvasConnection,
   type CanvasConnectionNodeType,
   type CanvasGroupNodeId,
   type CanvasNodeItem,
   type ImageNodeItem,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 import { resolveCanvasGraphNodeDimensions } from '../graph-runtime'
 import type { FlowNodeData } from '../types/flowTypes'
 import { getDefaultCanvasNodeTitle } from '../config/canvasNodeRegistry'
@@ -41,7 +41,7 @@ export interface FlowAdapterEdge {
 
 export type FlowSnapshotProjection = 'persistable' | 'runtime'
 
-export type FlowToCanvasBoardSnapshotOptions = {
+export type FlowToBoardSnapshotOptions = {
   projection?: FlowSnapshotProjection
 }
 
@@ -49,8 +49,8 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
 
-function createSnapshotShell(base?: CanvasBoardSnapshot): CanvasBoardSnapshot {
-  const snapshot = createEmptyCanvasBoardSnapshot()
+function createSnapshotShell(base?: BoardSnapshot): BoardSnapshot {
+  const snapshot = createEmptyBoardSnapshot()
   const boardRefs = (base?.mediaRefs ?? [])
     .filter((ref) => ref.refType === 'board')
     .map((ref) => ({ ...ref }))
@@ -59,8 +59,8 @@ function createSnapshotShell(base?: CanvasBoardSnapshot): CanvasBoardSnapshot {
 }
 
 function appendCurrentGroups(
-  snapshot: CanvasBoardSnapshot,
-  base: CanvasBoardSnapshot | undefined,
+  snapshot: BoardSnapshot,
+  base: BoardSnapshot | undefined,
   persistedCanvasNodeIds: ReadonlySet<string>,
 ) {
   const assignedCanvasNodeIds = new Set<string>()
@@ -128,13 +128,13 @@ function resolveNodeTitle(nodeType: CanvasConnectionNodeType, node: { title?: un
 }
 
 function getSnapshotNodeCollection(
-  snapshot: CanvasBoardSnapshot,
+  snapshot: BoardSnapshot,
   key: CanvasSnapshotNodeCollectionKey,
 ): CanvasNodeItem[] {
   return snapshot[key] as CanvasNodeItem[]
 }
 
-function getSnapshotNodeCollectionsByType(snapshot: CanvasBoardSnapshot) {
+function getSnapshotNodeCollectionsByType(snapshot: BoardSnapshot) {
   const collections = new Map<CanvasConnectionNodeType, CanvasNodeItem[]>()
   CANVAS_NODE_REGISTRY_LIST.forEach(({ kind, snapshotCollection }) => {
     collections.set(kind, getSnapshotNodeCollection(snapshot, snapshotCollection))
@@ -176,7 +176,7 @@ export function canvasNodeToFlowNode(
   }
 }
 
-export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): {
+export function boardSnapshotToFlow(snapshot: BoardSnapshot): {
   nodes: FlowAdapterNode[]
   edges: FlowAdapterEdge[]
 } {
@@ -205,7 +205,7 @@ export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): {
 function hasRenderableImageSource(
   node: CanvasNodeItem,
   data: FlowNodeData,
-  options: FlowToCanvasBoardSnapshotOptions,
+  options: FlowToBoardSnapshotOptions,
 ): boolean {
   if (node.type !== 'image-node') return true
   if (data.localUpload && (options.projection ?? 'persistable') !== 'runtime') return false
@@ -237,11 +237,11 @@ export function canvasConnectionToFlowEdge(connection: CanvasConnection): FlowAd
   }
 }
 
-export function flowToCanvasBoardSnapshot(
+export function flowToBoardSnapshot(
   input: { nodes: FlowAdapterNode[]; edges: FlowAdapterEdge[] },
-  base?: CanvasBoardSnapshot,
-  options: FlowToCanvasBoardSnapshotOptions = {},
-): CanvasBoardSnapshot {
+  base?: BoardSnapshot,
+  options: FlowToBoardSnapshotOptions = {},
+): BoardSnapshot {
   const snapshot = createSnapshotShell(base)
 
   const snapshotNodeCollections = getSnapshotNodeCollectionsByType(snapshot)
@@ -277,7 +277,7 @@ export function flowToCanvasBoardSnapshot(
     lookupData: (nodeId) => flowNodeDataMap.get(nodeId),
   })
   appendCurrentGroups(snapshot, base, persistedCanvasNodeIds)
-  rebuildCanvasBoardMediaRefs(snapshot, base)
+  rebuildBoardMediaRefs(snapshot, base)
 
   return snapshot
 }

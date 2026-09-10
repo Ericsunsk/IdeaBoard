@@ -2,7 +2,7 @@ import { computed, onScopeDispose, ref, shallowRef, type Ref } from 'vue'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { useCanvasGraphHistory } from '../../graph-runtime/application/useCanvasGraphHistory'
 import {
-  useCanvasBoardAutosave,
+  useBoardAutosave,
   createBoardSyncCoordinator,
   type SaveStatus,
 } from '../../board-session'
@@ -16,9 +16,9 @@ import {
   type CanvasGraphSessionRuntime,
 } from './canvasGraphSessionRuntime'
 import { useCanvasGroupRuntime } from '../../graph-runtime/application/useCanvasGroupRuntime'
-import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
-import { canvasBoardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
-import type { CanvasBoardSession } from '../../board-session'
+import type { BoardSnapshot } from '../../../board/domain'
+import { boardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
+import type { BoardSession } from '../../board-session'
 import {
   createCanvasDeleteCommandLifecycle,
   createCanvasNodeDragLifecycle,
@@ -38,15 +38,15 @@ import {
 export type UseFlowCanvasRuntimeOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  boardBaseSnapshot: Ref<CanvasBoardSnapshot>
+  boardBaseSnapshot: Ref<BoardSnapshot>
   isDirty: Ref<boolean>
   saveStatus: Ref<SaveStatus>
   isLoadingBoardSnapshot: Ref<boolean>
   isSavingBoard: Ref<boolean>
   autosaveResumeSignal?: Ref<unknown> | undefined
-  boardSession: CanvasBoardSession
+  boardSession: BoardSession
   executionCore: PendingImageExecutionCore
-  hydratePendingImageLeases?: ((snapshot: CanvasBoardSnapshot) => void) | undefined
+  hydratePendingImageLeases?: ((snapshot: BoardSnapshot) => void) | undefined
   cancelTasks: (taskIds: readonly string[]) => void
   onWarning: (message: string) => void
   onSuccess: (message: string) => void
@@ -280,7 +280,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   )
 
   function applyBoardSnapshot(
-    snapshot: CanvasBoardSnapshot,
+    snapshot: BoardSnapshot,
     source: 'hydrate-replace' | 'save-reconcile',
     applyOptions: { clearHistory?: boolean } = {},
   ) {
@@ -290,7 +290,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       snapshot,
       source === 'hydrate-replace' ? 'hydrate' : 'save-reconcile',
     )
-    const flow = canvasBoardSnapshotToFlow(snapshot)
+    const flow = boardSnapshotToFlow(snapshot)
     graphRuntime.commitGraph({ nodes: flow.nodes as Node[], edges: flow.edges as Edge[] }, source)
     if (source === 'hydrate-replace' || applyOptions.clearHistory) {
       canvasGraphHistory.clearBaseline()
@@ -324,7 +324,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     return result.saved
   }
 
-  const { markDirtyAndSchedule, flushAutosave } = useCanvasBoardAutosave({
+  const { markDirtyAndSchedule, flushAutosave } = useBoardAutosave({
     isDirty: options.isDirty,
     isSaving: options.isSavingBoard,
     resumeSignal: options.autosaveResumeSignal,

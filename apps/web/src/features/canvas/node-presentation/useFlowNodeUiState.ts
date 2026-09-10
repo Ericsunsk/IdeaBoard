@@ -7,7 +7,7 @@ import {
   getCanvasNodeVisibleInputPorts,
   isCanvasConnectionNodeType,
   isCanvasExecutionOutputNodeType,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 import {
   formatCanvasNodePortLabel,
   getCanvasNodeExecutionActionLabels,
@@ -19,7 +19,7 @@ import {
   type CanvasExecutionOutputNodeItem,
   type CanvasExecutionOutputNodeType,
   type CanvasNodeItem,
-} from '../../canvas-board/domain'
+} from '../../board/domain'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import { parseHandlePort, resolveSourceImageFromNode } from '../utils/flowNodeSourceResolution'
 import { measureCanvasPerf } from '../utils/canvasPerfProbe'

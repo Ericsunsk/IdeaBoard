@@ -1,13 +1,13 @@
 import { computed, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { createEmptyCanvasBoardSnapshot } from '../../../canvas-board/domain'
+import { createEmptyBoardSnapshot } from '../../../board/domain'
 import { CanvasGraphSession, type CanvasGraphGroupId } from '..'
 import { createGroupMembershipRuntime } from './groupMembershipRuntime'
 import type { CanvasGroupFrame } from '../../utils/canvasGroupGeometry'
 
 describe('groupMembershipRuntime', () => {
   function createHarness() {
-    const snapshot = createEmptyCanvasBoardSnapshot()
+    const snapshot = createEmptyBoardSnapshot()
     snapshot.groups = [
       {
         id: 'group-1',

@@ -1,6 +1,6 @@
 import type { CanvasGraphNodeRecord } from '../../graph-runtime'
 import type { CanvasRendererMetricsPort } from '../../vue-flow-adapter'
-import { resolveImageNodeStageHeight, type ImageNodeItem } from '../../../canvas-board/domain'
+import { resolveImageNodeStageHeight, type ImageNodeItem } from '../../../board/domain'
 import type { ImageResultAnchor } from '../planning/imageExecutionResultTypes'
 import { resolveImageNodeLayoutAnchor } from '../../utils/flowImageNodeSelectors'
 

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { createEmptyCanvasBoardSnapshot } from '../../../canvas-board/domain'
+import { createEmptyBoardSnapshot } from '../../../board/domain'
 import { collectPendingImageTasks } from './taskSnapshot'
 
 describe('collectPendingImageTasks', () => {
   it('reads reattach facts from Canvas domain snapshots and preserves client action identity', () => {
-    const snapshot = createEmptyCanvasBoardSnapshot()
+    const snapshot = createEmptyBoardSnapshot()
     snapshot.imageNodes.push(
       {
         id: 1,

@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createEmptyCanvasBoardSnapshot } from '../../canvas-board/domain'
+import { createEmptyBoardSnapshot } from '../../board/domain'
 import { CanvasGraphSession, stageCanvasGraphNodeDragIntent } from '../graph-runtime'
 import { bindCanvasGraphSessionProjection } from './bindCanvasGraphSessionProjection'
 
 describe('bindCanvasGraphSessionProjection', () => {
   it('projects a committed drag into the Vue Flow renderer', () => {
-    const snapshot = createEmptyCanvasBoardSnapshot()
+    const snapshot = createEmptyBoardSnapshot()
     snapshot.imageNodes = [
       {
         id: 1,
@@ -48,7 +48,7 @@ describe('bindCanvasGraphSessionProjection', () => {
   })
 
   it('contains renderer failures and schedules a full projection from canonical facts', () => {
-    const snapshot = createEmptyCanvasBoardSnapshot()
+    const snapshot = createEmptyBoardSnapshot()
     snapshot.imageNodes = [
       {
         id: 1,

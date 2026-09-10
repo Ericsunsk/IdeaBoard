@@ -1,4 +1,4 @@
-import type { useCanvasBoardRuntime } from './useCanvasBoardRuntime'
+import type { useBoardRuntime } from './useBoardRuntime'
 import type { CanvasFeedback } from '../../feedback/useCanvasFeedback'
 import type { CanvasVueFlowAdapter } from '../../vue-flow-adapter'
 import { useCanvasImageWorkflow, type CanvasImageWorkflowUiAdapter } from '../../image-workflow'
@@ -6,7 +6,7 @@ import type { createCanvasWorkspaceGraphRuntime } from './createCanvasWorkspaceG
 import type { PendingImageExecutionCore } from '../../execution/pending-execution'
 
 type CreateCanvasWorkspaceImageWorkflowOptions = {
-  board: ReturnType<typeof useCanvasBoardRuntime>
+  board: ReturnType<typeof useBoardRuntime>
   graph: ReturnType<typeof createCanvasWorkspaceGraphRuntime>
   flowPaneAdapter: CanvasVueFlowAdapter
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>

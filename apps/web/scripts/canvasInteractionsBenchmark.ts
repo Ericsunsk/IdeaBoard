@@ -7,15 +7,15 @@ import { fileURLToPath } from 'node:url'
 import { chromium, type BrowserContext, type Page, type Route } from 'playwright'
 import { stripUndefined } from '../src/shared/api/stripUndefined'
 import {
-  CANVAS_BOARD_STATE_SCHEMA_VERSION,
-  type CanvasBoardState,
+  BOARD_STATE_SCHEMA_VERSION,
+  type BoardState,
   type CanvasConnection,
   type CanvasConnectionPort,
   type CanvasConnectionNodeType,
   type FusionNodeItem,
   type ImageNodeItem,
   type PromptNodeItem,
-} from '../src/features/canvas-board/domain'
+} from '../src/features/board/domain'
 import type { CanvasGraphNodeId } from '../src/features/canvas/graph-runtime'
 import type {
   BoardStateEnvelope,
@@ -617,8 +617,8 @@ function createStructureHeavyFixture(nodeCount: number): BenchmarkFixture {
     refs,
     Math.floor(nodeCount * DEFAULT_EDGE_DENSITY),
   )
-  const state: CanvasBoardState = {
-    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
+  const state: BoardState = {
+    schemaVersion: BOARD_STATE_SCHEMA_VERSION,
     imageNodes,
     promptNodes,
     fusionNodes,
@@ -632,7 +632,7 @@ function createStructureHeavyFixture(nodeCount: number): BenchmarkFixture {
     state: toBoardStateEnvelope(state),
     access_role: 'owner',
     revision: 1,
-    state_schema_version: CANVAS_BOARD_STATE_SCHEMA_VERSION,
+    state_schema_version: BOARD_STATE_SCHEMA_VERSION,
     created_at: MOCK_UPDATED_AT - 86_400_000,
     updated_at: MOCK_UPDATED_AT,
   } satisfies UserBoardItem
@@ -660,7 +660,7 @@ function createStructureHeavyFixture(nodeCount: number): BenchmarkFixture {
   }
 }
 
-function toBoardStateEnvelope(state: CanvasBoardState): BoardStateEnvelope {
+function toBoardStateEnvelope(state: BoardState): BoardStateEnvelope {
   return stripUndefined({
     schemaVersion: state.schemaVersion,
     imageNodes: state.imageNodes.map((node) => ({ ...node })),
@@ -858,7 +858,7 @@ function applyBoardMutation(board: UserBoardItem, bodyText: string | null): User
     return {
       ...board,
       ...(typeof payload.name === 'string' ? { name: payload.name } : {}),
-      ...(isCanvasBoardState(payload.state) ? { state: toBoardStateEnvelope(payload.state) } : {}),
+      ...(isBoardState(payload.state) ? { state: toBoardStateEnvelope(payload.state) } : {}),
       ...(typeof payload.revision === 'number' ? { revision: payload.revision } : {}),
       updated_at: Date.now(),
     }
@@ -870,11 +870,11 @@ function applyBoardMutation(board: UserBoardItem, bodyText: string | null): User
   }
 }
 
-function isCanvasBoardState(value: unknown): value is CanvasBoardState {
+function isBoardState(value: unknown): value is BoardState {
   if (!value || typeof value !== 'object') return false
-  const record = value as Partial<CanvasBoardState>
+  const record = value as Partial<BoardState>
   return (
-    record.schemaVersion === CANVAS_BOARD_STATE_SCHEMA_VERSION &&
+    record.schemaVersion === BOARD_STATE_SCHEMA_VERSION &&
     Array.isArray(record.imageNodes) &&
     Array.isArray(record.promptNodes) &&
     Array.isArray(record.fusionNodes) &&

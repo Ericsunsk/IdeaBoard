@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ImageNodeItem } from '../../canvas-board/domain'
+import type { ImageNodeItem } from '../../board/domain'
 import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 import { unsupportedUploadImageMessage } from '../../../shared/utils/imageUploadSupport'
 import { useFlowImageUploadActions } from './useFlowImageUploadActions'

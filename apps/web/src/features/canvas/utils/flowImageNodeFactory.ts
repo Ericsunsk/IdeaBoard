@@ -1,5 +1,5 @@
 import type { Node } from '@vue-flow/core'
-import type { ImageNodeItem } from '../../canvas-board/domain'
+import type { ImageNodeItem } from '../../board/domain'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { FlowAdapterNode } from './flowSnapshotAdapter'
 import { resolveFlowNodeDragHandle } from './flowNodeDragHandle'

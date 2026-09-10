@@ -1,12 +1,12 @@
 import { TaskCancelledError } from '../../../../shared/api/taskEvents'
 import { describe, expect, it, vi } from 'vitest'
-import { createEmptyCanvasBoardSnapshot } from '../../../canvas-board/domain'
+import { createEmptyBoardSnapshot } from '../../../board/domain'
 import { CanvasGraphSession } from '../../graph-runtime'
-import { CanvasBoardGraphSession, createPendingImageExecutionCore } from '../pending-execution'
+import { BoardGraphSession, createPendingImageExecutionCore } from '../pending-execution'
 import { createCanvasExecutionRecoveryCoordinator } from './canvasExecutionRecoveryCoordinator'
 
 function pendingSnapshot() {
-  const snapshot = createEmptyCanvasBoardSnapshot()
+  const snapshot = createEmptyBoardSnapshot()
   snapshot.imageNodes.push({
     id: 1,
     type: 'image-node',
@@ -29,7 +29,7 @@ function createHarness(options: { onMaterialized?: (() => void) | undefined } = 
   const graph = CanvasGraphSession.hydrate('board-a', snapshot)
   const core = createPendingImageExecutionCore()
   core.attachBoard(
-    CanvasBoardGraphSession.create('board-a', {
+    BoardGraphSession.create('board-a', {
       graphSession: graph,
       onMaterialized: options.onMaterialized,
     }),
@@ -93,8 +93,8 @@ describe('Canvas Execution Recovery Coordinator', () => {
       expect(harness.core.factFor('image-1')).toMatchObject({ status: 'running' }),
     )
 
-    const nextGraph = CanvasGraphSession.hydrate('board-b', createEmptyCanvasBoardSnapshot())
-    harness.core.attachBoard(CanvasBoardGraphSession.create('board-b', { graphSession: nextGraph }))
+    const nextGraph = CanvasGraphSession.hydrate('board-b', createEmptyBoardSnapshot())
+    harness.core.attachBoard(BoardGraphSession.create('board-b', { graphSession: nextGraph }))
     resolveResult({ url: 'https://example.com/stale.png', ratio: 1 })
     await recovery
 

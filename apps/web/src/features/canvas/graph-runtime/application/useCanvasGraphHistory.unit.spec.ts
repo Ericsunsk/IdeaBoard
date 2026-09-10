@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { createEmptyCanvasBoardSnapshot } from '../../../canvas-board/domain'
+import { createEmptyBoardSnapshot } from '../../../board/domain'
 import { CanvasGraphSession } from '..'
 import { useCanvasGraphHistory } from './useCanvasGraphHistory'
 
 function createHarness() {
-  const snapshot = createEmptyCanvasBoardSnapshot()
+  const snapshot = createEmptyBoardSnapshot()
   snapshot.promptNodes = [
     {
       id: 1,

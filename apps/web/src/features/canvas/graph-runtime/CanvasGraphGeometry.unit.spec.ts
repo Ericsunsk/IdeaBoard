@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createEmptyCanvasBoardSnapshot } from '../../canvas-board/domain'
+import { createEmptyBoardSnapshot } from '../../board/domain'
 import {
   readCanvasGraphNodeBounds,
   resolveCanvasGraphNodeDimensions,
@@ -9,7 +9,7 @@ import { createCanvasGraphStore } from './canvasGraphStore'
 
 describe('CanvasGraphGeometry', () => {
   it('uses the canonical image ratio and header policy', () => {
-    const snapshot = createEmptyCanvasBoardSnapshot()
+    const snapshot = createEmptyBoardSnapshot()
     snapshot.imageNodes = [
       {
         id: 1,
@@ -42,7 +42,7 @@ describe('CanvasGraphGeometry', () => {
   })
 
   it('merges canonical node bounds with explicit group padding', () => {
-    const snapshot = createEmptyCanvasBoardSnapshot()
+    const snapshot = createEmptyBoardSnapshot()
     snapshot.promptNodes = [
       {
         id: 1,

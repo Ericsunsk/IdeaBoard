@@ -28,7 +28,7 @@ const mocks = vi.hoisted(() => ({
       actionUnavailable: vi.fn(),
     },
   },
-  useCanvasBoardRuntime: vi.fn(),
+  useBoardRuntime: vi.fn(),
   useCanvasGraphEditing: vi.fn(),
   useCanvasGraphInteractions: vi.fn(),
   useCanvasViewportRuntime: vi.fn(),
@@ -41,8 +41,8 @@ vi.mock('../../feedback/useCanvasFeedback', () => ({
   useCanvasFeedback: () => mocks.feedback,
 }))
 
-vi.mock('./useCanvasBoardRuntime', () => ({
-  useCanvasBoardRuntime: mocks.useCanvasBoardRuntime,
+vi.mock('./useBoardRuntime', () => ({
+  useBoardRuntime: mocks.useBoardRuntime,
 }))
 
 vi.mock('../../graph-editing', () => ({
@@ -301,12 +301,12 @@ function createWorkspacePartsHarness() {
   const viewportRuntime = {
     zoomLevel: ref(100),
     flushViewportPersistence: vi.fn(() => events.push('viewport')),
-    loadCanvasBoardAndProbe: vi.fn(),
+    loadBoardAndProbe: vi.fn(),
   }
   board.boardSession.flushAutosave.mockImplementation(async () => {
     events.push('autosave')
   })
-  mocks.useCanvasBoardRuntime.mockReturnValue(board)
+  mocks.useBoardRuntime.mockReturnValue(board)
   mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
   mocks.useCanvasGraphInteractions.mockReturnValue(createGraphInteractionRuntime(graph))
   mocks.useCanvasImageWorkflow.mockReturnValue(imageWorkflow)
@@ -324,7 +324,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     mocks.useCanvasViewportRuntime.mockReturnValue({
       zoomLevel: ref(100),
       flushViewportPersistence: vi.fn(),
-      loadCanvasBoardAndProbe: vi.fn(),
+      loadBoardAndProbe: vi.fn(),
     })
     mocks.createCanvasTaskLifecycle.mockReturnValue({
       cancelTasks: mocks.cancelTasks,
@@ -379,7 +379,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
 
     expect(events).toEqual(['viewport', 'autosave'])
     expect(board.boardSession.flushAutosave).toHaveBeenCalledWith({ silent: false })
-    expect(viewportRuntime.loadCanvasBoardAndProbe).toHaveBeenCalledTimes(1)
+    expect(viewportRuntime.loadBoardAndProbe).toHaveBeenCalledTimes(1)
     expect(imageWorkflow.reattachPendingImageResults).toHaveBeenCalledTimes(1)
     expect(graph.resumePendingLibraryImports).toHaveBeenCalledTimes(1)
   })
@@ -387,7 +387,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
   it('selects feedback and adapters for each Workspace runtime responsibility', () => {
     const { board, graph, runtimeOptions, runtime } = createWorkspacePartsHarness()
 
-    expect(mocks.useCanvasBoardRuntime).toHaveBeenCalledWith(
+    expect(mocks.useBoardRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
         feedback: mocks.feedback.boardSession,
         executionCore: expect.objectContaining({
@@ -458,7 +458,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     const board = createBoardRuntime()
     const graph = createGraphRuntime()
     const imageWorkflow = createImageWorkflowRuntime()
-    mocks.useCanvasBoardRuntime.mockReturnValue(board)
+    mocks.useBoardRuntime.mockReturnValue(board)
     mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
     mocks.useCanvasGraphInteractions.mockReturnValue(createGraphInteractionRuntime(graph))
     mocks.useCanvasImageWorkflow.mockReturnValue(imageWorkflow)

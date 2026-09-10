@@ -11,10 +11,10 @@ const consumers = {
   navigation: readSource('features/user-shell/components/UserWorkspaceNavigation.vue'),
   searchPage: readSource('features/search/presentation/pages/SearchPage.vue'),
   searchBatchDock: readSource('features/search/presentation/components/SearchBatchActionDock.vue'),
-  boardsSkin: readSource('features/board-catalog/lib/skin.ts'),
+  boardsSkin: readSource('features/board/presentation/catalog/skin.ts'),
   libraryIsland: readSource('features/library/components/LibraryFloatingIsland.vue'),
   canvasChrome: readSource('features/canvas/workspace-chrome/components/CanvasChrome.vue'),
-  canvasBoardHeader: readSource(
+  boardHeader: readSource(
     'features/canvas/workspace-chrome/components/CanvasChromeBoardHeader.vue',
   ),
   canvasMiniMap: readSource('features/canvas/components/CanvasMiniMap.vue'),
@@ -30,7 +30,7 @@ describe('Cross-feature page chrome surface contract', () => {
   })
 
   it('uses a command menu instead of a form select for Boards sorting', () => {
-    const boardsPage = readSource('features/board-catalog/pages/BoardsPage.vue')
+    const boardsPage = readSource('features/board/presentation/catalog/BoardsPage.vue')
 
     expect(boardsPage).toContain(':class="catalogClasses.sortMenuTrigger"')
     expect(boardsPage).toContain('<Menu')

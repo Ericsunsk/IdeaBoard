@@ -1,6 +1,6 @@
-import { resolveImageNodeFrameSize, type ImageNodeItem } from '../../../canvas-board/domain'
+import { resolveImageNodeFrameSize, type ImageNodeItem } from '../../../board/domain'
 import { CanvasGraphSession, type CanvasGraphStore } from '../../graph-runtime'
-import type { CanvasBoardAttachment, CanvasBoardSessionIdentity } from '../../board-attachment'
+import type { BoardAttachment, BoardSessionIdentity } from '../../board-attachment'
 import type { MediaRef } from '../../../../shared/media/mediaRef'
 
 export type PendingImageResultNodeId = `image-${number}`
@@ -38,26 +38,26 @@ export type PendingImageDomainMutationResult = Readonly<{
 }>
 
 export type PendingImageDomainMutationPort = Readonly<{
-  attachment: CanvasBoardAttachment
-  sessionIdentity: CanvasBoardSessionIdentity
+  attachment: BoardAttachment
+  sessionIdentity: BoardSessionIdentity
   materializeBatch: (
     inputs: readonly PendingImageDomainMutationInput[],
   ) => PendingImageDomainMutationResult
 }>
 
-export type CanvasBoardGraphSessionBinding = Readonly<{
-  attachment: CanvasBoardAttachment
-  sessionIdentity: CanvasBoardSessionIdentity
+export type BoardGraphSessionBinding = Readonly<{
+  attachment: BoardAttachment
+  sessionIdentity: BoardSessionIdentity
   mutations: PendingImageDomainMutationPort
 }>
 
-export type CanvasBoardGraphSessionOptions = Readonly<{
+export type BoardGraphSessionOptions = Readonly<{
   graphSession: CanvasGraphSession
   onMaterialized?:
     ((store: CanvasGraphStore, result: PendingImageDomainMutationResult) => void) | undefined
 }>
 
-export const bindCanvasBoardGraphSession = Symbol('bindCanvasBoardGraphSession')
+export const bindBoardGraphSession = Symbol('bindBoardGraphSession')
 
 function normalizeResolvedImageResult(
   result: PendingImageResolvedResult,
@@ -90,29 +90,29 @@ function requireBoardId(boardId: string): string {
   return normalized
 }
 
-export class CanvasBoardGraphSession {
+export class BoardGraphSession {
   readonly boardId: string
   readonly #graphSession: CanvasGraphSession
-  readonly #onMaterialized?: CanvasBoardGraphSessionOptions['onMaterialized']
-  readonly #identity = Object.freeze({}) as CanvasBoardSessionIdentity
+  readonly #onMaterialized?: BoardGraphSessionOptions['onMaterialized']
+  readonly #identity = Object.freeze({}) as BoardSessionIdentity
 
-  private constructor(boardId: string, options: CanvasBoardGraphSessionOptions) {
+  private constructor(boardId: string, options: BoardGraphSessionOptions) {
     this.boardId = requireBoardId(boardId)
     this.#graphSession = options.graphSession
     this.#onMaterialized = options.onMaterialized
     Object.freeze(this)
   }
 
-  static create(boardId: string, options: CanvasBoardGraphSessionOptions): CanvasBoardGraphSession {
-    return new CanvasBoardGraphSession(boardId, options)
+  static create(boardId: string, options: BoardGraphSessionOptions): BoardGraphSession {
+    return new BoardGraphSession(boardId, options)
   }
 
-  [bindCanvasBoardGraphSession](epoch: number): CanvasBoardGraphSessionBinding {
+  [bindBoardGraphSession](epoch: number): BoardGraphSessionBinding {
     const attachment = Object.freeze({
       boardId: this.boardId,
       epoch,
       sessionIdentity: this.#identity,
-    }) as CanvasBoardAttachment
+    }) as BoardAttachment
     const mutations: PendingImageDomainMutationPort = Object.freeze({
       attachment,
       sessionIdentity: this.#identity,

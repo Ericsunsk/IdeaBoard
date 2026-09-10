@@ -1,8 +1,8 @@
 import type { Edge, Node } from '@vue-flow/core'
 import { ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import type { ImageNodeItem } from '../../canvas-board/domain'
-import type { CanvasBoardAttachment } from '../board-attachment'
+import type { ImageNodeItem } from '../../board/domain'
+import type { BoardAttachment } from '../board-attachment'
 import { useCanvasVueFlowGraphAdapter } from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
 import { useCanvasLibraryImportRuntime } from './useCanvasLibraryImportRuntime'
@@ -21,8 +21,8 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-function attachment(): CanvasBoardAttachment {
-  return {} as CanvasBoardAttachment
+function attachment(): BoardAttachment {
+  return {} as BoardAttachment
 }
 
 function pendingNode(id = 'image-1', libraryAssetId = 7): Node<FlowNodeData> {
@@ -52,7 +52,7 @@ function createHarness(
 ) {
   const nodes = shallowRef<Node[]>(initialNodes)
   const edges = shallowRef<Edge[]>([])
-  const currentAttachment = ref<CanvasBoardAttachment | null>(attachment())
+  const currentAttachment = ref<BoardAttachment | null>(attachment())
   const graphAdapter = useCanvasVueFlowGraphAdapter({ nodes, edges })
   const updateImageSnapshot = vi.fn(
     (nodeId: string, mutate: (snapshot: ImageNodeItem) => ImageNodeItem) => {

@@ -1,4 +1,4 @@
-import type { PromptAspectRatio } from '../../canvas-board/domain'
+import type { PromptAspectRatio } from '../../board/domain'
 import type { ImageNodeAction } from '../config/imageActionRegistry'
 import type { OutpaintDragAnchor } from '../image-workflow/useImageOutpaintOverlay'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'

@@ -10,7 +10,7 @@ const routeComponents = vi.hoisted(() => ({
 vi.mock('../layout/UserLayout.vue', () => ({ default: routeComponents.layout }))
 
 type LazyRouteModule = {
-  default: Component
+  default?: Component
 }
 
 function requireRoute(routes: RouteRecordRaw[], path: string): RouteRecordRaw {
@@ -21,8 +21,8 @@ function requireRoute(routes: RouteRecordRaw[], path: string): RouteRecordRaw {
 
 async function loadRouteComponent(route: RouteRecordRaw): Promise<Component> {
   expect(route.component).toEqual(expect.any(Function))
-  const loaded = await (route.component as () => Promise<LazyRouteModule>)()
-  return loaded.default
+  const loaded = await (route.component as () => Promise<LazyRouteModule | Component>)()
+  return (loaded as LazyRouteModule).default ?? (loaded as Component)
 }
 
 describe('userRoutes contract', () => {

@@ -13,7 +13,7 @@ import {
 } from '../retouch/runtime/processingCancelled'
 import { isCanvasGraphNodeId, type CanvasGraphNodeId } from '../graph-runtime'
 import type { ImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
-import type { ImageNodeItem } from '../../canvas-board/domain'
+import type { ImageNodeItem } from '../../board/domain'
 
 type RetouchEffectLayers = Parameters<typeof hasRenderableRetouchLayerStack>[0]
 
