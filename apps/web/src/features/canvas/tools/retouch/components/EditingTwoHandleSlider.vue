@@ -34,6 +34,7 @@
 import { computed, nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { usePointerDragSession } from '../../../infrastructure/browser/interaction/usePointerDragSession.ts'
+import { clampWithFallback, clampUnit } from '../../../../../shared/utils/number'
 
 type TwoHandleSliderHandle = {
   id: string
@@ -82,15 +83,15 @@ const dragSession = usePointerDragSession<string>({
 
 const normalizedHandles = computed(() =>
   props.handles.slice(0, 2).map((handle) => {
-    const min = clampValue(handle.min, props.min, props.max)
-    const max = clampValue(handle.max, props.min, props.max)
+    const min = clampWithFallback(handle.min, props.min, props.max, props.min)
+    const max = clampWithFallback(handle.max, props.min, props.max, props.min)
     const lower = Math.min(min, max)
     const upper = Math.max(min, max)
     return {
       ...handle,
       min: snapValue(lower),
       max: snapValue(upper),
-      value: snapValue(clampValue(handle.value, lower, upper)),
+      value: snapValue(clampWithFallback(handle.value, lower, upper, lower)),
     }
   }),
 )
@@ -163,7 +164,7 @@ function resolveKeyboardDelta(key: string, step: number) {
 function emitHandleValue(handleId: string, value: number) {
   const handle = normalizedHandles.value.find((item) => item.id === handleId)
   if (!handle) return
-  emit('update:handle', handleId, snapValue(clampValue(value, handle.min, handle.max)))
+  emit('update:handle', handleId, snapValue(clampWithFallback(value, handle.min, handle.max, handle.min)))
 }
 
 function resolvePointerValue(position: PointerPosition) {
@@ -219,14 +220,6 @@ function snapValue(value: number) {
   return Math.round(value / props.step) * props.step
 }
 
-function clampValue(value: number, min: number, max: number) {
-  if (!Number.isFinite(value)) return min
-  return Math.min(max, Math.max(min, value))
-}
-
-function clampUnit(value: number) {
-  return clampValue(value, 0, 1)
-}
 </script>
 
 <style scoped>

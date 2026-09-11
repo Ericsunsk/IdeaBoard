@@ -1,4 +1,5 @@
 import { i18n } from '../../../../../shared/i18n'
+import { clampWithFallback } from '../../../../../shared/utils/number'
 import type { RetouchLevelsParams } from '../model.ts'
 import {
   RETOUCH_CHANNEL_MAX,
@@ -282,7 +283,7 @@ function createMidtonesConstraint(shadows: number, highlights: number): RetouchL
 }
 
 function clampUnit(value: number) {
-  return clampFloat(value, 0, 1, 0)
+  return clampWithFallback(value, 0, 1, 0)
 }
 
 function createLut(resolve: (value: number) => number) {
@@ -291,11 +292,6 @@ function createLut(resolve: (value: number) => number) {
     lut[index] = clampRetouchChannel(resolve(index))
   }
   return lut
-}
-
-function clampFloat(value: unknown, min: number, max: number, fallback: number) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
-  return Math.min(max, Math.max(min, value))
 }
 
 function formatMarkerValue(value: number) {

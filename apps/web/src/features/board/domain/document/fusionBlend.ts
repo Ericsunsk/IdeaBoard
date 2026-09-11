@@ -1,3 +1,5 @@
+import { clamp } from '../../../../shared/utils/number'
+
 export interface FusionBlendPoint {
   x: number
   y: number
@@ -32,10 +34,6 @@ const FUSION_SLOT_ANCHOR_FACTORIES: Record<
   'top-center': (geometry) => ({ x: 0.5, y: geometry.centerNear }),
   'bottom-left': (geometry) => ({ x: geometry.centerNear, y: geometry.centerFar }),
   'bottom-right': (geometry) => ({ x: geometry.centerFar, y: geometry.centerFar }),
-}
-
-function clamp01(value: number): number {
-  return Math.max(0, Math.min(1, value))
 }
 
 function resolveStageWidth(stageWidth?: number): number {
@@ -137,7 +135,7 @@ function projectPointToSegment(
   if (denom <= 0) {
     return { point: { ...start }, t: 0 }
   }
-  const t = clamp01(dot(wx, wy, vx, vy) / denom)
+  const t = clamp(dot(wx, wy, vx, vy) / denom, 0, 1)
   return {
     point: add(start, scale([vx, vy], t)),
     t,
@@ -203,8 +201,8 @@ export function normalizeFusionBlendPoint(value: unknown): FusionBlendPoint {
   const x = Number(candidate?.x)
   const y = Number(candidate?.y)
   return {
-    x: Number.isFinite(x) ? clamp01(x) : DEFAULT_FUSION_BLEND_POINT.x,
-    y: Number.isFinite(y) ? clamp01(y) : DEFAULT_FUSION_BLEND_POINT.y,
+    x: Number.isFinite(x) ? clamp(x, 0, 1) : DEFAULT_FUSION_BLEND_POINT.x,
+    y: Number.isFinite(y) ? clamp(y, 0, 1) : DEFAULT_FUSION_BLEND_POINT.y,
   }
 }
 
@@ -319,8 +317,8 @@ export function computeFusionBlendWeights(
   const maxY = quad[2]!.y
   const width = maxX - minX
   const height = maxY - minY
-  const u = width > 0 ? clamp01((blendPoint.x - minX) / width) : 0.5
-  const v = height > 0 ? clamp01((blendPoint.y - minY) / height) : 0.5
+  const u = width > 0 ? clamp((blendPoint.x - minX) / width, 0, 1) : 0.5
+  const v = height > 0 ? clamp((blendPoint.y - minY) / height, 0, 1) : 0.5
   return normalizeWeights([(1 - u) * (1 - v), u * (1 - v), (1 - u) * v, u * v])
 }
 

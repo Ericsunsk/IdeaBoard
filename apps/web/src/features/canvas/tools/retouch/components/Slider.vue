@@ -34,6 +34,7 @@
 import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'
 import { readFiniteNumberInputValue } from '../processing/readFiniteNumberInputValue.ts'
+import { clamp } from '../../../../../shared/utils/number'
 
 const props = defineProps<{
   label: string
@@ -72,12 +73,12 @@ function normalizeStep(step: number | undefined) {
 }
 
 function normalizeValue(value: number, min: number, max: number, step: number) {
-  const clamped = Math.min(max, Math.max(min, value))
+  const clamped = clamp(value, min, max)
   if (step >= 1 && Number.isInteger(step)) return Math.round(clamped)
 
   const offsetSteps = Math.round((clamped - min) / step)
   const stepped = min + offsetSteps * step
-  return Number(Math.min(max, Math.max(min, stepped)).toFixed(resolveDecimalPlaces(step)))
+  return Number(clamp(stepped, min, max).toFixed(resolveDecimalPlaces(step)))
 }
 
 function resolveDecimalPlaces(step: number) {

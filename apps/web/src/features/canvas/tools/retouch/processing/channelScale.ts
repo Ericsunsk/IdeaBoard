@@ -51,7 +51,14 @@ export function retouchPlotPercentToChannel(value: unknown, fallbackChannel = RE
   )
 }
 
-function clampFiniteNumber(value: unknown, min: number, max: number, fallback: number) {
+/**
+ * Canonical boundary parser for the retouch pipeline: accepts `unknown`,
+ * rejects every non-finite / non-number input to `fallback`, and returns the
+ * value clamped into `[min, max]`. The fallback is returned as-is (not itself
+ * clamped). This is the single implementation that the whole retouch feature
+ * derives its range coercion from.
+ */
+export function clampFiniteNumber(value: unknown, min: number, max: number, fallback: number) {
   if (!isFiniteNumber(value)) return fallback
   return Math.min(max, Math.max(min, value))
 }

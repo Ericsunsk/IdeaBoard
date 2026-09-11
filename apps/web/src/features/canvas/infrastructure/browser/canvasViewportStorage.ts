@@ -1,3 +1,5 @@
+import { clamp } from '../../../../shared/utils/number'
+
 export type CanvasFlowViewportState = {
   x: number
   y: number
@@ -36,7 +38,7 @@ function createCanvasViewportStorageKey(identity: CanvasViewportStorageIdentity)
 }
 
 function clampZoom(zoom: number): number {
-  return Math.min(CANVAS_VIEWPORT_MAX_ZOOM, Math.max(CANVAS_VIEWPORT_MIN_ZOOM, zoom))
+  return clamp(zoom, CANVAS_VIEWPORT_MIN_ZOOM, CANVAS_VIEWPORT_MAX_ZOOM)
 }
 
 function normalizeViewportRecord(value: unknown): StoredCanvasViewportState | null {

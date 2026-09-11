@@ -84,6 +84,7 @@ import { useI18n } from 'vue-i18n'
 import './styles/retouch-histogram-plot.css'
 import { computed, nextTick, ref } from 'vue'
 import { usePointerDragSession } from '../../../infrastructure/browser/interaction/usePointerDragSession.ts'
+import { clampWithFallback } from '../../../../../shared/utils/number'
 
 const props = withDefaults(
   defineProps<{
@@ -354,12 +355,11 @@ function resolveNearestMarker(position: PointerPosition) {
 }
 
 function clampPercent(value: number) {
-  return clampNumber(value, 0, 100)
+  return clampWithFallback(value, 0, 100, 0)
 }
 
 function clampNumber(value: number, min: number, max: number) {
-  if (!Number.isFinite(value)) return min
-  return Math.min(max, Math.max(min, value))
+  return clampWithFallback(value, min, max, min)
 }
 
 function isFiniteNumber(value: unknown): value is number {

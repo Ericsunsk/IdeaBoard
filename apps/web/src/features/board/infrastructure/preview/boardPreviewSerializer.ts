@@ -20,6 +20,7 @@ import {
   BLANK_BOARD_PREVIEW_DOT_RADIUS,
   BLANK_BOARD_PREVIEW_DOT_SPACING,
 } from './boardPreviewStyle'
+import { clamp } from '../../../../shared/utils/number'
 
 interface BoardPreviewFrame {
   key: string
@@ -99,10 +100,6 @@ function isFiniteNumber(value: unknown): value is number {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object'
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value))
 }
 
 function withAlpha(hex: string, alpha: number): string {

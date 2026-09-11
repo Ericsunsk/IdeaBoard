@@ -1,4 +1,5 @@
 import { i18n } from '../../../../../shared/i18n'
+import { clampWithFallback } from '../../../../../shared/utils/number'
 import type {
   ImageRetouchKind,
   RetouchEffectLayer,
@@ -298,8 +299,7 @@ function isNeutralSharpenRetouch(params: NormalizedSharpenEffect) {
 }
 
 function clampToRange(value: number, range: ImageRetouchNumberRange) {
-  if (!Number.isFinite(value)) return range.defaultValue
-  return Math.min(range.max, Math.max(range.min, value))
+  return clampWithFallback(value, range.min, range.max, range.defaultValue)
 }
 
 export function getImageRetouchDefaultParams<TKind extends ImageRetouchKind>(

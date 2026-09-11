@@ -1,4 +1,5 @@
 import type { RetouchEffectLayer } from '../model.ts'
+import { clamp, clampWithFallback } from '../../../../../shared/utils/number'
 import {
   CHANNEL_MAX,
   CHANNEL_MIN,
@@ -454,7 +455,7 @@ function alignPixelByteOffset(offset: number) {
 }
 
 function clampInteger(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value))
+  return clamp(value, min, max)
 }
 
 function createLut(resolve: (value: number) => number) {
@@ -480,14 +481,9 @@ function normalizeHueUnit(value: number) {
 }
 
 function clampChannel(value: number) {
-  return Math.round(clampNumber(value, CHANNEL_MIN, CHANNEL_MAX, CHANNEL_MIN))
+  return Math.round(clampWithFallback(value, CHANNEL_MIN, CHANNEL_MAX, CHANNEL_MIN))
 }
 
 function clampUnit(value: number) {
-  return clampNumber(value, 0, 1, 0)
-}
-
-function clampNumber(value: number, min: number, max: number, fallback: number) {
-  if (!Number.isFinite(value)) return fallback
-  return Math.min(max, Math.max(min, value))
+  return clampWithFallback(value, 0, 1, 0)
 }

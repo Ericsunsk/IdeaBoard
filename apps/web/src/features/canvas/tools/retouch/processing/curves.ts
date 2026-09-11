@@ -3,6 +3,7 @@ import {
   RETOUCH_CHANNEL_MAX,
   RETOUCH_CHANNEL_MIN,
   RETOUCH_PLOT_PERCENT_MAX,
+  clampFiniteNumber,
   clampRetouchChannel,
   clampRetouchRoundedPlotPercent,
   retouchChannelToPlotPercent,
@@ -275,7 +276,7 @@ export function moveCurvePoint(
   const maxInput = point.endpoint
     ? point.input
     : (next?.input ?? RETOUCH_PLOT_PERCENT_MAX) - RETOUCH_CURVE_MIN_INPUT_SPACING
-  const input = clampNumber(nextValue.input, minInput, maxInput, point.input)
+  const input = clampFiniteNumber(nextValue.input, minInput, maxInput, point.input)
   const updated = {
     id: point.id,
     input,
@@ -374,11 +375,6 @@ function isCurveChannelsRecord(
 
 function isCurvePointRecord(value: unknown): value is Partial<RetouchCurvePoint> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function clampNumber(value: unknown, min: number, max: number, fallback: number) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
-  return Math.min(max, Math.max(min, value))
 }
 
 function composeCurveChannelLuts(first: Uint8ClampedArray, second: Uint8ClampedArray) {
