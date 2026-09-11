@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import type { CanvasCreatableNodeKind } from '../../../board/domain'
+import type { CanvasCreatableNodeKind } from '../../../board'
 import { getCanvasNodeKindMenuItems } from '../../domain/nodes/canvasNodeRegistry.ts'
 
 type CanvasNodeContextMenuSnapshot = {

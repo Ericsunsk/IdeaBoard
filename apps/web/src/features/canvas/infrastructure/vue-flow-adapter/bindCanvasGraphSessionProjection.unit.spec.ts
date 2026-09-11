@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createEmptyBoardSnapshot } from '../../../board/domain'
+import { createEmptyBoardSnapshot } from '../../../board'
 import { CanvasGraphSession, stageCanvasGraphNodeDragIntent } from '../../domain/graph'
 import { bindCanvasGraphSessionProjection } from './bindCanvasGraphSessionProjection'
 

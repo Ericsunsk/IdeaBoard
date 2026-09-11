@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   createEmptyBoardSnapshot,
   type BoardSnapshot,
-} from '../../../../board/domain'
+} from '../../../../board'
 import { CanvasGraphSession } from '..'
 import { useCanvasGroupRuntime } from './useCanvasGroupRuntime'
 import type { CanvasVueFlowGraphAdapter } from '../../../infrastructure/vue-flow-adapter/useCanvasVueFlowGraphAdapter'

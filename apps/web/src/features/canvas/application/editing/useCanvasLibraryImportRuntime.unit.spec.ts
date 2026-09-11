@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@vue-flow/core'
 import { ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import type { ImageNodeItem } from '../../../board/domain'
+import type { ImageNodeItem } from '../../../board'
 import type { BoardAttachment } from '../execution/board-attachment'
 import { useCanvasVueFlowGraphAdapter } from '../../infrastructure/vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import type { FlowNodeData } from '../../domain/nodes/flowTypes.ts'

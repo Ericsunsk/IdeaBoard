@@ -1,6 +1,5 @@
 import { computed, type ComputedRef } from 'vue'
-import type { BoardSnapshot } from '../../../board/domain'
-import { isBoardNameConflictError } from '../../../board/application/sync/boardSync'
+import { isBoardNameConflictError, type BoardSnapshot } from '../../../board'
 import { i18n } from '../../../../shared/i18n'
 import {
   createBoardSessionRepository,

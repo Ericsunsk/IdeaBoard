@@ -5,7 +5,7 @@ import {
   createEmptyBoardSnapshot,
   type BoardSnapshot,
   type ImageNodeItem,
-} from '../../../board/domain'
+} from '../../../board'
 import { i18n } from '../../../../shared/i18n'
 import { loadLocaleMessages } from '../../../../shared/i18n/userLocale'
 import { CanvasGraphSession } from '../../domain/graph'

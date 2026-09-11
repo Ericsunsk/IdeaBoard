@@ -1,9 +1,9 @@
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { createCanvasNodeAt } from '../../../domain/nodes/canvasNodeFactory.ts'
-import { requireImageNodeOutputCount, type ImageNodeItem } from '../../../../board/domain'
+import { requireImageNodeOutputCount, type ImageNodeItem } from '../../../../board'
 import type { FlowNodeData } from '../../../domain/nodes/flowTypes.ts'
-import { resolveImageNodeFrameSize } from '../../../../board/domain'
+import { resolveImageNodeFrameSize } from '../../../../board'
 import type {
   ImageExecutionInput,
   ImageExecutionResultOptions,

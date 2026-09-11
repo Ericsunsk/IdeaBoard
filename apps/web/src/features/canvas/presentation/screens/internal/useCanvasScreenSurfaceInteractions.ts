@@ -1,6 +1,6 @@
 import { computed, type ComputedRef, type Ref } from 'vue'
 import type { NodeChange, NodeDragEvent, NodeMouseEvent } from '@vue-flow/core'
-import type { CanvasCreatableNodeKind } from '../../../../board/domain'
+import type { CanvasCreatableNodeKind } from '../../../../board'
 import { useFlowNodeDragInteractions } from '../useFlowNodeDragInteractions'
 import { useFlowCanvasShellInteractions } from '../useFlowCanvasShellInteractions'
 import { useFlowTransientUiDismissal } from '../useFlowTransientUiDismissal'

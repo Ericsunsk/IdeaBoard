@@ -1,4 +1,4 @@
-import type { ImageNodeItem } from '../../../../board/domain'
+import type { ImageNodeItem } from '../../../../board'
 import type { useBoardRuntime } from './useBoardRuntime'
 import type { CanvasFeedback } from '../useCanvasFeedback.ts'
 import type { CanvasVueFlowAdapter } from '../../../infrastructure/vue-flow-adapter'

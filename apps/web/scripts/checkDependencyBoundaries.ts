@@ -11,6 +11,63 @@ type BoundaryFixtureCase = {
   fixtureFilePath: string
   content: string
   additionalFiles?: Array<{ filePath: string; content: string }>
+  scannerOnly?: boolean
+}
+
+function resolveSourceModule(sourcePath: string, specifier: string): string | null {
+  if (!specifier.startsWith('.') && !specifier.startsWith('@/') && !specifier.startsWith('src/'))
+    return null
+  const candidate = specifier.startsWith('@/')
+    ? path.join(webRoot, 'src', specifier.slice(2))
+    : specifier.startsWith('src/')
+      ? path.join(webRoot, specifier)
+      : path.resolve(path.dirname(sourcePath), specifier)
+  const candidates = [
+    candidate,
+    `${candidate}.ts`,
+    `${candidate}.tsx`,
+    `${candidate}.vue`,
+    path.join(candidate, 'index.ts'),
+  ]
+  const resolved = candidates.find((file) => fs.existsSync(file) && fs.statSync(file).isFile())
+  return resolved ? path.relative(webRoot, resolved).split(path.sep).join('/') : null
+}
+
+function scanBoardDeepImports(includeFixtures = false): Set<string> {
+  const edges = new Set<string>()
+  const sourceFiles = runDepcruise([
+    '--config',
+    '.dependency-cruiser.cjs',
+    '--output-type',
+    'json',
+    'src',
+  ])
+  const modules = JSON.parse(sourceFiles.stdout || '{}') as { modules?: Array<{ source: string }> }
+  for (const module of modules.modules ?? []) {
+    if (
+      !/\.(?:ts|tsx|vue)$/.test(module.source) ||
+      module.source.startsWith('src/features/board/') ||
+      (!includeFixtures && module.source.includes('.fixture.'))
+    )
+      continue
+    const absoluteSource = path.join(webRoot, module.source)
+    const content = fs.readFileSync(absoluteSource, 'utf8')
+    const importPattern = /(?:from\s+|import\s*\(\s*)['"]([^'"]+)['"]/g
+    for (const match of content.matchAll(importPattern)) {
+      const specifier = match[1]
+      if (!specifier) continue
+      const target = resolveSourceModule(absoluteSource, specifier)
+      if (
+        !target ||
+        !/^src\/features\/board\/(?:domain|application|infrastructure|presentation|testing)(?:\/|$)/.test(
+          target,
+        )
+      )
+        continue
+      edges.add(`${module.source}|${target}`)
+    }
+  }
+  return edges
 }
 
 const fixtureCases: BoundaryFixtureCase[] = [
@@ -48,7 +105,14 @@ const fixtureCases: BoundaryFixtureCase[] = [
       webRoot,
       'src/features/admin/.boundary-cross-feature-deep.fixture.ts',
     ),
-    content: `import { useBoardRuntime } from '../canvas/application/workspace/internal/useBoardRuntime'; console.log(useBoardRuntime);`,
+    content: `import { createEmptyBoardSnapshot } from '../board/domain'; console.log(createEmptyBoardSnapshot);`,
+  },
+  {
+    name: 'prohibits aliased imports into Board internals',
+    expectedRule: 'no-cross-feature-deep-imports',
+    fixtureFilePath: path.join(webRoot, 'src/features/admin/.boundary-board-alias.fixture.ts'),
+    content: `import { createEmptyBoardSnapshot } from '@/features/board/domain'; console.log(createEmptyBoardSnapshot);`,
+    scannerOnly: true,
   },
 ]
 
@@ -62,10 +126,22 @@ function runDepcruise(args: string[]) {
 }
 
 console.log('--- 1. Running dependency-cruiser on production codebase ---')
-const prodResult = runDepcruise(['--config', '.dependency-cruiser.cjs', 'src'])
-if (prodResult.status !== 0) {
+const prodResult = runDepcruise([
+  '--config',
+  '.dependency-cruiser.cjs',
+  '--output-type',
+  'json',
+  'src',
+])
+const prodOutput = JSON.parse(prodResult.stdout || '{}') as {
+  summary?: { violations?: Array<{ from: string; to: string; rule?: { name?: string } }> }
+}
+const cruiseViolations = prodOutput.summary?.violations ?? []
+const scannedBoardEdges = scanBoardDeepImports()
+if (prodResult.status !== 0 || cruiseViolations.length > 0 || scannedBoardEdges.size > 0) {
   console.error('Production dependency boundaries check failed!')
-  console.error(prodResult.stdout || prodResult.stderr)
+  console.error('Dependency-cruiser violations:', cruiseViolations)
+  console.error('Board deep imports:', [...scannedBoardEdges])
   process.exit(1)
 }
 console.log('✓ Production codebase satisfies all dependency boundary rules.\n')
@@ -148,8 +224,13 @@ try {
     const triggered = negOutput.summary?.violations?.some(
       (v) => v.rule?.name === testCase.expectedRule,
     )
+    const scannerTriggered = testCase.scannerOnly
+      ? scanBoardDeepImports(true).has(
+          `${path.relative(webRoot, testCase.fixtureFilePath).split(path.sep).join('/')}|src/features/board/domain/index.ts`,
+        )
+      : false
 
-    if (!triggered) {
+    if (!triggered && !scannerTriggered) {
       console.error(
         `✗ Negative fixture failed: "${testCase.name}" expected to violate "${testCase.expectedRule}", but did not.`,
       )

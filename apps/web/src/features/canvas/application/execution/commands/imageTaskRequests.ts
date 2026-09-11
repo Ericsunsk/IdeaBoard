@@ -19,7 +19,7 @@ import { buildExecutionSizeParams, type ExecutionImageSize } from '../../../doma
 import { buildPromptAspectRatioTaskParams } from '../../../domain/execution-contracts/promptAspectRatioTaskParams.ts'
 import { assertRequestedOutputCount } from '../../../../../shared/domain/generationContract'
 import type { OutputResolution } from '../../../../../shared/domain/generationContract'
-import type { PromptAspectRatio } from '../../../../board/domain'
+import type { PromptAspectRatio } from '../../../../board'
 import { i18n } from '../../../../../shared/i18n'
 import {
   IMAGE_OUTPAINT_ACTION,

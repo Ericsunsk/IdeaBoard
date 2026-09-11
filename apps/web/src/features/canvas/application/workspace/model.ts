@@ -1,6 +1,6 @@
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import type { ComputedRef, Ref } from 'vue'
-import type { CanvasCreatableNodeKind, CanvasNodeItemByKind } from '../../../board/domain'
+import type { CanvasCreatableNodeKind, CanvasNodeItemByKind } from '../../../board'
 import type {
   CanvasGroupRuntimeCommands,
   CanvasGroupRuntimeView,

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PromptAspectRatio } from '../../../../board/domain'
+import type { PromptAspectRatio } from '../../../../board'
 import type {
   ActivatedImageExecutionPlan,
   ImageExecutionPlan,

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { shallowRef, triggerRef } from 'vue'
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import type { FusionNodeItem, ImageNodeItem } from '../../../board/domain'
+import type { FusionNodeItem, ImageNodeItem } from '../../../board'
 import type { FlowNodeData } from '../../domain/nodes/flowTypes.ts'
 import { useFlowNodeUiState } from './useFlowNodeUiState'
 

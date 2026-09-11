@@ -5,7 +5,7 @@ import {
   type CanvasConnectionNodeType,
   type ImageNodeItem,
   type ImageNodeOutputItem,
-} from '../../../board/domain'
+} from '../../../board'
 import { resolveImageNodeDisplayUrl } from './flowImageNodeSelectors'
 
 export interface FlowExecutionGraphOptions {

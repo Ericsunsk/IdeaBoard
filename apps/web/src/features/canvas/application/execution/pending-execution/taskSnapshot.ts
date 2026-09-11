@@ -1,4 +1,4 @@
-import type { BoardSnapshot, ImageNodeItem } from '../../../../board/domain'
+import type { BoardSnapshot, ImageNodeItem } from '../../../../board'
 
 export type PendingImageTaskSnapshot = Readonly<{
   resultNodeId: `image-${number}`

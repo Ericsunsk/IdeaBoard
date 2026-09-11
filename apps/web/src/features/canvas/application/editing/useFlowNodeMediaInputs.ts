@@ -1,5 +1,4 @@
-import type { CanvasNodeItem } from '../../../board/domain'
-import { IMAGE_NODE_EMPTY_SIZE } from '../../../board/domain'
+import { IMAGE_NODE_EMPTY_SIZE, type CanvasNodeItem } from '../../../board'
 
 type UseFlowNodeMediaInputsOptions = {
   pickImageFile: () => Promise<File | null>

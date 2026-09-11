@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BoardSnapshot, BoardState } from '../../../board/domain'
-import { makeBoardSnapshot, makeBoardState } from '../../../board/testing'
+import type { BoardSnapshot, BoardState } from '../../../board'
+import { makeBoardSnapshot, makeBoardState } from '../testing/boardFixtures'
 import type { BoardSessionPreviewRenderer } from './preview'
 import { BoardSessionRemoteSyncError, type BoardSessionRepository } from './repository'
 import { useBoardSession } from './useBoardSession'

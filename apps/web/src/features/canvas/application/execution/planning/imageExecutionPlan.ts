@@ -8,7 +8,7 @@ import {
   type ImageNodeItem,
   type PromptAspectRatio,
   type PromptNodeItem,
-} from '../../../../board/domain'
+} from '../../../../board'
 import { parseRequestedOutputCount } from '../../../../../shared/domain/generationContract'
 import {
   normalizeOutputResolution,

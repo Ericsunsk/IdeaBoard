@@ -15,7 +15,7 @@ import {
   type FusionNodeItem,
   type ImageNodeItem,
   type PromptNodeItem,
-} from '../src/features/board/domain'
+} from '../src/features/board'
 import type { CanvasGraphNodeId } from '../src/features/canvas/domain/graph'
 import type {
   BoardStateEnvelope,

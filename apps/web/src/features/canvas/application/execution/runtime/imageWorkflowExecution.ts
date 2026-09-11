@@ -2,7 +2,7 @@ import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { CanvasGraphStore } from '../../../domain/graph'
 import type { CanvasRendererMetricsPort } from '../../../infrastructure/vue-flow-adapter'
-import type { BoardSnapshot } from '../../../../board/domain'
+import type { BoardSnapshot } from '../../../../board'
 import { i18n } from '../../../../../shared/i18n'
 import {
   buildImageActionReadinessRequest,

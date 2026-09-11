@@ -7,7 +7,7 @@ import {
   getCanvasNodeVisibleInputPorts,
   isCanvasConnectionNodeType,
   isCanvasExecutionOutputNodeType,
-} from '../../../board/domain'
+} from '../../../board'
 import {
   formatCanvasNodePortLabel,
   getCanvasNodeExecutionActionLabels,
@@ -19,7 +19,7 @@ import {
   type CanvasExecutionOutputNodeItem,
   type CanvasExecutionOutputNodeType,
   type CanvasNodeItem,
-} from '../../../board/domain'
+} from '../../../board'
 import type { NodeUiState, PromptNodeUiState } from '../../domain/nodes/canvasNodeUi.ts'
 import { parseHandlePort, resolveSourceImageFromNode } from '../../infrastructure/vue-flow-adapter/flowNodeSourceResolution.ts'
 import { measureCanvasPerf } from '../../infrastructure/browser/canvasPerfProbe.ts'

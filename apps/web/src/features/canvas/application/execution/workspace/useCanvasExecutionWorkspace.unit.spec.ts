@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { createEmptyBoardSnapshot } from '../../../../board/domain'
+import { createEmptyBoardSnapshot } from '../../../../board'
 import { CanvasGraphSession } from '../../../domain/graph'
 import {
   BoardGraphSession,

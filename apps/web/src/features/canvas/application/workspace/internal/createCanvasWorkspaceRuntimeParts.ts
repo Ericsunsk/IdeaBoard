@@ -1,5 +1,5 @@
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
-import type { BoardSnapshot, ImageNodeItem } from '../../../../board/domain'
+import type { BoardSnapshot, ImageNodeItem } from '../../../../board'
 import { useCanvasViewportRuntime } from '../../../infrastructure/vue-flow-adapter/useCanvasViewportRuntime'
 import { useBoardRuntime } from './useBoardRuntime'
 import { useCanvasFeedback } from '../useCanvasFeedback.ts'

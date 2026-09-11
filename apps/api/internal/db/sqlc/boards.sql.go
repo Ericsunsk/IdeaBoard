@@ -583,19 +583,25 @@ SET name = EXCLUDED.name,
     last_saved_by = COALESCE($8::bigint, boards.last_saved_by),
     updated_at = EXCLUDED.updated_at
 WHERE boards.owner_user_id = EXCLUDED.owner_user_id
+  AND (
+    NOT $11::boolean
+    OR boards.revision = $12::bigint
+  )
 `
 
 type UpsertBoardParams struct {
-	BoardID            string          `json:"board_id"`
-	OwnerUserID        int64           `json:"owner_user_id"`
-	CreatedBy          int64           `json:"created_by"`
-	Name               string          `json:"name"`
-	State              json.RawMessage `json:"state"`
-	Revision           sql.NullInt64   `json:"revision"`
-	StateSchemaVersion sql.NullInt32   `json:"state_schema_version"`
-	LastSavedBy        sql.NullInt64   `json:"last_saved_by"`
-	CreatedAt          time.Time       `json:"created_at"`
-	UpdatedAt          time.Time       `json:"updated_at"`
+	BoardID             string          `json:"board_id"`
+	OwnerUserID         int64           `json:"owner_user_id"`
+	CreatedBy           int64           `json:"created_by"`
+	Name                string          `json:"name"`
+	State               json.RawMessage `json:"state"`
+	Revision            sql.NullInt64   `json:"revision"`
+	StateSchemaVersion  sql.NullInt32   `json:"state_schema_version"`
+	LastSavedBy         sql.NullInt64   `json:"last_saved_by"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+	HasExpectedRevision bool            `json:"has_expected_revision"`
+	ExpectedRevision    int64           `json:"expected_revision"`
 }
 
 func (q *Queries) UpsertBoard(ctx context.Context, arg UpsertBoardParams) (int64, error) {
@@ -610,6 +616,8 @@ func (q *Queries) UpsertBoard(ctx context.Context, arg UpsertBoardParams) (int64
 		arg.LastSavedBy,
 		arg.CreatedAt,
 		arg.UpdatedAt,
+		arg.HasExpectedRevision,
+		arg.ExpectedRevision,
 	)
 	if err != nil {
 		return 0, err

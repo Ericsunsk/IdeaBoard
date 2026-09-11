@@ -16,7 +16,7 @@ import {
   type CanvasGraphSessionRuntime,
 } from './canvasGraphSessionRuntime'
 import { useCanvasGroupRuntime } from '../../../domain/graph/application/useCanvasGroupRuntime.ts'
-import type { BoardSnapshot } from '../../../../board/domain'
+import type { BoardSnapshot } from '../../../../board'
 import { boardSnapshotToFlow } from '../../../infrastructure/vue-flow-adapter/flowSnapshotAdapter.ts'
 import type { BoardSession } from '../../board-session'
 import {

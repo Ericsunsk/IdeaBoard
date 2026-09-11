@@ -1,5 +1,5 @@
 import { onBeforeUnmount } from 'vue'
-import type { ImageNodeItem, ImageNodeOutputItem } from '../../../board/domain'
+import type { ImageNodeItem, ImageNodeOutputItem } from '../../../board'
 import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../../shared/config/runtimeUrls.ts'
 import {
   getMediaAssetMetadata,

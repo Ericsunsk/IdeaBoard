@@ -1,5 +1,5 @@
-import { resolvePromptAspectRatioValue, type PromptAspectRatio } from '../../../../board/domain'
-import { computeFusionBlendWeights, type FusionBlendPoint } from '../../../../board/domain'
+import { resolvePromptAspectRatioValue, type PromptAspectRatio } from '../../../../board'
+import { computeFusionBlendWeights, type FusionBlendPoint } from '../../../../board'
 
 export type FusionOutputImageSize = {
   width: number

@@ -1,7 +1,7 @@
 import { uploadApi } from '../../../../shared/api/upload'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
 import { i18n } from '../../../../shared/i18n'
-import { rebuildBoardMediaRefs, type BoardSnapshot } from '../../../board/domain'
+import { rebuildBoardMediaRefs, type BoardSnapshot } from '../../../board'
 import { filenameFromImageUrl, isDataUrl, resolveFetchUrl } from '../../infrastructure/media/canvasMediaIo.ts'
 import { prepareImageAssetForUpload } from '../../../../shared/media/imageAssetPipeline'
 import { buildMediaBrowserURL, type MediaRef } from '../../../../shared/media/mediaRef'

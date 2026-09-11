@@ -1,6 +1,6 @@
 import { isTaskResultPendingError, TaskCancelledError } from '../../../../../shared/api/taskEvents'
 import { i18n } from '../../../../../shared/i18n'
-import type { BoardSnapshot } from '../../../../board/domain'
+import type { BoardSnapshot } from '../../../../board'
 import {
   PendingImageMaterializationError,
   collectPendingImageTasks,

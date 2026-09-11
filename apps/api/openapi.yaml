@@ -3796,11 +3796,12 @@ components:
 
     UserBoardUpsertRequest:
       type: object
-      required: [name, state]
+      required: [name, state, base_revision]
       properties:
         name: { type: string }
         state:
           $ref: '#/components/schemas/BoardStateEnvelope'
+        base_revision: { type: integer, format: int64, minimum: 0 }
         created_at: { type: number }
         updated_at: { type: number }
 
@@ -5648,10 +5649,11 @@ components:
           properties:
             data:
               type: object
-              required: [board]
+              required: [board, new_revision]
               properties:
                 board:
                   $ref: '#/components/schemas/UserBoardItem'
+                new_revision: { type: integer, format: int64 }
 
     ApiResponseBoardMemberList:
       allOf:

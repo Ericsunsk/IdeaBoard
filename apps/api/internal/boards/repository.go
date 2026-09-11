@@ -114,6 +114,13 @@ func (r *Repository) Upsert(ctx context.Context, board *Board) error {
 			return err
 		}
 		if rows == 0 {
+			count, countErr := q.CountBoardsByBoardID(ctx, board.BoardID)
+			if countErr != nil {
+				return countErr
+			}
+			if count > 0 && board.ExpectedRevision != nil {
+				return ErrRevisionConflict
+			}
 			return ErrIDConflict
 		}
 		if !shouldReconcileMediaRefs {
@@ -138,9 +145,16 @@ func upsertBoardParams(board *Board) dbsqlc.UpsertBoardParams {
 			Int32: board.StateSchemaVersion,
 			Valid: board.StateSchemaVersion > 0,
 		},
-		LastSavedBy: dbutil.NullInt64(board.LastSavedBy),
-		CreatedAt:   board.CreatedAt,
-		UpdatedAt:   board.UpdatedAt,
+		LastSavedBy:         dbutil.NullInt64(board.LastSavedBy),
+		CreatedAt:           board.CreatedAt,
+		UpdatedAt:           board.UpdatedAt,
+		HasExpectedRevision: board.ExpectedRevision != nil,
+		ExpectedRevision: func() int64 {
+			if board.ExpectedRevision == nil {
+				return 0
+			}
+			return *board.ExpectedRevision
+		}(),
 	}
 }
 

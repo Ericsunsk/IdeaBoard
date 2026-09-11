@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { uploadApi } from '../../../../shared/api/upload'
-import { makeBoardSnapshot } from '../../../board/testing'
+import { makeBoardSnapshot } from '../testing/boardFixtures'
 import { createBoardSessionUploadLifecycle } from './uploadLifecycle'
 
 const mocks = vi.hoisted(() => ({

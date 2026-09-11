@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { UserBoardItem } from '../../../board/infrastructure/api/boardsResource'
 import { clearStoredAuth, setStoredAuth } from '../../../../shared/utils/auth'
-import { createBoard, getBoardById } from '../../../board/application/catalog/boards'
-import { getBoardState, replaceBoardStateMap } from '../../../board/infrastructure/persistence'
-import type { BoardSnapshot, BoardState } from '../../../board/domain'
-import { BOARD_STATE_SCHEMA_VERSION } from '../../../board/domain'
-import { makeBoardSnapshot, makeBoardState } from '../../../board/testing'
+import {
+  createBoard,
+  getBoardById,
+  getBoardState,
+  replaceBoardStateMap,
+  BOARD_STATE_SCHEMA_VERSION,
+  type BoardSnapshot,
+  type BoardState,
+} from '../../../board'
+import { makeBoardSnapshot, makeBoardState } from '../testing/boardFixtures'
 import {
   createBoardSessionRepository,
   isBoardSessionRemoteSyncError,
@@ -15,13 +19,23 @@ const mocks = vi.hoisted(() => {
   const request = vi.fn()
   const state: {
     listResponse: { code?: number; msg?: string; data: { list: UserBoardItem[] } }
-    upsertResponse: { code: number; msg?: string; data: null }
+    upsertResponse: { code: number; msg?: string; data: unknown }
   } = {
     listResponse: { data: { list: [] as UserBoardItem[] } },
-    upsertResponse: { code: 0, data: null },
+    upsertResponse: { code: 0, data: { board: {}, new_revision: 1 } },
   }
   return { request, state }
 })
+
+type UserBoardItem = {
+  board_id: string
+  name: string
+  state: unknown
+  revision: number
+  state_schema_version: number
+  created_at: number
+  updated_at: number
+}
 
 vi.mock('../../../../shared/api/client', () => ({
   api: {
@@ -73,7 +87,7 @@ describe('createBoardSessionRepository', () => {
     })
     vi.clearAllMocks()
     mocks.state.listResponse = { data: { list: [] } }
-    mocks.state.upsertResponse = { code: 0, data: null }
+    mocks.state.upsertResponse = { code: 0, data: { board: {}, new_revision: 1 } }
     mocks.request.mockImplementation(mockBoardApiRequest)
   })
 

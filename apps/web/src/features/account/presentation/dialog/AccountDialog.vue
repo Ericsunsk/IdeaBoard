@@ -68,6 +68,7 @@ const {
   },
   onVisibilityChange: (visible) => emit('update:visible', visible),
 })
+void dialogRef
 
 const accountDialogPt = createAccountDialogPt()
 </script>

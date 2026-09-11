@@ -3,7 +3,7 @@ import {
   createEmptyBoardSnapshot,
   type CanvasConnectionNodeType,
   type CanvasNodeItem,
-} from '../../../board/domain'
+} from '../../../board'
 import type { FlowNodeData } from '../../domain/nodes/flowTypes.ts'
 import {
   materializeFlowSnapshotConnections,

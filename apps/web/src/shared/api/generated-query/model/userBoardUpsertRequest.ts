@@ -9,6 +9,8 @@ import type { BoardStateEnvelope } from './boardStateEnvelope'
 export interface UserBoardUpsertRequest {
   name: string
   state: BoardStateEnvelope
+  /** @minimum 0 */
+  base_revision: number
   created_at?: number
   updated_at?: number
 }

@@ -4,7 +4,7 @@ import {
   type CanvasConnectionNodeType,
   type CanvasConnectionPort,
   type CanvasConnectionContractNode,
-} from '../../../board/domain'
+} from '../../../board'
 
 export interface CanvasConnectionEndpointLike {
   nodeType: CanvasConnectionNodeType

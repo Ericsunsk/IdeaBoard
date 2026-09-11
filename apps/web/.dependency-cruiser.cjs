@@ -48,13 +48,14 @@ module.exports = {
     {
       name: 'no-cross-feature-deep-imports',
       severity: 'error',
-      comment: 'Features must not import internal implementation details of other features.',
+      comment:
+        'Features must consume another feature through its public entrypoint; Board domain, application, infrastructure, presentation, and testing modules are private.',
       from: {
-        path: '^src/features/([^/]+)',
+        path: '^src/features/[^/]+(?:/|$)',
+        pathNot: '^src/features/board(?:/|$)',
       },
       to: {
-        path: '^src/features/[^/]+/.*internal',
-        pathNot: '^src/features/$1',
+        path: '^src/features/board/(?:domain|application|infrastructure|presentation|testing)(?:/|$)',
       },
     },
   ],

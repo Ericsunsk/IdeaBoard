@@ -75,7 +75,7 @@ import { SendDiagonalSolid } from '@iconoir/vue'
 import {
   IMAGE_OUTPUT_COUNT_PRESET_OPTIONS,
   type PromptAspectRatio,
-} from '../../../../board/domain'
+} from '../../../../board'
 import {
   OUTPUT_RESOLUTION_OPTIONS,
   type OutputResolution,

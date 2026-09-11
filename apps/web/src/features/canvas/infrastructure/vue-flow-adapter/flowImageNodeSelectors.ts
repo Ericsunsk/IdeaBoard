@@ -2,7 +2,7 @@ import {
   resolveImageNodeDisplayRatio,
   resolveImageNodeLatestOutput,
   type ImageNodeItem,
-} from '../../../board/domain'
+} from '../../../board'
 import { buildMediaBrowserURL, type MediaRef } from '../../../../shared/media/mediaRef'
 
 export type ImageNodeDisplayPayload = {

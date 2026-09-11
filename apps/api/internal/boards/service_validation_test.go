@@ -1,6 +1,7 @@
 package boards
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -23,6 +24,17 @@ func TestNormalizeBoardID(t *testing.T) {
 				t.Fatalf("got %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestUpsertBoardRejectsNegativeBaseRevision(t *testing.T) {
+	service := &Service{}
+	_, err := service.UpsertBoard(context.Background(), 1, "board-1", &UpsertRequest{
+		Name:         "Board",
+		BaseRevision: -1,
+	})
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("err = %v, want ErrInvalidInput", err)
 	}
 }
 

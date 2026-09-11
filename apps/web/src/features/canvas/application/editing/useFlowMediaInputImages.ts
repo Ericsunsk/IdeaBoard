@@ -8,8 +8,8 @@ import type {
   FusionNodeItem,
   PromptNodeInputImage,
   PromptNodeItem,
-} from '../../../board/domain'
-import { getCanvasNodeImageInputLimit } from '../../../board/domain'
+} from '../../../board'
+import { getCanvasNodeImageInputLimit } from '../../../board'
 import { type ImageNodeDisplayPayload } from '../../infrastructure/vue-flow-adapter/flowImageNodeSelectors.ts'
 import type { CanvasVueFlowGraphAdapter } from '../../infrastructure/vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions } from '../../infrastructure/vue-flow-adapter/flowGraphAdapterCommandSideEffects'

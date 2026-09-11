@@ -93,7 +93,7 @@ import {
   requireImageNodeOutputCount,
   type ImageNodeItem,
   type LibraryImportFact,
-} from '../../../../board/domain'
+} from '../../../../board'
 import type { ImageNodeAction } from '../../../domain/nodes/imageActionRegistry.ts'
 import type { OutputResolution } from '../../../../../shared/domain/generationContract'
 import type { OutpaintDragAnchor } from '../../../application/image-workflow/useImageOutpaintOverlay.ts'

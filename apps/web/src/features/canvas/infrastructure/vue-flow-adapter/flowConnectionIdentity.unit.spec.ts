@@ -1,6 +1,6 @@
 import type { Edge } from '@vue-flow/core'
 import { describe, expect, it } from 'vitest'
-import { createEmptyBoardSnapshot } from '../../../board/domain'
+import { createEmptyBoardSnapshot } from '../../../board'
 import { createCanvasGraphStore, toCanvasGraphEdgeId } from '../../domain/graph'
 import { createFlowEdgeProjectionIndex } from './flowConnectionIdentity'
 

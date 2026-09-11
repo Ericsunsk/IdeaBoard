@@ -17,6 +17,7 @@ export type { ApiResponseBase, BoardStateEnvelope, UserBoardItem }
 export type SaveUserBoardPayload = {
   name: string
   state: BoardStateEnvelope
+  base_revision: number
   created_at: number
   updated_at: number
 }
@@ -26,8 +27,8 @@ export async function fetchUserBoards(): Promise<UserBoardItem[]> {
   return Array.isArray(data.list) ? data.list : []
 }
 
-export async function saveUserBoard(boardId: string, payload: SaveUserBoardPayload): Promise<void> {
-  await resolveApiOk(
+export async function saveUserBoard(boardId: string, payload: SaveUserBoardPayload) {
+  return resolveApiData(
     upsertUserBoard(boardId, payload),
     i18n.global.t('workspace.sync.saveFailed'),
   )

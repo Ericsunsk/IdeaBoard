@@ -8,4 +8,5 @@ import type { UserBoardItem } from './userBoardItem'
 
 export type ApiResponseUserBoardData = {
   board: UserBoardItem
+  new_revision: number
 }

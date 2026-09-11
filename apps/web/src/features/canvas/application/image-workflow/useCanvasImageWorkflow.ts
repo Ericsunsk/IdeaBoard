@@ -1,5 +1,5 @@
 import type { ComputedRef, Ref } from 'vue'
-import type { PromptAspectRatio } from '../../../board/domain'
+import type { PromptAspectRatio } from '../../../board'
 import type { ActiveNodePanel, ActiveNodePanelKind } from '../../presentation/screens/useFlowActiveNodePanels.ts'
 import type { OutpaintDragAnchor } from './useImageOutpaintOverlay'
 import { useImageOutpaintOverlay } from './useImageOutpaintOverlay'

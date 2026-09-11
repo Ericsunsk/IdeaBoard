@@ -16,6 +16,7 @@ import {
   normalizeBoardName,
   publishCatalogChange,
   replaceBoards,
+  setBoardRevision,
   type BoardMeta,
 } from '../catalog/boards'
 import {
@@ -51,11 +52,13 @@ function toLocalMeta(board: UserBoardItem): BoardMeta | null {
   const boardId = board.board_id?.trim()
   const name = normalizeBoardName(board.name || '')
   if (!boardId || !name) return null
+  const revision = Number(board.revision)
   return {
     id: boardId,
     name,
     createdAt: Number(board.created_at) || Date.now(),
     updatedAt: Number(board.updated_at) || Date.now(),
+    ...(Number.isFinite(revision) && revision >= 0 ? { revision } : {}),
   }
 }
 
@@ -135,12 +138,19 @@ function applyRemoteBoardsToLocal(
 
   metas.forEach((remoteMeta) => {
     const localMeta = localMetaMap.get(remoteMeta.id)
+    const preserveLocal =
+      localMeta &&
+      shouldPreserveLocal(remoteMeta.id) &&
+      isLocalNewer(localMeta.updatedAt, remoteMeta.updatedAt)
+    // Keep the local optimistic content, but always advance its concurrency
+    // base to the server revision observed during hydration.
     mergedMetas.set(
       remoteMeta.id,
-      localMeta &&
-        shouldPreserveLocal(remoteMeta.id) &&
-        isLocalNewer(localMeta.updatedAt, remoteMeta.updatedAt)
-        ? localMeta
+      preserveLocal
+        ? {
+            ...localMeta,
+            ...(remoteMeta.revision === undefined ? {} : { revision: remoteMeta.revision }),
+          }
         : remoteMeta,
     )
   })
@@ -205,9 +215,7 @@ async function listRemoteBoards(): Promise<UserBoardItem[]> {
   return fetchUserBoards()
 }
 
-export async function hydrateBoardsFromServer(
-  options: HydrateBoardsFromServerOptions = {},
-) {
+export async function hydrateBoardsFromServer(options: HydrateBoardsFromServerOptions = {}) {
   const scope = getAuthStorageUserScope()
   if (!scope) return { ok: true } satisfies HydrateBoardsFromServerResult
   const resolvedOptions = resolveHydrateOptions(options)
@@ -237,30 +245,41 @@ export async function hydrateBoardsFromServer(
   return task
 }
 
-export async function syncBoardToServer(
-  boardId: string,
-  stateOverride?: BoardState | null,
-) {
+export async function syncBoardToServer(boardId: string, stateOverride?: BoardState | null) {
   const syncScope = getAuthStorageUserScope()
   const board = getBoardById(boardId)
   if (!board) return
-  const state =
-    stateOverride ?? getBoardState(boardId) ?? createEmptyBoardState(board.updatedAt)
+  const state = stateOverride ?? getBoardState(boardId) ?? createEmptyBoardState(board.updatedAt)
   try {
-    await saveUserBoard(boardId, {
+    const response = await saveUserBoard(boardId, {
       name: board.name,
       state: toGeneratedBoardStateProjection(state),
+      base_revision: board.revision ?? 0,
       created_at: board.createdAt,
       updated_at: Math.max(board.updatedAt, state?.updatedAt ?? 0),
     })
-    if (syncScope && getAuthStorageUserScope() === syncScope) {
-      pendingRollbackBoardIds.delete(boardId.trim())
-    }
+    applySyncSuccess(boardId, response, syncScope)
   } catch (error) {
-    if (syncScope && getAuthStorageUserScope() === syncScope && isBoardNameConflictError(error)) {
-      pendingRollbackBoardIds.add(boardId.trim())
-    }
+    markSyncFailure(boardId, syncScope, error)
     throw error
+  }
+}
+
+function applySyncSuccess(
+  boardId: string,
+  response: Awaited<ReturnType<typeof saveUserBoard>>,
+  syncScope: string | null,
+) {
+  const serverRevision = Number(response.new_revision ?? response.board?.revision)
+  if (Number.isFinite(serverRevision)) setBoardRevision(boardId, serverRevision)
+  if (syncScope && getAuthStorageUserScope() === syncScope) {
+    pendingRollbackBoardIds.delete(boardId.trim())
+  }
+}
+
+function markSyncFailure(boardId: string, syncScope: string | null, error: unknown) {
+  if (syncScope && getAuthStorageUserScope() === syncScope && isBoardNameConflictError(error)) {
+    pendingRollbackBoardIds.add(boardId.trim())
   }
 }
 

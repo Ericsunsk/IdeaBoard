@@ -95,6 +95,7 @@ const {
   handleShow,
   handleHide,
 } = usePrimePopupMenuOverlayLifecycle({})
+void menuRef
 
 function resolveTriggerElement(): HTMLElement | undefined {
   const button = triggerRef.value

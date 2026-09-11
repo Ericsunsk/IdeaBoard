@@ -1,6 +1,6 @@
 import type { NodeChange } from '@vue-flow/core'
 import { describe, expect, it } from 'vitest'
-import { createEmptyBoardSnapshot } from '../../../board/domain'
+import { createEmptyBoardSnapshot } from '../../../board'
 import { createCanvasGraphStore } from '../../domain/graph'
 import { createCanvasNodeDragLifecycle } from './nodeDragLifecycle'
 

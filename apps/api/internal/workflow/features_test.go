@@ -128,7 +128,7 @@ func TestSupportedFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T
 
 	featureKeys := extractFrontendWorkflowFeatureKeys(t, string(raw))
 	for label, relativePath := range map[string]string{
-		"frontend execution": "apps/web/src/features/canvas/execution/contracts/executionContract.ts",
+		"frontend execution": "apps/web/src/features/canvas/domain/execution-contracts/executionContract.ts",
 		"Admin registry":     "apps/web/src/features/admin/shared/lib/workflowFeatureAdminMeta.ts",
 	} {
 		contractRaw, err := os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(relativePath)))

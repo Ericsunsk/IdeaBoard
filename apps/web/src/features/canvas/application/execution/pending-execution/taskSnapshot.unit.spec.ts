@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createEmptyBoardSnapshot } from '../../../../board/domain'
+import { createEmptyBoardSnapshot } from '../../../../board'
 import { collectPendingImageTasks } from './taskSnapshot'
 
 describe('collectPendingImageTasks', () => {

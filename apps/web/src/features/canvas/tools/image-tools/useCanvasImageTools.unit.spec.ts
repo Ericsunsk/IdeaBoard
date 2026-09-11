@@ -1,7 +1,7 @@
 import type { Node } from '@vue-flow/core'
 import { createApp, defineComponent, nextTick, ref, shallowRef, type Ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ImageNodeItem } from '../../../board/domain'
+import type { ImageNodeItem } from '../../../board'
 import { renderRetouchLayerStackFile } from '../retouch/services/renderer'
 import { IMAGE_STRENGTH_ACTIONS, type ImageStrengthAction } from '../../application/execution'
 import type { UseCanvasImageToolsOptions } from './session'

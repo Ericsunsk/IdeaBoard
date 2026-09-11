@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@vue-flow/core'
 import { onScopeDispose, type Ref } from 'vue'
-import type { BoardSnapshot } from '../../../../board/domain'
+import type { BoardSnapshot } from '../../../../board'
 import type { BoardSession } from '../../board-session'
 import type { CanvasGraphHistory } from '../../../domain/graph/application/useCanvasGraphHistory.ts'
 import type { CanvasVueFlowGraphAdapter } from '../../../infrastructure/vue-flow-adapter/useCanvasVueFlowGraphAdapter'

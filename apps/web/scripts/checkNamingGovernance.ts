@@ -356,10 +356,29 @@ function checkTypesPlacement(
         detail: `'types.ts' is allowed only in a narrow leaf directory`,
       }
     }
+    const source = readFileSync(join(absoluteDir, fileName), 'utf8')
+    return checkTypeFamilyCardinality(relativePath, source)
   } catch {
     return null
   }
-  return null
+}
+
+function countExportedTypeFamilies(source: string): number {
+  // A type-family keep is intentionally conservative: at least two exported
+  // declarations must be present. Semantic relatedness stays documented in
+  // keptMultiFamilyTypes because it cannot be inferred reliably from syntax.
+  const exportedTypeDeclarations =
+    /^\s*export\s+(?:declare\s+)?(?:type|interface|enum|class)\s+([A-Za-z0-9_]+)/gm
+  return [...source.matchAll(exportedTypeDeclarations)].length
+}
+
+function checkTypeFamilyCardinality(relativePath: string, source: string): Violation | null {
+  if (countExportedTypeFamilies(source) >= 2) return null
+  return {
+    kind: 'types-placement',
+    path: relativePath,
+    detail: `'types.ts' must contain multiple exported type families; rename single-concept types to a responsibility-specific module`,
+  }
 }
 
 function checkStaleWorkspacePrefix(relativePath: string, fileName: string): Violation | null {
@@ -618,6 +637,22 @@ function runSelfTest(): void {
         'UserAuthModals.vue',
       ),
       null,
+    ],
+    [
+      'types-multi-family-ok',
+      checkTypeFamilyCardinality(
+        'features/example/types.ts',
+        'export type Alpha = string\nexport interface Beta { value: number }',
+      ),
+      null,
+    ],
+    [
+      'types-single-family-rejected',
+      checkTypeFamilyCardinality(
+        'features/example/types.ts',
+        'export type ResolvedTaskImageResult = { url: string }',
+      )?.kind,
+      'types-placement',
     ],
   ]
   let failed = 0

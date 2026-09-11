@@ -1,10 +1,13 @@
 package boards
 
 type UpsertRequest struct {
-	Name      string      `json:"name" binding:"required"`
-	State     interface{} `json:"state"`
-	CreatedAt *int64      `json:"created_at"`
-	UpdatedAt *int64      `json:"updated_at"`
+	Name  string      `json:"name" binding:"required"`
+	State interface{} `json:"state"`
+	// BaseRevision is the revision observed by the client before writing. New
+	// boards use zero; existing boards must match the persisted revision.
+	BaseRevision int64 `json:"base_revision"`
+	CreatedAt    *int64 `json:"created_at"`
+	UpdatedAt    *int64 `json:"updated_at"`
 }
 
 type InviteMemberRequest struct {

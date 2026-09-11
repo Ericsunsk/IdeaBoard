@@ -26,6 +26,7 @@ type Board struct {
 	LastSavedBy        *int64    `json:"last_saved_by,omitempty"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
+	ExpectedRevision   *int64    `json:"-"`
 }
 
 type Member struct {

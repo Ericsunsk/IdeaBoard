@@ -139,6 +139,7 @@ const {
   handleHide,
   select,
 } = usePrimePopupMenuOverlayLifecycle({})
+void menuRef
 const resolvedMenuPt = computed(() => props.menuPt ?? userAccountMenuPt)
 
 const loginItem = computed(() => props.items.find((item) => item.key === 'login'))

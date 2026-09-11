@@ -180,7 +180,6 @@ function getSourcePreview(node: NodeLike): NodeImagePreview | null {
 }
 
 function resolveNodePreview(
-  nodeType: CanvasConnectionNodeType,
   node: NodeLike,
 ): NodeImagePreview | null {
   return getLatestOutputPreview(node) ?? getSourcePreview(node)
@@ -202,7 +201,7 @@ function resolveNodeBodyHeight(
   width: number,
   node: NodeLike,
 ): number {
-  const preview = resolveNodePreview(nodeType, node)
+  const preview = resolveNodePreview(node)
   if (nodeType === 'image') {
     return resolveImageNodeStageHeight(width, preview?.ratio ?? 1, !!preview)
   }
@@ -269,7 +268,7 @@ function collectNodeFrames(state: BoardSnapshot): BoardPreviewFrame[] {
       const node = nodeLike as NodeLike
       if (!isFiniteNumber(node.id) || !isFiniteNumber(node.x) || !isFiniteNumber(node.y)) return
       const width = isFiniteNumber(node.width) && node.width > 0 ? node.width : 280
-      const preview = resolveNodePreview(nodeType, node)
+      const preview = resolveNodePreview(node)
       const fusionInputUrls = nodeType === 'fusion' ? getFusionInputPreviewUrls(node) : []
       frames.push({
         key: `node-${nodeType}-${node.id}-${index}`,

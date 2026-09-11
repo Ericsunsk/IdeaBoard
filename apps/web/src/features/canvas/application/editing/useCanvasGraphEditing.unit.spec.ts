@@ -7,7 +7,7 @@ import {
   type CanvasNodeItem,
   type ImageNodeItem,
   type PromptNodeItem,
-} from '../../../board/domain'
+} from '../../../board'
 import { CanvasGraphSession } from '../../domain/graph'
 import {
   useCanvasVueFlowGraphAdapter,

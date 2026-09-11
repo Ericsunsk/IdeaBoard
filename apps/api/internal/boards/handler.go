@@ -50,7 +50,8 @@ type boardListResponse struct {
 }
 
 type boardResponse struct {
-	Board boardDTO `json:"board"`
+	Board       boardDTO `json:"board"`
+	NewRevision int64    `json:"new_revision"`
 }
 
 type boardDeleteResponse struct {
@@ -135,6 +136,10 @@ func (h *Handler) UpsertBoard(c *gin.Context) {
 			response.Error(c, 409, "画布名称已存在，请使用其他名称")
 			return
 		}
+		if errors.Is(err, ErrRevisionConflict) {
+			response.Error(c, 409, "画布版本已变更，请刷新后重试")
+			return
+		}
 		if errors.Is(err, ErrIDConflict) {
 			response.Error(c, 409, "画布ID已存在，请刷新后重试")
 			return
@@ -142,7 +147,10 @@ func (h *Handler) UpsertBoard(c *gin.Context) {
 		response.InternalError(c, 500, "更新画布失败", err)
 		return
 	}
-	response.SuccessDTO(c, boardResponse{Board: toBoardDTO(board.Board, board.Role)})
+	response.SuccessDTO(c, boardResponse{
+		Board:       toBoardDTO(board.Board, board.Role),
+		NewRevision: board.Board.Revision,
+	})
 }
 
 func (h *Handler) DeleteBoard(c *gin.Context) {

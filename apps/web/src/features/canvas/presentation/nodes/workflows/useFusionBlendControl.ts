@@ -4,7 +4,7 @@ import {
   constrainFusionBlendPoint,
   getDefaultBlendPointForImageCount,
   type FusionBlendPoint,
-} from '../../../../board/domain'
+} from '../../../../board'
 
 interface UseFusionBlendControlOptions {
   stageRef: Ref<HTMLElement | null>

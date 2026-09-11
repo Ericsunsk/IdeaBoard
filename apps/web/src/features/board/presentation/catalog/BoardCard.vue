@@ -144,6 +144,7 @@ const {
     if (!visible) emit('menu-hidden')
   },
 })
+void menuRef
 const menuPt = createAppOverlayMenuPt('!z-40 !w-32 !min-w-[8rem] !max-w-[8rem] !p-0')
 
 const menuItems = computed<MenuItem[]>(() => [

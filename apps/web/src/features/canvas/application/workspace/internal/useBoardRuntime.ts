@@ -4,7 +4,7 @@ import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import {
   createEmptyBoardSnapshot,
   type BoardSnapshot,
-} from '../../../../board/domain'
+} from '../../../../board'
 import { HOME_PATH, USER_BOARDS_PATH } from '../../../../../shared/constants/routePaths'
 import { useBoardSession, type SaveStatus } from '../../board-session'
 import { useBoardHeaderActions } from '../../../presentation/chrome/useBoardHeaderActions.ts'

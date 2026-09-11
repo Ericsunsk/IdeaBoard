@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { createEmptyBoardSnapshot } from '../../../../board/domain'
+import { createEmptyBoardSnapshot } from '../../../../board'
 import { CanvasGraphSession, type CanvasGraphGroupId } from '..'
 import { createGroupMembershipRuntime } from './groupMembershipRuntime'
 import type { CanvasGroupFrame } from '../canvasGroupGeometry.ts'

@@ -5,6 +5,7 @@ export interface BoardMeta {
   name: string
   createdAt: number
   updatedAt: number
+  revision?: number
 }
 
 const STORAGE_KEY_PREFIX = 'ideaboard.canvas.boards.v2'
@@ -37,11 +38,16 @@ function toValidBoardMeta(item: unknown): BoardMeta | null {
   if (typeof record.name !== 'string') return null
   if (typeof record.createdAt !== 'number') return null
   if (typeof record.updatedAt !== 'number') return null
+  const revision =
+    typeof record.revision === 'number' && Number.isFinite(record.revision) && record.revision >= 0
+      ? record.revision
+      : undefined
   return {
     id: record.id,
     name: normalizeBoardName(record.name) || 'Untitled',
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
+    ...(revision === undefined ? {} : { revision }),
   }
 }
 
@@ -86,10 +92,7 @@ export function listBoards(): BoardMeta[] {
   return readRawBoards().sort(compareByRecentDesc)
 }
 
-export function replaceBoards(
-  boards: BoardMeta[],
-  options: { publish?: boolean } = {},
-) {
+export function replaceBoards(boards: BoardMeta[], options: { publish?: boolean } = {}) {
   const normalized = boards
     .map(toValidBoardMeta)
     .filter((item): item is BoardMeta => !!item)
@@ -178,6 +181,18 @@ export function touchBoard(boardId: string): BoardMeta | null {
   const target = boards.find((board) => board.id === id)
   if (!target) return null
   target.updatedAt = Date.now()
+  writeRawBoards(boards)
+  publishCatalogChange()
+  return target
+}
+
+export function setBoardRevision(boardId: string, revision: number): BoardMeta | null {
+  const id = boardId.trim()
+  if (!id || !Number.isFinite(revision) || revision < 0) return null
+  const boards = readRawBoards()
+  const target = boards.find((board) => board.id === id)
+  if (!target) return null
+  target.revision = revision
   writeRawBoards(boards)
   publishCatalogChange()
   return target

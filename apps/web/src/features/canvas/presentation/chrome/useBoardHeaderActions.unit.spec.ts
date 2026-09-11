@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createBoardRepository,
   type BoardRepository,
-} from '../../../board/application/catalog/repository'
-import { replaceBoards } from '../../../board/application/catalog/boards'
+} from '../../../board'
+import { replaceBoards } from '../../../board'
 import { clearStoredAuth, setStoredAuth } from '../../../../shared/utils/auth'
 import { useBoardHeaderActions } from './useBoardHeaderActions'
 

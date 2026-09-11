@@ -1,5 +1,4 @@
-import { normalizePromptAspectRatio } from '../../../board/domain'
-import type { PromptAspectRatio } from '../../../board/domain'
+import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../board'
 import type { MediaInputImage } from '../editing/useFlowMediaInputImages.ts'
 import type { MediaRef } from '../../../../shared/media/mediaRef'
 

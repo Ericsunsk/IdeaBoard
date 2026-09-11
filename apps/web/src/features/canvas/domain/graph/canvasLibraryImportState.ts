@@ -1,4 +1,4 @@
-import { resolveImageNodeFrameSize, type ImageNodeItem } from '../../../board/domain'
+import { resolveImageNodeFrameSize, type ImageNodeItem } from '../../../board'
 
 export type CanvasLibraryImportMaterialization = Readonly<{
   mediaAssetId: number

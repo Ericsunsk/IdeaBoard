@@ -3,8 +3,8 @@ import {
   rebuildBoardMediaRefs,
   type CanvasNodeItem,
   type ImageNodeItem,
-} from '../../../board/domain'
-import { makeBoardSnapshot } from '../../../board/testing'
+} from '../../../board'
+import { makeBoardSnapshot } from '../testing/boardFixtures'
 import { useFlowNodeMediaInputs } from './useFlowNodeMediaInputs'
 
 describe('useFlowNodeMediaInputs', () => {

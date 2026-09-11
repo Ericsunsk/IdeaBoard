@@ -4,7 +4,7 @@ import {
   createEmptyBoardSnapshot,
   InvalidBoardStateError,
   type BoardSnapshot,
-} from '../../../board/domain'
+} from '../../../board'
 import type { BoardSession, BoardSessionSaveResult } from './useBoardSession'
 import { createBoardSyncCoordinator, type SaveStatus } from './boardSyncCoordinator'
 

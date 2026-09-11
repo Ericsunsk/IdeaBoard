@@ -1,4 +1,4 @@
-import type { CanvasConnectionNodeType, WorkflowNodeOutputStatus } from '../../../board/domain'
+import type { CanvasConnectionNodeType, WorkflowNodeOutputStatus } from '../../../board'
 
 export type NodePrimaryActionState = {
   label: string

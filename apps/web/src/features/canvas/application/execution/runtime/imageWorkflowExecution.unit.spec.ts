@@ -2,7 +2,7 @@ import { ref, shallowRef } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
 import { TaskCancelledError } from '../../../../../shared/api/taskEvents'
-import { createEmptyBoardSnapshot } from '../../../../board/domain'
+import { createEmptyBoardSnapshot } from '../../../../board'
 import { useCanvasVueFlowGraphAdapter } from '../../../infrastructure/vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import {
   createFlowGraphCommandOptions,

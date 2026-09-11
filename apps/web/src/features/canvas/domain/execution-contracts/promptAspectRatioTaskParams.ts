@@ -1,5 +1,5 @@
 import type { SubmitTaskParams } from '../../../../shared/api/task'
-import type { PromptAspectRatio } from '../../../board/domain'
+import type { PromptAspectRatio } from '../../../board'
 
 export function buildPromptAspectRatioTaskParams(
   ratio: PromptAspectRatio,

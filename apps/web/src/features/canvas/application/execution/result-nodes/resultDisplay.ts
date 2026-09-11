@@ -5,7 +5,7 @@ import {
 } from '../../../../../shared/query/taskResult'
 import { getMediaAssetMetadata } from '../../../../../shared/api/mediaAssetDelivery'
 import { i18n } from '../../../../../shared/i18n'
-import type { ResolvedTaskImageResult } from './types'
+import type { ResolvedTaskImageResult } from './resolvedTaskImageResult'
 import { buildMediaBrowserURL, type MediaRef } from '../../../../../shared/media/mediaRef'
 
 export type ImageSize = {

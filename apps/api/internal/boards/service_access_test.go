@@ -120,7 +120,11 @@ func TestBoardServiceEditorCanUpdateStateButNotRename(t *testing.T) {
 		t.Fatalf("invite editor failed: %v", err)
 	}
 
-	updated, err := service.UpsertBoard(ctx, editor.ID, boardID, &UpsertRequest{Name: "Design Board", State: validBoardState(CurrentBoardStateSchemaVersion, 250)})
+	updated, err := service.UpsertBoard(ctx, editor.ID, boardID, &UpsertRequest{
+		Name:         "Design Board",
+		State:        validBoardState(CurrentBoardStateSchemaVersion, 250),
+		BaseRevision: 1,
+	})
 	if err != nil {
 		t.Fatalf("editor update failed: %v", err)
 	}
@@ -129,6 +133,11 @@ func TestBoardServiceEditorCanUpdateStateButNotRename(t *testing.T) {
 	}
 	if updated.Board.OwnerUserID != owner.ID {
 		t.Fatalf("updated owner id = %d, want %d", updated.Board.OwnerUserID, owner.ID)
+	}
+	if _, err := service.UpsertBoard(ctx, editor.ID, boardID, &UpsertRequest{
+		Name: "Design Board", State: validBoardState(CurrentBoardStateSchemaVersion, 251), BaseRevision: 1,
+	}); !errors.Is(err, ErrRevisionConflict) {
+		t.Fatalf("stale revision err = %v, want ErrRevisionConflict", err)
 	}
 	var state struct {
 		SchemaVersion int `json:"schemaVersion"`

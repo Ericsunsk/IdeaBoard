@@ -11,7 +11,7 @@ import {
   type ImageStrengthAction,
   type ImageTaskAction,
 } from '../execution'
-import type { PromptAspectRatio } from '../../../board/domain'
+import type { PromptAspectRatio } from '../../../board'
 import type { FlowSnapshotParamPatch } from '../../infrastructure/vue-flow-adapter/flowSnapshotParamMutations.ts'
 import { i18n } from '../../../../shared/i18n'
 import {

@@ -1,14 +1,16 @@
-import { syncBoardToServer } from '../../../board/application/sync/boardSync'
-import { useBoardRepository } from '../../../board/application/catalog/repository'
-import { getBoardById, touchBoard } from '../../../board/application/catalog/boards'
 import {
+  syncBoardToServer,
+  useBoardRepository,
+  getBoardById,
+  touchBoard,
   loadBoardState,
   serializeBoardState,
   setBoardPreviewSnapshot,
   setBoardState,
-} from '../../../board/infrastructure/persistence'
-import type { BoardSnapshot, BoardState } from '../../../board/domain'
-import { InvalidBoardStateError } from '../../../board/domain'
+  InvalidBoardStateError,
+  type BoardSnapshot,
+  type BoardState,
+} from '../../../board'
 
 export type BoardSessionRepository = {
   exists: (boardId: string) => boolean
@@ -48,6 +50,8 @@ export function createBoardSessionRepository(): BoardSessionRepository {
   async function load(boardId: string): Promise<BoardSnapshot | null> {
     const normalized = normalizeBoardId(boardId)
     if (!normalized) return null
+    // Read before hydration so malformed local state is rejected at its storage boundary;
+    // hydration must not silently replace or mask a recoverable local validation error.
     loadBoardState(normalized)
     const hydrateResult = await boardRepository.commands.hydrate()
     if (!hydrateResult.ok && hydrateResult.error instanceof InvalidBoardStateError) {

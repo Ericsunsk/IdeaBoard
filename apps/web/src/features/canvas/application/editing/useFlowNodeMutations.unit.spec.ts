@@ -7,7 +7,7 @@ import {
   type FusionNodeItem,
   type ImageNodeItem,
   type PromptNodeItem,
-} from '../../../board/domain'
+} from '../../../board'
 import { CanvasGraphSession } from '../../domain/graph'
 import { flowConnectionToCanvasConnection } from '../../infrastructure/vue-flow-adapter/flowConnectionAdapter.ts'
 import { bindCanvasGraphSessionProjection } from '../../infrastructure/vue-flow-adapter/bindCanvasGraphSessionProjection'

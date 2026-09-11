@@ -6,7 +6,7 @@ import type {
   User,
   UserBoardItem,
 } from '../src/shared/api/generated-query/model'
-import { BOARD_STATE_SCHEMA_VERSION } from '../src/features/board/domain'
+import { BOARD_STATE_SCHEMA_VERSION } from '../src/features/board'
 import { assertNoConsoleErrors } from './mockSmokeUtils'
 import { createBrowserSmokeRuntime } from './browserSmokeRuntime'
 import { pageChromeBrowserAssertionHelpers } from './pageChromeSmokeHelpers'

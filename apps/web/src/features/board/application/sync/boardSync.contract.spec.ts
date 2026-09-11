@@ -12,10 +12,24 @@ const mocks = vi.hoisted(() => {
   const request = vi.fn()
   const state: {
     listResponse: { code?: number; msg?: string; data: { list: UserBoardItem[] } }
-    upsertResponse: ApiResponseBase & { data: null }
+    upsertResponse: ApiResponseBase & { data?: unknown }
   } = {
     listResponse: { data: { list: [] as UserBoardItem[] } },
-    upsertResponse: { code: 0, msg: '', data: null },
+    upsertResponse: {
+      code: 0,
+      msg: '',
+      data: {
+        board: {
+          board_id: 'board-1',
+          name: 'Board',
+          revision: 2,
+          state_schema_version: 4,
+          created_at: 100,
+          updated_at: 2_000,
+          state: {},
+        },
+      },
+    },
   }
   return { request, state }
 })
@@ -66,7 +80,7 @@ function makeRemoteBoard(params: {
     created_at: params.createdAt,
     updated_at: params.updatedAt,
     revision: 1,
-    state_schema_version: BOARD_STATE_SCHEMA_VERSION,
+    state_schema_version: 4,
     state: params.state as unknown as UserBoardItem['state'],
   }
 }
@@ -87,7 +101,21 @@ describe('boardSync', () => {
     })
     vi.clearAllMocks()
     mocks.state.listResponse = { data: { list: [] } }
-    mocks.state.upsertResponse = { code: 0, msg: '', data: null }
+    mocks.state.upsertResponse = {
+      code: 0,
+      msg: '',
+      data: {
+        board: {
+          board_id: 'board-1',
+          name: 'Board',
+          revision: 2,
+          state_schema_version: 4,
+          created_at: 100,
+          updated_at: 2_000,
+          state: {},
+        },
+      },
+    }
     mocks.request.mockImplementation(mockBoardApiRequest)
   })
 
@@ -140,9 +168,7 @@ describe('boardSync', () => {
   })
 
   it('preserves local-only boards while adding remote boards during hydrate', async () => {
-    replaceBoards([
-      { id: 'local-only', name: 'Unsynced Local', createdAt: 100, updatedAt: 2_000 },
-    ])
+    replaceBoards([{ id: 'local-only', name: 'Unsynced Local', createdAt: 100, updatedAt: 2_000 }])
     replaceBoardStateMap({ 'local-only': makeState(2_000, 'local-only-state') })
     mocks.state.listResponse = {
       data: {
@@ -379,9 +405,7 @@ describe('boardSync', () => {
   })
 
   it('returns hydrate failure for invalid remote board state without clearing local boards', async () => {
-    replaceBoards([
-      { id: 'local-board', name: 'Local Board', createdAt: 100, updatedAt: 2_000 },
-    ])
+    replaceBoards([{ id: 'local-board', name: 'Local Board', createdAt: 100, updatedAt: 2_000 }])
     replaceBoardStateMap({ 'local-board': makeState(2_000, 'local-state') })
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     try {
@@ -449,15 +473,40 @@ describe('boardSync', () => {
     expect(readUpsertBoardPayload('board-1')).toEqual(
       expect.objectContaining({
         name: 'Local Rename',
+        base_revision: 0,
         updated_at: 3_000,
       }),
     )
   })
 
-  it('syncs the shared remote envelope shape without viewport', async () => {
+  it('sends the observed revision and stores the server revision', async () => {
     replaceBoards([
-      { id: 'board-1', name: 'Envelope Board', createdAt: 100, updatedAt: 3_000 },
+      { id: 'board-1', name: 'Revision Board', createdAt: 100, updatedAt: 3_000, revision: 7 },
     ])
+    mocks.state.upsertResponse = {
+      code: 0,
+      msg: 'ok',
+      data: {
+        board: {
+          board_id: 'board-1',
+          name: 'Revision Board',
+          revision: 8,
+          state_schema_version: 4,
+          created_at: 100,
+          updated_at: 3_000,
+          state: {},
+        },
+      },
+    }
+
+    await syncBoardToServer('board-1')
+
+    expect(readUpsertBoardPayload('board-1')).toEqual(expect.objectContaining({ base_revision: 7 }))
+    expect(listBoards()[0]?.revision).toBe(8)
+  })
+
+  it('syncs the shared remote envelope shape without viewport', async () => {
+    replaceBoards([{ id: 'board-1', name: 'Envelope Board', createdAt: 100, updatedAt: 3_000 }])
     replaceBoardStateMap({
       'board-1': makeBoardState({
         updatedAt: 2_000,

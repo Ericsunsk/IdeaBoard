@@ -8,7 +8,7 @@ import {
   type FusionNodeItem,
   type ImageNodeItem,
   type PromptNodeItem,
-} from '../../../board/domain'
+} from '../../../board'
 import { measureCanvasPerf } from '../../infrastructure/browser/canvasPerfProbe'
 import { recordCanvasInteractionCount } from '../../infrastructure/browser/canvasInteractionMetrics'
 

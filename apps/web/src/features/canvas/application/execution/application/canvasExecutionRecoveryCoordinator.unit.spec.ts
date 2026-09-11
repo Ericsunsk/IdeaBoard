@@ -1,6 +1,6 @@
 import { TaskCancelledError } from '../../../../../shared/api/taskEvents'
 import { describe, expect, it, vi } from 'vitest'
-import { createEmptyBoardSnapshot } from '../../../../board/domain'
+import { createEmptyBoardSnapshot } from '../../../../board'
 import { CanvasGraphSession } from '../../../domain/graph'
 import { BoardGraphSession, createPendingImageExecutionCore } from '../pending-execution'
 import { createCanvasExecutionRecoveryCoordinator } from './canvasExecutionRecoveryCoordinator'

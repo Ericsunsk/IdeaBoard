@@ -3,7 +3,7 @@ import {
   createEmptyBoardSnapshot,
   type BoardSnapshot,
   type ImageNodeItem,
-} from '../../../../board/domain'
+} from '../../../../board'
 import { CanvasGraphSession } from '../../../domain/graph'
 import {
   BoardGraphSession,

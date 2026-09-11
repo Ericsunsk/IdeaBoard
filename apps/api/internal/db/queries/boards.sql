@@ -54,7 +54,11 @@ SET name = EXCLUDED.name,
     state_schema_version = COALESCE(sqlc.narg(state_schema_version)::integer, boards.state_schema_version),
     last_saved_by = COALESCE(sqlc.narg(last_saved_by)::bigint, boards.last_saved_by),
     updated_at = EXCLUDED.updated_at
-WHERE boards.owner_user_id = EXCLUDED.owner_user_id;
+WHERE boards.owner_user_id = EXCLUDED.owner_user_id
+  AND (
+    NOT sqlc.arg(has_expected_revision)::boolean
+    OR boards.revision = sqlc.arg(expected_revision)::bigint
+  );
 
 -- name: CountBoardNameConflicts :one
 SELECT COUNT(*)

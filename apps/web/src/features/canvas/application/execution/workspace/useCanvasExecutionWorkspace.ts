@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
-import type { BoardSnapshot } from '../../../../board/domain'
+import type { BoardSnapshot } from '../../../../board'
 import type { TaskImageResult } from '../../../../../shared/query/taskResult'
 import { i18n } from '../../../../../shared/i18n'
 import type { CanvasGraphStore } from '../../../domain/graph'

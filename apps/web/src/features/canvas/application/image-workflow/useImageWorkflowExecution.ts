@@ -10,7 +10,7 @@ import {
   useImageWorkflowExecution as useRuntimeImageWorkflowExecution,
   type PendingImageExecutionCore,
 } from '../execution'
-import type { BoardSnapshot } from '../../../board/domain'
+import type { BoardSnapshot } from '../../../board'
 import type { CanvasGraphStore } from '../../domain/graph'
 import type { CanvasRendererMetricsPort } from '../../infrastructure/vue-flow-adapter'
 import type { CanvasFeedback } from '../workspace/useCanvasFeedback.ts'

@@ -13,7 +13,7 @@ import {
 } from '../retouch/runtime/processingCancelled'
 import { isCanvasGraphNodeId, type CanvasGraphNodeId } from '../../domain/graph'
 import type { ImageNodeDisplayPayload } from '../../infrastructure/vue-flow-adapter/flowImageNodeSelectors.ts'
-import type { ImageNodeItem } from '../../../board/domain'
+import type { ImageNodeItem } from '../../../board'
 
 type RetouchEffectLayers = Parameters<typeof hasRenderableRetouchLayerStack>[0]
 

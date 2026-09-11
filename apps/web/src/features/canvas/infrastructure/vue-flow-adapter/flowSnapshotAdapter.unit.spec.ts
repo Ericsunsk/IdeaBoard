@@ -11,7 +11,7 @@ import {
   type CanvasGroup,
   type ImageNodeItem,
   type PromptNodeInputImage,
-} from '../../../board/domain'
+} from '../../../board'
 import type { FlowNodeData } from '../../domain/nodes/flowTypes.ts'
 
 const GROUP_GEOMETRY = {

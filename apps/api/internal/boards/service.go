@@ -29,6 +29,7 @@ var (
 	ErrMemberInvalidRole   = errors.New("board member invalid role")
 	ErrMemberInviteSelf    = errors.New("board member invite self")
 	ErrCanvasCleanupFailed = errors.New("board canvas cleanup failed")
+	ErrRevisionConflict    = errors.New("board revision conflict")
 
 	ErrShareTokenNotFound = errors.New("share token not found")
 	ErrShareTokenInvalid  = errors.New("share token invalid")
@@ -92,6 +93,9 @@ func (s *Service) UpsertBoard(ctx context.Context, userID int64, boardID string,
 	if req == nil {
 		return nil, ErrInvalidInput
 	}
+	if req.BaseRevision < 0 {
+		return nil, ErrInvalidInput
+	}
 	normalizedID := normalizeBoardID(boardID)
 	name := normalizeBoardName(req.Name)
 	if normalizedID == "" || name == "" {
@@ -110,6 +114,10 @@ func (s *Service) UpsertBoard(ctx context.Context, userID int64, boardID string,
 			return nil, err
 		}
 		board := existing.Board
+		if req.BaseRevision != board.Revision {
+			return nil, ErrRevisionConflict
+		}
+		board.ExpectedRevision = &req.BaseRevision
 		board.Name = name
 		board.State = state
 		board.StateSchemaVersion = stateSchemaVersion
@@ -128,6 +136,10 @@ func (s *Service) UpsertBoard(ctx context.Context, userID int64, boardID string,
 			return nil, ErrPermissionDenied
 		}
 		board := accessible.Board
+		if req.BaseRevision != board.Revision {
+			return nil, ErrRevisionConflict
+		}
+		board.ExpectedRevision = &req.BaseRevision
 		board.State = state
 		board.StateSchemaVersion = stateSchemaVersion
 		board.LastSavedBy = &userID

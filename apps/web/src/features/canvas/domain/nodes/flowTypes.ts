@@ -1,4 +1,4 @@
-import type { CanvasConnectionNodeType } from '../../../board/domain'
+import type { CanvasConnectionNodeType } from '../../../board'
 
 export type FlowNodeKind = CanvasConnectionNodeType
 

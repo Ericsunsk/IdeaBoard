@@ -135,7 +135,7 @@ import type { NodeUiState, PromptNodeUiState } from '../../domain/nodes/canvasNo
 import type { FlowNodeData } from '../../domain/nodes/flowTypes.ts'
 import type { OutpaintDragAnchor } from '../../application/image-workflow/useImageOutpaintOverlay.ts'
 import { useFlowCanvasNodeAdapter } from '../../infrastructure/vue-flow-adapter/useFlowCanvasNodeAdapter'
-import type { PromptAspectRatio } from '../../../board/domain'
+import type { PromptAspectRatio } from '../../../board'
 import type {
   CanvasNodePresentationIntent,
   FusionNodePresentationBinding,

@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
-import type { ImageNodeItem } from '../../../board/domain'
+import type { ImageNodeItem } from '../../../board'
 import {
   resolveImageNodeDisplayPayload,
   type ImageNodeDisplayPayload,

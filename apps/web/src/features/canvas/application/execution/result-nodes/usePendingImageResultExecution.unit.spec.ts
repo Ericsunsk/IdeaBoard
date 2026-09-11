@@ -1,7 +1,7 @@
 import { shallowRef } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
-import { createEmptyBoardSnapshot } from '../../../../board/domain'
+import { createEmptyBoardSnapshot } from '../../../../board'
 import { CanvasGraphStore, CanvasGraphSession } from '../../../domain/graph'
 import { bindCanvasGraphSessionProjection } from '../../../infrastructure/vue-flow-adapter/bindCanvasGraphSessionProjection'
 import { boardSnapshotToFlow } from '../../../infrastructure/vue-flow-adapter/flowSnapshotAdapter.ts'

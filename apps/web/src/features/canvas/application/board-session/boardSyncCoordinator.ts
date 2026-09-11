@@ -2,7 +2,7 @@ import {
   createEmptyBoardSnapshot,
   InvalidBoardStateError,
   type BoardSnapshot,
-} from '../../../board/domain'
+} from '../../../board'
 import type { BoardSession } from './useBoardSession'
 import { i18n } from '../../../../shared/i18n'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'

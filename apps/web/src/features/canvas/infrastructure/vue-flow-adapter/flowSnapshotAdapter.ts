@@ -10,7 +10,7 @@ import {
   type CanvasGroupNodeId,
   type CanvasNodeItem,
   type ImageNodeItem,
-} from '../../../board/domain'
+} from '../../../board'
 import { resolveCanvasGraphNodeDimensions } from '../../domain/graph'
 import type { FlowNodeData } from '../../domain/nodes/flowTypes.ts'
 import { getDefaultCanvasNodeTitle } from '../../domain/nodes/canvasNodeRegistry.ts'

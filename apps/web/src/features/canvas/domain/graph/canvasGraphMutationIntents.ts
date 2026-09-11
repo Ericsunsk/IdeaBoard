@@ -2,7 +2,7 @@ import type {
   CanvasConnection,
   CanvasConnectionEndpoint,
   CanvasPoint,
-} from '../../../board/domain'
+} from '../../../board'
 import {
   type CanvasGraphEdgeId,
   type CanvasGraphGroupId,

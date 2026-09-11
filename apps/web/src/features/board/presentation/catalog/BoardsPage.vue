@@ -304,6 +304,7 @@ const {
     if (!visible) closeDeleteDialog()
   },
 })
+void deleteDialogRef
 
 function handleDeleteDialogAfterHide() {
   completeDeleteDialogClose()
@@ -326,6 +327,7 @@ const {
   handleHide: handleSortMenuHide,
   select: selectSortMenuItem,
 } = usePrimePopupMenuOverlayLifecycle({})
+void sortMenuRef
 const sortMenuItems = computed<MenuItem[]>(() =>
   sortOptions.value.map((option) => ({
     ...option,

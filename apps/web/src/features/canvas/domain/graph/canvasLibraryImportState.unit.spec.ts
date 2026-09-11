@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ImageNodeItem } from '../../../board/domain'
+import type { ImageNodeItem } from '../../../board'
 import {
   createPendingLibraryImportFact,
   failLibraryImport,

@@ -11,7 +11,7 @@ import {
   type CanvasConnectionPort,
   type CanvasConnectionContractNode,
   type CanvasNodePortContract,
-} from '../../../board/domain'
+} from '../../../board'
 
 const AUTO_HANDLE_PORT = '__auto'
 

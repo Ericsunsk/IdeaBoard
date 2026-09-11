@@ -7,7 +7,7 @@ import {
   createEmptyBoardSnapshot,
   type BoardSnapshot,
   type CanvasGroup,
-} from '../../../../board/domain'
+} from '../../../../board'
 import { CanvasGraphSession, type CanvasGraphTransaction } from '../../../domain/graph'
 import { boardSnapshotToFlow } from '../../../infrastructure/vue-flow-adapter/flowSnapshotAdapter.ts'
 import { useCanvasGraphEditing } from '../../editing'

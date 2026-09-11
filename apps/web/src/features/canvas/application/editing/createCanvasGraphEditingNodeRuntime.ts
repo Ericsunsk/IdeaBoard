@@ -1,4 +1,4 @@
-import type { CanvasNodeItem } from '../../../board/domain'
+import type { CanvasNodeItem } from '../../../board'
 import type { FlowSnapshotParamPatch } from '../../infrastructure/vue-flow-adapter/flowSnapshotParamMutations.ts'
 import { useFlowCanvasNodeHandlers } from './useFlowCanvasNodeHandlers'
 import { useFlowNodeMediaInputs } from './useFlowNodeMediaInputs'
