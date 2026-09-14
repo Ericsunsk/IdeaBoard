@@ -115,6 +115,7 @@ chmod 600 "${DEPLOY_RESULT_FILE}"
 deploy_status=0
 IDEABOARD_STACK_DIR="${STACK_DIR}" \
   ENV_FILE="${STACK_DIR}/docker/.env" \
+  IDEABOARD_SECRETS_BUNDLE="${IDEABOARD_SECRETS_BUNDLE:-}" \
   COMPOSE_PROJECT_NAME=ideaboard \
   IDEABOARD_DEPLOY_RESULT_FILE="${DEPLOY_RESULT_FILE}" \
   "${deploy_command}" update --manifest "${MANIFEST_FILE}" \

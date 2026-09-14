@@ -254,7 +254,7 @@ func Load() *Config {
 		Rewards: RewardsConfig{CodeHMACKeys: strings.TrimSpace(raw.RewardsCodeHMACKeys)},
 		Storage: StorageConfig{LocalRoot: strings.TrimSpace(raw.StorageLocalRoot)},
 		Imgproxy: ImgproxyConfig{
-			BaseURL: strings.TrimSpace(raw.ImgproxyBaseURL),
+			BaseURL: stringEnvDefault(raw.ImgproxyBaseURL, "http://127.0.0.1:8080"),
 			KeyHex:  strings.TrimSpace(raw.ImgproxyKeyHex),
 			SaltHex: strings.TrimSpace(raw.ImgproxySaltHex),
 		},

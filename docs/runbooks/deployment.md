@@ -201,17 +201,32 @@ GITHUB_TOKEN="${TOKEN}" bash /tmp/bootstrap-vps.sh \
 
 `REF` 与 manifest 必须来自同一发布批次。Bootstrap 不接受隐式默认分支或 latest release；缺少 `--ref` 或 `--manifest` 会在 clone、配置写入和部署前直接失败。强制重装可加 `IDEABOARD_FORCE=1`；脚本会备份旧目录并恢复 `docker/.env`。Bootstrap 会在部署前检查 `cosign`，除非你已经在 `docker/.env` 里显式设置 `COSIGN_VERIFY=false`。
 
-至少修改 `/opt/stacks/ideaboard/docker/.env`：
+推荐使用仓库内的 encrypted secret bundle 管理敏感值。先在安全的控制机生成并加密 bundle，将 age private key 只放在部署主机或 CI Secret Store：
+
+```bash
+SOPS_AGE_RECIPIENT='age1...' \
+  ./scripts/secrets-init.sh deploy/secrets/production.sops.json
+```
+
+部署主机保存非敏感配置 `/opt/stacks/ideaboard/docker/.env`（镜像 digest、`PUBLIC_ORIGIN`、端口和部署开关），并通过环境变量指定 bundle 与 age identity：
+
+```bash
+export IDEABOARD_SECRETS_BUNDLE=deploy/secrets/production.sops.json
+export SOPS_AGE_KEY_FILE=/secure/age/ideaboard-production.txt
+ideaboard update --manifest release-manifest.json
+```
+
+`deploy-stack.sh` 会在权限为 `0600` 的受保护临时目录渲染 bundle，与非敏感 `.env` 合并后传给 Compose，退出时删除临时文件。age private key 不会进入任何 container。一次性切换到 bundle 后，不再在 `.env` 中维护下列敏感值；它们必须从 bundle 提供。
+
+Release rollback snapshot 只保存非敏感的基础 `.env`，不会复制解密后的 secret bundle；仍应按主机备份策略定期清理 release history，并在疑似泄露时轮换对应 purpose-specific secret。
+
+至少配置 `/opt/stacks/ideaboard/docker/.env` 中的非敏感项：
 
 - `PUBLIC_ORIGIN`
 - `API_BASE_URL`（可选 override）
-- `POSTGRES_PASSWORD`
-- `API_DB_PASSWORD`
-- `AUTH_DB_PASSWORD`
-- `AUTH_INTERNAL_KEY`
-- `APP_SECRETS_ENCRYPTION_KEY`
-- `BETTER_AUTH_SECRET`
-- `NATS_PASSWORD`
+- `IDEABOARD_*_IMAGE`
+
+bundle 中的独立 security-boundary secrets 包括 `POSTGRES_PASSWORD`、`API_DB_PASSWORD`、`AUTH_DB_PASSWORD`、`AUTH_INTERNAL_KEY`、`APP_SECRETS_ENCRYPTION_KEY`、`BETTER_AUTH_SECRET`、`NATS_PASSWORD`、`IMGPROXY_KEY` 和 `IMGPROXY_SALT`。
 
 ### 3. 后续部署 / 升级
 

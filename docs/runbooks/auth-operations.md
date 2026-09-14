@@ -106,7 +106,7 @@ Provider Console 登记的是 Better Auth callback `/api/auth/callback/{provider
 
 #### 首次配置
 
-1. 先部署 migration 和应用，保持目标 Provider disabled；确认 `BETTER_AUTH_URL` 是该环境的公开 HTTPS Auth 基准地址，`APP_SECRETS_ENCRYPTION_KEY` 是稳定的 base64 32-byte key。
+1. 先部署 migration 和应用，保持目标 Provider disabled；确认 `PUBLIC_ORIGIN` 是该环境的公开 HTTPS Auth 基准地址（`BETTER_AUTH_URL` 可从其派生），`APP_SECRETS_ENCRYPTION_KEY` 是稳定的 base64 32-byte key。
 2. 在对应 Provider Console 配置 callback URL。Google scopes 只允许 `openid email profile`；Discord scopes 固定为 `identify email`，不追加其他 scope。
 3. 进入 Admin `用户管理`，点击筛选 icon 左侧的 settings icon，选择目标 Provider。先保持 disabled，填写 Client ID 和 Client Secret 后保存。Secret 为 write-only；后续留空表示保留原值。
 4. 核对 Client Secret 输入框显示“已配置”的占位提示，callback URL 与 Provider Console 完全一致。修改 Client ID 时先关闭 Provider，再保存新 Client ID/Secret。
@@ -147,7 +147,7 @@ Production Client 必须在 Staging external smoke 全部通过后单独配置�
 > [!IMPORTANT]
 > `用户管理` 页的身份侧操作建议仅允许内网/VPN/IP allowlist 访问。
 
-- 生产环境必须设置 `BETTER_AUTH_SECRET`（至少 32 字符高熵随机值）与 `BETTER_AUTH_URL`（正式访问地址），不得使用 `replace-with-*` 或本地开发 fallback。
+- 生产环境必须设置 `BETTER_AUTH_SECRET`（至少 32 字符高熵随机值）与 `PUBLIC_ORIGIN`（正式 HTTPS 访问地址）；`BETTER_AUTH_URL` 可省略并从 `PUBLIC_ORIGIN` 派生，不得使用 `replace-with-*` 或本地开发 fallback。
 - `AUTH_INTERNAL_KEY` 必须在 API 与 Auth Service 中保持一致，并仅在两侧共享；生产环境不得使用占位值。
 - `APP_SECRETS_ENCRYPTION_KEY` 必须同时提供给 API 与 Auth Service，用于静态加密 Resend/API/Storage Secret；生产环境不得临时轮换或使用占位值。
 - Auth Service 与 Go API 建议只监听 `127.0.0.1`，由 Nginx 统一对外暴露，避免绕过可信代理与限流边界。

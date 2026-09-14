@@ -56,6 +56,8 @@ output/
 !apps/web/.env.example
 !docker/.env.example
 docker/migration.env
+deploy/secrets/*.env
+deploy/secrets/*.plain.json
 
 # ===== Release Artifacts =====
 docker/releases/

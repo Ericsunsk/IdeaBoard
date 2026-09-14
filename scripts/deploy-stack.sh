@@ -30,6 +30,9 @@ find_stack_root() {
 ROOT_DIR="$(find_stack_root)"
 COMPOSE_FILE="$ROOT_DIR/docker/compose.yml"
 ENV_FILE="${ENV_FILE:-$ROOT_DIR/docker/.env}"
+BASE_ENV_FILE="$ENV_FILE"
+SECRETS_BUNDLE="${IDEABOARD_SECRETS_BUNDLE:-}"
+RENDERED_SECRETS_ENV=""
 ENV_EXAMPLE="$ROOT_DIR/docker/.env.example"
 BACKUP_DIR="${BACKUP_DIR:-$(cd "$ROOT_DIR/.." && pwd)/$(basename "$ROOT_DIR")-backups}"
 BACKUP_RETAIN="${BACKUP_RETAIN:-5}"
@@ -199,7 +202,12 @@ generate_url_safe_secret() {
 
 env_value() {
   local key="$1"
-  awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$ENV_FILE"
+  local value
+  value="$(awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$ENV_FILE")"
+  if [[ "$value" == '"'*'"' ]]; then
+    value="${value:1:${#value}-2}"
+  fi
+  printf '%s\n' "$value"
 }
 
 env_or_file_value() {
@@ -230,6 +238,17 @@ set_env_value() {
   ' "$ENV_FILE" > "$tmp"
   mv "$tmp" "$ENV_FILE"
   chmod 600 "$ENV_FILE"
+  if [[ -n "$SECRETS_BUNDLE" && "$BASE_ENV_FILE" != "$ENV_FILE" ]]; then
+    tmp="$(mktemp "$(dirname "$BASE_ENV_FILE")/.env.XXXXXX")"
+    awk -v key="$key" -v value="$value" '
+      BEGIN { found = 0 }
+      $0 ~ "^" key "=" { print key "=" value; found = 1; next }
+      { print }
+      END { if (!found) print key "=" value }
+    ' "$BASE_ENV_FILE" > "$tmp"
+    mv "$tmp" "$BASE_ENV_FILE"
+    chmod 600 "$BASE_ENV_FILE"
+  fi
 }
 
 is_placeholder() {
@@ -339,6 +358,57 @@ ensure_env_file() {
   fi
 }
 
+set_env_value_from_file() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+  local tmp
+  tmp="$(mktemp "$(dirname "$file")/.env.XXXXXX")"
+  local found=0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == "$key="* ]]; then
+      printf '%s=%s\n' "$key" "$value" >> "$tmp"
+      found=1
+    else
+      printf '%s\n' "$line" >> "$tmp"
+    fi
+  done < "$file"
+  if (( found == 0 )); then
+    printf '%s=%s\n' "$key" "$value" >> "$tmp"
+  fi
+  mv "$tmp" "$file"
+  chmod 600 "$file"
+}
+
+prepare_secrets_bundle() {
+  [[ -n "$SECRETS_BUNDLE" ]] || return 0
+  [[ "$SECRETS_BUNDLE" = /* ]] || SECRETS_BUNDLE="$ROOT_DIR/$SECRETS_BUNDLE"
+  [[ -f "$SECRETS_BUNDLE" ]] || die "secret bundle does not exist: $SECRETS_BUNDLE"
+  [[ -f "$ENV_FILE" ]] || die "base environment file is required with IDEABOARD_SECRETS_BUNDLE: $ENV_FILE"
+
+  local secret_env merged_env
+  secret_env="$(mktemp "${TMPDIR:-/tmp}/ideaboard-secrets.XXXXXX")"
+  merged_env="$(mktemp "${TMPDIR:-/tmp}/ideaboard-env.XXXXXX")"
+  RENDERED_SECRETS_ENV="$merged_env"
+  "$ROOT_DIR/scripts/secrets-render.sh" "$SECRETS_BUNDLE" "$secret_env"
+  chmod 600 "$secret_env"
+  cp "$ENV_FILE" "$merged_env"
+  chmod 600 "$merged_env"
+  while IFS= read -r line; do
+    [[ "$line" == *=* ]] || continue
+    set_env_value_from_file "$merged_env" "${line%%=*}" "${line#*=}"
+  done < "$secret_env"
+  rm -f -- "$secret_env"
+  ENV_FILE="$merged_env"
+}
+
+cleanup_rendered_secrets() {
+  if [[ -n "$RENDERED_SECRETS_ENV" ]]; then
+    rm -f -- "$RENDERED_SECRETS_ENV"
+    RENDERED_SECRETS_ENV=""
+  fi
+}
+
 validate_env_file() {
   local missing=()
   local key
@@ -355,7 +425,9 @@ validate_env_file() {
     AUTH_INTERNAL_KEY \
     APP_SECRETS_ENCRYPTION_KEY \
     BETTER_AUTH_SECRET \
-    NATS_PASSWORD; do
+    NATS_PASSWORD \
+    IMGPROXY_KEY \
+    IMGPROXY_SALT; do
     if is_placeholder "$(env_value "$key")"; then
       missing+=("$key")
     fi
@@ -1210,7 +1282,7 @@ init_release_context() {
   PREVIOUS_AUTH_IMAGE="$(env_value IDEABOARD_AUTH_IMAGE)"
   PREVIOUS_AUTH_MIGRATE_IMAGE="$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
   DEPLOY_ENV_SNAPSHOT="$(mktemp "$RELEASE_STATE_DIR/env.${DEPLOY_RELEASE_ID}.XXXXXX")"
-  cp "$ENV_FILE" "$DEPLOY_ENV_SNAPSHOT"
+  cp "$BASE_ENV_FILE" "$DEPLOY_ENV_SNAPSHOT"
   chmod 600 "$DEPLOY_ENV_SNAPSHOT"
 }
 
@@ -1277,8 +1349,15 @@ EOF
 
 restore_env_snapshot() {
   if [[ -n "$DEPLOY_ENV_SNAPSHOT" && -f "$DEPLOY_ENV_SNAPSHOT" ]]; then
-    cp "$DEPLOY_ENV_SNAPSHOT" "$ENV_FILE"
-    chmod 600 "$ENV_FILE"
+    cp "$DEPLOY_ENV_SNAPSHOT" "$BASE_ENV_FILE"
+    chmod 600 "$BASE_ENV_FILE"
+    if [[ -n "$SECRETS_BUNDLE" ]]; then
+      cleanup_rendered_secrets
+      ENV_FILE="$BASE_ENV_FILE"
+      prepare_secrets_bundle
+    else
+      ENV_FILE="$BASE_ENV_FILE"
+    fi
   fi
 }
 
@@ -1355,6 +1434,7 @@ handle_deploy_failure() {
     write_automation_result "failure" "$(automation_recovery_hint)" || true
     print_recovery_hint
   fi
+  cleanup_rendered_secrets
   exit "$exit_code"
 }
 
@@ -1376,6 +1456,7 @@ finish_trapped_command_success() {
     rm -f -- "$DEPLOY_ENV_SNAPSHOT"
   fi
   DEPLOY_SUCCEEDED=1
+  cleanup_rendered_secrets
   trap - EXIT
 }
 
@@ -1770,11 +1851,20 @@ render_cloudflare_real_ip_config() {
   bash "$ROOT_DIR/scripts/render-cloudflare-real-ip-conf.sh" "$output_path"
 }
 
-ensure_env_file
+if [[ -n "$SECRETS_BUNDLE" ]]; then
+  prepare_secrets_bundle
+  trap cleanup_rendered_secrets EXIT
+else
+  ensure_env_file
+fi
 
 if [[ "$command" == "init-env" ]]; then
   if validate_env_file; then
-    echo "Environment file is ready: $ENV_FILE"
+    if [[ -n "$SECRETS_BUNDLE" ]]; then
+      echo "Base environment and secret bundle are ready: $BASE_ENV_FILE"
+    else
+      echo "Environment file is ready: $ENV_FILE"
+    fi
   else
     echo "Environment file was created or updated: $ENV_FILE"
   fi

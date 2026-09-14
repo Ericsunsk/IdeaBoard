@@ -55,11 +55,7 @@ function validateDatabaseSSLMode(value: string): DatabaseSSLMode {
 export function loadEnv(source: EnvSource) {
   const productionRuntime = isProductionRuntime(source)
 
-  const trustedOrigins = getEnv(source, 'AUTH_TRUSTED_ORIGINS', '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-
+  const publicOrigin = getEnv(source, 'PUBLIC_ORIGIN', '')
   const authInternalKey = getEnv(source, 'AUTH_INTERNAL_KEY', '')
   const authHost = getEnv(source, 'AUTH_HOST', '127.0.0.1')
   const authSecret =
@@ -67,7 +63,12 @@ export function loadEnv(source: EnvSource) {
     (productionRuntime ? '' : 'ideaboard-local-development-secret-change-before-production')
   const authBaseURL =
     getEnv(source, 'BETTER_AUTH_URL', '') ||
+    publicOrigin ||
     (productionRuntime ? '' : 'http://localhost:5173')
+  const trustedOrigins = (getEnv(source, 'AUTH_TRUSTED_ORIGINS', '') || publicOrigin || authBaseURL)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
   const apiInternalURL =
     getEnv(source, 'API_INTERNAL_URL', '') || 'http://127.0.0.1:6000'
   const dbPassword = getEnv(source, 'DB_PASSWORD', '')
@@ -100,7 +101,7 @@ export function loadEnv(source: EnvSource) {
       )
     }
     if (!authBaseURL) {
-      throw new Error('BETTER_AUTH_URL is required when NODE_ENV=production')
+      throw new Error('BETTER_AUTH_URL or PUBLIC_ORIGIN is required when NODE_ENV=production')
     }
     validateProductionURL('BETTER_AUTH_URL', authBaseURL, { requireHTTPS: true })
     for (const origin of trustedOrigins) {
