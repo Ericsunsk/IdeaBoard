@@ -49,8 +49,7 @@ function productionSource(overrides: EnvSource = {}): EnvSource {
     NODE_ENV: 'production',
     AUTH_INTERNAL_KEY: strongInternalKey,
     BETTER_AUTH_SECRET: strongAuthSecret,
-    BETTER_AUTH_URL: 'https://auth.example.com',
-    AUTH_TRUSTED_ORIGINS: 'https://app.example.com',
+    PUBLIC_ORIGIN: 'https://app.example.com',
     DB_PASSWORD: 'db-prod-value-123',
     DB_SSLMODE: 'require',
     APP_SECRETS_ENCRYPTION_KEY: strongSecretsEncryptionKey,
@@ -62,18 +61,14 @@ describe('loadEnv production guard', () => {
   it('loads valid production values from an injected source', () => {
     const config = loadEnv(
       productionSource({
-        AUTH_TRUSTED_ORIGINS: 'https://app.example.com, https://admin.example.com',
         DB_SSLMODE: 'verify-full',
       }),
     )
 
     assert.equal(config.auth.internalKey, strongInternalKey)
     assert.equal(config.auth.secret, strongAuthSecret)
-    assert.equal(config.auth.baseURL, 'https://auth.example.com')
-    assert.deepEqual(config.auth.trustedOrigins, [
-      'https://app.example.com',
-      'https://admin.example.com',
-    ])
+    assert.equal(config.auth.baseURL, 'https://app.example.com')
+    assert.deepEqual(config.auth.trustedOrigins, ['https://app.example.com'])
     assert.equal(config.database.sslMode, 'verify-full')
   })
 
@@ -81,24 +76,11 @@ describe('loadEnv production guard', () => {
     const config = loadEnv(
       productionSource({
         PUBLIC_ORIGIN: 'https://app.example.com',
-        BETTER_AUTH_URL: undefined,
-        AUTH_TRUSTED_ORIGINS: undefined,
       }),
     )
 
     assert.equal(config.auth.baseURL, 'https://app.example.com')
     assert.deepEqual(config.auth.trustedOrigins, ['https://app.example.com'])
-  })
-
-  it('uses BETTER_AUTH_URL as the final trusted-origin fallback', () => {
-    const config = loadEnv(
-      productionSource({
-        PUBLIC_ORIGIN: undefined,
-        AUTH_TRUSTED_ORIGINS: undefined,
-      }),
-    )
-
-    assert.deepEqual(config.auth.trustedOrigins, ['https://auth.example.com'])
   })
 
   for (const field of ['AUTH_INTERNAL_KEY', 'BETTER_AUTH_SECRET', 'DB_PASSWORD'] as const) {
@@ -140,39 +122,18 @@ describe('loadEnv production guard', () => {
   })
 
   it('requires production auth origin to be a valid HTTPS URL', () => {
-    for (const value of ['not-a-url', 'http://auth.example.com', 'ftp://auth.example.com']) {
+    for (const value of ['not-a-url', 'http://app.example.com', 'ftp://app.example.com']) {
       assert.throws(
-        () => loadEnv(productionSource({ BETTER_AUTH_URL: value })),
-        /BETTER_AUTH_URL must be a valid https URL when NODE_ENV=production/,
+        () => loadEnv(productionSource({ PUBLIC_ORIGIN: value })),
+        /PUBLIC_ORIGIN must be a valid https URL when NODE_ENV=production/,
       )
     }
   })
 
-  it('requires BETTER_AUTH_URL or PUBLIC_ORIGIN in production', () => {
+  it('requires PUBLIC_ORIGIN in production', () => {
     assert.throws(
-      () => loadEnv(productionSource({ BETTER_AUTH_URL: undefined, PUBLIC_ORIGIN: undefined })),
-      /BETTER_AUTH_URL or PUBLIC_ORIGIN is required when NODE_ENV=production/,
-    )
-  })
-
-  it('rejects invalid production AUTH_TRUSTED_ORIGINS entries', () => {
-    for (const value of [
-      'https://app.example.com,not-a-url',
-      'https://app.example.com/path',
-      'https://user:pass@app.example.com',
-      'https://app.example.com?query=1',
-    ]) {
-      assert.throws(
-        () => loadEnv(productionSource({ AUTH_TRUSTED_ORIGINS: value })),
-        /AUTH_TRUSTED_ORIGINS entry must be a valid https URL when NODE_ENV=production/,
-      )
-    }
-  })
-
-  it('requires HTTPS for production AUTH_TRUSTED_ORIGINS entries', () => {
-    assert.throws(
-      () => loadEnv(productionSource({ AUTH_TRUSTED_ORIGINS: 'http://app.example.com' })),
-      /AUTH_TRUSTED_ORIGINS entry must be a valid https URL when NODE_ENV=production/,
+      () => loadEnv(productionSource({ PUBLIC_ORIGIN: undefined })),
+      /PUBLIC_ORIGIN is required when NODE_ENV=production/,
     )
   })
 

@@ -33,7 +33,7 @@ export async function proxyRequest({ request, env }: PagesContext): Promise<Resp
   const incoming = new URL(request.url)
   const target = new URL(`${origin.origin}${incoming.pathname}${incoming.search}`)
   const headers = new Headers(request.headers)
-  // Better Auth validates the browser Origin against AUTH_TRUSTED_ORIGINS,
+  // Better Auth validates the browser Origin against the canonical PUBLIC_ORIGIN,
   // so auth requests must retain the public origin while ordinary API routes
   // use the upstream origin for the API CORS policy.
   const isAuthRequest =

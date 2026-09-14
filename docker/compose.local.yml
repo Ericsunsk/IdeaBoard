@@ -73,7 +73,7 @@ services:
       IMGPROXY_KEY: ${IMGPROXY_KEY:?Set IMGPROXY_KEY in docker/.env}
       IMGPROXY_SALT: ${IMGPROXY_SALT:?Set IMGPROXY_SALT in docker/.env}
     ports:
-      - "127.0.0.1:${IMGPROXY_PORT:-8080}:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       - ../apps/api/uploads:/data:ro
     networks:

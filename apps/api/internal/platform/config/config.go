@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"log/slog"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -166,7 +167,9 @@ type envConfig struct {
 	DBName              string `env:"DB_NAME"`
 	DBSSLMode           string `env:"DB_SSLMODE"`
 	NATSEventBusEnabled string `env:"NATS_EVENT_BUS_ENABLED"`
-	NATSURL             string `env:"NATS_URL"`
+	NATSPassword        string `env:"NATS_PASSWORD"`
+	NATSHost            string `env:"NATS_HOST"`
+	NATSPort            string `env:"NATS_PORT"`
 	RiverConcurrency    string `env:"RIVER_WORKER_CONCURRENCY"`
 
 	AppPort               string `env:"APP_PORT"`
@@ -182,7 +185,6 @@ type envConfig struct {
 	StorageLocalRoot          string `env:"STORAGE_LOCAL_ROOT"`
 	CreditsWelcomeIdentityKey string `env:"CREDITS_WELCOME_IDENTITY_KEY"`
 	RewardsCodeHMACKeys       string `env:"REWARDS_CODE_HMAC_KEYS"`
-	ImgproxyBaseURL           string `env:"IMGPROXY_BASE_URL"`
 	ImgproxyKeyHex            string `env:"IMGPROXY_KEY"`
 	ImgproxySaltHex           string `env:"IMGPROXY_SALT"`
 }
@@ -204,7 +206,21 @@ func Load() *Config {
 	raw.DBMigrationPassword = strings.TrimSpace(raw.DBMigrationPassword)
 
 	appEnv := normalizeAppEnv(raw.AppEnv)
-	natsURL := strings.TrimSpace(raw.NATSURL)
+	imgproxyBaseURL := "http://127.0.0.1:8080"
+	if isProductionAppEnv(appEnv) {
+		imgproxyBaseURL = "http://imgproxy:8080"
+	}
+	natsURL := ""
+	natsPassword := strings.TrimSpace(raw.NATSPassword)
+	natsHost := stringEnvDefault(raw.NATSHost, "127.0.0.1")
+	natsPort := stringEnvDefault(raw.NATSPort, "4222")
+	if natsPassword != "" {
+		natsURL = (&url.URL{
+			Scheme: "nats",
+			User:   url.UserPassword("ideaboard", natsPassword),
+			Host:   net.JoinHostPort(natsHost, natsPort),
+		}).String()
+	}
 
 	publicOrigin := normalizePublicOrigin(raw.PublicOrigin)
 	apiOrigin := normalizePublicOrigin(raw.APIBaseURL)
@@ -254,7 +270,7 @@ func Load() *Config {
 		Rewards: RewardsConfig{CodeHMACKeys: strings.TrimSpace(raw.RewardsCodeHMACKeys)},
 		Storage: StorageConfig{LocalRoot: strings.TrimSpace(raw.StorageLocalRoot)},
 		Imgproxy: ImgproxyConfig{
-			BaseURL: stringEnvDefault(raw.ImgproxyBaseURL, "http://127.0.0.1:8080"),
+			BaseURL: imgproxyBaseURL,
 			KeyHex:  strings.TrimSpace(raw.ImgproxyKeyHex),
 			SaltHex: strings.TrimSpace(raw.ImgproxySaltHex),
 		},

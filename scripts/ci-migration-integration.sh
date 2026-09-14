@@ -29,9 +29,8 @@ export DB_MIGRATION_USER="${DB_MIGRATION_USER:-ideaboard}"
 export DB_MIGRATION_PASSWORD="${DB_MIGRATION_PASSWORD:-ideaboard_test}"
 export AUTH_INTERNAL_KEY="${AUTH_INTERNAL_KEY:-0123456789abcdef0123456789abcdef}"
 export APP_SECRETS_ENCRYPTION_KEY="${APP_SECRETS_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}"
-export AUTH_TRUSTED_ORIGINS="${AUTH_TRUSTED_ORIGINS:-https://app.example.com}"
+export PUBLIC_ORIGIN="${PUBLIC_ORIGIN:-https://app.example.com}"
 export BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-abcdef0123456789abcdef0123456789}"
-export BETTER_AUTH_URL="${BETTER_AUTH_URL:-https://api.example.com}"
 export NODE_ENV="${NODE_ENV:-production}"
 
 (cd "${repo_root}/apps/auth" && npm run build)

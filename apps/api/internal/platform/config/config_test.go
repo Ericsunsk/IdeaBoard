@@ -26,7 +26,9 @@ var configEnvKeys = []string{
 	"AUTH_INTERNAL_KEY",
 	"CREDITS_WELCOME_IDENTITY_KEY",
 	"RIVER_WORKER_CONCURRENCY",
-	"NATS_URL",
+	"NATS_PASSWORD",
+	"NATS_HOST",
+	"NATS_PORT",
 	"NATS_EVENT_BUS_ENABLED",
 	"REWARDS_CODE_HMAC_KEYS",
 }
@@ -207,12 +209,12 @@ func TestLoadRiverWorkerConcurrency(t *testing.T) {
 }
 
 func TestLoadEventBusConfig(t *testing.T) {
-	t.Run("defaults to disabled without nats url", func(t *testing.T) {
+	t.Run("defaults to disabled without nats password", func(t *testing.T) {
 		resetConfigEnv(t)
 
 		cfg := Load()
 		if cfg.Events.Enabled {
-			t.Fatal("expected event bus disabled without NATS_URL")
+			t.Fatal("expected event bus disabled without NATS_PASSWORD")
 		}
 		if cfg.Events.NATSStreamName != "" || cfg.Events.NATSSubjectPrefix != "" || cfg.Events.NATSConsumerName != "" ||
 			cfg.Events.NATSConnectTimeout != 0 || cfg.Events.NATSRequestTimeout != 0 || cfg.Events.NATSDrainTimeout != 0 {
@@ -220,22 +222,24 @@ func TestLoadEventBusConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("nats url enables event bus", func(t *testing.T) {
+	t.Run("nats password derives event bus url", func(t *testing.T) {
 		resetConfigEnv(t)
-		t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
+		t.Setenv("NATS_PASSWORD", "test-password")
+		t.Setenv("NATS_HOST", "127.0.0.1")
+		t.Setenv("NATS_PORT", "4222")
 
 		cfg := Load()
 		if !cfg.Events.Enabled {
-			t.Fatal("expected NATS_URL to enable event bus")
+			t.Fatal("expected NATS_PASSWORD to enable event bus")
 		}
-		if cfg.Events.NATSURL != "nats://127.0.0.1:4222" {
-			t.Fatalf("NATSURL=%q, want nats://127.0.0.1:4222", cfg.Events.NATSURL)
+		if cfg.Events.NATSURL != "nats://ideaboard:test-password@127.0.0.1:4222" {
+			t.Fatalf("NATSURL=%q, want derived local URL", cfg.Events.NATSURL)
 		}
 	})
 
 	t.Run("explicit disabled wins over nats url", func(t *testing.T) {
 		resetConfigEnv(t)
-		t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
+		t.Setenv("NATS_PASSWORD", "test-password")
 		t.Setenv("NATS_EVENT_BUS_ENABLED", "false")
 
 		cfg := Load()
@@ -243,6 +247,25 @@ func TestLoadEventBusConfig(t *testing.T) {
 			t.Fatal("expected explicit false to disable event bus")
 		}
 	})
+
+}
+
+func TestLoadDerivedServiceEndpoints(t *testing.T) {
+	t.Run("uses local imgproxy endpoint by default", func(t *testing.T) {
+		resetConfigEnv(t)
+		if got := Load().Imgproxy.BaseURL; got != "http://127.0.0.1:8080" {
+			t.Fatalf("local imgproxy base URL = %q", got)
+		}
+	})
+
+	t.Run("uses the production imgproxy service endpoint", func(t *testing.T) {
+		resetConfigEnv(t)
+		t.Setenv("APP_ENV", "production")
+		if got := Load().Imgproxy.BaseURL; got != "http://imgproxy:8080" {
+			t.Fatalf("production imgproxy base URL = %q", got)
+		}
+	})
+
 }
 
 func TestDetectCORSAllowedOrigins(t *testing.T) {

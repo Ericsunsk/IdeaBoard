@@ -90,7 +90,7 @@ func NewTaskStatusEventPublisher(
 		return localPublisher, nil, nil
 	}
 	if cfg.NATSURL == "" {
-		return nil, nil, fmt.Errorf("NATS_EVENT_BUS_ENABLED=true requires NATS_URL")
+		return nil, nil, fmt.Errorf("NATS_EVENT_BUS_ENABLED=true requires NATS_PASSWORD")
 	}
 
 	bus, err := events.NewNATSJetStreamEventBus(ctx, events.NATSJetStreamConfig{

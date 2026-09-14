@@ -318,7 +318,7 @@ function renderHTML(
 }
 
 function resolvePublicSiteOrigin(value?: string): string {
-  const candidate = value?.trim() || process.env.PUBLIC_ORIGIN?.trim() || process.env.BETTER_AUTH_URL?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN;
+  const candidate = value?.trim() || process.env.PUBLIC_ORIGIN?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN;
   try {
     const url = new URL(candidate);
     if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) {

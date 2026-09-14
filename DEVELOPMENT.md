@@ -314,7 +314,7 @@ sqlc:
 | `APP_SECRETS_ENCRYPTION_KEY`                                  | API key 和 storage secret 静态加密主密钥                                                           |
 | `REWARDS_CODE_HMAC_KEYS`                                      | Rewards Code current/previous keyed-HMAC JSON registry；key 至少 32 bytes，不能放入 Admin settings |
 | `BETTER_AUTH_SECRET`                                          | Better Auth 签名密钥，生产必须高熵                                                                 |
-| `BETTER_AUTH_URL`                                             | Auth 对外基准 URL                                                                                  |
+| `PUBLIC_ORIGIN`                                               | Auth 对外基准 URL与 trusted origin                                                                  |
 
 Auth 使用相同的 owner/runtime separation：长期运行的 Auth 读取 `DB_USER=ideaboard_auth`，`npm run migrate` 通过 `DB_MIGRATION_USER` 临时使用 owner，并在完成后只授予 Better Auth tables 权限。本地 migration credential 只放在已忽略的 `docker/migration.env`，不要复制进 API/Auth runtime `.env`。
 

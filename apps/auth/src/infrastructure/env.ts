@@ -61,14 +61,11 @@ export function loadEnv(source: EnvSource) {
   const authSecret =
     getEnv(source, 'BETTER_AUTH_SECRET', '') ||
     (productionRuntime ? '' : 'ideaboard-local-development-secret-change-before-production')
-  const authBaseURL =
-    getEnv(source, 'BETTER_AUTH_URL', '') ||
-    publicOrigin ||
-    (productionRuntime ? '' : 'http://localhost:5173')
-  const trustedOrigins = (getEnv(source, 'AUTH_TRUSTED_ORIGINS', '') || publicOrigin || authBaseURL)
-    .split(',')
+  const authBaseURL = publicOrigin || (productionRuntime ? '' : 'http://localhost:5173')
+  const trustedOrigins = [publicOrigin || authBaseURL]
     .map((item) => item.trim())
     .filter(Boolean)
+    .filter((item, index, all) => all.indexOf(item) === index)
   const apiInternalURL =
     getEnv(source, 'API_INTERNAL_URL', '') || 'http://127.0.0.1:6000'
   const dbPassword = getEnv(source, 'DB_PASSWORD', '')
@@ -101,12 +98,10 @@ export function loadEnv(source: EnvSource) {
       )
     }
     if (!authBaseURL) {
-      throw new Error('BETTER_AUTH_URL or PUBLIC_ORIGIN is required when NODE_ENV=production')
+      throw new Error('PUBLIC_ORIGIN is required when NODE_ENV=production')
     }
-    validateProductionURL('BETTER_AUTH_URL', authBaseURL, { requireHTTPS: true })
-    for (const origin of trustedOrigins) {
-      validateProductionURL('AUTH_TRUSTED_ORIGINS entry', origin, { requireHTTPS: true })
-    }
+    validateProductionURL('PUBLIC_ORIGIN', authBaseURL, { requireHTTPS: true })
+    validateProductionURL('PUBLIC_ORIGIN', trustedOrigins[0] ?? authBaseURL, { requireHTTPS: true })
   }
 
   return {

@@ -96,17 +96,17 @@
 为每个启用的 Provider 创建独立 OAuth Client。Google 在 Google Cloud Console 创建 `Web application` Client，Discord 在 Discord Developer Portal 创建 Application。每个环境登记的 Authorized redirect URI 必须与 Admin 只读显示的 callback URL 完全一致：
 
 | 环境       | Client policy                                      | Callback URI pattern                                      |
-| Production  | 独立 Production Client，不与其他环境共享           | `${PRODUCTION_BETTER_AUTH_URL}/api/auth/callback/{provider}` |
-| Staging     | 独立 Staging Client，不使用 Production credentials | `${STAGING_BETTER_AUTH_URL}/api/auth/callback/{provider}`    |
+| Production  | 独立 Production Client，不与其他环境共享           | `${PRODUCTION_PUBLIC_ORIGIN}/api/auth/callback/{provider}` |
+| Staging     | 独立 Staging Client，不使用 Production credentials | `${STAGING_PUBLIC_ORIGIN}/api/auth/callback/{provider}`    |
 | Local       | 复用 Staging Client，仅供授权开发人员              | 默认 `http://localhost:5173/api/auth/callback/{provider}`    |
 
-Local 复用方法：把本地 `BETTER_AUTH_URL` 对应的 callback URL 加入对应 **Staging Client** 的 Authorized redirect URIs，通过团队 Secret Manager 获取 Staging Client ID/Secret，再在本地 Admin 保存。默认开发基准 URL 是 `http://localhost:5173`；若修改了 `BETTER_AUTH_URL`，以 Admin Dialog 的只读 callback URL 为准。不要把 localhost URI 或 Staging Secret 加入 Production Client、仓库、Issue、日志或截图。
+Local 复用方法：把本地 `PUBLIC_ORIGIN` 对应的 callback URL 加入对应 **Staging Client** 的 Authorized redirect URIs，通过团队 Secret Manager 获取 Staging Client ID/Secret，再在本地 Admin 保存。默认开发基准 URL 是 `http://localhost:5173`。不要把 localhost URI 或 Staging Secret 加入 Production Client、仓库、Issue、日志或截图。
 
 Provider Console 登记的是 Better Auth callback `/api/auth/callback/{provider}`；登录成功后浏览器进入 Web completion page `/user/auth/callback`。两者不是同一个 URL，后者不需要登记为 Provider Authorized redirect URI。
 
 #### 首次配置
 
-1. 先部署 migration 和应用，保持目标 Provider disabled；确认 `PUBLIC_ORIGIN` 是该环境的公开 HTTPS Auth 基准地址（`BETTER_AUTH_URL` 可从其派生），`APP_SECRETS_ENCRYPTION_KEY` 是稳定的 base64 32-byte key。
+1. 先部署 migration 和应用，保持目标 Provider disabled；确认 `PUBLIC_ORIGIN` 是该环境的公开 HTTPS Auth 基准地址，`APP_SECRETS_ENCRYPTION_KEY` 是稳定的 base64 32-byte key。
 2. 在对应 Provider Console 配置 callback URL。Google scopes 只允许 `openid email profile`；Discord scopes 固定为 `identify email`，不追加其他 scope。
 3. 进入 Admin `用户管理`，点击筛选 icon 左侧的 settings icon，选择目标 Provider。先保持 disabled，填写 Client ID 和 Client Secret 后保存。Secret 为 write-only；后续留空表示保留原值。
 4. 核对 Client Secret 输入框显示“已配置”的占位提示，callback URL 与 Provider Console 完全一致。修改 Client ID 时先关闭 Provider，再保存新 Client ID/Secret。
@@ -147,7 +147,7 @@ Production Client 必须在 Staging external smoke 全部通过后单独配置�
 > [!IMPORTANT]
 > `用户管理` 页的身份侧操作建议仅允许内网/VPN/IP allowlist 访问。
 
-- 生产环境必须设置 `BETTER_AUTH_SECRET`（至少 32 字符高熵随机值）与 `PUBLIC_ORIGIN`（正式 HTTPS 访问地址）；`BETTER_AUTH_URL` 可省略并从 `PUBLIC_ORIGIN` 派生，不得使用 `replace-with-*` 或本地开发 fallback。
+- 生产环境必须设置 `BETTER_AUTH_SECRET`（至少 32 字符高熵随机值）与 `PUBLIC_ORIGIN`（正式 HTTPS 访问地址），不得使用 `replace-with-*` 或本地开发 fallback。
 - `AUTH_INTERNAL_KEY` 必须在 API 与 Auth Service 中保持一致，并仅在两侧共享；生产环境不得使用占位值。
 - `APP_SECRETS_ENCRYPTION_KEY` 必须同时提供给 API 与 Auth Service，用于静态加密 Resend/API/Storage Secret；生产环境不得临时轮换或使用占位值。
 - Auth Service 与 Go API 建议只监听 `127.0.0.1`，由 Nginx 统一对外暴露，避免绕过可信代理与限流边界。
