@@ -19,7 +19,6 @@ var DefaultTierPolicies = []TierPolicy{
 
 var OnDemandTierPolicies = map[string]TierPolicy{
 	TierLargePreview:    {Tier: TierLargePreview, Format: FormatWebP},
-	TierProcessing:      {Tier: TierProcessing, Format: FormatWebP},
 	TierProcessingInput: {Tier: TierProcessingInput, Format: FormatWebP},
 }
 

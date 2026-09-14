@@ -255,6 +255,11 @@ describe('renderImageRetouchFile', () => {
 
   it('renders visible retouch layers to an uploadable file', async () => {
     installCanvasMocks()
+    rendererMocks.readPixels.mockReturnValue({
+      data: new Uint8ClampedArray([10, 20, 30, 255]),
+      width: 1,
+      height: 1,
+    })
     fetchMock.mockResolvedValue({
       ok: true,
       blob: async () => new Blob(['source'], { type: 'image/png' }),

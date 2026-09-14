@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
 	storagedomain "ideaboard/api/internal/media/storage/domain"
 	storageports "ideaboard/api/internal/media/storage/ports"
 
@@ -21,8 +23,6 @@ type fakeMediaAssetRegistry struct {
 	assetErr       error
 	derivatives    []dbsqlc.MediaDerivative
 	derivativesErr error
-	repaired       []int64
-	repairErr      error
 }
 
 func (f *fakeMediaAssetRegistry) GetByID(_ context.Context, _ int64, _ int64) (dbsqlc.MediaAsset, error) {
@@ -35,18 +35,6 @@ func (f *fakeMediaAssetRegistry) GetByAssetID(_ context.Context, _ int64, _ stri
 
 func (f *fakeMediaAssetRegistry) ListDerivatives(_ context.Context, _ int64, _ int64) ([]dbsqlc.MediaDerivative, error) {
 	return f.derivatives, f.derivativesErr
-}
-
-func (f *fakeMediaAssetRegistry) EnsureDerivative(_ context.Context, _ int64, _ int64, _ string) error {
-	return nil
-}
-
-func (f *fakeMediaAssetRegistry) RequestDerivativeRepair(_ context.Context, _ int64, derivative dbsqlc.MediaDerivative) error {
-	if f.repairErr != nil {
-		return f.repairErr
-	}
-	f.repaired = append(f.repaired, derivative.ID)
-	return nil
 }
 
 type fakeMediaObjectReader struct {
@@ -83,19 +71,11 @@ func serveDerivativeContent(t *testing.T, handler *mediaAssetHandler, assetID, t
 	return rec
 }
 
-func readyDerivativeFixture() dbsqlc.MediaDerivative {
-	return dbsqlc.MediaDerivative{
-		ID:               7,
-		DerivativeID:     "derivative_7",
-		MediaAssetID:     3,
-		OwnerUserID:      42,
-		Tier:             "preview",
-		Format:           "webp",
-		Status:           "ready",
-		StorageProfileID: "builtin-local",
-		StorageKey:       "uploads/derivative-preview.webp",
-		MimeType:         "image/webp",
-		ObjectGeneration: 1,
+func testImgproxyConfig() imgproxy.Config {
+	return imgproxy.Config{
+		BaseURL: "http://imgproxy.local",
+		KeyHex:  strings.Repeat("ab", 32),
+		SaltHex: strings.Repeat("cd", 32),
 	}
 }
 
@@ -111,80 +91,62 @@ func readyAssetFixture() dbsqlc.MediaAsset {
 	}
 }
 
-func TestDerivativeContentServesReadyFile(t *testing.T) {
-	registry := &fakeMediaAssetRegistry{asset: readyAssetFixture(), derivatives: []dbsqlc.MediaDerivative{readyDerivativeFixture()}}
-	reader := &fakeMediaObjectReader{objects: map[string]*storageports.StoredUploadObject{
-		"uploads/derivative-preview.webp": {ObjectKey: "uploads/derivative-preview.webp", ContentType: "image/webp", Data: []byte("derivative-bytes")},
-	}}
+func TestDerivativeContentRedirectsReadyAssetToSignedTierURL(t *testing.T) {
+	registry := &fakeMediaAssetRegistry{asset: readyAssetFixture()}
+	reader := &fakeMediaObjectReader{}
 
-	rec := serveDerivativeContent(t, newMediaAssetHandler(registry, reader), "asset_3", "preview")
+	rec := serveDerivativeContent(t, newMediaAssetHandler(registry, reader, testImgproxyConfig()), "asset_3", "preview")
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusFound, rec.Body.String())
 	}
-	if got := rec.Header().Get("Content-Type"); got != "image/webp" {
-		t.Fatalf("content type = %q, want image/webp", got)
+	target := rec.Header().Get("Location")
+	if !strings.HasPrefix(target, "http://imgproxy.local/") {
+		t.Fatalf("location = %q, want an imgproxy tier URL", target)
 	}
-	if string(rec.Body.Bytes()) != "derivative-bytes" {
-		t.Fatalf("body = %q, want derivative bytes", rec.Body.String())
+	// Geometry is carried by imgproxy processing options, not the path.
+	if !strings.Contains(target, "rs:fit:640:640") {
+		t.Fatalf("location = %q, want the preview tier geometry", target)
 	}
-	if len(registry.repaired) != 0 {
-		t.Fatalf("repair requests = %v, want none for a healthy derivative", registry.repaired)
+	if !strings.Contains(target, "plain/local:///uploads/original.jpg") {
+		t.Fatalf("location = %q, want the asset storage key as the source", target)
 	}
 }
 
-func TestDerivativeContentFallsBackToOriginalAndRepairsOnMissingFile(t *testing.T) {
-	registry := &fakeMediaAssetRegistry{asset: readyAssetFixture(), derivatives: []dbsqlc.MediaDerivative{readyDerivativeFixture()}}
-	reader := &fakeMediaObjectReader{objects: map[string]*storageports.StoredUploadObject{
-		"uploads/original.jpg": {ObjectKey: "uploads/original.jpg", ContentType: "image/jpeg", Data: []byte("original-bytes")},
-	}}
+// The tier is resolved from the asset row alone: no derivative row is needed
+// for a ready asset, which is the point of the pull model.
+func TestDerivativeContentRedirectsWithoutDerivativeRows(t *testing.T) {
+	registry := &fakeMediaAssetRegistry{asset: readyAssetFixture(), derivatives: nil}
+	reader := &fakeMediaObjectReader{}
 
-	rec := serveDerivativeContent(t, newMediaAssetHandler(registry, reader), "asset_3", "preview")
+	rec := serveDerivativeContent(t, newMediaAssetHandler(registry, reader, testImgproxyConfig()), "asset_3", "processing-input")
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
-	}
-	if got := rec.Header().Get("Content-Type"); got != "image/jpeg" {
-		t.Fatalf("content type = %q, want image/jpeg original fallback", got)
-	}
-	if got := rec.Header().Get("Cache-Control"); got != "private, no-store" {
-		t.Fatalf("cache control = %q, want private, no-store for original fallback", got)
-	}
-	if string(rec.Body.Bytes()) != "original-bytes" {
-		t.Fatalf("body = %q, want original bytes", rec.Body.String())
-	}
-	if len(registry.repaired) != 1 || registry.repaired[0] != 7 {
-		t.Fatalf("repair requests = %v, want [7]", registry.repaired)
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusFound, rec.Body.String())
 	}
 }
 
-func TestDerivativeContentReturnsNotFoundWhenBothDerivativeAndOriginalAreMissing(t *testing.T) {
-	registry := &fakeMediaAssetRegistry{asset: readyAssetFixture(), derivatives: []dbsqlc.MediaDerivative{readyDerivativeFixture()}}
-	reader := &fakeMediaObjectReader{objects: map[string]*storageports.StoredUploadObject{}}
+func TestDerivativeContentReturnsAcceptedWhileAssetNotReady(t *testing.T) {
+	pending := readyAssetFixture()
+	pending.Status = "preparing"
+	registry := &fakeMediaAssetRegistry{asset: pending}
+	reader := &fakeMediaObjectReader{}
 
-	rec := serveDerivativeContent(t, newMediaAssetHandler(registry, reader), "asset_3", "preview")
-
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusNotFound, rec.Body.String())
-	}
-	if len(registry.repaired) != 1 {
-		t.Fatalf("repair requests = %v, want one self-heal request", registry.repaired)
-	}
-}
-
-func TestDerivativeContentReturnsAcceptedWhileRegenerating(t *testing.T) {
-	pending := readyDerivativeFixture()
-	pending.Status = "pending"
-	registry := &fakeMediaAssetRegistry{asset: readyAssetFixture(), derivatives: []dbsqlc.MediaDerivative{pending}}
-	reader := &fakeMediaObjectReader{objects: map[string]*storageports.StoredUploadObject{}}
-
-	rec := serveDerivativeContent(t, newMediaAssetHandler(registry, reader), "asset_3", "preview")
+	rec := serveDerivativeContent(t, newMediaAssetHandler(registry, reader, testImgproxyConfig()), "asset_3", "preview")
 
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusAccepted, rec.Body.String())
 	}
-	if len(registry.repaired) != 0 {
-		t.Fatalf("repair requests = %v, want none while regenerating", registry.repaired)
+}
+
+func TestDerivativeContentRejectsUnknownTier(t *testing.T) {
+	registry := &fakeMediaAssetRegistry{asset: readyAssetFixture()}
+	reader := &fakeMediaObjectReader{}
+
+	rec := serveDerivativeContent(t, newMediaAssetHandler(registry, reader, testImgproxyConfig()), "asset_3", "not-a-tier")
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
 	}
 }
 
@@ -192,9 +154,53 @@ func TestDerivativeContentReturnsNotFoundForUnknownAsset(t *testing.T) {
 	registry := &fakeMediaAssetRegistry{assetErr: sql.ErrNoRows}
 	reader := &fakeMediaObjectReader{objects: map[string]*storageports.StoredUploadObject{}}
 
-	rec := serveDerivativeContent(t, newMediaAssetHandler(registry, reader), "asset_missing", "preview")
+	rec := serveDerivativeContent(t, newMediaAssetHandler(registry, reader, testImgproxyConfig()), "asset_missing", "preview")
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusNotFound, rec.Body.String())
+	}
+}
+
+// Profiles without an imgproxy source must not serve original bytes as a tier.
+func TestDerivativeContentRejectsNonLocalProfileWithoutMaterializedDerivative(t *testing.T) {
+	asset := readyAssetFixture()
+	asset.StorageProfileID = "s3-profile"
+	registry := &fakeMediaAssetRegistry{asset: asset}
+	reader := &fakeMediaObjectReader{objects: map[string]*storageports.StoredUploadObject{
+		"uploads/original.jpg": {ObjectKey: "uploads/original.jpg", ContentType: "image/jpeg", Data: []byte("original-bytes")},
+	}}
+
+	rec := serveDerivativeContent(t, newMediaAssetHandler(registry, reader, testImgproxyConfig()), "asset_3", "preview")
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusServiceUnavailable, rec.Body.String())
+	}
+}
+
+func TestProcessingInputContentServesMaterializedNonLocalDerivative(t *testing.T) {
+	asset := readyAssetFixture()
+	asset.StorageProfileID = "s3-profile"
+	asset.ObjectGeneration = 7
+	registry := &fakeMediaAssetRegistry{
+		asset: asset,
+		derivatives: []dbsqlc.MediaDerivative{{
+			Tier: "processing-input", Status: "ready", StorageProfileID: "s3-profile",
+			StorageKey: "uploads/derivatives/processing-input.webp", MimeType: "image/webp",
+			SourceObjectGeneration: 7,
+		}},
+	}
+	reader := &fakeMediaObjectReader{objects: map[string]*storageports.StoredUploadObject{
+		"uploads/derivatives/processing-input.webp": {ObjectKey: "uploads/derivatives/processing-input.webp", ContentType: "image/webp", Data: []byte("normalized-bytes")},
+	}}
+
+	rec := serveDerivativeContent(t, newMediaAssetHandler(registry, reader, testImgproxyConfig()), "asset_3", "processing-input")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if got := rec.Header().Get("Content-Type"); got != "image/webp" {
+		t.Fatalf("content type = %q, want image/webp", got)
+	}
+	if string(rec.Body.Bytes()) != "normalized-bytes" {
+		t.Fatalf("body = %q, want normalized derivative bytes", rec.Body.String())
 	}
 }

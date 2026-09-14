@@ -1,9 +1,7 @@
 import {
   assertLatestBoardSnapshot,
-  assertLatestBoardState,
   createEmptyBoardSnapshot,
   type BoardSnapshot,
-  type BoardState,
 } from '../../../board'
 
 export function makeBoardSnapshot(
@@ -18,23 +16,10 @@ export function makeBoardSnapshot(
   )
 }
 
-export function makeBoardState(overrides: Partial<BoardState> = {}): BoardState {
-  const {
-    updatedAt,
-    previewSnapshotDataUrl,
-    previewSnapshotUpdatedAt,
-    previewSnapshotVersion,
-    ...snapshotOverrides
-  } = overrides
-  return assertLatestBoardState(
-    {
-      ...createEmptyBoardSnapshot(),
-      ...snapshotOverrides,
-      updatedAt: updatedAt ?? 1,
-      previewSnapshotDataUrl,
-      previewSnapshotUpdatedAt,
-      previewSnapshotVersion,
-    },
-    'canvas-application-test-fixture-state',
-  )
-}
+// Single source lives in board/testing/factories; re-exported here so canvas
+// specs keep a stable local import without a second copy of the factory.
+export { makeBoardState } from '../../../board/testing/factories'
+export {
+  createMockBoardApiRequest,
+  type MockBoardApiState,
+} from '../../../board/testing/factories'

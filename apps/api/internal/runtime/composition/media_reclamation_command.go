@@ -39,8 +39,6 @@ func runMediaReclamation(args []string) {
 	slog.Info("media reclamation scan completed",
 		"stale_uploading_assets", report.StaleUploadingAssets,
 		"stale_processing_derivatives", report.StaleProcessingDerivatives,
-		"missing_derivative_outbox", report.MissingDerivativeOutbox,
-		"missing_default_derivatives", report.MissingDefaultDerivatives,
 		"orphan_assets", report.OrphanAssets,
 		"pending_deletion_assets", report.PendingDeletionAssets,
 		"stale_after", staleAfter.String(),

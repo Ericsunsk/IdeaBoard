@@ -10,7 +10,7 @@ type ExecutionSizeTaskParams = Pick<
   'custom_width' | 'custom_height' | 'original_image_width' | 'original_image_height'
 >
 
-function normalizeExecutionImageSize(
+export function normalizeExecutionImageSize(
   size: ExecutionImageSize | null | undefined,
 ): ExecutionImageSize | null {
   if (!size) return null

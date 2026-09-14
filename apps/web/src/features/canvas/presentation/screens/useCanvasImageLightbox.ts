@@ -137,7 +137,7 @@ async function resolveOriginalCandidateSource(
     // Authenticated API content URLs are not safe <img> sources when the API
     // origin differs from the app origin. Prefer any ready signed derivative
     // instead of falling back to `/original/content` and triggering CORS.
-    for (const tier of ['processing', 'large-preview', 'preview', 'thumb'] as const) {
+    for (const tier of ['large-preview', 'preview', 'thumb'] as const) {
       const variant = metadata.derivatives[tier]
       if (variant?.status === 'ready' && variant.url) return normalizeImageUrl(variant.url)
     }

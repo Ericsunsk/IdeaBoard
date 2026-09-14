@@ -2,7 +2,6 @@ import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import type { BoardSnapshot } from '../../../../board'
 import type { TaskImageResult } from '../../../../../shared/query/taskResult'
-import { i18n } from '../../../../../shared/i18n'
 import type { CanvasGraphStore } from '../../../domain/graph'
 import type { CanvasRendererMetricsPort } from '../../../infrastructure/vue-flow-adapter'
 import { loadImageSizeFromUrl } from '../media/imageSize'
@@ -12,22 +11,14 @@ import {
   resolveTaskImageResultAtIndexDisplay,
   type ImageSizeLoader,
   type PendingImageResultExecution,
-  usePendingImageResultExecution,
 } from '../result-nodes'
 import { waitExistingOrLiveTaskImageResults } from '../task-runner/imageDirectActionExecutor'
-import {
-  createCanvasTaskClientActionId,
-  type ClientActionIdFactory,
-  withTaskClientActionId,
-} from '../task-runner/taskClientActionIds'
+import type { ClientActionIdFactory } from '../task-runner/taskClientActionIds'
 import { buildImageExecutionTaskRequest } from '../commands/imageTaskRequests'
-import { createPendingImageWorkflowRunner } from '../runtime/pendingImageWorkflowRunner'
 import type { PendingImageExecutionCore } from '../pending-execution'
 import { createCanvasExecutionRecoveryCoordinator } from '../application/canvasExecutionRecoveryCoordinator'
-import {
-  defaultCanvasTaskSubmissionAdapter,
-  type CanvasTaskSubmissionAdapter,
-} from './canvasTaskSubmissionAdapter'
+import { type CanvasTaskSubmissionAdapter } from './canvasTaskSubmissionAdapter'
+import { assemblePendingImageWorkflow } from '../runtime/pendingWorkflowAssembly'
 import { resolveMediaAssetProcessingURL } from '../../../../../shared/api/mediaAssetDelivery'
 
 export type CanvasExecutionWorkspaceState = {
@@ -69,72 +60,41 @@ export type UseCanvasExecutionWorkspaceOptions = {
 export function useCanvasExecutionWorkspace(
   options: UseCanvasExecutionWorkspaceOptions,
 ): CanvasExecutionWorkspace {
-  const waitTaskImageResults = options.waitTaskImageResults ?? waitExistingOrLiveTaskImageResults
-  const loadImageSize = options.loadImageSize ?? loadImageSizeFromUrl
-  const taskAdapter = options.taskAdapter ?? defaultCanvasTaskSubmissionAdapter
-  const pendingResults =
-    options.pendingResults ??
-    usePendingImageResultExecution({
+  const { workflowRunner, flushPendingTaskSnapshot } =
+    assemblePendingImageWorkflow({
       nodes: options.nodes,
       edges: options.edges,
       readCanvasGraphStore: options.readCanvasGraphStore,
-      writeCanvasGraphStore: options.readCanvasGraphStore,
       rendererMetrics: options.rendererMetrics,
-      readCurrentAttachment: options.executionCore.currentAttachment,
-      isAttachmentCurrent: options.executionCore.isAttachmentCurrent,
       refreshNodeInternals: options.refreshNodeInternals,
+      flushAutosave: options.flushAutosave,
+      pendingResults: options.pendingResults,
+      executionCore: options.executionCore,
       isNodeExecutionActive: (nodeId) =>
         options.executionCore.captureActiveLeases([nodeId as `image-${number}`]).length > 0,
+      taskAdapter: options.taskAdapter,
+      waitTaskImageResults: options.waitTaskImageResults,
+      loadImageSize: options.loadImageSize,
+      createClientActionId: options.createClientActionId,
+      cancelTasks: options.cancelTasks,
+      onSuccess: options.onSuccess,
+      onWarning: options.onWarning,
+      onError: options.onError,
     })
 
   function isNodeRunning(nodeId: string): boolean {
     return options.executionCore.captureActiveLeases([nodeId as `image-${number}`]).length > 0
   }
 
+  const waitTaskImageResults =
+    options.waitTaskImageResults ?? waitExistingOrLiveTaskImageResults
+  const loadImageSize = options.loadImageSize ?? loadImageSizeFromUrl
+
   function requireAttachment() {
     const attachment = options.executionCore.currentAttachment()
     if (!attachment) throw new Error('Canvas execution requires an active Board attachment')
     return attachment
   }
-
-  async function flushPendingTaskSnapshot() {
-    try {
-      await options.flushAutosave?.({ silent: true })
-    } catch (error) {
-      console.warn('[canvas] flush pending task snapshot failed', error)
-      options.onWarning(i18n.global.t('canvas.execution.canvasSaveFailedProgressLost'))
-    }
-  }
-
-  const workflowRunner = createPendingImageWorkflowRunner({
-    pendingResults,
-    executionCore: options.executionCore,
-    taskTransport: {
-      assertReady: (request, fallbackMessage) =>
-        taskAdapter.assertTaskRequestReady(
-          withTaskClientActionId(request, createCanvasTaskClientActionId()),
-          fallbackMessage,
-        ),
-      submit: (request, clientActionId, fallbackMessage) =>
-        taskAdapter.submitTaskRequest(
-          withTaskClientActionId(request, clientActionId),
-          fallbackMessage,
-        ),
-      resolve: async (taskId, resultIndex, fallbackRatio) =>
-        resolveTaskImageResultAtIndexDisplay(
-          await waitTaskImageResults(taskId),
-          resultIndex,
-          fallbackRatio,
-          loadImageSize,
-        ),
-    },
-    cancelTasks: options.cancelTasks,
-    afterTaskIdAttached: flushPendingTaskSnapshot,
-    createClientActionId: options.createClientActionId,
-    onSuccess: options.onSuccess,
-    onWarning: options.onWarning,
-    onError: options.onError,
-  })
 
   async function runGeneration(
     plan: ActivatedImageExecutionPlan & { kind: 'generation' },

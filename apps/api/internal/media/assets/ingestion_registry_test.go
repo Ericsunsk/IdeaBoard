@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -29,7 +29,7 @@ func newMediaAssetRegistryForTest(db *sql.DB) *MediaAssetRegistry {
 	return registry
 }
 
-func TestBoardUploadIngestionTransitionsToReadyWithDerivativeOutbox(t *testing.T) {
+func TestBoardUploadIngestionTransitionsToReadyWithProcessingInput(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
 	owner := &identitydomain.User{DisplayName: "board-ingestion-owner", Status: 1, Role: "user"}
@@ -70,82 +70,49 @@ func TestBoardUploadIngestionTransitionsToReadyWithDerivativeOutbox(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertDerivativeTiers(t, derivatives, []string{"thumb", "preview", "processing-input"})
-	for _, derivative := range derivatives {
-		var count int
-		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_derivative_outbox WHERE derivative_id = $1`, derivative.ID).Scan(&count); err != nil || count != 1 {
-			t.Fatalf("derivative %d outbox count=%d err=%v", derivative.ID, count, err)
-		}
-	}
-	if err := registry.EnsureDerivative(ctx, owner.ID, mediaAssetID, "large-preview"); err != nil {
-		t.Fatalf("ensure large preview derivative: %v", err)
-	}
-	derivatives, err = registry.ListDerivatives(ctx, owner.ID, mediaAssetID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertDerivativeTiers(t, derivatives, []string{"thumb", "preview", "processing-input", "large-preview"})
+	// Display tiers resolve on demand through the image delivery layer, so
+	// only the provider-neutral processing-input materializes synchronously.
+	assertDerivativeTiers(t, derivatives, []string{"processing-input"})
 }
 
-func TestDerivativeIsRequeuedWhenSourceGenerationChanges(t *testing.T) {
+func TestCompleteMarksAssetFailedWhenProcessingInputMaterializationFails(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
-	owner := &identitydomain.User{DisplayName: "derivative-generation-owner", Status: 1, Role: "user"}
+	owner := &identitydomain.User{DisplayName: "processing-input-failure-owner", Status: 1, Role: "user"}
 	if err := identitypostgres.NewRepository(db).Create(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
 	registry := newMediaAssetRegistryForTest(db)
+	registry.SetProcessingInputMaterializer(func(context.Context, int64, int64) error {
+		return fmt.Errorf("renderer unavailable")
+	})
 	request := ingestion.Request{
 		OwnerUserID: owner.ID, StorageProfile: "builtin-local",
-		StorageKey: "uploads/generation/source.png", URL: "/uploads/generation/source.png",
-		Origin: ingestion.BoardUploadFacts{BoardID: "generation"},
+		StorageKey: "uploads/canvas/processing-input-failure/image.png",
+		URL:        "/uploads/canvas/processing-input-failure/image.png",
+		Origin:     ingestion.BoardUploadFacts{BoardID: "processing-input-failure"},
 	}
 	handle, err := registry.Begin(ctx, request)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("begin ingestion: %v", err)
 	}
-	if err := registry.Complete(ctx, handle, ingestion.Completion{
-		StorageKey: request.StorageKey, URL: request.URL, MIMEType: "image/png", Width: 32, Height: 32,
-		SizeBytes: 128, ChecksumSHA256: "generation-v1",
-	}); err != nil {
-		t.Fatal(err)
-	}
-	var derivativeID int64
-	if err := db.QueryRowContext(ctx, `SELECT id FROM media_derivatives WHERE media_asset_id = $1 AND tier = 'preview'`, handle.AssetID).Scan(&derivativeID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.ExecContext(ctx, `UPDATE media_derivatives SET status = 'ready', storage_key = 'derivatives/generation/preview.webp', mime_type = 'image/webp', ready_at = now(), source_object_generation = (SELECT object_generation FROM media_assets WHERE id = $1) WHERE id = $2`, handle.AssetID, derivativeID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.ExecContext(ctx, `UPDATE media_assets SET object_generation = object_generation + 1 WHERE id = $1`, handle.AssetID); err != nil {
-		t.Fatal(err)
-	}
-	if err := registry.EnsureDerivative(ctx, owner.ID, handle.AssetID, "preview"); err != nil {
-		t.Fatal(err)
-	}
-	row, err := dbsqlc.New(db).GetMediaDerivativeByAssetTier(ctx, dbsqlc.GetMediaDerivativeByAssetTierParams{MediaAssetID: handle.AssetID, OwnerUserID: owner.ID, Tier: "preview"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if row.Status != "pending" {
-		t.Fatalf("stale derivative status = %q, want pending", row.Status)
+	err = registry.Complete(ctx, handle, ingestion.Completion{
+		StorageKey: request.StorageKey, URL: request.URL, MIMEType: "image/png",
+		Width: 32, Height: 24, SizeBytes: 128,
+	})
+	if err == nil || !strings.Contains(err.Error(), "materialize processing-input") {
+		t.Fatalf("expected materialization failure, got %v", err)
 	}
 	asset, err := dbsqlc.New(db).GetMediaAssetByID(ctx, handle.AssetID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if row.SourceObjectGeneration != asset.ObjectGeneration {
-		t.Fatalf("source generation = %d, asset generation = %d", row.SourceObjectGeneration, asset.ObjectGeneration)
-	}
-	if _, err := dbsqlc.New(db).GetMediaDerivativeForDelivery(ctx, dbsqlc.GetMediaDerivativeForDeliveryParams{MediaAssetID: handle.AssetID, OwnerUserID: owner.ID, Tier: "preview"}); !errors.Is(err, sql.ErrNoRows) {
-		t.Fatalf("stale derivative delivery err = %v, want sql.ErrNoRows", err)
+	if asset.Status != "failed" {
+		t.Fatalf("asset status = %q, want failed", asset.Status)
 	}
 }
 
-// This exercises the public ingestion/read seams rather than the concrete type. A
-// workflow can rely on Begin and Complete committing the ready asset and its
-// default derivative outbox together, without knowing the SQL implementation.
-func TestRegistryContractCompletesBoardIngestionWithDerivativeOutbox(t *testing.T) {
+func TestRegistryContractCompletesBoardIngestion(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
 	owner := &identitydomain.User{DisplayName: "registry-contract-owner", Status: 1, Role: "user"}
@@ -156,6 +123,7 @@ func TestRegistryContractCompletesBoardIngestionWithDerivativeOutbox(t *testing.
 	var registry interface {
 		IngestionRegistry
 		GetByID(context.Context, int64, int64) (dbsqlc.MediaAsset, error)
+		ListDerivatives(context.Context, int64, int64) ([]dbsqlc.MediaDerivative, error)
 	} = newMediaAssetRegistryForTest(db)
 	request := ingestion.Request{
 		OwnerUserID:    owner.ID,
@@ -189,56 +157,14 @@ func TestRegistryContractCompletesBoardIngestionWithDerivativeOutbox(t *testing.
 	if err != nil || asset.Status != "ready" {
 		t.Fatalf("ready asset = %#v err=%v", asset, err)
 	}
-	var outboxCount int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_derivative_outbox WHERE derivative_id IN (SELECT id FROM media_derivatives WHERE media_asset_id = $1)`, handle.AssetID).Scan(&outboxCount); err != nil {
-		t.Fatal(err)
-	}
-	if outboxCount != 3 {
-		t.Fatalf("derivative outbox count=%d, want 3", outboxCount)
-	}
-}
-
-func TestEnsureDerivativeKeepsOutboxWhenImmediateEnqueueFails(t *testing.T) {
-	db := testdb.Open(t)
-	ctx := context.Background()
-	owner := &identitydomain.User{DisplayName: "derivative-enqueue-fallback-owner", Status: 1, Role: "user"}
-	if err := identitypostgres.NewRepository(db).Create(ctx, owner); err != nil {
-		t.Fatal(err)
-	}
-	registry := newMediaAssetRegistryForTest(db)
-	request := ingestion.Request{
-		OwnerUserID:    owner.ID,
-		StorageProfile: "builtin-local", StorageKey: "uploads/canvas/fallback/image.png",
-		URL:    "/uploads/canvas/fallback/image.png",
-		Origin: ingestion.BoardUploadFacts{BoardID: "derivative-enqueue-fallback"},
-	}
-	handle, err := registry.Begin(ctx, request)
+	derivatives, err := registry.ListDerivatives(ctx, owner.ID, handle.AssetID)
 	if err != nil {
-		t.Fatalf("begin upload: %v", err)
-	}
-	stored := ports.StoredUploadRef{
-		URL: request.URL, StorageKey: request.StorageKey, StorageProfile: request.StorageProfile,
-		MIMEType: "image/png", Width: 64, Height: 64, SizeBytes: 128, ChecksumSHA256: "fallback-checksum",
-	}
-	if err := registry.Complete(ctx, handle, stored.IngestionCompletion("")); err != nil {
-		t.Fatalf("complete upload: %v", err)
-	}
-	registry.SetDerivativeEnqueuer(func(context.Context, int64) error {
-		return errors.New("river unavailable")
-	})
-	if err := registry.EnsureDerivative(ctx, owner.ID, handle.AssetID, "large-preview"); err != nil {
-		t.Fatalf("ensure derivative should tolerate immediate enqueue failure: %v", err)
-	}
-	var outboxCount int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_derivative_outbox WHERE derivative_id = (SELECT id FROM media_derivatives WHERE media_asset_id = $1 AND tier = 'large-preview')`, handle.AssetID).Scan(&outboxCount); err != nil {
 		t.Fatal(err)
 	}
-	if outboxCount != 1 {
-		t.Fatalf("outbox count=%d, want 1", outboxCount)
-	}
+	assertDerivativeTiers(t, derivatives, []string{"processing-input"})
 }
 
-func TestLibraryMaterializationReusesManagedAssetAndQueuesDerivatives(t *testing.T) {
+func TestLibraryMaterializationReusesManagedAssetAndMaterializesProcessingInput(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
 	owner := &identitydomain.User{DisplayName: "library-materialization-owner", Status: 1, Role: "user"}
@@ -288,7 +214,7 @@ func TestLibraryMaterializationReusesManagedAssetAndQueuesDerivatives(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertDerivativeTiers(t, derivatives, []string{"thumb", "preview", "processing-input"})
+	assertDerivativeTiers(t, derivatives, []string{"processing-input"})
 }
 
 func TestTaskResultIngestionTransitionsToReadyIdempotently(t *testing.T) {
@@ -328,13 +254,7 @@ func TestTaskResultIngestionTransitionsToReadyIdempotently(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertDerivativeTiers(t, derivatives, []string{"thumb", "preview", "processing-input"})
-	for _, derivative := range derivatives {
-		var count int
-		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_derivative_outbox WHERE derivative_id = $1`, derivative.ID).Scan(&count); err != nil || count != 1 {
-			t.Fatalf("derivative %d outbox count=%d err=%v", derivative.ID, count, err)
-		}
-	}
+	assertDerivativeTiers(t, derivatives, []string{"processing-input"})
 	retryHandle, err := registry.Begin(ctx, request)
 	if err != nil || !retryHandle.ExistingReady || retryHandle.AssetID != assetID {
 		t.Fatalf("retry task result handle=%#v err=%v, want asset %d ready", retryHandle, err, assetID)
@@ -345,7 +265,7 @@ func TestTaskResultIngestionTransitionsToReadyIdempotently(t *testing.T) {
 	if derivatives, err = registry.ListDerivatives(ctx, owner.ID, assetID); err != nil {
 		t.Fatal(err)
 	} else {
-		assertDerivativeTiers(t, derivatives, []string{"thumb", "preview", "processing-input"})
+		assertDerivativeTiers(t, derivatives, []string{"processing-input"})
 	}
 }
 
@@ -517,5 +437,44 @@ func TestMediaAssetRegistryRegistersBoardUploadForInitialReclamation(t *testing.
 				t.Fatalf("location = %#v, want profile/key from asset", location)
 			}
 		})
+	}
+}
+
+func TestRetireMissingOwnedMediaAssetReleasesChecksumSlot(t *testing.T) {
+	db := testdb.Open(t)
+	ctx := context.Background()
+	owner := &identitydomain.User{DisplayName: "retire-owner", Status: 1, Role: "user"}
+	if err := identitypostgres.NewRepository(db).Create(ctx, owner); err != nil {
+		t.Fatal(err)
+	}
+	registry := newMediaAssetRegistryForTest(db)
+	upload := ingestion.Request{OwnerUserID: owner.ID, Origin: ingestion.BoardUploadFacts{BoardID: "board-retire"},
+		StorageProfile: "builtin-local", URL: "/uploads/canvas/owner/board-retire/content/image.png", StorageKey: "uploads/canvas/owner/board-retire/content/image.png"}
+	handle, err := registry.Begin(ctx, upload)
+	if err != nil {
+		t.Fatalf("begin board upload: %v", err)
+	}
+	stored := ports.StoredUploadRef{
+		URL: "/uploads/canvas/owner/board-retire/content/image.png", StorageKey: "uploads/canvas/owner/board-retire/content/image.png",
+		StorageProfile: "builtin-local", MIMEType: "image/png", Width: 64, Height: 64, SizeBytes: 128, ChecksumSHA256: "retire-checksum",
+	}
+	if err := registry.Complete(ctx, handle, stored.IngestionCompletion("")); err != nil {
+		t.Fatalf("complete board upload: %v", err)
+	}
+	if _, found, err := registry.FindReadyOwnedMediaAssetByChecksum(ctx, owner.ID, "builtin-local", "retire-checksum"); err != nil || !found {
+		t.Fatalf("dedupe lookup before retire found=%v err=%v", found, err)
+	}
+	if err := registry.RetireMissingOwnedMediaAsset(ctx, owner.ID, handle.AssetID); err != nil {
+		t.Fatalf("retire missing asset: %v", err)
+	}
+	if _, found, err := registry.FindReadyOwnedMediaAssetByChecksum(ctx, owner.ID, "builtin-local", "retire-checksum"); err != nil || found {
+		t.Fatalf("dedupe lookup after retire found=%v err=%v, want miss", found, err)
+	}
+	// Retiring twice stays a no-op success so concurrent healers converge.
+	if err := registry.RetireMissingOwnedMediaAsset(ctx, owner.ID, handle.AssetID); err != nil {
+		t.Fatalf("second retire: %v", err)
+	}
+	if err := registry.RetireMissingOwnedMediaAsset(ctx, 0, handle.AssetID); err == nil {
+		t.Fatal("retire with invalid owner should fail")
 	}
 }

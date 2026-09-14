@@ -143,9 +143,9 @@ vec3 applyHsl(vec3 color) {
     ? nextLightness * (1.0 + nextSaturation)
     : nextLightness + nextSaturation - nextLightness * nextSaturation;
   float p = 2.0 * nextLightness - q;
-  vec3 hueVec = vec3(nextHue + 0.33333, nextHue, nextHue - 0.33333);
-  vec3 t = clamp(abs(fract(hueVec) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
-  return clamp(p + (q - p) * (1.0 - t), 0.0, 1.0);
+  vec3 hueVec = vec3(nextHue, nextHue + 0.66667, nextHue + 0.33333);
+  vec3 t = clamp(abs(mod(hueVec * 6.0, 6.0) - 3.0) - 1.0, 0.0, 1.0);
+  return clamp(p + (q - p) * t, 0.0, 1.0);
 }
 
 void main() {

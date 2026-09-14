@@ -12,6 +12,8 @@ services:
         condition: service_healthy
       auth:
         condition: service_healthy
+      imgproxy:
+        condition: service_started
     cap_drop:
       - ALL
     security_opt:
@@ -38,6 +40,9 @@ services:
       NATS_EVENT_BUS_ENABLED: ${NATS_EVENT_BUS_ENABLED:-true}
       RIVER_WORKER_CONCURRENCY: ${RIVER_WORKER_CONCURRENCY:-5}
       STORAGE_LOCAL_ROOT: ${STORAGE_LOCAL_ROOT:-/app}
+      IMGPROXY_BASE_URL: ${IMGPROXY_BASE_URL:-http://imgproxy:8080}
+      IMGPROXY_KEY: ${IMGPROXY_KEY:?Set IMGPROXY_KEY}
+      IMGPROXY_SALT: ${IMGPROXY_SALT:?Set IMGPROXY_SALT}
     volumes:
       - api-uploads:/app/uploads
     ports:
@@ -146,6 +151,21 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - ideaboard-network
+
+  imgproxy:
+    image: ghcr.io/imgproxy/imgproxy:v4.0.14
+    container_name: ideaboard-imgproxy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /data
+      IMGPROXY_KEY: ${IMGPROXY_KEY:?Set IMGPROXY_KEY}
+      IMGPROXY_SALT: ${IMGPROXY_SALT:?Set IMGPROXY_SALT}
+    volumes:
+      - api-uploads:/data/uploads:ro
     networks:
       - ideaboard-network
 

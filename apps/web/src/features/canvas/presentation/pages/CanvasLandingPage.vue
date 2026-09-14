@@ -1,6 +1,6 @@
 <template>
   <div
-    class="canvas-landing-page relative h-full w-full overflow-hidden bg-board-page bg-fixed text-[#1d1d1f] scroll-smooth [font-family:-apple-system,BlinkMacSystemFont,'SF_Pro_Display','Segoe_UI',Roboto,'Helvetica_Neue',sans-serif]"
+    class="canvas-landing-page relative flex min-h-dvh w-full flex-col overflow-x-hidden bg-board-page bg-fixed text-[#1d1d1f] scroll-smooth [font-family:-apple-system,BlinkMacSystemFont,'SF_Pro_Display','Segoe_UI',Roboto,'Helvetica_Neue',sans-serif]"
   >
     <header
       class="absolute top-[var(--spacing-ib-page-chrome-inset)] left-[var(--spacing-ib-page-chrome-inset)] z-20 inline-flex min-w-0 max-w-[calc(100%-64px)] items-center"
@@ -12,7 +12,7 @@
 
     <!-- 顶部 Hero 区域 -->
     <div
-      class="home-hero-shell relative z-[1] flex h-full min-h-full items-center justify-center overflow-hidden p-0"
+      class="home-hero-shell relative z-[1] flex min-h-dvh flex-1 items-center justify-center p-0"
     >
       <div
         class="home-hero-stage relative aspect-[1440/900] w-[clamp(960px,min(100vw,160vh),1440px)] shrink-0"
@@ -138,7 +138,7 @@ function startJourney() {
 @media (max-width: 720px) {
   .home-hero-shell {
     align-items: flex-start;
-    min-height: 100%;
+    min-height: 100dvh;
     padding: clamp(48px, 8vh, 72px) 20px 36px;
   }
 

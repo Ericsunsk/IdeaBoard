@@ -16,6 +16,32 @@ import { fileURLToPath } from 'node:url'
  * public symbol must therefore be a deliberate edit to the baseline, which is
  * what makes the surface reviewable in a diff.
  *
+ * ## Which barrels belong in the list
+ *
+ * A barrel earns a baseline entry when other modules actually cross it — the
+ * ratchet only has value where a widening would reach code that is not in the
+ * same directory. The current bar is **13+ consuming files**:
+ *
+ * - `domain/graph` (29), `application/execution` (25), `vue-flow-adapter` (18),
+ *   `application/workspace` (16), `presentation/nodes` (13)
+ *
+ * Canvas is the extreme case: it is one feature that consumers cross internally,
+ * so several of its intra-feature barrels are seams in the same sense as the
+ * cross-feature ones.
+ *
+ * Barrels with 1-2 consumers are deliberately **not** listed — those consumers
+ * sit next to the barrel, and ratcheting them would inflate the baseline into
+ * something people regenerate instead of review. Promote a barrel here once its
+ * fan-in grows; the count is the criterion, not the directory.
+ *
+ * ## Note on scope
+ *
+ * A barrel that re-exports only an explicit `export { ... }` list does not
+ * transitively expose that module's internals — an `export *` on top of it is
+ * what leaks. Sealing a split entry file with an explicit export list is
+ * therefore how the modules behind it stay private, and this check will not
+ * flag additions inside those sealed modules (they never reach the surface).
+ *
  * Run `npm run api:surface:update` to regenerate the baseline after an
  * intentional change.
  */

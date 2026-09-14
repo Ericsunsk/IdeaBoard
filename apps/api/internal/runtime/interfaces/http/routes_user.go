@@ -13,7 +13,7 @@ func registerAuthenticatedUserRoutes(r *gin.Engine, authDeps AuthDeps, h UserRou
 }
 
 func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
-	mediaAssetHandler := newMediaAssetHandler(h.MediaAssetRegistry, h.MediaStorageService)
+	mediaAssetHandler := newMediaAssetHandler(h.MediaAssetRegistry, h.MediaStorageService, h.Imgproxy)
 	userAPI.GET("/info", h.AuthHandler.GetCurrentUser)
 	userAPI.GET("/profile/avatar/content", profileAvatarContentHandler(h.Uploads))
 	userAPI.POST("/media-assets/delivery/batch", mediaAssetHandler.MetadataBatch)

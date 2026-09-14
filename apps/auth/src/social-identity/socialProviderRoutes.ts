@@ -1,4 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { getHeaderValue, sendError, sendSuccess } from "../infrastructure/httpResponse.js";
 import {
@@ -7,6 +6,7 @@ import {
 } from "./socialProviderSettings.js";
 import { authInternalRoutes } from "../generated/auth-internal/routes.gen.js";
 import { normalizeOrigin } from "../infrastructure/origin.js";
+import { createInternalKeyPreHandler } from "../admission/internalKeyGuard.js";
 
 type SocialProviderRouteService = Pick<
   SocialProviderSettingsService,
@@ -31,20 +31,7 @@ export function registerSocialProviderRoutes(
     getPublicCapabilities: () => Promise<PublicSocialProviderCapabilities>;
   },
 ) {
-  const requireInternalKey = async (
-    request: FastifyRequest,
-    reply: import("fastify").FastifyReply,
-  ) => {
-    if (
-      !matchesInternalKey(
-        getHeaderValue(request.headers["x-internal-key"]),
-        options.internalKey,
-      )
-    ) {
-      sendError(reply, 401, "unauthorized internal request");
-      return reply;
-    }
-  };
+  const requireInternalKey = createInternalKeyPreHandler(options.internalKey);
 
   const requireTrustedOrigin = async (
     request: FastifyRequest,
@@ -133,16 +120,6 @@ function serializeSummary(
     callback_url: summary.callbackURL,
     updated_at: summary.updatedAt,
   };
-}
-
-function matchesInternalKey(provided: string, expected: string): boolean {
-  const left = Buffer.from(provided.trim());
-  const right = Buffer.from(expected.trim());
-  return (
-    left.length > 0 &&
-    left.length === right.length &&
-    timingSafeEqual(left, right)
-  );
 }
 
 function stringValue(value: unknown): string {

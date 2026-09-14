@@ -119,8 +119,8 @@ func (d *LocalStorageDriver) UploadRef(ctx context.Context, profile *domain.Stor
 	if err != nil {
 		return nil, fmt.Errorf("图片校验失败: %w", err)
 	}
-	filename := remote.CanonicalStorageFilename(file.Filename, facts.Extension)
-	opts.ObjectKey = remote.CanonicalObjectKeyExtension(opts.ObjectKey, facts.Extension)
+	filename := domain.CanonicalStorageFilename(file.Filename, facts.Extension)
+	opts.ObjectKey = domain.CanonicalObjectKeyExtension(opts.ObjectKey, facts.Extension)
 
 	src, err := file.Open()
 	if err != nil {
@@ -146,8 +146,8 @@ func (d *LocalStorageDriver) StoreBytesRef(ctx context.Context, profile *domain.
 	if err != nil {
 		return nil, fmt.Errorf("读取图片信息失败: %w", err)
 	}
-	filename = remote.CanonicalStorageFilename(filename, facts.Extension)
-	opts.ObjectKey = remote.CanonicalObjectKeyExtension(opts.ObjectKey, facts.Extension)
+	filename = domain.CanonicalStorageFilename(filename, facts.Extension)
+	opts.ObjectKey = domain.CanonicalObjectKeyExtension(opts.ObjectKey, facts.Extension)
 
 	ref, err := d.SaveReaderLocalRef(ctx, filename, facts.MIMEType, bytes.NewReader(data), int64(len(data)), opts)
 	if err != nil {
@@ -169,7 +169,7 @@ func (d *LocalStorageDriver) StoreRemoteRef(ctx context.Context, profile *domain
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	opts.ObjectKey = remote.CanonicalObjectKeyExtension(opts.ObjectKey, filepath.Ext(remoteFile.Filename))
+	opts.ObjectKey = domain.CanonicalObjectKeyExtension(opts.ObjectKey, filepath.Ext(remoteFile.Filename))
 	ref, err := d.SaveReaderLocalRef(ctx, remoteFile.Filename, remoteFile.ContentType, remoteFile, remoteFile.Size, opts)
 	if err != nil {
 		return nil, err

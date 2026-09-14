@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -134,32 +132,4 @@ func copyWithBuffer(dst io.Writer, src io.Reader) (int64, error) {
 	bufPtr := copyBufferPool.Get().(*[]byte)
 	defer copyBufferPool.Put(bufPtr)
 	return io.CopyBuffer(copyWriter{dst: dst}, src, *bufPtr)
-}
-
-func CanonicalObjectKeyExtension(objectKey, ext string) string {
-	trimmed := strings.TrimSpace(objectKey)
-	if trimmed == "" || ext == "" {
-		return trimmed
-	}
-	base := filepath.Base(trimmed)
-	if base == "." || base == "" || base == ".." {
-		return trimmed
-	}
-	base = strings.TrimSuffix(base, filepath.Ext(base)) + ext
-	return filepath.ToSlash(filepath.Join(filepath.Dir(trimmed), base))
-}
-
-func CanonicalStorageFilename(filename, ext string) string {
-	base := strings.TrimSpace(filepath.Base(filename))
-	if base == "" || base == "." || base == string(filepath.Separator) {
-		base = "image"
-	}
-	oldExt := filepath.Ext(base)
-	if oldExt != "" {
-		base = strings.TrimSuffix(base, oldExt)
-	}
-	if base == "" {
-		base = "image"
-	}
-	return base + ext
 }

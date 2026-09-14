@@ -106,6 +106,7 @@ func newAppRouter(
 			UserEventStreamHandler: userEventStreamHandler,
 			MediaAssetRegistry:     repos.mediaAssetRegistry,
 			MediaStorageService:    services.storageService,
+			Imgproxy:               imgproxyTierConfig(cfg),
 			Uploads:                uploadDeps,
 			UploadDownloads: httpapi.UploadDownloadDeps{
 				Reader:     services.storageService,

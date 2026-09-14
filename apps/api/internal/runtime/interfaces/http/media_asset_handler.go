@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -13,6 +12,7 @@ import (
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/media/assets"
 	derivativedomain "ideaboard/api/internal/media/derivatives/domain"
+	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
 	storagedomain "ideaboard/api/internal/media/storage/domain"
 	storageports "ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/platform/response"
@@ -27,16 +27,16 @@ type mediaObjectReader interface {
 }
 
 type mediaAssetHandler struct {
-	assets           assets.ReadRegistry
-	derivativeRepair assets.DerivativeRepairRegistry
-	storage          mediaObjectReader
+	assets   assets.ReadRegistry
+	storage  mediaObjectReader
+	imgproxy imgproxy.Config
 }
 
-func newMediaAssetHandler(registry assets.ReadRepairRegistry, storageService mediaObjectReader) *mediaAssetHandler {
+func newMediaAssetHandler(registry assets.ReadRegistry, storageService mediaObjectReader, imgproxyConfig imgproxy.Config) *mediaAssetHandler {
 	return &mediaAssetHandler{
-		assets:           registry,
-		derivativeRepair: registry,
-		storage:          storageService,
+		assets:   registry,
+		storage:  storageService,
+		imgproxy: imgproxyConfig,
 	}
 }
 
@@ -101,21 +101,9 @@ func (h *mediaAssetHandler) Metadata(c *gin.Context) {
 		return
 	}
 	ensureTier := strings.TrimSpace(c.Query("ensure_tier"))
-	if ensureTier != "" {
-		if ensureTier != derivativedomain.TierLargePreview && ensureTier != derivativedomain.TierProcessing && ensureTier != derivativedomain.TierProcessingInput {
-			response.Error(c, http.StatusBadRequest, "请求的媒体派生规格无效")
-			return
-		}
-		if asset.Status == "ready" {
-			if err := h.assets.EnsureDerivative(c.Request.Context(), identity.UserID(), asset.ID, ensureTier); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					response.Error(c, http.StatusNotFound, "媒体不存在")
-					return
-				}
-				response.InternalError(c, http.StatusInternalServerError, "准备媒体派生信息失败", err)
-				return
-			}
-		}
+	if !validateEnsureTier(ensureTier) {
+		response.Error(c, http.StatusBadRequest, "请求的媒体派生规格无效")
+		return
 	}
 	result, err := h.buildMetadata(c, identity.UserID(), asset)
 	if err != nil {
@@ -164,7 +152,18 @@ func parseMetadataBatchRequest(c *gin.Context) (mediaAssetBatchRequest, string, 
 }
 
 func isMetadataBatchTier(ensureTier string) bool {
-	return ensureTier == "" || ensureTier == derivativedomain.TierLargePreview || ensureTier == derivativedomain.TierProcessing || ensureTier == derivativedomain.TierProcessingInput
+	return validateEnsureTier(ensureTier)
+}
+
+// validateEnsureTier checks the tier catalogue contract shared by the single
+// and batch metadata endpoints. Tiers resolve on demand through imgproxy, so
+// the parameter only validates: there is nothing to enqueue.
+func validateEnsureTier(ensureTier string) bool {
+	if ensureTier == "" {
+		return true
+	}
+	_, exists := derivativedomain.TierSpecs[ensureTier]
+	return exists
 }
 
 func respondMetadataBatchFailure(c *gin.Context, failure *metadataBatchFailure) {
@@ -207,11 +206,9 @@ func (h *mediaAssetHandler) loadMetadataBatchItem(c *gin.Context, ownerUserID in
 		return mediaAssetDTO{}, false, &metadataBatchFailure{status: http.StatusInternalServerError, message: "读取媒体信息失败", cause: err}
 	}
 	if ensureTier != "" && asset.Status == "ready" {
-		if err := h.assets.EnsureDerivative(c.Request.Context(), ownerUserID, asset.ID, ensureTier); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return mediaAssetDTO{}, false, nil
-			}
-			return mediaAssetDTO{}, false, &metadataBatchFailure{status: http.StatusInternalServerError, message: "准备媒体派生信息失败", cause: err}
+		// Tiers resolve on demand through imgproxy; nothing to enqueue.
+		if !validateEnsureTier(ensureTier) {
+			return mediaAssetDTO{}, false, &metadataBatchFailure{status: http.StatusBadRequest, message: "请求的媒体派生规格无效"}
 		}
 	}
 	item, err := h.buildMetadata(c, ownerUserID, asset)
@@ -222,10 +219,6 @@ func (h *mediaAssetHandler) loadMetadataBatchItem(c *gin.Context, ownerUserID in
 }
 
 func (h *mediaAssetHandler) buildMetadata(c *gin.Context, ownerUserID int64, asset dbsqlc.MediaAsset) (mediaAssetDTO, error) {
-	rows, err := h.assets.ListDerivatives(c.Request.Context(), ownerUserID, asset.ID)
-	if err != nil {
-		return mediaAssetDTO{}, err
-	}
 	result := mediaAssetDTO{
 		AssetID: asset.AssetID, Status: asset.Status, MIMEType: asset.MimeType,
 		Width: asset.Width, Height: asset.Height, SizeBytes: asset.SizeBytes,
@@ -241,26 +234,60 @@ func (h *mediaAssetHandler) buildMetadata(c *gin.Context, ownerUserID int64, ass
 		// the owning storage profile and preserves the gateway security boundary.
 		result.Original.URL = "/api/user/media-assets/" + asset.AssetID + "/original/content"
 	}
-	for tier := range derivativedomain.TierSpecs {
-		result.Derivatives[tier] = mediaAssetDerivativeDTO{Status: "pending"}
+	// Display tiers resolve on demand through imgproxy, so every known tier
+	// is immediately servable. The processing-input tier keeps its
+	// synchronously materialized row for provider inputs; derive the rest
+	// from the pull renderer instead of stored derivative rows.
+	readyDerivatives, err := h.listReadyDerivativeRows(c, ownerUserID, asset)
+	if err != nil {
+		return mediaAssetDTO{}, err
 	}
-	for _, row := range rows {
-		item := mediaAssetDerivativeDTO{Status: row.Status, Format: row.Format, Width: row.Width, Height: row.Height, SizeBytes: row.SizeBytes, ErrorCode: row.ErrorCode}
-		if row.Status == "ready" {
-			item.URL = fmt.Sprintf("/api/user/media-assets/%s/derivatives/%s/content", asset.AssetID, row.Tier)
+	for tier := range derivativedomain.TierSpecs {
+		if tier == derivativedomain.TierProcessingInput {
+			continue
 		}
-		result.Derivatives[row.Tier] = item
+		derivative := mediaAssetDerivativeDTO{Status: "ready", Format: "webp", Width: asset.Width, Height: asset.Height}
+		if asset.Status == "ready" {
+			derivative.URL = fmt.Sprintf("/api/user/media-assets/%s/derivatives/%s/content", asset.AssetID, tier)
+		} else {
+			derivative.Status = "pending"
+			derivative.URL = ""
+		}
+		result.Derivatives[tier] = derivative
+	}
+	for tier, item := range readyDerivatives {
+		result.Derivatives[tier] = item
 	}
 	return result, nil
 }
 
-// Content serves the ready derivative for a tier. Callers never guess the
-// physical encoded format: the handler negotiates among ready rows,
-// preferring the canonical webp encoding. Pending tiers return HTTP 202 so
-// progressive loaders can fall back to the original.
+// listReadyDerivativeRows reports synchronously materialized tiers
+// (currently only processing-input) from stored derivative rows.
+func (h *mediaAssetHandler) listReadyDerivativeRows(c *gin.Context, ownerUserID int64, asset dbsqlc.MediaAsset) (map[string]mediaAssetDerivativeDTO, error) {
+	items := make(map[string]mediaAssetDerivativeDTO)
+	rows, err := h.assets.ListDerivatives(c.Request.Context(), ownerUserID, asset.ID)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		if row.Status != "ready" {
+			continue
+		}
+		items[row.Tier] = mediaAssetDerivativeDTO{
+			Status: row.Status, Format: row.Format, Width: row.Width, Height: row.Height,
+			SizeBytes: row.SizeBytes, ErrorCode: row.ErrorCode,
+			URL: fmt.Sprintf("/api/user/media-assets/%s/derivatives/%s/content", asset.AssetID, row.Tier),
+		}
+	}
+	return items, nil
+}
+
+// Content serves a display tier by redirecting to a signed imgproxy URL
+// after ownership is verified. The gateway security boundary stays intact:
+// browsers never learn storage internals or imgproxy signing keys.
 func (h *mediaAssetHandler) Content(c *gin.Context) {
 	identity, ok := principal.Require(c)
-	if !ok || h == nil || h.assets == nil || h.storage == nil {
+	if !ok || h == nil || h.assets == nil {
 		return
 	}
 	assetID := strings.TrimSpace(c.Param("asset_id"))
@@ -269,10 +296,10 @@ func (h *mediaAssetHandler) Content(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "图片派生规格无效")
 		return
 	}
-	h.serveReadyDerivative(c, identity.UserID(), assetID, tier)
+	h.serveTierRedirect(c, identity.UserID(), assetID, tier)
 }
 
-func (h *mediaAssetHandler) serveReadyDerivative(c *gin.Context, ownerUserID int64, assetID, tier string) {
+func (h *mediaAssetHandler) serveTierRedirect(c *gin.Context, ownerUserID int64, assetID, tier string) {
 	asset, err := h.lookupAsset(c, ownerUserID, assetID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -282,76 +309,103 @@ func (h *mediaAssetHandler) serveReadyDerivative(c *gin.Context, ownerUserID int
 		response.InternalError(c, http.StatusInternalServerError, "读取媒体信息失败", err)
 		return
 	}
-	rows, err := h.assets.ListDerivatives(c.Request.Context(), ownerUserID, asset.ID)
+	if asset.Status != "ready" || asset.DeletedAt.Valid {
+		response.Error(c, http.StatusAccepted, "图片预览正在准备中")
+		return
+	}
+	source, err := imgproxySourceForAsset(asset)
 	if err != nil {
-		response.InternalError(c, http.StatusInternalServerError, "读取媒体派生信息失败", err)
-		return
-	}
-	var matchedRow *dbsqlc.MediaDerivative
-	for _, row := range rows {
-		if row.Tier != tier || row.Status != "ready" {
-			continue
-		}
-		if matchedRow == nil {
-			r := row
-			matchedRow = &r
-		} else if matchedRow.Format != derivativedomain.FormatWebP && row.Format == derivativedomain.FormatWebP {
-			// Prefer the canonical webp encoding when several ready
-			// physical formats exist for the same tier.
-			r := row
-			matchedRow = &r
-		}
-	}
-	if matchedRow != nil {
-		object, readErr := h.storage.ReadObjectAtProfile(c.Request.Context(), matchedRow.StorageProfileID, matchedRow.StorageKey, 50*1024*1024)
-		if readErr == nil {
-			c.Header("Cache-Control", "private, max-age=3600")
-			c.Header("Content-Disposition", "inline")
-			c.Data(http.StatusOK, matchedRow.MimeType, object.Data)
+		// A materialized processing-input can still be served provider-neutrally
+		// from its stored derivative. Never serve original bytes as a tier: that
+		// would silently violate the size/format contract for task inputs.
+		if h.serveStoredDerivative(c, ownerUserID, asset, tier) {
 			return
 		}
-		if !errors.Is(readErr, storagedomain.ErrStoredObjectNotFound) {
-			response.InternalError(c, http.StatusInternalServerError, "读取媒体派生文件失败", readErr)
-			return
-		}
-		h.serveOriginalFallback(c, ownerUserID, asset, *matchedRow)
+		response.Error(c, http.StatusServiceUnavailable, "图片派生服务暂不可用")
 		return
 	}
-	response.Error(c, http.StatusAccepted, "图片预览正在准备中")
+	target, err := h.imgproxy.TierURL(tier, source)
+	if err != nil {
+		response.InternalError(c, http.StatusInternalServerError, "生成图片派生地址失败", err)
+		return
+	}
+	c.Header("Cache-Control", "private, max-age=3600")
+	c.Redirect(http.StatusFound, target)
 }
 
-// serveOriginalFallback self-heals a ready derivative whose physical file is
-// missing: it requests regeneration through the durable outbox (best effort,
-// never failing the request) and serves the original image when available.
-// A missing original yields a user-safe 404 instead of a hard 500.
-func (h *mediaAssetHandler) serveOriginalFallback(c *gin.Context, ownerUserID int64, asset dbsqlc.MediaAsset, derivative dbsqlc.MediaDerivative) {
-	if repairErr := h.derivativeRepair.RequestDerivativeRepair(c.Request.Context(), ownerUserID, derivative); repairErr != nil {
-		slog.WarnContext(c.Request.Context(), "media derivative self-heal request failed",
-			"operation", "media.derivative.selfheal",
-			"media_asset_id", asset.AssetID,
-			"derivative_id", derivative.DerivativeID,
-			"tier", derivative.Tier,
-			"error", repairErr,
-		)
+func (h *mediaAssetHandler) writeOriginalBytes(c *gin.Context, asset dbsqlc.MediaAsset, cacheControl string) {
+	if h == nil || h.storage == nil {
+		response.InternalError(c, http.StatusInternalServerError, "读取原图失败", fmt.Errorf("media storage is unavailable"))
+		return
 	}
-	original, originalErr := h.storage.ReadObjectAtProfile(c.Request.Context(), asset.StorageProfileID, asset.StorageKey, 100*1024*1024)
-	if originalErr == nil {
-		mimeType := strings.TrimSpace(asset.MimeType)
-		if mimeType == "" {
-			mimeType = original.ContentType
+	object, err := h.storage.ReadObjectAtProfile(c.Request.Context(), asset.StorageProfileID, asset.StorageKey, 100*1024*1024)
+	if err != nil {
+		if errors.Is(err, storagedomain.ErrStoredObjectNotFound) {
+			response.Error(c, http.StatusNotFound, "媒体不存在")
+			return
 		}
-		// A derivative URL may temporarily serve the original while regeneration
-		// is queued; avoid caching that fallback as the derivative representation.
-		c.Header("Cache-Control", "private, no-store")
+		response.InternalError(c, http.StatusInternalServerError, "读取原图失败", err)
+		return
+	}
+	mimeType := strings.TrimSpace(asset.MimeType)
+	if mimeType == "" {
+		mimeType = object.ContentType
+	}
+	c.Header("Cache-Control", cacheControl)
+	c.Header("Content-Disposition", "inline")
+	c.Data(http.StatusOK, mimeType, object.Data)
+}
+
+func (h *mediaAssetHandler) serveStoredDerivative(c *gin.Context, ownerUserID int64, asset dbsqlc.MediaAsset, tier string) bool {
+	if h == nil || h.assets == nil || h.storage == nil {
+		return false
+	}
+	rows, err := h.assets.ListDerivatives(c.Request.Context(), ownerUserID, asset.ID)
+	if err != nil {
+		response.InternalError(c, http.StatusInternalServerError, "读取图片派生信息失败", err)
+		return true
+	}
+	for _, row := range rows {
+		if row.Tier != tier || row.Status != "ready" || row.SourceObjectGeneration != asset.ObjectGeneration {
+			continue
+		}
+		object, err := h.storage.ReadObjectAtProfile(c.Request.Context(), row.StorageProfileID, row.StorageKey, 100*1024*1024)
+		if err != nil {
+			if errors.Is(err, storagedomain.ErrStoredObjectNotFound) {
+				response.Error(c, http.StatusNotFound, "图片派生不存在")
+			} else {
+				response.InternalError(c, http.StatusInternalServerError, "读取图片派生失败", err)
+			}
+			return true
+		}
+		if object == nil || len(object.Data) == 0 {
+			response.Error(c, http.StatusNotFound, "图片派生不存在")
+			return true
+		}
+		mimeType := strings.TrimSpace(row.MimeType)
+		if mimeType == "" {
+			mimeType = object.ContentType
+		}
+		if mimeType == "" {
+			mimeType = "application/octet-stream"
+		}
+		c.Header("Cache-Control", "private, max-age=3600")
 		c.Header("Content-Disposition", "inline")
-		c.Data(http.StatusOK, mimeType, original.Data)
-		return
+		c.Data(http.StatusOK, mimeType, object.Data)
+		return true
 	}
-	if errors.Is(originalErr, storagedomain.ErrStoredObjectNotFound) {
-		response.Error(c, http.StatusNotFound, "媒体不存在")
-		return
+	return false
+}
+
+// imgproxySourceForAsset maps an asset to its imgproxy source URL.
+// Only the builtin-local profile resolves today. Other profiles must use a
+// materialized derivative or fail explicitly; they must never masquerade the
+// original object as a requested tier.
+func imgproxySourceForAsset(asset dbsqlc.MediaAsset) (string, error) {
+	if strings.TrimSpace(asset.StorageProfileID) != "builtin-local" {
+		return "", fmt.Errorf("storage profile %q has no imgproxy source", asset.StorageProfileID)
 	}
-	response.InternalError(c, http.StatusInternalServerError, "读取原图失败", originalErr)
+	return imgproxy.LocalSource(asset.StorageKey)
 }
 
 func (h *mediaAssetHandler) Original(c *gin.Context) {
@@ -373,18 +427,7 @@ func (h *mediaAssetHandler) Original(c *gin.Context) {
 		response.Error(c, http.StatusAccepted, "原图正在准备中")
 		return
 	}
-	object, err := h.storage.ReadObjectAtProfile(c.Request.Context(), asset.StorageProfileID, asset.StorageKey, 100*1024*1024)
-	if err != nil {
-		response.InternalError(c, http.StatusInternalServerError, "读取原图失败", err)
-		return
-	}
-	mimeType := strings.TrimSpace(asset.MimeType)
-	if mimeType == "" {
-		mimeType = object.ContentType
-	}
-	c.Header("Cache-Control", "private, max-age=3600")
-	c.Header("Content-Disposition", "inline")
-	c.Data(http.StatusOK, mimeType, object.Data)
+	h.writeOriginalBytes(c, asset, "private, max-age=3600")
 }
 
 func (h *mediaAssetHandler) lookupAsset(c *gin.Context, ownerUserID int64, raw string) (dbsqlc.MediaAsset, error) {

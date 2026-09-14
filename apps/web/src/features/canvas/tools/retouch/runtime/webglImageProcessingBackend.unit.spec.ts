@@ -19,7 +19,10 @@ describe('createMainThreadImageProcessingBackend', () => {
   it('uses an injected WebGL renderer factory for final renders and renders uniforms to output canvas', async () => {
     const source = createImageSource('final-source', [10, 20, 30, 255])
     const sourceCache = createSourceCache({ fullSize: source })
-    const renderer = createRendererMock()
+    const finalPixels = makeImageData([10, 20, 30, 255])
+    const renderer = createRendererMock({
+      readPixels: vi.fn(() => finalPixels),
+    })
     installCanvasMocks()
     const backend = createMainThreadImageProcessingBackend({
       sourceCache,
@@ -41,6 +44,8 @@ describe('createMainThreadImageProcessingBackend', () => {
     expect(renderer.updateSourceImage).toHaveBeenCalledWith(source.canvas, 1, 1)
     expect(renderer.updateUniforms).toHaveBeenCalled()
     expect(renderer.render).toHaveBeenCalled()
+    expect(renderer.readPixels).toHaveBeenCalled()
+    expect(createdCanvasContexts.at(-1)?.putImageData).toHaveBeenCalledWith(finalPixels, 0, 0)
     expect(renderer.dispose).toHaveBeenCalled()
     expect(sourceCache.releaseSource).toHaveBeenCalledWith(source)
   })
@@ -83,7 +88,9 @@ describe('createMainThreadImageProcessingBackend', () => {
     installCanvasMocks()
     const source = createImageSource('encode-failure-source', [10, 20, 30, 255])
     const sourceCache = createSourceCache({ fullSize: source, releaseCanvas: true })
-    const renderer = createRendererMock()
+    const renderer = createRendererMock({
+      readPixels: vi.fn(() => makeImageData([10, 20, 30, 255])),
+    })
     // Output canvas toBlob returns null
     vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
       if (tagName.toLowerCase() !== 'canvas') {
@@ -278,7 +285,9 @@ async function renderFinalWithAdjustedPixels(input: {
     canvas: input.canvas,
   })
   const sourceCache = createSourceCache({ fullSize: source })
-  const renderer = createRendererMock()
+  const renderer = createRendererMock({
+    readPixels: vi.fn(() => makeImageData(input.adjustedPixels)),
+  })
   const backend = createMainThreadImageProcessingBackend({
     sourceCache,
     rendererFactory: () => renderer,
@@ -289,6 +298,15 @@ async function renderFinalWithAdjustedPixels(input: {
     plan: createChannelLutPlan(),
     context: createTaskContext({ outputPolicy: createImageProcessingOutputPolicy() }),
   })
+
+  // Final encoding must consume the readPixels round-trip (which carries the
+  // orientation-checked bytes), not the raw WebGL drawing buffer.
+  expect(renderer.readPixels).toHaveBeenCalled()
+  expect(createdCanvasContexts.at(-1)?.putImageData).toHaveBeenCalledWith(
+    expect.objectContaining({ data: expect.any(Uint8ClampedArray) }),
+    0,
+    0,
+  )
 
   return { result, source }
 }

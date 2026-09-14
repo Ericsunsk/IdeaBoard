@@ -10,6 +10,5 @@ export type MediaAssetMetadataBatchRequestEnsureTier =
 
 export const MediaAssetMetadataBatchRequestEnsureTier = {
   'large-preview': 'large-preview',
-  processing: 'processing',
   'processing-input': 'processing-input',
 } as const

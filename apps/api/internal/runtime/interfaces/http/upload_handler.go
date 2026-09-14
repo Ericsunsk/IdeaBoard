@@ -277,7 +277,85 @@ func findExistingBoardAsset(c *gin.Context, h UploadDeps, ownerUserID int64, pre
 		response.InternalError(c, 500, "上传失败", err)
 		return dbsqlc.MediaAsset{}, false, false
 	}
-	return existing, found, true
+	if !found {
+		return dbsqlc.MediaAsset{}, false, true
+	}
+	return confirmDedupedBoardAsset(c, h.StorageService, h.MediaAssets, ownerUserID, existing)
+}
+
+// dedupeObjectProber is the narrow storage capability the dedupe liveness
+// gate needs. *storage.Service satisfies it implicitly; tests substitute fakes.
+type dedupeObjectProber interface {
+	ReadObjectAtProfile(ctx context.Context, profileID, objectKey string, maxBytes int64) (*ports.StoredUploadObject, error)
+}
+
+// dedupeAssetRetirer releases the checksum slot held by a dead deduped row.
+type dedupeAssetRetirer interface {
+	RetireMissingOwnedMediaAsset(ctx context.Context, ownerUserID, assetID int64) error
+}
+
+type dedupeDerivativeLocator interface {
+	LocateStoredDerivative(ctx context.Context, lookup ports.StoredDerivativeLookup) (ports.StoredUploadLocation, bool, error)
+}
+
+// confirmDedupedBoardAsset verifies that a checksum-deduped asset and its
+// provider-neutral processing-input are still usable before serving it. Either
+// object can disappear while the rows survive (e.g. wiped with a deleted
+// board), and serving such a row wedges clients on derivatives that can never
+// materialize. A verifiably missing object retires the dead row — freeing the
+// checksum slot — so this upload falls through to a fresh persist with the
+// bytes already in hand.
+// Transient storage errors fail open to preserve existing behavior.
+func confirmDedupedBoardAsset(c *gin.Context, prober dedupeObjectProber, retirer dedupeAssetRetirer, ownerUserID int64, existing dbsqlc.MediaAsset) (dbsqlc.MediaAsset, bool, bool) {
+	if prober == nil {
+		return existing, true, true
+	}
+	ctx := c.Request.Context()
+	probeErr := func() error {
+		probe, err := prober.ReadObjectAtProfile(ctx, existing.StorageProfileID, existing.StorageKey, 1)
+		if err != nil {
+			return err
+		}
+		if probe == nil || len(probe.Data) == 0 {
+			return domain.ErrStoredObjectNotFound
+		}
+		locator, ok := retirer.(dedupeDerivativeLocator)
+		if !ok {
+			return nil
+		}
+		location, found, err := locator.LocateStoredDerivative(ctx, ports.StoredDerivativeLookup{AssetID: existing.ID, Tier: "processing-input"})
+		if err != nil {
+			return err
+		}
+		if !found || strings.TrimSpace(location.StorageProfileID) == "" || strings.TrimSpace(location.StorageKey) == "" {
+			return domain.ErrStoredObjectNotFound
+		}
+		derivative, err := prober.ReadObjectAtProfile(ctx, location.StorageProfileID, location.StorageKey, 1)
+		if err != nil {
+			return err
+		}
+		if derivative == nil || len(derivative.Data) == 0 {
+			return domain.ErrStoredObjectNotFound
+		}
+		return nil
+	}()
+	if probeErr == nil {
+		return existing, true, true
+	}
+	if !errors.Is(probeErr, domain.ErrStoredObjectNotFound) {
+		slog.Warn("dedupe asset liveness probe failed", "asset_id", existing.AssetID, "err", probeErr)
+		return existing, true, true
+	}
+	if retirer == nil {
+		return existing, true, true
+	}
+	if err := retirer.RetireMissingOwnedMediaAsset(ctx, ownerUserID, existing.ID); err != nil {
+		slog.Warn("retire missing deduped asset failed", "asset_id", existing.AssetID, "err", err)
+		response.InternalError(c, 500, "上传失败", err)
+		return dbsqlc.MediaAsset{}, false, false
+	}
+	slog.Info("retired deduped media asset with missing object", "asset_id", existing.AssetID)
+	return dbsqlc.MediaAsset{}, false, true
 }
 
 func persistBoardAsset(c *gin.Context, h UploadDeps, board *boards.Board, file *multipart.FileHeader, storeOpts ports.StorageStoreOptions, prepared *ports.StoredUploadRef) (uploadImageResponse, bool) {
@@ -325,6 +403,13 @@ func convergeBoardAssetCompletionFailure(c *gin.Context, h UploadDeps, ownerUser
 	// checksum unique index. Re-read the canonical asset before surfacing an
 	// error so the loser still succeeds without retaining its object.
 	if existing, found, lookupErr := h.MediaAssets.FindReadyOwnedMediaAssetByChecksum(c.Request.Context(), ownerUserID, stored.StorageProfile, stored.ChecksumSHA256); lookupErr == nil && found {
+		// The lookup may return this very handle's asset when Complete
+		// committed the row before failing (e.g. a deferred post-commit
+		// step). That object is live and owned by the returned asset:
+		// deleting it would destroy a healthy upload.
+		if existing.ID == handle.AssetID {
+			return newUploadImageResponseFromAsset(existing), true
+		}
 		cleanupCtx := context.WithoutCancel(c.Request.Context())
 		_ = h.StorageService.DeleteObjectByStorageProfile(cleanupCtx, stored.StorageProfile, stored.StorageKey)
 		_ = h.MediaAssets.Fail(cleanupCtx, handle, completionErr)

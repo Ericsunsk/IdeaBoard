@@ -10,6 +10,7 @@ import (
 	"ideaboard/api/internal/accountpool/accounts/infrastructure/postgres"
 	"ideaboard/api/internal/accountpool/accounts/ports"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
 
@@ -71,23 +72,7 @@ func testIntPtr(value int) *int {
 
 func createAccountTestChannel(t testing.TB, db *sql.DB, suffix string) int64 {
 	t.Helper()
-	var id int64
-	err := db.QueryRowContext(context.Background(), `
-INSERT INTO provider_endpoints (api_type, protocol, name, base_url, status)
-VALUES ('openai-compatible', 'model-api', $1, $2, 1)
-RETURNING id`,
-		"test-channel-"+suffix,
-		"https://example.com/"+suffix,
-	).Scan(&id)
-	if err != nil {
-		t.Fatalf("create test channel failed: %v", err)
-	}
-	if _, err := db.ExecContext(context.Background(), `
-INSERT INTO provider_endpoint_capabilities (provider_endpoint_id, capability)
-VALUES ($1, 'generation')`, id); err != nil {
-		t.Fatalf("create test channel capability failed: %v", err)
-	}
-	return id
+	return testsupport.CreateProviderTestChannel(t, db, "test-channel-", suffix)
 }
 
 func seedAdminAccountWithTwoModelFixture(t testing.TB, ctx context.Context, repo *Repository, db *sql.DB, suffix string, configure func(*ApiAccount)) *ApiAccount {

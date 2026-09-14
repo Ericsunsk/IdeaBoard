@@ -1,8 +1,8 @@
-import { timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { getHeaderValue, sendError, sendSuccess } from "../infrastructure/httpResponse.js";
 import { MailConfigError, type MailConfigService } from "./mailConfig.js";
 import { authInternalRoutes } from "../generated/auth-internal/routes.gen.js";
+import { createInternalKeyPreHandler } from "../admission/internalKeyGuard.js";
 
 export function registerMailConfigRoutes(
   app: FastifyInstance,
@@ -14,20 +14,7 @@ export function registerMailConfigRoutes(
     >;
   },
 ) {
-  const preHandler = async (
-    request: FastifyRequest,
-    reply: import("fastify").FastifyReply,
-  ) => {
-    if (
-      !matchesInternalKey(
-        getHeaderValue(request.headers["x-internal-key"]),
-        options.internalKey,
-      )
-    ) {
-      sendError(reply, 401, "unauthorized internal request");
-      return reply;
-    }
-  };
+  const preHandler = createInternalKeyPreHandler(options.internalKey);
 
   app.get(authInternalRoutes.getMailConfig.fastifyPath, { preHandler }, async (_request, reply) => {
     reply.header("Cache-Control", "no-store");
@@ -101,16 +88,6 @@ function serializeSummary(
     last_tested_at: summary.lastTestedAt,
     last_test_error_code: summary.lastTestErrorCode,
   };
-}
-
-function matchesInternalKey(provided: string, expected: string): boolean {
-  const left = Buffer.from(provided.trim());
-  const right = Buffer.from(expected.trim());
-  return (
-    left.length > 0 &&
-    left.length === right.length &&
-    timingSafeEqual(left, right)
-  );
 }
 
 function stringValue(value: unknown): string {

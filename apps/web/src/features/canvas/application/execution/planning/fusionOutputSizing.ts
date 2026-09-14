@@ -1,10 +1,11 @@
 import { resolvePromptAspectRatioValue, type PromptAspectRatio } from '../../../../board'
 import { computeFusionBlendWeights, type FusionBlendPoint } from '../../../../board'
+import {
+  normalizeExecutionImageSize,
+  type ExecutionImageSize,
+} from '../../../domain/execution-contracts/sizeParams.ts'
 
-export type FusionOutputImageSize = {
-  width: number
-  height: number
-}
+export type FusionOutputImageSize = ExecutionImageSize
 
 type FusionOutputSizingInputImage = {
   ratio: number
@@ -26,16 +27,6 @@ export type ResolvedFusionOutputSize = {
 }
 
 const FUSION_WEIGHT_TIE_EPSILON = 0.01
-
-function normalizeSize(
-  size: FusionOutputImageSize | null | undefined,
-): FusionOutputImageSize | null {
-  if (!size) return null
-  const width = Math.max(1, Math.round(Number(size.width)))
-  const height = Math.max(1, Math.round(Number(size.height)))
-  if (!Number.isFinite(width) || !Number.isFinite(height)) return null
-  return { width, height }
-}
 
 function readImageRatio(
   inputImages: FusionOutputSizingInputImage[],
@@ -93,7 +84,7 @@ export function resolveFusionOutputSize({
   const count = Math.max(0, Math.min(inputImages.length, 4))
   const normalizedSizes = inputImages
     .slice(0, count)
-    .map((_, index) => normalizeSize(imageSizes[index]))
+    .map((_, index) => normalizeExecutionImageSize(imageSizes[index]))
   const sourceSize = normalizedSizes[0] ?? normalizedSizes.find(Boolean) ?? null
   if (count === 0) {
     return {

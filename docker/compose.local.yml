@@ -57,6 +57,28 @@ services:
     networks:
       - ideaboard-network
 
+  # ADR-0007: on-demand derivative rendering via imgproxy.
+  # The API signs every tier URL (IMGPROXY_KEY / IMGPROXY_SALT), so imgproxy
+  # must be given the same pair; unsigned requests are rejected. Local-only:
+  # loopback bind + local filesystem source. Production swaps the source for
+  # S3/R2 and keeps the same signing pair.
+  imgproxy:
+    image: ghcr.io/imgproxy/imgproxy:v4.0.14
+    container_name: ideaboard-imgproxy
+    restart: always
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /data
+      IMGPROXY_KEY: ${IMGPROXY_KEY:?Set IMGPROXY_KEY in docker/.env}
+      IMGPROXY_SALT: ${IMGPROXY_SALT:?Set IMGPROXY_SALT in docker/.env}
+    ports:
+      - "127.0.0.1:${IMGPROXY_PORT:-8080}:8080"
+    volumes:
+      - ../apps/api/uploads:/data:ro
+    networks:
+      - ideaboard-network
+
 volumes:
   postgres-data:
   nats-data:

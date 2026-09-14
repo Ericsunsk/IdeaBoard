@@ -8,6 +8,32 @@ import {
   type ImageNodeOutputItem,
 } from '../domain'
 
+export type MockBoardApiState = {
+  listResponse: { code?: number; msg?: string; data: { list: unknown[] } }
+  upsertResponse: unknown
+}
+
+/**
+ * Shared request mock for the user boards API contract: list on GET
+ * /user/boards, echo the configured upsert response on PUT, empty success on
+ * DELETE. State stays caller-owned so each spec drives its own fixtures.
+ */
+export function createMockBoardApiRequest(state: MockBoardApiState) {
+  return (url: string, config?: { method?: string }) => {
+    const method = config?.method ?? 'GET'
+    if (url === '/user/boards' && method === 'GET') {
+      return Promise.resolve({ code: 0, msg: 'ok', ...state.listResponse })
+    }
+    if (url.startsWith('/user/boards/') && method === 'PUT') {
+      return Promise.resolve(state.upsertResponse)
+    }
+    if (url.startsWith('/user/boards/') && method === 'DELETE') {
+      return Promise.resolve({ code: 0, data: null })
+    }
+    return Promise.reject(new Error(`Unexpected board API request: ${method} ${url}`))
+  }
+}
+
 function makeImageOutput(overrides: Partial<ImageNodeOutputItem> = {}): ImageNodeOutputItem {
   return {
     url: 'https://example.com/output.png',

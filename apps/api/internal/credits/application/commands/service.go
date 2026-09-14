@@ -158,46 +158,21 @@ func withManagedTransaction(
 	service *Service,
 	run func(*transactionCommands) (ports.CommandResult, error),
 ) (ports.CommandResult, error) {
-	if service == nil || service.pool == nil {
-		return ports.CommandResult{}, fmt.Errorf("credits service: database pool not configured")
-	}
-	tx, err := service.pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return ports.CommandResult{}, fmt.Errorf("credits service: begin transaction: %w", err)
-	}
-	committed := false
-	defer func() {
-		if committed {
-			return
-		}
-		rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rollbackTimeout)
-		defer cancel()
-		if rollbackErr := tx.Rollback(rollbackCtx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-			slog.Warn("failed to roll back Credits transaction", "err", rollbackErr)
-		}
-	}()
-	result, err := run(&transactionCommands{tx: tx, backend: service.backend})
-	if err != nil {
-		return ports.CommandResult{}, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return ports.CommandResult{}, fmt.Errorf("credits service: commit transaction: %w", err)
-	}
-	committed = true
-	return result, nil
+	return withManagedTransactionResult(ctx, service, run)
 }
 
-func withManagedTransactionResult(
+func withManagedTransactionResult[T any](
 	ctx context.Context,
 	service *Service,
-	run func(*transactionCommands) (ports.PaymentDisputeDebitResult, error),
-) (ports.PaymentDisputeDebitResult, error) {
+	run func(*transactionCommands) (T, error),
+) (T, error) {
+	var empty T
 	if service == nil || service.pool == nil {
-		return ports.PaymentDisputeDebitResult{}, fmt.Errorf("credits service: database pool not configured")
+		return empty, fmt.Errorf("credits service: database pool not configured")
 	}
 	tx, err := service.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return ports.PaymentDisputeDebitResult{}, fmt.Errorf("credits service: begin transaction: %w", err)
+		return empty, fmt.Errorf("credits service: begin transaction: %w", err)
 	}
 	committed := false
 	defer func() {
@@ -212,10 +187,10 @@ func withManagedTransactionResult(
 	}()
 	result, err := run(&transactionCommands{tx: tx, backend: service.backend})
 	if err != nil {
-		return ports.PaymentDisputeDebitResult{}, err
+		return empty, err
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return ports.PaymentDisputeDebitResult{}, fmt.Errorf("credits service: commit transaction: %w", err)
+		return empty, fmt.Errorf("credits service: commit transaction: %w", err)
 	}
 	committed = true
 	return result, nil

@@ -96,10 +96,15 @@ export function resolveAuthUrl(path: string): string {
   return joinRuntimeURL(AUTH_BASE_URL, path)
 }
 
+/**
+ * Normalize a delivery URL for browser use. Delivery runs behind the
+ * same-origin gateway, so absolute http(s), data:, and blob: URLs pass
+ * through and relative paths are already fetchable: the only normalization
+ * left is trimming. Prefer canonicalizeRuntimeUploadRef when the input may
+ * be a non-canonical (absolute CDN/loopback) upload ref.
+ */
 export function resolveAssetUrl(raw: string): string {
-  const trimmed = raw.trim()
-  if (!trimmed || HTTP_URL_RE.test(trimmed) || PASSTHROUGH_URL_RE.test(trimmed)) return raw
-  return raw
+  return raw.trim()
 }
 
 export function canonicalizeRuntimeUploadRef(raw: string): string {

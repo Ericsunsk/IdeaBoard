@@ -13,7 +13,6 @@ import (
 	derivativedomain "ideaboard/api/internal/media/derivatives/domain"
 	derivativeevents "ideaboard/api/internal/media/derivatives/infrastructure/events"
 	derivativerendering "ideaboard/api/internal/media/derivatives/infrastructure/rendering"
-	derivativeworker "ideaboard/api/internal/media/derivatives/infrastructure/worker"
 	"ideaboard/api/internal/media/preparation"
 	"ideaboard/api/internal/media/reclamation"
 	storageauth "ideaboard/api/internal/media/storage/application/authorization"
@@ -167,22 +166,14 @@ func newAppTaskRuntime(
 		}
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize user event fanout: %w", err)
 	}
-	mediaDerivativePeriodicJobs := derivativeworker.PeriodicJobs()
 	visionBillingService := searchcatalog.NewVisionBillingService(services.dbPool, services.billingCatalog, services.creditService, nil)
 	visionBillingPeriodicJobs := searchcatalog.VisionBillingPeriodicJobs()
-	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(reclamationPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(mediaDerivativePeriodicJobs)+len(visionBillingPeriodicJobs))
+	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(reclamationPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(visionBillingPeriodicJobs))
 	periodicJobs = append(periodicJobs, creditPeriodicJobs...)
 	periodicJobs = append(periodicJobs, reclamationPeriodicJobs...)
 	periodicJobs = append(periodicJobs, paymentPeriodicJobs...)
 	periodicJobs = append(periodicJobs, checkoutShutdownPeriodicJobs...)
-	periodicJobs = append(periodicJobs, mediaDerivativePeriodicJobs...)
 	periodicJobs = append(periodicJobs, visionBillingPeriodicJobs...)
-	derivativeOutboxDispatcher := derivativeworker.NewOutboxDispatcher(
-		dbs.db,
-		services.storageService,
-		integrity.NewIntegrityVerifier(services.storageService, integrity.IntegrityConfig{}),
-	)
-	derivativeOutboxDispatcher.SetReconciler(mediaDerivativeEvents)
 	riverClient, err := workerriver.NewRiverClient(dbs.riverPool, riverTaskWorker, workerriver.RiverServerOptions{
 		QueueName:   taskqueue.RiverQueueDefault,
 		Concurrency: workerConcurrency,
@@ -191,7 +182,6 @@ func newAppTaskRuntime(
 			reclamation.QueueName:                      {MaxWorkers: 1},
 			workerbilling.PaymentReconciliationQueue:   {MaxWorkers: 1},
 			workerbilling.PaymentCheckoutShutdownQueue: {MaxWorkers: 1},
-			derivativeworker.QueueName:                 {MaxWorkers: 2},
 			searchcatalog.VisionBillingQueue:           {MaxWorkers: 1},
 		},
 		RegisterWorkers: func(workers *river.Workers) {
@@ -202,8 +192,6 @@ func newAppTaskRuntime(
 			river.AddWorker(workers, workerbilling.NewPaymentReconciliationWorker(services.paymentService))
 			river.AddWorker(workers, workerbilling.NewPaymentCheckoutShutdownWorker(services.paymentService))
 			river.AddWorker(workers, workerbilling.NewPaymentCheckoutShutdownScheduleWorker(services.paymentService))
-			river.AddWorker(workers, derivativeworker.NewWorker(mediaDerivativeService))
-			river.AddWorker(workers, derivativeOutboxDispatcher)
 			river.AddWorker(workers, searchcatalog.NewVisionBillingReconciliationWorker(visionBillingService))
 		},
 		PeriodicJobs: periodicJobs,
@@ -214,9 +202,8 @@ func newAppTaskRuntime(
 		}
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize River client: %w", err)
 	}
-	repos.mediaAssetRegistry.SetDerivativeEnqueuer(func(ctx context.Context, derivativeID int64) error {
-		_, err := riverClient.Insert(ctx, derivativeworker.JobArgs{DerivativeID: derivativeID}, derivativeworker.DerivativeJobInsertOpts())
-		return err
+	repos.mediaAssetRegistry.SetProcessingInputMaterializer(func(ctx context.Context, assetID, ownerUserID int64) error {
+		return mediaDerivativeService.MaterializeProcessingInput(ctx, assetID, ownerUserID)
 	})
 	recoveryCoord := orchestration.NewTaskRecoveryCoordinator(repos.taskRepo, riverTaskWorker, riverStartupJobCanceller{client: riverClient})
 	if _, err := recoveryCoord.RecoverRunningTasks(ctx); err != nil {

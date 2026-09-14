@@ -100,7 +100,7 @@ func (d *S3CompatibleStorageDriver) StoreRemoteRef(ctx context.Context, profile 
 	}
 	defer remoteFile.Cleanup()
 
-	opts.ObjectKey = canonicalObjectKeyExtension(opts.ObjectKey, filepathExt(remoteFile.Filename))
+	opts.ObjectKey = domain.CanonicalObjectKeyExtension(opts.ObjectKey, filepathExt(remoteFile.Filename))
 	ref, err := d.service.UploadReaderWithConfigRef(ctx, remoteFile.Filename, remoteFile.ContentType, remoteFile.File, remoteFile.Size, S3CompatibleConfigFromProfile(profile), opts)
 	if err != nil {
 		return nil, err

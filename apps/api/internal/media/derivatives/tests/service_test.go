@@ -8,13 +8,18 @@ import (
 	"testing"
 )
 
-func TestProcessingTierIsSizedForEditorWork(t *testing.T) {
-	spec, ok := TierSpecs[TierProcessing]
+// processing-input is the tier that feeds the editor and AI models, so its
+// geometry has to be large enough for that work.
+func TestProcessingInputTierIsSizedForEditorWork(t *testing.T) {
+	spec, ok := TierSpecs[TierProcessingInput]
 	if !ok {
-		t.Fatal("processing tier is not configured")
+		t.Fatal("processing-input tier is not configured")
+	}
+	if spec.MaxSide != ProcessingInputMaxSide {
+		t.Fatalf("processing-input max side=%d, want %d", spec.MaxSide, ProcessingInputMaxSide)
 	}
 	if spec.MaxSide < 2048 || spec.MaxSide > 2560 {
-		t.Fatalf("processing max side=%d, want 2048..2560", spec.MaxSide)
+		t.Fatalf("processing-input max side=%d, want 2048..2560", spec.MaxSide)
 	}
 }
 

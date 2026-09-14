@@ -226,5 +226,8 @@ func loadConfigOrFatal() *config.Config {
 	if err != nil {
 		fatal("invalid configuration", "err", err)
 	}
+	if err := validateImgproxyOrFatal(cfg); err != nil {
+		fatal("invalid imgproxy configuration", "err", err)
+	}
 	return cfg
 }

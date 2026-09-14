@@ -197,9 +197,9 @@ export function useDisplayImagePreview(
     if (resolvedMaxSide.value === null) return 'original'
     if (resolvedMaxSide.value <= 256) return 'thumb'
     if (resolvedMaxSide.value <= 640) return 'preview'
-    // Canvas nodes stay backed by the processing derivative. It is the
+    // Canvas nodes stay backed by the largest display tier. It is the
     // durable edit-quality source; preview is reserved for editor controls.
-    return 'processing'
+    return 'large-preview'
   })
   const mediaDelivery = useMediaAssetDelivery(resolvedAssetId, resolvedMediaTier, {
     enabled: isVisible,

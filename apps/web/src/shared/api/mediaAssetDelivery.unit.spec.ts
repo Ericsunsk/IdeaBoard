@@ -102,7 +102,7 @@ describe('useMediaAssetDelivery', () => {
     scope.stop()
   })
 
-  it('requests large preview generation only when that tier is selected', async () => {
+  it('reads metadata once for the selected tier without an ensure_tier hint', async () => {
     mocks.request.mockResolvedValue(metadata('ready'))
     const { useMediaAssetDelivery, invalidateMediaAssetMetadata } =
       await import('./mediaAssetDelivery')
@@ -115,16 +115,14 @@ describe('useMediaAssetDelivery', () => {
 
     await vi.waitFor(() => expect(delivery.url.value).toBe('/api/large.webp'))
     expect(mocks.request).toHaveBeenCalledWith(
-      '/user/media-assets/asset-42?ensure_tier=large-preview',
+      '/user/media-assets/asset-42',
       expect.objectContaining({ method: 'GET' }),
     )
     scope.stop()
   })
 
-  it('requests processing generation and never falls back to the original', async () => {
-    mocks.request
-      .mockResolvedValueOnce(metadata('pending'))
-      .mockResolvedValueOnce(metadata('ready'))
+  it('resolves processing input in a single read and never falls back to the original', async () => {
+    mocks.request.mockResolvedValueOnce(metadata('ready'))
     const { resolveMediaAssetProcessingURL, invalidateMediaAssetMetadata } =
       await import('./mediaAssetDelivery')
     invalidateMediaAssetMetadata()
@@ -132,12 +130,9 @@ describe('useMediaAssetDelivery', () => {
     await expect(resolveMediaAssetProcessingURL('asset-42')).resolves.toBe(
       '/api/processing-input.webp',
     )
+    expect(mocks.request).toHaveBeenCalledTimes(1)
     expect(mocks.request).toHaveBeenCalledWith(
       '/user/media-assets/asset-42',
-      expect.objectContaining({ method: 'GET' }),
-    )
-    expect(mocks.request).toHaveBeenCalledWith(
-      '/user/media-assets/asset-42?ensure_tier=processing-input',
       expect.objectContaining({ method: 'GET' }),
     )
   })

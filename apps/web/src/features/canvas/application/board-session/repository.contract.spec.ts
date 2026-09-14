@@ -9,7 +9,7 @@ import {
   type BoardSnapshot,
   type BoardState,
 } from '../../../board'
-import { makeBoardSnapshot, makeBoardState } from '../testing/boardFixtures'
+import { makeBoardSnapshot, makeBoardState, createMockBoardApiRequest } from '../testing/boardFixtures'
 import {
   createBoardSessionRepository,
   isBoardSessionRemoteSyncError,
@@ -88,7 +88,7 @@ describe('createBoardSessionRepository', () => {
     vi.clearAllMocks()
     mocks.state.listResponse = { data: { list: [] } }
     mocks.state.upsertResponse = { code: 0, data: { board: {}, new_revision: 1 } }
-    mocks.request.mockImplementation(mockBoardApiRequest)
+    mocks.request.mockImplementation(createMockBoardApiRequest(mocks.state))
   })
 
   it('drops preview data and still syncs remotely when localStorage write throws', async () => {
@@ -401,20 +401,6 @@ describe('createBoardSessionRepository', () => {
     })
   })
 })
-
-function mockBoardApiRequest(url: string, config?: { method?: string }) {
-  const method = config?.method ?? 'GET'
-  if (url === '/user/boards' && method === 'GET') {
-    return Promise.resolve({ code: 0, msg: 'ok', ...mocks.state.listResponse })
-  }
-  if (url.startsWith('/user/boards/') && method === 'PUT') {
-    return Promise.resolve(mocks.state.upsertResponse)
-  }
-  if (url.startsWith('/user/boards/') && method === 'DELETE') {
-    return Promise.resolve({ code: 0, data: null })
-  }
-  return Promise.reject(new Error(`Unexpected board API request: ${method} ${url}`))
-}
 
 function readUpsertBoardPayload(boardId: string): { state?: BoardState } {
   const call = mocks.request.mock.calls.find(

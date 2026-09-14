@@ -24,4 +24,12 @@ describe('MediaRef', () => {
     expect(mediaRefEquals(preview, { ...preview, derivativeTier: 'thumb' })).toBe(false)
     expect(mediaRefEquals(preview, { ...preview, assetId: 'asset_43' })).toBe(false)
   })
+
+  it('routes the retired processing tier to large-preview without breaking persisted refs', () => {
+    const legacy: MediaRef = { assetId: 'asset_42', derivativeTier: 'processing' }
+    expect(isMediaRef(legacy)).toBe(true)
+    expect(buildMediaBrowserURL(legacy)).toBe(
+      '/api/user/media-assets/asset_42/derivatives/large-preview/content',
+    )
+  })
 })

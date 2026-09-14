@@ -24,6 +24,7 @@ type Config struct {
 	Credits       CreditsConfig
 	Rewards       RewardsConfig
 	Storage       StorageConfig
+	Imgproxy      ImgproxyConfig
 }
 
 type CreditsConfig struct {
@@ -147,6 +148,14 @@ type StorageConfig struct {
 	LocalRoot string
 }
 
+// ImgproxyConfig binds the on-demand derivative renderer. Display tiers
+// resolve through signed imgproxy URLs; the async precompute chain is gone.
+type ImgproxyConfig struct {
+	BaseURL string
+	KeyHex  string
+	SaltHex string
+}
+
 type envConfig struct {
 	DBHost              string `env:"DB_HOST"`
 	DBPort              string `env:"DB_PORT"`
@@ -173,6 +182,9 @@ type envConfig struct {
 	StorageLocalRoot          string `env:"STORAGE_LOCAL_ROOT"`
 	CreditsWelcomeIdentityKey string `env:"CREDITS_WELCOME_IDENTITY_KEY"`
 	RewardsCodeHMACKeys       string `env:"REWARDS_CODE_HMAC_KEYS"`
+	ImgproxyBaseURL           string `env:"IMGPROXY_BASE_URL"`
+	ImgproxyKeyHex            string `env:"IMGPROXY_KEY"`
+	ImgproxySaltHex           string `env:"IMGPROXY_SALT"`
 }
 
 var loadEnvOnce sync.Once
@@ -241,6 +253,11 @@ func Load() *Config {
 		Credits: CreditsConfig{WelcomeIdentityKey: strings.TrimSpace(raw.CreditsWelcomeIdentityKey)},
 		Rewards: RewardsConfig{CodeHMACKeys: strings.TrimSpace(raw.RewardsCodeHMACKeys)},
 		Storage: StorageConfig{LocalRoot: strings.TrimSpace(raw.StorageLocalRoot)},
+		Imgproxy: ImgproxyConfig{
+			BaseURL: strings.TrimSpace(raw.ImgproxyBaseURL),
+			KeyHex:  strings.TrimSpace(raw.ImgproxyKeyHex),
+			SaltHex: strings.TrimSpace(raw.ImgproxySaltHex),
+		},
 	}
 }
 

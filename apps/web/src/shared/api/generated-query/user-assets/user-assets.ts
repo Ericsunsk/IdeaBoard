@@ -286,14 +286,14 @@ export function useGetUserMediaAssetMetadataBatch<
 
 export const getGetUserMediaAssetDerivativeContentUrl = (
   assetId: string,
-  tier: 'thumb' | 'preview' | 'large-preview' | 'processing' | 'processing-input',
+  tier: 'thumb' | 'preview' | 'large-preview' | 'processing-input',
 ) => {
   return `/user/media-assets/${encodeURIComponent(String(assetId))}/derivatives/${encodeURIComponent(String(tier))}/content`
 }
 
 export const getUserMediaAssetDerivativeContent = async (
   assetId: string,
-  tier: 'thumb' | 'preview' | 'large-preview' | 'processing' | 'processing-input',
+  tier: 'thumb' | 'preview' | 'large-preview' | 'processing-input',
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<Blob | ApiResponseBase> => {
   return orvalMutator<Blob | ApiResponseBase>(
@@ -307,7 +307,7 @@ export const getUserMediaAssetDerivativeContent = async (
 
 export const getGetUserMediaAssetDerivativeContentQueryKey = (
   assetId: MaybeRefOrGetter<string>,
-  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview' | 'processing' | 'processing-input'>,
+  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview' | 'processing-input'>,
 ) => {
   return ['user', 'media-assets', assetId, 'derivatives', tier, 'content'] as const
 }
@@ -317,7 +317,7 @@ export const getGetUserMediaAssetDerivativeContentQueryOptions = <
   TError = ErrorType<unknown>,
 >(
   assetId: MaybeRefOrGetter<string>,
-  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview' | 'processing' | 'processing-input'>,
+  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview' | 'processing-input'>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getUserMediaAssetDerivativeContent>>, TError, TData>
@@ -365,7 +365,7 @@ export function useGetUserMediaAssetDerivativeContent<
   TError = ErrorType<unknown>,
 >(
   assetId: MaybeRefOrGetter<string>,
-  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview' | 'processing' | 'processing-input'>,
+  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview' | 'processing-input'>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getUserMediaAssetDerivativeContent>>, TError, TData>

@@ -3,6 +3,7 @@ import type { ApiResponseBase, UserBoardItem } from '../../infrastructure/api/bo
 import type { BoardState } from '../../domain'
 import { BOARD_STATE_SCHEMA_VERSION } from '../../domain'
 import { makeBoardState } from '../../testing'
+import { createMockBoardApiRequest } from '../../testing'
 import { clearStoredAuth, setStoredAuth } from '../../../../shared/utils/auth'
 import { getBoardState, replaceBoardStateMap } from '../../infrastructure/persistence'
 import { listBoards, replaceBoards, subscribeBoardChanges } from '../catalog/boards'
@@ -116,7 +117,7 @@ describe('boardSync', () => {
         },
       },
     }
-    mocks.request.mockImplementation(mockBoardApiRequest)
+    mocks.request.mockImplementation(createMockBoardApiRequest(mocks.state))
   })
 
   it('preserves newer local board meta and state during hydrate', async () => {
@@ -537,20 +538,6 @@ describe('boardSync', () => {
     expect(payload.state).not.toHaveProperty('viewport')
   })
 })
-
-function mockBoardApiRequest(url: string, config?: { method?: string }) {
-  const method = config?.method ?? 'GET'
-  if (url === '/user/boards' && method === 'GET') {
-    return Promise.resolve({ code: 0, msg: 'ok', ...mocks.state.listResponse })
-  }
-  if (url.startsWith('/user/boards/') && method === 'PUT') {
-    return Promise.resolve(mocks.state.upsertResponse)
-  }
-  if (url.startsWith('/user/boards/') && method === 'DELETE') {
-    return Promise.resolve({ code: 0, data: null })
-  }
-  return Promise.reject(new Error(`Unexpected board API request: ${method} ${url}`))
-}
 
 function readUpsertBoardPayload(boardId: string): Record<string, unknown> {
   const call = mocks.request.mock.calls.find(

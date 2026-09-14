@@ -14,8 +14,6 @@ const StaleUploadingAfter = maintenance.StaleUploadingAfter
 type ScanReport struct {
 	StaleUploadingAssets       int64
 	StaleProcessingDerivatives int64
-	MissingDerivativeOutbox    int64
-	MissingDefaultDerivatives  int64
 	OrphanAssets               int64
 	PendingDeletionAssets      int64
 }
@@ -58,25 +56,6 @@ WHERE asset.deleted_at IS NULL
 			dest:  &report.StaleProcessingDerivatives,
 			query: `SELECT COUNT(*) FROM media_derivatives WHERE status = 'processing' AND updated_at < $1`,
 			args:  []any{time.Now().Add(-maintenance.ProcessingLease)},
-		},
-		{
-			name: "missing derivative outbox",
-			dest: &report.MissingDerivativeOutbox,
-			query: `SELECT COUNT(*)
-FROM media_derivatives AS derivative
-LEFT JOIN media_derivative_outbox AS outbox ON outbox.derivative_id = derivative.id
-WHERE outbox.id IS NULL AND (derivative.status = 'pending' OR derivative.status = 'failed')`,
-			args: nil,
-		},
-		{
-			name: "missing default derivatives",
-			dest: &report.MissingDefaultDerivatives,
-			query: `SELECT COUNT(*)
-FROM media_assets AS asset
-WHERE asset.status = 'ready' AND asset.deleted_at IS NULL AND asset.media_kind = 'image'
-  AND (NOT EXISTS (SELECT 1 FROM media_derivatives WHERE media_asset_id = asset.id AND tier = 'thumb')
-    OR NOT EXISTS (SELECT 1 FROM media_derivatives WHERE media_asset_id = asset.id AND tier = 'preview'))`,
-			args: nil,
 		},
 		{
 			name:  "pending deletion assets",

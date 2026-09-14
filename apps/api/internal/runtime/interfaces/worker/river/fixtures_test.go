@@ -14,6 +14,7 @@ import (
 	taskexecution "ideaboard/api/internal/tasking/application/execution"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
+	"ideaboard/api/internal/testsupport"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
 
@@ -198,21 +199,7 @@ type testRuntimeDB interface {
 
 func createRiverTestChannel(t *testing.T, db testRuntimeDB, suffix string) int64 {
 	t.Helper()
-	var id int64
-	err := db.QueryRowContext(context.Background(), `
-INSERT INTO provider_endpoints (api_type, protocol, name, base_url, status)
-VALUES ('openai-compatible', 'model-api', $1, $2, 1)
-RETURNING id`,
-		"river-test-channel-"+suffix,
-		"https://example.com/"+suffix,
-	).Scan(&id)
-	if err != nil {
-		t.Fatalf("create river test channel failed: %v", err)
-	}
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO provider_endpoint_capabilities (provider_endpoint_id, capability) VALUES ($1, 'generation')`, id); err != nil {
-		t.Fatalf("create river test channel capability failed: %v", err)
-	}
-	return id
+	return testsupport.CreateProviderTestChannel(t, db, "river-test-channel-", suffix)
 }
 
 func providerOutputJSON(result string) runtimeports.ProviderCallOutput {

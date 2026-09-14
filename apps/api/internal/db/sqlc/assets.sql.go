@@ -554,12 +554,21 @@ SELECT id, asset_id, owner_user_id, storage_profile_id, storage_key,
   status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
   reclaim_claim_token, reclaim_generation
 FROM media_assets
-WHERE owner_user_id = $1
-  AND storage_profile_id = $2
-  AND checksum_sha256 = $3
-  AND checksum_sha256 <> ''
-  AND status = 'ready'
-  AND deleted_at IS NULL
+WHERE media_assets.owner_user_id = $1
+  AND media_assets.storage_profile_id = $2
+  AND media_assets.checksum_sha256 = $3
+  AND media_assets.checksum_sha256 <> ''
+  AND media_assets.status = 'ready'
+  AND media_assets.deleted_at IS NULL
+  AND EXISTS (
+    SELECT 1
+    FROM media_derivatives AS processing_input
+    WHERE processing_input.media_asset_id = media_assets.id
+      AND processing_input.owner_user_id = media_assets.owner_user_id
+      AND processing_input.tier = 'processing-input'
+      AND processing_input.status = 'ready'
+      AND processing_input.source_object_generation = media_assets.object_generation
+  )
 ORDER BY id ASC
 LIMIT 1
 `
@@ -1243,6 +1252,28 @@ func (q *Queries) MarkMediaAssetReclaimed(ctx context.Context, arg MarkMediaAsse
 	return result.RowsAffected()
 }
 
+const markReadyMediaAssetFailed = `-- name: MarkReadyMediaAssetFailed :one
+UPDATE media_assets
+SET status = 'failed', updated_at = now(), metadata = jsonb_set(
+  metadata, '{ingestion_error}', to_jsonb($1::text), true
+)
+WHERE id = $2 AND owner_user_id = $3 AND status = 'ready'
+RETURNING id
+`
+
+type MarkReadyMediaAssetFailedParams struct {
+	ErrorMessage string `json:"error_message"`
+	ID           int64  `json:"id"`
+	OwnerUserID  int64  `json:"owner_user_id"`
+}
+
+func (q *Queries) MarkReadyMediaAssetFailed(ctx context.Context, arg MarkReadyMediaAssetFailedParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, markReadyMediaAssetFailed, arg.ErrorMessage, arg.ID, arg.OwnerUserID)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const markStaleUploadingMediaAssetsFailed = `-- name: MarkStaleUploadingMediaAssetsFailed :execrows
 UPDATE media_assets
 SET status = 'failed', updated_at = now(), metadata = jsonb_set(
@@ -1350,6 +1381,25 @@ type ScheduleUnreferencedMediaAssetsForReclamationParams struct {
 func (q *Queries) ScheduleUnreferencedMediaAssetsForReclamation(ctx context.Context, arg ScheduleUnreferencedMediaAssetsForReclamationParams) error {
 	_, err := q.db.ExecContext(ctx, scheduleUnreferencedMediaAssetsForReclamation, arg.ReclaimAfter, pq.Array(arg.MediaAssetIds))
 	return err
+}
+
+const softDeleteMediaAssetByID = `-- name: SoftDeleteMediaAssetByID :execrows
+UPDATE media_assets
+SET status = 'deleted', url = '', deleted_at = now(), updated_at = now()
+WHERE id = $1 AND owner_user_id = $2 AND deleted_at IS NULL
+`
+
+type SoftDeleteMediaAssetByIDParams struct {
+	ID          int64 `json:"id"`
+	OwnerUserID int64 `json:"owner_user_id"`
+}
+
+func (q *Queries) SoftDeleteMediaAssetByID(ctx context.Context, arg SoftDeleteMediaAssetByIDParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, softDeleteMediaAssetByID, arg.ID, arg.OwnerUserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const upsertLibraryAssetMediaLink = `-- name: UpsertLibraryAssetMediaLink :exec

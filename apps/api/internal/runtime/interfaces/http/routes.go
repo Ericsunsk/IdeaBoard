@@ -18,6 +18,7 @@ import (
 	identityports "ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/assets"
+	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
 	"ideaboard/api/internal/media/storage"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	storageports "ideaboard/api/internal/media/storage/ports"
@@ -94,8 +95,9 @@ type UserRouteDeps struct {
 	RewardUserHandler      *rewards.UserHandler
 	PaymentUserHandler     *paymenthttp.UserCheckoutHandler
 	UserEventStreamHandler *UserEventStreamHandler
-	MediaAssetRegistry     assets.ReadRepairRegistry
+	MediaAssetRegistry     assets.ReadRegistry
 	MediaStorageService    *storage.Service
+	Imgproxy               imgproxy.Config
 	Uploads                UploadDeps
 	UploadDownloads        UploadDownloadDeps
 	VisionHandler          *searchcatalog.VisionHandler

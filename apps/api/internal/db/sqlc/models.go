@@ -421,16 +421,6 @@ type MediaDerivative struct {
 	LastAttemptAt          sql.NullTime `json:"last_attempt_at"`
 }
 
-type MediaDerivativeOutbox struct {
-	ID           int64        `json:"id"`
-	DerivativeID int64        `json:"derivative_id"`
-	AvailableAt  time.Time    `json:"available_at"`
-	ClaimedAt    sql.NullTime `json:"claimed_at"`
-	AttemptCount int32        `json:"attempt_count"`
-	LastError    string       `json:"last_error"`
-	CreatedAt    time.Time    `json:"created_at"`
-}
-
 type MediaRef struct {
 	ID           int64           `json:"id"`
 	MediaAssetID int64           `json:"media_asset_id"`

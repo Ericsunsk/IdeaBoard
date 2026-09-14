@@ -8,13 +8,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/url"
 	"strings"
 	"time"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
-	derivativeprocessing "ideaboard/api/internal/media/derivatives/application/processing"
 	mediaerrors "ideaboard/api/internal/media/errors"
 	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/media/reclamation"
@@ -78,16 +76,43 @@ func (r *MediaAssetRegistry) Complete(ctx context.Context, handle ingestion.Hand
 	}); err != nil {
 		return fmt.Errorf("complete media asset: %w", err)
 	}
-	derivativeIDs, err := derivativeprocessing.ScheduleDefault(ctx, q, handle.AssetID, handle.OwnerUserID)
-	if err != nil {
-		return fmt.Errorf("queue media asset derivatives: %w", err)
-	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit media asset completion: %w", err)
 	}
 	committed = true
-	r.enqueueDerivatives(ctx, derivativeIDs)
+	// Display tiers resolve on demand through imgproxy. Only the
+	// provider-neutral processing-input derivative materializes here,
+	// synchronously, so providers never wait on a queue. The asset row is
+	// already committed at this point; if materialization fails, explicitly
+	// transition the asset to failed before returning so callers can safely
+	// delete the uploaded object without leaving a ready-but-unusable row.
+	if r.processingInputMaterializer != nil {
+		if err := r.processingInputMaterializer(ctx, handle.AssetID, handle.OwnerUserID); err != nil {
+			failErr := r.markReadyAssetFailed(context.WithoutCancel(ctx), handle, err)
+			if failErr != nil {
+				return fmt.Errorf("materialize processing-input: %w; mark asset failed: %v", err, failErr)
+			}
+			return fmt.Errorf("materialize processing-input: %w", err)
+		}
+	}
 	return nil
+}
+
+func (r *MediaAssetRegistry) markReadyAssetFailed(ctx context.Context, handle ingestion.Handle, cause error) error {
+	if r == nil || r.q == nil || handle.OwnerUserID <= 0 || handle.AssetID <= 0 {
+		return fmt.Errorf("invalid media asset failure")
+	}
+	message := "media asset ingestion failed"
+	if cause != nil && strings.TrimSpace(cause.Error()) != "" {
+		message = cause.Error()
+	}
+	_, err := r.q.MarkReadyMediaAssetFailed(ctx, dbsqlc.MarkReadyMediaAssetFailedParams{
+		ID: handle.AssetID, OwnerUserID: handle.OwnerUserID, ErrorMessage: message,
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	return err
 }
 
 func (r *MediaAssetRegistry) Fail(ctx context.Context, handle ingestion.Handle, cause error) error {
@@ -106,18 +131,18 @@ func (r *MediaAssetRegistry) Fail(ctx context.Context, handle ingestion.Handle, 
 }
 
 type MediaAssetRegistry struct {
-	db                 *sql.DB
-	q                  *dbsqlc.Queries
-	now                func() time.Time
-	derivativeEnqueuer func(context.Context, int64) error
-	integrityVerifier  processingInputIntegrityVerifier
+	db                          *sql.DB
+	q                           *dbsqlc.Queries
+	now                         func() time.Time
+	integrityVerifier           processingInputIntegrityVerifier
+	processingInputMaterializer func(context.Context, int64, int64) error
 }
 
 type processingInputIntegrityVerifier interface {
 	Verify(context.Context, string, string, string, string, int64) error
 }
 
-type DerivativeEnqueuer func(context.Context, int64) error
+type ProcessingInputMaterializer func(ctx context.Context, assetID, ownerUserID int64) error
 
 type PreparedGenerationMedia struct {
 	AssetID        int64
@@ -188,9 +213,9 @@ func NewMediaAssetRegistry(db *sql.DB) *MediaAssetRegistry {
 	return &MediaAssetRegistry{db: db, q: dbsqlc.New(db), now: time.Now}
 }
 
-func (r *MediaAssetRegistry) SetDerivativeEnqueuer(enqueuer DerivativeEnqueuer) {
+func (r *MediaAssetRegistry) SetProcessingInputMaterializer(materializer ProcessingInputMaterializer) {
 	if r != nil {
-		r.derivativeEnqueuer = enqueuer
+		r.processingInputMaterializer = materializer
 	}
 }
 
@@ -257,7 +282,19 @@ func (r *MediaAssetRegistry) resolveManifestRef(ctx context.Context, userID int6
 	}
 	row, err := r.q.GetProcessingInputManifestObject(ctx, dbsqlc.GetProcessingInputManifestObjectParams{MediaAssetID: ref.AssetID, OwnerUserID: userID})
 	if errors.Is(err, sql.ErrNoRows) {
-		return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeMediaProcessing, "media.manifest.resolve", "processing-input derivative is not ready", err)
+		// Assets whose processing-input was never materialized (e.g. task
+		// outputs created before their first chained use) render it on
+		// demand here instead of failing the submission.
+		if r.processingInputMaterializer == nil {
+			return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeMediaProcessing, "media.manifest.resolve", "processing-input derivative is not ready", err)
+		}
+		if materializeErr := r.processingInputMaterializer(ctx, ref.AssetID, userID); materializeErr != nil {
+			return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeMediaProcessing, "media.manifest.resolve", "processing-input derivative is not ready", materializeErr)
+		}
+		row, err = r.q.GetProcessingInputManifestObject(ctx, dbsqlc.GetProcessingInputManifestObjectParams{MediaAssetID: ref.AssetID, OwnerUserID: userID})
+		if errors.Is(err, sql.ErrNoRows) {
+			return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeMediaProcessing, "media.manifest.resolve", "processing-input derivative is not ready", err)
+		}
 	}
 	if err != nil {
 		return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeStorageTransient, "media.manifest.resolve", "load processing-input derivative failed", err)
@@ -332,6 +369,21 @@ func (r *MediaAssetRegistry) FindReadyOwnedMediaAssetIDByChecksum(ctx context.Co
 	return asset.ID, true, nil
 }
 
+// RetireMissingOwnedMediaAsset soft-deletes a ready asset whose backing object
+// is verifiably gone (e.g. wiped with a deleted board). Retiring releases the
+// checksum dedupe slot so the next upload of identical bytes persists fresh
+// instead of re-serving an asset that can never materialize derivatives.
+// Missing rows are a no-op success so concurrent healers converge.
+func (r *MediaAssetRegistry) RetireMissingOwnedMediaAsset(ctx context.Context, ownerUserID, assetID int64) error {
+	if r == nil || r.q == nil || ownerUserID <= 0 || assetID <= 0 {
+		return fmt.Errorf("invalid media asset retirement")
+	}
+	_, err := r.q.SoftDeleteMediaAssetByID(ctx, dbsqlc.SoftDeleteMediaAssetByIDParams{
+		ID: assetID, OwnerUserID: ownerUserID,
+	})
+	return err
+}
+
 func (r *MediaAssetRegistry) ListDerivatives(ctx context.Context, ownerUserID, assetID int64) ([]dbsqlc.MediaDerivative, error) {
 	if r == nil || r.q == nil || ownerUserID <= 0 || assetID <= 0 {
 		return nil, fmt.Errorf("invalid media derivative lookup")
@@ -339,26 +391,6 @@ func (r *MediaAssetRegistry) ListDerivatives(ctx context.Context, ownerUserID, a
 	return r.q.ListMediaDerivativesByAsset(ctx, dbsqlc.ListMediaDerivativesByAssetParams{
 		MediaAssetID: assetID, OwnerUserID: ownerUserID,
 	})
-}
-
-func (r *MediaAssetRegistry) EnsureDerivative(ctx context.Context, ownerUserID, assetID int64, tier string) error {
-	if r == nil || r.q == nil || ownerUserID <= 0 || assetID <= 0 {
-		return fmt.Errorf("invalid media derivative request")
-	}
-	derivativeID, needsEnqueue, err := derivativeprocessing.EnsureOnDemand(ctx, r.q, assetID, ownerUserID, tier)
-	if err != nil {
-		return err
-	}
-	// The outbox remains the durable source of truth, but enqueue immediately
-	// so an interactive Apply does not wait for the periodic dispatcher.
-	if needsEnqueue && r.derivativeEnqueuer != nil {
-		if err := r.derivativeEnqueuer(ctx, derivativeID); err != nil {
-			// The outbox is durable and will enqueue this derivative on its next
-			// reconciliation pass. Direct River insertion only reduces latency.
-			slog.Warn("immediate media derivative enqueue failed", "derivative_id", derivativeID, "err", err)
-		}
-	}
-	return nil
 }
 
 func (r *MediaAssetRegistry) beginBoardUpload(ctx context.Context, request ingestion.Request, facts ingestion.BoardUploadFacts) (ingestion.Handle, error) {
@@ -523,17 +555,6 @@ func ingestionMetadata(origin ingestion.OriginFacts, completion ingestion.Comple
 	}
 }
 
-func (r *MediaAssetRegistry) enqueueDerivatives(ctx context.Context, ids []int64) {
-	if r == nil || r.derivativeEnqueuer == nil {
-		return
-	}
-	for _, id := range ids {
-		if err := r.derivativeEnqueuer(ctx, id); err != nil {
-			continue
-		}
-	}
-}
-
 func (r *MediaAssetRegistry) FindPreparedGenerationMedia(ctx context.Context, ownerUserID int64, refID, role string, inputIndex int) (PreparedGenerationMedia, bool, error) {
 	if r == nil || r.q == nil {
 		return PreparedGenerationMedia{}, false, fmt.Errorf("media asset registry is unavailable")
@@ -694,12 +715,37 @@ func (r *MediaAssetRegistry) ValidateProcessingInputReadiness(ctx context.Contex
 			MediaAssetID: assetID, OwnerUserID: userID, Tier: "processing-input",
 		})
 		if errors.Is(err, sql.ErrNoRows) {
-			return mediaerrors.New(
-				mediaerrors.CodeMediaProcessing,
-				"media.derivative.validate_processing_input",
-				fmt.Sprintf("media asset %d processing-input derivative is not yet scheduled", assetID),
-				err,
-			).WithFacts(fmt.Sprintf("%d", assetID), "", "", "", "", "")
+			// Task outputs never pass through ingestion completion, so they
+			// carry no processing-input row until first use. Materialize on
+			// demand here (same seam as the manifest builder) instead of
+			// rejecting chained submissions.
+			if r.processingInputMaterializer == nil {
+				return mediaerrors.New(
+					mediaerrors.CodeMediaProcessing,
+					"media.derivative.validate_processing_input",
+					fmt.Sprintf("media asset %d processing-input derivative is not ready", assetID),
+					err,
+				).WithFacts(fmt.Sprintf("%d", assetID), "", "", "", "", "")
+			}
+			if materializeErr := r.processingInputMaterializer(ctx, assetID, userID); materializeErr != nil {
+				return mediaerrors.New(
+					mediaerrors.CodeMediaProcessing,
+					"media.derivative.validate_processing_input",
+					fmt.Sprintf("media asset %d processing-input derivative is not ready", assetID),
+					materializeErr,
+				).WithFacts(fmt.Sprintf("%d", assetID), "", "", "", "", "")
+			}
+			derivative, err = r.q.GetMediaDerivativeByAssetTier(ctx, dbsqlc.GetMediaDerivativeByAssetTierParams{
+				MediaAssetID: assetID, OwnerUserID: userID, Tier: "processing-input",
+			})
+			if errors.Is(err, sql.ErrNoRows) {
+				return mediaerrors.New(
+					mediaerrors.CodeMediaProcessing,
+					"media.derivative.validate_processing_input",
+					fmt.Sprintf("media asset %d processing-input derivative is not ready", assetID),
+					err,
+				).WithFacts(fmt.Sprintf("%d", assetID), "", "", "", "", "")
+			}
 		}
 		if err != nil {
 			return mediaerrors.New(

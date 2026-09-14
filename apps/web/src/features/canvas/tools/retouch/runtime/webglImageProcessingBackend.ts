@@ -78,6 +78,20 @@ class MainThreadImageProcessingBackend implements ImageProcessingBackend {
       if (input.context.signal.aborted) throw processingCancelledError()
 
       input.context.reportProgress({ phase: 'encode' })
+      // The WebGL drawing buffer is scanline-flipped relative to 2D canvas
+      // convention (texture row 0 renders at the bottom). canvasToBlob on the
+      // WebGL canvas would persist an upside-down file, so encode from the
+      // readPixels round-trip that the preview path already orientation-checks.
+      const finalImageData = renderer.readPixels()
+      if (!finalImageData) {
+        throw new Error(i18n.global.t('canvas.retouch.errors.unsupportedCanvas'))
+      }
+      const encodeCanvas = document.createElement('canvas')
+      encodeCanvas.width = finalImageData.width
+      encodeCanvas.height = finalImageData.height
+      const encodeContext = encodeCanvas.getContext('2d')
+      if (!encodeContext) throw new Error(i18n.global.t('canvas.retouch.errors.unsupportedCanvas'))
+      encodeContext.putImageData(finalImageData, 0, 0)
       const hasTransparentPixels = detectCanvasTransparency(
         source.context,
         source.width,
@@ -89,7 +103,7 @@ class MainThreadImageProcessingBackend implements ImageProcessingBackend {
             sourceMimeType: source.mimeType,
             hasTransparentPixels,
           })
-      const blob = await canvasToBlob(outputCanvas, encoding.mimeType, encoding.quality)
+      const blob = await canvasToBlob(encodeCanvas, encoding.mimeType, encoding.quality)
       const outputMime = blob.type || encoding.mimeType
       const fileName = input.context.outputPolicy.resolveFileName({
         title: input.source.title,

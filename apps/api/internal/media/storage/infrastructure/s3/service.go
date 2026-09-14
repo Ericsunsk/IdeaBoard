@@ -157,8 +157,8 @@ func (s *S3CompatibleService) UploadBytesWithConfigRef(ctx context.Context, file
 	if err != nil {
 		return nil, fmt.Errorf("读取图片信息失败: %w", err)
 	}
-	filename = canonicalStorageFilename(filename, facts.Extension)
-	opts.ObjectKey = canonicalObjectKeyExtension(opts.ObjectKey, facts.Extension)
+	filename = domain.CanonicalStorageFilename(filename, facts.Extension)
+	opts.ObjectKey = domain.CanonicalObjectKeyExtension(opts.ObjectKey, facts.Extension)
 	ref, err := s.uploadReaderWithConfigRef(ctx, filename, facts.MIMEType, bytes.NewReader(data), int64(len(data)), cfg, opts)
 	if err != nil {
 		return nil, err
@@ -737,34 +737,6 @@ func filepathExt(filename string) string {
 		return ".png"
 	}
 	return strings.ToLower(filename[idx:])
-}
-
-func canonicalObjectKeyExtension(objectKey, ext string) string {
-	trimmed := strings.TrimSpace(objectKey)
-	if trimmed == "" || ext == "" {
-		return trimmed
-	}
-	base := path.Base(trimmed)
-	if base == "." || base == "" || base == ".." {
-		return trimmed
-	}
-	base = strings.TrimSuffix(base, path.Ext(base)) + ext
-	return path.Join(path.Dir(trimmed), base)
-}
-
-func canonicalStorageFilename(filename, ext string) string {
-	base := strings.TrimSpace(filepath.Base(filename))
-	if base == "" || base == "." || base == string(filepath.Separator) {
-		base = "image"
-	}
-	oldExt := filepath.Ext(base)
-	if oldExt != "" {
-		base = strings.TrimSuffix(base, oldExt)
-	}
-	if base == "" {
-		base = "image"
-	}
-	return base + ext
 }
 
 func readStorageObject(src io.Reader, maxBytes int64) ([]byte, error) {
