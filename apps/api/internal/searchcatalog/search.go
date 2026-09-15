@@ -222,7 +222,6 @@ func (s *SearchService) fetchProviderPages(ctx context.Context, query string, li
 	calls := make(chan providerCall, len(active))
 	var wait sync.WaitGroup
 	for _, provider := range active {
-		provider := provider
 		wait.Add(1)
 		go func() {
 			defer wait.Done()

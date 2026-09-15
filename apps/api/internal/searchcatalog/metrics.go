@@ -1,6 +1,7 @@
 package searchcatalog
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -145,8 +146,9 @@ func (m *prometheusSearchMetrics) RecordImageFailure(provider Provider) {
 
 func registerCounterVec(registerer prometheus.Registerer, collector *prometheus.CounterVec) (*prometheus.CounterVec, error) {
 	if err := registerer.Register(collector); err != nil {
-		if existing, ok := err.(prometheus.AlreadyRegisteredError); ok {
-			if typed, ok := existing.ExistingCollector.(*prometheus.CounterVec); ok {
+		var alreadyRegistered prometheus.AlreadyRegisteredError
+		if errors.As(err, &alreadyRegistered) {
+			if typed, ok := alreadyRegistered.ExistingCollector.(*prometheus.CounterVec); ok {
 				return typed, nil
 			}
 		}
@@ -157,8 +159,9 @@ func registerCounterVec(registerer prometheus.Registerer, collector *prometheus.
 
 func registerCounter(registerer prometheus.Registerer, collector prometheus.Counter) (prometheus.Counter, error) {
 	if err := registerer.Register(collector); err != nil {
-		if existing, ok := err.(prometheus.AlreadyRegisteredError); ok {
-			if typed, ok := existing.ExistingCollector.(prometheus.Counter); ok {
+		var alreadyRegistered prometheus.AlreadyRegisteredError
+		if errors.As(err, &alreadyRegistered) {
+			if typed, ok := alreadyRegistered.ExistingCollector.(prometheus.Counter); ok {
 				return typed, nil
 			}
 		}
@@ -169,8 +172,9 @@ func registerCounter(registerer prometheus.Registerer, collector prometheus.Coun
 
 func registerHistogram(registerer prometheus.Registerer, collector prometheus.Histogram) (prometheus.Histogram, error) {
 	if err := registerer.Register(collector); err != nil {
-		if existing, ok := err.(prometheus.AlreadyRegisteredError); ok {
-			if typed, ok := existing.ExistingCollector.(prometheus.Histogram); ok {
+		var alreadyRegistered prometheus.AlreadyRegisteredError
+		if errors.As(err, &alreadyRegistered) {
+			if typed, ok := alreadyRegistered.ExistingCollector.(prometheus.Histogram); ok {
 				return typed, nil
 			}
 		}
@@ -181,8 +185,9 @@ func registerHistogram(registerer prometheus.Registerer, collector prometheus.Hi
 
 func registerHistogramVec(registerer prometheus.Registerer, collector *prometheus.HistogramVec) (*prometheus.HistogramVec, error) {
 	if err := registerer.Register(collector); err != nil {
-		if existing, ok := err.(prometheus.AlreadyRegisteredError); ok {
-			if typed, ok := existing.ExistingCollector.(*prometheus.HistogramVec); ok {
+		var alreadyRegistered prometheus.AlreadyRegisteredError
+		if errors.As(err, &alreadyRegistered) {
+			if typed, ok := alreadyRegistered.ExistingCollector.(*prometheus.HistogramVec); ok {
 				return typed, nil
 			}
 		}

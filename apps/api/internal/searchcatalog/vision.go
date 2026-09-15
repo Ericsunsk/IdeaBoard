@@ -93,7 +93,7 @@ func (s *VisionSearchService) Extract(ctx context.Context, input VisionInput) (V
 		if errors.Is(err, ErrProviderUnavailable) {
 			return VisionExtraction{}, ErrVisionNotConfigured
 		}
-		return VisionExtraction{}, fmt.Errorf("%w: load provider config: %v", ErrVisionUnavailable, err)
+		return VisionExtraction{}, fmt.Errorf("%w: load provider config: %w", ErrVisionUnavailable, err)
 	}
 	if recorder, ok := s.metrics.(VisionSearchMetrics); ok {
 		recorder.RecordVisionRequest()

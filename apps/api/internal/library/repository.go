@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"ideaboard/api/internal/db/sqlc"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
 )
 
 type Repository struct {

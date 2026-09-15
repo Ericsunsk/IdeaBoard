@@ -2,11 +2,13 @@
   <IconoirProvider :icon-props="iconoirProps">
     <router-view />
   </IconoirProvider>
+  <!-- close-button remains keyboard-accessible; surface clicks also forward to
+       it for the click-to-dismiss behavior in useAppToast. -->
   <Toaster
     class="ideaboard-toaster"
     position="top-center"
     :visible-toasts="4"
-    :close-button="false"
+    :close-button="true"
     :rich-colors="false"
     :expand="true"
     :duration="2600"
@@ -31,6 +33,7 @@ const iconoirProps = {
 
 const toastOptions = {
   class: 'ideaboard-toast',
+  closeButtonAriaLabel: 'Close notification',
 }
 
 const defaultSiteIcon = {

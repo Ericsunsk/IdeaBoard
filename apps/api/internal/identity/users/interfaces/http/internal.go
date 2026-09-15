@@ -7,9 +7,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/platform/response"
+
+	"github.com/gin-gonic/gin"
 )
 
 const maxAuthUserIDLength = 128

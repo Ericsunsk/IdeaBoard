@@ -9,10 +9,7 @@ import (
 )
 
 func TestParseRepairTaskLeasesArgsDefaults(t *testing.T) {
-	opts, err := parseRepairTaskLeasesArgs([]string{"task-leases"})
-	if err != nil {
-		t.Fatalf("parseRepairTaskLeasesArgs returned error: %v", err)
-	}
+	opts := resolveRepairTaskLeasesOptions(true, false, "", false, defaultRepairLimit)
 	if !opts.DryRun {
 		t.Fatal("DryRun should default to true")
 	}
@@ -28,12 +25,7 @@ func TestParseRepairTaskLeasesArgsDefaults(t *testing.T) {
 }
 
 func TestParseRepairTaskLeasesArgsMutationMode(t *testing.T) {
-	opts, err := parseRepairTaskLeasesArgs([]string{
-		"task-leases", "--to=Pending", "--yes", "--limit=42",
-	})
-	if err != nil {
-		t.Fatalf("parseRepairTaskLeasesArgs returned error: %v", err)
-	}
+	opts := resolveRepairTaskLeasesOptions(true, false, "Pending", true, 42)
 	if opts.DryRun {
 		t.Fatal("DryRun should be false")
 	}
@@ -49,12 +41,7 @@ func TestParseRepairTaskLeasesArgsMutationMode(t *testing.T) {
 }
 
 func TestParseRepairTaskLeasesArgsExplicitDryRunWins(t *testing.T) {
-	opts, err := parseRepairTaskLeasesArgs([]string{
-		"task-leases", "--dry-run", "--to=pending", "--yes",
-	})
-	if err != nil {
-		t.Fatalf("parseRepairTaskLeasesArgs returned error: %v", err)
-	}
+	opts := resolveRepairTaskLeasesOptions(true, true, "pending", true, defaultRepairLimit)
 	if !opts.DryRun {
 		t.Fatal("DryRun should remain true when explicitly set")
 	}

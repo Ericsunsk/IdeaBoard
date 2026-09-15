@@ -204,7 +204,7 @@ func applyMediaRef(ref *MediaRef, intents []GenerationMediaIntent, intentIndex *
 	}
 	ref.AssetID = intent.AssetID
 	ref.Source = ""
-	*intentIndex = *intentIndex + 1
+	*intentIndex++
 	return nil
 }
 

@@ -106,9 +106,7 @@ func NewTaskStatusEventPublisher(
 		return nil, nil, err
 	}
 	remotePublisher := TaskEventHubPublisher{Hub: hub, UserHub: userHub, Resolver: resolver}
-	if err := bus.SubscribeTaskStatus(ctx, func(ctx context.Context, event events.TaskStatusEvent) error {
-		return remotePublisher.PublishTaskStatus(ctx, event)
-	}); err != nil {
+	if err := bus.SubscribeTaskStatus(ctx, remotePublisher.PublishTaskStatus); err != nil {
 		_ = bus.Close()
 		return nil, nil, err
 	}

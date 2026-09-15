@@ -296,7 +296,7 @@ func TestPublicBrandingSettingsHandlerRequiresProvider(t *testing.T) {
 func TestPublicSearchRouteDoesNotRequireAuthentication(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	registerPublicRoutes(router, nil, searchcatalog.NewSearchHandler(nil))
+	registerPublicRoutes(router, nil, searchcatalog.NewSearchHandler(nil), nil)
 
 	res := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, RoutePublicSearch, nil)

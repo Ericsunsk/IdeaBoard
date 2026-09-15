@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net"
 	"net/http"
@@ -21,6 +22,7 @@ const (
 	defaultRateLimitMaxTrackedIPs = 10_000
 	rateLimitEntryTTL             = 10 * time.Minute
 	rateLimitCleanupEvery         = 1 * time.Minute
+	rateLimitSettingsTimeout      = 2 * time.Second
 )
 
 type ipRateLimiterStore struct {
@@ -57,6 +59,13 @@ func rateLimitMiddleware(provider settings.RateLimitSettingProvider) gin.Handler
 		}
 
 		policy := resolveRateLimitPolicy(c.Request.Context(), provider)
+		if err := c.Request.Context().Err(); err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				response.Error(c, http.StatusServiceUnavailable, "请求处理超时，请稍后重试")
+			}
+			c.Abort()
+			return
+		}
 		if !rateLimitStore.allow(ip, policy) {
 			response.Error(c, http.StatusTooManyRequests, "请求过于频繁，请稍后重试")
 			c.Abort()
@@ -100,7 +109,9 @@ func resolveRateLimitPolicy(ctx context.Context, provider settings.RateLimitSett
 	if provider == nil {
 		return defaultRateLimitPolicy()
 	}
-	setting, err := provider.GetRateLimit(ctx)
+	settingsCtx, cancel := context.WithTimeout(ctx, rateLimitSettingsTimeout)
+	defer cancel()
+	setting, err := provider.GetRateLimit(settingsCtx)
 	if err != nil {
 		slog.WarnContext(ctx, "runtime rate limit settings read failed; using defaults", "error", err)
 		return defaultRateLimitPolicy()

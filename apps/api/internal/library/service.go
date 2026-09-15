@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/lib/pq"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/platform/database"
 )
 
 type Service struct {
@@ -341,6 +341,8 @@ func validateAssetKey(input AssetInput) error {
 }
 
 func isUniqueViolation(err error) bool {
-	var pqErr *pq.Error
-	return errors.As(err, &pqErr) && pqErr.Code == "23505"
+	// Never assert pq.Error directly: every database/sql handle in this
+	// process runs on the pgx stdlib driver, which surfaces *pgconn.PgError.
+	// The shared helper covers both shapes.
+	return database.IsDuplicateConstraintError(err)
 }

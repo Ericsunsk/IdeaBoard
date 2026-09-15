@@ -58,7 +58,7 @@ func TestExecuteStartupHappyPath(t *testing.T) {
 		Required: true,
 	}}
 
-	err := orchestration.ExecuteStartup(ctx, coord, orchestration.PlanDependencies{
+	err := orchestration.ExecuteStartup(ctx, coord, orchestration.StartupDependencies{
 		Recovery:       recovery,
 		Runners:        []ports.Runner{runner},
 		HealthCheckers: []ports.HealthChecker{checker},
@@ -83,7 +83,7 @@ func TestExecuteStartupFailsOnRecoveryError(t *testing.T) {
 	recovery := &fakeRecoveryCoordinator{err: recoveryErr}
 	runner := &fakeRunner{name: "river", kind: domain.ComponentKindRiver}
 
-	err := orchestration.ExecuteStartup(ctx, coord, orchestration.PlanDependencies{
+	err := orchestration.ExecuteStartup(ctx, coord, orchestration.StartupDependencies{
 		Recovery: recovery,
 		Runners:  []ports.Runner{runner},
 	})
@@ -106,7 +106,7 @@ func TestExecuteStartupRollsBackStartedRunners(t *testing.T) {
 	first := &fakeRunner{name: "first", kind: domain.ComponentKindRiver}
 	second := &fakeRunner{name: "second", kind: domain.ComponentKindHTTP, startErr: errors.New("bind failed")}
 
-	err := orchestration.ExecuteStartup(context.Background(), coord, orchestration.PlanDependencies{
+	err := orchestration.ExecuteStartup(context.Background(), coord, orchestration.StartupDependencies{
 		Runners: []ports.Runner{first, second},
 	})
 	if err == nil {

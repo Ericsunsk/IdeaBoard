@@ -2,37 +2,28 @@ package composition
 
 import (
 	"context"
-	"flag"
 	"log/slog"
-	"os"
+	"time"
 
 	"ideaboard/api/internal/media/reclamation"
 	"ideaboard/api/internal/platform/database"
 )
 
-func runMediaReclamation(args []string) {
-	if len(args) == 0 || args[0] != "scan" {
+func runMediaReclamation(staleAfter time.Duration) {
+	if staleAfter <= 0 {
 		fatal("usage: api media-reclamation scan [--stale-after=30m]")
 	}
-	fs := flag.NewFlagSet("media-reclamation scan", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
-	staleAfter := fs.Duration("stale-after", reclamation.StaleUploadingAfter, "age after which uploading assets are reported as stale")
-	if err := fs.Parse(args[1:]); err != nil {
-		fatal("failed to parse media reclamation scan arguments", "err", err)
-	}
-	if len(fs.Args()) > 0 || *staleAfter <= 0 {
-		fatal("usage: api media-reclamation scan [--stale-after=30m]")
-	}
-
 	cfg := loadConfigOrFatal()
 	configureRuntimeLogging(cfg)
-	db, err := database.NewPostgres(cfg.Database)
+	connectCtx, connectCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer connectCancel()
+	db, err := database.NewPostgres(connectCtx, cfg.Database)
 	if err != nil {
 		fatal("failed to connect to database for media reclamation scan", "err", err)
 	}
 	defer db.Close()
 
-	report, err := reclamation.Scan(context.Background(), db, *staleAfter)
+	report, err := reclamation.Scan(context.Background(), db, staleAfter)
 	if err != nil {
 		fatal("media reclamation scan failed", "err", err)
 	}

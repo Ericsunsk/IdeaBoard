@@ -2,6 +2,7 @@ package statisticshttp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -196,7 +197,7 @@ func (h *Handler) BackfillStatistics(c *gin.Context) {
 		Range string `json:"range"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		if err != io.EOF {
+		if !errors.Is(err, io.EOF) {
 			response.Error(c, 400, "请求参数错误")
 			return
 		}

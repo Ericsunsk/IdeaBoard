@@ -93,7 +93,7 @@ func (h *mediaAssetHandler) Metadata(c *gin.Context) {
 	assetID := strings.TrimSpace(c.Param("asset_id"))
 	asset, err := h.lookupAsset(c, identity.UserID(), assetID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			response.Error(c, http.StatusNotFound, "媒体不存在")
 			return
 		}
@@ -302,7 +302,7 @@ func (h *mediaAssetHandler) Content(c *gin.Context) {
 func (h *mediaAssetHandler) serveTierRedirect(c *gin.Context, ownerUserID int64, assetID, tier string) {
 	asset, err := h.lookupAsset(c, ownerUserID, assetID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			response.Error(c, http.StatusNotFound, "媒体不存在")
 			return
 		}
@@ -412,7 +412,7 @@ func (h *mediaAssetHandler) Original(c *gin.Context) {
 	assetID := strings.TrimSpace(c.Param("asset_id"))
 	asset, err := h.lookupAsset(c, identity.UserID(), assetID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			response.Error(c, http.StatusNotFound, "媒体不存在")
 			return
 		}

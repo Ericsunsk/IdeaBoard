@@ -42,6 +42,12 @@ func ValidateAuthInternalKey(cfg *config.Config) error {
 	if IsUnsafeProductionSecret(internalKey) {
 		return fmt.Errorf("AUTH_INTERNAL_KEY must not use placeholder or development values in production")
 	}
+	// DESIGN.md requires a high-entropy secret. 32 chars is the floor for a
+	// generated token (e.g. 256-bit hex is 64); shorter values are almost
+	// certainly human-chosen and brute-forceable.
+	if len(internalKey) < 32 {
+		return fmt.Errorf("AUTH_INTERNAL_KEY must be at least 32 characters when APP_ENV=production")
+	}
 	return nil
 }
 

@@ -334,3 +334,76 @@ func mustWriteTestFile(t *testing.T, name string, content string) {
 		t.Fatalf("write %s failed: %v", name, err)
 	}
 }
+
+func TestJailUploadStaticPathRejectsEscape(t *testing.T) {
+	for _, key := range []string{
+		"",
+		"   ",
+		"/etc/passwd",
+		"etc/passwd",
+		"uploads/../../etc/passwd",
+		"uploads/canvas/../../etc/passwd",
+		"/abs/uploads/canvas/a.png",
+	} {
+		if strings.HasPrefix(key, "/abs/") {
+			abs, err := filepath.Abs("uploads")
+			if err != nil {
+				t.Fatalf("resolve test root: %v", err)
+			}
+			key = filepath.Join(string(filepath.Separator), abs, "..", "etc", "passwd")
+		}
+		if _, err := jailUploadStaticPath(key); err == nil {
+			t.Fatalf("jailUploadStaticPath(%q) succeeded, want escape error", key)
+		}
+	}
+}
+
+func TestJailUploadStaticPathAcceptsNormalizedKeys(t *testing.T) {
+	got, err := jailUploadStaticPath(filepath.Join("uploads", "canvas", "OWNR1A", "board-1", "content", "demo.png"))
+	if err != nil {
+		t.Fatalf("jailUploadStaticPath() error = %v", err)
+	}
+	if !filepath.IsAbs(got) || !strings.HasSuffix(got, filepath.Join("uploads", "canvas", "OWNR1A", "board-1", "content", "demo.png")) {
+		t.Fatalf("jailed path = %q, want absolute uploads path", got)
+	}
+}
+
+func TestServeLocalUploadFileSandboxesAndRejectsSymlinks(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Chdir(t.TempDir())
+	mustWriteTestFile(t, filepath.Join("uploads", "canvas", "a.png"), "png-bytes")
+	if err := os.WriteFile("outside.txt", []byte("secret"), 0644); err != nil {
+		t.Fatalf("write outside file: %v", err)
+	}
+	if err := os.Symlink(filepath.Join("..", "outside.txt"), filepath.Join("uploads", "link.png")); err != nil {
+		t.Fatalf("create symlink: %v", err)
+	}
+
+	// Serve through a real engine: bare CreateTestContext never flushes
+	// Gin's buffered status code, so direct handler calls cannot assert Code.
+	serveWithKey := func(key string) *httptest.ResponseRecorder {
+		router := gin.New()
+		router.GET("/t", func(c *gin.Context) { serveLocalUploadFile(c, key) })
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/t", nil))
+		return rec
+	}
+
+	ok := serveWithKey(filepath.Join("uploads", "canvas", "a.png"))
+	if ok.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", ok.Code, http.StatusOK)
+	}
+	if got := ok.Header().Get("Content-Security-Policy"); got != "sandbox" {
+		t.Fatalf("Content-Security-Policy = %q, want sandbox", got)
+	}
+
+	link := serveWithKey(filepath.Join("uploads", "link.png"))
+	if link.Code != http.StatusNotFound {
+		t.Fatalf("symlink status = %d, want %d", link.Code, http.StatusNotFound)
+	}
+
+	escape := serveWithKey(filepath.Join("uploads", "..", "outside.txt"))
+	if escape.Code != http.StatusNotFound {
+		t.Fatalf("escape status = %d, want %d", escape.Code, http.StatusNotFound)
+	}
+}

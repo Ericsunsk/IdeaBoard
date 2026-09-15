@@ -102,7 +102,7 @@ func (s *Service) ConfirmTaskLease(ctx context.Context, assignment taskqueueport
 	}
 	if err := s.queue.ConfirmTaskLease(ctx, assignment); err != nil {
 		if errors.Is(err, taskqueueports.ErrTaskLeaseConflict) {
-			return fmt.Errorf("%w: %v", ErrTaskStateConflict, err)
+			return fmt.Errorf("%w: %w", ErrTaskStateConflict, err)
 		}
 		return err
 	}

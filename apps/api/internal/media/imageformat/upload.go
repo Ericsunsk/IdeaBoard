@@ -111,10 +111,22 @@ func requiredImageHeaderLength(signatures []imageSignature) int {
 }
 
 func validateImageMagic(buf []byte, ext string) error {
-	signatures := imageSignaturesByExtension(ext)
-	if len(signatures) == 0 {
+	normalizedExt, ok := NormalizeImageExtension(ext)
+	if !ok {
 		return fmt.Errorf("不支持的图片格式: %s", ext)
 	}
+	// A confident shared-database detection decides directly: a different
+	// allowlisted format is a mismatch, an unknown one (heic, svg, …) can
+	// never satisfy the claimed extension.
+	if detected := detectExtensionViaMimetype(buf); detected != "" {
+		if detected != normalizedExt {
+			return fmt.Errorf("文件内容与扩展名不匹配")
+		}
+		return nil
+	}
+	// No confident detection (e.g. truncated header): fall back to the
+	// allowlist-scoped per-format magic check.
+	signatures := imageSignaturesByExtension(normalizedExt)
 	for _, sig := range signatures {
 		if len(buf) < sig.offset+len(sig.bytes) {
 			return fmt.Errorf("文件内容不合法")

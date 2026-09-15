@@ -101,14 +101,14 @@ func (s *VisionBillingService) Extract(ctx context.Context, userID int64, idempo
 		code, message, status := visionFailureDetails(providerErr)
 		if err := s.release(context.WithoutCancel(ctx), reserved.result.OperationID, userID, code, message); err != nil {
 			_ = s.markReconciliationPending(context.WithoutCancel(ctx), reserved.result.OperationID)
-			return VisionBillingResult{OperationID: reserved.result.OperationID, Status: "reconciliation_pending"}, fmt.Errorf("%w: release: %v", ErrVisionSettlement, err)
+			return VisionBillingResult{OperationID: reserved.result.OperationID, Status: "reconciliation_pending"}, fmt.Errorf("%w: release: %w", ErrVisionSettlement, err)
 		}
 		return VisionBillingResult{}, &visionOperationFailure{Code: code, Message: message, HTTPStatus: status}
 	}
 
 	if err := s.capture(context.WithoutCancel(ctx), reserved.result.OperationID, userID, extraction.Query); err != nil {
 		_ = s.markReconciliationPending(context.WithoutCancel(ctx), reserved.result.OperationID)
-		return VisionBillingResult{OperationID: reserved.result.OperationID, Status: "reconciliation_pending"}, fmt.Errorf("%w: capture: %v", ErrVisionSettlement, err)
+		return VisionBillingResult{OperationID: reserved.result.OperationID, Status: "reconciliation_pending"}, fmt.Errorf("%w: capture: %w", ErrVisionSettlement, err)
 	}
 	return VisionBillingResult{VisionExtraction: extraction, OperationID: reserved.result.OperationID, Status: "succeeded"}, nil
 }

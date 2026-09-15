@@ -5,7 +5,7 @@ type UpsertRequest struct {
 	State interface{} `json:"state"`
 	// BaseRevision is the revision observed by the client before writing. New
 	// boards use zero; existing boards must match the persisted revision.
-	BaseRevision int64 `json:"base_revision"`
+	BaseRevision int64  `json:"base_revision"`
 	CreatedAt    *int64 `json:"created_at"`
 	UpdatedAt    *int64 `json:"updated_at"`
 }

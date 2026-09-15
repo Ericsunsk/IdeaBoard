@@ -7,7 +7,7 @@ import (
 )
 
 func registerAuthenticatedUserRoutes(r *gin.Engine, authDeps AuthDeps, h UserRouteDeps) {
-	userAPI := r.Group("/api/user")
+	userAPI := r.Group(UserAPIGroupPath)
 	userAPI.Use(auth.AuthMiddleware(authDeps.AuthServiceClient, authDeps.UserRepo, authDeps.UserLifecycle))
 	registerUserRoutes(userAPI, h)
 }
@@ -33,13 +33,13 @@ func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	userAPI.POST("/payments/pending-orders/:public_token/continue", h.PaymentUserHandler.ContinuePendingOrder)
 	userAPI.POST("/payments/pending-orders/:public_token/abandon", h.PaymentUserHandler.AbandonPendingOrder)
 	userAPI.GET("/payments/recharges", h.PaymentUserHandler.ListRecharges)
-	userAPI.GET("/events", h.UserEventStreamHandler.StreamUserEvents)
+	userAPI.GET(RouteUserEvents, h.UserEventStreamHandler.StreamUserEvents)
 
 	registerUserTaskRoutes(userAPI, h)
 	registerUserBoardRoutes(userAPI, h)
 	registerUserUploadRoutes(userAPI, h)
 	if h.VisionHandler != nil {
-		userAPI.POST("/search/vision-extract", requestBodyLimitMiddleware(visionRequestBodyLimitBytes), h.VisionHandler.Extract)
+		userAPI.POST(RouteUserVisionExtract, requestBodyLimitMiddleware(visionRequestBodyLimitBytes), h.VisionHandler.Extract)
 	}
 	if h.SearchMetricsHandler != nil {
 		userAPI.POST("/search/metrics", h.SearchMetricsHandler.RecordImageFailure)

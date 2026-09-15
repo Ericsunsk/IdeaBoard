@@ -57,7 +57,7 @@ func (h *VisionHandler) Extract(c *gin.Context) {
 	if err != nil {
 		var pending *visionBillingPending
 		if errors.As(err, &pending) || errors.Is(err, ErrVisionSettlement) {
-			c.JSON(http.StatusAccepted, response.Response{Code: 0, Msg: "accepted", Data: result})
+			c.JSON(http.StatusAccepted, response.Response{Code: 0, Msg: "accepted", RequestID: c.GetString(response.RequestIDHeader), Data: result})
 			return
 		}
 		var operationFailure *visionOperationFailure
@@ -85,7 +85,7 @@ func (h *VisionHandler) Extract(c *gin.Context) {
 		return
 	}
 	if result.Status != "succeeded" {
-		c.JSON(http.StatusAccepted, response.Response{Code: 0, Msg: "accepted", Data: result})
+		c.JSON(http.StatusAccepted, response.Response{Code: 0, Msg: "accepted", RequestID: c.GetString(response.RequestIDHeader), Data: result})
 		return
 	}
 	response.SuccessDTO(c, result)

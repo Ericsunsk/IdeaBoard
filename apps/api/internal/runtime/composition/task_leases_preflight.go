@@ -3,11 +3,10 @@ package composition
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
+	"time"
 
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
@@ -32,14 +31,7 @@ type repairTaskLeasesOptions struct {
 	Limit  int
 }
 
-func runPreflight(args []string) {
-	if len(args) == 0 || args[0] != "task-leases" {
-		fatal("usage: api preflight task-leases")
-	}
-	if len(args) > 1 {
-		fatal("usage: api preflight task-leases")
-	}
-
+func runPreflight() {
 	cfg := loadConfigOrFatal()
 	configureRuntimeLogging(cfg)
 
@@ -52,11 +44,7 @@ func runPreflight(args []string) {
 	}
 }
 
-func runRepair(args []string) {
-	opts, err := parseRepairTaskLeasesArgs(args)
-	if err != nil {
-		fatal("failed to parse repair task-leases arguments", "err", err)
-	}
+func runRepairTaskLeases(opts repairTaskLeasesOptions) {
 	if opts.Limit <= 0 {
 		fatal("repair limit must be greater than 0")
 	}
@@ -94,38 +82,20 @@ func runRepair(args []string) {
 	slog.Info("task lease repair completed", "reset_to_pending", affected, "limit", opts.Limit)
 }
 
-func parseRepairTaskLeasesArgs(args []string) (repairTaskLeasesOptions, error) {
+// resolveRepairTaskLeasesOptions folds flag values into the effective repair
+// policy. Preview is the default; mutation requires an explicit confirmation
+// pair, and an explicit --dry-run always wins over it.
+func resolveRepairTaskLeasesOptions(dryRun, dryRunExplicit bool, to string, yes bool, limit int) repairTaskLeasesOptions {
 	opts := repairTaskLeasesOptions{
-		DryRun: true,
-		Limit:  defaultRepairLimit,
+		DryRun: dryRun,
+		To:     strings.ToLower(strings.TrimSpace(to)),
+		Yes:    yes,
+		Limit:  limit,
 	}
-	if len(args) == 0 || args[0] != "task-leases" {
-		return opts, errors.New("usage: api repair task-leases [--dry-run] [--to=pending --yes] [--limit=N]")
-	}
-	fs := flag.NewFlagSet("repair task-leases", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
-	fs.BoolVar(&opts.DryRun, "dry-run", true, "preview only; no mutation")
-	fs.StringVar(&opts.To, "to", "", "target status for mutation (supported: pending)")
-	fs.BoolVar(&opts.Yes, "yes", false, "confirm mutation")
-	fs.IntVar(&opts.Limit, "limit", defaultRepairLimit, "max rows to update")
-
-	if err := fs.Parse(args[1:]); err != nil {
-		return opts, err
-	}
-	if len(fs.Args()) > 0 {
-		return opts, fmt.Errorf("unknown arguments: %s", strings.Join(fs.Args(), " "))
-	}
-	opts.To = strings.ToLower(strings.TrimSpace(opts.To))
-	dryRunExplicit := false
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "dry-run" {
-			dryRunExplicit = true
-		}
-	})
-	if !dryRunExplicit && opts.Yes && opts.To == "pending" {
+	if !dryRunExplicit && yes && opts.To == "pending" {
 		opts.DryRun = false
 	}
-	return opts, nil
+	return opts
 }
 
 type taskLeasePreflightReport struct {
@@ -171,7 +141,9 @@ func reportTaskLeasePreflight(ctx context.Context, repo taskLeasePreflightReposi
 }
 
 func newTaskLeasePreflightTaskRepo(cfg *config.Config) (taskLeasePreflightRepository, error) {
-	db, err := database.NewPostgres(cfg.Database)
+	connectCtx, connectCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer connectCancel()
+	db, err := database.NewPostgres(connectCtx, cfg.Database)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}

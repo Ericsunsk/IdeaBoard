@@ -12,6 +12,14 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Println("schema release check passed")
+}
+
+func run() error {
 	apiRoot := flag.String("api-root", ".", "API project root")
 	manifest := flag.String("manifest", "internal/db/schema/manifest.json", "schema manifest path")
 	output := flag.String("output", "", "generated schema artifact path (defaults to manifest output)")
@@ -23,15 +31,11 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
-	if err := schemarelease.Check(ctx, schemarelease.Options{
+	return schemarelease.Check(ctx, schemarelease.Options{
 		APIRoot: *apiRoot, ManifestPath: *manifest, OutputPath: *output,
 		WriteArtifact: *writeArtifact,
 		BaseSHA:       *baseSHA, HeadSHA: *headSHA, DatabaseDSN: os.Getenv("API_TEST_DATABASE_DSN"),
-	}); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	fmt.Println("schema release check passed")
+	})
 }
 
 func envOrDefault(name, fallback string) string {

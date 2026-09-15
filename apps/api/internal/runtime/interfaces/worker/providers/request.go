@@ -346,8 +346,7 @@ func compileProviderControls(params map[string]interface{}, operation workflow.R
 	if params == nil {
 		return controls
 	}
-	switch controlContract {
-	case workflow.RuntimeControlsVariation:
+	if controlContract == workflow.RuntimeControlsVariation {
 		if raw, ok := readProviderNumber(params, "variation_strength"); ok {
 			controls.OpenAI.VariationStrength = float64Ptr(raw)
 		}

@@ -8,10 +8,17 @@ import (
 	"fmt"
 	"math"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 )
 
 const ShanghaiTimezone = "Asia/Shanghai"
 const MaxSafeInteger int64 = 9_007_199_254_740_991
+
+// Shared usage loads must outlive an individual HTTP waiter, but still need
+// a hard upper bound so a stalled database cannot leave singleflight work
+// running forever after every caller has disconnected.
+const sharedUsageLoadTimeout = 30 * time.Second
 
 var ErrUnsafeNumber = errors.New("usage value exceeds JavaScript safe integer range")
 
@@ -48,6 +55,10 @@ type Service struct {
 	tasks    LogicalTaskUsageReader
 	now      func() time.Time
 	cache    *usageCache
+	// inflight collapses concurrent loads for the same key (e.g. every
+	// dashboard client hitting a just-expired TTL) into one DB read.
+	// Callers must keep Service behind its pointer: Group must not be copied.
+	inflight singleflight.Group
 }
 
 type ServiceOptions struct {
@@ -87,12 +98,49 @@ func (s *Service) GetCurrent(ctx context.Context, userID int64, usageRange Range
 	if cached, ok := s.cache.Get(key); ok {
 		return cached, nil
 	}
-	result, err := s.loadCurrent(ctx, userID, usageRange)
+	loaded, err := s.loadSingleflight(ctx, key, func(sharedCtx context.Context) (Usage, error) {
+		return s.loadCurrent(sharedCtx, userID, usageRange)
+	})
 	if err != nil {
 		return Usage{}, err
 	}
-	s.cache.Set(key, result)
-	return result, nil
+	return loaded, nil
+}
+
+// loadSingleflight shares one loadCurrent call across concurrent GetCurrent
+// calls for the same key and rechecks the cache inside, so a waiter that
+// arrives after a fresh Set never triggers a redundant load.
+func (s *Service) loadSingleflight(
+	ctx context.Context,
+	key cacheKey,
+	load func(context.Context) (Usage, error),
+) (Usage, error) {
+	waiter := s.inflight.DoChan(key.String(), func() (any, error) {
+		if cached, ok := s.cache.Get(key); ok {
+			return cached, nil
+		}
+		sharedCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), sharedUsageLoadTimeout)
+		defer cancel()
+		result, err := load(sharedCtx)
+		if err != nil {
+			return Usage{}, err
+		}
+		s.cache.Set(key, result)
+		return result, nil
+	})
+	select {
+	case <-ctx.Done():
+		return Usage{}, ctx.Err()
+	case res := <-waiter:
+		if res.Err != nil {
+			return Usage{}, res.Err
+		}
+		result, ok := res.Val.(Usage)
+		if !ok {
+			return Usage{}, fmt.Errorf("usage service: unexpected cached value type")
+		}
+		return result, nil
+	}
 }
 
 func (s *Service) loadCurrent(ctx context.Context, userID int64, usageRange Range) (Usage, error) {

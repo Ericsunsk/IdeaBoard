@@ -152,7 +152,7 @@ func readLibraryVisionImage(ctx context.Context, asset library.Asset) (VisionIma
 	}
 	response, err := getVisionImage(ctx, parsed)
 	if err != nil {
-		return VisionImage{}, fmt.Errorf("%w: %v", ErrVisionImageUnavailable, err)
+		return VisionImage{}, fmt.Errorf("%w: %w", ErrVisionImageUnavailable, err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
@@ -160,7 +160,7 @@ func readLibraryVisionImage(ctx context.Context, asset library.Asset) (VisionIma
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, visionMaxBytes+1))
 	if err != nil {
-		return VisionImage{}, fmt.Errorf("%w: %v", ErrVisionImageUnavailable, err)
+		return VisionImage{}, fmt.Errorf("%w: %w", ErrVisionImageUnavailable, err)
 	}
 	if len(data) > visionMaxBytes {
 		return VisionImage{}, ErrVisionImageInvalid
@@ -330,7 +330,7 @@ func readExternalVisionImage(ctx context.Context, ref VisionExternalReference) (
 	}
 	response, err := getVisionImage(ctx, parsed)
 	if err != nil {
-		return VisionImage{}, fmt.Errorf("%w: %v", ErrVisionImageUnavailable, err)
+		return VisionImage{}, fmt.Errorf("%w: %w", ErrVisionImageUnavailable, err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
@@ -338,7 +338,7 @@ func readExternalVisionImage(ctx context.Context, ref VisionExternalReference) (
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, visionMaxBytes+1))
 	if err != nil {
-		return VisionImage{}, fmt.Errorf("%w: %v", ErrVisionImageUnavailable, err)
+		return VisionImage{}, fmt.Errorf("%w: %w", ErrVisionImageUnavailable, err)
 	}
 	if len(data) == 0 || len(data) > visionMaxBytes {
 		return VisionImage{}, ErrVisionImageInvalid

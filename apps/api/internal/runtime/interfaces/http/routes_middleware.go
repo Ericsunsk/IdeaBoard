@@ -10,7 +10,17 @@ import (
 )
 
 func registerGlobalMiddleware(r *gin.Engine, deps Dependencies) {
+	// RequestID first so access logs, recovery and downstream handlers
+	// share one correlation ID. Recovery stays ahead of CORS/rate-limit
+	// so panics there also render the shared error envelope.
+	r.Use(RequestIDMiddleware())
+	r.Use(AccessLogMiddleware())
+	r.Use(RecoveryMiddleware())
+	r.Use(SecurityHeadersMiddleware())
 	r.Use(deps.CORSMiddleware)
+	// Apply the request deadline before rate-limit settings can perform a
+	// cold-cache database read.
+	r.Use(RequestTimeoutMiddleware(DefaultRequestTimeout))
 	// Reject disallowed cross-origin requests before they consume application rate-limit budget.
 	r.Use(rateLimitMiddleware(deps.RateLimit))
 	r.Use(globalRequestBodyLimitMiddleware())
@@ -35,10 +45,12 @@ func isUploadRequest(req *http.Request) bool {
 	// with a filesystem root. Avoid filesystem-style path normalization so
 	// traversal-like input cannot be reclassified as an upload route.
 	requestPath := req.URL.Path
-	if requestPath == "/api/user/profile/avatar" || requestPath == "/api/admin/upload" {
+	// Full paths are derived from the group + route constants so the bypass
+	// cannot drift from route registration.
+	if requestPath == UserAPIGroupPath+RouteUserProfileAvatar || requestPath == AdminAPIGroupPath+RouteAdminUpload {
 		return true
 	}
-	if requestPath == "/api/user/search/vision-extract" {
+	if requestPath == UserAPIGroupPath+RouteUserVisionExtract {
 		return true
 	}
 	return isBoardUploadPath(requestPath)

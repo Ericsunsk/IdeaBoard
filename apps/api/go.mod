@@ -4,6 +4,7 @@ go 1.26.6
 
 require (
 	github.com/caarlos0/env/v11 v11.4.1
+	github.com/gabriel-vasile/mimetype v1.4.12
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.10.0
@@ -16,8 +17,10 @@ require (
 	github.com/riverqueue/river v0.38.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.38.0
 	github.com/riverqueue/river/rivertype v0.38.0
+	github.com/spf13/cobra v1.10.2
 	github.com/stripe/stripe-go/v86 v86.4.0
 	golang.org/x/image v0.45.0
+	golang.org/x/sync v0.22.0
 	golang.org/x/text v0.41.0
 	golang.org/x/time v0.15.0
 	ideaboard/api/internal/testdb v0.0.0
@@ -45,7 +48,6 @@ require (
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fatih/structtag v1.2.0 // indirect
-	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
 	github.com/getkin/kin-openapi v0.135.0 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/go-openapi/jsonpointer v0.22.4 // indirect
@@ -104,7 +106,6 @@ require (
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/speakeasy-api/jsonpath v0.6.3 // indirect
 	github.com/speakeasy-api/openapi v1.19.2 // indirect
-	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/sqlc-dev/doubleclick v1.0.0 // indirect
 	github.com/sqlc-dev/sqlc v1.31.1 // indirect
@@ -133,7 +134,6 @@ require (
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
 	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
-	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260708182218-49f421fb7959 // indirect
 	golang.org/x/tools v0.48.0 // indirect

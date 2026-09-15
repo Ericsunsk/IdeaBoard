@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -325,7 +326,7 @@ func (b *NATSJetStreamEventBus) Close() error {
 	if b.nc != nil {
 		err := b.nc.Drain()
 		b.nc.Close()
-		if err != nil && err != nats.ErrConnectionClosed {
+		if err != nil && !errors.Is(err, nats.ErrConnectionClosed) {
 			return err
 		}
 	}

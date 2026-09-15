@@ -16,6 +16,10 @@ const (
 	migrationsDir = "file:///app/migrations"
 )
 
+// This binary intentionally duplicates the migrate path instead of invoking
+// the main server image: it ships in a minimal init-job image with only the
+// atlas binary and migration files. Keep it flag-free; all migration policy
+// lives in composition.Migrate.
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

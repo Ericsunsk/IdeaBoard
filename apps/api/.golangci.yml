@@ -12,8 +12,144 @@ linters:
     - misspell
     - staticcheck
     - unused
+    - errcheck
+    - errorlint
+    - bodyclose
+    - rowserrcheck
+    - sqlclosecheck
+    - gosec
+    - revive
+    - gocritic
+    - depguard
+    - copyloopvar
+    - nilerr
+    - sloglint
+    # perfsprint: follow-up after autofix pass (touches ~12 files, low risk
+    # but noisy for this PR). Re-enable once `golangci-lint run --fix`
+    # for perfsprint is applied.
+  settings:
+    errcheck:
+      # defer Close()/Rollback() noise is covered by sqlclosecheck/bodyclose;
+      # keep blank-error checks off to avoid `_, _ =` churn.
+      check-blank: false
+    gocritic:
+      # ifElseChain churns business branching; fix incrementally.
+      disabled-checks:
+        - ifElseChain
+    gosec:
+      # G304/G204/G702 are intentional: schema assembly reads manifest paths,
+      # schema-release/migration shell out to Atlas, renderer shells out to a
+      # configured binary. G101/G115/G109 fire on test fixtures, env names and
+      # clamped int conversions; real secrets are env/file based. G301/G302
+      # are 0755/0644 for checked-in schema artifacts and local dev dirs.
+      # G703/G704/G122 are taint-analysis noise on already-validated
+      # upload paths and allowlisted SSRF-guarded HTTP clients.
+      excludes:
+        - G304
+        - G204
+        - G702
+        - G703
+        - G704
+        - G101
+        - G109
+        - G115
+        - G122
+        - G301
+        - G302
+        - G306
+    depguard:
+      rules:
+        # DESIGN.md: platform must not import business contexts.
+        platform-boundary:
+          files:
+            - internal/platform/**/*.go
+            - internal/db/**/*.go
+            - internal/events/**/*.go
+          deny:
+            - pkg: ideaboard/api/internal/accountpool
+              desc: platform must not depend on business contexts
+            - pkg: ideaboard/api/internal/billing
+              desc: platform must not depend on business contexts
+            - pkg: ideaboard/api/internal/billingrecords
+              desc: platform must not depend on business contexts
+            - pkg: ideaboard/api/internal/boards
+              desc: platform must not depend on business contexts
+            - pkg: ideaboard/api/internal/credits
+              desc: platform must not depend on business contexts
+            - pkg: ideaboard/api/internal/identity
+              desc: platform must not depend on business contexts
+            - pkg: ideaboard/api/internal/library
+              desc: platform must not depend on business contexts
+            - pkg: ideaboard/api/internal/media
+              desc: platform must not depend on business contexts
+            - pkg: ideaboard/api/internal/payments
+              desc: platform must not depend on business contexts
+            - pkg: ideaboard/api/internal/prompts
+              desc: platform must not depend on business contexts
+            - pkg: ideaboard/api/internal/rewards
+              desc: platform must not depend on business contexts
+            - pkg: ideaboard/api/internal/tasking
+              desc: platform must not depend on business contexts
+            - pkg: ideaboard/api/internal/usage
+              desc: platform must not depend on business contexts
+            - pkg: ideaboard/api/internal/workflow
+              desc: platform must not depend on business contexts
+        # DESIGN.md + apps/api/CONTEXT.md: business must not import runtime.
+        no-runtime-from-business:
+          files:
+            - internal/accountpool/**/*.go
+            - internal/billing/**/*.go
+            - internal/billingrecords/**/*.go
+            - internal/boards/**/*.go
+            - internal/credits/**/*.go
+            - internal/identity/**/*.go
+            - internal/library/**/*.go
+            - internal/media/**/*.go
+            - internal/payments/**/*.go
+            - internal/prompts/**/*.go
+            - internal/rewards/**/*.go
+            - internal/tasking/**/*.go
+            - internal/usage/**/*.go
+            - internal/workflow/**/*.go
+            - internal/searchcatalog/**/*.go
+          deny:
+            - pkg: ideaboard/api/internal/runtime
+              desc: business contexts must not depend on runtime (see apps/api/CONTEXT.md)
+    revive:
+      # Keep default rules; exported-comment stutter is noisy on this codebase.
+      rules:
+        - name: exported
+          disabled: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - std-error-handling
+      - common-false-positives
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - errorlint
+          - bodyclose
+          - rowserrcheck
+          - sqlclosecheck
+          - gosec
+          - gocritic
+          - revive
+          - nilerr
+          - sloglint
+          - copyloopvar
+      # defer Cleanup()/Rollback()/RemoveAll()/c.Error() are best-effort
+      # teardown; real failures are surfaced by the primary error return.
+      - text: Error return value of `.*(Cleanup|Rollback|RemoveAll)` is not checked
+        linters:
+          - errcheck
+      - text: Error return value of `c\.Error` is not checked
+        linters:
+          - errcheck
 
 formatters:
   enable:
     - gofmt
-
+    - goimports

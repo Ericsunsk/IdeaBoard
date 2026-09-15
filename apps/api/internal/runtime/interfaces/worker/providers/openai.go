@@ -559,7 +559,7 @@ func extractOpenAIImageResponses(respBody []byte) ([]string, error) {
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(respBody, &respData); err != nil {
-		return nil, fmt.Errorf("解析响应失败: %v", err)
+		return nil, fmt.Errorf("解析响应失败: %w", err)
 	}
 	if len(respData.Data) == 0 {
 		return nil, fmt.Errorf("API 未返回图片")

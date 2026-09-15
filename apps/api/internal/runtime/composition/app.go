@@ -21,10 +21,16 @@ import (
 )
 
 func Run(args []string) {
-	if dispatchCLICommand(args) {
-		return
+	root := newRootCommand()
+	if len(args) > 1 {
+		root.SetArgs(args[1:])
 	}
+	if err := root.Execute(); err != nil {
+		os.Exit(1)
+	}
+}
 
+func runServe() {
 	cfg := loadConfigOrFatal()
 	configureRuntimeLogging(cfg)
 	slog.Info("server starting", "storage_profiles", true)
@@ -51,51 +57,6 @@ func Run(args []string) {
 	defer cancel()
 	if err := app.Shutdown(shutdownCtx); err != nil {
 		fatal("server forced to shutdown", "err", err)
-	}
-}
-
-func dispatchCLICommand(args []string) bool {
-	if len(args) <= 1 {
-		return false
-	}
-	if dispatchMigrationCommand(args[1]) {
-		return true
-	}
-	return dispatchMaintenanceCommand(args[1], args[2:])
-}
-
-func dispatchMigrationCommand(cmd string) bool {
-	switch cmd {
-	case "init-admin":
-		runInitAdmin()
-		return true
-	case "finalize-migrate":
-		runFinalizeMigrate()
-		return true
-	case "migrate":
-		runMigrate()
-		return true
-	default:
-		return false
-	}
-}
-
-func dispatchMaintenanceCommand(cmd string, extraArgs []string) bool {
-	switch cmd {
-	case "init-credit-wallets":
-		runInitCreditWallets(extraArgs)
-		return true
-	case "preflight":
-		runPreflight(extraArgs)
-		return true
-	case "repair":
-		runRepair(extraArgs)
-		return true
-	case "media-reclamation":
-		runMediaReclamation(extraArgs)
-		return true
-	default:
-		return false
 	}
 }
 

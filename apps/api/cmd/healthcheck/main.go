@@ -12,6 +12,10 @@ import (
 const defaultHealthcheckPort = "6000"
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	url := healthcheckURL()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -19,17 +23,18 @@ func main() {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		os.Exit(1)
+		return 1
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		os.Exit(1)
+		return 1
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 func healthcheckURL() string {

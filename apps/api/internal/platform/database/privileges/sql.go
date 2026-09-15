@@ -201,6 +201,7 @@ func verifyPrivilegeBatch(
 	if scanErr := rows.Scan(&checkIndex, &objectExists, &allowed); scanErr != nil {
 		return closeVerificationRows(rows, fmt.Errorf("scan %s mismatch: %w", batch.kind, scanErr))
 	}
+	//nolint:sqlclosecheck // early close surfaces verification query errors with batch context
 	if closeErr := rows.Close(); closeErr != nil {
 		return fmt.Errorf("verify PostgreSQL privileges for %s: close %s checks: %w", formatPolicyNames(sortedUnique(policyNames)), batch.kind, closeErr)
 	}

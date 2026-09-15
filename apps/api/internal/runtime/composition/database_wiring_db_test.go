@@ -105,13 +105,13 @@ func TestOpenAppDatabasesFailsBeforeRiverPoolAndClosesSQLPoolOnPrivilegeDrift(t 
 		t.Fatalf("inject forbidden Billing privilege: %v", err)
 	}
 
-	runtimeDB, err := database.NewPostgres(fixture.config.Database)
+	runtimeDB, err := database.NewPostgres(ctx, fixture.config.Database)
 	if err != nil {
 		t.Fatalf("open limited-role SQL pool: %v", err)
 	}
 	riverOpened := false
 	_, err = openAppDatabasesWithOpeners(ctx, fixture.config, appDatabaseOpeners{
-		postgres: func(config.DatabaseConfig) (*sql.DB, error) {
+		postgres: func(context.Context, config.DatabaseConfig) (*sql.DB, error) {
 			return runtimeDB, nil
 		},
 		river: func(context.Context, string) (*pgxpool.Pool, error) {

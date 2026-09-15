@@ -432,8 +432,7 @@ func (s *Service) maskProfiles(profiles []domain.StorageProfile) []domain.Storag
 func (s *Service) maskProfile(profile domain.StorageProfile) domain.StorageProfile {
 	masked := profile
 	masked.Config = cloneConfig(profile.Config)
-	switch masked.Provider {
-	case domain.StorageProviderS3Compatible:
+	if masked.Provider == domain.StorageProviderS3Compatible {
 		secret := configString(masked.Config, storageSecretAccessKeyName)
 		masked.SecretConfigured = masked.SecretConfigured || secret != ""
 		if secret != "" {

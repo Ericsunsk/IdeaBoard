@@ -26,6 +26,11 @@ type Config struct {
 	Rewards       RewardsConfig
 	Storage       StorageConfig
 	Imgproxy      ImgproxyConfig
+	// InvalidEnv lists env keys whose raw values failed parsing and fell
+	// back to defaults (e.g. RIVER_WORKER_CONCURRENCY="lots"). Development
+	// tolerates them with a warning; LoadAndValidate rejects them in
+	// production so misconfiguration cannot silently run with defaults.
+	InvalidEnv []string
 }
 
 type CreditsConfig struct {
@@ -53,6 +58,12 @@ type AppConfig struct {
 	MetricsAddr        string
 	Env                string
 	CORSAllowedOrigins []string
+	// TrustedProxies are the reverse proxies (Nginx, Cloudflare, load
+	// balancer) whose X-Forwarded-For headers Gin may trust for ClientIP.
+	// ClientIP feeds per-IP rate limiting, so an open trust breaks abuse
+	// control via header spoofing. Defaults to loopback only; production
+	// behind a proxy must set APP_TRUSTED_PROXIES explicitly.
+	TrustedProxies []string
 }
 
 // PublicOriginsConfig is immutable deployment configuration. Web owns browser
@@ -177,6 +188,7 @@ type envConfig struct {
 	MetricsAddr           string `env:"METRICS_ADDR"`
 	AppEnv                string `env:"APP_ENV"`
 	AppCORSAllowedOrigins string `env:"APP_CORS_ALLOWED_ORIGINS"`
+	AppTrustedProxies     string `env:"APP_TRUSTED_PROXIES"`
 	PublicOrigin          string `env:"PUBLIC_ORIGIN"`
 	APIBaseURL            string `env:"API_BASE_URL"`
 
@@ -228,6 +240,18 @@ func Load() *Config {
 		apiOrigin = publicOrigin
 	}
 
+	var invalidEnv []string
+	eventBusEnabled, eventBusValid := parseBoolEnv(raw.NATSEventBusEnabled, natsURL != "")
+	if !eventBusValid {
+		invalidEnv = append(invalidEnv, "NATS_EVENT_BUS_ENABLED")
+		slog.Warn("invalid boolean env; fallback to default", "key", "NATS_EVENT_BUS_ENABLED", "value", strings.TrimSpace(raw.NATSEventBusEnabled), "default", natsURL != "")
+	}
+	workerConcurrency, workerValid := boundedIntEnv(raw.RiverConcurrency, DefaultRiverWorkerConcurrency, minRiverWorkerConcurrency, maxRiverWorkerConcurrency)
+	if !workerValid {
+		invalidEnv = append(invalidEnv, "RIVER_WORKER_CONCURRENCY")
+		slog.Warn("invalid integer env; fallback to default", "key", "RIVER_WORKER_CONCURRENCY", "value", strings.TrimSpace(raw.RiverConcurrency), "default", DefaultRiverWorkerConcurrency)
+	}
+
 	return &Config{
 		Database: DatabaseConfig{
 			Host:              stringEnvDefault(raw.DBHost, "localhost"),
@@ -240,7 +264,7 @@ func Load() *Config {
 			SSLMode:           stringEnvDefault(raw.DBSSLMode, "disable"),
 		},
 		Events: EventBusConfig{
-			Enabled: parseBoolEnvDefault("NATS_EVENT_BUS_ENABLED", raw.NATSEventBusEnabled, natsURL != ""),
+			Enabled: eventBusEnabled,
 			NATSURL: natsURL,
 		},
 		App: AppConfig{
@@ -249,6 +273,7 @@ func Load() *Config {
 			MetricsAddr:        stringEnvDefault(raw.MetricsAddr, "127.0.0.1:9091"),
 			Env:                appEnv,
 			CORSAllowedOrigins: detectCORSAllowedOrigins(raw.AppCORSAllowedOrigins, appEnv),
+			TrustedProxies:     detectTrustedProxies(raw.AppTrustedProxies),
 		},
 		PublicOrigins: PublicOriginsConfig{
 			Web: publicOrigin,
@@ -259,13 +284,7 @@ func Load() *Config {
 			InternalAPIKey: strings.TrimSpace(raw.AuthServiceInternalAPIKey),
 			TimeoutSeconds: 5,
 		},
-		Worker: WorkerConfig{Concurrency: boundedIntEnvDefault(
-			"RIVER_WORKER_CONCURRENCY",
-			raw.RiverConcurrency,
-			DefaultRiverWorkerConcurrency,
-			minRiverWorkerConcurrency,
-			maxRiverWorkerConcurrency,
-		)},
+		Worker:  WorkerConfig{Concurrency: workerConcurrency},
 		Credits: CreditsConfig{WelcomeIdentityKey: strings.TrimSpace(raw.CreditsWelcomeIdentityKey)},
 		Rewards: RewardsConfig{CodeHMACKeys: strings.TrimSpace(raw.RewardsCodeHMACKeys)},
 		Storage: StorageConfig{LocalRoot: strings.TrimSpace(raw.StorageLocalRoot)},
@@ -274,19 +293,40 @@ func Load() *Config {
 			KeyHex:  strings.TrimSpace(raw.ImgproxyKeyHex),
 			SaltHex: strings.TrimSpace(raw.ImgproxySaltHex),
 		},
+		InvalidEnv: invalidEnv,
 	}
 }
 
 // LoadAndValidate loads deployment configuration and rejects unsafe database
 // settings before any connection attempt. Development keeps the local
 // DB_SSLMODE=disable default; production/release requires an explicit,
-// non-placeholder DB_PASSWORD and an allowlisted SSL mode.
+// non-placeholder DB_PASSWORD and an allowlisted SSL mode. Production also
+// rejects env keys that failed parsing (see Config.InvalidEnv) so a typo like
+// RIVER_WORKER_CONCURRENCY="lots" cannot silently run with defaults.
 func LoadAndValidate() (*Config, error) {
 	cfg := Load()
 	if err := cfg.ValidateDatabase(); err != nil {
 		return nil, err
 	}
+	if err := cfg.ValidateEnvStrict(); err != nil {
+		return nil, err
+	}
 	return cfg, nil
+}
+
+// ValidateEnvStrict rejects fallback defaults from malformed env values in
+// production. Development keeps warn-and-default so local iteration stays fast.
+func (c *Config) ValidateEnvStrict() error {
+	if c == nil {
+		return fmt.Errorf("config is required")
+	}
+	if !isProductionAppEnv(c.App.Env) {
+		return nil
+	}
+	if len(c.InvalidEnv) > 0 {
+		return fmt.Errorf("invalid env values in production (fix or unset): %s", strings.Join(c.InvalidEnv, ", "))
+	}
+	return nil
 }
 
 func (c *Config) ValidateDatabase() error {
@@ -363,6 +403,13 @@ func detectCORSAllowedOrigins(raw, appEnv string) []string {
 	}
 }
 
+func detectTrustedProxies(raw string) []string {
+	if proxies := splitCSVEnv(raw); len(proxies) > 0 {
+		return proxies
+	}
+	return []string{"127.0.0.1", "::1"}
+}
+
 func isProductionAppEnv(env string) bool {
 	switch strings.ToLower(strings.TrimSpace(env)) {
 	case "prod", "production", "release":
@@ -423,31 +470,34 @@ func stringEnvDefault(raw, defaultValue string) string {
 	return defaultValue
 }
 
-func parseBoolEnvDefault(key, raw string, defaultValue bool) bool {
+// parseBoolEnv parses a boolean env value, reporting validity separately so
+// Load can record fallback defaults in Config.InvalidEnv. Empty means unset
+// (valid, use default); unknown tokens are invalid.
+func parseBoolEnv(raw string, defaultValue bool) (bool, bool) {
 	value := strings.TrimSpace(raw)
 	if value == "" {
-		return defaultValue
+		return defaultValue, true
 	}
 	switch strings.ToLower(value) {
 	case "1", "true", "t", "yes", "y", "on":
-		return true
+		return true, true
 	case "0", "false", "f", "no", "n", "off":
-		return false
+		return false, true
 	default:
-		slog.Warn("invalid boolean env; fallback to default", "key", key, "value", value, "default", defaultValue)
-		return defaultValue
+		return defaultValue, false
 	}
 }
 
-func boundedIntEnvDefault(key, raw string, defaultValue, minValue, maxValue int) int {
+// boundedIntEnv parses an integer env value within [minValue, maxValue],
+// reporting validity separately for Config.InvalidEnv tracking.
+func boundedIntEnv(raw string, defaultValue, minValue, maxValue int) (int, bool) {
 	value := strings.TrimSpace(raw)
 	if value == "" {
-		return defaultValue
+		return defaultValue, true
 	}
 	parsed, err := strconv.Atoi(value)
 	if err != nil || parsed < minValue || parsed > maxValue {
-		slog.Warn("invalid integer env; fallback to default", "key", key, "value", value, "default", defaultValue)
-		return defaultValue
+		return defaultValue, false
 	}
-	return parsed
+	return parsed, true
 }

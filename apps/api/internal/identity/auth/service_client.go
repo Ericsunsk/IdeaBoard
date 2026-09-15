@@ -439,7 +439,7 @@ func (c *ServiceClient) ValidateSession(ctx context.Context, cookieHeader string
 		ClaimIdentityVerified: contractSession.ClaimIdentityVerified,
 	})
 	if trustErr != nil {
-		return nil, fmt.Errorf("%w: auth service returned an untrusted session identity: %v", ErrSessionUnauthorized, trustErr)
+		return nil, fmt.Errorf("%w: auth service returned an untrusted session identity: %w", ErrSessionUnauthorized, trustErr)
 	}
 	return &session, nil
 }

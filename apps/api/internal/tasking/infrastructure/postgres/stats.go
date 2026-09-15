@@ -131,8 +131,7 @@ func taskStatOutputCount(rawParams string) (int64, error) {
 }
 
 func taskStatOccurredAt(task *tasks.Task) time.Time {
-	switch task.Status {
-	case tasks.StatusCancelled:
+	if task.Status == tasks.StatusCancelled {
 		if task.CancelledAt != nil && !task.CancelledAt.IsZero() {
 			return *task.CancelledAt
 		}

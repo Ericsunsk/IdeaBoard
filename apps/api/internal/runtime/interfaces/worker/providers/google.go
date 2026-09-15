@@ -444,7 +444,7 @@ func (c *ProviderExecutor) resolveGoogleRemoteImage(ctx context.Context, ref str
 func extractGoogleGeminiImageResponses(respBody []byte) ([]string, error) {
 	var respData googleGeminiResponse
 	if err := json.Unmarshal(respBody, &respData); err != nil {
-		return nil, fmt.Errorf("解析响应失败: %v", err)
+		return nil, fmt.Errorf("解析响应失败: %w", err)
 	}
 
 	var urls []string
@@ -537,7 +537,7 @@ func (c *ProviderExecutor) callGoogleImagenPredict(ctx context.Context, account 
 func extractGoogleImagenResponses(respBody []byte) ([]string, error) {
 	var respData googleImagenResponse
 	if err := json.Unmarshal(respBody, &respData); err != nil {
-		return nil, fmt.Errorf("解析响应失败: %v", err)
+		return nil, fmt.Errorf("解析响应失败: %w", err)
 	}
 
 	urls := make([]string, 0, len(respData.Predictions))

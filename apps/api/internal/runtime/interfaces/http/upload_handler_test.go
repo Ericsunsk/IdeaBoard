@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/db/sqlc"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/storage/ports"
@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	errDedupeRetireBoom    = errors.New("retire boom")
+	errDedupeRetireBoom     = errors.New("retire boom")
 	errDedupeProbeTransient = errors.New("probe transient")
 )
 

@@ -38,7 +38,7 @@ type appDatabases struct {
 }
 
 type appDatabaseOpeners struct {
-	postgres func(config.DatabaseConfig) (*sql.DB, error)
+	postgres func(context.Context, config.DatabaseConfig) (*sql.DB, error)
 	river    func(context.Context, string) (*pgxpool.Pool, error)
 }
 
@@ -77,7 +77,7 @@ func openAppDatabasesWithOpeners(
 	if openers.postgres == nil || openers.river == nil {
 		return appDatabases{}, fmt.Errorf("database openers are incomplete")
 	}
-	db, err := openers.postgres(cfg.Database)
+	db, err := openers.postgres(ctx, cfg.Database)
 	if err != nil {
 		return appDatabases{}, fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -106,7 +106,7 @@ func finalizeAppDatabases(ctx context.Context, cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
-	migrationDB, err := database.NewPostgres(migrationConfig)
+	migrationDB, err := database.NewPostgres(ctx, migrationConfig)
 	if err != nil {
 		return fmt.Errorf("failed to connect migration database: %w", err)
 	}

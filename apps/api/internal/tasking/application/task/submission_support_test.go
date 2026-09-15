@@ -3,7 +3,6 @@ package task
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5"
 	"ideaboard/api/internal/billing"
 	creditsdomain "ideaboard/api/internal/credits/domain"
 	creditsports "ideaboard/api/internal/credits/ports"
@@ -11,6 +10,8 @@ import (
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
 	"ideaboard/api/internal/workflow"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type submitTestServiceDeps struct {

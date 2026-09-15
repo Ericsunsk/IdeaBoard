@@ -1,9 +1,10 @@
 package imageformat
 
 import (
-	"net/http"
 	"path/filepath"
 	"strings"
+
+	"github.com/gabriel-vasile/mimetype"
 )
 
 type imageSignature struct {
@@ -151,15 +152,28 @@ func ImageMIMEFromExtension(ext string) string {
 	return imageFormatsByExt[normalizedExt].MIME
 }
 
+// detectExtensionViaMimetype sniffs the canonical extension with the shared
+// magic database, gated through the upload allowlist registry. Anything the
+// registry does not know (heic, svg, …) resolves to "" and stays rejected.
+func detectExtensionViaMimetype(data []byte) string {
+	if len(data) == 0 {
+		return ""
+	}
+	return ImageExtensionFromMIME(mimetype.Detect(data).String())
+}
+
 func DetectImageExtensionFromBytes(data []byte) string {
+	// Precise full-content sniffing first: net/http.DetectContentType only
+	// inspects the first 512 bytes and misses container formats (avif/heic).
+	if ext := detectExtensionViaMimetype(data); ext != "" {
+		return ext
+	}
+	// Compat fallback for truncated headers the shared database declines
+	// (e.g. a bare "GIF" prefix): keep the previous allowlist-scoped match.
 	for _, spec := range imageFormatSpecs {
 		if validateImageMagic(data, spec.Ext) == nil {
 			return spec.Ext
 		}
-	}
-	mimeType := strings.ToLower(strings.TrimSpace(http.DetectContentType(data)))
-	if ext := ImageExtensionFromMIME(mimeType); ext != "" {
-		return ext
 	}
 	return ""
 }

@@ -68,7 +68,12 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		closeStartupResources(dbs.db, dbs.riverPool)
 		return nil, err
 	}
-	router := newAppRouter(cfg, repos, services, taskServices)
+	dbHealthChecker := databaseinfra.NewHealthChecker(&databaseinfra.Pools{DB: dbs.db, RiverPool: dbs.riverPool})
+	router, err := newAppRouter(cfg, repos, services, taskServices, dbHealthChecker)
+	if err != nil {
+		closeStartupResources(dbs.db, dbs.riverPool)
+		return nil, err
+	}
 	natsHealthChecker := natsinfra.NewEventBusFromUnderlying(workerRuntime.eventBus)
 
 	return &appContainer{
@@ -77,7 +82,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		riverPool:     dbs.riverPool,
 		workerRuntime: workerRuntime,
 		healthCheckers: []ports.HealthChecker{
-			databaseinfra.NewHealthChecker(&databaseinfra.Pools{DB: dbs.db, RiverPool: dbs.riverPool}),
+			dbHealthChecker,
 			workerRuntime,
 			natsHealthChecker,
 			// HTTP runners are added after construction in BuildApp, once their
@@ -116,7 +121,7 @@ type App struct {
 
 // Start executes the ordered startup sequence and marks runtime ready.
 func (a *App) Start(ctx context.Context) error {
-	return orchestration.ExecuteStartup(ctx, a.coordinator, orchestration.PlanDependencies{
+	return orchestration.ExecuteStartup(ctx, a.coordinator, orchestration.StartupDependencies{
 		Runners: []ports.Runner{
 			a.workerRuntime,
 			a.httpServer,

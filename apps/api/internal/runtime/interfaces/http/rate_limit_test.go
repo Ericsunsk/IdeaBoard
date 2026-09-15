@@ -19,6 +19,15 @@ type mutableRateLimitSettingsProvider struct {
 	setting settings.RateLimitSetting
 }
 
+type deadlineObservingRateLimitProvider struct {
+	deadline time.Time
+}
+
+func (p *deadlineObservingRateLimitProvider) GetRateLimit(ctx context.Context) (settings.RateLimitSetting, error) {
+	p.deadline, _ = ctx.Deadline()
+	return settings.DefaultRateLimitSetting(), nil
+}
+
 func (p *mutableRateLimitSettingsProvider) GetRateLimit(_ context.Context) (settings.RateLimitSetting, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -62,6 +71,19 @@ func TestRateLimitMiddlewareAllowsInitialBurst(t *testing.T) {
 		if res.Code != http.StatusOK {
 			t.Fatalf("request %d status = %d, want %d", i+1, res.Code, http.StatusOK)
 		}
+	}
+}
+
+func TestRateLimitSettingsLookupUsesBoundedContext(t *testing.T) {
+	provider := &deadlineObservingRateLimitProvider{}
+	started := time.Now()
+	resolveRateLimitPolicy(context.Background(), provider)
+
+	if provider.deadline.IsZero() {
+		t.Fatal("rate-limit settings lookup should receive a deadline")
+	}
+	if provider.deadline.Before(started) || provider.deadline.After(started.Add(rateLimitSettingsTimeout+time.Second)) {
+		t.Fatalf("deadline = %v, want within %v from start %v", provider.deadline, rateLimitSettingsTimeout, started)
 	}
 }
 

@@ -11,13 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentorder "ideaboard/api/internal/payments/application/order"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentports "ideaboard/api/internal/payments/ports"
 	"ideaboard/api/internal/platform/secrets"
+
+	"github.com/google/uuid"
 )
 
 type ConfigurationStore interface {

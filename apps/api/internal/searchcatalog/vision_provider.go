@@ -172,7 +172,7 @@ func decodeOpenAIChatExtraction(data []byte) (VisionExtraction, error) {
 	}
 	extraction, err := decodeVisionExtraction(envelope.Choices[0].Message.Content)
 	if err != nil {
-		return VisionExtraction{}, fmt.Errorf("%w: invalid model JSON: %v", ErrVisionSchema, err)
+		return VisionExtraction{}, fmt.Errorf("%w: invalid model JSON: %w", ErrVisionSchema, err)
 	}
 	return extraction, nil
 }
@@ -358,7 +358,7 @@ func cloudflareVisionRequestBody(input VisionInput) ([]byte, error) {
 	}
 	imageBytes, err := buildVisionContactSheet(input.Images)
 	if err != nil {
-		return nil, fmt.Errorf("%w: build reference contact sheet: %v", ErrVisionImageInvalid, err)
+		return nil, fmt.Errorf("%w: build reference contact sheet: %w", ErrVisionImageInvalid, err)
 	}
 	imageInts := make([]int, len(imageBytes))
 	for i, b := range imageBytes {

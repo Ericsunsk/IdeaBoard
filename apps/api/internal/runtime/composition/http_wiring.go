@@ -1,6 +1,7 @@
 package composition
 
 import (
+	"fmt"
 	"log/slog"
 
 	accounthttp "ideaboard/api/internal/accountpool/accounts/interfaces/http"
@@ -24,7 +25,8 @@ import (
 	"ideaboard/api/internal/runtime/adapters/webdist"
 	configinfra "ideaboard/api/internal/runtime/infrastructure/config"
 	httpinfra "ideaboard/api/internal/runtime/infrastructure/http"
-	"ideaboard/api/internal/runtime/interfaces/http"
+	httpapi "ideaboard/api/internal/runtime/interfaces/http"
+	"ideaboard/api/internal/runtime/ports"
 	"ideaboard/api/internal/searchcatalog"
 	statisticshttp "ideaboard/api/internal/tasking/interfaces/http/statistics"
 	taskhttp "ideaboard/api/internal/tasking/interfaces/http/task"
@@ -39,7 +41,8 @@ func newAppRouter(
 	repos appRepositories,
 	services appDomainServices,
 	taskServices appTaskServices,
-) *gin.Engine {
+	readyChecker ports.HealthChecker,
+) (*gin.Engine, error) {
 	accountHandler := accounthttp.NewHandler(taskServices.accountService)
 	taskHandler := taskhttp.NewHandler(taskhttp.HandlerDeps{
 		Commands: taskServices.taskService, AdminQueries: taskServices.taskService, UserQueries: taskServices.taskService,
@@ -89,7 +92,14 @@ func newAppRouter(
 	visionHandler.SetBillingService(searchcatalog.NewVisionBillingService(services.dbPool, services.billingCatalog, services.creditService, visionService))
 
 	router := gin.New()
-	router.Use(gin.Recovery())
+	// ClientIP feeds per-IP rate limiting. Trust only the configured reverse
+	// proxies so X-Forwarded-For cannot be spoofed by direct clients.
+	// Production behind Nginx/Cloudflare must set APP_TRUSTED_PROXIES.
+	if err := router.SetTrustedProxies(cfg.App.TrustedProxies); err != nil {
+		return nil, fmt.Errorf("invalid trusted proxies %v: %w", cfg.App.TrustedProxies, err)
+	}
+	// Panic recovery, access logging and request IDs are registered in
+	// registerGlobalMiddleware so every route shares the error envelope.
 	registerHTTPRoutes(router, httpapi.Dependencies{
 		Auth:                authDeps,
 		PublicSearchHandler: searchcatalog.NewSearchHandler(searchcatalog.NewSearchService(searchProviderConfig, searchMetrics)),
@@ -153,11 +163,12 @@ func newAppRouter(
 		CORSMiddleware: httpinfra.BuildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
 		RateLimit:      services.runtimeSettings,
 		Branding:       services.runtimeSettings,
+		ReadyChecker:   readyChecker,
 	}, httpapi.FrontendRouteOptions{
 		WarnMissingIndex: configinfra.IsProductionRuntime(cfg.App.Env),
 	})
 
-	return router
+	return router, nil
 }
 
 func registerHTTPRoutes(r *gin.Engine, deps httpapi.Dependencies, frontendOptions httpapi.FrontendRouteOptions) {

@@ -440,6 +440,19 @@
   color: var(--ideaboard-toast-text);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  /* Surface click dismisses (see installClickToDismiss in useAppToast). */
+  cursor: pointer;
+}
+
+/* Keep the close hook available to screen readers and keyboard users while
+   preserving the surface-click interaction. Reveal it when focused so the
+   keyboard focus path remains visible. */
+[data-sonner-toaster].ideaboard-toaster [data-sonner-toast].ideaboard-toast [data-close-button] {
+  opacity: 0;
+}
+
+[data-sonner-toaster].ideaboard-toaster [data-sonner-toast].ideaboard-toast [data-close-button]:focus-visible {
+  opacity: 1;
 }
 
 [data-sonner-toaster].ideaboard-toaster [data-sonner-toast].ideaboard-toast [data-icon] {

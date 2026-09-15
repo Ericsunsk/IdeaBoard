@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"image"
+	"image/color"
 	"image/png"
 	"io"
 	"strings"
@@ -135,4 +136,48 @@ func decodeTestAVIF(t *testing.T) []byte {
 		t.Fatalf("decode avif fixture: %v", err)
 	}
 	return data
+}
+
+func TestDetectExtensionRejectsHeicDespiteSharedDatabase(t *testing.T) {
+	// Minimal ftyp box with an heic brand: the shared magic database
+	// recognizes image/heic, but the upload allowlist must still reject it.
+	buf := []byte{
+		0x00, 0x00, 0x00, 0x18,
+		0x66, 0x74, 0x79, 0x70,
+		0x68, 0x65, 0x69, 0x63,
+		0x00, 0x00, 0x00, 0x00,
+		0x68, 0x65, 0x69, 0x63,
+		0x00, 0x00, 0x00, 0x00,
+	}
+	if ext := DetectImageExtensionFromBytes(buf); ext != "" {
+		t.Fatalf("expected heic to stay rejected, got %q", ext)
+	}
+	if err := ValidateImageBytes(buf, ".jpg"); err == nil {
+		t.Fatal("expected heic bytes claimed as jpg to fail")
+	}
+}
+
+func TestDetectExtensionKeepsTruncatedGIFCompat(t *testing.T) {
+	// A bare "GIF" prefix is below the shared database threshold: the
+	// allowlist-scoped legacy check preserves the previous acceptance.
+	if ext := DetectImageExtensionFromBytes([]byte{0x47, 0x49, 0x46}); ext != ".gif" {
+		t.Fatalf("expected truncated gif compat, got %q", ext)
+	}
+}
+
+func TestValidateImageMagicRejectsConfidentMismatch(t *testing.T) {
+	img := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	img.Set(0, 0, color.NRGBA{R: 1, G: 2, B: 3, A: 255})
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("encode png: %v", err)
+	}
+	if err := validateImageMagic(buf.Bytes(), ".png"); err != nil {
+		t.Fatalf("expected png bytes to pass as png, got %v", err)
+	}
+	if err := validateImageMagic(buf.Bytes(), ".jpg"); err == nil {
+		t.Fatal("expected png bytes claimed as jpg to fail")
+	} else if !strings.Contains(err.Error(), "不匹配") {
+		t.Fatalf("expected mismatch error, got %v", err)
+	}
 }

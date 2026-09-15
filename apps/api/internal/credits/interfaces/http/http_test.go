@@ -7,8 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
@@ -16,6 +14,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/testdb"

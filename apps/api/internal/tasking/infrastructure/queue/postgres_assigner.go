@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"strings"
@@ -56,7 +57,7 @@ func assignTaskTx(ctx context.Context, tx *sql.Tx, task *tasks.TaskPayload) (tas
 	policy := taskAssignmentPolicy{}
 	taskState, err := getTaskStateForUpdate(ctx, tx, task.TaskID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return policy.discard(task.TaskID), nil
 		}
 		return taskqueueports.TaskAssignment{}, err
@@ -82,7 +83,7 @@ func assignTaskTx(ctx context.Context, tx *sql.Tx, task *tasks.TaskPayload) (tas
 		executionPlan.RoutingRequirement(),
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return policy.noCapacity(task.TaskID), nil
 		}
 		return taskqueueports.TaskAssignment{}, err

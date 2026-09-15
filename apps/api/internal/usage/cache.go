@@ -2,6 +2,7 @@ package usage
 
 import (
 	"container/list"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -14,6 +15,12 @@ const (
 type cacheKey struct {
 	userID     int64
 	usageRange Range
+}
+
+// String renders the singleflight de-duplication key. cacheKey itself stays
+// a comparable struct for the map index; singleflight requires a string.
+func (k cacheKey) String() string {
+	return fmt.Sprintf("%d/%s", k.userID, k.usageRange)
 }
 
 type cacheEntry struct {

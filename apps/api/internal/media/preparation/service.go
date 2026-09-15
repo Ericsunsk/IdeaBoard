@@ -162,7 +162,7 @@ func (s *Service) completePreparedMedia(ctx context.Context, userID int64, item 
 				return true, nil
 			}
 			if lookupErr != nil {
-				err = fmt.Errorf("%w; find checksum conflict winner: %v", err, lookupErr)
+				err = fmt.Errorf("%w; find checksum conflict winner: %w", err, lookupErr)
 			}
 		}
 		return false, errors.Join(err, s.discardPreparedMedia(ctx, handle, err))

@@ -54,7 +54,7 @@ func Migrate(ctx context.Context, cfg *config.Config, atlasBinary, migrationsDir
 }
 
 func reconcileCleanBreakDatabase(ctx context.Context, migrationConfig config.DatabaseConfig, migrationsDirectory string) error {
-	db, err := database.NewPostgres(migrationConfig)
+	db, err := database.NewPostgres(ctx, migrationConfig)
 	if err != nil {
 		return fmt.Errorf("connect migration database: %w", err)
 	}

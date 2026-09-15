@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -74,7 +75,7 @@ func ParseCodeKeyring(raw string) (CodeKeyring, error) {
 	if err := decoder.Decode(&encoded); err != nil {
 		return CodeKeyring{}, fmt.Errorf("decode REWARDS_CODE_HMAC_KEYS: %w", err)
 	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		if err == nil {
 			err = fmt.Errorf("multiple JSON values")
 		}

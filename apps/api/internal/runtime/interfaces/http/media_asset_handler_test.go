@@ -255,7 +255,7 @@ func TestProcessingInputContentServesMaterializedNonLocalDerivative(t *testing.T
 	if got := rec.Header().Get("Content-Type"); got != "image/webp" {
 		t.Fatalf("content type = %q, want image/webp", got)
 	}
-	if string(rec.Body.Bytes()) != "normalized-bytes" {
+	if rec.Body.String() != "normalized-bytes" {
 		t.Fatalf("body = %q, want normalized derivative bytes", rec.Body.String())
 	}
 }

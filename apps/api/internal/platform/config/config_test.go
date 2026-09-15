@@ -20,6 +20,7 @@ var configEnvKeys = []string{
 	"APP_HOST",
 	"METRICS_ADDR",
 	"APP_CORS_ALLOWED_ORIGINS",
+	"APP_TRUSTED_PROXIES",
 	"PUBLIC_ORIGIN",
 	"API_BASE_URL",
 	"AUTH_SERVICE_BASE_URL",
@@ -266,6 +267,44 @@ func TestLoadDerivedServiceEndpoints(t *testing.T) {
 		}
 	})
 
+}
+
+func TestLoadTrustedProxies(t *testing.T) {
+	resetConfigEnv(t)
+	if got := Load().App.TrustedProxies; len(got) != 2 || got[0] != "127.0.0.1" || got[1] != "::1" {
+		t.Fatalf("default trusted proxies = %v, want loopback only", got)
+	}
+
+	resetConfigEnv(t)
+	t.Setenv("APP_TRUSTED_PROXIES", "10.0.0.0/8, 172.16.0.5")
+	if got := Load().App.TrustedProxies; len(got) != 2 || got[0] != "10.0.0.0/8" || got[1] != "172.16.0.5" {
+		t.Fatalf("configured trusted proxies = %v", got)
+	}
+}
+
+func TestValidateEnvStrictRejectsFallbacksInProduction(t *testing.T) {
+	resetConfigEnv(t)
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("RIVER_WORKER_CONCURRENCY", "lots")
+	t.Setenv("NATS_EVENT_BUS_ENABLED", "maybe")
+
+	cfg := Load()
+	if len(cfg.InvalidEnv) != 2 {
+		t.Fatalf("InvalidEnv = %v, want both malformed keys tracked", cfg.InvalidEnv)
+	}
+	if err := cfg.ValidateEnvStrict(); err == nil {
+		t.Fatal("ValidateEnvStrict succeeded in production with fallback defaults")
+	}
+
+	resetConfigEnv(t)
+	t.Setenv("RIVER_WORKER_CONCURRENCY", "lots")
+	devCfg := Load()
+	if len(devCfg.InvalidEnv) != 1 {
+		t.Fatalf("dev InvalidEnv = %v, want malformed key tracked", devCfg.InvalidEnv)
+	}
+	if err := devCfg.ValidateEnvStrict(); err != nil {
+		t.Fatalf("ValidateEnvStrict failed in development: %v", err)
+	}
 }
 
 func TestDetectCORSAllowedOrigins(t *testing.T) {

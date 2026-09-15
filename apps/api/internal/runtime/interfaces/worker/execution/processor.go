@@ -118,11 +118,11 @@ func (p *Processor) runBeforeExecute(ctx context.Context, assignment taskqueuepo
 		})
 		if resetErr != nil {
 			return errors.Join(
-				fmt.Errorf("%w: %v", ErrFinalAttemptMarkerResetFailed, err),
+				fmt.Errorf("%w: %w", ErrFinalAttemptMarkerResetFailed, err),
 				fmt.Errorf("reset task after marker failure: %w", resetErr),
 			)
 		}
-		return fmt.Errorf("%w: %v", ErrFinalAttemptMarkerUnavailable, err)
+		return fmt.Errorf("%w: %w", ErrFinalAttemptMarkerUnavailable, err)
 	}
 	return nil
 }

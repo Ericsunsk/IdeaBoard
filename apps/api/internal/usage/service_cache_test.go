@@ -2,8 +2,10 @@ package usage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -215,4 +217,111 @@ func rangeFromDays(days int) (Range, error) {
 
 func usageCacheTestKey(userID int64, usageRange Range) string {
 	return fmt.Sprintf("%d:%s", userID, usageRange)
+}
+
+func TestServiceCacheCollapsesConcurrentColdLoads(t *testing.T) {
+	clock := newUsageTestClock()
+	captures := &pilingCaptureReader{countingCaptureReader: newCountingCaptureReader()}
+	service := NewService(captures, &taskUsageReaderStub{}, ServiceOptions{
+		Now:           clock.Now,
+		CacheTTL:      time.Minute,
+		CacheCapacity: 8,
+	})
+
+	const readers = 32
+	var wait sync.WaitGroup
+	errorsCh := make(chan error, readers)
+	for range readers {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			if _, err := service.GetCurrent(context.Background(), 7, Range30Days); err != nil {
+				errorsCh <- err
+			}
+		}()
+	}
+	wait.Wait()
+	close(errorsCh)
+	for err := range errorsCh {
+		t.Fatalf("concurrent GetCurrent() error = %v", err)
+	}
+	if calls := captures.dailyCallCount(7, Range30Days); calls != 1 {
+		t.Fatalf("concurrent cold loads daily reads = %d, want 1", calls)
+	}
+}
+
+func TestServiceSingleflightLoaderOutlivesLeaderCancellation(t *testing.T) {
+	service := NewService(newCountingCaptureReader(), &taskUsageReaderStub{}, ServiceOptions{})
+	leaderCtx, cancelLeader := context.WithCancel(context.Background())
+	defer cancelLeader()
+	started := make(chan struct{})
+	release := make(chan struct{})
+	loaderFinished := make(chan error, 1)
+	leaderFinished := make(chan error, 1)
+	waiterFinished := make(chan error, 1)
+	key := cacheKey{userID: 7, usageRange: Range30Days}
+	var startedOnce sync.Once
+	var loadCalls atomic.Int32
+	load := func(loadCtx context.Context) (Usage, error) {
+		loadCalls.Add(1)
+		startedOnce.Do(func() { close(started) })
+		select {
+		case <-release:
+			loaderFinished <- loadCtx.Err()
+			return Usage{}, nil
+		case <-loadCtx.Done():
+			loaderFinished <- loadCtx.Err()
+			return Usage{}, loadCtx.Err()
+		}
+	}
+
+	go func() {
+		_, err := service.loadSingleflight(leaderCtx, key, load)
+		leaderFinished <- err
+	}()
+
+	<-started
+	go func() {
+		_, err := service.loadSingleflight(context.Background(), key, load)
+		waiterFinished <- err
+	}()
+	cancelLeader()
+	close(release)
+	select {
+	case err := <-loaderFinished:
+		if err != nil {
+			t.Fatalf("shared loader context = %v after leader cancellation, want nil", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("shared loader did not finish after release")
+	}
+	if err := <-leaderFinished; !errors.Is(err, context.Canceled) {
+		t.Fatalf("leader result error = %v, want context cancellation", err)
+	}
+	if err := <-waiterFinished; err != nil {
+		t.Fatalf("waiter result error = %v", err)
+	}
+	if calls := loadCalls.Load(); calls != 1 {
+		t.Fatalf("singleflight loader calls = %d, want 1", calls)
+	}
+}
+
+// pilingCaptureReader stalls the first DB read so concurrent GetCurrent calls
+// pile onto the same cache miss instead of serializing past each other.
+type pilingCaptureReader struct {
+	*countingCaptureReader
+	started atomic.Int32
+}
+
+func (r *pilingCaptureReader) GetDailyCaptureUsage(
+	ctx context.Context,
+	userID int64,
+	location *time.Location,
+	start time.Time,
+	endExclusive time.Time,
+) (map[string]int64, error) {
+	if r.started.Add(1) == 1 {
+		time.Sleep(150 * time.Millisecond)
+	}
+	return r.countingCaptureReader.GetDailyCaptureUsage(ctx, userID, location, start, endExclusive)
 }

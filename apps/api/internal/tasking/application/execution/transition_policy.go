@@ -101,7 +101,7 @@ func normalizeTaskTransitionWriteError(err error) error {
 		return nil
 	}
 	if errors.Is(err, runtimecontracts.ErrTaskLeaseStateConflict) {
-		return fmt.Errorf("%w: %v", ErrTaskStateConflict, err)
+		return fmt.Errorf("%w: %w", ErrTaskStateConflict, err)
 	}
 	return err
 }

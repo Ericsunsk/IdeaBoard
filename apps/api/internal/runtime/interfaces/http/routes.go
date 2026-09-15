@@ -5,6 +5,7 @@ import (
 	"errors"
 	iofs "io/fs"
 	"net/http"
+	"time"
 
 	credithttp "ideaboard/api/internal/credits/interfaces/http"
 
@@ -28,6 +29,7 @@ import (
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/rewards"
+	"ideaboard/api/internal/runtime/ports"
 	"ideaboard/api/internal/searchcatalog"
 	statisticshttp "ideaboard/api/internal/tasking/interfaces/http/statistics"
 	taskhttp "ideaboard/api/internal/tasking/interfaces/http/task"
@@ -47,6 +49,9 @@ type Dependencies struct {
 	Branding            settings.BrandingSettingProvider
 	PaymentWebhook      *paymenthttp.WebhookHandler
 	Internal            InternalRouteDeps
+	// ReadyChecker backs /api/readyz. Nil keeps the shallow contract used
+	// by unit tests; production wires the database (PG+River) checker.
+	ReadyChecker ports.HealthChecker
 }
 
 type InternalRouteDeps struct{ UserHandler *identityhttp.InternalHandler }
@@ -132,6 +137,15 @@ const globalRequestBodyLimitBytes int64 = 2 * 1024 * 1024
 const uploadRequestBodyLimitBytes int64 = 64 * 1024 * 1024
 const visionRequestBodyLimitBytes int64 = 11 * 1024 * 1024
 
+// API group prefixes. RouteUser*/RouteAdmin* constants below are
+// group-relative; full paths are group + relative (e.g. UserAPIGroupPath +
+// RouteUserProfileAvatar). The body-limit upload bypass must build from these
+// constants instead of hardcoding full paths a second time.
+const (
+	UserAPIGroupPath  = "/api/user"
+	AdminAPIGroupPath = "/api/admin"
+)
+
 // Hand-written route paths that bypass the Orval-generated client.
 const (
 	RouteHealth                   = "/api/health"
@@ -140,6 +154,8 @@ const (
 	RouteUserProfileAvatar        = "/profile/avatar"
 	RouteUserBoardUploads         = "/boards/:board_id/uploads"
 	RouteUserDownload             = "/download"
+	RouteUserEvents               = "/events"
+	RouteUserVisionExtract        = "/search/vision-extract"
 	RouteAdminUpload              = "/upload"
 	RouteAdminSettingsBranding    = "/settings/branding"
 	RouteAdminSettingsMediaUpload = "/settings/media-upload"
@@ -152,9 +168,14 @@ const (
 	RoutePaymentStripeWebhook     = "/api/webhooks/stripe"
 )
 
+// UploadsStaticRoutePrefix is the public prefix for locally served upload
+// bytes. Static routes, timeout exemptions and resource parsing must build
+// from it instead of repeating the literal.
+const UploadsStaticRoutePrefix = "/uploads/"
+
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, frontendOptions FrontendRouteOptions) {
 	registerGlobalMiddleware(r, deps)
-	registerPublicRoutes(r, deps.Branding, deps.PublicSearchHandler)
+	registerPublicRoutes(r, deps.Branding, deps.PublicSearchHandler, deps.ReadyChecker)
 	registerPaymentWebhookRoutes(r, deps.PaymentWebhook)
 	registerInternalRoutes(r, deps.Internal)
 	registerStaticUploadRoutes(r, deps.StaticUploads)
@@ -168,13 +189,44 @@ type healthResponse struct {
 	Status string `json:"status"`
 }
 
-func registerPublicRoutes(r *gin.Engine, branding settings.BrandingSettingProvider, searchHandler *searchcatalog.SearchHandler) {
+type readyResponse struct {
+	Status    string `json:"status"`
+	Ready     bool   `json:"ready"`
+	Component string `json:"component,omitempty"`
+}
+
+func registerPublicRoutes(r *gin.Engine, branding settings.BrandingSettingProvider, searchHandler *searchcatalog.SearchHandler, readyChecker ports.HealthChecker) {
+	// RouteHealth stays shallow: process liveness for Docker/Compose and the
+	// existing healthcheck binary. Orchestrators must use /api/readyz.
 	r.GET(RouteHealth, func(c *gin.Context) {
 		response.SuccessDTO(c, healthResponse{Status: "ok"})
 	})
+	r.GET("/api/livez", func(c *gin.Context) {
+		response.SuccessDTO(c, healthResponse{Status: "ok"})
+	})
+	r.GET("/api/readyz", readyHandler(readyChecker))
 	r.GET(RoutePublicSettingsBranding, publicBrandingSettingsHandler(branding))
 	if searchHandler != nil {
 		r.GET(RoutePublicSearch, searchHandler.Search)
+	}
+}
+
+// readyHandler reports dependency readiness (PostgreSQL+River via the runtime
+// database checker). Nil checker preserves the shallow test contract.
+func readyHandler(checker ports.HealthChecker) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if checker == nil {
+			response.SuccessDTO(c, readyResponse{Status: "ok", Ready: true})
+			return
+		}
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+		defer cancel()
+		status := checker.CheckHealth(ctx)
+		if !status.Ready {
+			response.Error(c, http.StatusServiceUnavailable, "服务尚未就绪")
+			return
+		}
+		response.SuccessDTO(c, readyResponse{Status: "ok", Ready: true, Component: status.Name})
 	}
 }
 
@@ -208,6 +260,6 @@ func registerInternalRoutes(r *gin.Engine, deps InternalRouteDeps) {
 
 func registerStaticUploadRoutes(r *gin.Engine, deps StaticUploadDeps) {
 	uploadsHandler := uploadStaticHandler(deps)
-	r.GET("/uploads/*filepath", uploadsHandler)
-	r.HEAD("/uploads/*filepath", uploadsHandler)
+	r.GET(UploadsStaticRoutePrefix+"*filepath", uploadsHandler)
+	r.HEAD(UploadsStaticRoutePrefix+"*filepath", uploadsHandler)
 }

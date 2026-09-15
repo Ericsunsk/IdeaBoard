@@ -90,7 +90,7 @@ func (r *MediaAssetRegistry) Complete(ctx context.Context, handle ingestion.Hand
 		if err := r.processingInputMaterializer(ctx, handle.AssetID, handle.OwnerUserID); err != nil {
 			failErr := r.markReadyAssetFailed(context.WithoutCancel(ctx), handle, err)
 			if failErr != nil {
-				return fmt.Errorf("materialize processing-input: %w; mark asset failed: %v", err, failErr)
+				return fmt.Errorf("materialize processing-input: %w; mark asset failed: %w", err, failErr)
 			}
 			return fmt.Errorf("materialize processing-input: %w", err)
 		}
@@ -592,8 +592,9 @@ func (r *MediaAssetRegistry) FindReusableGenerationMedia(ctx context.Context, ow
 		return 0, false, nil
 	}
 	if strings.HasPrefix(trimmed, "/uploads/") {
-		resource, err := domain.ParseUploadResource(strings.TrimPrefix(trimmed, "/"))
-		if err != nil {
+		resource, parseErr := domain.ParseUploadResource(strings.TrimPrefix(trimmed, "/"))
+		if parseErr != nil {
+			//nolint:nilerr // unparsable source means not reusable, not a failure
 			return 0, false, nil
 		}
 		ids, err := r.q.ListReadyOwnedMediaAssetIDsByStorageKey(ctx, dbsqlc.ListReadyOwnedMediaAssetIDsByStorageKeyParams{
@@ -612,8 +613,9 @@ func (r *MediaAssetRegistry) FindReusableGenerationMedia(ctx context.Context, ow
 			return 0, false, fmt.Errorf("reusable media asset storage key is ambiguous")
 		}
 	}
-	parsed, err := url.Parse(trimmed)
-	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || !strings.HasPrefix(parsed.Path, "/uploads/") {
+	parsed, parseErr := url.Parse(trimmed)
+	if parseErr != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || !strings.HasPrefix(parsed.Path, "/uploads/") {
+		//nolint:nilerr // non-upload URL means not reusable, not a failure
 		return 0, false, nil
 	}
 	assetID, err := r.q.FindReadyOwnedMediaAssetIDByURL(ctx, dbsqlc.FindReadyOwnedMediaAssetIDByURLParams{

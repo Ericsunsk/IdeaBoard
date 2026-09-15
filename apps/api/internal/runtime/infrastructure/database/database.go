@@ -5,9 +5,10 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"ideaboard/api/internal/runtime/domain"
 	"ideaboard/api/internal/runtime/ports"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Pools holds runtime-owned database pool references.

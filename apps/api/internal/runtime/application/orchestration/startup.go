@@ -17,9 +17,6 @@ type StartupDependencies struct {
 	HealthCheckers []ports.HealthChecker
 }
 
-// PlanDependencies is an alias for StartupDependencies for backwards compatibility.
-type PlanDependencies = StartupDependencies
-
 // ExecuteStartup runs the structured runtime startup sequence:
 // 1. Begin initialization
 // 2. Begin recovery and converge orphaned tasks

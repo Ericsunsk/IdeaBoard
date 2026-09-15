@@ -574,11 +574,11 @@ func (s *S3CompatibleService) VerifyObjectGeneration(ctx context.Context, object
 	} else {
 		client, clientErr := s.clientWithConfig(ctx, cfg)
 		if clientErr != nil {
-			return fmt.Errorf("%w: %v", domain.ErrObjectGenerationUnavailable, clientErr)
+			return fmt.Errorf("%w: %w", domain.ErrObjectGenerationUnavailable, clientErr)
 		}
 		info, statErr := client.StatObject(ctx, strings.TrimSpace(cfg.BucketName), key, minio.StatObjectOptions{})
 		if statErr != nil {
-			return fmt.Errorf("%w: stat object: %v", domain.ErrObjectGenerationUnavailable, statErr)
+			return fmt.Errorf("%w: stat object: %w", domain.ErrObjectGenerationUnavailable, statErr)
 		}
 		raw := strings.TrimSpace(info.Metadata.Get("X-Amz-Meta-Object-Generation"))
 		if raw == "" {
@@ -593,7 +593,7 @@ func (s *S3CompatibleService) VerifyObjectGeneration(ctx context.Context, object
 		}
 	}
 	if err != nil {
-		return fmt.Errorf("%w: read object generation: %v", domain.ErrObjectGenerationUnavailable, err)
+		return fmt.Errorf("%w: read object generation: %w", domain.ErrObjectGenerationUnavailable, err)
 	}
 	if actual <= 0 || actual != expected {
 		return fmt.Errorf("%w: got %d, want %d", domain.ErrObjectGenerationUnavailable, actual, expected)

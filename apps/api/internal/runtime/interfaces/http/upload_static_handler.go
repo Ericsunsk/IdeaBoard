@@ -22,7 +22,7 @@ import (
 
 func uploadStaticHandler(deps StaticUploadDeps) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		resource, err := domain.ParseUploadResource("/uploads/" + strings.TrimPrefix(c.Param("filepath"), "/"))
+		resource, err := domain.ParseUploadResource(UploadsStaticRoutePrefix + strings.TrimPrefix(c.Param("filepath"), "/"))
 		if err != nil {
 			c.Status(http.StatusNotFound)
 			return
@@ -49,13 +49,58 @@ func uploadStaticHandler(deps StaticUploadDeps) gin.HandlerFunc {
 }
 
 func serveLocalUploadFile(c *gin.Context, objectKey string) {
-	localPath := filepath.FromSlash(objectKey)
-	info, err := os.Stat(localPath)
-	if err != nil || info.IsDir() {
+	localPath, err := jailUploadStaticPath(objectKey)
+	if err != nil {
 		c.Status(http.StatusNotFound)
 		return
 	}
+	// Lstat (not Stat): a symlink inside uploads must never be followed to
+	// resolve outside the jail. Uploads only contain regular files.
+	info, err := os.Lstat(localPath)
+	if err != nil || info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	// User-controlled bytes are served same-origin. SVG/active content is
+	// rejected at upload, but sandbox neuters direct-navigation script
+	// execution as defense in depth. Safe for <img> embedding: subresource
+	// loads ignore the image response CSP.
+	c.Header("Content-Security-Policy", "sandbox")
 	c.File(localPath)
+}
+
+// jailUploadStaticPath re-asserts the domain-boundary jail at the serving
+// layer: objectKey must stay under the runtime uploads root after cleaning.
+// Canonical cleaning lives in domain.NormalizeUploadObjectKey (single source);
+// the Abs/Rel check below only guards against root relocation between the
+// two calls. ParseUploadResource already enforces this; serving must not
+// trust callers.
+func jailUploadStaticPath(objectKey string) (string, error) {
+	normalized, err := domain.NormalizeUploadObjectKey(objectKey)
+	if err != nil {
+		return "", err
+	}
+	cleaned := filepath.FromSlash(normalized)
+	root := "uploads"
+	if cleaned != root && !strings.HasPrefix(cleaned, root+string(filepath.Separator)) {
+		return "", fmt.Errorf("upload object key escapes uploads root")
+	}
+	rootAbs, err := filepath.Abs(root)
+	if err != nil {
+		return "", fmt.Errorf("resolve uploads root: %w", err)
+	}
+	fullAbs, err := filepath.Abs(cleaned)
+	if err != nil {
+		return "", fmt.Errorf("resolve upload path: %w", err)
+	}
+	relative, err := filepath.Rel(rootAbs, fullAbs)
+	if err != nil {
+		return "", fmt.Errorf("relativize upload path: %w", err)
+	}
+	if relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("upload object key escapes uploads root")
+	}
+	return fullAbs, nil
 }
 
 func authorizeUploadRead(c *gin.Context, deps AuthDeps) bool {

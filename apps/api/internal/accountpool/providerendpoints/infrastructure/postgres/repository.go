@@ -306,9 +306,9 @@ func ProviderEndpointConflictError(err error) error {
 	constraintName := providerEndpointUniqueConstraintName(err)
 	switch constraintName {
 	case ProviderEndpointNameUniqueIndex:
-		return fmt.Errorf("%w: %v", domain.ErrNameConflict, err)
+		return fmt.Errorf("%w: %w", domain.ErrNameConflict, err)
 	case ProviderEndpointAPITypeBaseURLUniqIdx:
-		return fmt.Errorf("%w: %v", domain.ErrURLConflict, err)
+		return fmt.Errorf("%w: %w", domain.ErrURLConflict, err)
 	default:
 		return err
 	}

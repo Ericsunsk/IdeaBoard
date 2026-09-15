@@ -31,6 +31,14 @@ func TestValidateAuthInternalKeyInProduction(t *testing.T) {
 	if err := configinfra.ValidateAuthInternalKey(devCfg); err != nil {
 		t.Fatalf("ValidateAuthInternalKey failed on dev: %v", err)
 	}
+
+	shortCfg := &config.Config{
+		App:  config.AppConfig{Env: "production"},
+		Auth: config.AuthServiceConfig{InternalAPIKey: "short-human-key"},
+	}
+	if err := configinfra.ValidateAuthInternalKey(shortCfg); err == nil {
+		t.Fatal("ValidateAuthInternalKey succeeded, want error for short production secret")
+	}
 }
 
 func TestIsUnsafeProductionSecret(t *testing.T) {

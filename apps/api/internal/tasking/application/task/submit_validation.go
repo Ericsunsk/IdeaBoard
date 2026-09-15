@@ -154,7 +154,7 @@ func normalizeFusionInputWeights(weights []float64) ([]float64, error) {
 		return nil, fmt.Errorf("fusion 权重总和必须大于 0")
 	}
 	for index := range out {
-		out[index] = out[index] / total
+		out[index] /= total
 	}
 	return out, nil
 }

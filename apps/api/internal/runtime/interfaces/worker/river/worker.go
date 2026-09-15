@@ -500,6 +500,15 @@ func NewRiverPgxPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 		return nil, err
 	}
 	cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
+	// Budget: 10 conns. Combined with the database/sql pool (25) a single
+	// API instance holds 35 < PostgreSQL default max_connections 100, with
+	// head room for migrations, CLIs and test fixtures. Idle recycling
+	// matches the database/sql pool so both age out together.
+	cfg.MaxConns = 10
+	cfg.MinConns = 1
+	cfg.MaxConnLifetime = 30 * time.Minute
+	cfg.MaxConnIdleTime = 5 * time.Minute
+	cfg.HealthCheckPeriod = time.Minute
 	return pgxpool.NewWithConfig(ctx, cfg)
 }
 

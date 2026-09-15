@@ -2,7 +2,6 @@ package boards
 
 import (
 	"encoding/json"
-	"errors"
 	"strconv"
 	"strings"
 
@@ -124,27 +123,7 @@ func (h *Handler) UpsertBoard(c *gin.Context) {
 	}
 	board, err := h.service.UpsertBoard(c.Request.Context(), userID, boardID, &req)
 	if err != nil {
-		if errors.Is(err, ErrInvalidInput) {
-			response.Error(c, 400, "参数错误")
-			return
-		}
-		if errors.Is(err, ErrPermissionDenied) {
-			response.Error(c, 403, "无权修改该画布")
-			return
-		}
-		if errors.Is(err, ErrNameConflict) {
-			response.Error(c, 409, "画布名称已存在，请使用其他名称")
-			return
-		}
-		if errors.Is(err, ErrRevisionConflict) {
-			response.Error(c, 409, "画布版本已变更，请刷新后重试")
-			return
-		}
-		if errors.Is(err, ErrIDConflict) {
-			response.Error(c, 409, "画布ID已存在，请刷新后重试")
-			return
-		}
-		response.InternalError(c, 500, "更新画布失败", err)
+		respondBoardError(c, err, upsertBoardErrorRows, "更新画布失败")
 		return
 	}
 	response.SuccessDTO(c, boardResponse{
@@ -164,23 +143,7 @@ func (h *Handler) DeleteBoard(c *gin.Context) {
 		return
 	}
 	if err := h.service.DeleteBoard(c.Request.Context(), userID, boardID); err != nil {
-		if errors.Is(err, ErrInvalidInput) {
-			response.Error(c, 400, "参数错误")
-			return
-		}
-		if errors.Is(err, ErrNotFound) {
-			response.Error(c, 404, "画布不存在")
-			return
-		}
-		if errors.Is(err, ErrPermissionDenied) {
-			response.Error(c, 403, "无权删除该画布")
-			return
-		}
-		if errors.Is(err, ErrCanvasCleanupFailed) {
-			response.InternalError(c, 500, "删除画布失败：文件清理失败", err)
-			return
-		}
-		response.InternalError(c, 500, "删除画布失败", err)
+		respondBoardError(c, err, deleteBoardErrorRows, "删除画布失败")
 		return
 	}
 	response.SuccessDTO(c, boardDeleteResponse{Deleted: true})
@@ -337,45 +300,11 @@ func (h *Handler) JoinByShareToken(c *gin.Context) {
 }
 
 func (h *Handler) respondBoardMemberError(c *gin.Context, err error, internalMessage string) {
-	switch {
-	case errors.Is(err, ErrInvalidInput):
-		response.Error(c, 400, "参数错误")
-	case errors.Is(err, ErrNotFound):
-		response.Error(c, 404, "画布不存在")
-	case errors.Is(err, ErrPermissionDenied):
-		response.Error(c, 403, "仅 owner 可管理成员")
-	case errors.Is(err, ErrMemberNotFound):
-		response.Error(c, 404, "成员不存在")
-	case errors.Is(err, ErrMemberInvalidRole):
-		response.Error(c, 400, "角色无效，仅支持 editor/viewer")
-	case errors.Is(err, ErrMemberInviteSelf):
-		response.Error(c, 400, "不能邀请或移除 owner 自己")
-	default:
-		response.InternalError(c, 500, internalMessage, err)
-	}
+	respondBoardError(c, err, boardMemberErrorRows, internalMessage)
 }
 
 func (h *Handler) respondShareTokenError(c *gin.Context, err error, internalMessage string) {
-	switch {
-	case errors.Is(err, ErrInvalidInput):
-		response.Error(c, 400, "参数错误")
-	case errors.Is(err, ErrNotFound):
-		response.Error(c, 404, "画布不存在")
-	case errors.Is(err, ErrPermissionDenied):
-		response.Error(c, 403, "仅 owner 可管理分享链接")
-	case errors.Is(err, ErrMemberInvalidRole):
-		response.Error(c, 400, "角色无效，仅支持 editor/viewer")
-	case errors.Is(err, ErrShareTokenNotFound):
-		response.Error(c, 404, "分享链接不存在")
-	case errors.Is(err, ErrShareTokenRevoked):
-		response.Error(c, 400, "分享链接已撤销")
-	case errors.Is(err, ErrShareTokenExpired):
-		response.Error(c, 400, "分享链接已过期")
-	case errors.Is(err, ErrShareTokenInvalid):
-		response.Error(c, 400, "分享链接无效")
-	default:
-		response.InternalError(c, 500, internalMessage, err)
-	}
+	respondBoardError(c, err, shareTokenErrorRows, internalMessage)
 }
 
 func toBoardDTO(board Board, role AccessRole) boardDTO {

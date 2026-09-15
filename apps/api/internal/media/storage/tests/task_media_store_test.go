@@ -15,7 +15,7 @@ import (
 
 	"github.com/lib/pq"
 
-	"ideaboard/api/internal/db/sqlc"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/platform/outbound"
 	tasks "ideaboard/api/internal/tasking/domain"

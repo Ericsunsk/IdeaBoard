@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -571,31 +570,4 @@ func parseReconciliationPage(c *gin.Context) (ports.ListReconciliationInput, boo
 func parsePositiveInt64(value string) (int64, bool) {
 	parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
 	return parsed, err == nil && parsed > 0
-}
-
-func writeCreditError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, domain.ErrInvalidCommand):
-		response.Error(c, http.StatusBadRequest, "参数错误")
-	case errors.Is(err, domain.ErrIdempotencyConflict):
-		response.Error(c, http.StatusConflict, "幂等键已用于不同的Idea操作")
-	case errors.Is(err, domain.ErrWalletNotFound):
-		response.Error(c, http.StatusNotFound, "Idea钱包不存在")
-	case errors.Is(err, domain.ErrWalletFrozen):
-		response.Error(c, http.StatusLocked, "Idea钱包已冻结")
-	case errors.Is(err, domain.ErrWalletRestricted):
-		response.Error(c, http.StatusLocked, "Idea钱包当前受限")
-	case errors.Is(err, domain.ErrInsufficientCredits):
-		response.Error(c, http.StatusUnprocessableEntity, "Idea不足")
-	case errors.Is(err, domain.ErrChargeNotFound):
-		response.Error(c, http.StatusNotFound, "原扣款记录不存在")
-	case errors.Is(err, domain.ErrRefundExceedsCharge):
-		response.Error(c, http.StatusUnprocessableEntity, "退款金额超过原扣款剩余额度")
-	case errors.Is(err, domain.ErrReconciliationNotFound):
-		response.Error(c, http.StatusNotFound, "Idea对账任务不存在")
-	case errors.Is(err, domain.ErrReconciliationUnavailable):
-		response.InternalError(c, http.StatusServiceUnavailable, "Idea对账服务暂不可用", err)
-	default:
-		response.InternalError(c, http.StatusInternalServerError, "Idea操作失败", err)
-	}
 }
