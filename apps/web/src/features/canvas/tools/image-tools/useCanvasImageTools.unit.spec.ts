@@ -169,9 +169,7 @@ function mountCanvasImageTools() {
     NonNullable<UseCanvasImageToolsOptions['applyImageFileToImageNode']>
   >(async () => true)
   const removeNode = vi.fn<NonNullable<UseCanvasImageToolsOptions['removeNode']>>()
-  const updateSnapshotNode = vi.fn<
-    NonNullable<UseCanvasImageToolsOptions['updateSnapshotNode']>
-  >()
+  const updateSnapshotNode = vi.fn<NonNullable<UseCanvasImageToolsOptions['updateSnapshotNode']>>()
   const setViewport = vi.fn()
   const setCenter = vi.fn()
   const runInpaintAction = vi.fn()

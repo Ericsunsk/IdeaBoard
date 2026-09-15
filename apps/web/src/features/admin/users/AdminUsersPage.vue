@@ -309,12 +309,7 @@ import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
 import { AdminUserWalletDialog } from '../credits-billing/wallets'
 import { banDurationOptions } from './commands'
 import { useAdminUsersContext } from './context'
-import {
-  getCountryFlag,
-  getCountryLabel,
-  type AdminUserRowView,
-  type UserActionKey,
-} from './view'
+import { getCountryFlag, getCountryLabel, type AdminUserRowView, type UserActionKey } from './view'
 import { useUsersFeedback } from './useUsersFeedback'
 import { adminFramedIconButtonClass } from '../shared/lib/uiClasses'
 

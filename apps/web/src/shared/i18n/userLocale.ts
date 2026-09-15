@@ -9,6 +9,7 @@ import {
   type SupportedLocale,
 } from './localeCore'
 import { LOCALE_MANIFEST } from './localeManifest'
+import { writeLocalStorageItem } from '../utils/storage'
 import { isValidSupportedLocale, resolveInitialUserLocale } from './localeDetection'
 
 export {
@@ -150,13 +151,8 @@ export async function setUserLocale(
     document.documentElement.lang = locale
   }
 
-  if (typeof localStorage !== 'undefined') {
-    try {
-      localStorage.setItem(USER_LOCALE_STORAGE_KEY, locale)
-    } catch {
-      // Ignore storage errors (e.g. sandboxed iframe or private browsing)
-    }
-  }
+  // Best-effort: sandboxed iframes or private browsing must not break the switch.
+  writeLocalStorageItem(USER_LOCALE_STORAGE_KEY, locale)
 
   return true
 }

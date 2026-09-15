@@ -3,7 +3,8 @@ import type {
   AdminCreditGrantRequest,
   AdminCreditRefundRequest,
 } from '../../../../shared/api/generated-query/model'
-import { formatIdeaAmount } from '../../shared/lib/ideaCurrency'
+import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
+import { createUniqueId } from '../../../../shared/utils/ids'
 
 export type AdminCreditCommandKind = 'grant' | 'deduction' | 'refund'
 
@@ -59,7 +60,7 @@ export function validateAdminCreditCommand(
 
 export function buildAdminCreditCommandRequest(
   input: AdminCreditCommandInput,
-  idFactory: () => string = () => crypto.randomUUID(),
+  idFactory: () => string = () => createUniqueId(),
 ): AdminCreditCommandRequest {
   const validation = validateAdminCreditCommand(input)
   if (!validation.valid || input.amountCredits == null) {

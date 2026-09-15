@@ -65,8 +65,7 @@ export type PendingWorkflowAssembly = {
 export function assemblePendingImageWorkflow(
   options: PendingWorkflowAssemblyOptions,
 ): PendingWorkflowAssembly {
-  const waitTaskImageResults =
-    options.waitTaskImageResults ?? waitExistingOrLiveTaskImageResults
+  const waitTaskImageResults = options.waitTaskImageResults ?? waitExistingOrLiveTaskImageResults
   const loadImageSize = options.loadImageSize ?? loadImageSizeFromUrl
   const taskAdapter = options.taskAdapter ?? defaultCanvasTaskSubmissionAdapter
   const pendingResults =

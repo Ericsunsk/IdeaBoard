@@ -12,9 +12,7 @@ function normalizeRequiredText(value: unknown, errorMessage: string): string {
   return normalized
 }
 
-export async function joinSharedBoardByToken(
-  token: string,
-): Promise<JoinSharedBoardResult> {
+export async function joinSharedBoardByToken(token: string): Promise<JoinSharedBoardResult> {
   const boardRepository = useBoardRepository()
   const normalizedToken = normalizeRequiredText(
     token,

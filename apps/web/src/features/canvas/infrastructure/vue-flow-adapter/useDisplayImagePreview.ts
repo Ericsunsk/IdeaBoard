@@ -14,7 +14,10 @@ import {
   WEBP_PREVIEW_MIME_TYPE,
   WEBP_PREVIEW_QUALITY,
 } from '../../infrastructure/media/displayImagePreviewEncoding.ts'
-import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../../shared/config/runtimeUrls'
+import {
+  canonicalizeRuntimeUploadRef,
+  resolveAssetUrl,
+} from '../../../../shared/config/runtimeUrls'
 import {
   normalizeMediaAssetId,
   useMediaAssetDelivery,
@@ -269,8 +272,7 @@ export function useDisplayImagePreview(
       // Transient loading/idle keeps the previous frame so zoom-tier
       // switches don't flash the source.
       if (
-        (mediaDelivery.status.value === 'pending' ||
-          mediaDelivery.status.value === 'processing') &&
+        (mediaDelivery.status.value === 'pending' || mediaDelivery.status.value === 'processing') &&
         !resolvedSourceUrl.value.startsWith('/api/')
       ) {
         return resolvedSourceUrl.value

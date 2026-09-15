@@ -2,7 +2,10 @@ import type { Node } from '@vue-flow/core'
 import { computed, effectScope, nextTick, ref, shallowRef } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CanvasGraphGroupId } from '../../../domain/graph'
-import type { CanvasFlowViewportTransform, CanvasGroupFrame } from '../../../domain/graph/canvasGroupGeometry.ts'
+import type {
+  CanvasFlowViewportTransform,
+  CanvasGroupFrame,
+} from '../../../domain/graph/canvasGroupGeometry.ts'
 import { useCanvasGroupPresentationInteraction } from './index'
 import type { CanvasSelectionGroupAction } from '../../../domain/graph/application/useCanvasGroupRuntime.ts'
 

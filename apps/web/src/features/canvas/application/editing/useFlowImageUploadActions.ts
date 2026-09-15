@@ -1,8 +1,4 @@
-import type {
-  CanvasCreatableNodeKind,
-  CanvasNodeItem,
-  ImageNodeItem,
-} from '../../../board'
+import type { CanvasCreatableNodeKind, CanvasNodeItem, ImageNodeItem } from '../../../board'
 import {
   isSupportedUploadImageFile,
   unsupportedUploadImageMessage,

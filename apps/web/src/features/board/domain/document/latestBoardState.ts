@@ -1,9 +1,5 @@
 import * as v from 'valibot'
-import {
-  BOARD_STATE_SCHEMA_VERSION,
-  type BoardSnapshot,
-  type BoardState,
-} from './nodes'
+import { BOARD_STATE_SCHEMA_VERSION, type BoardSnapshot, type BoardState } from './nodes'
 import { boardSnapshotSchema, boardStateSchema } from '../schema/stateSchema'
 
 export type BoardStateValidationIssue = {

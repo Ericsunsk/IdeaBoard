@@ -3,7 +3,10 @@ import type { Connection, Edge, Node } from '@vue-flow/core'
 import { i18n } from '../../../../shared/i18n'
 import { createCanvasNodeAt } from '../../domain/nodes/canvasNodeFactory.ts'
 import { getDefaultCanvasNodeTitle } from '../../domain/nodes/canvasNodeRegistry.ts'
-import { isFlowConnectionAllowed, normalizeFlowConnection } from '../../infrastructure/vue-flow-adapter/flowConnectionAdapter.ts'
+import {
+  isFlowConnectionAllowed,
+  normalizeFlowConnection,
+} from '../../infrastructure/vue-flow-adapter/flowConnectionAdapter.ts'
 import {
   patchFlowSnapshotParam,
   type FlowSnapshotParamPatch,

@@ -313,14 +313,16 @@ func (h *mediaAssetHandler) serveTierRedirect(c *gin.Context, ownerUserID int64,
 		response.Error(c, http.StatusAccepted, "图片预览正在准备中")
 		return
 	}
+	// Prefer a generation-matched stored derivative so same-origin fetch
+	// consumers (retouch export, canvas downscale) receive bytes directly
+	// instead of following a cross-origin imgproxy redirect that browsers
+	// block without CORS headers. The pull renderer stays as fallback for
+	// tiers without stored rows.
+	if h.serveStoredDerivative(c, ownerUserID, asset, tier) {
+		return
+	}
 	source, err := imgproxySourceForAsset(asset)
 	if err != nil {
-		// A materialized processing-input can still be served provider-neutrally
-		// from its stored derivative. Never serve original bytes as a tier: that
-		// would silently violate the size/format contract for task inputs.
-		if h.serveStoredDerivative(c, ownerUserID, asset, tier) {
-			return
-		}
 		response.Error(c, http.StatusServiceUnavailable, "图片派生服务暂不可用")
 		return
 	}
@@ -370,17 +372,11 @@ func (h *mediaAssetHandler) serveStoredDerivative(c *gin.Context, ownerUserID in
 			continue
 		}
 		object, err := h.storage.ReadObjectAtProfile(c.Request.Context(), row.StorageProfileID, row.StorageKey, 100*1024*1024)
-		if err != nil {
-			if errors.Is(err, storagedomain.ErrStoredObjectNotFound) {
-				response.Error(c, http.StatusNotFound, "图片派生不存在")
-			} else {
-				response.InternalError(c, http.StatusInternalServerError, "读取图片派生失败", err)
-			}
-			return true
-		}
-		if object == nil || len(object.Data) == 0 {
-			response.Error(c, http.StatusNotFound, "图片派生不存在")
-			return true
+		// A missing or unreadable stored object falls through to the next row
+		// or the pull renderer, which derives the tier from the original:
+		// never fail a tier that imgproxy may still be able to serve.
+		if err != nil || object == nil || len(object.Data) == 0 {
+			continue
 		}
 		mimeType := strings.TrimSpace(row.MimeType)
 		if mimeType == "" {

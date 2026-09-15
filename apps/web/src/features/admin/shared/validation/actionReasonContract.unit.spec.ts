@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  MAX_ADMIN_ACTION_REASON_LENGTH,
-  validateAdminActionReason,
-} from './actionReasonContract'
+import { MAX_ADMIN_ACTION_REASON_LENGTH, validateAdminActionReason } from './actionReasonContract'
 
 describe('admin action reason contract', () => {
   it('rejects blank and oversized reasons', () => {

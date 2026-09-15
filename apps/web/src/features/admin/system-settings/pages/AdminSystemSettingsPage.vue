@@ -233,19 +233,10 @@ import SettingEditorCard from '../SettingEditorCard.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminLogoCropDialog from '../../shared/components/AdminLogoCropDialog.vue'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
-import {
-  RATE_LIMIT_MAX_REQUESTS,
-  RATE_LIMIT_MAX_WINDOW_SECONDS,
-} from '../useAccessSettings'
-import {
-  MEDIA_UPLOAD_MAX_CONCURRENT,
-  MEDIA_UPLOAD_MIN_CONCURRENT,
-} from '../useMediaUploadSettings'
+import { RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_MAX_WINDOW_SECONDS } from '../useAccessSettings'
+import { MEDIA_UPLOAD_MAX_CONCURRENT, MEDIA_UPLOAD_MIN_CONCURRENT } from '../useMediaUploadSettings'
 import { useSystemSettings } from '../useSystemSettings'
-import {
-  adminActionButtonClass,
-  adminTwoColumnMasonryGridClass,
-} from '../../shared/lib/uiClasses'
+import { adminActionButtonClass, adminTwoColumnMasonryGridClass } from '../../shared/lib/uiClasses'
 import SiteBrandLogo from '../../../../shared/components/SiteBrandLogo.vue'
 import { brandMarkClasses, createBrandMarkClass } from '../../../../shared/lib/brandMark'
 

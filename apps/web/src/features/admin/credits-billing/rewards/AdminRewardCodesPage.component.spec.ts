@@ -1,3 +1,4 @@
+import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PrimeVue from 'primevue/config'
 import { fireEvent } from '@testing-library/vue'
@@ -23,6 +24,28 @@ vi.mock('./resource', async (importOriginal) => ({
 
 vi.mock('../../../../shared/composables/useAppToast', () => ({
   useAppToast: () => toast,
+}))
+
+// `useAppClipboard` wraps `useClipboard` (legacy execCommand fallback), which is
+// unavailable in happy-dom. Route it to the spec-controlled `navigator.clipboard`
+// mock so copy success/failure stays deterministic.
+vi.mock('../../../../shared/composables/useAppClipboard', () => ({
+  useAppClipboard: () => ({
+    copyText: (text: string) => {
+      const clipboard = (
+        globalThis as {
+          navigator?: { clipboard?: { writeText?: (value: string) => Promise<void> } }
+        }
+      ).navigator?.clipboard
+      if (!text || !clipboard?.writeText) return Promise.resolve(false)
+      return clipboard.writeText(text).then(
+        () => true,
+        () => false,
+      )
+    },
+    copied: { value: false },
+    isSupported: { value: true },
+  }),
 }))
 
 vi.mock('../../shared/composables/useAdminConfirm', () => ({
@@ -421,8 +444,16 @@ describe('AdminRewardCodesPage', () => {
 })
 
 function renderPage() {
+  // Fresh client per render: the list query caches by key, so sharing one
+  // across tests would serve stale pages and hide `resource.search` calls.
+  const queryClient = new QueryClient()
   return renderWithUser(AdminRewardCodesPage, {
-    global: { plugins: [[PrimeVue, adminPrimeVueTestOptions]] },
+    global: {
+      plugins: [
+        [PrimeVue, adminPrimeVueTestOptions],
+        [VueQueryPlugin, { queryClient }],
+      ],
+    },
   })
 }
 

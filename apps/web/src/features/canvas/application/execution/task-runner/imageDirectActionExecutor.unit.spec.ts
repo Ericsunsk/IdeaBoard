@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SubmitTaskData } from '../../../../../shared/api/task'
 import { TaskResultPendingError } from '../../../../../shared/api/taskEvents'
-import {
-  submitTaskRequest,
-  waitExistingOrLiveTaskImageResults,
-} from './imageDirectActionExecutor'
+import { submitTaskRequest, waitExistingOrLiveTaskImageResults } from './imageDirectActionExecutor'
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),

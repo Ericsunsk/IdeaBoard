@@ -1,4 +1,5 @@
 import { SUPPORTED_LOCALES, USER_LOCALE_STORAGE_KEY, type SupportedLocale } from './localeCore'
+import { readLocalStorageItem } from '../utils/storage'
 
 export function isValidSupportedLocale(locale: unknown): locale is SupportedLocale {
   return typeof locale === 'string' && (SUPPORTED_LOCALES as readonly string[]).includes(locale)
@@ -58,12 +59,8 @@ export function resolveInitialUserLocale(
   navigatorLanguages?: readonly string[],
 ): SupportedLocale {
   let resolvedStorageValue = storageValue
-  if (resolvedStorageValue === undefined && typeof localStorage !== 'undefined') {
-    try {
-      resolvedStorageValue = localStorage.getItem(USER_LOCALE_STORAGE_KEY)
-    } catch {
-      resolvedStorageValue = null
-    }
+  if (resolvedStorageValue === undefined) {
+    resolvedStorageValue = readLocalStorageItem(USER_LOCALE_STORAGE_KEY)
   }
 
   if (isValidSupportedLocale(resolvedStorageValue)) {

@@ -139,20 +139,34 @@ describe('RetouchCurveGraph', () => {
     expect(handles[1]?.style.top).toBe('0%')
   })
 
-  it('selects and drags a nearby endpoint instead of adding another point', () => {
+  it('selects a nearby endpoint on pointerdown without moving it', () => {
     const { events, graph } = renderCurveGraph()
 
     dispatchPointerEvent(graph, 'pointerdown', { clientX: 0, clientY: 100 })
+    dispatchPointerEvent(window, 'pointerup', { clientX: 0, clientY: 100 })
 
     expect(events.selectPoint).toHaveBeenCalledWith(RETOUCH_CURVE_ENDPOINT_BLACK_ID)
     expect(events.addPoint).not.toHaveBeenCalled()
+    expect(events.movePoint).not.toHaveBeenCalled()
+  })
+
+  it('moves the selected endpoint after dragging beyond the click threshold', () => {
+    const { events, graph } = renderCurveGraph()
+
+    dispatchPointerEvent(graph, 'pointerdown', { clientX: 0, clientY: 100 })
+    expect(events.movePoint).not.toHaveBeenCalled()
+
+    dispatchPointerEvent(window, 'pointermove', { clientX: 2, clientY: 98 })
+    expect(events.movePoint).not.toHaveBeenCalled()
+
+    dispatchPointerEvent(window, 'pointermove', { clientX: 0, clientY: 90 })
     expect(events.movePoint).toHaveBeenCalledWith(RETOUCH_CURVE_ENDPOINT_BLACK_ID, {
       input: 0,
-      output: 0,
+      output: 10,
     })
   })
 
-  it('selects and drags a nearby point instead of adding another point', () => {
+  it('selects a nearby point on pointerdown and moves it only after dragging', () => {
     const { events, graph } = renderCurveGraph({
       points: normalizeCurveChannelPoints([{ id: 'mid', input: 50, output: 50 }]),
     })
@@ -161,7 +175,10 @@ describe('RetouchCurveGraph', () => {
 
     expect(events.addPoint).not.toHaveBeenCalled()
     expect(events.selectPoint).toHaveBeenCalledWith('mid')
-    expect(events.movePoint).toHaveBeenCalledWith('mid', { input: 53, output: 49 })
+    expect(events.movePoint).not.toHaveBeenCalled()
+
+    dispatchPointerEvent(window, 'pointermove', { clientX: 60, clientY: 40 })
+    expect(events.movePoint).toHaveBeenCalledWith('mid', { input: 60, output: 60 })
   })
 
   it('captures the active pointer and stops dragging after pointer cancel', () => {

@@ -1,10 +1,7 @@
 import { computed, nextTick, ref, type Ref } from 'vue'
 import type { Router } from 'vue-router'
 import { normalizeBoardName } from '../../../board'
-import {
-  useBoardRepository,
-  type BoardRepository,
-} from '../../../board'
+import { useBoardRepository, type BoardRepository } from '../../../board'
 import { USER_CANVAS_PATH } from '../../../../shared/constants/routePaths'
 import { i18n } from '../../../../shared/i18n'
 

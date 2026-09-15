@@ -1,11 +1,7 @@
 import { computed, onScopeDispose, ref, shallowRef, type Ref } from 'vue'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { useCanvasGraphHistory } from '../../../domain/graph/application/useCanvasGraphHistory.ts'
-import {
-  useBoardAutosave,
-  createBoardSyncCoordinator,
-  type SaveStatus,
-} from '../../board-session'
+import { useBoardAutosave, createBoardSyncCoordinator, type SaveStatus } from '../../board-session'
 import {
   useCanvasVueFlowGraphAdapter,
   type CanvasVueFlowGraphActions,

@@ -7,7 +7,10 @@ import { describe, expect, it } from 'vitest'
 
 const canvasRoot = path.resolve(process.cwd(), 'src/features/canvas')
 const corePath = path.join(canvasRoot, 'application/execution/pending-execution/core.ts')
-const flowRuntimePath = path.join(canvasRoot, 'application/workspace/internal/useFlowCanvasRuntime.ts')
+const flowRuntimePath = path.join(
+  canvasRoot,
+  'application/workspace/internal/useFlowCanvasRuntime.ts',
+)
 const legacyRuntimePath = path.join(canvasRoot, 'execution/runtime/CanvasExecutionRuntime.ts')
 
 describe('Pending Image Execution ownership contract', () => {

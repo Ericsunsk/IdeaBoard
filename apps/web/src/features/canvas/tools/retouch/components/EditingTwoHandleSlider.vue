@@ -164,7 +164,11 @@ function resolveKeyboardDelta(key: string, step: number) {
 function emitHandleValue(handleId: string, value: number) {
   const handle = normalizedHandles.value.find((item) => item.id === handleId)
   if (!handle) return
-  emit('update:handle', handleId, snapValue(clampWithFallback(value, handle.min, handle.max, handle.min)))
+  emit(
+    'update:handle',
+    handleId,
+    snapValue(clampWithFallback(value, handle.min, handle.max, handle.min)),
+  )
 }
 
 function resolvePointerValue(position: PointerPosition) {
@@ -219,7 +223,6 @@ function snapValue(value: number) {
   if (props.step <= 0) return value
   return Math.round(value / props.step) * props.step
 }
-
 </script>
 
 <style scoped>

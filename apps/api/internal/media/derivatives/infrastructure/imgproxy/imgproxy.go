@@ -83,14 +83,31 @@ func (c Config) TierURL(tier, source string) (string, error) {
 
 // LocalSource maps a builtin-local storage key to an imgproxy source URL.
 //
+// Storage keys are relative to the app working directory and always start
+// with the uploads root (see UploadObjectRoot). Compose mounts that root at
+// /data/uploads, while IMGPROXY_LOCAL_FILESYSTEM_ROOT points at /data, so the
+// uploads segment must remain part of the source path.
+//
 // The local:// scheme treats the segment between the slashes as a host and the
 // rest as a path relative to IMGPROXY_LOCAL_FILESYSTEM_ROOT. An absolute path
 // therefore needs the empty host form — "local:///<key>" — or imgproxy resolves
 // the key against the wrong directory and 404s.
 func LocalSource(storageKey string) (string, error) {
-	key := strings.TrimSpace(storageKey)
+	key := strings.TrimPrefix(strings.TrimSpace(storageKey), "/")
 	if key == "" {
 		return "", fmt.Errorf("imgproxy local source key is required")
 	}
-	return "local:///" + strings.TrimPrefix(key, "/"), nil
+	// Storage keys are relative to the uploads mount. Requiring the canonical
+	// root and rejecting empty/dot segments prevents directory resolution and
+	// path traversal even if a malformed key reaches this boundary.
+	segments := strings.Split(key, "/")
+	if len(segments) < 2 || segments[0] != "uploads" {
+		return "", fmt.Errorf("imgproxy local source key must be below the uploads root")
+	}
+	for _, segment := range segments {
+		if segment == "" || segment == "." || segment == ".." {
+			return "", fmt.Errorf("imgproxy local source key contains an invalid path segment")
+		}
+	}
+	return "local:///" + key, nil
 }

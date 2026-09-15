@@ -1,12 +1,12 @@
 import {
   assertLatestBoardSnapshot,
+  assertLatestBoardState,
   createEmptyBoardSnapshot,
   type BoardSnapshot,
+  type BoardState,
 } from '../../../board'
 
-export function makeBoardSnapshot(
-  overrides: Partial<BoardSnapshot> = {},
-): BoardSnapshot {
+export function makeBoardSnapshot(overrides: Partial<BoardSnapshot> = {}): BoardSnapshot {
   return assertLatestBoardSnapshot(
     {
       ...createEmptyBoardSnapshot(),
@@ -16,10 +16,45 @@ export function makeBoardSnapshot(
   )
 }
 
-// Single source lives in board/testing/factories; re-exported here so canvas
-// specs keep a stable local import without a second copy of the factory.
-export { makeBoardState } from '../../../board/testing/factories'
-export {
-  createMockBoardApiRequest,
-  type MockBoardApiState,
-} from '../../../board/testing/factories'
+export type MockBoardApiState = {
+  listResponse: { code?: number; msg?: string; data: { list: unknown[] } }
+  upsertResponse: unknown
+}
+
+/** Canvas owns this test seam locally to avoid importing Board's private testing module. */
+export function createMockBoardApiRequest(state: MockBoardApiState) {
+  return (url: string, config?: { method?: string }) => {
+    const method = config?.method ?? 'GET'
+    if (url === '/user/boards' && method === 'GET') {
+      return Promise.resolve({ code: 0, msg: 'ok', ...state.listResponse })
+    }
+    if (url.startsWith('/user/boards/') && method === 'PUT') {
+      return Promise.resolve(state.upsertResponse)
+    }
+    if (url.startsWith('/user/boards/') && method === 'DELETE') {
+      return Promise.resolve({ code: 0, data: null })
+    }
+    return Promise.reject(new Error(`Unexpected board API request: ${method} ${url}`))
+  }
+}
+
+export function makeBoardState(overrides: Partial<BoardState> = {}): BoardState {
+  const {
+    updatedAt,
+    previewSnapshotDataUrl,
+    previewSnapshotUpdatedAt,
+    previewSnapshotVersion,
+    ...snapshotOverrides
+  } = overrides
+  return assertLatestBoardState(
+    {
+      ...createEmptyBoardSnapshot(),
+      ...snapshotOverrides,
+      updatedAt: updatedAt ?? 1,
+      previewSnapshotDataUrl,
+      previewSnapshotUpdatedAt,
+      previewSnapshotVersion,
+    },
+    'canvas-test-fixture-state',
+  )
+}

@@ -66,7 +66,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
+import { useTimeoutFn } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
@@ -83,7 +84,10 @@ const emit = defineEmits<{ retry: [] }>()
 const { t } = useI18n()
 const statusElement = ref<HTMLElement>()
 const delayed = ref(false)
-let delayedTimer: ReturnType<typeof setTimeout> | undefined
+// `useTimeoutFn` auto-cancels on unmount — no manual clearTimeout pairing.
+useTimeoutFn(() => {
+  delayed.value = true
+}, 60_000)
 const showError = computed(
   () =>
     props.status?.status !== 'credited' &&
@@ -105,14 +109,7 @@ const statusClass = computed(() => {
 })
 
 onMounted(async () => {
-  delayedTimer = setTimeout(() => {
-    delayed.value = true
-  }, 60_000)
   await nextTick()
   statusElement.value?.focus()
-})
-
-onBeforeUnmount(() => {
-  if (delayedTimer) clearTimeout(delayedTimer)
 })
 </script>

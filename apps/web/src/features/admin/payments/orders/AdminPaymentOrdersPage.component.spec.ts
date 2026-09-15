@@ -1,3 +1,4 @@
+import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import PrimeVue from 'primevue/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { adminPrimeVueTestOptions } from '../../../../test/primeVue'
@@ -233,8 +234,16 @@ describe('AdminPaymentOrdersPage', () => {
 const orderNumber = 'IBP-20260803-ABCDEF123456'
 
 function renderPage() {
+  // Fresh client per render: the list query caches by key, so sharing one
+  // across tests would serve stale pages and hide `resource.search` calls.
+  const queryClient = new QueryClient()
   return renderWithUser(AdminPaymentOrdersPage, {
-    global: { plugins: [[PrimeVue, adminPrimeVueTestOptions]] },
+    global: {
+      plugins: [
+        [PrimeVue, adminPrimeVueTestOptions],
+        [VueQueryPlugin, { queryClient }],
+      ],
+    },
   })
 }
 

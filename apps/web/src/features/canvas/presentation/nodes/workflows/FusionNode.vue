@@ -66,7 +66,10 @@ import NodeShell from '../primitives/NodeShell.vue'
 import NodePromptComposer from '../primitives/NodePromptComposer.vue'
 import NodeFloatingControls from '../primitives/NodeFloatingControls.vue'
 import { WORKFLOW_FEATURE } from '../../../../../shared/domain/workflowFeatures'
-import { buildFusionBillingReadinessRequest, useCanvasBillingQuote } from '../../../application/execution'
+import {
+  buildFusionBillingReadinessRequest,
+  useCanvasBillingQuote,
+} from '../../../application/execution'
 
 const props = defineProps<{
   node: FusionNodeItem

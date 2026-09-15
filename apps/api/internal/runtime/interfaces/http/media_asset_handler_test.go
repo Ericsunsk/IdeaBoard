@@ -161,6 +161,61 @@ func TestDerivativeContentReturnsNotFoundForUnknownAsset(t *testing.T) {
 	}
 }
 
+// A generation-matched stored derivative is served as bytes directly so
+// same-origin fetch consumers (retouch export) never follow the
+// cross-origin imgproxy redirect that browsers block without CORS headers.
+func TestDerivativeContentServesStoredDerivativeDirectly(t *testing.T) {
+	asset := readyAssetFixture()
+	asset.ObjectGeneration = 1
+	registry := &fakeMediaAssetRegistry{
+		asset: asset,
+		derivatives: []dbsqlc.MediaDerivative{{
+			Tier: "processing-input", Status: "ready", Format: "jpeg",
+			StorageProfileID: "builtin-local", StorageKey: "uploads/processing-input.jpg",
+			MimeType: "image/jpeg", SourceObjectGeneration: 1,
+		}},
+	}
+	reader := &fakeMediaObjectReader{objects: map[string]*storageports.StoredUploadObject{
+		"uploads/processing-input.jpg": {ObjectKey: "uploads/processing-input.jpg", ContentType: "image/jpeg", Data: []byte("processing-bytes")},
+	}}
+
+	rec := serveDerivativeContent(t, newMediaAssetHandler(registry, reader, testImgproxyConfig()), "asset_3", "processing-input")
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if rec.Header().Get("Location") != "" {
+		t.Fatalf("location = %q, want no redirect for a stored derivative", rec.Header().Get("Location"))
+	}
+	if rec.Body.String() != "processing-bytes" {
+		t.Fatalf("body = %q, want stored derivative bytes", rec.Body.String())
+	}
+}
+
+// A stale row (generation mismatch) or a missing stored object falls back
+// to the pull renderer instead of failing the tier.
+func TestDerivativeContentFallsBackToRedirectWhenStoredDerivativeStale(t *testing.T) {
+	asset := readyAssetFixture()
+	asset.ObjectGeneration = 2
+	registry := &fakeMediaAssetRegistry{
+		asset: asset,
+		derivatives: []dbsqlc.MediaDerivative{{
+			Tier: "preview", Status: "ready", Format: "jpeg",
+			StorageProfileID: "builtin-local", StorageKey: "uploads/preview.jpg",
+			MimeType: "image/jpeg", SourceObjectGeneration: 1,
+		}},
+	}
+	reader := &fakeMediaObjectReader{objects: map[string]*storageports.StoredUploadObject{
+		"uploads/preview.jpg": {ObjectKey: "uploads/preview.jpg", ContentType: "image/jpeg", Data: []byte("stale-bytes")},
+	}}
+
+	rec := serveDerivativeContent(t, newMediaAssetHandler(registry, reader, testImgproxyConfig()), "asset_3", "preview")
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusFound, rec.Body.String())
+	}
+}
+
 // Profiles without an imgproxy source must not serve original bytes as a tier.
 func TestDerivativeContentRejectsNonLocalProfileWithoutMaterializedDerivative(t *testing.T) {
 	asset := readyAssetFixture()

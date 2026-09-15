@@ -218,6 +218,7 @@ import AdminFormField from '../shared/components/AdminFormField.vue'
 import AdminStatusPill from '../shared/components/AdminStatusPill.vue'
 import AdminLogoPickerPopover from '../provider-config/AdminLogoPickerPopover.vue'
 import { formatAdminDisplayError, useAdminToast } from '../shared/lib/toast'
+import { useAppClipboard } from '../../../shared/composables/useAppClipboard'
 import { adminActionButtonClass } from '../shared/lib/uiClasses'
 import googleLogoUrl from '../../../shared/assets/oauth/google.svg'
 import discordLogoUrl from '../../../shared/assets/oauth/discord.svg'
@@ -437,13 +438,12 @@ function clearSensitiveState() {
   errors.clientSecret = ''
 }
 
+const { copyText } = useAppClipboard()
+
 async function copyCallbackUrl() {
   if (!summary.value?.callbackUrl) return
-  try {
-    await navigator.clipboard.writeText(summary.value.callbackUrl)
-    toast.success('Callback URL 已复制到剪贴板')
-  } catch {
-    toast.error('复制失败，请手动选择复制')
-  }
+  const ok = await copyText(summary.value.callbackUrl)
+  if (ok) toast.success('Callback URL 已复制到剪贴板')
+  else toast.error('复制失败，请手动选择复制')
 }
 </script>

@@ -19,10 +19,7 @@ import {
   normalizeModelKey,
 } from './payload'
 import type { ProviderEndpointProtocol } from '../../../shared/api/generated-query/model'
-import {
-  createAdminProviderConfigResource,
-  type AdminProviderConfigResource,
-} from './resource'
+import { createAdminProviderConfigResource, type AdminProviderConfigResource } from './resource'
 import {
   MAX_DETECTED_MODELS,
   mergeDetectedModelValues,

@@ -203,7 +203,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { useQueryClient } from '@tanstack/vue-query'
+import { useAdminCollectionQuery } from '../../shared/composables/useAdminCollectionQuery'
 import { MoreHoriz, Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
@@ -212,7 +214,7 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
-import { formatIdeaAmount } from '../../shared/lib/ideaCurrency'
+import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminRowActionsPopover from '../../shared/components/AdminRowActionsPopover.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
@@ -220,7 +222,6 @@ import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
-import { useCollectionState } from '../../shared/composables/useCollectionState'
 import { useCursorPagination } from '../../shared/composables/useCursorPagination'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
@@ -231,7 +232,9 @@ import RewardCodeRedemptionsDialog from './RewardCodeRedemptionsDialog.vue'
 import {
   createAdminRewardCodeResource,
   type RewardCode,
+  type RewardCodePage,
   type RewardCodeStatus,
+  type SearchRewardCodesInput,
 } from './resource'
 
 const resource = createAdminRewardCodeResource()
@@ -263,25 +266,54 @@ const rewardCodeActionItems = computed(() => [
   },
 ])
 const confirm = useAdminConfirm()
+const queryClient = useQueryClient()
 let pagination: ReturnType<typeof useCursorPagination<number>>
-const collection = useCollectionState({
-  load: (signal) =>
+// TanStack Query owns the list lifecycle (same pattern as the orders pilot):
+// filter/pagination state feeds the query key, so navigation actions below
+// only mutate state. Pagination is assigned before the query because the key
+// reads the cursor during setup.
+pagination = useCursorPagination<number>({ pending: () => loading.value })
+const rewardCodeListCriteria = computed((): Omit<SearchRewardCodesInput, 'signal' | 'limit'> => ({
+  query: appliedSearchKeyword.value,
+  status: statusFilter.value,
+  beforeId: pagination.cursor.value,
+}))
+const REWARD_CODE_LIST_QUERY_ROOT = ['admin', 'credits', 'reward-codes'] as const
+const REWARD_CODE_LIST_CRITERIA_INDEX = REWARD_CODE_LIST_QUERY_ROOT.length
+const rewardCodeListKey = computed(
+  () => [...REWARD_CODE_LIST_QUERY_ROOT, rewardCodeListCriteria.value] as const,
+)
+const {
+  data: rewardCodePage,
+  loading,
+  initialError,
+  backgroundError,
+  query: rewardCodeListQuery,
+} = useAdminCollectionQuery({
+  queryKey: rewardCodeListKey,
+  queryFn: ({ queryKey, signal }) =>
     resource.search({
-      query: appliedSearchKeyword.value,
-      status: statusFilter.value,
-      beforeId: pagination.cursor.value,
+      ...(queryKey[REWARD_CODE_LIST_CRITERIA_INDEX] as typeof rewardCodeListCriteria.value),
       signal,
     }),
-  isEmpty: (page) => page.rewardCodes.length === 0,
-  onInitialError: (error) => toast.error(formatAdminDisplayError(error, '兑换码加载失败')),
+  getNextCursor: (page) => page.nextBeforeId,
+  pagination,
 })
-const { data: rewardCodePage, loading, initialError, backgroundError, updateData } = collection
-pagination = useCursorPagination<number>({ pending: loading })
+// Matches the previous `onInitialError` toast; the error Message stays mounted
+// for repeated failures while the toast fires on each new failure transition.
+watch(initialError, (failed, wasFailed) => {
+  if (failed && !wasFailed) {
+    toast.error(formatAdminDisplayError(rewardCodeListQuery.error.value, '兑换码加载失败'))
+  }
+})
 const rewardCodes = computed(() => rewardCodePage.value?.rewardCodes ?? [])
 const totalRewardCodes = computed(() => rewardCodePage.value?.total ?? 0)
 const totalRewardCodesLabel = computed(() => '共 ' + totalRewardCodes.value + ' 个兑换码')
 const showEmptyState = computed(
-  () => !loading.value && !initialError.value && collection.isEmpty.value,
+  () =>
+    rewardCodeListQuery.isSuccess.value &&
+    !loading.value &&
+    (rewardCodePage.value?.rewardCodes.length ?? 0) === 0,
 )
 const emptyTitle = computed(() =>
   appliedSearchKeyword.value.trim() || statusFilter.value ? '未找到匹配的兑换码' : '暂无兑换码',
@@ -294,42 +326,39 @@ const statusOptions = [
 ] satisfies Array<{ label: string; value: RewardCodeStatus }>
 type PrimePopupPanel = { toggle: (event: Event) => void; hide?: () => void }
 
-onMounted(() => {
-  void loadRewardCodes()
-})
-
-onBeforeUnmount(() => collection.cancel())
-
 watch(statusFilter, () => {
-  resetCriteriaAndLoad()
+  resetCriteriaAndReload()
 })
 
-async function loadRewardCodes({ preserveData = false }: { preserveData?: boolean } = {}) {
-  const page = await collection.reload({ preserveData })
-  if (page) pagination.setNextCursor(page.nextBeforeId)
+function updateRewardCodes(update: (page: RewardCodePage) => RewardCodePage) {
+  queryClient.setQueryData(rewardCodeListKey.value, (current: RewardCodePage | undefined) =>
+    current ? update(current) : current,
+  )
 }
 
 function refreshRewardCodes() {
-  void loadRewardCodes({ preserveData: true })
+  // Same-key refetch: stale rows stay mounted with the table loading state,
+  // matching the previous background-refresh behavior.
+  void rewardCodeListQuery.refetch()
 }
 
 function searchRewardCodes() {
   appliedSearchKeyword.value = searchKeyword.value
-  resetCriteriaAndLoad()
+  resetCriteriaAndReload()
 }
 
 function clearSearch() {
   appliedSearchKeyword.value = ''
-  resetCriteriaAndLoad()
+  resetCriteriaAndReload()
 }
 
 function resetStatusFilter() {
   statusFilter.value = undefined
 }
 
-function resetCriteriaAndLoad() {
+function resetCriteriaAndReload() {
+  // Cursor/filter changes feed the query key and refetch by themselves.
   pagination.reset()
-  void loadRewardCodes()
 }
 
 function openCreateDialog() {
@@ -368,8 +397,11 @@ async function saveRewardCode(input: RewardCodeFormValue) {
       toast.success(input.code ? '兑换码与 Code 已更新' : '兑换码已更新')
     }
     createDialogVisible.value = false
+    // Resetting the cursor reloads the first page via the key — unless
+    // already there, in which case the key is unchanged and needs a refetch.
+    const wasFirstPage = pagination.currentPage.value === 1
     pagination.reset()
-    void loadRewardCodes()
+    if (wasFirstPage) void rewardCodeListQuery.refetch()
   } catch (error) {
     saveError.value = formatAdminDisplayError(
       error,
@@ -419,12 +451,12 @@ async function deleteRewardCode(rewardCode: RewardCode) {
   deletePending[rewardCode.id] = true
   try {
     await resource.delete(rewardCode.id)
-    updateData((page) => ({
+    updateRewardCodes((page) => ({
       ...page,
       rewardCodes: page.rewardCodes.filter((candidate) => candidate.id !== rewardCode.id),
     }))
     toast.success('兑换码已删除')
-    void loadRewardCodes({ preserveData: true })
+    refreshRewardCodes()
   } catch (error) {
     toast.error(formatAdminDisplayError(error, '删除兑换码失败'))
   } finally {
@@ -438,7 +470,7 @@ async function setRewardCodeEnabled(rewardCode: RewardCode, enabled: boolean) {
   try {
     replaceRewardCode(await resource.setEnabled(rewardCode.id, enabled))
     toast.success(enabled ? '兑换码已启用' : '兑换码已停用')
-    void loadRewardCodes({ preserveData: true })
+    refreshRewardCodes()
   } catch (error) {
     toast.error(formatAdminDisplayError(error, enabled ? '启用兑换码失败' : '停用兑换码失败'))
   } finally {
@@ -447,7 +479,7 @@ async function setRewardCodeEnabled(rewardCode: RewardCode, enabled: boolean) {
 }
 
 function replaceRewardCode(updated: RewardCode) {
-  updateData((page) => ({
+  updateRewardCodes((page) => ({
     ...page,
     rewardCodes: page.rewardCodes.map((candidate) =>
       candidate.id === updated.id ? updated : candidate,
@@ -456,13 +488,11 @@ function replaceRewardCode(updated: RewardCode) {
 }
 
 function previousPage() {
-  if (!pagination.retreat()) return
-  void loadRewardCodes()
+  pagination.retreat()
 }
 
 function nextPage() {
-  if (!pagination.advance()) return
-  void loadRewardCodes()
+  pagination.advance()
 }
 
 function handlePlaintextDialogVisible(visible: boolean) {

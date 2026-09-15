@@ -2,10 +2,7 @@ import { computed, ref, watch, type Ref } from 'vue'
 import { useGetAdminMonitor } from '../../../../shared/api/generated-query/admin-monitor/admin-monitor'
 import type { MonitorResponse } from '../../../../shared/api/generated-query/model'
 import { createApiDataSelector } from '../../../../shared/api/apiResponse'
-import {
-  GetAdminStatisticsRange,
-  useAdminStatisticsResource,
-} from '../../statistics/resource'
+import { GetAdminStatisticsRange, useAdminStatisticsResource } from '../../statistics/resource'
 import {
   buildAdminAnomalyItems,
   type AdminAnomalyItem,

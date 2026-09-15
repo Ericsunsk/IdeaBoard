@@ -227,6 +227,7 @@ import {
   adminDateTimePickerPt,
 } from '../../shared/lib/dateTimePickerPt'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
+import { createUniqueId } from '../../../../shared/utils/ids'
 import type { RewardCode, UpdateRewardCodeInput } from './resource'
 import { generateRewardCode } from './rewardCodeGenerator'
 import {
@@ -338,7 +339,7 @@ function emptyCreateForm(): RewardCodeFormValue {
     creditAmount: 100,
     maxRedemptions: 0,
     expiresAt: '',
-    idempotencyKey: crypto.randomUUID(),
+    idempotencyKey: createUniqueId(),
   }
 }
 

@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiResponseAdminBrandLogoOverrideList } from '../../../../shared/api/generated-query/model'
 import { getAdminBrandLogoOverride, replaceAdminBrandLogoOverrides } from './brandLogos'
-import {
-  createAdminBrandLogoResource,
-  hydrateAdminBrandLogoOverrides,
-} from './brandLogoResource'
+import { createAdminBrandLogoResource, hydrateAdminBrandLogoOverrides } from './brandLogoResource'
 
 const api = vi.hoisted(() => ({
   set: vi.fn(),

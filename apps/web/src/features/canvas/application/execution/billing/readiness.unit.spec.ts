@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { WORKFLOW_FEATURE, type WorkflowFeature } from '../../../../../shared/domain/workflowFeatures'
+import {
+  WORKFLOW_FEATURE,
+  type WorkflowFeature,
+} from '../../../../../shared/domain/workflowFeatures'
 import type {
   SubmitTaskReadinessData,
   SubmitTaskReadinessRequestData,

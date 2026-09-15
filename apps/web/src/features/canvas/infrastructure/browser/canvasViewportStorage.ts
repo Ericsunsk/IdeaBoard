@@ -1,4 +1,5 @@
 import { clamp } from '../../../../shared/utils/number'
+import { readLocalStorageItem, writeLocalStorageItem } from '../../../../shared/utils/storage'
 
 export type CanvasFlowViewportState = {
   x: number
@@ -71,15 +72,15 @@ function normalizeViewportRecord(value: unknown): StoredCanvasViewportState | nu
 function readCanvasViewportState(
   identity: CanvasViewportStorageIdentity,
 ): StoredCanvasViewportState | null {
-  if (typeof window === 'undefined') return null
   const key = createCanvasViewportStorageKey(identity)
   if (!key) return null
+  const onError = (error: unknown) => console.warn('[canvas] read viewport failed', error)
+  const raw = readLocalStorageItem(key, onError)
+  if (!raw) return null
   try {
-    const raw = localStorage.getItem(key)
-    if (!raw) return null
     return normalizeViewportRecord(JSON.parse(raw))
   } catch (error) {
-    console.warn('[canvas] read viewport failed', error)
+    onError(error)
     return null
   }
 }
@@ -96,7 +97,6 @@ export function writeCanvasViewportState(
   viewport: CanvasFlowViewportState,
   now = Date.now(),
 ): StoredCanvasViewportState | null {
-  if (typeof window === 'undefined') return null
   const key = createCanvasViewportStorageKey(identity)
   if (!key) return null
   const next = normalizeViewportRecord({
@@ -104,11 +104,8 @@ export function writeCanvasViewportState(
     updatedAt: Number.isFinite(now) ? now : Date.now(),
   })
   if (!next) return null
-  try {
-    localStorage.setItem(key, JSON.stringify(next))
-    return next
-  } catch (error) {
-    console.warn('[canvas] persist viewport failed', error)
-    return null
-  }
+  const ok = writeLocalStorageItem(key, JSON.stringify(next), (error) =>
+    console.warn('[canvas] persist viewport failed', error),
+  )
+  return ok ? next : null
 }

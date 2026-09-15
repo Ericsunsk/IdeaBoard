@@ -44,9 +44,7 @@ export type BoardRepositoryViewModel = {
 }
 
 export type BoardRepositoryCommands = {
-  hydrate(
-    options?: HydrateBoardsFromServerOptions,
-  ): Promise<HydrateBoardsFromServerResult>
+  hydrate(options?: HydrateBoardsFromServerOptions): Promise<HydrateBoardsFromServerResult>
   create: BoardCommands['create']
   rename(input: { boardId: string; nextName: string }): Promise<BoardRepositoryRenameResult>
   duplicate: BoardCommands['duplicate']
@@ -65,9 +63,7 @@ export type BoardRepositoryDependencies = {
   getScope(): string | null
   subscribeScope(listener: (scope: string | null) => void): () => void
   createCommands(scopeGuard?: { isCurrent: () => boolean }): BoardRepositoryMutations
-  hydrate(
-    options?: HydrateBoardsFromServerOptions,
-  ): Promise<HydrateBoardsFromServerResult>
+  hydrate(options?: HydrateBoardsFromServerOptions): Promise<HydrateBoardsFromServerResult>
 }
 
 const defaultDependencies: BoardRepositoryDependencies = {

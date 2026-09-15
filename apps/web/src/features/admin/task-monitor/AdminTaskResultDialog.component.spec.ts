@@ -5,10 +5,7 @@ import { renderWithUser, screen } from '../../../test/render'
 import { stripUndefined } from '../../../shared/api/stripUndefined'
 import AdminTaskResultDialog from './AdminTaskResultDialog.vue'
 import { adminTaskStatuses } from './status'
-import type {
-  AdminTaskMonitorDetailModel,
-  AdminTaskMonitorExecutionAttempt,
-} from './resource'
+import type { AdminTaskMonitorDetailModel, AdminTaskMonitorExecutionAttempt } from './resource'
 
 const toast = vi.hoisted(() => ({
   success: vi.fn(),

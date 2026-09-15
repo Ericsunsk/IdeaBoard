@@ -1,12 +1,7 @@
 import { computed, readonly, ref, watch } from 'vue'
 import type { BoardRepository } from '../../application/catalog/repository'
 import type { BoardPreviewRefreshQueue } from '../../infrastructure/preview'
-import type {
-  CatalogEntry,
-  CatalogSortMode,
-  Catalog,
-  CatalogNavigation,
-} from './contract'
+import type { CatalogEntry, CatalogSortMode, Catalog, CatalogNavigation } from './contract'
 import type { BoardFeedback } from './useBoardFeedback'
 import { createCommandHandlers } from './commandHandlers'
 
@@ -18,9 +13,7 @@ type GalleryControllerDependencies = {
   warn: (...data: unknown[]) => void
 }
 
-export function createGalleryController(
-  dependencies: GalleryControllerDependencies,
-): Catalog {
+export function createGalleryController(dependencies: GalleryControllerDependencies): Catalog {
   const activeMenuBoardId = ref<string | null>(null)
   const isBoardsLoading = ref(true)
   const searchKeyword = ref('')

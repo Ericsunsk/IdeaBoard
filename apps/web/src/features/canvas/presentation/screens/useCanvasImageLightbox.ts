@@ -1,19 +1,18 @@
 import { onBeforeUnmount } from 'vue'
 import type { ImageNodeItem, ImageNodeOutputItem } from '../../../board'
-import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../../shared/config/runtimeUrls.ts'
+import {
+  canonicalizeRuntimeUploadRef,
+  resolveAssetUrl,
+} from '../../../../shared/config/runtimeUrls.ts'
 import {
   getMediaAssetMetadata,
   resolveMediaAssetOriginalURL,
 } from '../../../../shared/api/mediaAssetDelivery.ts'
+import { readImageNaturalSize } from '../../../../shared/media/imageDimensions.ts'
 import PhotoSwipeLightbox from 'photoswipe/lightbox'
 import 'photoswipe/style.css'
 
 type PreviewTarget = 'source' | 'latest-output'
-
-interface ImageNaturalSize {
-  width: number
-  height: number
-}
 
 interface LightboxCandidate {
   src: string
@@ -28,10 +27,6 @@ interface LightboxDataSourceItem {
 }
 
 const LIGHTBOX_FALLBACK_SHORT_SIDE = 1440
-const IMAGE_DIMENSION_TIMEOUT_MS = 1800
-const IMAGE_DIMENSION_CACHE_LIMIT = 120
-const imageDimensionCache = new Map<string, ImageNaturalSize>()
-const imageDimensionTasks = new Map<string, Promise<ImageNaturalSize | null>>()
 
 export function normalizeImageUrl(value: unknown): string {
   if (typeof value !== 'string') return ''
@@ -57,62 +52,6 @@ function toLightboxSize(ratio: number): { width: number; height: number } {
     width: Math.round(LIGHTBOX_FALLBACK_SHORT_SIDE / safeRatio),
     height: LIGHTBOX_FALLBACK_SHORT_SIDE,
   }
-}
-
-function normalizeNaturalSize(width: number, height: number): ImageNaturalSize | null {
-  if (!Number.isFinite(width) || !Number.isFinite(height)) return null
-  const roundedWidth = Math.round(width)
-  const roundedHeight = Math.round(height)
-  if (roundedWidth <= 0 || roundedHeight <= 0) return null
-  return {
-    width: roundedWidth,
-    height: roundedHeight,
-  }
-}
-
-function rememberImageDimension(url: string, size: ImageNaturalSize) {
-  if (imageDimensionCache.has(url)) imageDimensionCache.delete(url)
-  imageDimensionCache.set(url, size)
-  while (imageDimensionCache.size > IMAGE_DIMENSION_CACHE_LIMIT) {
-    const oldestKey = imageDimensionCache.keys().next().value
-    if (!oldestKey) break
-    imageDimensionCache.delete(oldestKey)
-  }
-}
-
-function readImageNaturalSize(url: string): Promise<ImageNaturalSize | null> {
-  if (imageDimensionCache.has(url)) {
-    return Promise.resolve(imageDimensionCache.get(url) ?? null)
-  }
-  const inFlight = imageDimensionTasks.get(url)
-  if (inFlight) return inFlight
-
-  const task = new Promise<ImageNaturalSize | null>((resolve) => {
-    const image = new Image()
-    let settled = false
-    let timeoutId = 0
-    function finish(size: ImageNaturalSize | null) {
-      if (settled) return
-      settled = true
-      window.clearTimeout(timeoutId)
-      image.onload = null
-      image.onerror = null
-      if (size) rememberImageDimension(url, size)
-      resolve(size)
-    }
-    timeoutId = window.setTimeout(() => finish(null), IMAGE_DIMENSION_TIMEOUT_MS)
-    image.onload = () => finish(normalizeNaturalSize(image.naturalWidth, image.naturalHeight))
-    image.onerror = () => finish(null)
-    image.src = url
-    if (image.complete) {
-      finish(normalizeNaturalSize(image.naturalWidth, image.naturalHeight))
-    }
-  }).finally(() => {
-    imageDimensionTasks.delete(url)
-  })
-
-  imageDimensionTasks.set(url, task)
-  return task
 }
 
 async function createLightboxItem(candidate: LightboxCandidate): Promise<LightboxDataSourceItem> {
@@ -156,25 +95,6 @@ function collectOutputItems(outputImages: ImageNodeItem['outputImages']): ImageN
     : []
 }
 
-export function useCanvasImageLightbox() {
-  let lightbox: PhotoSwipeLightbox | null = null
-  let isDisposed = false
-  let previewRequestId = 0
-
-  function ensureLightbox(): PhotoSwipeLightbox {
-    if (lightbox) return lightbox
-    lightbox = new PhotoSwipeLightbox({
-      dataSource: [],
-      pswpModule: () => import('photoswipe'),
-      bgOpacity: 0.9,
-      wheelToZoom: true,
-      pinchToClose: true,
-      showHideAnimationType: 'zoom',
-    })
-    lightbox.init()
-    return lightbox
-  }
-
 function toAssetCandidate(src: string, ratio: number, assetId?: string): LightboxCandidate {
   const trimmed = assetId?.trim()
   return {
@@ -206,6 +126,25 @@ function collectLightboxCandidates(node: ImageNodeItem): {
   }
   return { candidates, hasSourceCandidate, outputCount: outputItems.length }
 }
+
+export function useCanvasImageLightbox() {
+  let lightbox: PhotoSwipeLightbox | null = null
+  let isDisposed = false
+  let previewRequestId = 0
+
+  function ensureLightbox(): PhotoSwipeLightbox {
+    if (lightbox) return lightbox
+    lightbox = new PhotoSwipeLightbox({
+      dataSource: [],
+      pswpModule: () => import('photoswipe'),
+      bgOpacity: 0.9,
+      wheelToZoom: true,
+      pinchToClose: true,
+      showHideAnimationType: 'zoom',
+    })
+    lightbox.init()
+    return lightbox
+  }
 
   async function openNodeImagePreview(
     node: ImageNodeItem,

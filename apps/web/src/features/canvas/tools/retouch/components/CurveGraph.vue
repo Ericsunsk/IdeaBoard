@@ -73,12 +73,23 @@ const { t } = useI18n()
 type PointerPosition = Pick<PointerEvent, 'clientX' | 'clientY'>
 
 const CURVE_POINT_HIT_RADIUS_PX = 7
+// Click-vs-drag disambiguation for existing points: pointerdown only selects.
+// The point moves once the pointer travels beyond this radius, so a plain
+// click never nudges curve values (regression: click used to snap the point
+// to the pointerdown position and dirty the params).
+const CURVE_POINT_DRAG_THRESHOLD_PX = 3
 const USER_POINT_MIN_INPUT = 1
 const USER_POINT_MAX_INPUT = 99
 
 const graphRef = ref<HTMLElement | null>(null)
 const pointButtonRefs = new Map<string, HTMLButtonElement>()
 const activeDragPointId = ref<string | null>(null)
+const pointDragOrigin = ref<{
+  pointId: string
+  clientX: number
+  clientY: number
+  moved: boolean
+} | null>(null)
 const pendingCreatedPointDrag = ref<{
   latestPosition: PointerPosition
   hasMoved: boolean
@@ -128,7 +139,7 @@ function startPointDrag(pointId: string, event: PointerEvent) {
   pointerDragSession.beginDrag(event, undefined, { target: graphRef.value })
   activeDragPointId.value = pointId
   pendingCreatedPointDrag.value = null
-  updatePointFromPointerPosition(pointId, event)
+  pointDragOrigin.value = { pointId, clientX: event.clientX, clientY: event.clientY, moved: false }
 }
 
 function startPendingCreatedPointDrag(event: PointerEvent) {
@@ -142,6 +153,7 @@ function startPendingCreatedPointDrag(event: PointerEvent) {
 
 function onDragPointerMove(event: PointerEvent) {
   if (activeDragPointId.value) {
+    if (!hasExceededPointDragThreshold(event)) return
     updatePointFromPointerPosition(activeDragPointId.value, event)
     return
   }
@@ -153,8 +165,19 @@ function onDragPointerMove(event: PointerEvent) {
   }
 }
 
+function hasExceededPointDragThreshold(event: PointerEvent): boolean {
+  const origin = pointDragOrigin.value
+  if (!origin || origin.pointId !== activeDragPointId.value) return true
+  if (origin.moved) return true
+  const travelled = Math.hypot(event.clientX - origin.clientX, event.clientY - origin.clientY)
+  if (travelled <= CURVE_POINT_DRAG_THRESHOLD_PX) return false
+  pointDragOrigin.value = { ...origin, moved: true }
+  return true
+}
+
 function clearPointDrag() {
   activeDragPointId.value = null
+  pointDragOrigin.value = null
   pendingCreatedPointDrag.value = null
 }
 

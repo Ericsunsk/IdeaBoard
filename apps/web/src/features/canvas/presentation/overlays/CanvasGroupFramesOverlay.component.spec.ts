@@ -13,7 +13,10 @@ const adapterSkinCss = readFileSync(
   'utf8',
 )
 const overlayVue = readFileSync(
-  path.join(process.cwd(), 'src/features/canvas/presentation/overlays/CanvasGroupFramesOverlay.vue'),
+  path.join(
+    process.cwd(),
+    'src/features/canvas/presentation/overlays/CanvasGroupFramesOverlay.vue',
+  ),
   'utf8',
 )
 

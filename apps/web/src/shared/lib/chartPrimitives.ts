@@ -94,12 +94,18 @@ export function defineChartNumericScale(input: ChartNumericScaleInput) {
 }
 
 export function withAlpha(hexColor: string, opacity: number) {
-  const value = hexColor.replace('#', '')
-  const bigint = Number.parseInt(value.length === 3 ? expandShortHex(value) : value, 16)
+  const value = hexColor.trim().replace(/^#/, '')
+  const normalized = value.length === 3 ? expandShortHex(value) : value
+  // Chart.js paints canvas pixels, so colors must resolve to concrete values
+  // here (CSS vars / color-mix are not available). Invalid input falls back
+  // to the raw string instead of producing `rgba(NaN, …)`.
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return hexColor
+  const bigint = Number.parseInt(normalized, 16)
   const red = (bigint >> 16) & 255
   const green = (bigint >> 8) & 255
   const blue = bigint & 255
-  return `rgba(${red}, ${green}, ${blue}, ${opacity})`
+  const alpha = Number.isFinite(opacity) ? Math.min(1, Math.max(0, opacity)) : 1
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`
 }
 
 export function getParsedY(context: ChartTooltipItem) {

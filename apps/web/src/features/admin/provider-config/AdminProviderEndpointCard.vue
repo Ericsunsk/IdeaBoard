@@ -6,7 +6,9 @@
           <button
             type="button"
             :class="[adminLogoButtonClass, 'size-10 p-2']"
-            :data-control-state="activeLogoTargetId === card.providerEndpoint.id ? 'selected' : 'idle'"
+            :data-control-state="
+              activeLogoTargetId === card.providerEndpoint.id ? 'selected' : 'idle'
+            "
             :aria-expanded="activeLogoTargetId === card.providerEndpoint.id ? 'true' : 'false'"
             title="点击切换端点 Logo"
             aria-label="切换端点 Logo"
@@ -116,9 +118,7 @@
               {{ card.providerEndpoint.apiKeyConfigured ? 'API Key 已配置' : '未配置 Key' }}
             </span>
             <template v-else-if="card.providerEndpoint.protocol === 'model-api'">
-              <span class="font-medium text-admin-text-2">
-                🔑 {{ card.accounts.length }} Key
-              </span>
+              <span class="font-medium text-admin-text-2"> 🔑 {{ card.accounts.length }} Key </span>
               <span class="text-admin-border">|</span>
               <span class="font-medium text-admin-text-2"> ⚡ {{ card.modelCount }} 模型 </span>
             </template>
@@ -126,10 +126,7 @@
         </div>
 
         <!-- Model API 关联 APIKey 与模型管理主体 -->
-        <div
-          v-if="card.providerEndpoint.protocol === 'model-api'"
-          class="flex flex-col gap-2.5"
-        >
+        <div v-if="card.providerEndpoint.protocol === 'model-api'" class="flex flex-col gap-2.5">
           <!-- 扁平化 Account / APIKey 列表 -->
           <div v-if="card.accounts.length > 0" class="flex flex-col gap-2">
             <div
@@ -265,10 +262,7 @@ import ProgressBar from 'primevue/progressbar'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { Plus } from '@iconoir/vue'
 import { adminCardPt } from '../shared/lib/cardPt'
-import {
-  adminLogoButtonClass,
-  adminMasonryCardClass,
-} from '../shared/lib/uiClasses'
+import { adminLogoButtonClass, adminMasonryCardClass } from '../shared/lib/uiClasses'
 import type { ProviderEndpointCard } from './types'
 import type { ProviderEndpointEditor } from './providerEndpointEditor'
 import type { AccountEditor } from './accountEditor'

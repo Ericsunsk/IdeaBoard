@@ -138,7 +138,10 @@ import {
   type CanvasChromeAccountState,
   type CanvasChromeBoardState,
 } from '../chrome'
-import { CANVAS_VIEWPORT_MAX_ZOOM, CANVAS_VIEWPORT_MIN_ZOOM } from '../../infrastructure/browser/canvasViewportStorage.ts'
+import {
+  CANVAS_VIEWPORT_MAX_ZOOM,
+  CANVAS_VIEWPORT_MIN_ZOOM,
+} from '../../infrastructure/browser/canvasViewportStorage.ts'
 import { useWorkspaceAccountControls, type WorkspaceNavigationAdapter } from '../../../workspace'
 import { useCanvasScreenImageToolUi } from './internal/useCanvasScreenImageToolUi'
 import { useCanvasScreenSurfaceInteractions } from './internal/useCanvasScreenSurfaceInteractions'

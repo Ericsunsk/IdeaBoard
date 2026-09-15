@@ -249,12 +249,12 @@ function readSnapshotInputIdentity(record: SnapshotInputRecord):
   }
 }
 
-function readSnapshotInputMedia(
-  record: SnapshotInputRecord,
-): (Pick<ResolvedFlowInputImage, 'url' | 'ratio'> & {
-  mediaAssetId?: number
-  assetId?: string
-}) | null {
+function readSnapshotInputMedia(record: SnapshotInputRecord):
+  | (Pick<ResolvedFlowInputImage, 'url' | 'ratio'> & {
+      mediaAssetId?: number
+      assetId?: string
+    })
+  | null {
   const url = typeof record.url === 'string' ? record.url.trim() : ''
   const ratio = Number(record.ratio)
   const mediaAssetId = Number(record.mediaAssetId)

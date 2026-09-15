@@ -400,15 +400,12 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import PrimeImage from 'primevue/image'
 import Tag from 'primevue/tag'
-import { formatIdeaAmount } from '../shared/lib/ideaCurrency'
+import { formatIdeaAmount } from '../../../shared/i18n/userIdeaCurrency'
 import { adminOverlayDialogRootClass, createAdminDialogPt } from '../shared/lib/overlayPt'
 import { adminActionButtonClass, adminTextButtonClass } from '../shared/lib/uiClasses'
 import { getTaskPriorityLabel } from './columns'
 import { adminTaskStatuses, getTaskStatusDefinition } from './status'
-import type {
-  AdminTaskMonitorDetailModel,
-  AdminTaskMonitorExecutionAttempt,
-} from './resource'
+import type { AdminTaskMonitorDetailModel, AdminTaskMonitorExecutionAttempt } from './resource'
 import DetailMetric from './TaskResultDetailMetric.vue'
 import { useAdminTaskResultFeedback } from './useAdminTaskMonitorFeedback'
 import { useTaskResultDetail } from './useTaskResultDetail'

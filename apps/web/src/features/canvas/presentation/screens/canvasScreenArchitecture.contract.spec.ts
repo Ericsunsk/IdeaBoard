@@ -10,7 +10,9 @@ const readSource = (relativePath: string) => readFileSync(resolve(canvasRoot, re
 const canvasScreen = readSource('presentation/screens/CanvasScreen.vue')
 const screenIndex = readSource('presentation/screens/index.ts')
 const screenLifecycle = readSource('presentation/screens/internal/useCanvasScreenLifecycle.ts')
-const runtimeParts = readSource('application/workspace/internal/createCanvasWorkspaceRuntimeParts.ts')
+const runtimeParts = readSource(
+  'application/workspace/internal/createCanvasWorkspaceRuntimeParts.ts',
+)
 const imageWorkflow = readSource('application/image-workflow/useCanvasImageWorkflow.ts')
 
 describe('Canvas Screen architecture contract', () => {

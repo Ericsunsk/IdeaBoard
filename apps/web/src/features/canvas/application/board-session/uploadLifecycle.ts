@@ -2,7 +2,11 @@ import { uploadApi } from '../../../../shared/api/upload'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
 import { i18n } from '../../../../shared/i18n'
 import { rebuildBoardMediaRefs, type BoardSnapshot } from '../../../board'
-import { filenameFromImageUrl, isDataUrl, resolveFetchUrl } from '../../infrastructure/media/canvasMediaIo.ts'
+import {
+  filenameFromImageUrl,
+  isDataUrl,
+  resolveFetchUrl,
+} from '../../infrastructure/media/canvasMediaIo.ts'
 import { prepareImageAssetForUpload } from '../../../../shared/media/imageAssetPipeline'
 import { buildMediaBrowserURL, type MediaRef } from '../../../../shared/media/mediaRef'
 import { measureCanvasPerfAsync } from '../../infrastructure/browser/canvasPerfProbe.ts'
@@ -143,7 +147,6 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
     const mediaRef: MediaRef = {
       assetId,
       derivativeTier: 'preview',
-
     }
     return { url: buildMediaBrowserURL(mediaRef), mediaRef }
   }
@@ -186,9 +189,7 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
     return await response.blob()
   }
 
-  async function stabilizeSnapshotForSave(
-    snapshot: BoardSnapshot,
-  ): Promise<BoardSnapshot> {
+  async function stabilizeSnapshotForSave(snapshot: BoardSnapshot): Promise<BoardSnapshot> {
     let unstableRefCount = 0
     return measureCanvasPerfAsync(
       'board.save.stabilizeSnapshot',

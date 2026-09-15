@@ -46,7 +46,7 @@
             text
             :class="adminTextButtonClass"
             :loading="loading"
-            @click="loadRedemptions()"
+            @click="refreshRedemptions"
           />
         </div>
       </Message>
@@ -89,7 +89,9 @@
           <template #body="{ data }">{{ formatIdeaAmount(data.creditedAmount) }}</template>
         </Column>
         <Column field="redeemedAt" header="兑换时间" :style="{ width: '220px' }">
-          <template #body="{ data }">{{ formatAdminDateTime(data.redeemedAt) }}</template>
+          <template #body="{ data }">{{
+            formatAdminDateTimeWithSeconds(data.redeemedAt)
+          }}</template>
         </Column>
 
         <template #expansion="{ data }">
@@ -157,6 +159,8 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useQueryClient } from '@tanstack/vue-query'
+import { useAdminCollectionQuery } from '../../shared/composables/useAdminCollectionQuery'
 import { Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
@@ -164,14 +168,13 @@ import type { DataTableRowCollapseEvent, DataTableRowExpandEvent } from 'primevu
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
-import { formatIdeaAmount } from '../../shared/lib/ideaCurrency'
+import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
-import { useCollectionState } from '../../shared/composables/useCollectionState'
 import { useCursorPagination } from '../../shared/composables/useCursorPagination'
-import { formatAdminDateTime } from '../format'
+import { formatAdminDateTimeWithSeconds } from '../format'
 import { adminTextButtonClass } from '../../shared/lib/uiClasses'
 import type { RewardCode } from './resource'
 import {
@@ -198,52 +201,61 @@ const detailError = ref(false)
 let activeDetailRequest: AbortController | undefined
 let detailRequestEpoch = 0
 let pagination: ReturnType<typeof useCursorPagination<number>>
-const collection = useCollectionState({
-  load: (signal) =>
-    resource.list(props.rewardCode.id, {
-      beforeId: pagination.cursor.value,
+// TanStack Query owns the list lifecycle (same pattern as the orders pilot).
+// The dialog mounts hidden, so the query stays disabled until opened;
+// closing drops the cached pages so reopening always spins fresh.
+const queryClient = useQueryClient()
+pagination = useCursorPagination<number>({ pending: () => loading.value })
+const REDEMPTION_LIST_QUERY_ROOT = ['admin', 'credits', 'redemptions'] as const
+const REDEMPTION_LIST_ID_INDEX = REDEMPTION_LIST_QUERY_ROOT.length
+const REDEMPTION_LIST_CURSOR_INDEX = REDEMPTION_LIST_QUERY_ROOT.length + 1
+const redemptionListKey = computed(
+  () => [...REDEMPTION_LIST_QUERY_ROOT, props.rewardCode.id, pagination.cursor.value] as const,
+)
+const {
+  data: redemptionPage,
+  loading,
+  initialError,
+  backgroundError,
+  refresh: refreshRedemptionList,
+} = useAdminCollectionQuery({
+  queryKey: redemptionListKey,
+  queryFn: ({ queryKey, signal }) =>
+    resource.list(queryKey[REDEMPTION_LIST_ID_INDEX] as number, {
+      beforeId: queryKey[REDEMPTION_LIST_CURSOR_INDEX] as number | undefined,
       signal,
     }),
-  isEmpty: (page) => page.redemptions.length === 0,
+  enabled: computed(() => props.visible),
+  getNextCursor: (page) => page.nextBeforeId,
+  pagination,
 })
-const { data: redemptionPage, loading, initialError, backgroundError } = collection
-pagination = useCursorPagination<number>({ pending: loading })
 const redemptions = computed(() => redemptionPage.value?.redemptions ?? [])
 
-watch(
-  [() => props.visible, () => props.rewardCode.id],
-  ([visible]) => {
-    resetDialogState()
-    if (!visible) return
-    void loadRedemptions()
-  },
-  { immediate: true },
-)
+watch([() => props.visible, () => props.rewardCode.id], ([visible]) => {
+  pagination.reset()
+  clearExpansion()
+  if (!visible) {
+    void queryClient.removeQueries({ queryKey: [...REDEMPTION_LIST_QUERY_ROOT] })
+  }
+})
 
 onBeforeUnmount(() => {
-  collection.cancel()
   activeDetailRequest?.abort()
 })
 
-async function loadRedemptions({ preserveData = false }: { preserveData?: boolean } = {}) {
-  const page = await collection.reload({ preserveData })
-  if (page) pagination.setNextCursor(page.nextBeforeId)
+function refreshRedemptions() {
+  // Same-key refetch: stale rows stay mounted with the table loading state.
+  void refreshRedemptionList()
 }
 
 function previousPage() {
-  if (!pagination.retreat()) return
+  pagination.retreat()
   clearExpansion()
-  void loadRedemptions()
 }
 
 function nextPage() {
-  if (!pagination.advance()) return
+  pagination.advance()
   clearExpansion()
-  void loadRedemptions()
-}
-
-function refreshRedemptions() {
-  void loadRedemptions({ preserveData: true })
 }
 
 function expandRedemption(event: DataTableRowExpandEvent<RewardCodeRedemption>) {
@@ -303,11 +315,5 @@ function clearExpansion() {
   detailLoading.value = false
   detailError.value = false
   expandedRows.value = {}
-}
-
-function resetDialogState() {
-  collection.reset()
-  pagination.reset()
-  clearExpansion()
 }
 </script>

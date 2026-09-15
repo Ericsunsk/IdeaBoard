@@ -11,6 +11,7 @@ import { resolveApiUrl, resolveAssetUrl } from '../config/runtimeUrls'
 import { requireApiData } from './apiResponse'
 import { api } from './client'
 import { subscribeUserEvent } from './userEventStream'
+import { createPollDelay } from '../utils/polling'
 import { i18n } from '../i18n'
 import {
   getGetUserMediaAssetMetadataUrl,
@@ -291,12 +292,12 @@ export function useMediaAssetDelivery(
   let abortController: AbortController | null = null
   let unsubscribeInvalidation: (() => void) | null = null
   let retryTimer = 0
-  let retryDelayMs = 800
+  const retryDelay = createPollDelay({ initialDelayMs: 800, maxDelayMs: 2_000, backoffFactor: 2 })
 
   function reset() {
     window.clearTimeout(retryTimer)
     retryTimer = 0
-    retryDelayMs = 800
+    retryDelay.reset()
     metadata.value = null
     url.value = ''
     status.value = 'idle'
@@ -331,9 +332,8 @@ export function useMediaAssetDelivery(
     window.clearTimeout(retryTimer)
     retryTimer = window.setTimeout(() => {
       retryTimer = 0
-      retryDelayMs = Math.min(2_000, retryDelayMs * 2)
       void load(currentAssetId, currentTier, true)
-    }, retryDelayMs)
+    }, retryDelay.next())
   }
 
   function settleDeliveryUrl(
@@ -345,7 +345,7 @@ export function useMediaAssetDelivery(
     status.value = nextStatus
     url.value = variant?.status === 'ready' && variant.url ? resolveAssetUrl(variant.url) : ''
     if (url.value) {
-      retryDelayMs = 800
+      retryDelay.reset()
     } else if (nextStatus === 'pending' || nextStatus === 'processing') {
       scheduleDeliveryRetry(currentAssetId, currentTier)
     }

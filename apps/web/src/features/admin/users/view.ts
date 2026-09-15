@@ -1,6 +1,6 @@
 import type { AdminUserListItem } from '../../../shared/api/generated-query/model'
 import { formatDateOnly } from '../../../shared/utils/dateTime'
-import { formatIdeaAmount } from '../shared/lib/ideaCurrency'
+import { formatIdeaAmount } from '../../../shared/i18n/userIdeaCurrency'
 
 export type AdminUserRole = 'admin' | 'user'
 export type AdminUserStatus = 0 | 1

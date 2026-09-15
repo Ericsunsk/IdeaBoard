@@ -10,6 +10,7 @@ import { formatIdeaAmount } from '../../../shared/i18n/userIdeaCurrency'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
+import { createUniqueId } from '../../../shared/utils/ids'
 import type { LibraryAssetView } from '../../library'
 import type { SearchAuthAction } from '../domain/authAction'
 import {
@@ -120,7 +121,7 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
     if (activeExtraction?.fingerprint === fingerprint) return activeExtraction.promise
     if (idempotencyFingerprint !== fingerprint) resetExtraction()
     idempotencyFingerprint = fingerprint
-    idempotencyKey ??= crypto.randomUUID()
+    idempotencyKey ??= createUniqueId()
     const controller = new AbortController()
     extractionController = controller
     const generation = ++extractionGeneration
@@ -223,7 +224,7 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
       collection.add({
         file,
         previewUrl: URL.createObjectURL(file),
-        key: `local:${crypto.randomUUID()}`,
+        key: `local:${createUniqueId()}`,
       })
     }
     markStale()

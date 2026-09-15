@@ -63,6 +63,7 @@ export default {
     parseImageFailed: 'The image content could not be parsed.',
     compressInvalidOutput: 'Compression produced invalid output.',
     heicConversionFailed: 'The HEIC/HEIF image could not be converted. Try another image.',
+    unexpected: 'Something went wrong. Please try again.',
   },
   dialogs: {
     unsavedChangesTitle: 'Unsaved changes',

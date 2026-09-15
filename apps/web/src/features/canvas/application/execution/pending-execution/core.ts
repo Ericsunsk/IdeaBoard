@@ -14,15 +14,8 @@ import {
   preparePendingImageMaterialization,
   type PendingImageMaterializationSlot,
 } from './materialization'
-import {
-  releasePendingImageExecutions,
-  type PendingImageExecutionReleaseContext,
-} from './release'
-import {
-  attachmentRejection,
-  isAttachmentCurrent,
-  leaseRejection,
-} from './validation'
+import { releasePendingImageExecutions, type PendingImageExecutionReleaseContext } from './release'
+import { attachmentRejection, isAttachmentCurrent, leaseRejection } from './validation'
 
 export type {
   PendingImageExecutionStatus,

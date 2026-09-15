@@ -1,20 +1,36 @@
-/** Date/time formatting utilities — no external deps. */
+import { getLocaleDateFormatter } from '../i18n/formatters'
+import { getActiveUserLocale } from '../i18n/userLocale'
 
-export function formatDateOnly(input: string | Date): string {
+function toDate(input: string | Date): Date | null {
   const d = typeof input === 'string' ? new Date(input) : input
-  if (isNaN(d.getTime())) return ''
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+/**
+ * Canonical `YYYY-MM-DD` key (locale-invariant, e.g. chart buckets, stable labels).
+ * Local calendar fields keep it stable without `Intl` overhead.
+ */
+export function formatDateOnly(input: string | Date): string {
+  const d = toDate(input)
+  if (!d) return ''
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
 
+/** Locale-aware admin timestamp. Falls back when the input is invalid. */
 export function formatAdminDateTime(input: string | Date, fallback = '-'): string {
-  const d = typeof input === 'string' ? new Date(input) : input
-  if (isNaN(d.getTime())) return fallback
-  const h = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}-${h}:${min}`
+  const d = toDate(input)
+  if (!d) return fallback
+  return getLocaleDateFormatter(getActiveUserLocale(), {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(d)
 }
 
 export function calcDurationSeconds(start: string | Date, end: string | Date): number | null {

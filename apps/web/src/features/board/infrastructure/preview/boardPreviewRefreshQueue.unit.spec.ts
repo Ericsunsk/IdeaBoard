@@ -38,9 +38,7 @@ function flushPromises() {
   return new Promise<void>((resolve) => setTimeout(resolve, 0))
 }
 
-function makeDeps(
-  states: Record<string, BoardState | null>,
-): BoardPreviewRefreshQueueDependencies {
+function makeDeps(states: Record<string, BoardState | null>): BoardPreviewRefreshQueueDependencies {
   return {
     getBoardState: vi.fn((boardId: string) => states[boardId] ?? null),
     setPreviewSnapshot: vi.fn(

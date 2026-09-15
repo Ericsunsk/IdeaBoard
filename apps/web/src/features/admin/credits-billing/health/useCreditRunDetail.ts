@@ -1,77 +1,65 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 
 type PollableRun = {
   id: number
   status: string
 }
 
+const CREDIT_RUN_DETAIL_QUERY_ROOT = ['admin', 'credits', 'run-detail'] as const
+const RUN_DETAIL_ID_INDEX = CREDIT_RUN_DETAIL_QUERY_ROOT.length
+const RUN_DETAIL_POLL_MS = 3_000
+
+function isPollableStatus(status: string): boolean {
+  return status === 'queued' || status === 'running'
+}
+
 export function useCreditRunDetail<TRun extends PollableRun>(
   load: (runId: number, signal: AbortSignal) => Promise<TRun>,
 ) {
   const selectedRunId = ref<number | null>(null)
-  const run = ref<TRun>()
-  const loading = ref(false)
-  const error = ref(false)
-  let requestEpoch = 0
-  let activeRequest: AbortController | undefined
-  let pollTimer: ReturnType<typeof setTimeout> | undefined
+  const queryClient = useQueryClient()
+
+  const query = useQuery({
+    queryKey: computed(() => [...CREDIT_RUN_DETAIL_QUERY_ROOT, selectedRunId.value]),
+    queryFn: ({ queryKey, signal }) => load(queryKey[RUN_DETAIL_ID_INDEX] as number, signal),
+    enabled: computed(() => selectedRunId.value !== null),
+    // Single attempt like the previous hand-rolled loader: failures surface
+    // as the detail error state instead of retrying behind the dialog.
+    retry: false,
+    // Terminal runs settle; queued/running runs keep the 3s cadence.
+    refetchInterval: (query) => {
+      const run = query.state.data as TRun | undefined
+      return run && isPollableStatus(run.status) ? RUN_DETAIL_POLL_MS : false
+    },
+  })
 
   async function open(runId: number) {
+    if (selectedRunId.value === runId) {
+      // Same row re-expanded: the key is unchanged so force a fresh load,
+      // matching the previous always-reload behavior.
+      await query.refetch()
+      return
+    }
     selectedRunId.value = runId
-    return refresh()
   }
 
-  async function refresh() {
-    const runId = selectedRunId.value
-    if (runId === null) return
-
-    const epoch = ++requestEpoch
-    activeRequest?.abort()
-    const controller = new AbortController()
-    activeRequest = controller
-    stopPolling()
-    loading.value = true
-    error.value = false
-    run.value = undefined
-
-    try {
-      const nextRun = await load(runId, controller.signal)
-      if (controller.signal.aborted || epoch !== requestEpoch || selectedRunId.value !== runId)
-        return
-      run.value = nextRun
-      if (nextRun.status === 'queued' || nextRun.status === 'running') schedulePolling()
-    } catch {
-      if (!controller.signal.aborted && epoch === requestEpoch && selectedRunId.value === runId) {
-        error.value = true
-      }
-    } finally {
-      if (!controller.signal.aborted && epoch === requestEpoch && selectedRunId.value === runId) {
-        loading.value = false
-      }
-    }
+  function refresh() {
+    return query.refetch()
   }
 
   function close() {
-    requestEpoch += 1
-    activeRequest?.abort()
-    activeRequest = undefined
-    stopPolling()
     selectedRunId.value = null
-    run.value = undefined
-    loading.value = false
-    error.value = false
+    void queryClient.removeQueries({ queryKey: [...CREDIT_RUN_DETAIL_QUERY_ROOT] })
   }
 
-  function schedulePolling() {
-    pollTimer = setTimeout(() => {
-      void refresh()
-    }, 3_000)
+  return {
+    selectedRunId,
+    run: computed(() => query.data.value),
+    loading: computed(() => query.isLoading.value),
+    error: computed(() => query.isError.value),
+    open,
+    refresh,
+    close,
   }
-
-  function stopPolling() {
-    if (pollTimer !== undefined) clearTimeout(pollTimer)
-    pollTimer = undefined
-  }
-
-  return { selectedRunId, run, loading, error, open, refresh, close }
 }

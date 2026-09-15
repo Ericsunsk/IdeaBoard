@@ -146,9 +146,7 @@ describe('boardStateSerialization', () => {
   })
 
   it('returns recoverable validation context for non-serializable board state', () => {
-    const nonSerializableState = makeBoardState() as ReturnType<
-      typeof makeBoardState
-    > & {
+    const nonSerializableState = makeBoardState() as ReturnType<typeof makeBoardState> & {
       toJSON?: () => unknown
     }
     Object.defineProperty(nonSerializableState, 'toJSON', {

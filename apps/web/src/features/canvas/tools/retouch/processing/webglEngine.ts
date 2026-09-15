@@ -190,7 +190,11 @@ export type WebGLRetouchRenderer = {
   isContextLost: () => boolean
 }
 
-function compileShader(gl: WebGLRenderingContext, type: number, source: string): WebGLShader | null {
+function compileShader(
+  gl: WebGLRenderingContext,
+  type: number,
+  source: string,
+): WebGLShader | null {
   const shader = gl.createShader(type)
   if (!shader) return null
   gl.shaderSource(shader, source)
@@ -218,9 +222,7 @@ function createLutTexture(gl: WebGLRenderingContext): WebGLTexture | null {
  * when WebGL is unavailable so callers fall back to the CPU engine.
  * Handles context loss by flagging `isContextLost()` instead of throwing.
  */
-export function createWebGLRetouchRenderer(
-  canvas: HTMLCanvasElement,
-): WebGLRetouchRenderer | null {
+export function createWebGLRetouchRenderer(canvas: HTMLCanvasElement): WebGLRetouchRenderer | null {
   const gl = canvas.getContext('webgl', {
     premultipliedAlpha: false,
     preserveDrawingBuffer: true,
@@ -297,7 +299,17 @@ export function createWebGLRetouchRenderer(
       data[index * 4 + 2] = lut.blue[index] ?? index
       data[index * 4 + 3] = 255
     }
-    context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, 256, 1, 0, context.RGBA, context.UNSIGNED_BYTE, data)
+    context.texImage2D(
+      context.TEXTURE_2D,
+      0,
+      context.RGBA,
+      256,
+      1,
+      0,
+      context.RGBA,
+      context.UNSIGNED_BYTE,
+      data,
+    )
     context.uniform1i(locations.lut, 1)
     context.uniform1i(locations.useLut, 1)
   }
@@ -316,7 +328,14 @@ export function createWebGLRetouchRenderer(
       context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MAG_FILTER, context.LINEAR)
       context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_S, context.CLAMP_TO_EDGE)
       context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_T, context.CLAMP_TO_EDGE)
-      context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, context.RGBA, context.UNSIGNED_BYTE, image)
+      context.texImage2D(
+        context.TEXTURE_2D,
+        0,
+        context.RGBA,
+        context.RGBA,
+        context.UNSIGNED_BYTE,
+        image,
+      )
       context.uniform1i(locations.image, 0)
       context.uniform2f(locations.texel, 1 / imageWidth, 1 / imageHeight)
     },
@@ -346,7 +365,15 @@ export function createWebGLRetouchRenderer(
       if (contextLost) return null
       try {
         const pixels = new Uint8ClampedArray(imageWidth * imageHeight * 4)
-        context.readPixels(0, 0, imageWidth, imageHeight, context.RGBA, context.UNSIGNED_BYTE, pixels)
+        context.readPixels(
+          0,
+          0,
+          imageWidth,
+          imageHeight,
+          context.RGBA,
+          context.UNSIGNED_BYTE,
+          pixels,
+        )
         return new ImageData(pixels, imageWidth, imageHeight)
       } catch {
         return null

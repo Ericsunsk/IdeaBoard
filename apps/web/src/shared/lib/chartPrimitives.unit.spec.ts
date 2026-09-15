@@ -125,4 +125,11 @@ describe('chart primitives', () => {
     expect(withAlpha('#336699', 0.25)).toBe('rgba(51, 102, 153, 0.25)')
     expect(withAlpha('#abc', 0.5)).toBe('rgba(170, 187, 204, 0.5)')
   })
+
+  it('clamps alpha and falls back to the raw string for non-hex colors', () => {
+    expect(withAlpha('#336699', 2)).toBe('rgba(51, 102, 153, 1)')
+    expect(withAlpha('#336699', -1)).toBe('rgba(51, 102, 153, 0)')
+    expect(withAlpha('var(--color-admin-accent)', 0.5)).toBe('var(--color-admin-accent)')
+    expect(withAlpha('not-a-color', 0.5)).toBe('not-a-color')
+  })
 })

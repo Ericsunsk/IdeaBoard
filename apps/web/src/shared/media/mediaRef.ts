@@ -42,10 +42,7 @@ export function mediaRefEquals(
   a: MediaRef | null | undefined,
   b: MediaRef | null | undefined,
 ): boolean {
-  return (
-    a === b ||
-    (!!a && !!b && a.assetId === b.assetId && a.derivativeTier === b.derivativeTier)
-  )
+  return a === b || (!!a && !!b && a.assetId === b.assetId && a.derivativeTier === b.derivativeTier)
 }
 
 function isDerivativeTier(value: unknown): value is MediaRefDerivativeTier {

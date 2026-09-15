@@ -2,6 +2,7 @@ import type { User } from '../api/generated-query/model'
 import { clearAuthScopedQueryCache } from '../query/queryClient'
 import { resolveAuthFailureAction } from '../auth/sessionPolicy'
 import type { AuthFailureAction, AuthFailureContext } from '../auth/sessionPolicy'
+import { readLocalStorageItem, removeLocalStorageItem, writeLocalStorageItem } from './storage'
 export {
   isSafeInternalRedirectPath,
   normalizeSafeInternalRedirectPath,
@@ -24,7 +25,7 @@ export function subscribeAuthStorageScopeChange(
 }
 
 export function getStoredUser(): User | null {
-  const raw = localStorage.getItem(USER_KEY)
+  const raw = readLocalStorageItem(USER_KEY)
   if (!raw) return null
 
   try {
@@ -37,14 +38,18 @@ export function getStoredUser(): User | null {
 
 export function setStoredAuth(user: User) {
   const previousScope = resolveAuthStorageUserScope(getStoredUser())
-  localStorage.setItem(USER_KEY, JSON.stringify(user))
+  if (!writeLocalStorageItem(USER_KEY, JSON.stringify(user))) {
+    // Identity snapshot is best-effort: the in-memory session still works for
+    // this tab, so warn instead of throwing the login flow off a cliff.
+    console.warn('[auth] persist session snapshot failed')
+  }
   const scope = resolveAuthStorageUserScope(user)
   if (scope) rememberAuthStorageUserScope(scope)
   if (scope !== previousScope) notifyAuthStorageScopeChange(scope)
 }
 
 export function clearStoredAuth() {
-  localStorage.removeItem(USER_KEY)
+  removeLocalStorageItem(USER_KEY)
   notifyAuthStorageScopeChange(null)
 }
 
@@ -69,12 +74,10 @@ function resolveAuthStorageUserScope(user: User | null): string | null {
 }
 
 function rememberAuthStorageUserScope(scope: string) {
-  try {
-    if (localStorage.getItem(LAST_AUTH_STORAGE_SCOPE_KEY) === scope) return
-    localStorage.setItem(LAST_AUTH_STORAGE_SCOPE_KEY, scope)
-  } catch (error) {
+  if (readLocalStorageItem(LAST_AUTH_STORAGE_SCOPE_KEY) === scope) return
+  writeLocalStorageItem(LAST_AUTH_STORAGE_SCOPE_KEY, scope, (error) => {
     console.warn('[auth] remember storage scope failed', error)
-  }
+  })
 }
 
 export function getAuthStorageUserScope(): string | null {
@@ -86,13 +89,10 @@ export function getAuthStorageUserScope(): string | null {
 export function getRecoverableAuthStorageUserScope(): string | null {
   const activeScope = getAuthStorageUserScope()
   if (activeScope) return activeScope
-  try {
-    const scope = localStorage.getItem(LAST_AUTH_STORAGE_SCOPE_KEY)
-    return scope?.trim() || null
-  } catch (error) {
+  const scope = readLocalStorageItem(LAST_AUTH_STORAGE_SCOPE_KEY, (error) => {
     console.warn('[auth] read recovery storage scope failed', error)
-    return null
-  }
+  })
+  return scope?.trim() || null
 }
 
 function getCurrentAuthFailureContext(params: {

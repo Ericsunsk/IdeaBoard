@@ -1,17 +1,12 @@
 import type { SubmitTaskData } from '../../../../../shared/api/task'
+import { createUniqueId } from '../../../../../shared/utils/ids'
 
 export type ClientActionIdFactory = () => string
 
 const CANVAS_CLIENT_ACTION_ID_PREFIX = 'canvas:'
 
 function createCanvasId(): string {
-  const randomUUID = globalThis.crypto?.randomUUID
-  if (typeof randomUUID === 'function') {
-    return `${CANVAS_CLIENT_ACTION_ID_PREFIX}${randomUUID.call(globalThis.crypto)}`
-  }
-  return `${CANVAS_CLIENT_ACTION_ID_PREFIX}${Date.now().toString(36)}-${Math.random()
-    .toString(36)
-    .slice(2, 12)}`
+  return `${CANVAS_CLIENT_ACTION_ID_PREFIX}${createUniqueId()}`
 }
 
 export function createCanvasTaskClientActionId(): string {

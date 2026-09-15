@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageProcessingBackend, ImageProcessingRuntime } from './types'
 
-const { createMainThreadBackendMock, createImageProcessingRuntimeMock } =
-  vi.hoisted(() => ({
-    createMainThreadBackendMock: vi.fn(),
-    createImageProcessingRuntimeMock: vi.fn(),
-  }))
+const { createMainThreadBackendMock, createImageProcessingRuntimeMock } = vi.hoisted(() => ({
+  createMainThreadBackendMock: vi.fn(),
+  createImageProcessingRuntimeMock: vi.fn(),
+}))
 
 vi.mock('./imageProcessingRuntime', () => ({
   createImageProcessingRuntime: createImageProcessingRuntimeMock,

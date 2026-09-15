@@ -1,14 +1,11 @@
+import { calcDurationSeconds } from '../../../../shared/utils/dateTime'
 import type { AdminCreditRun } from './runHistoryResource'
 
 export function formatReconciliationRunDuration(run: AdminCreditRun): string {
   if (!run.started_at) return '—'
   if (!run.completed_at) return '进行中'
-  const startedAt = new Date(run.started_at).getTime()
-  const completedAt = new Date(run.completed_at).getTime()
-  if (!Number.isFinite(startedAt) || !Number.isFinite(completedAt) || completedAt < startedAt) {
-    return '—'
-  }
-  const totalSeconds = Math.round((completedAt - startedAt) / 1000)
+  const totalSeconds = calcDurationSeconds(run.started_at, run.completed_at)
+  if (totalSeconds == null) return '—'
   if (totalSeconds < 60) return `${totalSeconds} 秒`
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60

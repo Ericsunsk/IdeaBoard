@@ -63,7 +63,9 @@ export function useFlowCanvasNodeAdapter({
     const localUploadPreview = data().localUpload?.previewUrl.trim()
     if (localUploadPreview) return { url: localUploadPreview }
     const payload = resolveImageNodeDisplayPayload(imageSnapshot.value)
-    return payload ? { url: payload.url, ...(payload.assetId ? { assetId: payload.assetId } : {}) } : null
+    return payload
+      ? { url: payload.url, ...(payload.assetId ? { assetId: payload.assetId } : {}) }
+      : null
   })
   const libraryImport = computed(() => imageSnapshot.value?.libraryImport)
   const localUpload = computed(() => data().localUpload)

@@ -6,7 +6,10 @@ import type { SubmitTaskReadinessData } from '../../../../../shared/api/task'
 import type { ImageStrengthAction } from '../../../application/execution'
 import HomeCanvasImageActionMenu from './ImageActionMenu.vue'
 import { render, screen, waitFor } from '../../../../../test/render'
-import { canvasBillingReadinessKey, type CanvasBillingReadinessStore } from '../../../application/execution'
+import {
+  canvasBillingReadinessKey,
+  type CanvasBillingReadinessStore,
+} from '../../../application/execution'
 import { createCanvasBillingReadinessStore } from '../../../application/execution/billing/readiness.ts'
 
 function createDeferred<T>() {

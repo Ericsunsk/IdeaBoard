@@ -89,10 +89,7 @@ import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.v
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
-import {
-  provideAdminProviderConfig,
-  useProviderConfig,
-} from '../useProviderConfig'
+import { provideAdminProviderConfig, useProviderConfig } from '../useProviderConfig'
 import { useProviderConfigFeedback } from '../useProviderConfigFeedback'
 import SearchProviderCard from '../SearchProviderCard.vue'
 import AdminLogoPickerPopover from '../AdminLogoPickerPopover.vue'

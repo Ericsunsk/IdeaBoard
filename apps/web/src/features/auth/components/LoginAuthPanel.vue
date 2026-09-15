@@ -333,7 +333,7 @@ import { getPasswordLengthError } from '../../../shared/auth/passwordPolicy'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
 import IbFormField from '../../../shared/components/IbFormField.vue'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
-import { getRequiredError } from './formUtils'
+import { getEmailError, getRequiredError } from './formUtils'
 import { useAuthPanelControls } from './panelControls'
 import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../shared/auth/oauthProviders'
 import {
@@ -420,8 +420,8 @@ function resolveFieldControlState(invalid: boolean) {
 function handleFieldBlur(field: LoginField) {
   const value = formValue.value[field].trim()
   if (!value) return
-  if (field === 'identifier' && (!value.includes('@') || value.endsWith('@'))) {
-    errors.value.identifier = t('auth.errors.invalidEmail')
+  if (field === 'identifier' && value.includes('@')) {
+    errors.value.identifier = getEmailError(value, t('auth.errors.invalidEmail'))
   }
 }
 
@@ -472,7 +472,7 @@ async function handleSocialLogin(provider: OAuthProviderCode) {
 
 async function handleResetPassword() {
   const email = resetForm.value.email.trim()
-  resetErrors.value.email = !email || !email.includes('@') ? t('auth.errors.invalidEmail') : ''
+  resetErrors.value.email = getEmailError(email, t('auth.errors.invalidEmail'))
   if (resetErrors.value.email) return
 
   const sent = await runAsyncAction(() => userStore.requestPasswordResetOTP(email), {

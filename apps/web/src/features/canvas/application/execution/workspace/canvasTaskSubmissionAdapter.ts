@@ -1,8 +1,5 @@
 import type { SubmitTaskData, SubmitTaskReadinessRequestData } from '../../../../../shared/api/task'
-import {
-  assertTaskRequestReady,
-  submitTaskRequest,
-} from '../task-runner/imageDirectActionExecutor'
+import { assertTaskRequestReady, submitTaskRequest } from '../task-runner/imageDirectActionExecutor'
 
 export type CanvasTaskSubmission = {
   taskId: string

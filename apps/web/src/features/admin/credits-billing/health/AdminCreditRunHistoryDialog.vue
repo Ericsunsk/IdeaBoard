@@ -62,7 +62,7 @@
             severity="secondary"
             outlined
             :loading="runsLoading"
-            @click="loadRuns()"
+            @click="refreshRuns"
           />
         </div>
       </Message>
@@ -87,7 +87,9 @@
         <Column expander style="width: 52px" />
         <Column header="时间" style="width: 190px">
           <template #body="{ data }">
-            <span class="whitespace-nowrap">{{ formatAdminDateTime(data.requested_at) }}</span>
+            <span class="whitespace-nowrap">{{
+              formatAdminDateTimeWithSeconds(data.requested_at)
+            }}</span>
           </template>
         </Column>
         <Column header="状态" style="width: 110px">
@@ -184,6 +186,8 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useQueryClient } from '@tanstack/vue-query'
+import { useIntervalFn } from '@vueuse/core'
 import { Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
@@ -197,19 +201,16 @@ import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
-import { useCollectionState } from '../../shared/composables/useCollectionState'
 import { useCursorPagination } from '../../shared/composables/useCursorPagination'
+import { useAdminCollectionQuery } from '../../shared/composables/useAdminCollectionQuery'
 import {
-  formatAdminDateTime,
+  formatAdminDateTimeWithSeconds,
   formatReconciliationRunError,
   getRunStatusLabel,
   getRunStatusSeverity,
 } from '../format'
 import { adminActionButtonClass, adminTextButtonClass } from '../../shared/lib/uiClasses'
-import {
-  createAdminCreditRunHistoryResource,
-  type AdminCreditRun,
-} from './runHistoryResource'
+import { createAdminCreditRunHistoryResource, type AdminCreditRun } from './runHistoryResource'
 import {
   formatReconciliationRunDuration,
   formatReconciliationRunResult,
@@ -222,13 +223,29 @@ defineEmits<{ 'update:visible': [visible: boolean] }>()
 
 const expandedRows = ref<Record<string, boolean>>({})
 const resource = createAdminCreditRunHistoryResource()
+const queryClient = useQueryClient()
 let pagination: ReturnType<typeof useCursorPagination<number>>
-const collection = useCollectionState({
-  load: (signal) => resource.list({ beforeId: pagination.cursor.value, signal }),
-  isEmpty: (page) => page.runs.length === 0,
+// TanStack Query owns the list lifecycle (same pattern as the orders pilot).
+// The dialog mounts hidden, so the query stays disabled until opened;
+// closing drops the cached pages so reopening always spins fresh.
+pagination = useCursorPagination<number>({ pending: () => runsLoading.value })
+const RUN_HISTORY_QUERY_ROOT = ['admin', 'credits', 'run-history'] as const
+const RUN_HISTORY_CURSOR_INDEX = RUN_HISTORY_QUERY_ROOT.length
+const runHistoryKey = computed(() => [...RUN_HISTORY_QUERY_ROOT, pagination.cursor.value] as const)
+const {
+  data: runPage,
+  loading: runsLoading,
+  initialError,
+  backgroundError,
+  refresh: refreshRunHistory,
+} = useAdminCollectionQuery({
+  queryKey: runHistoryKey,
+  queryFn: ({ queryKey, signal }) =>
+    resource.list({ beforeId: queryKey[RUN_HISTORY_CURSOR_INDEX] as number | undefined, signal }),
+  enabled: computed(() => props.visible),
+  getNextCursor: (page) => page.next_before_id,
+  pagination,
 })
-const { data: runPage, loading: runsLoading, initialError, backgroundError } = collection
-pagination = useCursorPagination<number>({ pending: runsLoading })
 const runs = computed(() => runPage.value?.runs ?? [])
 const runDetail = useCreditRunDetail<AdminCreditRun>(resource.get)
 const selectedRunId = runDetail.selectedRunId
@@ -245,43 +262,32 @@ watch(
   (visible) => {
     stopRefreshTimer()
     if (!visible) {
-      collection.reset()
+      pagination.reset()
       clearExpansion()
+      void queryClient.removeQueries({ queryKey: [...RUN_HISTORY_QUERY_ROOT] })
       return
     }
     pagination.reset()
     clearExpansion()
-    void loadRuns()
     scheduleRefresh()
   },
 )
 
 onBeforeUnmount(() => {
-  collection.cancel()
   runDetail.close()
   stopRefreshTimer()
 })
 
-async function loadRuns({ preserveData = false }: { preserveData?: boolean } = {}) {
-  const page = await collection.reload({ preserveData })
-  if (page) pagination.setNextCursor(page.next_before_id)
-}
-
 function refreshRuns() {
-  void loadRuns({ preserveData: true })
+  // Same-key refetch: stale rows stay mounted with the table loading state.
+  void refreshRunHistory()
 }
 
-let refreshTimer: number | undefined
-
-function scheduleRefresh() {
-  refreshTimer = window.setInterval(refreshRuns, 5_000)
-}
-
-function stopRefreshTimer() {
-  if (refreshTimer === undefined) return
-  window.clearInterval(refreshTimer)
-  refreshTimer = undefined
-}
+// Polls run history while the dialog is visible — `useIntervalFn` owns the
+// interval lifecycle (auto-paused on unmount), replacing manual setInterval pairing.
+const { pause: stopRefreshTimer, resume: scheduleRefresh } = useIntervalFn(refreshRuns, 5_000, {
+  immediate: false,
+})
 
 function expandRun(event: DataTableRowExpandEvent<AdminCreditRun>) {
   expandedRows.value = { [String(event.data.id)]: true }
@@ -295,13 +301,11 @@ function collapseRun(event: DataTableRowCollapseEvent) {
 function nextPage() {
   if (!pagination.advance()) return
   clearExpansion()
-  void loadRuns()
 }
 
 function previousPage() {
   if (!pagination.retreat()) return
   clearExpansion()
-  void loadRuns()
 }
 
 function clearExpansion() {

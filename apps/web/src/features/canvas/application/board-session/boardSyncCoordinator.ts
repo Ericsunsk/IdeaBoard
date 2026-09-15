@@ -6,7 +6,10 @@ import {
 import type { BoardSession } from './useBoardSession'
 import { i18n } from '../../../../shared/i18n'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
-import { measureCanvasPerf, measureCanvasPerfAsync } from '../../infrastructure/browser/canvasPerfProbe.ts'
+import {
+  measureCanvasPerf,
+  measureCanvasPerfAsync,
+} from '../../infrastructure/browser/canvasPerfProbe.ts'
 import { rebaseStabilizedMedia } from './boardSyncMediaReconciliation'
 
 export type SaveStatus = 'idle' | 'saved' | 'pending' | 'retry' | 'conflict' | 'recover'
@@ -36,9 +39,7 @@ export type BoardSyncCoordinatorOptions = {
 export type BoardSyncCoordinator = {
   canSaveBoard: () => boolean
   loadInitialOrRouteBoard: () => Promise<BoardLoadResult>
-  saveCurrentBoardSnapshot: (
-    options?: SaveCurrentBoardSnapshotOptions,
-  ) => Promise<BoardSaveResult>
+  saveCurrentBoardSnapshot: (options?: SaveCurrentBoardSnapshotOptions) => Promise<BoardSaveResult>
 }
 
 export type BoardLoadResult =

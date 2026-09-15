@@ -1,4 +1,7 @@
-import { isCanvasEditingSurfaceEventTarget, isEditableEventTarget } from '../../infrastructure/browser/domEventTargets.ts'
+import {
+  isCanvasEditingSurfaceEventTarget,
+  isEditableEventTarget,
+} from '../../infrastructure/browser/domEventTargets.ts'
 
 export type FlowKeyboardShortcutHandlers = {
   onSave: () => void | Promise<void>

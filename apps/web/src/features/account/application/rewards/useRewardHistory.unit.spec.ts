@@ -9,8 +9,7 @@ import { useRewardHistory } from './useRewardHistory'
 const fetchRewardRedemptionsMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../../infrastructure/rewards/resource', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../../infrastructure/rewards/resource')>()
+  const actual = await importOriginal<typeof import('../../infrastructure/rewards/resource')>()
   return { ...actual, fetchRewardRedemptions: fetchRewardRedemptionsMock }
 })
 

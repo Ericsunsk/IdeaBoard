@@ -229,7 +229,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useAdminCollectionQuery } from '../../shared/composables/useAdminCollectionQuery'
 import { Eye, Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
@@ -244,11 +245,11 @@ import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
-import { useCollectionState } from '../../shared/composables/useCollectionState'
 import { useCursorPagination } from '../../shared/composables/useCursorPagination'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
 import { adminActionButtonClass, adminFramedIconButtonClass } from '../../shared/lib/uiClasses'
+import { createUniqueId } from '../../../../shared/utils/ids'
 import PaymentOrderDetailDialog from './PaymentOrderDetailDialog.vue'
 import {
   formatPaymentDateTime,
@@ -258,7 +259,11 @@ import {
   paymentOrderStatusOptions,
 } from './paymentOrderPresentation'
 import { createAdminPaymentOrderResource } from './paymentOrderResource'
-import type { AdminPaymentOrderDetail, AdminPaymentOrderStatus } from './paymentOrderTypes'
+import type {
+  AdminPaymentOrderDetail,
+  AdminPaymentOrderStatus,
+  SearchAdminPaymentOrdersInput,
+} from './paymentOrderTypes'
 
 const resource = createAdminPaymentOrderResource()
 const orderNumberSearch = ref('')
@@ -282,20 +287,38 @@ const refundIdempotencyKeys = new Map<string, string>()
 let detailRequestEpoch = 0
 let activeDetailRequest: AbortController | undefined
 
-const collection = useCollectionState({
-  load: (signal) =>
+// TanStack Query owns the list lifecycle (pilot for the Admin collection
+// migration): filter/pagination state feeds the query key, so navigation
+// actions below only mutate state — fetching, cancellation, and background
+// refresh semantics come from the query itself. Pagination is assigned before
+// the query because the key reads the cursor during setup.
+pagination = useCursorPagination<string>({ pending: () => loading.value })
+const orderListCriteria = computed((): Omit<SearchAdminPaymentOrdersInput, 'signal' | 'limit'> => ({
+  orderNumber: appliedOrderNumber.value,
+  user: appliedUser.value,
+  status: statusFilter.value,
+  anomalyOnly: anomalyOnly.value,
+  cursor: pagination.cursor.value,
+}))
+const ORDER_LIST_QUERY_ROOT = ['admin', 'payments', 'orders'] as const
+const ORDER_LIST_CRITERIA_INDEX = ORDER_LIST_QUERY_ROOT.length
+const {
+  data: orderPage,
+  loading,
+  initialError,
+  backgroundError,
+  refresh: refreshOrderList,
+  query: orderListQuery,
+} = useAdminCollectionQuery({
+  queryKey: computed(() => [...ORDER_LIST_QUERY_ROOT, orderListCriteria.value]),
+  queryFn: ({ queryKey, signal }) =>
     resource.search({
-      orderNumber: appliedOrderNumber.value,
-      user: appliedUser.value,
-      status: statusFilter.value,
-      anomalyOnly: anomalyOnly.value,
-      cursor: pagination.cursor.value,
+      ...(queryKey[ORDER_LIST_CRITERIA_INDEX] as typeof orderListCriteria.value),
       signal,
     }),
-  isEmpty: (page) => page.orders.length === 0,
+  getNextCursor: (page) => page.nextCursor,
+  pagination,
 })
-const { data: orderPage, loading, initialError, backgroundError, hasLoadedResult } = collection
-pagination = useCursorPagination<string>({ pending: loading })
 const orders = computed(() => orderPage.value?.orders ?? [])
 const total = computed(() => orderPage.value?.total ?? 0)
 
@@ -310,21 +333,19 @@ const hasCriteria = computed(() =>
   ),
 )
 const showEmptyState = computed(
-  () => hasLoadedResult.value && !loading.value && !initialError.value && collection.isEmpty.value,
+  () =>
+    orderListQuery.isSuccess.value && !loading.value && (orderPage.value?.orders.length ?? 0) === 0,
 )
 const emptyTitle = computed(() => (hasCriteria.value ? '未找到匹配的支付订单' : '暂无支付订单'))
 
-onMounted(() => {
-  void loadOrders()
-})
-
+// The query fetches on mount and cancels on unmount by itself; only the
+// detail request (still hand-rolled, out of pilot scope) needs teardown here.
 onBeforeUnmount(() => {
-  collection.cancel()
   activeDetailRequest?.abort()
 })
 
 watch([statusFilter, anomalyOnly], () => {
-  resetPaginationAndLoad()
+  resetPaginationAndReload()
 })
 
 watch(detailVisible, (visible) => {
@@ -339,25 +360,31 @@ watch(detailVisible, (visible) => {
   refundError.value = ''
 })
 
-async function loadOrders({ preserveData = false }: { preserveData?: boolean } = {}) {
-  const page = await collection.reload({ preserveData })
-  if (page) pagination.setNextCursor(page.nextCursor)
+function refreshOrders() {
+  // Same-key refetch: stale rows stay mounted with the table loading state,
+  // matching the previous background-refresh behavior.
+  void refreshOrderList()
+}
+
+function resetPaginationAndReload() {
+  // Cursor/filter changes feed the query key and refetch by themselves.
+  pagination.reset()
 }
 
 function applySearch() {
   appliedOrderNumber.value = orderNumberSearch.value
   appliedUser.value = userSearch.value
-  resetPaginationAndLoad()
+  resetPaginationAndReload()
 }
 
 function clearOrderNumberSearch() {
   appliedOrderNumber.value = ''
-  resetPaginationAndLoad()
+  resetPaginationAndReload()
 }
 
 function clearUserSearch() {
   appliedUser.value = ''
-  resetPaginationAndLoad()
+  resetPaginationAndReload()
 }
 
 function resetFilters() {
@@ -365,23 +392,12 @@ function resetFilters() {
   anomalyOnly.value = false
 }
 
-function refreshOrders() {
-  void loadOrders({ preserveData: true })
-}
-
-function resetPaginationAndLoad() {
-  pagination.reset()
-  void loadOrders()
-}
-
 function previousPage() {
-  if (!pagination.retreat()) return
-  void loadOrders()
+  pagination.retreat()
 }
 
 function nextPage() {
-  if (!pagination.advance()) return
-  void loadOrders()
+  pagination.advance()
 }
 
 function openDetail(publicOrderNumber: string) {
@@ -410,7 +426,7 @@ async function executeRefund(publicOrderNumber: string, ideaQuantity: number) {
   const key = `${publicOrderNumber}:${ideaQuantity}`
   let idempotencyKey = refundIdempotencyKeys.get(key)
   if (!idempotencyKey) {
-    idempotencyKey = crypto.randomUUID()
+    idempotencyKey = createUniqueId()
     refundIdempotencyKeys.set(key, idempotencyKey)
   }
   refundLoading.value = true

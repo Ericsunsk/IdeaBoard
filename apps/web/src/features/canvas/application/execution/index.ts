@@ -12,10 +12,7 @@ export {
   type ImageTaskAction,
 } from '../../domain/execution-contracts/imageActionExecution.ts'
 export { createImageExecutionPlanner } from './planning/imageExecutionPlan'
-export {
-  resolvePendingImageResultPosition,
-  type PendingImageResultLookup,
-} from './result-nodes'
+export { resolvePendingImageResultPosition, type PendingImageResultLookup } from './result-nodes'
 export { useImageWorkflowExecution } from './runtime/imageWorkflowExecution'
 export {
   createImageWorkflowCommands,

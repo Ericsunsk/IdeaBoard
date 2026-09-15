@@ -51,23 +51,22 @@ export type UseImageWorkflowExecutionOptions = {
 export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOptions) {
   const executionWorkspace = options.executionWorkspace
   const executionCore = executionWorkspace.state.executionCore
-  const { workflowRunner } =
-    assemblePendingImageWorkflow({
-      nodes: options.nodes,
-      edges: options.edges,
-      readCanvasGraphStore: options.readCanvasGraphStore,
-      rendererMetrics: options.rendererMetrics,
-      refreshNodeInternals: options.refreshNodeInternals,
-      flushAutosave: options.flushAutosave,
-      executionCore,
-      isNodeExecutionActive: executionWorkspace.state.isNodeRunning,
-      taskTransport: options.taskTransport,
-      waitTaskImageResults: options.waitTaskImageResults,
-      cancelTasks: options.cancelTasks,
-      onSuccess: options.onSuccess,
-      onWarning: options.onWarning,
-      onError: options.onError,
-    })
+  const { workflowRunner } = assemblePendingImageWorkflow({
+    nodes: options.nodes,
+    edges: options.edges,
+    readCanvasGraphStore: options.readCanvasGraphStore,
+    rendererMetrics: options.rendererMetrics,
+    refreshNodeInternals: options.refreshNodeInternals,
+    flushAutosave: options.flushAutosave,
+    executionCore,
+    isNodeExecutionActive: executionWorkspace.state.isNodeRunning,
+    taskTransport: options.taskTransport,
+    waitTaskImageResults: options.waitTaskImageResults,
+    cancelTasks: options.cancelTasks,
+    onSuccess: options.onSuccess,
+    onWarning: options.onWarning,
+    onError: options.onError,
+  })
 
   function isNodeExecutionActive(nodeId: string): boolean {
     return executionWorkspace.state.isNodeRunning(nodeId)
@@ -81,9 +80,9 @@ export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOpti
     return attachment
   }
 
-  async function resolveExecutionSource<
-    T extends { url: string; assetId?: string | undefined },
-  >(source: T): Promise<T> {
+  async function resolveExecutionSource<T extends { url: string; assetId?: string | undefined }>(
+    source: T,
+  ): Promise<T> {
     if (!source.assetId) return source
     const url = await resolveMediaAssetProcessingURL(source.assetId)
     return { ...source, url }

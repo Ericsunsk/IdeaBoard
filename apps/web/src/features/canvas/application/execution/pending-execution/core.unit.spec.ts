@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import {
-  createEmptyBoardSnapshot,
-  type BoardSnapshot,
-  type ImageNodeItem,
-} from '../../../../board'
+import { createEmptyBoardSnapshot, type BoardSnapshot, type ImageNodeItem } from '../../../../board'
 import { CanvasGraphSession } from '../../../domain/graph'
 import {
   BoardGraphSession,
@@ -16,10 +12,7 @@ import {
   type PendingImageResultNodeId,
 } from './index'
 import type { BoardAttachment } from '../board-attachment'
-import {
-  bindBoardGraphSession,
-  type PendingImageDomainMutationResult,
-} from './boardGraphSession'
+import { bindBoardGraphSession, type PendingImageDomainMutationResult } from './boardGraphSession'
 
 function imageNodeId(id: number): PendingImageResultNodeId {
   return `image-${id}`

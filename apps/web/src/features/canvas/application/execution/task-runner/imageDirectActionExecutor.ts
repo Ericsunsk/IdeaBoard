@@ -57,18 +57,23 @@ export async function waitExistingOrLiveTaskImageResults(
   return settleFastPathTerminal(taskId, task) ?? waitTaskImageResultsWithSse(taskId)
 }
 
-type FastPathTerminalTask = Pick<
-  Task,
-  'status' | 'outputs' | 'result' | 'error_msg' | 'cancel_reason' | 'execution_metrics'
-> | null
-| undefined
+type FastPathTerminalTask =
+  | Pick<
+      Task,
+      'status' | 'outputs' | 'result' | 'error_msg' | 'cancel_reason' | 'execution_metrics'
+    >
+  | null
+  | undefined
 
 /**
  * Single terminal-status settlement for the task fast path (issue #676).
  * Returns the materialized results, throws the mapped terminal error, or
  * returns null when the task is still live (caller continues to SSE wait).
  */
-function settleFastPathTerminal(taskId: string, task: FastPathTerminalTask): TaskImageResult[] | null {
+function settleFastPathTerminal(
+  taskId: string,
+  task: FastPathTerminalTask,
+): TaskImageResult[] | null {
   if (!task) return null
   if (task.status === 'completed') {
     notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'completed' })

@@ -7,6 +7,8 @@ import { getMediaAssetMetadata } from '../../../../../shared/api/mediaAssetDeliv
 import { i18n } from '../../../../../shared/i18n'
 import type { ResolvedTaskImageResult } from './resolvedTaskImageResult'
 import { buildMediaBrowserURL, type MediaRef } from '../../../../../shared/media/mediaRef'
+import { normalizeNaturalSize } from '../../../../../shared/media/imageDimensions'
+import { sleep } from '../../../../../shared/utils/polling'
 
 export type ImageSize = {
   width: number
@@ -43,24 +45,8 @@ async function awaitReceiptDerivativeReady(assetId: string): Promise<void> {
       })
       return
     }
-    await new Promise((resolve) => globalThis.setTimeout(resolve, RECEIPT_DERIVATIVE_POLL_MS))
+    await sleep(RECEIPT_DERIVATIVE_POLL_MS)
   }
-}
-
-function normalizePositiveImageSize(width: unknown, height: unknown): ImageSize | null {
-  const widthNumber = Number(width)
-  const heightNumber = Number(height)
-  if (
-    !Number.isFinite(widthNumber) ||
-    widthNumber <= 0 ||
-    !Number.isFinite(heightNumber) ||
-    heightNumber <= 0
-  ) {
-    return null
-  }
-  const normalizedWidth = Math.max(1, Math.round(widthNumber))
-  const normalizedHeight = Math.max(1, Math.round(heightNumber))
-  return { width: normalizedWidth, height: normalizedHeight }
 }
 
 function pickFirstValidImageResult(results: TaskImageResult[]): TaskImageResult | null {
@@ -107,7 +93,7 @@ export async function resolveTaskImageResultDisplay(
 
   if (normalized.assetId) await awaitReceiptDerivativeReady(normalized.assetId)
 
-  let size = normalizePositiveImageSize(normalized.width, normalized.height)
+  let size = normalizeNaturalSize(Number(normalized.width), Number(normalized.height))
   if (!size) {
     try {
       size = await loadImageSize(normalized.url)

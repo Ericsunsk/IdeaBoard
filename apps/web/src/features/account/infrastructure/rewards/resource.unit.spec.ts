@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  fetchRewardRedemptions,
-  redeemRewardCode,
-  rewardRedemptionsQueryKeys,
-} from './resource'
+import { fetchRewardRedemptions, redeemRewardCode, rewardRedemptionsQueryKeys } from './resource'
 
 const generated = vi.hoisted(() => ({
   listUserRewardRedemptions: vi.fn(),

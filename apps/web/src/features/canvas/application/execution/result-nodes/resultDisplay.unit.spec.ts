@@ -83,7 +83,7 @@ describe('resultDisplay', () => {
       ),
     ).resolves.toEqual({
       url: '/api/user/media-assets/asset_1/derivatives/preview/content',
-      mediaRef: { assetId: 'asset_1', derivativeTier: 'preview', },
+      mediaRef: { assetId: 'asset_1', derivativeTier: 'preview' },
       ratio: 0.5,
       width: 400,
       height: 200,
@@ -102,7 +102,7 @@ describe('resultDisplay', () => {
       ),
     ).resolves.toMatchObject({
       url: '/api/user/media-assets/asset_42/derivatives/preview/content',
-      mediaRef: { assetId: 'asset_42', derivativeTier: 'preview', },
+      mediaRef: { assetId: 'asset_42', derivativeTier: 'preview' },
     })
   })
 
@@ -117,7 +117,7 @@ describe('resultDisplay', () => {
       ),
     ).resolves.toEqual({
       url: '/api/user/media-assets/asset_1/derivatives/preview/content',
-      mediaRef: { assetId: 'asset_1', derivativeTier: 'preview', },
+      mediaRef: { assetId: 'asset_1', derivativeTier: 'preview' },
       ratio: 1.25,
     })
     expect(loadImageSize).toHaveBeenCalledWith(

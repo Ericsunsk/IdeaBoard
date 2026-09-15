@@ -213,10 +213,7 @@ import {
   adminActionButtonClass,
 } from '../../shared/lib/uiClasses'
 import { useAdminPromptConfigWorkspace } from '../workspace'
-import type {
-  FeaturePromptVariable,
-  FeaturePromptVariableTone,
-} from '../workspace'
+import type { FeaturePromptVariable, FeaturePromptVariableTone } from '../workspace'
 import {
   featureMap,
   groupedFeatureGroups,

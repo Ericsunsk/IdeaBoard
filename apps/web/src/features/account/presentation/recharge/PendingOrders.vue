@@ -110,7 +110,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { useNow } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
@@ -137,17 +137,8 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const now = ref(Date.now())
-let refreshTimer: ReturnType<typeof setInterval> | undefined
-
-onMounted(() => {
-  refreshTimer = setInterval(() => {
-    now.value = Date.now()
-  }, 5_000)
-})
-onBeforeUnmount(() => {
-  if (refreshTimer) clearInterval(refreshTimer)
-})
+// 5s ticker for expiry/delayed labels — `useNow` owns the interval lifecycle.
+const now = useNow({ interval: 5_000 })
 
 function isActionPending(publicToken: string, kind: PendingOrderAction['kind']) {
   return (
@@ -196,7 +187,7 @@ function statusTone(status: PendingPaymentOrder['status']) {
 
 function isCreditProcessingDelayed(updatedAt: string) {
   const updatedAtMs = new Date(updatedAt).getTime()
-  return Number.isFinite(updatedAtMs) && now.value - updatedAtMs > 60_000
+  return Number.isFinite(updatedAtMs) && now.value.getTime() - updatedAtMs > 60_000
 }
 
 function expiryText(item: PendingPaymentOrder) {

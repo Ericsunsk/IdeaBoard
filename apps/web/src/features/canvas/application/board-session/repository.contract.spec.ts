@@ -9,11 +9,12 @@ import {
   type BoardSnapshot,
   type BoardState,
 } from '../../../board'
-import { makeBoardSnapshot, makeBoardState, createMockBoardApiRequest } from '../testing/boardFixtures'
 import {
-  createBoardSessionRepository,
-  isBoardSessionRemoteSyncError,
-} from './repository'
+  makeBoardSnapshot,
+  makeBoardState,
+  createMockBoardApiRequest,
+} from '../testing/boardFixtures'
+import { createBoardSessionRepository, isBoardSessionRemoteSyncError } from './repository'
 
 const mocks = vi.hoisted(() => {
   const request = vi.fn()

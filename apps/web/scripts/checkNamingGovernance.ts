@@ -117,7 +117,15 @@ const VUE_RESPONSIBILITY_SUFFIXES = new Set([
   'Navigation',
   'Form',
 ])
-const GENERIC_NAMES = new Set(['common', 'misc', 'utils', 'manager', 'service', 'handler', 'helpers'])
+const GENERIC_NAMES = new Set([
+  'common',
+  'misc',
+  'utils',
+  'manager',
+  'service',
+  'handler',
+  'helpers',
+])
 const ACRONYM_RUNS = ['API', 'SSE', 'URL', 'DTO', 'HTTP', 'IO']
 const VAGUE_VUE_SUFFIXES = ['View', 'Manager', 'Service']
 
@@ -618,8 +626,16 @@ function runSelfTest(): void {
       checkStyleAsset('shared/motion/dialogMotion.css', 'dialogMotion.css')?.kind,
       'style-asset',
     ],
-    ['kept-generic-dir', checkGenericName('features/account/presentation/common', 'common', true), null],
-    ['generic-flagged', checkGenericName('features/x/utils.ts', 'utils.ts', false)?.kind, 'generic-name'],
+    [
+      'kept-generic-dir',
+      checkGenericName('features/account/presentation/common', 'common', true),
+      null,
+    ],
+    [
+      'generic-flagged',
+      checkGenericName('features/x/utils.ts', 'utils.ts', false)?.kind,
+      'generic-name',
+    ],
     [
       'stale-user-prefix',
       checkStaleWorkspacePrefix('features/user/layout/UserLayout.vue', 'UserLayout.vue')?.kind,

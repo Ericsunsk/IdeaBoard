@@ -21,7 +21,10 @@ import {
   type CanvasNodeItem,
 } from '../../../board'
 import type { NodeUiState, PromptNodeUiState } from '../../domain/nodes/canvasNodeUi.ts'
-import { parseHandlePort, resolveSourceImageFromNode } from '../../infrastructure/vue-flow-adapter/flowNodeSourceResolution.ts'
+import {
+  parseHandlePort,
+  resolveSourceImageFromNode,
+} from '../../infrastructure/vue-flow-adapter/flowNodeSourceResolution.ts'
 import { measureCanvasPerf } from '../../infrastructure/browser/canvasPerfProbe.ts'
 
 type FlowEdgeLike = {

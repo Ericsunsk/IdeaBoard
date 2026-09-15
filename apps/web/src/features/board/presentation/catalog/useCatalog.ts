@@ -6,17 +6,10 @@ import { formatCatalogDate } from './format'
 import type { Catalog, CatalogNavigation } from './contract'
 import { useBoardFeedback } from './useBoardFeedback'
 
-export type {
-  CatalogEntry,
-  CatalogSortMode,
-  Catalog,
-  CatalogNavigation,
-} from './contract'
+export type { CatalogEntry, CatalogSortMode, Catalog, CatalogNavigation } from './contract'
 export { formatCatalogDate }
 
-export function createCatalog(options: {
-  navigation: CatalogNavigation
-}): Catalog {
+export function createCatalog(options: { navigation: CatalogNavigation }): Catalog {
   return createGalleryController({
     catalog: useBoardRepository(),
     preview: createBoardPreviewRefreshQueue(),

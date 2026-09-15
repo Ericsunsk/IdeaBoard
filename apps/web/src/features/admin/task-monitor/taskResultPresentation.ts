@@ -5,10 +5,7 @@ import {
 } from '../../../shared/utils/errorMessages'
 import { adminTaskStatuses } from './status'
 import { getSafeTaskResultImageUrl } from './taskResultImages'
-import type {
-  AdminTaskMonitorDetailModel,
-  AdminTaskMonitorListItemModel,
-} from './resource'
+import type { AdminTaskMonitorDetailModel, AdminTaskMonitorListItemModel } from './resource'
 
 const RESULT_MAX_STRING_LENGTH = 300
 const RESULT_DEBUG_MAX_DEPTH = 4

@@ -2,6 +2,7 @@ import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { PaymentReturnContext } from '../../domain'
 import { i18n } from '../../../../shared/i18n'
+import { createUniqueId } from '../../../../shared/utils/ids'
 import {
   billingRecordsQueryKeys,
   creditsQueryKeys,
@@ -121,7 +122,7 @@ export function useRecharge(
       ':',
     )
     if (checkoutIntent?.fingerprint !== fingerprint) {
-      checkoutIntent = { fingerprint, idempotencyKey: globalThis.crypto.randomUUID() }
+      checkoutIntent = { fingerprint, idempotencyKey: createUniqueId() }
     }
 
     const request: PaymentCheckoutRequest = {

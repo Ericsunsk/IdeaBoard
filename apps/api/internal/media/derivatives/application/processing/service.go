@@ -77,7 +77,7 @@ func (s *Service) MaterializeProcessingInput(ctx context.Context, assetID, owner
 	if original == nil || len(original.Data) == 0 {
 		return fmt.Errorf("processing-input source object is empty")
 	}
-	if _, err := imageformat.InspectBytes(original.Data, ""); err != nil {
+	if _, err := imageformat.InspectDetectedBytes(original.Data); err != nil {
 		return fmt.Errorf("inspect processing-input source: %w", err)
 	}
 	encoded, width, height, format, err := s.renderer.Render(renderCtx, original.Data, asset.StorageKey, domain.ProcessingInputMaxSide)

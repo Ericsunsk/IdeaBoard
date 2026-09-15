@@ -50,9 +50,7 @@
         type="password"
         class="w-full font-mono text-xs"
         autocomplete="new-password"
-        :placeholder="
-          isEditAccount ? '留空表示保持原有密钥不变' : '请输入该账号对应的 API Key'
-        "
+        :placeholder="isEditAccount ? '留空表示保持原有密钥不变' : '请输入该账号对应的 API Key'"
         :invalid="invalid"
         :aria-describedby="describedbyId"
         @update:model-value="clearAccountFormError('secret')"

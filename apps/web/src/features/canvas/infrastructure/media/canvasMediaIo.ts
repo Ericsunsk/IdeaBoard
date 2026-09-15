@@ -1,6 +1,10 @@
 /** Shared media URL/Blob/Canvas utilities used across canvas services. */
 import { USER_DOWNLOAD_ENDPOINT } from '../../../../shared/constants/media'
-import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../../shared/config/runtimeUrls'
+import {
+  canonicalizeRuntimeUploadRef,
+  resolveAssetUrl,
+} from '../../../../shared/config/runtimeUrls'
+import { createUniqueSuffix } from '../../../../shared/utils/ids'
 
 /**
  * Returns true if the value is a data: URL.
@@ -115,7 +119,7 @@ export function inferImageExtension(mime: string): string {
 /** Derive a filename from a URL and MIME type. */
 export function filenameFromImageUrl(raw: string, mime: string, fallbackPrefix = 'image'): string {
   const ext = inferImageExtension(mime)
-  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const stamp = createUniqueSuffix()
   if (isDataUrl(raw)) {
     return `flow-mask-${stamp}.${ext}`
   }

@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { useEventListener } from '@vueuse/core'
 import type { SearchResult } from '../domain/models'
 
 export function useSearchLightbox() {
@@ -19,18 +20,18 @@ export function useSearchLightbox() {
     if (event.key === 'Escape' && visible.value) close()
   }
 
-  let active = false
+  // Listener lifetime follows the search session (activate/dispose), not the
+  // component scope — `useEventListener` owns add/removeEventListener pairing.
+  let stopKeydown: (() => void) | null = null
 
   function activate() {
-    if (active) return
-    active = true
-    window.addEventListener('keydown', handleKeydown)
+    if (stopKeydown) return
+    stopKeydown = useEventListener(window, 'keydown', handleKeydown)
   }
 
   function dispose() {
-    if (!active) return
-    active = false
-    window.removeEventListener('keydown', handleKeydown)
+    stopKeydown?.()
+    stopKeydown = null
     close()
   }
 

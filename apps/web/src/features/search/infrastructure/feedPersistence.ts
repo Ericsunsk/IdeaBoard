@@ -1,5 +1,10 @@
 import type { SearchFeedSnapshot, SearchFeedPersistence } from '../ports/persistencePort'
-import { searchScopedStorageKey, searchSessionStorage } from './browserPersistence'
+import { searchScopedStorageKey } from './browserPersistence'
+import {
+  readSessionStorageItem,
+  removeSessionStorageItem,
+  writeSessionStorageItem,
+} from '../../../shared/utils/storage'
 
 const FEED_CACHE_KEY = 'ideaboard:search:feed_cache'
 const FEED_SCROLL_KEY = 'ideaboard:search:feed_scroll'
@@ -28,22 +33,20 @@ function browserWasReloaded(): boolean {
 export function createBrowserSearchFeedPersistence(): SearchFeedPersistence {
   return {
     read(query, scope, allowReloadBypass) {
-      const storage = searchSessionStorage()
-      if (!storage) return null
+      const cacheKey = searchScopedStorageKey(FEED_CACHE_KEY, scope)
+      if (query === '' && allowReloadBypass && browserWasReloaded()) {
+        removeSessionStorageItem(cacheKey)
+        return null
+      }
+      const raw = readSessionStorageItem(cacheKey)
+      if (!raw) return null
       try {
-        const cacheKey = searchScopedStorageKey(FEED_CACHE_KEY, scope)
-        if (query === '' && allowReloadBypass && browserWasReloaded()) {
-          storage.removeItem(cacheKey)
-          return null
-        }
-        const raw = storage.getItem(cacheKey)
-        if (!raw) return null
         const snapshot = JSON.parse(raw) as PersistedSnapshot
         if (snapshot.query !== query || Date.now() - snapshot.timestamp > MAX_CACHE_AGE_MS) {
-          if (Date.now() - snapshot.timestamp > MAX_CACHE_AGE_MS) storage.removeItem(cacheKey)
+          if (Date.now() - snapshot.timestamp > MAX_CACHE_AGE_MS) removeSessionStorageItem(cacheKey)
           return null
         }
-        const scrollY = Number(storage.getItem(scrollKey(scope, query)))
+        const scrollY = Number(readSessionStorageItem(scrollKey(scope, query)))
         return {
           query: snapshot.query,
           results: snapshot.results,
@@ -56,10 +59,8 @@ export function createBrowserSearchFeedPersistence(): SearchFeedPersistence {
       }
     },
     write(snapshot, scope) {
-      const storage = searchSessionStorage()
-      if (!storage) return
       try {
-        storage.setItem(
+        writeSessionStorageItem(
           searchScopedStorageKey(FEED_CACHE_KEY, scope),
           JSON.stringify({ ...snapshot, timestamp: Date.now() }),
         )
@@ -69,10 +70,8 @@ export function createBrowserSearchFeedPersistence(): SearchFeedPersistence {
     },
     writeScroll(scrollY, query, scope) {
       if (!Number.isFinite(scrollY) || scrollY < 0) return
-      const storage = searchSessionStorage()
-      if (!storage) return
       try {
-        storage.setItem(scrollKey(scope, query), String(Math.round(scrollY)))
+        writeSessionStorageItem(scrollKey(scope, query), String(Math.round(scrollY)))
       } catch {
         // Scroll restoration is opportunistic.
       }

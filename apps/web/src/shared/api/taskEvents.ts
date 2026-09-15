@@ -4,6 +4,7 @@ import {
   type TaskResultPayloadLike,
 } from '../query/taskResult'
 import { sanitizeApiErrorMessage } from '../utils/errorMessages'
+import { createPollDelay, sleep } from '../utils/polling'
 import { taskApi } from './task'
 import type { Task } from './task'
 import { notifyUserCreditsInvalidation } from '../query/userCreditsInvalidation'
@@ -209,7 +210,11 @@ async function waitWithPolling(
   deadlineAt: number,
   options: { initialDelayMs: number; maxDelayMs: number },
 ): Promise<TaskImageResult[]> {
-  let nextDelayMs = options.initialDelayMs
+  const nextDelay = createPollDelay({
+    initialDelayMs: options.initialDelayMs,
+    maxDelayMs: options.maxDelayMs,
+    backoffFactor: POLL_BACKOFF_FACTOR,
+  })
   let lastError: unknown
 
   while (Date.now() <= deadlineAt) {
@@ -249,23 +254,13 @@ async function waitWithPolling(
 
     const remainingMs = deadlineAt - Date.now()
     if (remainingMs <= 0) break
-    await sleep(Math.min(nextDelayMs, remainingMs))
-    nextDelayMs = Math.min(
-      options.maxDelayMs,
-      Math.max(nextDelayMs + 1, Math.ceil(nextDelayMs * POLL_BACKOFF_FACTOR)),
-    )
+    await sleep(Math.min(nextDelay.next(), remainingMs))
   }
 
   if (lastError) {
     throw new TaskResultPendingError('timeout')
   }
   throw new TaskResultPendingError('timeout')
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms)
-  })
 }
 
 function isTaskNotFoundError(error: unknown): boolean {

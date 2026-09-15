@@ -4,6 +4,23 @@ import { useTaskResultDetail } from './useTaskResultDetail'
 import { getSafeResultImageUrl, getSafeTaskResultImageUrl } from './taskResultImages'
 import type { AdminTaskMonitorDetailModel } from './resource'
 
+vi.mock('../../../shared/composables/useAppClipboard', () => ({
+  useAppClipboard: () => ({
+    copyText: (text: string) => {
+      const clipboard = (
+        globalThis as { navigator?: { clipboard?: { writeText?: (t: string) => Promise<void> } } }
+      ).navigator?.clipboard
+      if (!clipboard?.writeText) return Promise.resolve(false)
+      return clipboard.writeText(text).then(
+        () => true,
+        () => false,
+      )
+    },
+    copied: ref(false),
+    isSupported: ref(true),
+  }),
+}))
+
 describe('task result image URL validation', () => {
   it.each([
     '/uploads/canvas/user/board/content/image.webp',
@@ -110,12 +127,14 @@ describe('task result image URL validation', () => {
     vi.unstubAllGlobals()
   })
 
-  it('reports unavailable clipboard access as a copy failure', () => {
+  it('reports unavailable clipboard access as a copy failure', async () => {
     const feedback = createTaskResultFeedback()
     vi.stubGlobal('navigator', { clipboard: undefined })
     const detail = useTaskResultDetail(ref<AdminTaskMonitorDetailModel | null>(null), { feedback })
 
     detail.copyToClipboard('task_1')
+    await Promise.resolve()
+    await Promise.resolve()
 
     expect(feedback.copyFailed).toHaveBeenCalledOnce()
     vi.unstubAllGlobals()

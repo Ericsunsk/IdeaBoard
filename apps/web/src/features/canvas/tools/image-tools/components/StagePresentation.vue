@@ -98,5 +98,11 @@ function readMaskCanvasSize(style: Record<string, string> | null, key: 'width' |
 .image-tool-stage-zero-copy {
   position: absolute;
   inset: 0;
+  /* The GL framebuffer is scanline-flipped by design: texture row 0
+     renders at the bottom (see webglEngine updateSourceImage), and the
+     export path depends on it (readPixels bottom-first + putImageData
+     top-first cancel out to an upright file). Mirror only the live canvas
+     back so the on-screen preview matches the node image. */
+  transform: scaleY(-1);
 }
 </style>

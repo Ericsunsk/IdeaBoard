@@ -1,20 +1,16 @@
 import type { LibrarySearchReference, SearchAuthAction } from '../domain/authAction'
 import { normalizeSearchQuery } from '../domain/queryPolicy'
+import {
+  readSessionStorageItem,
+  removeSessionStorageItem,
+  writeSessionStorageItem,
+} from '../../../shared/utils/storage'
 
 const ANONYMOUS_QUERY_GATE_KEY = 'ideaboard:search:anonymous-query-gate'
 const PENDING_ACTION_KEY = 'ideaboard:search:pending-auth-action'
 export const MAX_ANONYMOUS_SEARCH_QUERIES = 5
 
 let pendingAction: SearchAuthAction | null = null
-
-function storage(): Storage | null {
-  if (typeof window === 'undefined') return null
-  try {
-    return window.sessionStorage
-  } catch {
-    return null
-  }
-}
 
 function isPersistableAction(action: SearchAuthAction): boolean {
   return action.kind !== 'vision-search'
@@ -57,42 +53,37 @@ function isPersistedSearchAuthAction(value: unknown): value is SearchAuthAction 
 }
 
 function readPersistedAction(): SearchAuthAction | null {
-  const currentStorage = storage()
-  if (!currentStorage) return null
+  const raw = readSessionStorageItem(PENDING_ACTION_KEY)
+  if (!raw) return null
   try {
-    const raw = currentStorage.getItem(PENDING_ACTION_KEY)
-    if (!raw) return null
     const value: unknown = JSON.parse(raw)
     if (!isPersistedSearchAuthAction(value)) {
-      currentStorage.removeItem(PENDING_ACTION_KEY)
+      removeSessionStorageItem(PENDING_ACTION_KEY)
       return null
     }
     return value
   } catch {
-    currentStorage.removeItem(PENDING_ACTION_KEY)
+    removeSessionStorageItem(PENDING_ACTION_KEY)
     return null
   }
 }
 
 function persistAction(action: SearchAuthAction | null): void {
-  const currentStorage = storage()
-  if (!currentStorage) return
   try {
     if (!action || !isPersistableAction(action)) {
-      currentStorage.removeItem(PENDING_ACTION_KEY)
+      removeSessionStorageItem(PENDING_ACTION_KEY)
       return
     }
-    currentStorage.setItem(PENDING_ACTION_KEY, JSON.stringify(action))
+    writeSessionStorageItem(PENDING_ACTION_KEY, JSON.stringify(action))
   } catch {
     // Private mode or a full session store should not block authentication.
   }
 }
 
 function readTrackedQueries(): string[] {
-  if (typeof window === 'undefined') return []
+  const raw = readSessionStorageItem(ANONYMOUS_QUERY_GATE_KEY)
+  if (!raw) return []
   try {
-    const raw = window.sessionStorage.getItem(ANONYMOUS_QUERY_GATE_KEY)
-    if (!raw) return []
     const value: unknown = JSON.parse(raw)
     if (!Array.isArray(value)) return []
     return [...new Set(value.filter((query): query is string => typeof query === 'string'))].slice(
@@ -115,10 +106,7 @@ export function allowAnonymousSearchQuery(query: string): boolean {
 
   if (typeof window !== 'undefined') {
     try {
-      window.sessionStorage.setItem(
-        ANONYMOUS_QUERY_GATE_KEY,
-        JSON.stringify([...tracked, normalized]),
-      )
+      writeSessionStorageItem(ANONYMOUS_QUERY_GATE_KEY, JSON.stringify([...tracked, normalized]))
     } catch {
       // Private mode or a full session store should not block the user.
     }

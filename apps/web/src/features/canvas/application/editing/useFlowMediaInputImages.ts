@@ -21,6 +21,7 @@ import {
 } from '../../domain/graph'
 import { boardSnapshotToFlow } from '../../infrastructure/vue-flow-adapter/flowSnapshotAdapter.ts'
 import type { MediaRef } from '../../../../shared/media/mediaRef'
+import { createPrefixedId } from '../../../../shared/utils/ids'
 
 export type MediaInputImage = {
   id: string
@@ -271,7 +272,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
         const current = snapshotNode.inputImages
         const snapshotInputLimit = getCanvasNodeImageInputLimit(snapshotNode.type)
         const externalImage: PromptNodeInputImage = {
-          id: `external:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`,
+          id: createPrefixedId('external', ':'),
           sourceType: 'external',
           sourceId: uploaded.assetId,
           url: uploaded.url,

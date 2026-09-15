@@ -2,7 +2,7 @@ import type {
   CreditLedgerTransaction,
   CreditReconciliationRun,
 } from '../../../shared/api/generated-query/model'
-import { formatIdeaAmount } from '../shared/lib/ideaCurrency'
+import { formatIdeaAmount } from '../../../shared/i18n/userIdeaCurrency'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 
 const dateTimeFormat = new Intl.DateTimeFormat('zh-CN', {
@@ -19,7 +19,12 @@ export function formatCredits(value: number) {
   return formatIdeaAmount(value)
 }
 
-export function formatAdminDateTime(value?: string) {
+/**
+ * Admin-local fixed `zh-CN` timestamp with seconds.
+ * Named distinctly from `shared/utils/dateTime.formatAdminDateTime`
+ * (locale-aware, no seconds) to avoid cross-module misuse.
+ */
+export function formatAdminDateTimeWithSeconds(value?: string) {
   if (!value) return '-'
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? '-' : dateTimeFormat.format(date)

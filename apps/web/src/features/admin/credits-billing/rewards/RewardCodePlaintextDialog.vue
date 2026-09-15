@@ -41,6 +41,7 @@ import { ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
+import { useAppClipboard } from '../../../../shared/composables/useAppClipboard'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 
 const props = withDefaults(
@@ -61,14 +62,11 @@ watch(
   },
 )
 
+const { copyText } = useAppClipboard()
+
 async function copy() {
-  try {
-    await navigator.clipboard.writeText(props.plaintext)
-    copied.value = true
-    copyError.value = false
-  } catch {
-    copied.value = false
-    copyError.value = true
-  }
+  const ok = await copyText(props.plaintext)
+  copied.value = ok
+  copyError.value = !ok
 }
 </script>

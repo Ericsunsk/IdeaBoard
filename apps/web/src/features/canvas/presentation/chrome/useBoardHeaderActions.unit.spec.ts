@@ -1,10 +1,7 @@
 import { computed, ref } from 'vue'
 import type { Router } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  createBoardRepository,
-  type BoardRepository,
-} from '../../../board'
+import { createBoardRepository, type BoardRepository } from '../../../board'
 import { replaceBoards } from '../../../board'
 import { clearStoredAuth, setStoredAuth } from '../../../../shared/utils/auth'
 import { useBoardHeaderActions } from './useBoardHeaderActions'
@@ -140,9 +137,7 @@ describe('useBoardHeaderActions', () => {
   })
 
   it('keeps rename visibly pending and blocks another rename until sync completes', async () => {
-    let resolveRename!: (
-      value: Awaited<ReturnType<BoardRepository['commands']['rename']>>,
-    ) => void
+    let resolveRename!: (value: Awaited<ReturnType<BoardRepository['commands']['rename']>>) => void
     const rename = vi.fn(
       () =>
         new Promise<Awaited<ReturnType<BoardRepository['commands']['rename']>>>((resolve) => {

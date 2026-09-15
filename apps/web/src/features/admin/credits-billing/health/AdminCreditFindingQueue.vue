@@ -66,7 +66,7 @@
           severity="secondary"
           outlined
           :loading="loading"
-          @click="loadFindings()"
+          @click="refreshFindings"
         />
       </div>
     </Message>
@@ -127,7 +127,9 @@
       </Column>
       <Column header="最近发现" style="width: 16%; min-width: 170px">
         <template #body="{ data }">
-          <span class="whitespace-nowrap">{{ formatAdminDateTime(data.last_seen_at) }}</span>
+          <span class="whitespace-nowrap">{{
+            formatAdminDateTimeWithSeconds(data.last_seen_at)
+          }}</span>
         </template>
       </Column>
     </DataTableFrame>
@@ -165,19 +167,19 @@
         <div>
           <div class="text-admin-caption font-[700] text-admin-text-3">首次发现</div>
           <div class="mt-1 text-admin-body text-admin-text-1">
-            {{ formatAdminDateTime(selectedFinding.first_seen_at) }}
+            {{ formatAdminDateTimeWithSeconds(selectedFinding.first_seen_at) }}
           </div>
         </div>
         <div>
           <div class="text-admin-caption font-[700] text-admin-text-3">最近发现</div>
           <div class="mt-1 text-admin-body text-admin-text-1">
-            {{ formatAdminDateTime(selectedFinding.last_seen_at) }}
+            {{ formatAdminDateTimeWithSeconds(selectedFinding.last_seen_at) }}
           </div>
         </div>
         <div v-if="selectedFinding.resolved_at">
           <div class="text-admin-caption font-[700] text-admin-text-3">解决时间</div>
           <div class="mt-1 text-admin-body text-admin-text-1">
-            {{ formatAdminDateTime(selectedFinding.resolved_at) }}
+            {{ formatAdminDateTimeWithSeconds(selectedFinding.resolved_at) }}
           </div>
         </div>
       </section>
@@ -221,7 +223,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useAdminCollectionQuery } from '../../shared/composables/useAdminCollectionQuery'
 import { Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
@@ -234,14 +237,13 @@ import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
-import { useCollectionState } from '../../shared/composables/useCollectionState'
 import { useCursorPagination } from '../../shared/composables/useCursorPagination'
 import {
   adminActionButtonClass,
   adminCompactTagClass,
   adminTextButtonClass,
 } from '../../shared/lib/uiClasses'
-import { formatAdminDateTime } from '../format'
+import { formatAdminDateTimeWithSeconds } from '../format'
 import {
   createAdminCreditFindingQueueResource,
   type AdminCreditFinding,
@@ -263,13 +265,34 @@ const selectedFinding = ref<AdminCreditFinding | null>(null)
 const drawerVisible = ref(false)
 let pagination: ReturnType<typeof useCursorPagination<number>>
 const resource = createAdminCreditFindingQueueResource()
-const collection = useCollectionState({
-  load: (signal) =>
-    resource.list({ status: status.value, beforeId: pagination.cursor.value, signal }),
-  isEmpty: (page) => page.findings.length === 0,
+// TanStack Query owns the list lifecycle (same pattern as the orders pilot).
+// The previous recursive refresh timer folds into `refetchInterval`, which
+// follows the status cadence (5s open / 30s resolved) reactively.
+pagination = useCursorPagination<number>({ pending: () => loading.value })
+const FINDING_LIST_QUERY_ROOT = ['admin', 'credits', 'findings'] as const
+const FINDING_LIST_STATUS_INDEX = FINDING_LIST_QUERY_ROOT.length
+const FINDING_LIST_CURSOR_INDEX = FINDING_LIST_QUERY_ROOT.length + 1
+const findingListKey = computed(
+  () => [...FINDING_LIST_QUERY_ROOT, status.value, pagination.cursor.value] as const,
+)
+const {
+  data: findingPage,
+  loading,
+  initialError,
+  backgroundError,
+  refresh: refreshFindingList,
+} = useAdminCollectionQuery({
+  queryKey: findingListKey,
+  queryFn: ({ queryKey, signal }) =>
+    resource.list({
+      status: queryKey[FINDING_LIST_STATUS_INDEX] as AdminCreditFindingStatus,
+      beforeId: queryKey[FINDING_LIST_CURSOR_INDEX] as number | undefined,
+      signal,
+    }),
+  refetchInterval: computed(() => (status.value === 'open' ? 5_000 : 30_000)),
+  getNextCursor: (page) => page.next_before_id,
+  pagination,
 })
-const { data: findingPage, loading, initialError, backgroundError } = collection
-pagination = useCursorPagination<number>({ pending: loading })
 const findings = computed(() => findingPage.value?.findings ?? [])
 const currentPage = pagination.currentPage
 const knownPageCount = pagination.knownPageCount
@@ -290,50 +313,19 @@ watch(status, () => {
   pagination.reset()
   drawerVisible.value = false
   selectedFinding.value = null
-  void loadFindings()
-  scheduleRefresh()
 })
-
-let refreshTimer: number | undefined
-
-onMounted(() => {
-  void loadFindings()
-  scheduleRefresh()
-})
-
-onBeforeUnmount(() => {
-  collection.cancel()
-  if (refreshTimer !== undefined) window.clearTimeout(refreshTimer)
-})
-
-async function loadFindings({ preserveData = false }: { preserveData?: boolean } = {}) {
-  const page = await collection.reload({ preserveData })
-  if (page) pagination.setNextCursor(page.next_before_id)
-}
 
 function refreshFindings() {
-  void loadFindings({ preserveData: true })
-}
-
-function scheduleRefresh() {
-  if (refreshTimer !== undefined) window.clearTimeout(refreshTimer)
-  refreshTimer = window.setTimeout(
-    () => {
-      refreshFindings()
-      scheduleRefresh()
-    },
-    status.value === 'open' ? 5_000 : 30_000,
-  )
+  // Same-key refetch: stale rows stay mounted with the table loading state.
+  void refreshFindingList()
 }
 
 function nextPage() {
   if (!pagination.advance()) return
-  void loadFindings()
 }
 
 function previousPage() {
   if (!pagination.retreat()) return
-  void loadFindings()
 }
 
 function openFinding(finding: AdminCreditFinding) {

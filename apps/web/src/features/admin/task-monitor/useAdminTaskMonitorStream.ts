@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/vue-query'
-import { useDocumentVisibility } from '@vueuse/core'
+import { useDocumentVisibility, useEventSource } from '@vueuse/core'
 import { computed, onScopeDispose, ref, watch } from 'vue'
 import { getGetAdminMonitorQueryKey } from '../../../shared/api/generated-query/admin-monitor/admin-monitor'
 import type { ApiResponseMonitor, MonitorResponse } from '../../../shared/api/generated-query/model'
@@ -31,62 +31,80 @@ export function useAdminTaskMonitorStream() {
   const snapshot = ref<MonitorResponse | null>(null)
   const isPageVisible = computed(() => visibility.value === 'visible')
   const isConnected = computed(() => status.value === 'connected')
-  let eventSource: EventSource | null = null
+  const isSupported = typeof EventSource !== 'undefined'
 
-  function closeStream(nextStatus: AdminMonitorStreamStatus = 'idle') {
-    eventSource?.close()
-    eventSource = null
-    status.value = nextStatus
-  }
+  // Transport owned by `@vueuse/core` (auto-reconnect); this module keeps the
+  // `idle/unsupported/connecting/connected/degraded` contract and the Query
+  // cache write. The non-Vue `/user/events` singleton in
+  // `shared/api/userEventStream.ts` intentionally stays hand-rolled: promise
+  // machinery (`taskEvents.ts`) has no component scope for a composable.
+  const {
+    data,
+    event,
+    status: sourceStatus,
+    error,
+    open,
+    close,
+  } = useEventSource(
+    resolveApiUrl('/admin/monitor/stream'),
+    ['snapshot', 'snapshot_error', 'close'],
+    { immediate: false, autoReconnect: { retries: -1, delay: 1000 }, withCredentials: true },
+  )
 
   function connectStream() {
-    if (typeof EventSource === 'undefined') {
+    if (!isSupported) {
       status.value = 'unsupported'
       return
     }
-    if (eventSource) return
-
     status.value = 'connecting'
-    const source = new EventSource(resolveApiUrl('/admin/monitor/stream'), {
-      withCredentials: true,
-    })
-    eventSource = source
+    open()
+  }
 
-    source.onopen = () => {
-      status.value = 'connected'
-    }
+  function disconnectStream(nextStatus: AdminMonitorStreamStatus = 'idle') {
+    close()
+    status.value = nextStatus
+  }
 
-    source.addEventListener('snapshot', (event: MessageEvent) => {
-      try {
-        const parsed = parseMonitorSnapshot(event.data)
-        if (!parsed) {
-          status.value = 'degraded'
-          return
-        }
-        queryClient.setQueryData(getGetAdminMonitorQueryKey(), parsed.response)
-        snapshot.value = parsed.snapshot
-        status.value = 'connected'
-      } catch {
+  function applySnapshot(raw: string | null | undefined) {
+    if (raw == null) return
+    try {
+      const parsed = parseMonitorSnapshot(raw)
+      if (!parsed) {
         status.value = 'degraded'
+        return
       }
-    })
-
-    source.addEventListener('snapshot_error', () => {
-      status.value = 'degraded'
-    })
-
-    source.addEventListener('close', () => {
-      closeStream('idle')
-      if (isPageVisible.value) connectStream()
-    })
-
-    source.onerror = () => {
+      queryClient.setQueryData(getGetAdminMonitorQueryKey(), parsed.response)
+      snapshot.value = parsed.snapshot
+      status.value = 'connected'
+    } catch {
       status.value = 'degraded'
     }
   }
 
+  watch([event, data], ([nextEvent]) => {
+    if (nextEvent === 'snapshot') applySnapshot(data.value)
+    else if (nextEvent === 'snapshot_error') status.value = 'degraded'
+    else if (nextEvent === 'close') {
+      // Server-initiated close: tear down and reconnect when visible.
+      disconnectStream()
+      if (isPageVisible.value) connectStream()
+    }
+  })
+
+  // Transport state mirrors the contract; CLOSED is intentionally unmapped —
+  // explicit closes set `idle` at the call site and auto-reconnect cycles
+  // through CONNECTING/OPEN on its own.
+  watch(sourceStatus, (next) => {
+    if (next === 'CONNECTING') status.value = 'connecting'
+    else if (next === 'OPEN') status.value = 'connected'
+  })
+
+  watch(error, (next) => {
+    if (next) status.value = 'degraded'
+  })
+
   function reconnect() {
-    closeStream('idle')
+    disconnectStream()
     if (isPageVisible.value) connectStream()
   }
 
@@ -97,12 +115,12 @@ export function useAdminTaskMonitorStream() {
         connectStream()
         return
       }
-      closeStream('idle')
+      disconnectStream()
     },
     { immediate: true },
   )
 
-  onScopeDispose(() => closeStream())
+  onScopeDispose(() => close())
 
   return {
     isConnected,

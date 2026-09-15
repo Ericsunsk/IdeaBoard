@@ -122,11 +122,11 @@ describe('createBoardSessionUploadLifecycle', () => {
 
     expect(snapshot.imageNodes[0]?.outputImages[0]).toMatchObject({
       url: '/api/user/media-assets/asset_201/derivatives/preview/content',
-      mediaRef: { assetId: 'asset_201', derivativeTier: 'preview', },
+      mediaRef: { assetId: 'asset_201', derivativeTier: 'preview' },
     })
     expect(snapshot.fusionNodes[0]?.outputImages[0]).toMatchObject({
       url: '/api/user/media-assets/asset_202/derivatives/preview/content',
-      mediaRef: { assetId: 'asset_202', derivativeTier: 'preview', },
+      mediaRef: { assetId: 'asset_202', derivativeTier: 'preview' },
     })
     expect(snapshot.mediaRefs).toBeUndefined()
   })
@@ -201,11 +201,11 @@ describe('createBoardSessionUploadLifecycle', () => {
 
     expect(snapshot.promptNodes[0]?.inputImages[0]).toMatchObject({
       url: '/api/user/media-assets/asset_301/derivatives/preview/content',
-      mediaRef: { assetId: 'asset_301', derivativeTier: 'preview', },
+      mediaRef: { assetId: 'asset_301', derivativeTier: 'preview' },
     })
     expect(snapshot.fusionNodes[0]?.inputImages[0]).toMatchObject({
       url: '/api/user/media-assets/asset_302/derivatives/preview/content',
-      mediaRef: { assetId: 'asset_302', derivativeTier: 'preview', },
+      mediaRef: { assetId: 'asset_302', derivativeTier: 'preview' },
     })
     expect(snapshot.mediaRefs).toBeUndefined()
   })

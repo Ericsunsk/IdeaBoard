@@ -4,10 +4,6 @@ import { fileURLToPath } from 'node:url'
 
 const webRoot = fileURLToPath(new URL('..', import.meta.url))
 const adminRoot = path.join(webRoot, 'src/features/admin')
-const canonicalCollectionState = path.join(
-  adminRoot,
-  'shared/composables/useCollectionState.ts',
-)
 
 async function listAdminSourceFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory)
@@ -25,8 +21,6 @@ async function main() {
   const duplicateLifecycles: string[] = []
 
   for (const filePath of await listAdminSourceFiles(adminRoot)) {
-    if (filePath === canonicalCollectionState) continue
-
     const source = await readFile(filePath, 'utf8')
     const ownsManualCollectionLifecycle =
       source.includes('initialError') &&
@@ -55,7 +49,9 @@ async function main() {
   }
 
   console.error('Admin collection-state contract failed.')
-  console.error('Use features/admin/shared/composables/useCollectionState for this lifecycle:')
+  console.error(
+    'Own the list lifecycle with TanStack Query (key carries filters/cursor, same-key refetch is the background refresh) instead of a hand-rolled duplicate:',
+  )
   for (const filePath of duplicateLifecycles) console.error(`- ${filePath}`)
   process.exitCode = 1
 }

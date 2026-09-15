@@ -1,3 +1,4 @@
+import { validateEmail } from '../../../shared/auth/passwordPolicy'
 import { markRequiredError } from '../../../shared/utils/formValidation'
 
 export const AUTH_DISPLAY_NAME_LIMIT = {
@@ -14,4 +15,8 @@ export function getLengthError(value: string, limit: { min: number; max: number 
     return `${label} must be between ${limit.min} and ${limit.max} characters`
   }
   return ''
+}
+
+export function getEmailError(value: string, invalidLabel: string) {
+  return validateEmail(value, invalidLabel)
 }

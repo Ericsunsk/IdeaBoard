@@ -31,7 +31,10 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { CanvasGroupFrame, CanvasGroupResizeHandle } from '../../domain/graph/canvasGroupGeometry.ts'
+import type {
+  CanvasGroupFrame,
+  CanvasGroupResizeHandle,
+} from '../../domain/graph/canvasGroupGeometry.ts'
 
 const props = defineProps<{
   frames: CanvasGroupFrame[]

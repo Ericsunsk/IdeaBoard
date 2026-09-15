@@ -9,11 +9,7 @@ import {
   StatsDownSquare,
   Wallet,
 } from '@iconoir/vue'
-import {
-  ADMIN_DEFAULT_PATH,
-  ADMIN_LOGIN_PATH,
-  adminNavigationRouteDefs,
-} from './navigationMeta'
+import { ADMIN_DEFAULT_PATH, ADMIN_LOGIN_PATH, adminNavigationRouteDefs } from './navigationMeta'
 import { isPathUnderRoute } from '../../../shared/constants/routePaths'
 import type { AdminNavigationKey, AdminNavigationRouteDef } from './navigationMeta'
 

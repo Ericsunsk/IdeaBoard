@@ -1,6 +1,9 @@
 import type { ComputedRef, Ref } from 'vue'
 import type { PromptAspectRatio } from '../../../board'
-import type { ActiveNodePanel, ActiveNodePanelKind } from '../../presentation/screens/useFlowActiveNodePanels.ts'
+import type {
+  ActiveNodePanel,
+  ActiveNodePanelKind,
+} from '../../presentation/screens/useFlowActiveNodePanels.ts'
 import type { OutpaintDragAnchor } from './useImageOutpaintOverlay'
 import { useImageOutpaintOverlay } from './useImageOutpaintOverlay'
 import type { CanvasFeedback } from '../workspace/useCanvasFeedback.ts'

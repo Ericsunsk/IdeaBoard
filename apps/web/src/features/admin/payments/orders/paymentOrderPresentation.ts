@@ -1,3 +1,4 @@
+import { formatMinorCurrencyValue } from '../../../../shared/utils/currency'
 import type { AdminPaymentOrderStatus } from './paymentOrderTypes'
 
 type StatusTone = 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast'
@@ -68,18 +69,13 @@ export function formatPaymentDateTime(value?: string): string {
 }
 
 export function formatPaymentMoney(amountMinor?: number, currency?: string): string {
-  if (amountMinor === undefined || !Number.isSafeInteger(amountMinor) || amountMinor < 0) return '—'
-  const normalizedCurrency = currency?.trim().toUpperCase()
-  if (!normalizedCurrency || !/^[A-Z]{3}$/.test(normalizedCurrency)) return '—'
-  const fractionDigits =
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: normalizedCurrency,
-    }).resolvedOptions().maximumFractionDigits ?? 2
-  const divisor = 10 ** fractionDigits
-  return new Intl.NumberFormat('zh-CN', {
-    style: 'currency',
-    currency: normalizedCurrency,
-    currencyDisplay: 'symbol',
-  }).format(amountMinor / divisor)
+  // Payment tables degrade to an em dash instead of throwing; the exact
+  // BigInt math lives in the shared currency helper (float division here
+  // used to lose minor units past MAX_SAFE_INTEGER).
+  try {
+    if (amountMinor === undefined || currency === undefined) return '—'
+    return formatMinorCurrencyValue(amountMinor, currency, 'zh-CN')
+  } catch {
+    return '—'
+  }
 }

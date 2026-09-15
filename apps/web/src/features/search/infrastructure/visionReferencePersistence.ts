@@ -1,13 +1,18 @@
 import type { CachedVisionReference } from '../ports/persistencePort'
 import type { VisionReference } from '../domain/models'
-import { searchScopedStorageKey, searchSessionStorage } from './browserPersistence'
+import { searchScopedStorageKey } from './browserPersistence'
+import {
+  readSessionStorageItem,
+  removeSessionStorageItem,
+  writeSessionStorageItem,
+} from '../../../shared/utils/storage'
 
 const VISION_REF_CACHE_KEY = 'ideaboard:search:vision_refs'
 
 /** Library-backed and External references are reloadable; local File/blob state remains in memory. */
 export function getCachedVisionReferences(scope = 'anonymous'): CachedVisionReference[] {
   try {
-    const raw = searchSessionStorage()?.getItem(searchScopedStorageKey(VISION_REF_CACHE_KEY, scope))
+    const raw = readSessionStorageItem(searchScopedStorageKey(VISION_REF_CACHE_KEY, scope))
     if (!raw) return []
     return (JSON.parse(raw) as CachedVisionReference[]).filter((reference) =>
       Boolean(reference.libraryAssetID || reference.externalReference),
@@ -35,11 +40,9 @@ export function setCachedVisionReferences(
         libraryAssetID: reference.libraryAssetID,
         externalReference: reference.externalReference,
       }))
-    const session = searchSessionStorage()
-    if (!session) return
     const storageKey = searchScopedStorageKey(VISION_REF_CACHE_KEY, scope)
-    if (serializable.length > 0) session.setItem(storageKey, JSON.stringify(serializable))
-    else session.removeItem(storageKey)
+    if (serializable.length > 0) writeSessionStorageItem(storageKey, JSON.stringify(serializable))
+    else removeSessionStorageItem(storageKey)
   } catch {
     // Persistence is optional and must not affect the active query.
   }
@@ -47,7 +50,7 @@ export function setCachedVisionReferences(
 
 export function clearCachedVisionReferences(scope = 'anonymous'): void {
   try {
-    searchSessionStorage()?.removeItem(searchScopedStorageKey(VISION_REF_CACHE_KEY, scope))
+    removeSessionStorageItem(searchScopedStorageKey(VISION_REF_CACHE_KEY, scope))
   } catch {
     // Persistence is optional.
   }

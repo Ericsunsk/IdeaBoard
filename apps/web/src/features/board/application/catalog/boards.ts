@@ -1,4 +1,6 @@
 import { getRecoverableAuthStorageUserScope } from '../../../../shared/utils/auth'
+import { createPrefixedId } from '../../../../shared/utils/ids'
+import { readLocalStorageItem, writeLocalStorageJson } from '../../../../shared/utils/storage'
 
 export interface BoardMeta {
   id: string
@@ -17,12 +19,11 @@ export function publishCatalogChange() {
 }
 
 function readStorageValue(key: string): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem(key)
+  return readLocalStorageItem(key)
 }
 
-function createBoardId(now: number): string {
-  return `board_${now}_${Math.random().toString(36).slice(2, 8)}`
+function createBoardId(): string {
+  return createPrefixedId('board')
 }
 
 export function normalizeBoardName(name: string): string {
@@ -73,10 +74,9 @@ function readRawBoards(): BoardMeta[] {
 }
 
 function writeRawBoards(boards: BoardMeta[]) {
-  if (typeof window === 'undefined') return
   const scopedKey = getScopedStorageKey()
   if (!scopedKey) return
-  localStorage.setItem(scopedKey, JSON.stringify(boards))
+  writeLocalStorageJson(scopedKey, boards)
 }
 
 export function subscribeBoardChanges(listener: () => void): () => void {
@@ -148,7 +148,7 @@ export function createBoard(name = 'Untitled'): BoardMeta {
   const now = Date.now()
   const boards = readRawBoards()
   const board: BoardMeta = {
-    id: createBoardId(now),
+    id: createBoardId(),
     name: makeUniqueBoardName(name),
     createdAt: now,
     updatedAt: now,
@@ -217,7 +217,7 @@ export function duplicateBoard(boardId: string): BoardMeta | null {
   if (!source) return null
   const now = Date.now()
   const copy: BoardMeta = {
-    id: createBoardId(now),
+    id: createBoardId(),
     name: makeUniqueBoardName(`${source.name} Copy`),
     createdAt: now,
     updatedAt: now,

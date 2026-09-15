@@ -1,8 +1,4 @@
-import {
-  formatAdminDisplayError,
-  type AdminToastPort,
-  useAdminToast,
-} from '../shared/lib/toast'
+import { formatAdminDisplayError, type AdminToastPort, useAdminToast } from '../shared/lib/toast'
 
 export type AdminStorageFeedback = {
   loadProfilesFailed: (error: unknown) => void

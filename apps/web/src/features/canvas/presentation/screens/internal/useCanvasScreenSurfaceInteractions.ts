@@ -5,7 +5,10 @@ import { useFlowNodeDragInteractions } from '../useFlowNodeDragInteractions'
 import { useFlowCanvasShellInteractions } from '../useFlowCanvasShellInteractions'
 import { useFlowTransientUiDismissal } from '../useFlowTransientUiDismissal'
 import { useCanvasCustomLayerOverlay } from '../../overlays'
-import { useVueFlowSelectionAdapter, type CanvasVueFlowAdapter } from '../../../infrastructure/vue-flow-adapter'
+import {
+  useVueFlowSelectionAdapter,
+  type CanvasVueFlowAdapter,
+} from '../../../infrastructure/vue-flow-adapter'
 import { useCanvasGroupPresentationInteraction } from '../../nodes/groups'
 import type { CanvasWorkspaceRuntime } from '../../../application/workspace'
 import { useCanvasNodeContextMenu } from '../useCanvasNodeContextMenu'

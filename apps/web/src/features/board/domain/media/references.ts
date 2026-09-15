@@ -1,9 +1,6 @@
 import type { BoardStateMediaRef, BoardSnapshot } from '../document/nodes'
 
-function resolveImageNodeMediaRefRole(
-  base: BoardSnapshot | undefined,
-  refId: string,
-): string {
+function resolveImageNodeMediaRefRole(base: BoardSnapshot | undefined, refId: string): string {
   return (
     base?.mediaRefs?.find(
       (ref) =>

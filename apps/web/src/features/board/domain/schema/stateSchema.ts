@@ -258,7 +258,4 @@ const boardStateShape = v.strictObject({
   updatedAt: finiteNumberSchema,
 })
 
-export const boardStateSchema = boardStateShape satisfies v.GenericSchema<
-  unknown,
-  BoardState
->
+export const boardStateSchema = boardStateShape satisfies v.GenericSchema<unknown, BoardState>

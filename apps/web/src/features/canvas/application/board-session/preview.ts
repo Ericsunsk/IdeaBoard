@@ -1,11 +1,5 @@
-import {
-  assertLatestBoardSnapshot,
-  type BoardSnapshot,
-} from '../../../board'
-import {
-  BOARD_PREVIEW_RENDERER_VERSION,
-  renderBoardPreviewDataUrl,
-} from '../../../board'
+import { assertLatestBoardSnapshot, type BoardSnapshot } from '../../../board'
+import { BOARD_PREVIEW_RENDERER_VERSION, renderBoardPreviewDataUrl } from '../../../board'
 import type { BoardSessionRepository } from './repository'
 
 export type BoardSessionPreviewRenderer = {

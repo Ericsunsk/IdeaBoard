@@ -176,9 +176,7 @@ function getSourcePreview(node: NodeLike): NodeImagePreview | null {
   }
 }
 
-function resolveNodePreview(
-  node: NodeLike,
-): NodeImagePreview | null {
+function resolveNodePreview(node: NodeLike): NodeImagePreview | null {
   return getLatestOutputPreview(node) ?? getSourcePreview(node)
 }
 
@@ -803,9 +801,7 @@ function drawFrame(
   ctx.stroke()
 }
 
-export async function renderBoardPreviewDataUrl(
-  state: BoardSnapshot | null,
-): Promise<string> {
+export async function renderBoardPreviewDataUrl(state: BoardSnapshot | null): Promise<string> {
   if (!state) return ''
   const canvas = createPreviewCanvas()
   if (!canvas) return ''

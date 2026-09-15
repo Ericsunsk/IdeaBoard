@@ -22,9 +22,7 @@ type AdminSystemSettingsLifecycleOptions<T> = {
   feedback: AdminSystemSettingsFeedback
 }
 
-export function useSystemSettingsLifecycle<T>(
-  options: AdminSystemSettingsLifecycleOptions<T>,
-) {
+export function useSystemSettingsLifecycle<T>(options: AdminSystemSettingsLifecycleOptions<T>) {
   const form = ref(clone(options.defaultValue)) as Ref<T>
   const lastSyncedForm = ref(clone(options.defaultValue)) as Ref<T>
   const validationError = ref('')

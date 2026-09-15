@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import {
-  rebuildBoardMediaRefs,
-  type CanvasNodeItem,
-  type ImageNodeItem,
-} from '../../../board'
+import { rebuildBoardMediaRefs, type CanvasNodeItem, type ImageNodeItem } from '../../../board'
 import { makeBoardSnapshot } from '../testing/boardFixtures'
 import { useFlowNodeMediaInputs } from './useFlowNodeMediaInputs'
 

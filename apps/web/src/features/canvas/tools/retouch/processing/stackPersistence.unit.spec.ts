@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  deserializeRetouchStack,
-  serializeRetouchStack,
-} from './stackPersistence'
+import { deserializeRetouchStack, serializeRetouchStack } from './stackPersistence'
 import type { RetouchLayer } from '../model.ts'
 
 describe('retouchStackPersistence', () => {

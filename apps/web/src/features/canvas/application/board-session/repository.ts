@@ -61,10 +61,7 @@ export function createBoardSessionRepository(): BoardSessionRepository {
     return state ? serializeBoardState(state, 'session-snapshot') : null
   }
 
-  async function saveLocal(
-    boardId: string,
-    snapshot: BoardSnapshot,
-  ): Promise<BoardState> {
+  async function saveLocal(boardId: string, snapshot: BoardSnapshot): Promise<BoardState> {
     const normalized = normalizeBoardId(boardId)
     if (!normalized) {
       throw new Error('MISSING_BOARD_ID')

@@ -7,8 +7,5 @@ export type {
   VisionExtraction,
   SearchCatalogProvider,
 } from './domain/models'
-export type {
-  SearchAuthAction,
-  LibrarySearchReference,
-} from './domain/authAction'
+export type { SearchAuthAction, LibrarySearchReference } from './domain/authAction'
 export { clearPendingSearchAuthAction } from './infrastructure/authContinuation'

@@ -1,27 +1,21 @@
 import { computed, inject, provide, readonly, ref, type InjectionKey } from 'vue'
 import { normalizeSafeInternalRedirectPath } from '../../shared/auth/sessionPolicy'
+import {
+  readSessionStorageItem,
+  removeSessionStorageItem,
+  writeSessionStorageItem,
+} from '../../shared/utils/storage'
 
 export type AuthOverlayMode = 'login' | 'register'
 
 const POST_AUTH_PATH_KEY = 'ideaboard:auth:post-auth-path'
 
-function authSessionStorage(): Storage | null {
-  if (typeof window === 'undefined') return null
-  try {
-    return window.sessionStorage
-  } catch {
-    return null
-  }
-}
-
 function persistPostAuthPath(path: string | null): void {
-  const storage = authSessionStorage()
-  if (!storage) return
   try {
     if (path) {
-      storage.setItem(POST_AUTH_PATH_KEY, path)
+      writeSessionStorageItem(POST_AUTH_PATH_KEY, path)
     } else {
-      storage.removeItem(POST_AUTH_PATH_KEY)
+      removeSessionStorageItem(POST_AUTH_PATH_KEY)
     }
   } catch {
     // Authentication must remain available when sessionStorage is unavailable.
@@ -29,13 +23,11 @@ function persistPostAuthPath(path: string | null): void {
 }
 
 function readPostAuthPath(): string | null {
-  const storage = authSessionStorage()
-  if (!storage) return null
   try {
-    const path = storage.getItem(POST_AUTH_PATH_KEY)
+    const path = readSessionStorageItem(POST_AUTH_PATH_KEY)
     if (!path) return null
     const normalized = normalizeSafeInternalRedirectPath(path)?.fullPath ?? null
-    if (!normalized) storage.removeItem(POST_AUTH_PATH_KEY)
+    if (!normalized) removeSessionStorageItem(POST_AUTH_PATH_KEY)
     return normalized
   } catch {
     return null

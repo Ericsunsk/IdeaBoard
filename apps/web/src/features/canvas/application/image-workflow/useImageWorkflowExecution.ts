@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@vue-flow/core'
-import { onScopeDispose, ref, type Ref } from 'vue'
+import { ref, type Ref } from 'vue'
+import { useTimeoutFn } from '@vueuse/core'
 import { i18n } from '../../../../shared/i18n'
 import {
   createImageExecutionPlanner,
@@ -52,37 +53,35 @@ export function useImageWorkflowExecution(
 ): ImageWorkflowExecution {
   const generationUnavailableUntilMs = ref(0)
   const generationUnavailableMessage = ref(defaultGenerationUnavailableMessage())
-  let generationAvailabilityTimer: ReturnType<typeof setTimeout> | null = null
+  const cooldownDelayMs = ref(0)
+  // Cooldown timer owned by `useTimeoutFn` (auto-cancelled on scope dispose).
+  // `interval` stays a ref because each schedule carries its own delay while
+  // `start` only restarts with the configured interval.
+  const { start: startCooldownTimer, stop: stopCooldownTimer } = useTimeoutFn(
+    () => {
+      if (!isGenerationAvailable()) {
+        refreshGenerationAvailabilityAfter(generationUnavailableUntilMs.value - Date.now())
+        return
+      }
+      generationUnavailableUntilMs.value = 0
+      generationUnavailableMessage.value = defaultGenerationUnavailableMessage()
+    },
+    cooldownDelayMs,
+    { immediate: false },
+  )
   // Single task-result waiter shared by the execution workspace and the
   // workflow entrypoint, so completion reconciliation cannot fragment (issue
   // #676). Test doubles inject through the same option on both seams.
-  const waitTaskImageResults =
-    options.waitTaskImageResults ?? waitExistingOrLiveTaskImageResults
+  const waitTaskImageResults = options.waitTaskImageResults ?? waitExistingOrLiveTaskImageResults
 
   function isGenerationAvailable(): boolean {
     return Date.now() >= generationUnavailableUntilMs.value
   }
 
-  function clearGenerationAvailabilityTimer() {
-    if (!generationAvailabilityTimer) return
-    clearTimeout(generationAvailabilityTimer)
-    generationAvailabilityTimer = null
-  }
-
   function refreshGenerationAvailabilityAfter(delayMs: number) {
-    clearGenerationAvailabilityTimer()
-    generationAvailabilityTimer = setTimeout(
-      () => {
-        generationAvailabilityTimer = null
-        if (!isGenerationAvailable()) {
-          refreshGenerationAvailabilityAfter(generationUnavailableUntilMs.value - Date.now())
-          return
-        }
-        generationUnavailableUntilMs.value = 0
-        generationUnavailableMessage.value = defaultGenerationUnavailableMessage()
-      },
-      Math.max(0, delayMs),
-    )
+    stopCooldownTimer()
+    cooldownDelayMs.value = Math.max(0, delayMs)
+    startCooldownTimer()
   }
 
   function handleWorkflowWarning(message: string) {
@@ -101,8 +100,6 @@ export function useImageWorkflowExecution(
     }
     return false
   }
-
-  onScopeDispose(clearGenerationAvailabilityTimer)
 
   const planner = createImageExecutionPlanner(() => ({
     nodes: options.nodes.value,

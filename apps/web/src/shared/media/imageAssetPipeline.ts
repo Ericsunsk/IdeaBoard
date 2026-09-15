@@ -37,24 +37,37 @@ const COMPRESSIBLE_IMAGE_MIME_TYPES = new Set([
   'image/x-ms-bmp',
 ])
 
-const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.png': 'image/png',
-  '.webp': 'image/webp',
-  '.bmp': 'image/bmp',
-  '.avif': 'image/avif',
-  '.heic': 'image/heic',
-  '.heif': 'image/heif',
-}
+/**
+ * Single source of truth for upload image mime/extension mapping.
+ * Mirrors `SUPPORTED_IMAGE_UPLOAD_*` in `shared/constants/media`
+ * (`image/x-ms-bmp` is a Windows alias of BMP with no canonical extension).
+ */
+const IMAGE_FORMAT_TABLE = [
+  { mime: 'image/jpeg', extensions: ['.jpg', '.jpeg'] },
+  { mime: 'image/png', extensions: ['.png'] },
+  { mime: 'image/gif', extensions: ['.gif'] },
+  { mime: 'image/webp', extensions: ['.webp'] },
+  { mime: 'image/bmp', extensions: ['.bmp'] },
+  { mime: 'image/x-ms-bmp', extensions: [] as string[] },
+  { mime: 'image/avif', extensions: ['.avif'] },
+  { mime: 'image/heic', extensions: ['.heic'] },
+  { mime: 'image/heif', extensions: ['.heif'] },
+] as const
 
-const IMAGE_EXTENSION_BY_MIME: Record<string, string> = {
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'image/bmp': '.bmp',
-  'image/x-ms-bmp': '.bmp',
-}
+const IMAGE_MIME_BY_EXTENSION: Record<string, string> = Object.fromEntries(
+  IMAGE_FORMAT_TABLE.flatMap((format) =>
+    format.extensions.map((extension) => [extension, format.mime]),
+  ),
+)
+
+const IMAGE_EXTENSION_BY_MIME: Record<string, string> = Object.fromEntries(
+  IMAGE_FORMAT_TABLE.filter((format) => format.extensions.length > 0).map((format) => [
+    format.mime,
+    format.extensions[0],
+  ]),
+)
+// `image/x-ms-bmp` uploads normalize to the canonical BMP extension.
+IMAGE_EXTENSION_BY_MIME['image/x-ms-bmp'] = '.bmp'
 
 type DetectedImageFormat = {
   mime: string
@@ -78,7 +91,10 @@ function detectImageFormat(data: Uint8Array): DetectedImageFormat | null {
   if (hasBytes(data, 0, [0x89, 0x50, 0x4e, 0x47])) {
     return { mime: 'image/png', extension: '.png', compatibleExtensions: ['.png'] }
   }
-  if (hasBytes(data, 0, [0x47, 0x49, 0x46])) {
+  if (
+    hasBytes(data, 0, [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]) ||
+    hasBytes(data, 0, [0x47, 0x49, 0x46, 0x38, 0x39, 0x61])
+  ) {
     return { mime: 'image/gif', extension: '.gif', compatibleExtensions: ['.gif'] }
   }
   if (hasBytes(data, 0, [0x42, 0x4d])) {

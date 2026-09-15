@@ -69,9 +69,7 @@ export function makePendingImageNodeSnapshot(
   })
 }
 
-export function makeBoardSnapshot(
-  overrides: Partial<BoardSnapshot> = {},
-): BoardSnapshot {
+export function makeBoardSnapshot(overrides: Partial<BoardSnapshot> = {}): BoardSnapshot {
   return assertLatestBoardSnapshot(
     {
       ...createEmptyBoardSnapshot(),

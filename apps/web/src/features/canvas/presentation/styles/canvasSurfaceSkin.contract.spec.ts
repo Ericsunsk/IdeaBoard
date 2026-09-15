@@ -16,9 +16,7 @@ const toolTooltipSkin = readSource('presentation/styles/canvas-tool-tooltip.css'
 const nodeSkin = readSource('presentation/nodes/styles/node-shared.css')
 const nodeToolSkin = readSource('presentation/nodes/styles/node-tool-buttons.css')
 const nodeStageFrame = readSource('presentation/nodes/primitives/NodeStageFrame.vue')
-const imageToolStagePresentation = readSource(
-  'tools/image-tools/components/StagePresentation.vue',
-)
+const imageToolStagePresentation = readSource('tools/image-tools/components/StagePresentation.vue')
 const vueFlowAdapterSkin = readSource('presentation/styles/canvas-vue-flow-adapter-skin.css')
 const canvasMiniMap = readSource('presentation/chrome/CanvasMiniMap.vue')
 const nodeHandleRail = readSource('presentation/nodes/FlowCanvasNodeHandleRail.vue')

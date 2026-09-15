@@ -47,9 +47,7 @@ function createRepository(overrides: Partial<BoardSessionRepository> = {}): Boar
   return {
     exists: vi.fn(() => true),
     load: vi.fn(async () => makeSnapshot(100)),
-    saveLocal: vi.fn(async (_boardId: string, snapshot: BoardSnapshot) =>
-      makeState(snapshot),
-    ),
+    saveLocal: vi.fn(async (_boardId: string, snapshot: BoardSnapshot) => makeState(snapshot)),
     save: vi.fn(async (_boardId: string, snapshot: BoardSnapshot) => makeState(snapshot)),
     setPreview: vi.fn(() => makeState(makeSnapshot(100))),
     sync: vi.fn(async () => undefined),

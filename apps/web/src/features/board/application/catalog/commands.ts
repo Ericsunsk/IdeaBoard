@@ -85,9 +85,7 @@ export interface BoardCommandDependencies {
   deleteBoardState(boardId: string): boolean
   syncBoard(boardId: string): Promise<void>
   syncDeleteBoard(boardId: string): Promise<void>
-  hydrateBoards(
-    options?: HydrateBoardsFromServerOptions,
-  ): Promise<HydrateBoardsFromServerResult>
+  hydrateBoards(options?: HydrateBoardsFromServerOptions): Promise<HydrateBoardsFromServerResult>
   isNameConflictError(error: unknown): boolean
   isNotFoundError(error: unknown): boolean
   clearSyncRollback(boardId: string): void

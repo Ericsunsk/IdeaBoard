@@ -7,7 +7,10 @@ import type {
   GenerationExecutionPlan,
   PreparedFusionExecutionPlan,
 } from '../planning/imageExecutionPlan'
-import { resolveOutpaintPixelGeometry, type OutpaintRect } from '../../../domain/graph/outpaintGeometry.ts'
+import {
+  resolveOutpaintPixelGeometry,
+  type OutpaintRect,
+} from '../../../domain/graph/outpaintGeometry.ts'
 import {
   buildExecutionTaskRequest,
   EXECUTION_FEATURE,
@@ -15,7 +18,10 @@ import {
   EXECUTION_PARTIAL_EDIT_META,
   EXECUTION_META,
 } from '../../../domain/execution-contracts/executionContract.ts'
-import { buildExecutionSizeParams, type ExecutionImageSize } from '../../../domain/execution-contracts/sizeParams.ts'
+import {
+  buildExecutionSizeParams,
+  type ExecutionImageSize,
+} from '../../../domain/execution-contracts/sizeParams.ts'
 import { buildPromptAspectRatioTaskParams } from '../../../domain/execution-contracts/promptAspectRatioTaskParams.ts'
 import { assertRequestedOutputCount } from '../../../../../shared/domain/generationContract'
 import type { OutputResolution } from '../../../../../shared/domain/generationContract'

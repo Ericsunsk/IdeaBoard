@@ -13,7 +13,9 @@ export type { AccountEditor } from './accountEditor'
 export type AdminProviderConfigContext = ReturnType<typeof useProviderConfig>
 export type AdminProviderConfigCommands = AdminProviderConfigContext['commands']
 
-const ADMIN_PROVIDER_CONFIG_KEY: InjectionKey<AdminProviderConfigContext> = Symbol('AdminProviderConfigContext')
+const ADMIN_PROVIDER_CONFIG_KEY: InjectionKey<AdminProviderConfigContext> = Symbol(
+  'AdminProviderConfigContext',
+)
 
 export function provideAdminProviderConfig(context: AdminProviderConfigContext) {
   provide(ADMIN_PROVIDER_CONFIG_KEY, context)

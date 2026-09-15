@@ -53,11 +53,26 @@ func TestValidateRejectsWeakBindings(t *testing.T) {
 }
 
 func TestLocalSource(t *testing.T) {
+	// Builtin-local keys carry the uploads root, which is mounted below /data
+	// by Compose and therefore remains part of the imgproxy source path.
 	got, err := LocalSource("uploads/canvas/u/b/content/image.png")
 	if err != nil || got != "local:///uploads/canvas/u/b/content/image.png" {
 		t.Fatalf("got %q err %v", got, err)
 	}
 	if _, err := LocalSource("  "); err == nil {
 		t.Fatal("blank key should fail")
+	}
+	for _, key := range []string{
+		"uploads/",
+		"uploads///",
+		"uploads/.",
+		"uploads/./image.png",
+		"uploads/../image.png",
+		"media/image.png",
+		"etc/passwd",
+	} {
+		if _, err := LocalSource(key); err == nil {
+			t.Fatalf("invalid local source key %q should fail", key)
+		}
 	}
 }

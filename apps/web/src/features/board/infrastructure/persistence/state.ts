@@ -5,13 +5,15 @@ import {
   type BoardState,
 } from '../../domain'
 import { getRecoverableAuthStorageUserScope } from '../../../../shared/utils/auth'
+import { readLocalStorageItem, writeLocalStorageItem } from '../../../../shared/utils/storage'
 import { normalizeBoardState, serializeBoardState } from './boardStateSerialization'
 
 const STORAGE_KEY_PREFIX = 'ideaboard.canvas.boardStates.v2'
 
 function readStorageValue(key: string): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem(key)
+  return readLocalStorageItem(key, (error) => {
+    console.warn('[canvas] read board state failed', error)
+  })
 }
 
 function getScopedStorageKey(): string | null {
@@ -79,8 +81,10 @@ function tryWriteRawStateMap(stateMap: Record<string, BoardState>): boolean {
   const scopedKey = getScopedStorageKey()
   if (!scopedKey) return true
   try {
-    localStorage.setItem(scopedKey, JSON.stringify(stateMap))
-    return true
+    const raw = JSON.stringify(stateMap)
+    return writeLocalStorageItem(scopedKey, raw, (error) => {
+      console.warn('[canvas] persist board state failed', error)
+    })
   } catch (error) {
     console.warn('[canvas] persist board state failed', error)
     return false
@@ -127,10 +131,7 @@ export function loadBoardState(boardId: string): BoardState | null {
   return stateMap[id] || null
 }
 
-export function setBoardState(
-  boardId: string,
-  state: BoardSnapshot,
-): BoardState | null {
+export function setBoardState(boardId: string, state: BoardSnapshot): BoardState | null {
   const id = normalizeBoardId(boardId)
   if (!id) return null
   const stateMap = readRawStateMap()

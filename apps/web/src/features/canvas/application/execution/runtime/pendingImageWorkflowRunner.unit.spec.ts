@@ -29,9 +29,7 @@ function createHarness(taskIds: readonly string[] = ['task-1']) {
   )
   const store = CanvasGraphSession.hydrate('board-a', snapshot)
   const core = createPendingImageExecutionCore()
-  const attachment = core.attachBoard(
-    BoardGraphSession.create('board-a', { graphSession: store }),
-  )
+  const attachment = core.attachBoard(BoardGraphSession.create('board-a', { graphSession: store }))
   const pendingResults = {
     reservePendingResults: vi.fn(() => ({
       resultNodeIds: taskIds.map((_, index) => `image-${index + 1}`),

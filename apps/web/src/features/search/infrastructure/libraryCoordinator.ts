@@ -1,9 +1,6 @@
 import type { SearchLibraryCoordinator } from '../ports/libraryCoordinatorPort'
 import { inject, provide, type InjectionKey } from 'vue'
-import {
-  createLibraryFolderFacts,
-  createLibraryMutationPublisher,
-} from '../../library'
+import { createLibraryFolderFacts, createLibraryMutationPublisher } from '../../library'
 import {
   removeSearchReference,
   saveSearchReference,

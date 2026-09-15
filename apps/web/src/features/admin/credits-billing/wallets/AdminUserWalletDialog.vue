@@ -335,7 +335,7 @@
             <Column header="时间" style="width: 160px">
               <template #body="{ data }">
                 <span class="font-mono text-admin-caption text-admin-text-3 whitespace-nowrap">
-                  {{ formatAdminDateTime(data.created_at) }}
+                  {{ formatAdminDateTimeWithSeconds(data.created_at) }}
                 </span>
               </template>
             </Column>
@@ -394,16 +394,13 @@ import { adminActionButtonClass, adminCompactTagClass } from '../../shared/lib/u
 import AdminActionReasonField from '../AdminActionReasonField.vue'
 import { useAdminCreditsBillingOperationsFeedback } from '../feedback'
 import {
-  formatAdminDateTime,
+  formatAdminDateTimeWithSeconds,
   formatCredits,
   getCreditCommandLabel,
   getCreditCommandSeverity,
   getCreditCommandSign,
 } from '../format'
-import {
-  useAdminCreditWalletResource,
-  type AdminCreditLedgerTransaction,
-} from './resource'
+import { useAdminCreditWalletResource, type AdminCreditLedgerTransaction } from './resource'
 import { type AdminCreditCommandKind, validateAdminCreditCommand } from './creditCommandContract'
 
 type AdminUserWalletTarget = {

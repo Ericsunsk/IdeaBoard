@@ -1,7 +1,7 @@
 <template>
-  <div ref="viewportRef" class="relative min-h-0 w-full" :style="{ height: `${totalHeight}px` }">
+  <div ref="viewportRef" class="relative min-h-0 w-full" :style="{ height: `${contentHeight}px` }">
     <slot
-      v-for="entry in visibleEntries"
+      v-for="entry in renderedEntries"
       :key="entry.key"
       :item="entry.item"
       :index="entry.index"
@@ -12,6 +12,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useVirtualizer, useWindowVirtualizer, type Virtualizer } from '@tanstack/vue-virtual'
 import type { SearchResult } from '../../domain/models'
 
 const props = withDefaults(
@@ -40,22 +41,10 @@ const emit = defineEmits<{
   'scroll-position': [scrollTop: number]
 }>()
 
-const viewportRef = ref<HTMLElement | null>(null)
-const containerWidth = ref(0)
-const scrollTop = ref(0)
-const viewportHeight = ref(0)
-const viewportOffsetTop = ref(0)
-let resizeObserver: ResizeObserver | null = null
-let frame: number | null = null
-let needsLayoutMeasure = false
-let paginationRequestedForHeight: number | null = null
-
-type LayoutEntry = {
+type RenderedEntry = {
   item: SearchResult
   index: number
   key: string
-  top: number
-  height: number
   style: {
     position: 'absolute'
     top: string
@@ -64,7 +53,19 @@ type LayoutEntry = {
   }
 }
 
-const columns = computed(() => {
+const viewportRef = ref<HTMLElement | null>(null)
+const containerWidth = ref(0)
+const viewportHeight = ref(0)
+// Offset of this container from the start of the scroll content — the
+// `scrollMargin` the virtualizers measure from. Stable across scrolls;
+// only content above this container moves it.
+const contentOffsetTop = ref(0)
+let resizeObserver: ResizeObserver | null = null
+let paginationRequestedForHeight: number | null = null
+
+// Responsive lane count and geometry mirror the previous hand-rolled masonry:
+// shortest-lane-first placement keyed off aspect-ratio estimates.
+const laneCount = computed(() => {
   if (containerWidth.value < 640) return 1
   if (containerWidth.value < 768) return 2
   if (containerWidth.value < 1024) return 3
@@ -72,129 +73,177 @@ const columns = computed(() => {
   return props.compact ? 4 : 5
 })
 
-const gap = computed(() => (props.compact ? 14 : 16))
-const layout = computed(() => {
+const gapPx = computed(() => (props.compact ? 14 : 16))
+const laneWidth = computed(() => {
   const width = containerWidth.value
-  if (width <= 0 || props.items.length === 0) {
-    return { columns: [] as LayoutEntry[][], totalHeight: 0 }
+  if (width <= 0) return 0
+  return (width - gapPx.value * (laneCount.value - 1)) / laneCount.value
+})
+
+function aspectRatio(item: SearchResult): number {
+  return item.height > 0 && item.width > 0 ? item.height / item.width : 1
+}
+
+const FALLBACK_CARD_HEIGHT = 320
+
+function estimateCardHeight(index: number): number {
+  const item = props.items[index]
+  if (!item) return FALLBACK_CARD_HEIGHT
+  if (laneWidth.value <= 0) return FALLBACK_CARD_HEIGHT
+  return laneWidth.value * aspectRatio(item)
+}
+
+function itemKey(index: number): string {
+  const item = props.items[index]
+  return item ? `${item.provider}:${item.id}` : `${index}`
+}
+
+// Window scrolling needs the window-flavored observers, so both virtualizers
+// exist and exactly one is enabled. The idle one measures nothing.
+const useElementScroll = computed(() => props.scrollRoot !== null)
+
+// TanStack counts `overscan` in items, not pixels. Translate the pixel budget
+// (the prop contract) into an item count from the estimated average card
+// height. Must not read `getTotalSize()` here: that would feed the virtualizer
+// output back into its own options and cause recompute jitter.
+const indexOverscan = computed(() => {
+  const count = props.items.length
+  if (count === 0 || laneWidth.value <= 0) return 4
+  const sample = Math.min(count, 20)
+  let sum = 0
+  for (let i = 0; i < sample; i += 1) {
+    const item = props.items[i]
+    if (item) sum += laneWidth.value * aspectRatio(item)
   }
-  const columnWidth = (width - gap.value * (columns.value - 1)) / columns.value
-  const heights = Array.from({ length: columns.value }, () => 0)
-  const columnEntries = Array.from({ length: columns.value }, () => [] as LayoutEntry[])
-  props.items.forEach((item, index) => {
-    const column = heights.indexOf(Math.min(...heights))
-    const height = columnWidth * (item.height > 0 && item.width > 0 ? item.height / item.width : 1)
-    const top = heights[column] ?? 0
-    heights[column] = top + height + gap.value
-    columnEntries[column]?.push({
-      item,
-      index,
-      key: `${item.provider}:${item.id}`,
-      top,
-      height,
+  const avg = sum > 0 ? sum / sample : FALLBACK_CARD_HEIGHT
+  if (avg <= 0) return 4
+  return Math.min(count, Math.max(1, Math.ceil(((props.overscan * 2) / avg) * laneCount.value)))
+})
+
+const elementVirtualizer = useVirtualizer(
+  computed(() => ({
+    count: props.items.length,
+    getScrollElement: () => props.scrollRoot,
+    estimateSize: estimateCardHeight,
+    getItemKey: itemKey,
+    lanes: laneCount.value,
+    laneAssignmentMode: 'estimate' as const,
+    gap: gapPx.value,
+    overscan: indexOverscan.value,
+    scrollMargin: contentOffsetTop.value,
+    enabled: useElementScroll.value,
+  })),
+)
+
+const windowVirtualizer = useWindowVirtualizer(
+  computed(() => ({
+    count: props.items.length,
+    estimateSize: estimateCardHeight,
+    getItemKey: itemKey,
+    lanes: laneCount.value,
+    laneAssignmentMode: 'estimate' as const,
+    gap: gapPx.value,
+    overscan: indexOverscan.value,
+    scrollMargin: contentOffsetTop.value,
+    enabled: !useElementScroll.value,
+  })),
+)
+
+// NOTE: this must stay a plain function, not a computed. The adapter pushes
+// updates via `triggerRef` on a stable instance, and a computed returning that
+// same instance reference would swallow the notification (`Object.is` equal),
+// silently freezing scroll/windowing updates downstream.
+function getActiveVirtualizer(): Virtualizer<HTMLElement, Element> | Virtualizer<Window, Element> {
+  return useElementScroll.value ? elementVirtualizer.value : windowVirtualizer.value
+}
+
+const renderedEntries = computed<RenderedEntry[]>(() => {
+  const virtualizer = getActiveVirtualizer()
+  const width = laneWidth.value
+  if (width <= 0) return []
+  const margin = contentOffsetTop.value
+  const gap = gapPx.value
+  return virtualizer.getVirtualItems().map((virtual) => {
+    const item = props.items[virtual.index]
+    // `getVirtualItems` never yields indexes outside `count`, and `count`
+    // always equals `items.length`; the guard is for type narrowing only.
+    const safeItem = item ?? props.items[0]!
+    return {
+      item: safeItem,
+      index: virtual.index,
+      key: virtual.key as string,
       style: {
         position: 'absolute' as const,
-        top: `${top}px`,
-        left: `${column * (columnWidth + gap.value)}px`,
-        width: `${columnWidth}px`,
+        top: `${virtual.start - margin}px`,
+        left: `${virtual.lane * (width + gap)}px`,
+        width: `${width}px`,
       },
-    })
+    }
   })
-  return {
-    columns: columnEntries,
-    totalHeight: Math.max(...heights) - gap.value,
-  }
 })
 
-const totalHeight = computed(() => layout.value.totalHeight)
-
-const visibleEntries = computed(() => {
-  const start = scrollTop.value - viewportOffsetTop.value - props.overscan
-  const end = start + viewportHeight.value + props.overscan * 2
-  const visible: LayoutEntry[] = []
-  for (const column of layout.value.columns) {
-    let low = 0
-    let high = column.length
-    while (low < high) {
-      const middle = (low + high) >>> 1
-      const entry = column[middle]
-      if (entry && entry.top + entry.height < start) low = middle + 1
-      else high = middle
-    }
-    for (let index = low; index < column.length; index += 1) {
-      const entry = column[index]
-      if (!entry || entry.top > end) break
-      visible.push(entry)
-    }
-  }
-  return visible.sort((left, right) => left.index - right.index)
+const contentHeight = computed(() => {
+  if (laneWidth.value <= 0) return 0
+  return Math.max(0, getActiveVirtualizer().getTotalSize())
 })
 
-function scheduleFrame(measureLayout: boolean) {
-  needsLayoutMeasure ||= measureLayout
-  if (frame !== null) return
-  frame = requestAnimationFrame(() => {
-    frame = null
-    const element = viewportRef.value
-    if (!element) return
-    const root = props.scrollRoot
-    scrollTop.value = root?.scrollTop ?? window.scrollY
-    emit('scroll-position', scrollTop.value)
-    if (needsLayoutMeasure) {
-      needsLayoutMeasure = false
-      containerWidth.value = element.clientWidth
-      viewportHeight.value = root?.clientHeight ?? window.innerHeight
-      const rootTop = root?.getBoundingClientRect().top ?? 0
-      viewportOffsetTop.value = element.getBoundingClientRect().top - rootTop + scrollTop.value
-    }
-    requestNextPageIfNeeded()
-  })
+function measureContainer() {
+  const element = viewportRef.value
+  if (!element) return
+  containerWidth.value = element.clientWidth
+  const root = props.scrollRoot
+  viewportHeight.value = root?.clientHeight ?? window.innerHeight
+  const scrollTop = root?.scrollTop ?? window.scrollY
+  const rootTop = root?.getBoundingClientRect().top ?? 0
+  contentOffsetTop.value = element.getBoundingClientRect().top - rootTop + scrollTop
 }
+
+// Lane width lives inside the `estimateSize` closure where the virtualizer
+// memo cannot see it — rebuild explicitly so assignments never go stale.
+watch(laneWidth, () => {
+  getActiveVirtualizer().measure()
+})
+
+watch(
+  () => getActiveVirtualizer().scrollOffset,
+  (offset) => {
+    if (offset != null) emit('scroll-position', offset)
+  },
+)
 
 /** The viewport owns geometry and observation only; the feed decides whether a load is valid. */
 function requestNextPageIfNeeded() {
-  if (!props.hasMore || props.loading || totalHeight.value <= 0) return
-  const viewportBottom = scrollTop.value - viewportOffsetTop.value + viewportHeight.value
-  if (viewportBottom + props.overscan < totalHeight.value) return
-  if (paginationRequestedForHeight === totalHeight.value) return
-  paginationRequestedForHeight = totalHeight.value
+  const virtualizer = getActiveVirtualizer()
+  if (!props.hasMore || props.loading || laneWidth.value <= 0) return
+  const total = virtualizer.getTotalSize()
+  if (total <= 0) return
+  const viewportBottom = (virtualizer.scrollOffset ?? 0) + viewportHeight.value
+  if (viewportBottom + props.overscan < total) return
+  if (paginationRequestedForHeight === total) return
+  paginationRequestedForHeight = total
   emit('load-next-page')
 }
 
-function scheduleScrollUpdate() {
-  scheduleFrame(false)
-}
+const paginationProbe = computed(() => ({
+  offset: getActiveVirtualizer().scrollOffset,
+  height: contentHeight.value,
+  viewport: viewportHeight.value,
+  count: props.items.length,
+  hasMore: props.hasMore,
+  loading: props.loading,
+}))
 
-function scheduleLayoutMeasure() {
-  scheduleFrame(true)
-}
-
-function attachScrollRoot(root: HTMLElement | null) {
-  root?.addEventListener('scroll', scheduleScrollUpdate, { passive: true })
-  scheduleLayoutMeasure()
-  return () => root?.removeEventListener('scroll', scheduleScrollUpdate)
-}
-
-let detachScrollRoot = () => {}
-watch(
-  () => props.scrollRoot,
-  (root) => {
-    detachScrollRoot()
-    detachScrollRoot = attachScrollRoot(root)
-  },
-  { immediate: true },
-)
+watch(paginationProbe, () => requestNextPageIfNeeded())
 
 watch(
   () => props.items,
   () => {
     paginationRequestedForHeight = null
-    scheduleLayoutMeasure()
   },
 )
-watch(() => [props.compact, props.hasMore, props.loading], scheduleLayoutMeasure)
+
 watch(
-  [visibleEntries, () => props.activeAnchor],
+  [renderedEntries, () => props.activeAnchor],
   () => {
     const anchor = props.activeAnchor
     if (!anchor) return
@@ -205,22 +254,29 @@ watch(
   { flush: 'post' },
 )
 
+watch(
+  () => props.scrollRoot,
+  () => {
+    measureContainer()
+  },
+)
+
 onMounted(async () => {
   await nextTick()
-  resizeObserver = new ResizeObserver(scheduleLayoutMeasure)
+  resizeObserver = new ResizeObserver(() => measureContainer())
   if (viewportRef.value) {
     resizeObserver.observe(viewportRef.value)
     if (viewportRef.value.parentElement) resizeObserver.observe(viewportRef.value.parentElement)
   }
-  window.addEventListener('resize', scheduleLayoutMeasure, { passive: true })
-  scheduleLayoutMeasure()
+  window.addEventListener('resize', measureContainer, { passive: true })
+  measureContainer()
+  getActiveVirtualizer().measure()
+  requestNextPageIfNeeded()
 })
 
 onBeforeUnmount(() => {
   if (props.activeAnchor) emit('active-anchor-hidden')
-  detachScrollRoot()
   resizeObserver?.disconnect()
-  window.removeEventListener('resize', scheduleLayoutMeasure)
-  if (frame !== null) cancelAnimationFrame(frame)
+  window.removeEventListener('resize', measureContainer)
 })
 </script>

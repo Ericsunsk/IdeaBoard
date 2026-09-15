@@ -1,9 +1,4 @@
-export type {
-  CatalogEntry,
-  CatalogSortMode,
-  Catalog,
-  CatalogNavigation,
-} from './contract'
+export type { CatalogEntry, CatalogSortMode, Catalog, CatalogNavigation } from './contract'
 export { createCatalog, formatCatalogDate, useCatalog } from './useCatalog'
 export { createGalleryController } from './galleryController'
 export { createCommandHandlers } from './commandHandlers'

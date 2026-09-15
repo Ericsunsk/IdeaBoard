@@ -132,14 +132,64 @@ const PRIVATE_ROUTE_SEO: RouteSeo = {
   robots: 'noindex,nofollow',
 }
 
-function upsertMeta(selector: string, attributes: Record<string, string>, content: string) {
+export type RouteSeoMetaTag =
+  { name: string; content: string } | { property: string; content: string }
+
+export type RouteSeoTags = {
+  title: string
+  lang: string
+  canonical: string | null
+  meta: RouteSeoMetaTag[]
+  jsonLd?: Record<string, unknown> | undefined
+}
+
+export function isNameMetaTag(tag: RouteSeoMetaTag): tag is { name: string; content: string } {
+  return 'name' in tag
+}
+
+export function metaTagAttribute(tag: RouteSeoMetaTag): {
+  name: 'name' | 'property'
+  value: string
+} {
+  return isNameMetaTag(tag)
+    ? { name: 'name', value: tag.name }
+    : { name: 'property', value: tag.property }
+}
+
+/**
+ * Single tag descriptor shared by the client router guard (`applyRouteSeo`)
+ * and the build-time static HTML renderer (`renderStaticSeoDocument`).
+ * Add or rename a tag here — never in only one of the two sinks.
+ */
+export function buildRouteSeoTags(seo: RouteSeo): RouteSeoTags {
+  const canonical = seo.canonicalPath ? `${PUBLIC_SITE_ORIGIN}${seo.canonicalPath}` : null
+  return {
+    title: seo.title,
+    lang: 'en',
+    canonical,
+    meta: [
+      { name: 'description', content: seo.description },
+      { name: 'robots', content: seo.robots },
+      { property: 'og:title', content: seo.title },
+      { property: 'og:description', content: seo.description },
+      { property: 'og:type', content: 'website' },
+      { property: 'og:url', content: canonical ?? PUBLIC_SITE_ORIGIN },
+      { property: 'og:site_name', content: 'IdeaBoard' },
+    ],
+    ...(seo.jsonLd ? { jsonLd: seo.jsonLd } : {}),
+  }
+}
+
+function upsertMetaTag(tag: RouteSeoMetaTag) {
+  const attr = metaTagAttribute(tag)
+  const selector = `meta[${attr.name}="${attr.value}"]`
   let element = document.head.querySelector<HTMLMetaElement>(selector)
   if (!element) {
     element = document.createElement('meta')
-    Object.entries(attributes).forEach(([name, value]) => element!.setAttribute(name, value))
+    element.setAttribute(attr.name, attr.value)
     document.head.appendChild(element)
   }
-  element.setAttribute('content', content)
+  element.setAttribute('content', tag.content)
 }
 
 function upsertCanonical(href: string) {
@@ -176,23 +226,17 @@ export function resolveRouteSeo(route: RouteSeoLocation): RouteSeo {
 
 export function applyRouteSeo(route: RouteSeoLocation): RouteSeo {
   const seo = resolveRouteSeo(route)
-  const canonical = seo.canonicalPath ? `${PUBLIC_SITE_ORIGIN}${seo.canonicalPath}` : null
+  const tags = buildRouteSeoTags(seo)
 
-  document.documentElement.lang = 'en'
-  document.title = seo.title
-  upsertMeta('meta[name="description"]', { name: 'description' }, seo.description)
-  upsertMeta('meta[name="robots"]', { name: 'robots' }, seo.robots)
-  upsertMeta('meta[property="og:title"]', { property: 'og:title' }, seo.title)
-  upsertMeta('meta[property="og:description"]', { property: 'og:description' }, seo.description)
-  upsertMeta('meta[property="og:type"]', { property: 'og:type' }, 'website')
-  upsertMeta('meta[property="og:url"]', { property: 'og:url' }, canonical ?? PUBLIC_SITE_ORIGIN)
-  upsertMeta('meta[property="og:site_name"]', { property: 'og:site_name' }, 'IdeaBoard')
-  if (canonical) {
-    upsertCanonical(canonical)
+  document.documentElement.lang = tags.lang
+  document.title = tags.title
+  for (const tag of tags.meta) upsertMetaTag(tag)
+  if (tags.canonical) {
+    upsertCanonical(tags.canonical)
   } else {
     document.head.querySelector('link[rel="canonical"]')?.remove()
   }
-  upsertJsonLd(seo.jsonLd)
+  upsertJsonLd(tags.jsonLd)
 
   return seo
 }

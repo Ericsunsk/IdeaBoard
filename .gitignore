@@ -62,6 +62,7 @@ deploy/secrets/*.plain.json
 # ===== Release Artifacts =====
 docker/releases/
 .cache/
+.vitest/
 .codebase-memory/
 
 .worktrees/

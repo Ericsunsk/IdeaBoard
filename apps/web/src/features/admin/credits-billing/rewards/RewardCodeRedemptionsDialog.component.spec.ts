@@ -1,3 +1,4 @@
+import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import PrimeVue from 'primevue/config'
 import { describe, expect, it } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
@@ -278,13 +279,21 @@ describe('RewardCodeRedemptionsDialog', () => {
 })
 
 function renderDialog(overrides: Record<string, unknown> = {}) {
+  // Fresh client per render: the list query caches by key, so sharing one
+  // across tests would serve stale pages and hide HTTP calls.
+  const queryClient = new QueryClient()
   return renderWithUser(RewardCodeRedemptionsDialog, {
     props: {
       visible: true,
       rewardCode: makeRewardCode(),
       ...overrides,
     },
-    global: { plugins: [[PrimeVue, adminPrimeVueTestOptions]] },
+    global: {
+      plugins: [
+        [PrimeVue, adminPrimeVueTestOptions],
+        [VueQueryPlugin, { queryClient }],
+      ],
+    },
   })
 }
 

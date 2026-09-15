@@ -42,19 +42,19 @@ _Avoid_: 页面直调 generated client，画廊自建目录事实
 
 ## Module Ownership
 
-| Module | Responsibility | Public Interface | Implementation Detail Boundary |
-| :--- | :--- | :--- | :--- |
-| `domain/document` | 纯节点定义、快照模型、融合比例、尺寸与长宽比规则。 | `domain/index.ts`（经 `document/index.ts`）。 | 严禁引入 Vue、Router 或运行时 DOM，纯函数驱动。 |
-| `domain/schema` | 快照 Schema、信封契约。 | `domain/index.ts`（经 `schema/index.ts`）。 | 同上。 |
-| `domain/media` | 媒体引用提取（`references.ts`）。 | `domain/index.ts`（经 `media/index.ts`）。 | 同上。 |
-| `application/catalog` | 目录 repository 外观、CRUD 命令、本地目录 store。 | `useBoardRepository()`、`createBoardRepository()`（经 `catalog/index.ts`）。 | 不直接 import generated-query；传输经 `infrastructure/api`。 |
-| `application/sync` | 服务端 hydrate/同步/删除与冲突分类。 | `hydrateBoardsFromServer`、`syncBoardToServer`、`isBoardNameConflictError`。 | 传输经 `infrastructure/api/boardsResource`。 |
-| `application/collaboration` | 分享加入工作流。 | `joinSharedBoardByToken`。 | 同上。 |
-| `infrastructure/api` | Board 传输适配：boards CRUD + share join + DTO 重导出。 | `boardsResource.ts`（`fetchUserBoards`、`saveUserBoard`、`removeUserBoard`、`joinUserBoardByShareToken`）。 | 本层是唯一可 import generated-query boards 边界的地方。 |
-| `infrastructure/persistence` | 序列化/反序列化、版本迁移适配、内存快照 map。 | `serializeBoardState`、`parseBoardState`（经 `persistence/index.ts`）。 | 兼容旧字段与空默认值修补，输出稳定合规模型。 |
-| `infrastructure/preview` | 预览图生成与刷新队列。 | `renderBoardPreviewDataUrl`、`createBoardPreviewRefreshQueue`。 | 预览降级算法留在内部，对外输出稳定 Data URL。 |
-| `presentation/catalog` | 画廊页面、卡片、gallery controller、feedback、skin、format。 | `createCatalog`、`useCatalog`、`BoardsPage`（经 root `board/index.ts`）。 | 纯视图组合，不拥有目录事实。 |
-| `testing` | 测试工厂（snapshot/state 构造）。 | `board/testing`（仅测试引用）。 | 不得进入生产 barrel。 |
+| Module                       | Responsibility                                               | Public Interface                                                                                            | Implementation Detail Boundary                               |
+| :--------------------------- | :----------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------- |
+| `domain/document`            | 纯节点定义、快照模型、融合比例、尺寸与长宽比规则。           | `domain/index.ts`（经 `document/index.ts`）。                                                               | 严禁引入 Vue、Router 或运行时 DOM，纯函数驱动。              |
+| `domain/schema`              | 快照 Schema、信封契约。                                      | `domain/index.ts`（经 `schema/index.ts`）。                                                                 | 同上。                                                       |
+| `domain/media`               | 媒体引用提取（`references.ts`）。                            | `domain/index.ts`（经 `media/index.ts`）。                                                                  | 同上。                                                       |
+| `application/catalog`        | 目录 repository 外观、CRUD 命令、本地目录 store。            | `useBoardRepository()`、`createBoardRepository()`（经 `catalog/index.ts`）。                                | 不直接 import generated-query；传输经 `infrastructure/api`。 |
+| `application/sync`           | 服务端 hydrate/同步/删除与冲突分类。                         | `hydrateBoardsFromServer`、`syncBoardToServer`、`isBoardNameConflictError`。                                | 传输经 `infrastructure/api/boardsResource`。                 |
+| `application/collaboration`  | 分享加入工作流。                                             | `joinSharedBoardByToken`。                                                                                  | 同上。                                                       |
+| `infrastructure/api`         | Board 传输适配：boards CRUD + share join + DTO 重导出。      | `boardsResource.ts`（`fetchUserBoards`、`saveUserBoard`、`removeUserBoard`、`joinUserBoardByShareToken`）。 | 本层是唯一可 import generated-query boards 边界的地方。      |
+| `infrastructure/persistence` | 序列化/反序列化、版本迁移适配、内存快照 map。                | `serializeBoardState`、`parseBoardState`（经 `persistence/index.ts`）。                                     | 兼容旧字段与空默认值修补，输出稳定合规模型。                 |
+| `infrastructure/preview`     | 预览图生成与刷新队列。                                       | `renderBoardPreviewDataUrl`、`createBoardPreviewRefreshQueue`。                                             | 预览降级算法留在内部，对外输出稳定 Data URL。                |
+| `presentation/catalog`       | 画廊页面、卡片、gallery controller、feedback、skin、format。 | `createCatalog`、`useCatalog`、`BoardsPage`（经 root `board/index.ts`）。                                   | 纯视图组合，不拥有目录事实。                                 |
+| `testing`                    | 测试工厂（snapshot/state 构造）。                            | `board/testing`（仅测试引用）。                                                                             | 不得进入生产 barrel。                                        |
 
 跨 feature 消费统一走 root `board/index.ts`；`board/testing` 仅测试引用。Canvas `board-session` 经本 seam 编排 session 生命周期。
 

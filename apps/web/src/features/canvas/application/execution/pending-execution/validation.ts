@@ -1,8 +1,5 @@
 import type { BoardAttachment, BoardSessionIdentity } from '../board-attachment'
-import type {
-  PendingImageExecutionFact,
-  PendingImageExecutionLease,
-} from './types'
+import type { PendingImageExecutionFact, PendingImageExecutionLease } from './types'
 
 export function attachmentRejection(
   candidate: BoardAttachment,

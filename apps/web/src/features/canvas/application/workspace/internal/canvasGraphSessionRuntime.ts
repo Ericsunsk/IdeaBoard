@@ -36,10 +36,7 @@ type CanvasGraphSessionRuntimeOptions = {
 export type CanvasGraphSessionRuntime = {
   isAttached: () => boolean
   readCanvasGraphStore: () => CanvasGraphStore
-  replaceGraphSnapshot: (
-    snapshot: BoardSnapshot,
-    reason: 'hydrate' | 'save-reconcile',
-  ) => void
+  replaceGraphSnapshot: (snapshot: BoardSnapshot, reason: 'hydrate' | 'save-reconcile') => void
   exportGraphSnapshot: (baseSnapshot: BoardSnapshot) => BoardSnapshot
   commitGraph: (
     graph: { nodes: Node[]; edges: Edge[] },
@@ -126,10 +123,7 @@ export function createCanvasGraphSessionRuntime(
     options.graphAdapter.replaceGraph(resolvedGraph)
   }
 
-  function replaceGraphSnapshot(
-    snapshot: BoardSnapshot,
-    reason: 'hydrate' | 'save-reconcile',
-  ) {
+  function replaceGraphSnapshot(snapshot: BoardSnapshot, reason: 'hydrate' | 'save-reconcile') {
     const boardId = options.boardSession.currentBoardId.value
     if (!boardId) {
       dispose()
@@ -156,9 +150,7 @@ export function createCanvasGraphSessionRuntime(
       graphAdapter: options.graphAdapter,
       readCurrent: () => ({ nodes: options.nodes.value, edges: options.edges.value }),
       projectFull: () => {
-        const flow = boardSnapshotToFlow(
-          session.exportSnapshot(options.boardBaseSnapshot.value),
-        )
+        const flow = boardSnapshotToFlow(session.exportSnapshot(options.boardBaseSnapshot.value))
         return {
           nodes: options.projectCurrentGroupNodeLayers(flow.nodes as Node[]),
           edges: flow.edges as Edge[],
@@ -179,9 +171,7 @@ export function createCanvasGraphSessionRuntime(
       unsubscribeProjection()
       unsubscribeHistory()
     }
-    options.executionCore.attachBoard(
-      BoardGraphSession.create(boardId, { graphSession: session }),
-    )
+    options.executionCore.attachBoard(BoardGraphSession.create(boardId, { graphSession: session }))
     options.hydratePendingImageLeases?.(snapshot)
   }
 

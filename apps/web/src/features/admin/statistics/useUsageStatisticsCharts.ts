@@ -14,10 +14,7 @@ import {
   defineAdminChartPointClipStyle,
   defineAdminChartOptions,
 } from '../shared/lib/chart'
-import {
-  buildAdminTimeRangeBuckets,
-  shouldShowAdminTimeRangeTick,
-} from '../shared/lib/timeRange'
+import { buildAdminTimeRangeBuckets, shouldShowAdminTimeRangeTick } from '../shared/lib/timeRange'
 import { useUsageStatisticsBreakdownCharts } from './usageStatisticsBreakdownCharts'
 import {
   baseChartOptions,

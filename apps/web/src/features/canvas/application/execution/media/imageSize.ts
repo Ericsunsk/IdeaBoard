@@ -1,16 +1,12 @@
+import { readImageNaturalSize } from '../../../../../shared/media/imageDimensions.ts'
+
+/**
+ * Canvas-local alias kept for existing execution callers.
+ * Implementation lives in `shared/media/imageDimensions` (LRU + timeout +
+ * in-flight dedupe); do not fork probe logic here.
+ */
 export function loadImageSizeFromUrl(
   url: string,
 ): Promise<{ width: number; height: number } | null> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.onload = () => {
-      if (!img.naturalWidth || !img.naturalHeight) {
-        resolve(null)
-        return
-      }
-      resolve({ width: img.naturalWidth, height: img.naturalHeight })
-    }
-    img.onerror = () => resolve(null)
-    img.src = url
-  })
+  return readImageNaturalSize(url)
 }

@@ -1,4 +1,5 @@
 import { nextTick, ref, type Ref } from 'vue'
+import { useTimeoutFn } from '@vueuse/core'
 import { libraryAssetKey, lookupSavedAssetKeys } from '../../library'
 import { type SearchResult } from '../domain/models'
 import {
@@ -63,10 +64,26 @@ export function createSearchFeed(
   let loadGeneration = 0
   let cacheWriteVersion = 0
   let cancelScheduledCacheWrite = () => {}
-  let scrollWriteTimer: ReturnType<typeof setTimeout> | null = null
   let pendingScrollY = 0
   let pendingScrollTarget: { query: string; scope: string } | null = null
   let disposed = false
+  // Trailing-edge scroll persistence — `useTimeoutFn` owns the timer pairing
+  // (auto-cancelled on scope dispose); target-switch cancellation stays explicit.
+  const {
+    isPending: isScrollWritePending,
+    start: startScrollWrite,
+    stop: stopScrollWriteTimer,
+  } = useTimeoutFn(
+    () => {
+      const target = pendingScrollTarget
+      pendingScrollTarget = null
+      if (target) {
+        dependencies.persistence.writeScroll(pendingScrollY, target.query, target.scope)
+      }
+    },
+    150,
+    { immediate: false },
+  )
   let savedMutationRevision = 0
   const savedKeyMutationRevisions = new Map<string, number>()
 
@@ -77,8 +94,7 @@ export function createSearchFeed(
   }
 
   function cancelScrollWrite(): void {
-    if (scrollWriteTimer) clearTimeout(scrollWriteTimer)
-    scrollWriteTimer = null
+    stopScrollWriteTimer()
     pendingScrollTarget = null
   }
 
@@ -233,19 +249,15 @@ export function createSearchFeed(
   function recordScroll(scrollY: number): void {
     const target = { query: options.submittedQuery.value, scope: cacheScope }
     if (
-      scrollWriteTimer &&
+      isScrollWritePending.value &&
       (pendingScrollTarget?.query !== target.query || pendingScrollTarget.scope !== target.scope)
     ) {
       cancelScrollWrite()
     }
     pendingScrollY = scrollY
-    if (scrollWriteTimer) return
+    if (isScrollWritePending.value) return
     pendingScrollTarget = target
-    scrollWriteTimer = setTimeout(() => {
-      scrollWriteTimer = null
-      pendingScrollTarget = null
-      dependencies.persistence.writeScroll(pendingScrollY, target.query, target.scope)
-    }, 150)
+    startScrollWrite()
   }
 
   function markSavedKey(key: string): void {

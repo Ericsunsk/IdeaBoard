@@ -14,11 +14,11 @@ _Avoid_: 各协议页面重复编写外层导航与排版 CSS
 
 ## Module Ownership
 
-| Module | Responsibility | Public Interface | Implementation Detail Boundary |
-| :--- | :--- | :--- | :--- |
-| `legalDocuments.ts` | 事实源：各法律文本的数据结构、版本标记与多语言条款内容。 | `legalDocuments` 常量导出。 | 纯数据定义，不依赖 Vue。 |
-| `components/PublicLegalPage.vue` | 法律文档排版壳：目录生成、响应式阅读器、顶部返回导航。 | 基础展示组件。 | 样式遵循阅读器排版，不引入业务侧复杂状态。 |
-| `pages/*Page.vue` | 各独立法律路由页面（Terms、Privacy、Refund、AcceptableUse）。 | 路由页面出口。 | 薄装配层：读取 `legalDocuments` 并传入 `PublicLegalPage`。 |
+| Module                           | Responsibility                                                | Public Interface            | Implementation Detail Boundary                             |
+| :------------------------------- | :------------------------------------------------------------ | :-------------------------- | :--------------------------------------------------------- |
+| `legalDocuments.ts`              | 事实源：各法律文本的数据结构、版本标记与多语言条款内容。      | `legalDocuments` 常量导出。 | 纯数据定义，不依赖 Vue。                                   |
+| `components/PublicLegalPage.vue` | 法律文档排版壳：目录生成、响应式阅读器、顶部返回导航。        | 基础展示组件。              | 样式遵循阅读器排版，不引入业务侧复杂状态。                 |
+| `pages/*Page.vue`                | 各独立法律路由页面（Terms、Privacy、Refund、AcceptableUse）。 | 路由页面出口。              | 薄装配层：读取 `legalDocuments` 并传入 `PublicLegalPage`。 |
 
 ## Rules
 

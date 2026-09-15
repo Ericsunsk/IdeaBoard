@@ -302,7 +302,12 @@ import IbFormField from '../../../shared/components/IbFormField.vue'
 import { getPasswordLengthError } from '../../../shared/auth/passwordPolicy'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import { useAuthPanelControls } from './panelControls'
-import { AUTH_DISPLAY_NAME_LIMIT, getLengthError, getRequiredError } from './formUtils'
+import {
+  AUTH_DISPLAY_NAME_LIMIT,
+  getEmailError,
+  getLengthError,
+  getRequiredError,
+} from './formUtils'
 import {
   authButtonPt,
   authCompactModalShellClass,
@@ -378,8 +383,8 @@ function handleFieldBlur(field: RegisterField) {
     }
   } else if (field === 'email') {
     const email = formValue.value.email.trim()
-    if (email && (!email.includes('@') || email.endsWith('@'))) {
-      errors.value.email = t('auth.errors.invalidEmail')
+    if (email) {
+      errors.value.email = getEmailError(email, t('auth.errors.invalidEmail'))
     }
   } else if (field === 'password') {
     const password = formValue.value.password
@@ -412,10 +417,9 @@ function validateField(field: RegisterField) {
 
   if (field === 'email') {
     const email = formValue.value.email.trim()
-    errors.value.email = getRequiredError(email, t('auth.fields.email'))
-    if (!errors.value.email && (!email.includes('@') || email.endsWith('@'))) {
-      errors.value.email = t('auth.errors.invalidEmail')
-    }
+    errors.value.email =
+      getRequiredError(email, t('auth.fields.email')) ||
+      getEmailError(email, t('auth.errors.invalidEmail'))
     return !errors.value.email
   }
 

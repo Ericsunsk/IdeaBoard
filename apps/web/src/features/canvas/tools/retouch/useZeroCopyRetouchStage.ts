@@ -1,12 +1,4 @@
-import {
-  computed,
-  onBeforeUnmount,
-  ref,
-  shallowRef,
-  watch,
-  type ComputedRef,
-  type Ref,
-} from 'vue'
+import { computed, onBeforeUnmount, ref, shallowRef, watch, type ComputedRef, type Ref } from 'vue'
 import { compileImageRetouchPlan } from './processing/engine.ts'
 import {
   bakeWebGLRetouchUniforms,
@@ -50,7 +42,9 @@ export function isUsableTextureImage(image: HTMLImageElement | null | undefined)
  * editor binds this element as its WebGL texture, so entering Retouch never
  * waits on the network.
  */
-export function resolveDomTextureImage(stageElement: Element | null | undefined): HTMLImageElement | null {
+export function resolveDomTextureImage(
+  stageElement: Element | null | undefined,
+): HTMLImageElement | null {
   if (!stageElement || typeof stageElement.querySelector !== 'function') return null
   const images = Array.from(stageElement.querySelectorAll('img'))
   let best: HTMLImageElement | null = null
@@ -85,9 +79,14 @@ export function useZeroCopyRetouchStage(
   const contextFailed = ref(false)
 
   let renderer: WebGLRetouchRenderer | null = null
+  let boundCanvas: HTMLCanvasElement | null = null
   let drawQueued = false
   let lastHistogramAt = 0
   let restoredListener: (() => void) | null = null
+  // Set when bind found no usable DOM image yet (e.g. entering Retouch
+  // before the node image decodes). Unlike contextFailed it is recoverable:
+  // the next layer change or canvas/mode transition retries the bind.
+  let sourcePending = false
 
   const isGpuActive = computed(
     () =>
@@ -111,18 +110,25 @@ export function useZeroCopyRetouchStage(
   }
 
   function disposeRenderer(): void {
+    const canvas = boundCanvas
+    boundCanvas = null
+    if (canvas && restoredListener)
+      canvas.removeEventListener('webglcontextrestored', restoredListener)
+    restoredListener = null
     renderer?.dispose()
     renderer = null
     textureReady.value = false
     drawQueued = false
+    sourcePending = false
   }
 
   function scheduleDraw(): void {
     if (drawQueued || !renderer || renderer.isContextLost()) return
     drawQueued = true
-    const schedule = typeof requestAnimationFrame === 'function'
-      ? requestAnimationFrame
-      : (callback: () => void) => globalThis.setTimeout(callback, 16)
+    const schedule =
+      typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame
+        : (callback: () => void) => globalThis.setTimeout(callback, 16)
     schedule(() => {
       drawQueued = false
       if (!renderer || renderer.isContextLost()) return
@@ -168,7 +174,16 @@ export function useZeroCopyRetouchStage(
     if (!renderer || !options.isAdjustMode.value) return
     const domImage = options.resolveDomImage()
     if (domImage && uploadDomImage(domImage)) {
+      sourcePending = false
       scheduleDraw()
+      return
+    }
+    if (!domImage) {
+      // The stage DOM may still be mounting or decoding (e.g. entering
+      // Retouch right after the node image starts loading). Stay pending and
+      // retry on the next layer change or canvas/mode transition instead of
+      // failing the whole session permanently.
+      sourcePending = true
       return
     }
     contextFailed.value = true
@@ -177,6 +192,12 @@ export function useZeroCopyRetouchStage(
   function ensureRenderer(): void {
     const canvas = canvasRef.value
     if (!canvas || !options.isAdjustMode.value || !gpuSupported) return
+    if (renderer && boundCanvas !== canvas) {
+      // The stage canvas was replaced (node switch / remount). A GL renderer
+      // draws into its original canvas, so rebuild it instead of rendering
+      // into a detached surface while the visible stage stays blank.
+      disposeRenderer()
+    }
     if (!renderer) {
       try {
         renderer = createWebGLRetouchRenderer(canvas)
@@ -187,6 +208,7 @@ export function useZeroCopyRetouchStage(
         contextFailed.value = true
         return
       }
+      boundCanvas = canvas
       attachRestoreListener(canvas)
     }
     if (renderer.isContextLost()) {
@@ -209,11 +231,18 @@ export function useZeroCopyRetouchStage(
 
   // Single shallow watcher: layer identity changes flow straight into baked
   // uniforms + one coalesced draw. No deep watch, no array recreation here.
+  // A pending source bind also retries here, so the first slider drag after
+  // an early entry rebinds from the now-decoded DOM image and draws.
   watch(
     () => options.layers.value,
     () => {
-      if (!isGpuActive.value) return
-      scheduleDraw()
+      if (isGpuActive.value) {
+        scheduleDraw()
+        return
+      }
+      if (sourcePending && options.isAdjustMode.value && canvasRef.value) {
+        ensureRenderer()
+      }
     },
   )
   watch([canvasRef, () => options.isAdjustMode.value], () => {
@@ -227,7 +256,8 @@ export function useZeroCopyRetouchStage(
 
   onBeforeUnmount(() => {
     const canvas = canvasRef.value
-    if (canvas && restoredListener) canvas.removeEventListener('webglcontextrestored', restoredListener)
+    if (canvas && restoredListener)
+      canvas.removeEventListener('webglcontextrestored', restoredListener)
     restoredListener = null
     disposeRenderer()
   })

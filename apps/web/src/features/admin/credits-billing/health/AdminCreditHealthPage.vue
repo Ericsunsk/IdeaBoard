@@ -139,7 +139,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import AdminSurfaceFrame from '../../shared/components/AdminSurfaceFrame.vue'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
 import { adminActionButtonClass, adminTextButtonClass } from '../../shared/lib/uiClasses'
-import { formatAdminDateTime, formatReconciliationRunError } from '../format'
+import { formatAdminDateTimeWithSeconds, formatReconciliationRunError } from '../format'
 import AdminCreditFindingQueue from './AdminCreditFindingQueue.vue'
 import AdminCreditRunHistoryDialog from './AdminCreditRunHistoryDialog.vue'
 import { useAdminCreditHealthResource } from './resource'
@@ -162,7 +162,7 @@ const facts = computed(() => {
     {
       label: '最近成功检查',
       value: value.latest_successful_run?.completed_at
-        ? formatAdminDateTime(value.latest_successful_run.completed_at)
+        ? formatAdminDateTimeWithSeconds(value.latest_successful_run.completed_at)
         : '—',
       detail: value.latest_successful_run ? `Run #${value.latest_successful_run.id}` : '',
     },
@@ -184,7 +184,7 @@ const facts = computed(() => {
     {
       label: '最近失败检查',
       value: value.latest_failed_run?.completed_at
-        ? formatAdminDateTime(value.latest_failed_run.completed_at)
+        ? formatAdminDateTimeWithSeconds(value.latest_failed_run.completed_at)
         : '—',
       detail: value.latest_failed_run ? `Run #${value.latest_failed_run.id}` : '',
     },

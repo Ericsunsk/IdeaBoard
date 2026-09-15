@@ -62,6 +62,7 @@ export default {
     parseImageFailed: '图片内容解析失败。',
     compressInvalidOutput: '图片压缩产生无效输出。',
     heicConversionFailed: 'HEIC/HEIF 图片转换失败，请换一张图片。',
+    unexpected: '出现了意外错误，请重试。',
   },
   dialogs: {
     unsavedChangesTitle: '未保存的更改',

@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  bakeWebGLRetouchUniforms,
-  createWebGLRetouchRenderer,
-} from './webglEngine'
+import { bakeWebGLRetouchUniforms, createWebGLRetouchRenderer } from './webglEngine'
 import type { ImageRetouchPlan } from './engine'
 
 /**

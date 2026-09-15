@@ -1,8 +1,4 @@
-import {
-  formatAdminDisplayError,
-  type AdminToastPort,
-  useAdminToast,
-} from '../shared/lib/toast'
+import { formatAdminDisplayError, type AdminToastPort, useAdminToast } from '../shared/lib/toast'
 import { unsupportedUploadImageMessage } from '../../../shared/utils/imageUploadSupport'
 
 type AdminSettingFeedback = {

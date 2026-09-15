@@ -6,7 +6,11 @@ import {
   IMAGE_ACTION_REGISTRY_LIST,
   IMAGE_NODE_ACTION,
 } from './imageActionRegistry'
-import { IMAGE_OUTPAINT_ACTION, IMAGE_UPSCALE_ACTION, isImageStrengthAction } from '../../application/execution'
+import {
+  IMAGE_OUTPAINT_ACTION,
+  IMAGE_UPSCALE_ACTION,
+  isImageStrengthAction,
+} from '../../application/execution'
 
 describe('imageActionRegistry', () => {
   it('defines each image action exactly once', () => {

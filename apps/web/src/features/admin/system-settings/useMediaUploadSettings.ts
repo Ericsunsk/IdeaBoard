@@ -20,9 +20,7 @@ export const MEDIA_UPLOAD_MAX_CONCURRENT = 64
 
 const selectMediaUploadSetting = createApiDataSelector<MediaUploadSetting>('加载上传设置失败')
 
-export function useMediaUploadSettings(options: {
-  feedback: AdminMediaUploadSettingsFeedback
-}) {
+export function useMediaUploadSettings(options: { feedback: AdminMediaUploadSettingsFeedback }) {
   const queryClient = useQueryClient()
   const query = useGetAdminMediaUploadSetting<MediaUploadSetting>({
     query: { select: selectMediaUploadSetting },

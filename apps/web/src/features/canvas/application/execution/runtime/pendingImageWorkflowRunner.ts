@@ -9,10 +9,7 @@ import type {
   ImageExecutionInput,
   ImageExecutionResultOptions,
 } from '../planning/imageExecutionPlan'
-import type {
-  ResolvedTaskImageResult,
-  PendingImageResultExecution,
-} from '../result-nodes'
+import type { ResolvedTaskImageResult, PendingImageResultExecution } from '../result-nodes'
 import {
   type PendingImageExecutionCore,
   type PendingImageExecutionLease,

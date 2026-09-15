@@ -417,8 +417,7 @@ function addSchemaVersionChecks(sources: ContractSources, violations: Violation[
   if (frontendSchemaVersionLiteralCount < 2) {
     violations.push({
       check: 'frontend schemaVersion literal',
-      message:
-        'Frontend snapshot and state schemas must use BOARD_STATE_SCHEMA_VERSION literals.',
+      message: 'Frontend snapshot and state schemas must use BOARD_STATE_SCHEMA_VERSION literals.',
       details: [
         `${repoPath(sourceFiles.frontendSchema)} has ${frontendSchemaVersionLiteralCount} literal reference(s).`,
       ],

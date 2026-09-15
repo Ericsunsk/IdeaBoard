@@ -13,10 +13,7 @@ import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useAuthOverlay } from '../../auth/overlay'
 import { useRoute, useRouter } from 'vue-router'
 import { libraryAssetKey, loadLibraryFloatingIsland } from '../../library'
-import {
-  readSearchReferenceTransfer,
-  writeSearchReferenceTransfer,
-} from '../../library'
+import { readSearchReferenceTransfer, writeSearchReferenceTransfer } from '../../library'
 import { type SearchAuthAction } from '../domain/authAction'
 import {
   peekPendingSearchAuthAction,

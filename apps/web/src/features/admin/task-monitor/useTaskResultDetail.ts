@@ -1,4 +1,5 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue'
+import { useAppClipboard } from '../../../shared/composables/useAppClipboard'
 import { formatAdminDateTime } from '../../../shared/utils/dateTime'
 import type { AdminTaskResultFeedback } from './useAdminTaskMonitorFeedback'
 import type { AdminTaskMonitorDetailModel } from './resource'
@@ -59,19 +60,14 @@ export function useTaskResultDetail(
     window.open(normalizedUrl, '_blank', 'noopener,noreferrer')
   }
 
+  const { copyText } = useAppClipboard()
+
   function copyToClipboard(text: string) {
     if (!text) return
-    const clipboard = navigator.clipboard
-    if (!clipboard?.writeText) {
-      options.feedback.copyFailed()
-      return
-    }
-    clipboard
-      .writeText(text)
-      .then(() => options.feedback.copiedToClipboard())
-      .catch(() => {
-        options.feedback.copyFailed()
-      })
+    copyText(text).then((ok) => {
+      if (ok) options.feedback.copiedToClipboard()
+      else options.feedback.copyFailed()
+    })
   }
 
   function formatDateTime(timeStr: string | null | undefined): string {

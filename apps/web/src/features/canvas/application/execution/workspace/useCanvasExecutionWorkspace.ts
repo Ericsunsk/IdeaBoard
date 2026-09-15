@@ -60,34 +60,32 @@ export type UseCanvasExecutionWorkspaceOptions = {
 export function useCanvasExecutionWorkspace(
   options: UseCanvasExecutionWorkspaceOptions,
 ): CanvasExecutionWorkspace {
-  const { workflowRunner, flushPendingTaskSnapshot } =
-    assemblePendingImageWorkflow({
-      nodes: options.nodes,
-      edges: options.edges,
-      readCanvasGraphStore: options.readCanvasGraphStore,
-      rendererMetrics: options.rendererMetrics,
-      refreshNodeInternals: options.refreshNodeInternals,
-      flushAutosave: options.flushAutosave,
-      pendingResults: options.pendingResults,
-      executionCore: options.executionCore,
-      isNodeExecutionActive: (nodeId) =>
-        options.executionCore.captureActiveLeases([nodeId as `image-${number}`]).length > 0,
-      taskAdapter: options.taskAdapter,
-      waitTaskImageResults: options.waitTaskImageResults,
-      loadImageSize: options.loadImageSize,
-      createClientActionId: options.createClientActionId,
-      cancelTasks: options.cancelTasks,
-      onSuccess: options.onSuccess,
-      onWarning: options.onWarning,
-      onError: options.onError,
-    })
+  const { workflowRunner, flushPendingTaskSnapshot } = assemblePendingImageWorkflow({
+    nodes: options.nodes,
+    edges: options.edges,
+    readCanvasGraphStore: options.readCanvasGraphStore,
+    rendererMetrics: options.rendererMetrics,
+    refreshNodeInternals: options.refreshNodeInternals,
+    flushAutosave: options.flushAutosave,
+    pendingResults: options.pendingResults,
+    executionCore: options.executionCore,
+    isNodeExecutionActive: (nodeId) =>
+      options.executionCore.captureActiveLeases([nodeId as `image-${number}`]).length > 0,
+    taskAdapter: options.taskAdapter,
+    waitTaskImageResults: options.waitTaskImageResults,
+    loadImageSize: options.loadImageSize,
+    createClientActionId: options.createClientActionId,
+    cancelTasks: options.cancelTasks,
+    onSuccess: options.onSuccess,
+    onWarning: options.onWarning,
+    onError: options.onError,
+  })
 
   function isNodeRunning(nodeId: string): boolean {
     return options.executionCore.captureActiveLeases([nodeId as `image-${number}`]).length > 0
   }
 
-  const waitTaskImageResults =
-    options.waitTaskImageResults ?? waitExistingOrLiveTaskImageResults
+  const waitTaskImageResults = options.waitTaskImageResults ?? waitExistingOrLiveTaskImageResults
   const loadImageSize = options.loadImageSize ?? loadImageSizeFromUrl
 
   function requireAttachment() {

@@ -1,11 +1,7 @@
 import type { Edge, Elements, Node } from '@vue-flow/core'
 import { shallowRef } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-  createEmptyBoardSnapshot,
-  type BoardSnapshot,
-  type ImageNodeItem,
-} from '../../../board'
+import { createEmptyBoardSnapshot, type BoardSnapshot, type ImageNodeItem } from '../../../board'
 import { i18n } from '../../../../shared/i18n'
 import { loadLocaleMessages } from '../../../../shared/i18n/userLocale'
 import { CanvasGraphSession } from '../../domain/graph'
