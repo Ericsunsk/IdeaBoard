@@ -309,15 +309,17 @@ function onDialogSaveModel(model: string) {
   if (selectedItem.value) saveModelForItem(selectedItem.value, model)
 }
 
-function confirmArchivedDelete(item: AdminBillableItemCard) {
+async function confirmArchivedDelete(item: AdminBillableItemCard) {
   if (item.status !== 'archived' || deletePending[item.sku]) return
-  confirm.request({
+  const confirmed = await confirm.confirm({
     title: '删除已归档功能',
     message: `确定彻底删除“${item.displayName}”及其价格配置吗？此操作不可撤销。`,
     confirmLabel: '确认删除',
     intent: 'danger',
-    onConfirm: () => deleteArchived(item),
   })
+  if (confirmed) {
+    await deleteArchived(item)
+  }
 }
 
 async function deleteArchived(item: AdminBillableItemCard) {

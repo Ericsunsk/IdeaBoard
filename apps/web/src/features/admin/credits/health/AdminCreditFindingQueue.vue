@@ -181,6 +181,7 @@
         class="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
       />
       <DialogContent
+        :show-close="false"
         class="fixed inset-y-0 right-0 z-50 flex h-full w-[min(38rem,calc(100vw-1rem))] flex-col border-l border-admin-border-soft bg-white shadow-2xl transition-transform data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right"
       >
         <div class="flex items-center justify-between border-b border-admin-border-soft px-6 py-4">

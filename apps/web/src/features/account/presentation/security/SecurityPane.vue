@@ -18,7 +18,7 @@
         inline-required
         :field-class="passwordFieldClass"
       >
-        <UiPassword
+        <PasswordInput
           :id="fieldId"
           v-model="pwdForm.oldPassword"
           autocomplete="current-password"
@@ -53,7 +53,7 @@
           inline-required
           :field-class="passwordFieldClass"
         >
-        <UiPassword
+        <PasswordInput
           :id="fieldId"
           v-model="pwdForm.newPassword"
           autocomplete="new-password"
@@ -87,7 +87,7 @@
           inline-required
           :field-class="passwordFieldClass"
         >
-        <UiPassword
+        <PasswordInput
           :id="fieldId"
           v-model="pwdForm.confirmPassword"
           autocomplete="new-password"
@@ -105,11 +105,11 @@
         </IbFormField>
       </div>
 
-      <UiButton
+      <Button
         type="submit"
         :loading="pwdLoading"
         :disabled="pwdLoading"
-        :class="accountPrimaryActionButtonClass">{{ pwdLoading ? t('account.security.updating') : t('account.security.updatePassword') }}</UiButton>
+        :class="accountPrimaryActionButtonClass">{{ pwdLoading ? t('account.security.updating') : t('account.security.updatePassword') }}</Button>
     </form>
 
     <div class="my-8 border-t border-ib-border-soft" aria-hidden="true"></div>
@@ -137,7 +137,7 @@
         inline-required
         :field-class="passwordFieldClass"
       >
-        <UiPassword
+        <PasswordInput
           :id="fieldId"
           v-model="emailForm.currentPassword"
           autocomplete="current-password"
@@ -168,7 +168,7 @@
         inline-required
         :field-class="passwordFieldClass"
       >
-        <UiInput
+        <Input
           :id="fieldId"
           v-model="emailForm.newEmail"
           type="email"
@@ -181,11 +181,11 @@
           :aria-describedby="describedbyId"
         />
       </IbFormField>
-      <UiButton
+      <Button
         type="submit"
         :loading="emailLoading"
         :disabled="emailLoading"
-        :class="accountPrimaryActionButtonClass">{{ emailLoading ? t('account.security.sending') : t('account.security.sendCode') }}</UiButton>
+        :class="accountPrimaryActionButtonClass">{{ emailLoading ? t('account.security.sending') : t('account.security.sendCode') }}</Button>
     </form>
 
     <form v-else class="grid gap-5" novalidate @submit.prevent="handleConfirmEmailChange">
@@ -209,7 +209,7 @@
         inline-required
         :field-class="passwordFieldClass"
       >
-        <UiInput
+        <Input
           :id="fieldId"
           v-model="emailForm.otp"
           inputmode="numeric"
@@ -223,11 +223,11 @@
           :aria-describedby="describedbyId"
         />
       </IbFormField>
-      <UiButton
+      <Button
         type="submit"
         :loading="emailLoading"
         :disabled="emailLoading"
-        :class="accountPrimaryActionButtonClass">{{ emailLoading ? t('account.security.updating') : t('account.security.confirmEmailChange') }}</UiButton>
+        :class="accountPrimaryActionButtonClass">{{ emailLoading ? t('account.security.updating') : t('account.security.confirmEmailChange') }}</Button>
     </form>
   </AccountPane>
 </template>
@@ -235,8 +235,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Button as UiButton } from '@/components/ui/button'
-import { Input as UiInput, PasswordInput as UiPassword } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Input, PasswordInput } from '@/components/ui/input'
 import {
   ibFormFieldClass,
   ibFormInputClass,

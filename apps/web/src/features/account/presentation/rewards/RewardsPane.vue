@@ -10,7 +10,7 @@
           {{ t('account.rewards.codeLabel') }}
         </label>
         <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_112px] gap-3 max-[640px]:grid-cols-1">
-          <UiInput
+          <Input
             id="account-reward-code"
             v-model="code"
             type="text"
@@ -21,11 +21,11 @@
             :class="ibFormInputClass"
             :placeholder="t('account.rewards.codePlaceholder')"
           />
-          <UiButton
+          <Button
             type="submit"
             :disabled="!canSubmit"
             :loading="pending"
-            :class="accountPrimaryActionButtonClass">{{ t('account.rewards.redeem') }}</UiButton>
+            :class="accountPrimaryActionButtonClass">{{ t('account.rewards.redeem') }}</Button>
         </div>
       </form>
     </section>
@@ -45,26 +45,26 @@
         :empty-title="t('account.rewards.emptyTitle')"
         :empty-description="t('account.rewards.emptyDescription')"
       >
-        <UiColumn
+        <DataTableColumn
           field="redeemed_at"
           :header="t('account.rewards.columnRedeemedAt')"
           :style="{ width: '190px' }"
         >
           <template #body="{ data }">
-            <UiSkeleton v-if="isSkeletonRow(data)" width="8rem" />
+            <Skeleton v-if="isSkeletonRow(data)" width="8rem" />
             <time v-else class="whitespace-nowrap font-mono text-[13px] text-ib-text-muted">
               {{ formatShanghaiDateTime(data.redeemed_at) }}
             </time>
           </template>
-        </UiColumn>
+        </DataTableColumn>
 
-        <UiColumn
+        <DataTableColumn
           field="reward_code_display_name"
           :header="t('account.rewards.columnReward')"
           :style="{ minWidth: '220px' }"
         >
           <template #body="{ data }">
-            <UiSkeleton v-if="isSkeletonRow(data)" width="7rem" />
+            <Skeleton v-if="isSkeletonRow(data)" width="7rem" />
             <span
               v-else
               class="block max-w-[320px] truncate font-semibold"
@@ -73,33 +73,33 @@
               {{ data.reward_code_display_name }}
             </span>
           </template>
-        </UiColumn>
+        </DataTableColumn>
 
-        <UiColumn
+        <DataTableColumn
           field="credited_amount"
           :header="t('account.rewards.columnCredited')"
           :style="{ width: '130px' }"
         >
           <template #body="{ data }">
-            <UiSkeleton v-if="isSkeletonRow(data)" width="4rem" />
+            <Skeleton v-if="isSkeletonRow(data)" width="4rem" />
             <span v-else class="whitespace-nowrap font-mono font-bold text-ib-success">
               {{ formatCreditedAmount(data.credited_amount) }}
             </span>
           </template>
-        </UiColumn>
+        </DataTableColumn>
 
-        <UiColumn
+        <DataTableColumn
           field="masked_code_hint"
           :header="t('account.rewards.columnCode')"
           :style="{ width: '150px' }"
         >
           <template #body="{ data }">
-            <UiSkeleton v-if="isSkeletonRow(data)" width="5rem" />
+            <Skeleton v-if="isSkeletonRow(data)" width="5rem" />
             <span v-else class="whitespace-nowrap font-mono text-[13px] text-ib-text-muted">
               {{ data.masked_code_hint }}
             </span>
           </template>
-        </UiColumn>
+        </DataTableColumn>
 
         <template #empty>
           <div
@@ -111,11 +111,11 @@
             <p class="mt-1 mb-0 text-sm text-ib-text-muted">
               {{ errorMessage(initialError) }}
             </p>
-            <UiButton
+            <Button
               variant="ghost"
               size="sm"
               class="mt-3"
-              @click="retryInitial()">{{ t('account.reload') }}</UiButton>
+              @click="retryInitial()">{{ t('account.reload') }}</Button>
           </div>
           <div
             v-else
@@ -145,20 +145,20 @@
             role="alert"
           >
             <span class="text-sm text-ib-danger">{{ errorMessage(loadMoreError) }}</span>
-            <UiButton
+            <Button
               variant="ghost"
               size="sm"
-              @click="loadMore()">{{ t('account.rewards.retryLoad') }}</UiButton>
+              @click="loadMore()">{{ t('account.rewards.retryLoad') }}</Button>
           </div>
           <div
             v-else-if="hasNextPage"
             class="flex justify-center border-t border-ib-border-soft px-4 py-3"
           >
-            <UiButton
+            <Button
               variant="outline"
               size="sm"
               :loading="isFetchingNextPage"
-              @click="loadMore()">{{ t('account.rewards.loadMore') }}</UiButton>
+              @click="loadMore()">{{ t('account.rewards.loadMore') }}</Button>
           </div>
         </template>
       </DataTableFrame>
@@ -169,10 +169,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Button as UiButton } from '@/components/ui/button'
-import UiColumn from '../../../../shared/components/DataTableColumn.vue'
-import { Input as UiInput } from '@/components/ui/input'
-import { Skeleton as UiSkeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
+import DataTableColumn from '../../../../shared/components/DataTableColumn.vue'
+import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
 import { ibFormInputClass } from '../../../../shared/theme/formControls'

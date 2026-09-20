@@ -132,7 +132,7 @@
 import { computed, useSlots, type HTMLAttributes, type VNode } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NavArrowDown } from '@iconoir/vue'
-import { cn } from '../lib/classNames'
+import { cn } from '@/lib/utils'
 import AdminButton from './AdminButton.vue'
 import AdminColumn from './AdminColumn.vue'
 import AdminSpinner from './AdminSpinner.vue'

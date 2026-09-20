@@ -8,9 +8,9 @@
       :aria-label="t('account.topUp.optionsLoading')"
     >
       <span class="sr-only">{{ t('account.topUp.optionsLoading') }}</span>
-      <UiSkeleton height="4.5rem" />
-      <UiSkeleton height="2.75rem" />
-      <UiSkeleton height="2.75rem" />
+      <Skeleton height="4.5rem" />
+      <Skeleton height="2.75rem" />
+      <Skeleton height="2.75rem" />
     </div>
 
     <div
@@ -21,11 +21,11 @@
         {{ t('account.errors.optionsLoadFailed') }}
       </p>
       <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(error) }}</p>
-      <UiButton
+      <Button
         variant="ghost"
         size="sm"
         class="mt-3"
-        @click="emit('retry')">{{ t('account.reload') }}</UiButton>
+        @click="emit('retry')">{{ t('account.reload') }}</Button>
     </div>
 
     <div
@@ -58,7 +58,7 @@
             :key="quantity"
             type="button"
             v-bind="packageControlState(quantity)"
-            class="flex min-h-[72px] min-w-0 flex-col items-start justify-center rounded-[var(--radius-ib-control)] border px-3 py-2 text-left transition-[background-color,border-color,box-shadow,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)] disabled:cursor-not-allowed disabled:opacity-60"
+            class="flex min-h-[72px] min-w-0 flex-col items-start justify-center rounded-ib-control border px-3 py-2 text-left transition-[background-color,border-color,box-shadow,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:outline-none focus-visible:shadow-ib-focus disabled:cursor-not-allowed disabled:opacity-60"
             :class="
               quantity === selectedQuantity && selectionMode === 'package'
                 ? 'border-ib-creative-accent bg-ib-creative-accent-soft text-ib-creative-accent-pressed'
@@ -103,25 +103,25 @@
       </IbFormField>
 
       <div>
-        <UiButton
+        <Button
           type="submit"
           :disabled="!canCheckout"
           :loading="checkoutPending"
-          :class="accountPrimaryActionButtonClass">{{ t('account.topUp.payNow') }}</UiButton>
+          :class="accountPrimaryActionButtonClass">{{ t('account.topUp.payNow') }}</Button>
         <p class="mt-2 mb-0 text-center text-[12px] leading-5 text-ib-text-subtle">
           {{ t('account.topUp.termsPrefix') }}
           <a
             :href="options.terms.url"
             target="_blank"
             rel="noopener noreferrer"
-            class="rounded-[var(--radius-ib-control)] font-semibold text-ib-creative-accent-pressed focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"
+            class="rounded-ib-control font-semibold text-ib-creative-accent-pressed focus-visible:outline-none focus-visible:shadow-ib-focus"
             >{{ t('account.topUp.termsLink') }}</a
           >{{ t('account.topUp.termsAnd') }}
           <a
             :href="options.refund_policy.url"
             target="_blank"
             rel="noopener noreferrer"
-            class="rounded-[var(--radius-ib-control)] font-semibold text-ib-creative-accent-pressed focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"
+            class="rounded-ib-control font-semibold text-ib-creative-accent-pressed focus-visible:outline-none focus-visible:shadow-ib-focus"
             >{{ t('account.topUp.refundLink') }}</a
           >
         </p>
@@ -140,8 +140,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Button as UiButton } from '@/components/ui/button'
-import { Skeleton as UiSkeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import IbFormField from '../../../../shared/components/IbFormField.vue'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
 import { resolveInteractiveControlState } from '../../../../shared/interaction/interactiveControlState'

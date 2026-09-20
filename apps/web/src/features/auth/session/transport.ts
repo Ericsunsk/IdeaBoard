@@ -252,6 +252,18 @@ export const authTransport = {
     )
   },
 
+  async getSessionUser(): Promise<{ email?: string } | null> {
+    try {
+      const result = await authClient.getSession()
+      if (!result?.data?.user) return null
+      return {
+        email: result.data.user.email,
+      }
+    } catch {
+      return null
+    }
+  },
+
   useSession() {
     return authClient.useSession()
   },

@@ -7,9 +7,11 @@ import { createBrowserSessionTransition } from './browserSessionTransition'
 
 export type UserSessionStore = {
   user: User | null
+  readonly email: string | null
   readonly isAdmin: boolean
   sessionValidatedAt: number
   setAuth: (newUser: User) => void
+  setEmail: (email: string) => void
   clearAuth: () => void
   login: (identifier: string, password: string) => Promise<boolean>
   register: (email: string, displayName: string, password: string) => Promise<boolean>
@@ -47,6 +49,16 @@ function createUserSessionStore(): UserSessionStore {
 
   const isAdmin = computed(() => user.value?.role === 'admin')
 
+  const email = ref<string | null>(null)
+
+  function setEmail(newEmail: string) {
+    email.value = newEmail.trim().toLowerCase()
+  }
+
+  function clearEmail() {
+    email.value = null
+  }
+
   function updateAuth(newUser: User) {
     user.value = newUser
     userInfoLoaded.value = true
@@ -57,6 +69,7 @@ function createUserSessionStore(): UserSessionStore {
     user.value = null
     userInfoLoaded.value = false
     sessionValidatedAt.value = 0
+    clearEmail()
   }
 
   const transition = createBrowserSessionTransition({
@@ -75,7 +88,7 @@ function createUserSessionStore(): UserSessionStore {
 
   async function login(identifier: string, password: string) {
     await authTransport.login(identifier, password)
-
+    setEmail(identifier)
     await transition.fetchUserInfo(true, { failClosedOnError: true })
     if (!user.value) {
       throw new Error(i18n.global.t('auth.errors.sessionRestoreFailed'))
@@ -118,11 +131,13 @@ function createUserSessionStore(): UserSessionStore {
 
   async function changeEmailWithOTP(newEmail: string, otp: string) {
     await authTransport.changeEmailWithOTP(newEmail, otp)
+    setEmail(newEmail)
     await transition.fetchUserInfo(true, { failClosedOnError: true })
     return true
   }
 
   async function logout() {
+    clearEmail()
     return transition.logout()
   }
 
@@ -140,9 +155,11 @@ function createUserSessionStore(): UserSessionStore {
 
   const store = reactive({
     user,
+    email,
     isAdmin,
     sessionValidatedAt,
     setAuth: transition.setAuth,
+    setEmail,
     clearAuth: transition.clearLocal,
     login,
     register,

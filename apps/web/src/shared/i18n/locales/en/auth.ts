@@ -38,12 +38,6 @@ export default {
     verifyAndSignIn: 'Verify & Sign in',
     verifying: 'Verifying...',
   },
-  links: {
-    forgot: 'Forgot?',
-    backToSignIn: 'Back to sign in',
-    terms: 'Terms',
-    privacy: 'Privacy',
-  },
   legal: {
     agreePrefix: 'By signing up, you agree to our ',
     terms: 'Terms',
@@ -53,7 +47,6 @@ export default {
   },
   footer: {
     dontHaveAccount: "Don't have an account?",
-    signUp: 'Sign up',
     alreadyHaveAccount: 'Already have an account?',
     signIn: 'Sign in',
   },

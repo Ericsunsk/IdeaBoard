@@ -3,6 +3,7 @@
     <DialogPortal>
       <DialogOverlay :class="ibDialogMaskClass" @click="handleMaskClick" />
       <DialogContent
+        :show-close="false"
         :class="cn(dialogContentBaseClass, accountDialogContentClass)"
         :aria-label="t('account.dialog.title')"
         :aria-busy="ariaBusy"

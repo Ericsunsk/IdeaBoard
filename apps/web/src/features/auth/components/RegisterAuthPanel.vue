@@ -36,7 +36,7 @@
             <span :class="authInputIconClass">
               <UserIcon class="size-4.5" />
             </span>
-            <InputText
+            <Input
               :id="fieldId"
               v-model="formValue.displayName"
               v-bind="resolveFieldControlState(invalid)"
@@ -72,7 +72,7 @@
         >
           <div class="relative w-full">
             <span :class="authInputIconClass"><UserIcon class="size-4.5" /></span>
-            <InputText
+            <Input
               :id="fieldId"
               v-model="formValue.email"
               v-bind="resolveFieldControlState(invalid)"
@@ -110,7 +110,7 @@
             <span :class="authInputIconClass">
               <LockIcon class="size-4.5" />
             </span>
-            <Password
+            <PasswordInput
               :id="fieldId"
               v-model="formValue.password"
               autocomplete="new-password"
@@ -148,7 +148,7 @@
             <span :class="authInputIconClass">
               <ShieldIcon class="size-4.5" />
             </span>
-            <Password
+            <PasswordInput
               :id="fieldId"
               v-model="formValue.confirmPassword"
               autocomplete="new-password"
@@ -176,7 +176,7 @@
           <RouterLink
             :to="TERMS_PATH"
             target="_blank"
-            class="rounded-[var(--radius-ib-control)] font-semibold text-[var(--color-ib-auth-link)] no-underline focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-auth-focus)]"
+            class="rounded-ib-control font-semibold text-[var(--color-ib-auth-link)] no-underline focus-visible:outline-none focus-visible:shadow-ib-auth-focus"
           >
             Terms
           </RouterLink>
@@ -184,7 +184,7 @@
           <RouterLink
             :to="PRIVACY_POLICY_PATH"
             target="_blank"
-            class="rounded-[var(--radius-ib-control)] font-semibold text-[var(--color-ib-auth-link)] no-underline focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-auth-focus)]"
+            class="rounded-ib-control font-semibold text-[var(--color-ib-auth-link)] no-underline focus-visible:outline-none focus-visible:shadow-ib-auth-focus"
           >
             Privacy
           </RouterLink>
@@ -218,7 +218,7 @@
           inline-required
           :field-class="authFieldClass"
         >
-          <InputText
+          <Input
             :id="fieldId"
             v-model="otp"
             inputmode="numeric"
@@ -258,7 +258,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
-import { Input as InputText, PasswordInput as Password } from '@/components/ui/input'
+import { Input, PasswordInput } from '@/components/ui/input'
 import { Lock as LockIcon, Shield as ShieldIcon, User as UserIcon } from '@iconoir/vue'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
 import { PRIVACY_POLICY_PATH, TERMS_PATH } from '../../../shared/constants/routePaths'

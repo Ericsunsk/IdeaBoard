@@ -2,10 +2,6 @@
  * Textos comunes en español utilizados en las superficies accesibles para el usuario.
  */
 export default {
-  brand: {
-    studioName: 'Eric Studio',
-    currency: 'Ideas',
-  },
   navigation: {
     search: 'Buscar',
     workspace: 'Espacio de trabajo',
@@ -63,10 +59,6 @@ export default {
     compressInvalidOutput: 'La compresión produjo un resultado no válido.',
     heicConversionFailed: 'No se pudo convertir la imagen HEIC/HEIF. Pruebe con otra imagen.',
     unexpected: 'Algo salió mal. Inténtelo de nuevo.',
-  },
-  dialogs: {
-    unsavedChangesTitle: 'Cambios sin guardar',
-    unsavedChangesMessage: 'Tiene cambios sin guardar. ¿Está seguro de que desea salir?',
   },
   a11y: {
     dialog: 'Diálogo',

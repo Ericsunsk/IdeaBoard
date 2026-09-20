@@ -91,7 +91,7 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     },
     reason: 'Task metric pill/chart palette is a domain visual contract shared by monitor pills and charts.',
   },
-  'src/features/admin/app/AdminLayout.vue': {
+  'src/features/admin/app/AdminSidebar.vue': {
     counts: {
       'raw-motion': 30,
     },

@@ -7,6 +7,7 @@ import billing from './billing'
 import errors from './errors'
 import workspace from './workspace'
 import account from './account'
+import admin from './admin'
 
 export default {
   common,
@@ -18,6 +19,7 @@ export default {
   errorCodes: errors,
   workspace,
   account,
+  admin,
 } as const
 
-export { common, auth, search, canvas, library, billing, errors, workspace, account }
+export { common, auth, search, canvas, library, billing, errors, workspace, account, admin }

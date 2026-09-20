@@ -129,7 +129,7 @@ function renderCallbackPage() {
     global: {
       stubs: {
         Button: ButtonStub,
-        ProgressSpinner: true,
+        Spinner: true,
       },
     },
   })

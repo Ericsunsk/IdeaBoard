@@ -10,8 +10,16 @@ export type AdminConfirmRequest = {
   onConfirm: () => void | Promise<void>
 }
 
+export type AdminConfirmOptions = {
+  title: string
+  message: string
+  confirmLabel: string
+  intent: AdminConfirmIntent
+  onConfirm?: () => void | Promise<void>
+}
+
 export type AdminConfirmPort = {
-  request: (request: AdminConfirmRequest) => void
+  confirm: (options: AdminConfirmOptions) => Promise<boolean>
 }
 
 export type AdminConfirmState = {
@@ -28,28 +36,41 @@ export type AdminConfirmState = {
 export const activeAdminConfirm = ref<AdminConfirmState | null>(null)
 
 export function useAdminConfirm(): AdminConfirmPort {
-  return {
-    request(request) {
+  function confirm(options: AdminConfirmOptions): Promise<boolean> {
+    return new Promise<boolean>((resolve, reject) => {
       activeAdminConfirm.value = {
         open: true,
-        title: request.title,
-        message: request.message,
-        confirmLabel: request.confirmLabel,
-        intent: request.intent,
+        title: options.title,
+        message: options.message,
+        confirmLabel: options.confirmLabel,
+        intent: options.intent,
         loading: false,
         confirm: async () => {
           if (!activeAdminConfirm.value) return
           activeAdminConfirm.value.loading = true
           try {
-            await request.onConfirm()
-          } finally {
+            if (options.onConfirm) {
+              await options.onConfirm()
+            }
             activeAdminConfirm.value = null
+            resolve(true)
+          } catch (error) {
+            if (activeAdminConfirm.value) {
+              activeAdminConfirm.value.loading = false
+            }
+            reject(error)
+            throw error
           }
         },
         cancel: () => {
           activeAdminConfirm.value = null
+          resolve(false)
         },
       }
-    },
+    })
+  }
+
+  return {
+    confirm,
   }
 }

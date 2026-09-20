@@ -8,6 +8,7 @@ import billing from './locales/en/billing'
 import errors from './locales/en/errors'
 import workspace from './locales/en/workspace'
 import account from './locales/en/account'
+import admin from './locales/en/admin'
 import type { SupportedLocale } from './localeCore'
 
 export const englishMessages = {
@@ -20,6 +21,7 @@ export const englishMessages = {
   errorCodes: errors,
   workspace,
   account,
+  admin,
 } as const
 
 export const i18n = createI18n({

@@ -11,11 +11,24 @@ export const badgeVariants = cva(
           'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80',
         destructive:
           'border-transparent bg-destructive text-destructive-foreground shadow hover:bg-destructive/80',
-        outline: 'text-foreground',
+        outline: 'border-border text-foreground',
+        success:
+          'border-emerald-500/20 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+        warning:
+          'border-amber-500/20 bg-amber-500/15 text-amber-700 dark:text-amber-400',
+        danger:
+          'border-destructive/20 bg-destructive/15 text-destructive',
+        info:
+          'border-sky-500/20 bg-sky-500/15 text-sky-700 dark:text-sky-400',
+      },
+      rounded: {
+        default: 'rounded-md',
+        full: 'rounded-full',
       },
     },
     defaultVariants: {
       variant: 'default',
+      rounded: 'default',
     },
   },
 )

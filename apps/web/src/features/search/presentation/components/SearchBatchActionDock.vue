@@ -22,7 +22,7 @@
         <!-- 批量作为视觉搜索参考图 (Vision Search) -->
         <button
           type="button"
-          class="h-8 px-4 rounded-full bg-board-primary hover:bg-board-primary-hover text-ib-text-inverse text-xs font-bold shadow-none transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
+          class="h-8 px-4 rounded-full bg-board-primary hover:bg-board-primary-hover text-ib-text-inverse text-xs font-bold shadow-none transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:shadow-board-focus"
           @click="emit('vision-search')"
         >
           <Search class="size-3.5" aria-hidden="true" />
@@ -32,7 +32,7 @@
         <!-- 批量存入个人素材库 (Save All to Library) -->
         <button
           type="button"
-          class="h-8 px-3 rounded-full border border-board-card-border text-board-page-text-muted hover:text-board-page-text hover:border-board-primary hover:bg-board-primary/10 text-xs font-medium transition-[border-color,background-color,color] flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
+          class="h-8 px-3 rounded-full border border-board-card-border text-board-page-text-muted hover:text-board-page-text hover:border-board-primary hover:bg-board-primary/10 text-xs font-medium transition-[border-color,background-color,color] flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:shadow-board-focus"
           @click="emit('save-all')"
         >
           <Bookmark class="size-3.5 text-board-primary" aria-hidden="true" />

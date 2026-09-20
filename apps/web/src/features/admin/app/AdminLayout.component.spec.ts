@@ -136,4 +136,27 @@ describe('AdminLayout', () => {
     await user.click(screen.getByRole('button', { name: '切换导航菜单' }))
     expect(nav).not.toHaveClass('-translate-x-full')
   })
+
+  it('opens minimalist account dropdown menu on clicking user avatar button', async () => {
+    const { user } = await renderLayout()
+    const avatarButton = await screen.findByRole('button', { name: '账户菜单' })
+
+    expect(avatarButton).toHaveAttribute('aria-expanded', 'false')
+    await user.click(avatarButton)
+    expect(avatarButton).toHaveAttribute('aria-expanded', 'true')
+    expect(await screen.findByRole('menuitem', { name: /返回画布/ })).toBeVisible()
+    expect(screen.getByRole('menuitem', { name: /退出登录/ })).toBeVisible()
+    expect(screen.getByText('admin')).toBeVisible()
+    expect(screen.getByText('--')).toBeVisible()
+  })
+
+  it('does not render a stale persisted email in the account menu', async () => {
+    localStorage.setItem('ideaboard_auth_email', 'stale@example.com')
+    const { user } = await renderLayout()
+
+    await user.click(await screen.findByRole('button', { name: '账户菜单' }))
+
+    expect(screen.queryByText('stale@example.com')).not.toBeInTheDocument()
+    expect(screen.getByText('--')).toBeVisible()
+  })
 })

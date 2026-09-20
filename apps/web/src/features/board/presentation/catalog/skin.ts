@@ -15,12 +15,12 @@ export const catalogClasses = {
   toolbar:
     'mb-6 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3.5 max-[860px]:grid-cols-1',
   recoveryState:
-    'mb-4 flex min-h-10 items-center justify-between gap-3 rounded-[var(--radius-ib-panel)] border border-board-card-border bg-board-control-bg px-3 py-2',
+    'mb-4 flex min-h-10 items-center justify-between gap-3 rounded-ib-panel border border-board-card-border bg-board-control-bg px-3 py-2',
   recoveryText: 'min-w-0 text-[13px] font-semibold text-board-control-text',
   recoveryButton:
     'inline-flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-board-primary px-3 text-xs font-bold text-ib-text-inverse hover:bg-board-primary-hover disabled:cursor-wait disabled:opacity-60',
   createButton:
-    '!h-[42px] !rounded-full !border-0 !bg-board-primary !px-5 !text-sm !font-bold !tracking-normal !text-ib-text-inverse !shadow-none hover:!bg-board-primary-hover focus-visible:!shadow-[var(--shadow-board-focus-strong)] max-[860px]:!w-full',
+    'cursor-pointer !h-[42px] !rounded-full !border-0 !bg-board-primary !px-5 !text-sm !font-bold !tracking-normal !text-ib-text-inverse !shadow-none hover:!bg-board-primary-hover focus-visible:!shadow-[var(--shadow-board-focus-strong)] max-[860px]:!w-full',
   searchWrap: 'ib-page-chrome-surface flex h-[42px] min-w-0 items-center gap-2 rounded-full px-3',
   searchIcon: 'size-3.5 shrink-0 text-board-control-icon',
   searchInput:
@@ -32,10 +32,10 @@ export const catalogClasses = {
   loadingSpinner: '!h-9 !w-9 text-board-primary',
   boardsGrid: 'grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3.5',
   createCard:
-    'relative flex h-[244px] w-full flex-col cursor-pointer overflow-hidden rounded-xl border border-board-card-border bg-board-card-bg p-0 text-left transition-colors hover:border-board-card-border-hover focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]',
+    'relative flex h-[244px] w-full flex-col cursor-pointer overflow-hidden rounded-xl border border-board-card-border bg-board-card-bg p-0 text-left transition-[border-color,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-board-card-border-hover hover:-translate-y-0.5 hover:scale-[1.006] focus-visible:outline-none focus-visible:shadow-board-focus',
   createPreview: `flex h-[186px] w-full items-center justify-center border-b border-board-card-preview-divider ${blankBoardPreviewSurfaceClass}`,
   createPreviewIcon:
-    "relative flex size-[54px] items-center justify-center rounded-[var(--radius-ib-panel)] border border-board-create-icon bg-board-surface-strong before:absolute before:top-1/2 before:left-1/2 before:h-[25px] before:w-[2.5px] before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:bg-board-create-icon before:content-[''] after:absolute after:top-1/2 after:left-1/2 after:h-[2.5px] after:w-[25px] after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bg-board-create-icon after:content-['']",
+    "relative flex size-[54px] items-center justify-center rounded-ib-panel border border-board-create-icon bg-board-surface-strong before:absolute before:top-1/2 before:left-1/2 before:h-[25px] before:w-[2.5px] before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:bg-board-create-icon before:content-[''] after:absolute after:top-1/2 after:left-1/2 after:h-[2.5px] after:w-[25px] after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bg-board-create-icon after:content-['']",
   createMeta: 'px-3 pt-2.5 pb-3',
   createTitle: 'text-sm font-bold text-board-create-title',
   createDate: 'mt-[3px] text-xs text-board-card-text',

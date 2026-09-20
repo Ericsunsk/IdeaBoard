@@ -26,7 +26,7 @@
     </AdminAlert>
 
     <div v-else-if="detail" class="flex min-w-0 flex-col gap-5">
-      <section class="rounded-[var(--radius-ib-control)] border border-admin-border-soft p-4">
+      <section class="rounded-ib-control border border-admin-border-soft p-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="min-w-0">
             <div class="font-mono text-admin-content font-bold text-admin-title-color">
@@ -95,7 +95,7 @@
             <li
               v-for="(refund, index) in detail.refunds"
               :key="refund.id || index"
-              class="rounded-[var(--radius-ib-control)] border border-admin-border-soft p-3 text-admin-meta"
+              class="rounded-ib-control border border-admin-border-soft p-3 text-admin-meta"
             >
               <div class="font-bold text-admin-text-1">{{ refundStatusLabel(refund.status) }}</div>
               <div v-if="refund.stripeStatus" class="mt-1 text-admin-text-3">
@@ -122,7 +122,7 @@
             <li
               v-for="(dispute, index) in detail.disputes"
               :key="dispute.id || index"
-              class="rounded-[var(--radius-ib-control)] border border-admin-border-soft p-3 text-admin-meta"
+              class="rounded-ib-control border border-admin-border-soft p-3 text-admin-meta"
             >
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="font-bold text-admin-text-1">{{ dispute.status }}</div>
@@ -145,7 +145,7 @@
       <section
         v-if="canRefund"
         aria-labelledby="payment-refund-action"
-        class="rounded-[var(--radius-ib-control)] border border-admin-border-soft p-4"
+        class="rounded-ib-control border border-admin-border-soft p-4"
       >
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div>

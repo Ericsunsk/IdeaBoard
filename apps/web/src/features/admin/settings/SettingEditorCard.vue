@@ -31,7 +31,7 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import AdminBadge from '../shared/components/AdminBadge.vue'
-import { cn } from '../shared/lib/classNames'
+import { cn } from '@/lib/utils'
 
 const props = withDefaults(
   defineProps<{

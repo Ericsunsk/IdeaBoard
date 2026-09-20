@@ -81,11 +81,11 @@
       </div>
 
       <section v-if="isBoardsLoading" :class="catalogClasses.loadingState" aria-live="polite">
-        <ProgressSpinner :class="catalogClasses.loadingSpinner" stroke-width="4" />
+        <Spinner :class="catalogClasses.loadingSpinner" />
       </section>
 
       <section v-else :class="catalogClasses.boardsGrid">
-        <Button
+        <button
           type="button"
           :class="catalogClasses.createCard"
           @click="createAndOpenBoard"
@@ -101,7 +101,7 @@
               {{ t('workspace.boards.startFromEmpty') }}
             </div>
           </div>
-        </Button>
+        </button>
 
         <TransitionGroup name="board-card" appear>
           <BoardCard
@@ -221,7 +221,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Spinner as ProgressSpinner } from '@/components/ui/spinner'
+import { Spinner } from '@/components/ui/spinner'
 import { formatCatalogDate, useCatalog, type CatalogSortMode } from './useCatalog'
 
 const router = useRouter()

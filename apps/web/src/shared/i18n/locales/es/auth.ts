@@ -40,12 +40,6 @@ export default {
     verifyAndSignIn: 'Verificar e iniciar sesión',
     verifying: 'Verificando...',
   },
-  links: {
-    forgot: '¿Olvidó su contraseña?',
-    backToSignIn: 'Volver a iniciar sesión',
-    terms: 'Términos',
-    privacy: 'Privacidad',
-  },
   legal: {
     agreePrefix: 'Al registrarse, acepta nuestros ',
     terms: 'Términos de servicio',
@@ -55,7 +49,6 @@ export default {
   },
   footer: {
     dontHaveAccount: '¿No tiene una cuenta?',
-    signUp: 'Registrarse',
     alreadyHaveAccount: '¿Ya tiene una cuenta?',
     signIn: 'Iniciar sesión',
   },

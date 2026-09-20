@@ -1,6 +1,8 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/vue'
+import { i18n } from '../../../../shared/i18n'
+import { loadLocaleMessages } from '../../../../shared/i18n/userLocale'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import AdminRewardCodesPage from './AdminRewardCodesPage.vue'
@@ -13,7 +15,7 @@ const resource = vi.hoisted(() => ({
   update: vi.fn(),
 }))
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
-const confirm = vi.hoisted(() => ({ request: vi.fn() }))
+const confirm = vi.hoisted(() => ({ confirm: vi.fn().mockResolvedValue(true) }))
 
 vi.mock('./resource', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./resource')>()),
@@ -47,6 +49,15 @@ vi.mock('../../shared/composables/useAdminConfirm', () => ({
 }))
 
 describe('AdminRewardCodesPage', () => {
+  beforeAll(async () => {
+    await loadLocaleMessages('zh-CN')
+    ;(i18n.global.locale as { value: string }).value = 'zh-CN'
+  })
+
+  afterAll(() => {
+    ;(i18n.global.locale as { value: string }).value = 'en'
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     resource.search.mockResolvedValue({
@@ -440,7 +451,7 @@ describe('AdminRewardCodesPage', () => {
 
     await user.click(screen.getByRole('button', { name: '新用户奖励 操作菜单' }))
     await user.click(await screen.findByRole('button', { name: '删除' }))
-    expect(confirm.request).toHaveBeenCalledWith(
+    expect(confirm.confirm).toHaveBeenCalledWith(
       expect.objectContaining({
         title: '删除兑换码',
         confirmLabel: '确认删除',
@@ -448,8 +459,7 @@ describe('AdminRewardCodesPage', () => {
       }),
     )
 
-    await confirm.request.mock.calls[0]![0].onConfirm()
-    expect(resource.delete).toHaveBeenCalledWith(7)
+    await waitFor(() => expect(resource.delete).toHaveBeenCalledWith(7))
     expect(screen.getByText('新用户奖励')).toBeVisible()
     expect(toast.error).toHaveBeenCalledWith('已有兑换记录，只能停用')
   })

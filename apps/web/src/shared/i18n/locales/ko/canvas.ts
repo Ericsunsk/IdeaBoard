@@ -34,9 +34,6 @@ export default {
     imageGenerationFailed: '이미지 생성에 실패했습니다',
   },
   homeHero: {
-    tagline: 'AI CANVAS FOR VISUAL DESIGNERS',
-    getStarted: '시작하기',
-    note: '{projectName}은 시각 디자이너를 위한 AI 캔버스로, 하나의 연결된 워크스페이스에서 이미지 방향을 탐색하고 비교하며 다듬을 수 있습니다.',
     legalNavAria: '법적 링크',
   },
   task: {

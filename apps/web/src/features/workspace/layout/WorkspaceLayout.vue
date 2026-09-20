@@ -2,11 +2,11 @@
   <div class="flex h-screen w-full flex-col overflow-hidden">
     <div
       v-if="isImpersonating"
-      class="fixed top-2.5 left-1/2 z-[1200] flex min-h-10 w-max max-w-[calc(100vw-20px)] -translate-x-1/2 items-center justify-between gap-2.5 rounded-[var(--radius-ib-panel)] border border-ib-creative-accent/25 bg-ib-creative-accent-soft/90 px-2.5 py-1.5 text-ib-text backdrop-blur-[10px] max-[720px]:top-2 max-[720px]:max-w-[calc(100vw-12px)] max-[720px]:rounded-[var(--radius-ib-control)] max-[720px]:px-2 max-[720px]:py-1"
+      class="fixed top-2.5 left-1/2 z-[1200] flex min-h-10 w-max max-w-[calc(100vw-20px)] -translate-x-1/2 items-center justify-between gap-2.5 rounded-ib-panel border border-ib-creative-accent/25 bg-ib-creative-accent-soft/90 px-2.5 py-1.5 text-ib-text backdrop-blur-[10px] max-[720px]:top-2 max-[720px]:max-w-[calc(100vw-12px)] max-[720px]:rounded-ib-control max-[720px]:px-2 max-[720px]:py-1"
     >
       <div class="inline-flex min-w-0 items-center gap-2">
         <span
-          class="inline-flex size-[22px] shrink-0 items-center justify-center rounded-[var(--radius-ib-control)] bg-ib-creative-accent/15 text-ib-creative-accent-pressed"
+          class="inline-flex size-[22px] shrink-0 items-center justify-center rounded-ib-control bg-ib-creative-accent/15 text-ib-creative-accent-pressed"
         >
           <Shield class="size-3.5" />
         </span>
@@ -18,7 +18,7 @@
         type="button"
         variant="ghost"
         size="icon"
-        class="size-[26px] min-w-[26px] shrink-0 rounded-full border border-ib-creative-accent/35 bg-ib-surface p-0 text-ib-creative-accent-pressed shadow-none hover:border-ib-creative-accent/50 hover:bg-ib-creative-accent-soft active:border-ib-creative-accent-pressed/55 active:bg-ib-creative-accent/15 focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)] disabled:cursor-wait disabled:opacity-70 max-[720px]:size-6 max-[720px]:min-w-6"
+        class="size-[26px] min-w-[26px] shrink-0 rounded-full border border-ib-creative-accent/35 bg-ib-surface p-0 text-ib-creative-accent-pressed shadow-none hover:border-ib-creative-accent/50 hover:bg-ib-creative-accent-soft active:border-ib-creative-accent-pressed/55 active:bg-ib-creative-accent/15 focus-visible:outline-none focus-visible:shadow-ib-focus disabled:cursor-wait disabled:opacity-70 max-[720px]:size-6 max-[720px]:min-w-6"
         :aria-label="t('common.impersonation.exit')"
         :aria-busy="stopImpersonatingLoading"
         :disabled="stopImpersonatingLoading"

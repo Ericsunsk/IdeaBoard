@@ -1,22 +1,21 @@
 <template>
-  <input
-    :value="modelValue ?? ''"
+  <Input
+    :model-value="modelValue ?? ''"
     :aria-label="ariaLabel"
-    :aria-invalid="invalid || undefined"
-    :class="
-      cn(
-        adminInputChromeClass,
-        'h-9 px-3 py-1.5 text-admin-body',
-        size === 'small' && 'h-8 px-2.5 text-admin-meta',
-        invalid && 'border-admin-danger focus-visible:border-admin-danger focus-visible:ring-admin-danger/20',
-        'file:border-0 file:bg-transparent file:text-admin-body file:font-medium',
-        props.class,
-      )
-    "
+    :invalid="invalid"
+    :size="size === 'small' ? 'compact' : 'default'"
     :type="type"
     :disabled="disabled"
     :placeholder="placeholder"
     :readonly="readonly"
+    :class="
+      cn(
+        adminInputChromeClass,
+        size === 'small' ? 'text-admin-meta' : 'text-admin-body',
+        invalid && 'border-admin-danger focus-visible:border-admin-danger focus-visible:ring-admin-danger/20',
+        props.class,
+      )
+    "
     @input="handleInput"
     @keydown.enter="$emit('enter')"
   />
@@ -24,7 +23,8 @@
 
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
-import { cn } from '../lib/classNames'
+import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 import { adminInputChromeClass } from '../lib/uiClasses'
 
 const props = withDefaults(

@@ -205,22 +205,21 @@ export function useAdminModelCatalogWorkspace(
     editDialogVisible.value = true
   }
 
-  function handleDeleteModel(model: AdminModelItem) {
-    adminConfirm.request({
+  async function handleDeleteModel(model: AdminModelItem) {
+    const confirmed = await adminConfirm.confirm({
       title: '删除模型',
       message: `确定要从模型库中移除模型「${model.name} (${model.id})」吗？引用该模型的功能定价映射将一并移除，需重新指定模型。`,
       confirmLabel: '确认删除',
       intent: 'danger',
-      onConfirm: async () => {
-        const nextList = allModels.value.filter((m) => m.id !== model.id)
-        try {
-          await saveCatalogMutation.mutateAsync(nextList)
-          toast.success(`已删除模型「${model.name}」`)
-        } catch (err) {
-          toast.error(formatAdminDisplayError(err, '删除模型失败'))
-        }
-      },
     })
+    if (!confirmed) return
+    const nextList = allModels.value.filter((m) => m.id !== model.id)
+    try {
+      await saveCatalogMutation.mutateAsync(nextList)
+      toast.success(`已删除模型「${model.name}」`)
+    } catch (err) {
+      toast.error(formatAdminDisplayError(err, '删除模型失败'))
+    }
   }
 
   async function handleSaveModel(item: AdminModelItem) {

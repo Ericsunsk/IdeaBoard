@@ -144,30 +144,30 @@ export function useAdminUserCommands(
     const row = activeActionUser.value
     if (!row) return
     activeActionUser.value = null
-    handleAction(key, row)
+    void handleAction(key, row)
   }
 
-  function handleAction(key: UserActionKey, row: AdminUserCommandTarget) {
+  async function handleAction(key: UserActionKey, row: AdminUserCommandTarget) {
     switch (key) {
       case 'status':
-        handleToggleStatus(row)
+        await handleToggleStatus(row)
         break
       case 'revoke':
-        handleRevokeSessions(row)
+        await handleRevokeSessions(row)
         break
       case 'impersonate':
-        void handleImpersonate(row)
+        await handleImpersonate(row)
         break
       case 'role':
-        handleToggleRole(row)
+        await handleToggleRole(row)
         break
       case 'delete':
-        handleDeleteUser(row)
+        await handleDeleteUser(row)
         break
     }
   }
 
-  function handleToggleStatus(row: AdminUserCommandTarget) {
+  async function handleToggleStatus(row: AdminUserCommandTarget) {
     if (isAdminUser(row)) {
       options.feedback.adminStatusChangeForbidden()
       return
@@ -180,20 +180,19 @@ export function useAdminUserCommands(
       return
     }
 
-    options.confirm.request({
+    const confirmed = await options.confirm.confirm({
       title: '确认解除封禁',
       message: `确定要恢复用户 ${row.displayName} 的访问权限吗？`,
       confirmLabel: '确认解封',
       intent: 'warn',
-      onConfirm: async () => {
-        try {
-          await unbanUserMutation.mutateAsync(row.publicId)
-          options.feedback.unbanSucceeded()
-        } catch (error) {
-          options.feedback.unbanFailed(error)
-        }
-      },
     })
+    if (!confirmed) return
+    try {
+      await unbanUserMutation.mutateAsync(row.publicId)
+      options.feedback.unbanSucceeded()
+    } catch (error) {
+      options.feedback.unbanFailed(error)
+    }
   }
 
   const confirmBanUser = async () => {
@@ -216,21 +215,20 @@ export function useAdminUserCommands(
     }
   }
 
-  function handleRevokeSessions(row: AdminUserCommandTarget) {
-    options.confirm.request({
+  async function handleRevokeSessions(row: AdminUserCommandTarget) {
+    const confirmed = await options.confirm.confirm({
       title: '确认踢下线',
       message: `将强制吊销账号 ${row.displayName} 的所有活跃会话，是否继续？`,
       confirmLabel: '确认',
       intent: 'warn',
-      onConfirm: async () => {
-        try {
-          await revokeUserSessionsMutation.mutateAsync(row.publicId)
-          options.feedback.revokeSessionsSucceeded()
-        } catch (error) {
-          options.feedback.revokeSessionsFailed(error)
-        }
-      },
     })
+    if (!confirmed) return
+    try {
+      await revokeUserSessionsMutation.mutateAsync(row.publicId)
+      options.feedback.revokeSessionsSucceeded()
+    } catch (error) {
+      options.feedback.revokeSessionsFailed(error)
+    }
   }
 
   async function handleImpersonate(row: AdminUserCommandTarget) {
@@ -242,31 +240,30 @@ export function useAdminUserCommands(
     }
   }
 
-  function handleDeleteUser(row: AdminUserCommandTarget) {
+  async function handleDeleteUser(row: AdminUserCommandTarget) {
     if (isAdminUser(row)) {
       options.feedback.adminStatusChangeForbidden()
       return
     }
 
-    options.confirm.request({
+    const confirmed = await options.confirm.confirm({
       title: '危险操作：彻底注销',
       message: `确定要彻底删除用户 ${row.displayName} 吗？此操作将清除该用户在 Auth 及业务数据库中的所有数据，不可撤销！`,
       confirmLabel: '确定删除',
       intent: 'danger',
-      onConfirm: async () => {
-        try {
-          await deleteUserMutation.mutateAsync(row.publicId)
-          options.feedback.userDeleted()
-        } catch (error: unknown) {
-          options.feedback.userDeleteFailed(error)
-        }
-      },
     })
+    if (!confirmed) return
+    try {
+      await deleteUserMutation.mutateAsync(row.publicId)
+      options.feedback.userDeleted()
+    } catch (error: unknown) {
+      options.feedback.userDeleteFailed(error)
+    }
   }
 
-  function handleToggleRole(row: AdminUserCommandTarget) {
+  async function handleToggleRole(row: AdminUserCommandTarget) {
     const nextRole = isAdminUser(row) ? 'user' : 'admin'
-    options.confirm.request({
+    const confirmed = await options.confirm.confirm({
       title: nextRole === 'admin' ? '确认设为管理员' : '确认取消管理员',
       message:
         nextRole === 'admin'
@@ -274,15 +271,14 @@ export function useAdminUserCommands(
           : `确定要取消用户 ${row.displayName} 的管理员权限吗？`,
       confirmLabel: '确认',
       intent: 'warn',
-      onConfirm: async () => {
-        try {
-          await updateUserRoleMutation.mutateAsync({ publicId: row.publicId, role: nextRole })
-          options.feedback.roleUpdated(nextRole)
-        } catch (error: unknown) {
-          options.feedback.roleUpdateFailed(error)
-        }
-      },
     })
+    if (!confirmed) return
+    try {
+      await updateUserRoleMutation.mutateAsync({ publicId: row.publicId, role: nextRole })
+      options.feedback.roleUpdated(nextRole)
+    } catch (error: unknown) {
+      options.feedback.roleUpdateFailed(error)
+    }
   }
 
   return {

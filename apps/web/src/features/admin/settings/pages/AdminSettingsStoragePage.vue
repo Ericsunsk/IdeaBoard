@@ -36,17 +36,7 @@
             :style="{ width: '280px', minWidth: '220px' }"
           >
             <template #body="{ data }">
-              <div class="flex items-center gap-3">
-                <div
-                  class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-admin-border-soft bg-admin-surface-muted text-admin-accent"
-                >
-                  <component :is="data.icon" class="size-4" />
-                </div>
-                <div class="min-w-0">
-                  <div class="text-admin-body font-bold text-admin-title-color">{{ data.title }}</div>
-                  <div class="truncate text-admin-caption text-admin-text-3">{{ data.description }}</div>
-                </div>
-              </div>
+              <AdminItemCell :icon="data.icon" :title="data.title" :description="data.description" />
             </template>
           </AdminColumn>
 
@@ -176,6 +166,7 @@ import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminInput from '../../shared/components/AdminInput.vue'
+import AdminItemCell from '../../shared/components/AdminItemCell.vue'
 import AdminTable from '../../shared/components/AdminTable.vue'
 import AdminStoragePage from '../../storage/pages/AdminStoragePage.vue'
 import {

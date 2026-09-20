@@ -18,7 +18,7 @@
       </button>
       <button
         type="button"
-        class="ib-control-state [--ib-control-hover-transform:scale(1.02)] [--ib-control-active-transform:scale(0.97)] inline-flex h-9 items-center justify-center rounded-full border-0 bg-gradient-to-r from-[var(--color-ib-auth-primary-from)] to-[var(--color-ib-auth-primary-to)] px-4.5 text-xs font-semibold text-[var(--color-ib-auth-primary-text)] shadow-[var(--shadow-ib-auth-primary)] transition-[box-shadow,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-[var(--shadow-ib-auth-primary-hover)] active:scale-[0.97]"
+        class="ib-control-state [--ib-control-hover-transform:scale(1.02)] [--ib-control-active-transform:scale(0.97)] inline-flex h-9 items-center justify-center rounded-full border-0 bg-gradient-to-r from-[var(--color-ib-auth-primary-from)] to-[var(--color-ib-auth-primary-to)] px-4.5 text-xs font-semibold text-[var(--color-ib-auth-primary-text)] shadow-ib-auth-primary transition-[box-shadow,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-ib-auth-primary-hover active:scale-[0.97]"
         :aria-label="t('auth.signUpFree')"
         @click="registerItem?.command?.()"
       >

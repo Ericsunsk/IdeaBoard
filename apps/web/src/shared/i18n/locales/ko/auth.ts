@@ -38,12 +38,6 @@ export default {
     verifyAndSignIn: '인증 및 로그인',
     verifying: '인증 중...',
   },
-  links: {
-    forgot: '비밀번호를 잊으셨나요?',
-    backToSignIn: '로그인으로 돌아가기',
-    terms: '이용약관',
-    privacy: '개인정보 보호정책',
-  },
   legal: {
     agreePrefix: '가입하면 ',
     terms: '이용약관',
@@ -53,7 +47,6 @@ export default {
   },
   footer: {
     dontHaveAccount: '계정이 없으신가요?',
-    signUp: '회원가입',
     alreadyHaveAccount: '이미 계정이 있으신가요?',
     signIn: '로그인',
   },

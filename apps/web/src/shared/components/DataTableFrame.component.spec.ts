@@ -2,7 +2,7 @@ import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen } from '../../test/render'
 import DataTableFrame from './DataTableFrame.vue'
-import UiColumn from './DataTableColumn.vue'
+import DataTableColumn from './DataTableColumn.vue'
 
 const rows = [{ id: 'row-1', name: '第一条记录' }]
 
@@ -26,7 +26,7 @@ describe('DataTableFrame', () => {
   it('does not focus an unlabeled table container', () => {
     renderWithUser(DataTableFrame, {
       props: { value: rows },
-      slots: { default: () => h(UiColumn, { field: 'name', header: '名称' }) },
+      slots: { default: () => h(DataTableColumn, { field: 'name', header: '名称' }) },
     })
 
     const tableContainer = screen.getByRole('table').parentElement
@@ -65,15 +65,15 @@ describe('DataTableFrame', () => {
 
   it('renders scoped body slots with row data', () => {
     const BodyHarness = defineComponent({
-      components: { DataTableFrame, UiColumn },
+      components: { DataTableFrame, DataTableColumn },
       setup() {
         return { rows }
       },
       template: `
         <DataTableFrame :value="rows" data-key="id">
-          <UiColumn field="name" header="名称">
+          <DataTableColumn field="name" header="名称">
             <template #body="{ data }">记录-{{ data.name }}</template>
-          </UiColumn>
+          </DataTableColumn>
         </DataTableFrame>
       `,
     })
@@ -84,13 +84,13 @@ describe('DataTableFrame', () => {
 
   it('keeps row identity stable through data-key', () => {
     const KeyHarness = defineComponent({
-      components: { DataTableFrame, UiColumn },
+      components: { DataTableFrame, DataTableColumn },
       setup() {
         return { rows: ref([...rows]) }
       },
       template: `
         <DataTableFrame :value="rows" data-key="id">
-          <UiColumn field="name" header="名称" />
+          <DataTableColumn field="name" header="名称" />
         </DataTableFrame>
       `,
     })
@@ -115,7 +115,7 @@ function renderTable(
       tableAriaLabel: '记录表格',
     },
     slots: {
-      default: () => h(UiColumn, { field: 'name', header: '名称' }),
+      default: () => h(DataTableColumn, { field: 'name', header: '名称' }),
       after: () => h('div', '表格后置内容'),
     },
     attrs: { onRowClick },

@@ -2,10 +2,6 @@
  * 사용자 영역에서 사용되는 공통 한국어 문구.
  */
 export default {
-  brand: {
-    studioName: 'Eric Studio',
-    currency: 'Ideas',
-  },
   navigation: {
     search: '검색',
     workspace: '워크스페이스',
@@ -63,10 +59,6 @@ export default {
     compressInvalidOutput: '압축 결과가 올바르지 않습니다.',
     heicConversionFailed: 'HEIC/HEIF 이미지를 변환할 수 없습니다. 다른 이미지를 사용해 주세요.',
     unexpected: '예기치 않은 오류가 발생했습니다. 다시 시도해 주세요.',
-  },
-  dialogs: {
-    unsavedChangesTitle: '저장되지 않은 변경사항',
-    unsavedChangesMessage: '저장되지 않은 변경사항이 있습니다. 정말 떠나시겠습니까?',
   },
   a11y: {
     dialog: '대화상자',

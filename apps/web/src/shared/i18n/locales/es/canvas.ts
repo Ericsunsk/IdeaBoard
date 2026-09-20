@@ -33,9 +33,6 @@ export default {
     imageGenerationFailed: 'Error al generar la imagen',
   },
   homeHero: {
-    tagline: 'LIENZO DE IA PARA DISEÑADORES VISUALES',
-    getStarted: 'Empezar',
-    note: '{projectName} es un lienzo de IA para diseñadores visuales para explorar, comparar y perfeccionar direcciones de imagen en un solo espacio de trabajo conectado.',
     legalNavAria: 'Enlaces legales',
   },
   task: {

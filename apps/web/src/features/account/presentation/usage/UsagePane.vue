@@ -9,8 +9,8 @@
             :class="[summaryCellClass, metric.cellClass]"
             aria-hidden="true"
           >
-            <div class="h-9 w-2/3 rounded-[var(--radius-ib-control)] bg-ib-surface-muted" />
-            <div class="mt-3 h-5 w-1/2 rounded-[var(--radius-ib-control)] bg-ib-surface-muted" />
+            <div class="h-9 w-2/3 rounded-ib-control bg-ib-surface-muted" />
+            <div class="mt-3 h-5 w-1/2 rounded-ib-control bg-ib-surface-muted" />
           </article>
         </div>
       </section>
@@ -18,19 +18,19 @@
 
     <section
       v-else-if="!usage && error"
-      class="rounded-[var(--radius-ib-panel)] border border-ib-danger/25 bg-ib-surface p-5"
+      class="rounded-ib-panel border border-ib-danger/25 bg-ib-surface p-5"
       role="alert"
     >
       <p class="m-0 font-semibold text-ib-danger">{{ t('account.errors.usageLoadFailed') }}</p>
       <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(error) }}</p>
-      <UiButton
+      <Button
         type="button"
         variant="ghost"
         class="!mt-3 !px-0 !font-semibold !text-ib-creative-accent-pressed"
         @click="retry()"
       >
         {{ t('account.reload') }}
-      </UiButton>
+      </Button>
     </section>
 
     <template v-else-if="usage">
@@ -84,18 +84,18 @@
           </p>
           <div
             v-if="error"
-            class="mt-3 flex min-w-0 items-center justify-between gap-3 rounded-[var(--radius-ib-control)] border border-ib-danger/25 bg-ib-surface-muted px-3 py-2 max-[640px]:items-start max-[640px]:flex-col"
+            class="mt-3 flex min-w-0 items-center justify-between gap-3 rounded-ib-control border border-ib-danger/25 bg-ib-surface-muted px-3 py-2 max-[640px]:items-start max-[640px]:flex-col"
             role="alert"
           >
             <p class="m-0 min-w-0 text-sm text-ib-danger">{{ errorMessage(error) }}</p>
-            <UiButton
+            <Button
               type="button"
               variant="ghost"
               class="!shrink-0 !p-0 !text-sm !font-semibold !text-ib-creative-accent-pressed"
               @click="retry()"
             >
               {{ t('account.usage.retryCurrentRange') }}
-            </UiButton>
+            </Button>
           </div>
         </template>
       </template>
@@ -103,7 +103,7 @@
       <template #chart-fallback>
         <div
           data-testid="usage-trend-skeleton"
-          class="h-full rounded-[var(--radius-ib-control)] bg-ib-surface-muted"
+          class="h-full rounded-ib-control bg-ib-surface-muted"
           aria-hidden="true"
         />
       </template>
@@ -136,7 +136,7 @@
 <script setup lang="ts">
 import { computed, markRaw, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Button as UiButton } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import RangedLineChartCard from '../../../../shared/components/RangedLineChartCard.vue'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
@@ -154,7 +154,7 @@ const { usage, displayRange, isInitialPending, isSwitching, error, retry } = use
   () => props.active,
 )
 const summaryPanelClass =
-  'overflow-hidden rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-control)]'
+  'overflow-hidden rounded-ib-panel border border-ib-border-soft bg-ib-surface shadow-ib-control'
 const summaryGridClass = 'grid grid-cols-5 max-[640px]:grid-cols-2'
 const summaryCellClass = 'min-h-[108px] min-w-0 p-5 max-[640px]:min-h-[100px] max-[640px]:p-4'
 const trendChartTheme = resolveUsageChartTheme()

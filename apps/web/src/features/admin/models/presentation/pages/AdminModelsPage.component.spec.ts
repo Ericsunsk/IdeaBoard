@@ -5,11 +5,11 @@ import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
 import { renderWithUser, screen, waitFor } from '../../../../../test/render'
 import AdminModelsPage from './AdminModelsPage.vue'
 
-const confirmRequestMock = vi.hoisted(() => vi.fn())
+const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
 
 vi.mock('../../../shared/composables/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({ request: confirmRequestMock }),
+  useAdminConfirm: () => ({ confirm: confirmMock }),
 }))
 
 vi.mock('../../../shared/lib/toast', async (importOriginal) => ({
@@ -22,7 +22,8 @@ describe('AdminModelsPage', () => {
   let storedCatalog: ReturnType<typeof wireCatalogModels> = []
 
   beforeEach(() => {
-    confirmRequestMock.mockReset()
+    confirmMock.mockReset()
+    confirmMock.mockResolvedValue(true)
     toast.success.mockReset()
     toast.warning.mockReset()
     toast.error.mockReset()
@@ -227,9 +228,7 @@ describe('AdminModelsPage', () => {
     const deleteBtn = await screen.findByRole('button', { name: '删除 seedream-v2-pro' })
     await user.click(deleteBtn)
 
-    expect(confirmRequestMock).toHaveBeenCalledOnce()
-    const req = confirmRequestMock.mock.calls[0]?.[0] as { onConfirm: () => Promise<void> }
-    await req.onConfirm()
+    expect(confirmMock).toHaveBeenCalledOnce()
 
     await waitFor(() => expect(savedList).not.toBeNull())
     expect(toast.success).toHaveBeenCalledWith('已删除模型「seedream-v2-pro」')

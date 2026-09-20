@@ -58,6 +58,17 @@ export function validateAdminCreditCommand(
   }
 }
 
+
+export function isRefundableCharge(transaction: {
+  command_type: string
+  charge?: { remaining_refundable_credits?: number | null } | null
+}): boolean {
+  return (
+    transaction.command_type === 'capture' &&
+    (transaction.charge?.remaining_refundable_credits ?? 0) > 0
+  )
+}
+
 export function buildAdminCreditCommandRequest(
   input: AdminCreditCommandInput,
   idFactory: () => string = () => createUniqueId(),

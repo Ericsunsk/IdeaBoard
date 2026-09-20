@@ -31,8 +31,8 @@ export function useStorageContext(options: UseAdminStorageContextOptions) {
     fetchBucketDomains: workspace.fetchBucketDomains,
   })
 
-  function requestRemoveProfile(target: StorageProfileCommandTarget) {
-    workspace.requestRemoveProfile(target)
+  async function requestRemoveProfile(target: StorageProfileCommandTarget) {
+    await workspace.requestRemoveProfile(target)
   }
 
   return {

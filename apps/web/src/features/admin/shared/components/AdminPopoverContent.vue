@@ -23,7 +23,7 @@ import {
   PopoverPortal,
   type PopoverContentProps,
 } from 'reka-ui'
-import { cn } from '../lib/classNames'
+import { cn } from '@/lib/utils'
 
 const props = withDefaults(
   defineProps<{

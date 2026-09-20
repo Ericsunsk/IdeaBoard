@@ -99,7 +99,7 @@ describe('admin users pagination contract', () => {
 function createContext() {
   return useAdminUsersContext({
     feedback: { loadFailed: vi.fn() } as unknown as AdminUsersFeedback,
-    confirm: { request: vi.fn() } as AdminConfirmPort,
+    confirm: { confirm: vi.fn().mockResolvedValue(true) } as AdminConfirmPort,
   })
 }
 

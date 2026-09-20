@@ -1,10 +1,12 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { i18n } from '../../../shared/i18n'
+import { loadLocaleMessages } from '../../../shared/i18n/userLocale'
 import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import { renderWithUser, screen, waitFor, within } from '../../../test/render'
 import AdminUsersPage from './AdminUsersPage.vue'
 
-const confirmRequestMock = vi.hoisted(() => vi.fn())
+const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
   warning: vi.fn(),
@@ -13,7 +15,7 @@ const toastMocks = vi.hoisted(() => ({
 const userPublicID = '00000000-0000-0000-0000-000000000012'
 
 vi.mock('../shared/composables/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({ request: confirmRequestMock }),
+  useAdminConfirm: () => ({ confirm: confirmMock }),
 }))
 
 vi.mock('../../../shared/composables/useAppToast', () => ({
@@ -21,11 +23,21 @@ vi.mock('../../../shared/composables/useAppToast', () => ({
 }))
 
 describe('AdminUsersPage', () => {
+  beforeAll(async () => {
+    await loadLocaleMessages('zh-CN')
+    ;(i18n.global.locale as { value: string }).value = 'zh-CN'
+  })
+
+  afterAll(() => {
+    ;(i18n.global.locale as { value: string }).value = 'en'
+  })
+
   let userListRequestCount: number
   let commandRequests: Array<Record<string, unknown>>
 
   beforeEach(() => {
-    confirmRequestMock.mockReset()
+    confirmMock.mockReset()
+    confirmMock.mockResolvedValue(true)
     vi.clearAllMocks()
     userListRequestCount = 0
     commandRequests = []
@@ -189,9 +201,11 @@ describe('AdminUsersPage', () => {
     await user.type(within(dialog).getByRole('spinbutton', { name: 'Idea数量' }), '20')
     await user.type(within(dialog).getByRole('textbox', { name: /操作原因/ }), '运营补偿')
     await user.click(within(dialog).getByRole('button', { name: '核对操作' }))
-    const confirmation = confirmRequestMock.mock.calls.at(-1)?.[0]
-    expect(confirmation).toEqual(expect.objectContaining({ title: '确认赠送Idea' }))
-    await confirmation.onConfirm()
+    await waitFor(() =>
+      expect(confirmMock).toHaveBeenCalledWith(
+        expect.objectContaining({ title: '确认赠送Idea' }),
+      ),
+    )
 
     await waitFor(() =>
       expect(commandRequests[0]).toMatchObject({
@@ -351,9 +365,11 @@ describe('AdminUsersPage', () => {
     await user.type(within(dialog).getByRole('spinbutton', { name: 'Idea数量' }), '25')
     await user.type(within(dialog).getByRole('textbox', { name: /操作原因/ }), '运营扣减')
     await user.click(within(dialog).getByRole('button', { name: '核对操作' }))
-    const confirmation = confirmRequestMock.mock.calls.at(-1)?.[0]
-    expect(confirmation).toEqual(expect.objectContaining({ title: '确认扣减Idea' }))
-    await confirmation.onConfirm()
+    await waitFor(() =>
+      expect(confirmMock).toHaveBeenCalledWith(
+        expect.objectContaining({ title: '确认扣减Idea' }),
+      ),
+    )
 
     await waitFor(() => expect(within(dialog).getByText('100 Ideas')).toBeVisible())
     expect(await within(dialog).findByText('运营扣减')).toBeVisible()
@@ -380,7 +396,11 @@ describe('AdminUsersPage', () => {
     await user.type(amount, '25')
     await user.type(reason, '受限账户扣减')
     await user.click(within(dialog).getByRole('button', { name: '核对操作' }))
-    await confirmRequestMock.mock.calls.at(-1)?.[0].onConfirm()
+    await waitFor(() =>
+      expect(confirmMock).toHaveBeenCalledWith(
+        expect.objectContaining({ title: '确认扣减Idea' }),
+      ),
+    )
 
     await waitFor(() => expect(toastMocks.error).toHaveBeenCalled())
     expect(amount).toHaveValue('25')
@@ -420,8 +440,6 @@ describe('AdminUsersPage', () => {
     await user.type(within(dialog).getByRole('spinbutton', { name: 'Idea数量' }), '25')
     await user.type(within(dialog).getByRole('textbox', { name: /操作原因/ }), '等待扣减')
     await user.click(within(dialog).getByRole('button', { name: '核对操作' }))
-    const confirmation = confirmRequestMock.mock.calls.at(-1)?.[0]
-    void confirmation.onConfirm()
 
     await waitFor(() => expect(deductionRequests).toBe(1))
     expect(within(dialog).getByRole('spinbutton', { name: 'Idea数量' })).toBeDisabled()
@@ -551,9 +569,11 @@ describe('AdminUsersPage', () => {
     await user.type(within(dialog).getByRole('spinbutton', { name: 'Idea数量' }), '10')
     await user.type(within(dialog).getByRole('textbox', { name: /退款原因/ }), '任务取消退款')
     await user.click(within(dialog).getByRole('button', { name: '核对退款' }))
-    const confirmation = confirmRequestMock.mock.calls.at(-1)?.[0]
-    expect(confirmation).toEqual(expect.objectContaining({ title: '确认退款Idea' }))
-    await confirmation.onConfirm()
+    await waitFor(() =>
+      expect(confirmMock).toHaveBeenCalledWith(
+        expect.objectContaining({ title: '确认退款Idea' }),
+      ),
+    )
 
     await waitFor(() => expect(within(dialog).getByText('135 Ideas')).toBeVisible())
     const refundRow = (await within(dialog).findByText('任务取消退款')).closest('tr')

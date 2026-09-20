@@ -3,10 +3,6 @@
  * Keys are stable identifiers; never use sentences as keys.
  */
 export default {
-  brand: {
-    studioName: 'Eric Studio',
-    currency: 'Ideas',
-  },
   navigation: {
     search: 'Search',
     workspace: 'Workspace',
@@ -64,10 +60,6 @@ export default {
     compressInvalidOutput: 'Compression produced invalid output.',
     heicConversionFailed: 'The HEIC/HEIF image could not be converted. Try another image.',
     unexpected: 'Something went wrong. Please try again.',
-  },
-  dialogs: {
-    unsavedChangesTitle: 'Unsaved changes',
-    unsavedChangesMessage: 'You have unsaved changes. Are you sure you want to leave?',
   },
   a11y: {
     dialog: 'Dialog',

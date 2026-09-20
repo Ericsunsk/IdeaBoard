@@ -2,10 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAdminUserCommands } from './commands'
 import type { AdminUserCommandTarget } from './view'
 
-type ConfirmRequest = {
-  onConfirm: () => void | Promise<void>
-}
-
 const userQueryClientMock = vi.hoisted(() => ({
   invalidateQueries: vi.fn().mockResolvedValue(undefined),
 }))
@@ -71,15 +67,15 @@ describe('admin user command query invalidation', () => {
 
     commands.openUserActionMenu(makeUser({ publicId: 'user-2', status: 0, displayName: 'bob' }))
     commands.handleActionSelect('status')
-    await harness.acceptLastConfirm()
+    await harness.settleConfirms()
 
     commands.openUserActionMenu(makeUser({ publicId: 'user-3', role: 'user', displayName: 'cara' }))
     commands.handleActionSelect('role')
-    await harness.acceptLastConfirm()
+    await harness.settleConfirms()
 
     commands.openUserActionMenu(makeUser({ publicId: 'user-4', role: 'user', displayName: 'dana' }))
     commands.handleActionSelect('delete')
-    await harness.acceptLastConfirm()
+    await harness.settleConfirms()
 
     expect(userQueryClientMock.invalidateQueries).toHaveBeenCalledTimes(4)
     expect(userQueryClientMock.invalidateQueries).toHaveBeenNthCalledWith(1, {
@@ -98,9 +94,8 @@ describe('admin user command query invalidation', () => {
 })
 
 function createHarness() {
-  const confirmRequests: ConfirmRequest[] = []
   const confirm = {
-    request: vi.fn((request: ConfirmRequest) => confirmRequests.push(request)),
+    confirm: vi.fn().mockResolvedValue(true),
   }
   const feedback = createAdminUsersFeedback()
   const commands = useAdminUserCommands(
@@ -114,10 +109,10 @@ function createHarness() {
 
   return {
     commands,
-    acceptLastConfirm: async () => {
-      const request = confirmRequests.at(-1)
-      expect(request).toBeTruthy()
-      await request?.onConfirm()
+    confirm,
+    settleConfirms: async () => {
+      await vi.waitFor(() => expect(confirm.confirm).toHaveBeenCalled())
+      await new Promise((resolve) => setTimeout(resolve, 0))
     },
   }
 }

@@ -38,12 +38,6 @@ export default {
     verifyAndSignIn: '验证并登录',
     verifying: '验证中...',
   },
-  links: {
-    forgot: '忘记密码？',
-    backToSignIn: '返回登录',
-    terms: '服务条款',
-    privacy: '隐私政策',
-  },
   legal: {
     agreePrefix: '注册即表示您同意我们的',
     terms: '服务条款',
@@ -53,7 +47,6 @@ export default {
   },
   footer: {
     dontHaveAccount: '还没有账户？',
-    signUp: '注册',
     alreadyHaveAccount: '已有账户？',
     signIn: '登录',
   },

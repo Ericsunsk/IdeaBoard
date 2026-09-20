@@ -4,11 +4,13 @@ import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import AdminBillingPricingPage from './AdminBillingPricingPage.vue'
 
-const confirmRequestMock = vi.hoisted(() => vi.fn())
+const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
 
 vi.mock('../../shared/composables/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({ request: confirmRequestMock }),
+  useAdminConfirm: () => ({
+    confirm: confirmMock,
+  }),
 }))
 
 vi.mock('../../shared/lib/toast', async (importOriginal) => ({
@@ -18,7 +20,8 @@ vi.mock('../../shared/lib/toast', async (importOriginal) => ({
 
 describe('AdminBillingPricingPage', () => {
   beforeEach(() => {
-    confirmRequestMock.mockReset()
+    confirmMock.mockReset()
+    confirmMock.mockResolvedValue(true)
     toast.success.mockReset()
     toast.warning.mockReset()
     toast.error.mockReset()
@@ -314,11 +317,11 @@ describe('AdminBillingPricingPage', () => {
 
     const { user } = renderPricingPage()
     await user.click(await screen.findByRole('button', { name: '删除' }))
-    expect(confirmRequestMock).toHaveBeenCalledOnce()
-    const request = confirmRequestMock.mock.calls[0]?.[0] as { onConfirm: () => Promise<void> }
-    await request.onConfirm()
+    expect(confirmMock).toHaveBeenCalledOnce()
 
-    expect(screen.queryByText('legacy:removed')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.queryByText('legacy:removed')).not.toBeInTheDocument()
+    })
     expect(toast.success).toHaveBeenCalledWith('已归档功能已删除')
   })
 
@@ -337,10 +340,11 @@ describe('AdminBillingPricingPage', () => {
 
     const { user } = renderPricingPage()
     await user.click(await screen.findByRole('button', { name: '删除' }))
-    const request = confirmRequestMock.mock.calls[0]?.[0] as { onConfirm: () => Promise<void> }
-    await request.onConfirm()
+    expect(confirmMock).toHaveBeenCalledOnce()
 
-    expect(screen.getByText('legacy:removed')).toBeVisible()
+    await waitFor(() => {
+      expect(screen.getByText('legacy:removed')).toBeVisible()
+    })
     expect(toast.error).toHaveBeenCalledWith('功能已有历史计费记录，无法删除')
   })
 

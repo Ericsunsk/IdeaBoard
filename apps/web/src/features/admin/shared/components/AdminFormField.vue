@@ -32,11 +32,11 @@ const props = withDefaults(
   defineProps<{
     label: string
     for?: string | undefined
-    error?: string
-    hint?: string
-    required?: boolean
-    labelClass?: string
-    bodyClass?: string
+    error?: string | undefined
+    hint?: string | undefined
+    required?: boolean | undefined
+    labelClass?: string | undefined
+    bodyClass?: string | undefined
   }>(),
   {
     for: undefined,

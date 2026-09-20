@@ -10,28 +10,28 @@
 
     <div
       v-if="pending"
-      class="grid gap-2 rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface p-4 shadow-[var(--shadow-ib-control)]"
+      class="grid gap-2 rounded-ib-panel border border-ib-border-soft bg-ib-surface p-4 shadow-ib-control"
       role="status"
       :aria-label="t('account.topUp.pendingOrdersLoading')"
     >
-      <UiSkeleton height="1.25rem" width="42%" />
-      <UiSkeleton height="1rem" width="68%" />
+      <Skeleton height="1.25rem" width="42%" />
+      <Skeleton height="1rem" width="68%" />
     </div>
 
     <div
       v-else-if="error"
-      class="rounded-[var(--radius-ib-panel)] border border-ib-danger/25 bg-ib-surface p-4 shadow-[var(--shadow-ib-control)]"
+      class="rounded-ib-panel border border-ib-danger/25 bg-ib-surface p-4 shadow-ib-control"
       role="alert"
     >
       <p class="m-0 font-semibold text-ib-danger">
         {{ t('account.errors.pendingOrdersLoadFailed') }}
       </p>
       <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(error) }}</p>
-      <UiButton
+      <Button
         variant="ghost"
         size="sm"
         class="mt-2"
-        @click="emit('retry')">{{ t('account.reload') }}</UiButton>
+        @click="emit('retry')">{{ t('account.reload') }}</Button>
     </div>
 
     <div v-else class="grid gap-2">
@@ -39,7 +39,7 @@
         v-for="item in items"
         :key="item.public_token"
         :data-testid="`pending-payment-order-${item.public_token}`"
-        class="rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface p-4 shadow-[var(--shadow-ib-control)] max-[640px]:p-3.5"
+        class="rounded-ib-panel border border-ib-border-soft bg-ib-surface p-4 shadow-ib-control max-[640px]:p-3.5"
       >
         <div class="flex min-w-0 items-start justify-between gap-4 max-[640px]:flex-col">
           <div class="min-w-0">
@@ -58,35 +58,35 @@
             v-if="item.status === 'checkout_open'"
             class="grid w-36 shrink-0 gap-2 max-[640px]:w-full"
           >
-            <UiButton
+            <Button
               :loading="isActionPending(item.public_token, 'continue')"
               :disabled="actionPending"
               :class="[accountPrimaryActionButtonClass, 'w-full']"
-              @click="emit('continue', item.public_token)">{{ t('account.topUp.continuePayment') }}</UiButton>
-            <UiButton
+              @click="emit('continue', item.public_token)">{{ t('account.topUp.continuePayment') }}</Button>
+            <Button
               variant="outline"
               size="sm"
               class="w-full"
               :loading="isActionPending(item.public_token, 'abandon')"
               :disabled="actionPending"
-              @click="emit('abandon', item.public_token)">{{ t('account.topUp.abandonOrder') }}</UiButton>
+              @click="emit('abandon', item.public_token)">{{ t('account.topUp.abandonOrder') }}</Button>
           </div>
         </div>
 
         <div
           v-if="actionError && actionTarget?.publicToken === item.public_token"
-          class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[var(--radius-ib-control)] border border-ib-danger/25 bg-ib-surface-muted px-3 py-2"
+          class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-ib-control border border-ib-danger/25 bg-ib-surface-muted px-3 py-2"
           role="alert"
         >
           <span class="text-sm font-semibold text-ib-danger">{{ errorMessage(actionError) }}</span>
-          <UiButton
+          <Button
             variant="ghost"
             size="sm"
             class="!p-0"
             :disabled="actionPending"
             @click="retryAction(item.public_token)">{{ actionTarget?.kind === 'continue'
                 ? t('account.topUp.retryContinuePayment')
-                : t('account.topUp.retryAbandonOrder') }}</UiButton>
+                : t('account.topUp.retryAbandonOrder') }}</Button>
         </div>
       </article>
     </div>
@@ -96,8 +96,8 @@
 <script setup lang="ts">
 import { useNow } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
-import { Button as UiButton } from '@/components/ui/button'
-import { Skeleton as UiSkeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { formatLocaleDate } from '../../../../shared/i18n/formatters'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'

@@ -1,31 +1,37 @@
 <template>
-  <component
-    :is="href ? 'a' : 'button'"
+  <Button
+    :as="href ? 'a' : 'button'"
+    :variant="baseButtonVariant"
+    :size="baseButtonSize"
+    :disabled="disabled || loading"
+    :loading="loading"
+    :type="!href ? type : undefined"
+    :href="isDisabledOrLoading ? undefined : href"
+    :aria-disabled="isDisabledOrLoading ? 'true' : undefined"
+    :target="target"
+    :rel="rel"
     :class="computedClasses"
-    v-bind="elementAttrs"
-    :aria-busy="loading || undefined"
   >
-    <AdminSpinner v-if="loading" class="size-4 shrink-0" aria-label="加载中" />
-    <slot v-else name="icon">
+    <slot v-if="!loading" name="icon">
       <component :is="icon" v-if="icon" class="size-4 shrink-0" />
     </slot>
     <span v-if="label">{{ label }}</span>
     <slot />
-  </component>
+  </Button>
 </template>
 
 <script setup lang="ts">
 import { computed, type Component, type HTMLAttributes } from 'vue'
-import AdminSpinner from './AdminSpinner.vue'
-import { cn } from '../lib/classNames'
+import { Button, type ButtonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 export type AdminButtonVariant =
   | 'default'
   | 'primary'
+  | 'secondary'
   | 'destructive'
   | 'danger'
   | 'outline'
-  | 'secondary'
   | 'ghost'
   | 'link'
   | 'success'
@@ -69,79 +75,70 @@ const props = withDefaults(
   },
 )
 
-type ButtonStyleInput = {
-  text: boolean
-  outlined: boolean
-  severity: 'primary' | 'secondary' | 'danger' | 'success' | 'info' | 'warn' | undefined
-  variant: AdminButtonVariant | undefined
+function resolveEffectiveVariant(): AdminButtonVariant {
+  if (props.text) {
+    return 'ghost'
+  }
+  if (props.outlined) {
+    return 'outline'
+  }
+  if (props.severity === 'danger') {
+    return 'destructive'
+  }
+  if (props.severity === 'secondary') {
+    return 'secondary'
+  }
+  if (props.severity === 'success') {
+    return 'success'
+  }
+  return props.variant ?? 'default'
 }
 
-function resolveVariantClass(input: ButtonStyleInput): string {
-  const { text, outlined, severity, variant } = input
-  if (text) {
-    if (severity === 'danger') {
-      return 'text-admin-danger hover:bg-admin-danger-soft active:bg-admin-danger-soft/80'
-    }
-    return 'text-admin-text-2 hover:bg-admin-surface-hover hover:text-admin-text-1'
-  }
-  if (outlined) {
-    if (severity === 'danger') {
-      return 'border border-admin-danger/30 text-admin-danger bg-white hover:bg-admin-danger-soft'
-    }
-    return 'border border-admin-border bg-white text-admin-text-1 hover:bg-admin-surface-hover'
-  }
-  if (severity === 'danger' || variant === 'destructive' || variant === 'danger') {
-    return 'bg-admin-danger !text-white hover:bg-admin-danger-hover active:bg-admin-danger-pressed shadow-xs'
-  }
-  if (severity === 'success' || variant === 'success') {
-    return 'bg-admin-success !text-white hover:bg-admin-success/90 shadow-xs'
-  }
-  if (severity === 'secondary' || variant === 'secondary') {
-    return 'bg-admin-surface-muted text-admin-text-1 hover:bg-admin-surface-hover active:bg-admin-surface-pressed border border-admin-border-soft'
-  }
-  if (variant === 'outline') {
-    return 'border border-admin-border bg-white text-admin-text-1 hover:bg-admin-surface-hover active:bg-admin-surface-pressed shadow-xs'
-  }
-  if (variant === 'ghost') {
-    return 'text-admin-text-2 hover:bg-admin-surface-hover hover:text-admin-text-1 active:bg-admin-surface-pressed'
-  }
-  if (variant === 'link') {
-    return 'text-admin-accent underline-offset-4 hover:underline'
-  }
-  return 'bg-admin-accent !text-white hover:bg-admin-accent-hover active:bg-admin-accent-pressed shadow-xs'
-}
-
-function resolveSizeClass(size: AdminButtonSize | undefined): string {
-  if (size === 'small' || size === 'sm') return 'h-8 px-3 text-admin-meta'
-  if (size === 'large' || size === 'lg') return 'h-10 px-6 text-admin-title-sm'
-  if (size === 'icon') return 'size-9 p-0'
-  return 'h-9 px-4 py-2 text-admin-body'
-}
-
-const computedClasses = computed(() => {
-  const variantClass = resolveVariantClass({
-    text: props.text,
-    outlined: props.outlined,
-    severity: props.severity,
-    variant: props.variant,
-  })
-  const sizeClass = resolveSizeClass(props.size)
-  const radiusClass = props.rounded ? 'rounded-full' : 'rounded-lg'
-
-  return cn(
-    'inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-accent/20 disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer',
-    sizeClass,
-    variantClass,
-    radiusClass,
-    props.class,
-  )
+const baseButtonVariant = computed<ButtonVariants['variant']>(() => {
+  const v = resolveEffectiveVariant()
+  if (v === 'destructive' || v === 'danger') return 'destructive'
+  if (v === 'outline') return 'outline'
+  if (v === 'secondary') return 'secondary'
+  if (v === 'ghost') return 'ghost'
+  if (v === 'link') return 'link'
+  if (v === 'success') return 'success'
+  return 'default'
 })
 
-// 有 href 即渲染 anchor（旧 PrimeVue Button as="a" 的替代），无 href 保持 button。
-const elementAttrs = computed(() => {
-  if (props.href) {
-    return { href: props.href, target: props.target, rel: props.rel }
-  }
-  return { disabled: props.disabled || props.loading, type: props.type }
+const baseButtonSize = computed<ButtonVariants['size']>(() => {
+  if (props.size === 'small' || props.size === 'sm') return 'compact'
+  if (props.size === 'large' || props.size === 'lg') return 'lg'
+  if (props.size === 'icon') return 'icon'
+  return 'default'
+})
+
+const adminColorClasses: Record<AdminButtonVariant, string> = {
+  default: 'bg-admin-accent !text-white hover:bg-admin-accent-hover active:bg-admin-accent-pressed shadow-xs',
+  primary: 'bg-admin-accent !text-white hover:bg-admin-accent-hover active:bg-admin-accent-pressed shadow-xs',
+  secondary: 'bg-admin-surface-muted text-admin-text-1 hover:bg-admin-surface-hover active:bg-admin-surface-pressed border border-admin-border-soft',
+  destructive: 'bg-admin-danger !text-white hover:bg-admin-danger-hover active:bg-admin-danger-pressed shadow-xs',
+  danger: 'bg-admin-danger !text-white hover:bg-admin-danger-hover active:bg-admin-danger-pressed shadow-xs',
+  outline: 'border border-admin-border bg-white text-admin-text-1 hover:bg-admin-surface-hover active:bg-admin-surface-pressed shadow-xs',
+  ghost: 'text-admin-text-2 hover:bg-admin-surface-hover hover:text-admin-text-1 active:bg-admin-surface-pressed',
+  link: 'text-admin-accent underline-offset-4 hover:underline',
+  success: 'bg-admin-success !text-white hover:bg-admin-success/90 shadow-xs',
+}
+
+const isDisabledOrLoading = computed(() => Boolean(props.disabled || props.loading))
+
+const computedClasses = computed(() => {
+  const effVariant = resolveEffectiveVariant()
+  return cn(
+    'focus-visible:ring-2 focus-visible:ring-admin-accent/20 select-none cursor-pointer',
+    props.rounded ? 'rounded-full' : 'rounded-lg',
+    (props.size === 'small' || props.size === 'sm') && 'text-admin-meta',
+    (props.size === 'large' || props.size === 'lg') && 'text-admin-title-sm',
+    (!props.size || props.size === 'default') && 'text-admin-body',
+    adminColorClasses[effVariant],
+    props.text && props.severity === 'danger' && 'text-admin-danger hover:bg-admin-danger-soft active:bg-admin-danger-soft/80',
+    props.outlined && props.severity === 'danger' && 'border-admin-danger/30 text-admin-danger hover:bg-admin-danger-soft',
+    props.href && isDisabledOrLoading.value && 'pointer-events-none opacity-50 !cursor-not-allowed',
+    props.class,
+  )
 })
 </script>

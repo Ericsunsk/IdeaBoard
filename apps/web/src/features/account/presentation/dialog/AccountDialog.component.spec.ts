@@ -126,7 +126,7 @@ describe('AccountDialog', () => {
     renderAccountDialog(true)
 
     expect(screen.getByRole('dialog', { name: 'Account' })).toHaveClass(
-      'shadow-[var(--shadow-ib-overlay)]',
+      'shadow-ib-overlay',
     )
   })
 

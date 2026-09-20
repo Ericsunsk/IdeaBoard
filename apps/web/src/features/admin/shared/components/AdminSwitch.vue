@@ -23,7 +23,7 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import { SwitchRoot, SwitchThumb } from 'reka-ui'
-import { cn } from '../lib/classNames'
+import { cn } from '@/lib/utils'
 
 const props = withDefaults(
   defineProps<{

@@ -224,95 +224,18 @@
           :style="{ height: `${h}px` }"
         ></div>
       </div>
-      <section
-        v-else-if="hasError && results.length === 0"
-        class="mt-8 flex min-h-[320px] flex-col items-center justify-center rounded-3xl border border-dashed border-board-card-border/80 bg-board-loading-bg/40 px-6 py-14 text-center backdrop-blur-sm"
-      >
-        <div class="flex max-w-sm flex-col items-center">
-          <div
-            class="mb-4 flex size-14 items-center justify-center rounded-2xl bg-board-card-bg text-board-danger shadow-xs ring-1 ring-board-card-border/70"
-          >
-            <WarningTriangle class="size-6 stroke-[1.75]" aria-hidden="true" />
-          </div>
-          <h3 class="m-0 text-base font-semibold text-board-page-text tracking-tight">
-            {{ t('search.errors.unableToLoadInspiration') }}
-          </h3>
-          <p class="mt-2 mb-0 text-xs sm:text-[13px] text-board-page-text-muted leading-relaxed">
-            {{ t('search.errors.unableToLoadResults') }}
-          </p>
-          <div class="mt-6">
-            <Button
-              class="!h-9 !rounded-full !border-0 !bg-board-primary !px-5 !text-xs !font-semibold !text-ib-text-inverse hover:!bg-board-primary-hover cursor-pointer shadow-xs"
-              @click="reload"
-            >
-              {{ t('search.actions.retry') }}
-            </Button>
-          </div>
-        </div>
-      </section>
-      <section
+
+      <SearchEmptyState
         v-else-if="results.length === 0"
-        class="mt-8 flex min-h-[320px] flex-col items-center justify-center rounded-3xl border border-dashed border-board-card-border/80 bg-board-loading-bg/40 px-6 py-14 text-center backdrop-blur-sm"
-      >
-        <div class="flex max-w-sm flex-col items-center">
-          <div
-            class="mb-4 flex size-14 items-center justify-center rounded-2xl bg-board-card-bg shadow-xs ring-1 ring-board-card-border/70 transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105"
-          >
-            <Search
-              v-if="hasActiveSearch"
-              class="size-6 stroke-[1.75] text-board-page-text-muted"
-              aria-hidden="true"
-            />
-            <Compass v-else class="size-6 stroke-[1.75] text-board-primary" aria-hidden="true" />
-          </div>
-
-          <h3 class="m-0 text-base font-semibold text-board-page-text tracking-tight">
-            {{
-              hasActiveSearch ? t('search.empty.noResultsTitle') : t('search.empty.emptyFeedTitle')
-            }}
-          </h3>
-
-          <p class="mt-2 mb-0 text-xs sm:text-[13px] text-board-page-text-muted leading-relaxed">
-            {{
-              hasActiveSearch
-                ? t('search.empty.noResultsDescription')
-                : t('search.empty.emptyFeedDescription')
-            }}
-          </p>
-
-          <div class="mt-6 flex flex-wrap items-center justify-center gap-2.5">
-            <button
-              v-if="hasActiveSearch"
-              type="button"
-              class="h-9 px-4 rounded-full border border-board-card-border bg-board-card-bg text-xs font-medium text-board-page-text shadow-xs transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-board-primary hover:text-board-primary cursor-pointer flex items-center gap-1.5"
-              @click="handleClearSearch"
-            >
-              <Xmark class="size-3.5" aria-hidden="true" />
-              <span>{{ t('search.empty.clearQuery') }}</span>
-            </button>
-
-            <template v-else>
-              <button
-                type="button"
-                class="h-9 px-4 rounded-full border border-board-card-border bg-board-card-bg text-xs font-medium text-board-page-text shadow-xs transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-board-primary hover:text-board-primary cursor-pointer flex items-center gap-1.5 disabled:cursor-not-allowed disabled:opacity-50"
-                :disabled="!canAddReference"
-                @click="openFilePicker"
-              >
-                <Camera class="size-3.5 text-board-primary" aria-hidden="true" />
-                <span>{{ t('search.fallbackImageTitle') }}</span>
-              </button>
-              <button
-                type="button"
-                class="h-9 px-4 rounded-full bg-board-primary text-xs font-semibold text-ib-text-inverse shadow-xs transition-[background-color,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-board-primary-hover hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-1.5"
-                @click="handleStartCreating"
-              >
-                <Plus class="size-3.5 stroke-[2.5]" aria-hidden="true" />
-                <span>{{ t('search.empty.startCreating') }}</span>
-              </button>
-            </template>
-          </div>
-        </div>
-      </section>
+        :has-error="hasError"
+        :results-count="results.length"
+        :has-active-search="hasActiveSearch"
+        :can-add-reference="canAddReference"
+        @reload="reload"
+        @clear-search="handleClearSearch"
+        @open-file-picker="openFilePicker"
+        @start-creating="handleStartCreating"
+      />
 
       <!-- Virtualized responsive Masonry result viewport -->
       <SearchResultViewport
@@ -329,157 +252,30 @@
         @scroll-position="recordScroll"
       >
         <template #default="{ item: result, index, style }">
-          <article
-            :key="`${result.provider}:${result.id}`"
-            :style="style"
-            draggable="true"
-            class="group relative overflow-hidden rounded-[var(--search-card-radius)] bg-board-control-bg/80 cursor-grab active:cursor-grabbing select-none"
-            @dragstart="handleCardDragStart($event, result)"
-            @dragend="handleCardDragEnd"
-          >
-            <button
-              type="button"
-              class="block w-full cursor-zoom-in text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-board-primary"
-              :aria-label="
-                t('search.viewResult', { title: result.title || t('search.fallbackTitle') })
-              "
-              @click="openLightbox(result)"
-            >
-              <div
-                class="relative overflow-hidden bg-board-loading-bg"
-                :style="{ aspectRatio: `${result.width} / ${result.height}` }"
-              >
-                <img
-                  :key="`${result.provider}:${result.id}:${imageRetryCount(result.id)}`"
-                  :src="result.preview_url || result.thumbnail_url"
-                  :srcset="`${result.thumbnail_url} 400w, ${result.preview_url} 1200w`"
-                  sizes="(min-width: 1280px) 20vw, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 100vw"
-                  :alt="result.title || t('search.fallbackTitle')"
-                  :loading="index < 4 ? 'eager' : 'lazy'"
-                  :fetchpriority="index < 2 ? 'high' : 'auto'"
-                  class="block h-full w-full object-cover select-none pointer-events-none"
-                  @error="markImageError(result.id)"
-                />
-              </div>
-            </button>
-
-            <!-- 🌟 Hover 渐变半透操作浮层 (顶栏左上角多选对勾 + 右上角搜图 + 底栏标题/作者 + 存入个人素材库) -->
-            <div
-              class="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between p-3.5 transition-opacity duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] bg-gradient-to-t from-black/80 via-transparent to-black/20 group-hover:opacity-100"
-              :class="isResultSelected(result) ? 'opacity-100' : 'opacity-0'"
-            >
-              <!-- 顶栏：左上角极简多选对勾 + 右上角搜图参考圆纽 (严格统一在同一水平基准线) -->
-              <div class="pointer-events-auto flex items-center justify-between">
-                <!-- 左上角极简多选微圆对勾 (强制 28x28 正圆) -->
-                <button
-                  type="button"
-                  class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full transition-colors duration-[var(--motion-control-duration)] cursor-pointer focus-visible:outline-none"
-                  :class="
-                    isResultSelected(result)
-                      ? '!bg-board-primary text-ib-text-inverse shadow-xs'
-                      : 'bg-[var(--search-overlay-btn-bg)] text-white/80 hover:bg-[var(--search-overlay-btn-bg-hover)] hover:text-white backdrop-blur-[var(--ib-glass-blur)]'
-                  "
-                  :title="
-                    isResultSelected(result)
-                      ? t('search.tooltips.deselectImage')
-                      : t('search.tooltips.selectImage')
-                  "
-                  :aria-label="
-                    isResultSelected(result)
-                      ? t('search.tooltips.deselectImage')
-                      : t('search.tooltips.selectImage')
-                  "
-                  @click.stop="toggleBatchSelect(result)"
-                >
-                  <Check class="size-3.5 stroke-[2.5]" aria-hidden="true" />
-                </button>
-
-                <!-- 右上角以图搜图参考圆纽 (强制 28x28 正圆) -->
-                <button
-                  type="button"
-                  class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full bg-[var(--search-overlay-btn-bg)] text-white backdrop-blur-[var(--ib-glass-blur)] transition-colors hover:bg-board-primary focus-visible:outline-none cursor-pointer"
-                  :class="{
-                    '!bg-board-primary shadow-xs': references.some(
-                      (ref) => ref.key === searchReferenceKey(result.provider, result.id),
-                    ),
-                  }"
-                  :title="t('search.tooltips.useAsReference')"
-                  :aria-label="t('search.tooltips.useAsReference')"
-                  @click.stop="handleSearchResultReference(result)"
-                >
-                  <Search class="size-3.5" aria-hidden="true" />
-                </button>
-              </div>
-
-              <!-- 底部信息与存入素材库按钮 -->
-              <div class="pointer-events-auto flex items-end justify-between gap-3">
-                <div class="min-w-0 flex-1">
-                  <p class="m-0 truncate text-xs font-medium text-white leading-tight">
-                    {{ result.title || t('search.lightbox.untitledReference') }}
-                  </p>
-                  <p class="mt-1 mb-0 truncate text-[11px] text-white/70 leading-tight">
-                    {{
-                      t('search.attribution.byAuthorProvider', {
-                        author: result.author,
-                        provider: result.provider,
-                      })
-                    }}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full shadow-md transition focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
-                  :class="
-                    savedKeys.has(libraryAssetKey(result.provider, result.id))
-                      ? 'bg-ib-success text-ib-text-inverse hover:bg-ib-success/90'
-                      : 'bg-board-primary text-ib-text-inverse hover:bg-board-primary-hover shadow-board-primary/30'
-                  "
-                  :aria-label="
-                    savedKeys.has(libraryAssetKey(result.provider, result.id))
-                      ? t('search.tooltips.removeFromLibrary')
-                      : t('search.tooltips.saveToLibrary')
-                  "
-                  :title="
-                    savedKeys.has(libraryAssetKey(result.provider, result.id))
-                      ? t('search.tooltips.removeFromLibrary')
-                      : t('search.tooltips.saveToLibrary')
-                  "
-                  @click.stop="toggleSavePopover($event, result)"
-                >
-                  <BookmarkSolid
-                    v-if="savedKeys.has(libraryAssetKey(result.provider, result.id))"
-                    class="size-3.5"
-                  />
-                  <Plus v-else class="size-3.5 stroke-[2.5]" />
-                </button>
-              </div>
-            </div>
-
-            <div
-              v-if="failedImages.has(result.id)"
-              class="grid place-items-center gap-2 bg-board-loading-bg px-4 py-5 text-center"
-            >
-              <span class="text-xs font-semibold text-board-page-text-muted">{{
-                t('common.errors.imageLoadFailed')
-              }}</span>
-              <Button
-                variant="outline"
-                size="sm"
-                class="!rounded-full"
-                @click="retryImage(result.id)"
-              >
-                {{ t('common.actions.retry') }}
-              </Button>
-            </div>
-          </article>
+          <SearchResultCard
+            :result="result"
+            :index="index"
+            :card-style="style"
+            :is-selected="isResultSelected(result)"
+            :is-used-as-reference="references.some((ref) => ref.key === searchReferenceKey(result.provider, result.id))"
+            :is-saved="savedKeys.has(libraryAssetKey(result.provider, result.id))"
+            :has-image-error="failedImages.has(result.id)"
+            :image-retry-count="imageRetryCount(result.id)"
+            @card-drag-start="handleCardDragStart($event, result)"
+            @card-drag-end="handleCardDragEnd"
+            @open-lightbox="openLightbox(result)"
+            @mark-image-error="markImageError(result.id)"
+            @toggle-select="toggleBatchSelect(result)"
+            @use-as-reference="handleSearchResultReference(result)"
+            @toggle-save="toggleSavePopover($event, result)"
+            @retry-image="retryImage(result.id)"
+          />
         </template>
       </SearchResultViewport>
 
       <div v-if="loadingMore" class="flex justify-center py-5">
-        <ProgressSpinner
+        <Spinner
           class="!h-7 !w-7 text-board-primary"
-          stroke-width="4"
           :label="t('search.loadingMore')"
         />
       </div>
@@ -510,74 +306,12 @@
       @anchor-changed="libraryCommands.setSavePopoverAnchor"
     />
 
-    <!-- 🌟 Demo 同款零遮挡全景高清 Lightbox 弹窗 (bg-black/65 backdrop-blur-2xl) -->
-    <Teleport to="body">
-      <Transition
-        enter-active-class="transition-opacity duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)]"
-        leave-active-class="transition-opacity duration-[var(--motion-exit-duration)] ease-[var(--motion-exit-easing)]"
-        enter-from-class="opacity-0"
-        leave-to-class="opacity-0"
-      >
-        <div
-          v-if="lightboxVisible && activeResult"
-          class="fixed inset-0 z-[2000] flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-black/65 backdrop-blur-2xl select-none"
-          @click="closeLightbox"
-        >
-          <!-- 顶部极简悬浮信息与操作栏 -->
-          <div
-            class="flex w-full max-w-6xl items-center justify-between z-20 shrink-0 mb-3 px-2"
-            @click.stop
-          >
-            <!-- 左上角：纯净悬浮文字 (Title + Author) -->
-            <div class="min-w-0 pr-4">
-              <h3
-                class="m-0 text-white text-base sm:text-lg font-semibold tracking-tight drop-shadow-md truncate max-w-[240px] sm:max-w-md"
-              >
-                {{ activeResult.title || t('search.lightbox.inspiration') }}
-              </h3>
-              <p class="mt-1 mb-0 text-white/70 text-xs drop-shadow-md">
-                {{ activeResult.author }} · {{ activeResult.provider }}
-              </p>
-            </div>
-
-            <!-- 右上角：来源链接 + 极简圆形 ✕ 关闭按钮 (通透轻量毛玻璃 + Search 同款紫色 Hover) -->
-            <div class="flex items-center gap-2">
-              <a
-                v-if="activeResult.source_url"
-                :href="activeResult.source_url"
-                target="_blank"
-                rel="noreferrer"
-                class="h-7 px-3 rounded-full bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-board-primary hover:text-white hover:border-transparent flex items-center justify-center text-xs font-medium no-underline cursor-pointer"
-              >
-                <span>{{ t('search.lightbox.viewSource') }}</span>
-              </a>
-
-              <button
-                type="button"
-                class="grid size-7 place-items-center rounded-full bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-board-primary hover:text-white hover:border-transparent focus-visible:outline-none cursor-pointer"
-                :aria-label="t('search.lightbox.close')"
-                :title="t('search.lightbox.close')"
-                @click="closeLightbox"
-              >
-                <Xmark class="size-3.5" aria-hidden="true" />
-              </button>
-            </div>
-          </div>
-
-          <!-- 中间大图展示区 (彻底去除边框与遮挡，纯粹沉浸大图鉴赏) -->
-          <div
-            class="flex-1 w-full max-w-6xl flex items-center justify-center overflow-hidden min-h-0"
-            @click.stop
-          >
-            <img
-              :src="activeResult.original_url || activeResult.preview_url"
-              :alt="activeResult.title || t('search.fallbackTitle')"
-              class="max-h-[82vh] max-w-full object-contain rounded-2xl shadow-2xl border-0 ring-0 outline-none select-none"
-            />
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <!-- 🌟 Demo 同款零遮挡全景高清 Lightbox 弹窗 -->
+    <SearchLightboxModal
+      :visible="lightboxVisible"
+      :active-result="activeResult"
+      @close="closeLightbox"
+    />
 
     <!-- 🌟 多选批量悬浮操作岛 (SearchBatchActionDock) -->
     <SearchBatchActionDock
@@ -595,16 +329,13 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
-import { Spinner as ProgressSpinner } from '@/components/ui/spinner'
+import { Spinner } from '@/components/ui/spinner'
 import {
   Bookmark,
   BookmarkSolid,
   Camera,
-  Check,
-  Compass,
   Plus,
   Search,
-  WarningTriangle,
   Xmark,
 } from '@iconoir/vue'
 import StudioName from '../../../../shared/components/StudioName.vue'
@@ -617,6 +348,9 @@ import { WorkspaceNavigation, useWorkspaceAccountControls } from '../../../works
 import SearchSavePopover from '../components/SearchSavePopover.vue'
 import SearchBatchActionDock from '../components/SearchBatchActionDock.vue'
 import SearchResultViewport from '../components/SearchResultViewport.vue'
+import SearchResultCard from '../components/SearchResultCard.vue'
+import SearchEmptyState from '../components/SearchEmptyState.vue'
+import SearchLightboxModal from '../components/SearchLightboxModal.vue'
 import { libraryAssetKey } from '../../../library'
 import { searchReferenceKey } from '../../infrastructure/libraryBridge'
 import { useAuthOverlay } from '../../../auth/overlay'

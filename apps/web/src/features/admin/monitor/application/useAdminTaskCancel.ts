@@ -37,15 +37,16 @@ export function useAdminTaskCancel(options: UseAdminTaskCancelOptions) {
     return pendingTaskID.value === taskID
   }
 
-  function requestCancelTask(task: AdminTaskRow) {
+  async function requestCancelTask(task: AdminTaskRow) {
     if (!isCancellableTask(task) || pendingTaskID.value) return
-    options.confirm.request({
+    const confirmed = await options.confirm.confirm({
       title: '确认取消任务',
       message: '任务将停止执行，已产生的结果和账务记录会保留。',
       confirmLabel: '取消任务',
       intent: 'warn',
-      onConfirm: () => cancelTask(task.task_id),
     })
+    if (!confirmed) return
+    await cancelTask(task.task_id)
   }
 
   async function cancelTask(taskID: string) {

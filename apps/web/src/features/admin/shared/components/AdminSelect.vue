@@ -75,7 +75,7 @@ import {
   SelectViewport,
 } from 'reka-ui'
 import { Check, NavArrowDown } from '@iconoir/vue'
-import { cn } from '../lib/classNames'
+import { cn } from '@/lib/utils'
 
 export type SelectOptionItem = {
   label: string

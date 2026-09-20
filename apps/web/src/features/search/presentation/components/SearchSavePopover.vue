@@ -132,7 +132,7 @@ const { folders } = library.folderFacts
 let pendingOpen: OpenRequest | null = null
 
 const searchSavePopoverContentClass =
-  'search-save-popover ib-page-chrome-surface rounded-[var(--radius-ib-control)] p-1.5'
+  'search-save-popover ib-page-chrome-surface rounded-ib-control p-1.5'
 
 const quickSavesFolder = computed(() =>
   folders.value.find((folder) => folder.name.toLowerCase() === 'quick saves' || folder.is_default),

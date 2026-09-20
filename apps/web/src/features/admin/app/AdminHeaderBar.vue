@@ -1,0 +1,275 @@
+<template>
+  <div class="sticky top-0 z-30 flex shrink-0 flex-col bg-admin-bg">
+    <header
+      class="flex h-14 shrink-0 items-center justify-between border-b border-admin-border px-4 sm:px-6 lg:px-8"
+    >
+      <div class="flex min-w-0 items-center gap-3">
+        <button
+          type="button"
+          aria-label="切换导航菜单"
+          class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-admin-border text-admin-text-1 transition-colors hover:bg-admin-surface-muted lg:hidden"
+          @click="drawerOpen = !drawerOpen"
+        >
+          <MenuIcon v-if="!drawerOpen" class="size-5" />
+          <Xmark v-else class="size-5" />
+        </button>
+
+        <button
+          type="button"
+          title="回到顶部"
+          class="hidden min-w-0 items-center gap-2 text-left transition lg:flex"
+          :class="
+            stickyTitleVisible
+              ? 'translate-y-0 opacity-100'
+              : 'pointer-events-none -translate-y-1 opacity-0'
+          "
+          @click="$emit('scrollToTop')"
+        >
+          <component
+            :is="activeItem.icon"
+            class="size-4 shrink-0 text-admin-text-2"
+            aria-hidden="true"
+          />
+          <span class="truncate text-base font-semibold text-admin-title-color">
+            {{ dynamicTitle || currentMeta.title }}
+          </span>
+        </button>
+      </div>
+
+      <div class="flex shrink-0 items-center gap-2">
+        <PopoverRoot>
+          <PopoverTrigger as-child>
+            <button
+              title="异常雷达"
+              type="button"
+              :class="[notificationButtonClass, 'cursor-pointer']"
+              :aria-label="hasAnomalies ? `异常雷达，${anomalyCount} 项活跃异常` : '异常雷达'"
+              aria-haspopup="dialog"
+            >
+              <BellIcon class="size-4" />
+              <span
+                v-if="hasAnomalies"
+                class="absolute top-[7px] right-[7px] size-2.5 rounded-full bg-admin-danger ring-2 ring-white"
+                aria-hidden="true"
+              ></span>
+            </button>
+          </PopoverTrigger>
+          <PopoverPortal>
+            <PopoverContent
+              class="z-50 w-[340px] max-w-[calc(100vw_-_28px)] rounded-xl border border-admin-border bg-admin-card-strong p-0 text-admin-text-1 shadow-lg outline-none overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2"
+              :side-offset="8"
+              align="end"
+            >
+              <div :class="adminAnomalyPopoverClass">
+                <div
+                  class="flex items-start justify-between gap-4 border-b border-admin-border px-4 py-3.5"
+                >
+                  <div class="min-w-0">
+                    <div class="text-admin-content font-bold text-admin-title-color">
+                      异常雷达
+                    </div>
+                  </div>
+                  <AdminBadge
+                    :value="hasAnomalies ? `${anomalyCount} 项` : '正常'"
+                    :severity="hasAnomalies ? 'danger' : 'success'"
+                    rounded
+                  />
+                </div>
+
+                <div
+                  v-if="hasAnomalies"
+                  class="app-scrollbar min-h-0 flex-1 overflow-y-auto p-2"
+                >
+                  <button
+                    v-for="item in anomalies"
+                    :key="item.id"
+                    type="button"
+                    class="flex w-full min-w-0 cursor-pointer gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-admin-surface-muted"
+                    @click="handleAnomalySelect(item)"
+                  >
+                    <span
+                      class="mt-[7px] size-2 shrink-0 rounded-full bg-admin-danger"
+                      aria-hidden="true"
+                    ></span>
+                    <span class="min-w-0 flex-1">
+                      <span class="flex min-w-0 items-center justify-between gap-3">
+                        <span class="truncate text-admin-body font-bold text-admin-text-1">
+                          {{ item.title }}
+                        </span>
+                        <span class="shrink-0 text-admin-caption font-bold text-admin-text-3">
+                          {{ item.metric || item.actionLabel }}
+                        </span>
+                      </span>
+                      <span class="mt-1 block text-admin-meta leading-5 text-admin-text-2">
+                        {{ item.summary }}
+                      </span>
+                      <span class="mt-1.5 block text-admin-caption font-bold text-admin-text-3">
+                        {{ item.actionLabel }}
+                      </span>
+                    </span>
+                  </button>
+                </div>
+
+                <div v-else class="px-5 py-8 text-center">
+                  <div class="text-admin-content font-bold text-admin-title-color">
+                    运行正常
+                  </div>
+                  <div class="mt-1.5 text-admin-meta text-admin-subtitle-color">
+                    当前没有活跃异常
+                  </div>
+                </div>
+              </div>
+            </PopoverContent>
+          </PopoverPortal>
+        </PopoverRoot>
+
+        <DropdownMenu v-model:open="userMenuOpen">
+          <DropdownMenuTrigger as-child>
+            <button
+              title="账户菜单"
+              type="button"
+              :class="userAvatarButtonClass"
+              aria-label="账户菜单"
+            >
+              <img
+                v-if="userStore.user?.avatar"
+                :src="userStore.user.avatar"
+                :class="userAvatarImageClass"
+                alt="用户头像"
+              />
+              <span v-else :class="userAvatarPlaceholderClass" aria-hidden="true">
+                <UserIcon :class="userAvatarIconClass" />
+              </span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" :side-offset="8" class="w-48">
+            <!-- 极简用户信息：主标题为邮箱，副标题为 admin -->
+            <DropdownMenuLabel class="px-2.5 py-1.5 font-normal">
+              <div class="flex flex-col">
+                <span class="truncate text-xs font-semibold text-admin-title-color">
+                  {{ userEmail }}
+                </span>
+                <span class="truncate text-[11px] text-admin-text-3 font-mono">
+                  admin
+                </span>
+              </div>
+            </DropdownMenuLabel>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem
+              class="cursor-pointer gap-2"
+              @select="handleUserAction('boards')"
+            >
+              <ViewGrid class="size-4 text-admin-text-3" />
+              <span>返回画布</span>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem
+              class="cursor-pointer gap-2 text-admin-danger focus:bg-admin-danger-soft focus:text-admin-danger"
+              @select="handleUserAction('logout')"
+            >
+              <LogOut class="size-4" />
+              <span>退出登录</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </header>
+    <!-- 二级子导航栏（插槽/Teleport 挂载区：有子页面时挂载，无子页面时 empty:hidden 高度折叠） -->
+    <div id="admin-sub-header" class="border-b border-admin-border empty:hidden"></div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import AdminBadge from '../shared/components/AdminBadge.vue'
+import {
+  BellNotificationSolid as BellIcon,
+  LogOut,
+  Menu as MenuIcon,
+  User as UserIcon,
+  ViewGrid,
+  Xmark,
+} from '@iconoir/vue'
+import type { AdminNavigationItem } from './navigation'
+import { useUserStore } from '../../auth/session/userSession'
+import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
+import { useAnomalyRadar } from '../shared/composables/useAnomalyRadar'
+import { useAdminToast } from '../shared/lib/toast'
+import type { AdminAnomalyItem } from '../shared/lib/anomalyRules'
+import { adminAnomalyPopoverClass } from '../shared/lib/uiClasses'
+import { ADMIN_LOGIN_PATH, USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
+
+defineProps<{
+  activeItem: AdminNavigationItem
+  currentMeta: { title: string; subtitle?: string | undefined }
+  stickyTitleVisible: boolean
+  dynamicTitle: string
+}>()
+
+defineEmits<{
+  (e: 'scrollToTop'): void
+}>()
+
+const drawerOpen = defineModel<boolean>('drawerOpen', { required: true })
+
+const toast = useAdminToast()
+const router = useRouter()
+const route = useRoute()
+const userStore = useUserStore()
+const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
+
+const userMenuOpen = ref(false)
+
+const userEmail = computed(() => {
+  return userStore.email || '--'
+})
+
+const { anomalies, anomalyCount, hasAnomalies } = useAnomalyRadar({
+  enabled: computed(() => true),
+})
+
+const notificationButtonClass =
+  'relative flex size-9 items-center justify-center rounded-lg text-admin-text-3 transition-colors hover:bg-admin-surface-muted'
+const userAvatarButtonClass =
+  'relative flex size-9 items-center justify-center rounded-lg text-admin-text-3 transition-colors hover:bg-admin-surface-muted cursor-pointer'
+const userAvatarImageClass = 'size-6 rounded-full object-cover'
+const userAvatarPlaceholderClass = 'flex size-full items-center justify-center text-admin-text-3'
+const userAvatarIconClass = 'size-4'
+
+function handleAnomalySelect(item: AdminAnomalyItem) {
+  if (route.path === item.route) {
+    toast.info(`已在当前页面：${item.title}`)
+    return
+  }
+  void router.push(item.route)
+}
+
+function handleUserAction(action: 'boards' | 'logout') {
+  userMenuOpen.value = false
+  if (action === 'boards') {
+    void router.push(USER_BOARDS_PATH)
+    return
+  }
+  void logoutAndRedirect(ADMIN_LOGIN_PATH, { replace: true })
+}
+
+defineExpose({
+  closeUserMenu: () => {
+    userMenuOpen.value = false
+  },
+})
+</script>

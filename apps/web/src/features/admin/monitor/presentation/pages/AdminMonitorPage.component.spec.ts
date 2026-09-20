@@ -102,7 +102,7 @@ vi.mock('../../application/useAdminMonitorFeedback', () => ({
 }))
 
 vi.mock('../../../shared/composables/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({ request: vi.fn() }),
+  useAdminConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
 }))
 
 const SlotStub = defineComponent({

@@ -3,11 +3,11 @@
     <section class="min-w-0" :aria-label="t('account.profile.overviewAria')">
       <div class="flex min-w-0 items-center gap-5 max-[520px]:items-start">
         <div
-          class="relative size-[88px] shrink-0 overflow-visible rounded-[var(--radius-ib-pill)] bg-ib-surface-raised shadow-[var(--shadow-ib-control)] max-[520px]:size-20"
+          class="relative size-[88px] shrink-0 overflow-visible rounded-ib-pill bg-ib-surface-raised shadow-ib-control max-[520px]:size-20"
         >
           <button
             type="button"
-            class="group relative flex h-full w-full cursor-pointer items-center justify-center overflow-hidden rounded-[var(--radius-ib-pill)] border-0 bg-transparent p-0 text-ib-text-inverse outline-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:shadow-[var(--shadow-ib-focus)] disabled:cursor-wait"
+            class="group relative flex h-full w-full cursor-pointer items-center justify-center overflow-hidden rounded-ib-pill border-0 bg-transparent p-0 text-ib-text-inverse outline-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:shadow-ib-focus disabled:cursor-wait"
             :disabled="avatarUploading"
             :aria-busy="avatarUploading"
             :aria-label="t('account.profile.changeAvatar')"
@@ -28,7 +28,7 @@
               </AvatarFallback>
             </Avatar>
             <span
-              class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[var(--radius-ib-pill)] bg-[color-mix(in_srgb,var(--color-ib-text)_52%,transparent)] transition-opacity duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
+              class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-ib-pill bg-[color-mix(in_srgb,var(--color-ib-text)_52%,transparent)] transition-opacity duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
               :class="
                 avatarUploading
                   ? 'opacity-100'

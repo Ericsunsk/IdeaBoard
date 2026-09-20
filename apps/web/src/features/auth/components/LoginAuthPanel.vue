@@ -65,7 +65,7 @@
             <span :class="authInputIconClass">
               <UserIcon class="size-4.5" />
             </span>
-            <InputText
+            <Input
               :id="fieldId"
               v-model="formValue.identifier"
               v-bind="resolveFieldControlState(invalid)"
@@ -115,7 +115,7 @@
               <span :class="authInputIconClass">
                 <LockIcon class="size-4.5" />
               </span>
-              <Password
+              <PasswordInput
                 :id="fieldId"
                 v-model="formValue.password"
                 autocomplete="current-password"
@@ -164,7 +164,7 @@
           inline-required
           :field-class="authFieldClass"
         >
-          <InputText
+          <Input
             :id="fieldId"
             v-model="resetForm.email"
             autocomplete="email"
@@ -214,7 +214,7 @@
           inline-required
           :field-class="authFieldClass"
         >
-          <InputText
+          <Input
             :id="fieldId"
             v-model="resetForm.otp"
             inputmode="numeric"
@@ -245,7 +245,7 @@
           inline-required
           :field-class="authFieldClass"
         >
-          <Password
+          <PasswordInput
             :id="fieldId"
             v-model="resetForm.password"
             :required="required"
@@ -281,7 +281,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
-import { Input as InputText, PasswordInput as Password } from '@/components/ui/input'
+import { Input, PasswordInput } from '@/components/ui/input'
 import { Lock as LockIcon, User as UserIcon } from '@iconoir/vue'
 import googleLogoUrl from '../../../shared/assets/oauth/google.svg'
 import discordLogoUrl from '../../../shared/assets/oauth/discord.svg'

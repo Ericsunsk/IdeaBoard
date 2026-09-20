@@ -183,29 +183,28 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
     )
   }
 
-  function requestRemoveProfile(
+  async function requestRemoveProfile(
     target: StorageProfileCommandTarget,
     commandOptions: DeleteStorageProfileCommandOptions = {},
   ) {
     const storage = resolveStorageTarget(target)
     if (!storage) return
 
-    options.confirm.request({
+    const confirmed = await options.confirm.confirm({
       title: '确认删除存储',
       message: `确定删除存储「${storage.name}」吗？此操作不可恢复。`,
       confirmLabel: '确定删除',
       intent: 'danger',
-      onConfirm: async () => {
-        try {
-          const response = await resource.deleteProfile(storage.id)
-          options.feedback.profileDeleted(response.message)
-          commandOptions.afterDeleted?.(storage.id)
-          await refreshAfterCommand()
-        } catch (error) {
-          options.feedback.deleteProfileFailed(error)
-        }
-      },
     })
+    if (!confirmed) return
+    try {
+      const response = await resource.deleteProfile(storage.id)
+      options.feedback.profileDeleted(response.message)
+      commandOptions.afterDeleted?.(storage.id)
+      await refreshAfterCommand()
+    } catch (error) {
+      options.feedback.deleteProfileFailed(error)
+    }
   }
 
   function fetchBucketDomains(id: string) {

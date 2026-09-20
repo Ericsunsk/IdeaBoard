@@ -446,18 +446,19 @@ function selectAction(action: string) {
     createDialogVisible.value = true
     return
   }
-  if (action === 'delete') confirmDelete(rewardCode)
+  if (action === 'delete') void confirmDelete(rewardCode)
 }
 
-function confirmDelete(rewardCode: RewardCode) {
+async function confirmDelete(rewardCode: RewardCode) {
   if (deletePending[rewardCode.id]) return
-  confirm.request({
+  const confirmed = await confirm.confirm({
     title: '删除兑换码',
     message: `确定永久删除“${rewardCode.displayName}”吗？没有 Redemption 的兑换码才可删除。`,
     confirmLabel: '确认删除',
     intent: 'danger',
-    onConfirm: () => deleteRewardCode(rewardCode),
   })
+  if (!confirmed) return
+  await deleteRewardCode(rewardCode)
 }
 
 async function deleteRewardCode(rewardCode: RewardCode) {

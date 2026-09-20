@@ -174,9 +174,9 @@ describe('admin storage workspace facade', () => {
     const { workspace, feedback, confirm } = createWorkspace()
 
     await workspace.loadData()
-    workspace.requestRemoveProfile({ id: 'profile-1', name: '对象存储' })
+    await workspace.requestRemoveProfile({ id: 'profile-1', name: '对象存储' })
 
-    expect(confirm.request).toHaveBeenCalledWith(
+    expect(confirm.confirm).toHaveBeenCalledWith(
       expect.objectContaining({
         title: '确认删除存储',
         message: '确定删除存储「对象存储」吗？此操作不可恢复。',
@@ -184,8 +184,6 @@ describe('admin storage workspace facade', () => {
         intent: 'danger',
       }),
     )
-
-    await confirm.request.mock.calls[0]?.[0].onConfirm()
 
     expect(mockResource.deleteProfile).toHaveBeenCalledWith('profile-1')
     expect(feedback.profileDeleted).toHaveBeenCalledWith('deleted')
@@ -195,7 +193,7 @@ describe('admin storage workspace facade', () => {
 
 function createWorkspace() {
   const feedback = createStorageFeedback()
-  const confirm = { request: vi.fn() }
+  const confirm = { confirm: vi.fn().mockResolvedValue(true) }
   const { runAsyncAction } = useAsyncAction()
   const workspace = createAdminStorageWorkspace({
     feedback,

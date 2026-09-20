@@ -2,7 +2,7 @@
   <section
     ref="statusElement"
     tabindex="-1"
-    class="rounded-[var(--radius-ib-panel)] border px-4 py-3 focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"
+    class="rounded-ib-panel border px-4 py-3 focus-visible:outline-none focus-visible:shadow-ib-focus"
     :class="statusClass"
     :role="showError ? 'alert' : 'status'"
     aria-live="polite"
@@ -35,11 +35,11 @@
       <p class="m-0 font-semibold text-ib-danger">
         {{ t('account.errors.orderStatusLoadFailed') }}
       </p>
-      <UiButton
+      <Button
         variant="ghost"
         size="sm"
         class="mt-2"
-        @click="emit('retry')">{{ t('account.returnStatus.recheck') }}</UiButton>
+        @click="emit('retry')">{{ t('account.returnStatus.recheck') }}</Button>
     </template>
     <template v-else-if="status?.status === 'failed'">
       <p class="m-0 font-semibold text-ib-danger">{{ t('account.returnStatus.failedTitle') }}</p>
@@ -66,7 +66,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useTimeoutFn } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
-import { Button as UiButton } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import type { PaymentReturnSource } from '../../domain'
 import type { PaymentOrderReturnStatus } from '../../infrastructure'

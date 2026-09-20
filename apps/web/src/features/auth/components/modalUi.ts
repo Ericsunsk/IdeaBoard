@@ -11,7 +11,7 @@ export const authDialogContentClass =
   'w-[min(390px,calc(100vw-32px))] overflow-visible border-0 bg-transparent p-0 shadow-none'
 
 const authModalShellBaseClass =
-  'relative overflow-hidden rounded-[20px] border border-[var(--color-ib-auth-shell-border)] bg-[var(--color-ib-auth-shell)] backdrop-blur-xl px-7 text-[var(--color-ib-auth-text)] shadow-[var(--shadow-ib-auth-shell)] max-[520px]:px-5'
+  'relative overflow-hidden rounded-[20px] border border-[var(--color-ib-auth-shell-border)] bg-[var(--color-ib-auth-shell)] backdrop-blur-xl px-7 text-[var(--color-ib-auth-text)] shadow-ib-auth-shell max-[520px]:px-5'
 
 export const authModalShellClass = `${authModalShellBaseClass} py-7 max-[520px]:py-6`
 
@@ -38,10 +38,10 @@ export const authInputClass = `${ibFormInputClass} !h-10 !text-[14px]`
 export const authInputErrorClass = ibFormInputErrorClass
 
 export const authPrimaryButtonClass =
-  'ib-control-state ib-auth-primary-action [--ib-control-hover-transform:scale(1.008)] [--ib-control-active-transform:scale(0.99)] [--ib-control-disabled-opacity:0.7] mt-1 inline-flex h-[42px] w-full items-center justify-center rounded-[10px] border-0 bg-gradient-to-r from-[var(--color-ib-auth-primary-from)] to-[var(--color-ib-auth-primary-to)] px-6 text-[14px] font-semibold text-[var(--color-ib-auth-primary-text)] shadow-[var(--shadow-ib-auth-primary)] transition-[transform,box-shadow,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-[var(--shadow-ib-auth-primary-hover)]'
+  'ib-control-state ib-auth-primary-action [--ib-control-hover-transform:scale(1.008)] [--ib-control-active-transform:scale(0.99)] [--ib-control-disabled-opacity:0.7] mt-1 inline-flex h-[42px] w-full items-center justify-center rounded-ib-control border-0 bg-gradient-to-r from-[var(--color-ib-auth-primary-from)] to-[var(--color-ib-auth-primary-to)] px-6 text-[14px] font-semibold text-[var(--color-ib-auth-primary-text)] shadow-ib-auth-primary transition-[transform,box-shadow,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-ib-auth-primary-hover'
 
 export const authSocialIconButtonClass =
-  'ib-control-state [--ib-control-active-transform:scale(0.99)] [--ib-control-disabled-opacity:0.7] inline-flex h-10 w-full items-center justify-center rounded-[10px] border border-ib-border bg-ib-surface-raised p-0 shadow-none outline-none transition-[border-color,background-color,box-shadow,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-ib-border-hover focus-visible:border-ib-creative-accent focus-visible:bg-ib-surface focus-visible:shadow-[var(--shadow-ib-focus)] disabled:bg-ib-surface-disabled'
+  'ib-control-state [--ib-control-active-transform:scale(0.99)] [--ib-control-disabled-opacity:0.7] inline-flex h-10 w-full items-center justify-center rounded-[10px] border border-ib-border bg-ib-surface-raised p-0 shadow-none outline-none transition-[border-color,background-color,box-shadow,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-ib-border-hover focus-visible:border-ib-creative-accent focus-visible:bg-ib-surface focus-visible:shadow-ib-focus disabled:bg-ib-surface-disabled'
 
 export const authFooterClass =
   'relative z-[1] text-center text-[12px] text-[var(--color-ib-auth-muted)]'

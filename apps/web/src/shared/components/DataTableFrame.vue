@@ -31,7 +31,7 @@
             <td :colspan="Math.max(columns.length, 1)" :class="bodyCellClass">
               <slot name="loading">
                 <div class="flex items-center justify-center px-6 py-10" role="status">
-                  <UiSpinner class="size-6 text-ib-text-subtle" />
+                  <Spinner class="size-6 text-ib-text-subtle" />
                 </div>
               </slot>
             </td>
@@ -92,7 +92,7 @@ import {
   type VNode,
 } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Spinner as UiSpinner } from '@/components/ui/spinner'
+import { Spinner } from '@/components/ui/spinner'
 
 export type DataTableFrameRowClickPayload<TRow> = {
   originalEvent: MouseEvent
@@ -165,7 +165,7 @@ const wrapperAttrs = computed(() => ({ ...attrs }))
 
 const rows = computed<TRow[]>(() => [...(props.value ?? [])])
 
-// Column（primevue/column 或 UiColumn）都是 renderless 声明：只读 vnode 的 props + slots，不渲染自身。
+// Column 定义组件都是 renderless 声明：只读 vnode 的 props + slots，不渲染自身。
 const columns = computed<ColumnDef[]>(() => {
   const vnodes = flattenSlotVNodes(slots.default?.() ?? [])
   return vnodes

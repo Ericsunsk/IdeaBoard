@@ -34,7 +34,7 @@
                 : 'bg-admin-accent hover:bg-admin-accent-hover active:bg-admin-accent-pressed',
             ]"
             :disabled="activeAdminConfirm?.loading"
-            @click="activeAdminConfirm?.confirm()"
+            @click="handleConfirm"
           >
             {{ activeAdminConfirm?.loading ? '处理中...' : activeAdminConfirm?.confirmLabel }}
           </button>
@@ -54,4 +54,15 @@ import {
   AlertDialogTitle,
 } from 'reka-ui'
 import { activeAdminConfirm } from '../composables/useAdminConfirm'
+import { formatAdminDisplayError, useAdminToast } from '../lib/toast'
+
+const toast = useAdminToast()
+
+async function handleConfirm() {
+  try {
+    await activeAdminConfirm.value?.confirm()
+  } catch (error) {
+    toast.error(formatAdminDisplayError(error, '操作失败，请重试'))
+  }
+}
 </script>

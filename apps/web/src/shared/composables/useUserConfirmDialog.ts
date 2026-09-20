@@ -3,8 +3,8 @@ import { ref, type Ref } from 'vue'
 export type UserConfirmRequest = {
   title: string
   message: string
-  confirmLabel?: string
-  intent?: 'primary' | 'danger'
+  confirmLabel?: string | undefined
+  intent?: 'primary' | 'danger' | undefined
 }
 
 export function useUserConfirmDialog(): {
@@ -15,6 +15,7 @@ export function useUserConfirmDialog(): {
   intent: Ref<'primary' | 'danger'>
   loading: Ref<boolean>
   request: (request: UserConfirmRequest, action: () => void | Promise<void>) => void
+  confirmAsync: (request: UserConfirmRequest) => Promise<boolean>
   confirm: () => Promise<void>
   close: () => void
 } {
@@ -25,6 +26,7 @@ export function useUserConfirmDialog(): {
   const intent = ref<'primary' | 'danger'>('primary')
   const loading = ref(false)
   let pendingAction: (() => void | Promise<void>) | null = null
+  let pendingCancel: (() => void) | null = null
 
   function request(next: UserConfirmRequest, action: () => void | Promise<void>) {
     title.value = next.title
@@ -32,12 +34,33 @@ export function useUserConfirmDialog(): {
     confirmLabel.value = next.confirmLabel ?? 'Confirm'
     intent.value = next.intent ?? 'primary'
     pendingAction = action
+    pendingCancel = null
     visible.value = true
+  }
+
+  function confirmAsync(next: UserConfirmRequest): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      title.value = next.title
+      message.value = next.message
+      confirmLabel.value = next.confirmLabel ?? 'Confirm'
+      intent.value = next.intent ?? 'primary'
+      pendingAction = () => {
+        resolve(true)
+      }
+      pendingCancel = () => {
+        resolve(false)
+      }
+      visible.value = true
+    })
   }
 
   function close() {
     if (loading.value) return
     visible.value = false
+    if (pendingCancel) {
+      pendingCancel()
+      pendingCancel = null
+    }
     pendingAction = null
   }
 
@@ -48,6 +71,7 @@ export function useUserConfirmDialog(): {
       await pendingAction()
       visible.value = false
       pendingAction = null
+      pendingCancel = null
     } finally {
       loading.value = false
     }
@@ -61,6 +85,7 @@ export function useUserConfirmDialog(): {
     intent,
     loading,
     request,
+    confirmAsync,
     confirm,
     close,
   }

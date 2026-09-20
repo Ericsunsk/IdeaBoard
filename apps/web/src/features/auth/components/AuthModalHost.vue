@@ -3,6 +3,7 @@
     <DialogPortal>
       <DialogOverlay :class="ibDialogMaskClass" @click="handleMaskClick" />
       <DialogContent
+        :show-close="false"
         :class="cn(dialogContentBaseClass, authDialogContentClass)"
         :aria-label="props.ariaLabel"
         :aria-busy="props.busy || undefined"

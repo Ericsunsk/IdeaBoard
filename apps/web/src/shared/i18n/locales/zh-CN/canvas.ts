@@ -33,9 +33,6 @@ export default {
     imageGenerationFailed: '图片生成失败',
   },
   homeHero: {
-    tagline: 'AI CANVAS FOR VISUAL DESIGNERS',
-    getStarted: '开始体验',
-    note: '{projectName} 是专为视觉设计师打造的 AI 画布，在同一个互联工作区中探索、对比和提炼图像创意方向。',
     legalNavAria: '法律条款链接',
   },
   task: {

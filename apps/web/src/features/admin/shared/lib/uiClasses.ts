@@ -2,7 +2,7 @@ export const adminSurfaceRootViewportClass =
   'flex max-w-full min-w-0 flex-col gap-4 p-0'
 
 export const adminSurfacePanelClass =
-  'min-w-0 overflow-hidden rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface p-0'
+  'min-w-0 overflow-hidden rounded-ib-panel border border-ib-border-soft bg-ib-surface p-0'
 
 export const adminSurfacePanelViewportClass = 'flex flex-col min-[1081px]:h-[calc(100dvh-192px)]'
 

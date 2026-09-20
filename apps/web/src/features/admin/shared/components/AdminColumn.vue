@@ -9,7 +9,7 @@ defineProps<{
   expander?: boolean | undefined
 }>()
 
-// Slot props mirror the PrimeVue Column body contract so migrated templates
+// Slot props mirror the column body contract so templates
 // keep working unchanged. Rows vary per table and pass through untouched,
 // hence the intentionally loose data type (same looseness as its predecessor).
 defineSlots<{

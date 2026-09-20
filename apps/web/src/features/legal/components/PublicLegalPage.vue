@@ -4,13 +4,13 @@
       <div class="mx-auto flex w-full max-w-[860px] items-center justify-between gap-4 px-6 py-5">
         <RouterLink
           :to="HOME_PATH"
-          class="rounded-[var(--radius-ib-control)] text-base font-bold text-ib-text no-underline focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"
+          class="rounded-ib-control text-base font-bold text-ib-text no-underline focus-visible:outline-none focus-visible:shadow-ib-focus"
         >
           {{ projectName }}
         </RouterLink>
         <RouterLink
           :to="HOME_PATH"
-          class="rounded-[var(--radius-ib-control)] px-2 py-1 text-sm font-semibold text-ib-text-muted no-underline transition-colors duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-ib-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"
+          class="rounded-ib-control px-2 py-1 text-sm font-semibold text-ib-text-muted no-underline transition-colors duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-ib-text focus-visible:outline-none focus-visible:shadow-ib-focus"
         >
           Back to home
         </RouterLink>
@@ -19,7 +19,7 @@
 
     <main class="mx-auto w-full max-w-[860px] px-6 py-12 max-[640px]:px-4 max-[640px]:py-8">
       <article
-        class="rounded-[var(--radius-ib-overlay)] border border-ib-border-soft bg-ib-surface px-10 py-9 shadow-[var(--shadow-ib-control)] max-[640px]:rounded-[var(--radius-ib-panel)] max-[640px]:px-5 max-[640px]:py-6"
+        class="rounded-ib-overlay border border-ib-border-soft bg-ib-surface px-10 py-9 shadow-ib-control max-[640px]:rounded-ib-panel max-[640px]:px-5 max-[640px]:py-6"
       >
         <header class="border-b border-ib-border-soft pb-7">
           <p class="m-0 text-[12px] font-semibold tracking-wide text-ib-text-subtle">
@@ -46,7 +46,7 @@
           v-for="link in legalLinks"
           :key="link.to"
           :to="link.to"
-          class="rounded-[var(--radius-ib-control)] no-underline transition-colors hover:text-ib-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"
+          class="rounded-ib-control no-underline transition-colors hover:text-ib-text focus-visible:outline-none focus-visible:shadow-ib-focus"
         >
           {{ link.label }}
         </RouterLink>

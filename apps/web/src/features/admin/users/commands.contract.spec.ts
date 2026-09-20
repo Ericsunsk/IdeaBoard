@@ -2,14 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { useAdminUserCommands } from './commands'
 import type { AdminUserCommandTarget } from './view'
 
-type ConfirmRequest = {
-  title: string
-  message: string
-  confirmLabel: string
-  intent: 'warn' | 'danger'
-  onConfirm: () => void | Promise<void>
-}
-
 describe('admin user commands', () => {
   it('opens the ban dialog for active users and submits the ban payload', async () => {
     const harness = createHarness()
@@ -49,7 +41,7 @@ describe('admin user commands', () => {
     commands.handleActionSelect('delete')
 
     expect(harness.feedback.adminStatusChangeForbidden).toHaveBeenCalled()
-    expect(harness.confirm.request).not.toHaveBeenCalled()
+    expect(harness.confirm.confirm).not.toHaveBeenCalled()
     expect(harness.mutations.deleteUser.mutateAsync).not.toHaveBeenCalled()
   })
 
@@ -60,9 +52,9 @@ describe('admin user commands', () => {
 
     commands.openUserActionMenu(makeUser({ publicId: 'user-3', status: 0, displayName: 'bob' }))
     commands.handleActionSelect('status')
-    await harness.acceptLastConfirm()
+    await harness.settleConfirms()
 
-    expect(harness.confirm.request).toHaveBeenCalledWith(
+    expect(harness.confirm.confirm).toHaveBeenCalledWith(
       expect.objectContaining({ title: '确认解除封禁', confirmLabel: '确认解封' }),
     )
     expect(harness.mutations.unbanUser.mutateAsync).toHaveBeenCalledWith('user-3')
@@ -75,9 +67,9 @@ describe('admin user commands', () => {
 
     commands.openUserActionMenu(makeUser({ publicId: 'user-4', role: 'user', displayName: 'cara' }))
     commands.handleActionSelect('role')
-    await harness.acceptLastConfirm()
+    await harness.settleConfirms()
 
-    expect(harness.confirm.request).toHaveBeenCalledWith(
+    expect(harness.confirm.confirm).toHaveBeenCalledWith(
       expect.objectContaining({ title: '确认设为管理员' }),
     )
     expect(harness.mutations.updateRole.mutateAsync).toHaveBeenCalledWith({
@@ -95,7 +87,7 @@ describe('admin user commands', () => {
       makeUser({ publicId: 'user-8', role: 'admin', displayName: 'root' }),
     )
     commands.handleActionSelect('role')
-    await harness.acceptLastConfirm()
+    await harness.settleConfirms()
 
     expect(harness.feedback.adminStatusChangeForbidden).not.toHaveBeenCalled()
     expect(harness.mutations.updateRole.mutateAsync).toHaveBeenCalledWith({
@@ -111,7 +103,7 @@ describe('admin user commands', () => {
 
     commands.openUserActionMenu(makeUser({ publicId: 'user-5', displayName: 'dana' }))
     commands.handleActionSelect('revoke')
-    await harness.acceptLastConfirm()
+    await harness.settleConfirms()
 
     expect(harness.feedback.missingAuthUserForSessionRevoke).not.toHaveBeenCalled()
     expect(harness.mutations.revokeSessions.mutateAsync).toHaveBeenCalledWith('user-5')
@@ -123,9 +115,10 @@ describe('admin user commands', () => {
 
     commands.openUserActionMenu(makeUser({ publicId: 'user-6', displayName: 'erin' }))
     commands.handleActionSelect('impersonate')
-    await Promise.resolve()
+    await vi.waitFor(() =>
+      expect(harness.sessionCommands.startImpersonation).toHaveBeenCalledWith('user-6'),
+    )
 
-    expect(harness.sessionCommands.startImpersonation).toHaveBeenCalledWith('user-6')
     expect(harness.feedback.impersonationStarted).toHaveBeenCalledWith('erin')
   })
 
@@ -135,17 +128,16 @@ describe('admin user commands', () => {
 
     commands.openUserActionMenu(makeUser({ publicId: 'user-9', displayName: 'fran' }))
     commands.handleActionSelect('impersonate')
-    await Promise.resolve()
-
-    expect(harness.sessionCommands.startImpersonation).toHaveBeenCalledWith('user-9')
+    await vi.waitFor(() =>
+      expect(harness.sessionCommands.startImpersonation).toHaveBeenCalledWith('user-9'),
+    )
   })
 })
 
 function createHarness() {
   const feedback = createAdminUsersFeedback()
-  const confirmRequests: ConfirmRequest[] = []
   const confirm = {
-    request: vi.fn((request: ConfirmRequest) => confirmRequests.push(request)),
+    confirm: vi.fn().mockResolvedValue(true),
   }
   const mutations = {
     banUser: { mutateAsync: vi.fn().mockResolvedValue(undefined) },
@@ -171,10 +163,9 @@ function createHarness() {
           sessionCommands,
         },
       ),
-    acceptLastConfirm: async () => {
-      const request = confirmRequests.at(-1)
-      expect(request).toBeTruthy()
-      await request?.onConfirm()
+    settleConfirms: async () => {
+      await vi.waitFor(() => expect(confirm.confirm).toHaveBeenCalled())
+      await new Promise((resolve) => setTimeout(resolve, 0))
     },
   }
 }

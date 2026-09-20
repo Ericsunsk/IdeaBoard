@@ -344,6 +344,10 @@
   --motion-exit-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
   --motion-feedback-duration: 160ms;
   --motion-feedback-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --text-ib-micro: 10px;
+  --text-ib-caption: 11px;
+  --text-ib-body: 13px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -355,10 +359,22 @@
   }
 }
 
+@utility ib-motion-control {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: var(--motion-control-duration);
+  transition-timing-function: var(--motion-control-easing);
+}
+
 @utility ib-motion-control-colors {
   transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
   transition-duration: var(--motion-control-duration);
   transition-timing-function: var(--motion-control-easing);
+}
+
+@utility ib-motion-enter {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: var(--motion-enter-duration);
+  transition-timing-function: var(--motion-enter-easing);
 }
 
 @utility ib-page-dot-bg {
@@ -565,8 +581,8 @@ body.admin-route .font-mono {
 }
 
 /*
- * Dialog responsive width contract (user UiDialog + AdminDialogShell share
- * the same five sizes). Keyed by stable data-size, not by the exact Tailwind
+ * Dialog responsive width contract (Dialog and AdminDialogShell share
+ * the same five standard sizes). Keyed by stable data-size, not by the exact Tailwind
  * width class strings in dialogWidthClasses, so variant refactors cannot
  * silently detach this block.
  */

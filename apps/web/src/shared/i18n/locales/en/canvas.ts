@@ -34,9 +34,6 @@ export default {
     imageGenerationFailed: 'Image generation failed',
   },
   homeHero: {
-    tagline: 'AI CANVAS FOR VISUAL DESIGNERS',
-    getStarted: 'Get started',
-    note: '{projectName} is an AI Canvas for Visual Designers to explore, compare, and refine image directions in one connected workspace.',
     legalNavAria: 'Legal links',
   },
   task: {

@@ -408,16 +408,17 @@ function retryDetail() {
   void loadDetail()
 }
 
-function requestRefund(ideaQuantity: number) {
+async function requestRefund(ideaQuantity: number) {
   const publicOrderNumber = selectedOrderNumber.value
   if (!publicOrderNumber || refundLoading.value) return
-  adminConfirm.request({
+  const confirmed = await adminConfirm.confirm({
     title: '确认退款',
     message: `将为订单 ${publicOrderNumber} 发起 ${ideaFormatter.format(ideaQuantity)} Ideas 退款。退款提交后会先预留余额，是否继续？`,
     confirmLabel: '发起退款',
     intent: 'danger',
-    onConfirm: () => executeRefund(publicOrderNumber, ideaQuantity),
   })
+  if (!confirmed) return
+  await executeRefund(publicOrderNumber, ideaQuantity)
 }
 
 async function executeRefund(publicOrderNumber: string, ideaQuantity: number) {

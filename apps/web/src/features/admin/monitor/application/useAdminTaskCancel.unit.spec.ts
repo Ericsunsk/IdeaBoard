@@ -1,5 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
-import type { AdminConfirmRequest } from '../../shared/composables/useAdminConfirm'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AdminTaskRow } from './useAdminTaskList'
 import { useAdminTaskCancel } from './useAdminTaskCancel'
 
@@ -30,11 +29,15 @@ vi.mock('../infrastructure/resource', () => ({
 }))
 
 describe('useAdminTaskCancel', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('confirms one active task, invalidates task monitor data, and keeps terminal rows non-actionable', async () => {
-    const requests: AdminConfirmRequest[] = []
+    const confirm = { confirm: vi.fn().mockResolvedValue(true) }
     const feedback = { taskCancelled: vi.fn(), cancelTaskFailed: vi.fn() }
     const commands = useAdminTaskCancel({
-      confirm: { request: (request) => requests.push(request) },
+      confirm,
       feedback,
     })
     const runningTask = makeTask('running')
@@ -42,18 +45,15 @@ describe('useAdminTaskCancel', () => {
     expect(commands.isCancellableTask(runningTask)).toBe(true)
     expect(commands.isCancellableTask(makeTask('completed'))).toBe(false)
 
-    commands.requestCancelTask(runningTask)
-    expect(requests).toHaveLength(1)
-    expect(requests[0]).toMatchObject({
-      title: '确认取消任务',
-      confirmLabel: '取消任务',
-      intent: 'warn',
-    })
-
-    const confirmRequest = requests[0]
-    if (!confirmRequest) throw new Error('expected cancel confirm request')
-
-    await confirmRequest.onConfirm()
+    await commands.requestCancelTask(runningTask)
+    expect(confirm.confirm).toHaveBeenCalledTimes(1)
+    expect(confirm.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: '确认取消任务',
+        confirmLabel: '取消任务',
+        intent: 'warn',
+      }),
+    )
 
     expect(mocks.cancelAdminTaskByID).toHaveBeenCalledWith(runningTask.task_id)
     expect(feedback.taskCancelled).toHaveBeenCalledOnce()
@@ -62,6 +62,21 @@ describe('useAdminTaskCancel', () => {
     expect(mocks.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ['admin', 'tasks', runningTask.task_id],
     })
+  })
+
+  it('skips cancellation when the operator declines confirmation', async () => {
+    const confirm = { confirm: vi.fn().mockResolvedValue(false) }
+    const feedback = { taskCancelled: vi.fn(), cancelTaskFailed: vi.fn() }
+    const commands = useAdminTaskCancel({
+      confirm,
+      feedback,
+    })
+
+    await commands.requestCancelTask(makeTask('running'))
+
+    expect(confirm.confirm).toHaveBeenCalledTimes(1)
+    expect(mocks.cancelAdminTaskByID).not.toHaveBeenCalled()
+    expect(feedback.taskCancelled).not.toHaveBeenCalled()
   })
 })
 

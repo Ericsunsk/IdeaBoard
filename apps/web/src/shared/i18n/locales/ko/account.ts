@@ -106,7 +106,6 @@ export default {
       reward: '보상',
       topUp: '충전',
       systemGrant: 'Ideas grant',
-      systemRetouch: '조정',
     },
   },
   usage: {

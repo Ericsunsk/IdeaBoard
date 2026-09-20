@@ -23,7 +23,7 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref, watch } from 'vue'
 import type { HTMLAttributes } from 'vue'
-import { cn } from '../lib/classNames'
+import { cn } from '@/lib/utils'
 import { adminInputChromeClass } from '../lib/uiClasses'
 
 const props = withDefaults(

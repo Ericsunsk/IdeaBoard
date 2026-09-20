@@ -2,10 +2,6 @@
  * 通用简体中文文案。
  */
 export default {
-  brand: {
-    studioName: 'Eric Studio',
-    currency: 'Ideas',
-  },
   navigation: {
     search: '搜索',
     workspace: '工作区',
@@ -63,10 +59,6 @@ export default {
     compressInvalidOutput: '图片压缩产生无效输出。',
     heicConversionFailed: 'HEIC/HEIF 图片转换失败，请换一张图片。',
     unexpected: '出现了意外错误，请重试。',
-  },
-  dialogs: {
-    unsavedChangesTitle: '未保存的更改',
-    unsavedChangesMessage: '您有未保存的更改，确定要离开吗？',
   },
   a11y: {
     dialog: '对话框',

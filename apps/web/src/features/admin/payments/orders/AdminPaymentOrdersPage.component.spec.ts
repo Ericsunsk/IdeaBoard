@@ -8,7 +8,7 @@ const resource = vi.hoisted(() => ({
   get: vi.fn(),
   refund: vi.fn(),
 }))
-const confirm = vi.hoisted(() => ({ request: vi.fn() }))
+const confirm = vi.hoisted(() => ({ confirm: vi.fn().mockResolvedValue(true) }))
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 
 vi.mock('./paymentOrderResource', () => ({
@@ -202,12 +202,12 @@ describe('AdminPaymentOrdersPage', () => {
     await user.type(input, '200')
     await user.click(screen.getByRole('button', { name: '确认退款' }))
 
-    const confirmation = confirm.request.mock.calls.at(-1)?.[0]
-    expect(confirmation).toEqual(expect.objectContaining({ title: '确认退款' }))
-    await confirmation.onConfirm()
-    expect(resource.refund).toHaveBeenCalledWith(
-      orderNumber,
-      expect.objectContaining({ ideaQuantity: 200, idempotencyKey: expect.any(String) }),
+    expect(confirm.confirm).toHaveBeenCalledWith(expect.objectContaining({ title: '确认退款' }))
+    await waitFor(() =>
+      expect(resource.refund).toHaveBeenCalledWith(
+        orderNumber,
+        expect.objectContaining({ ideaQuantity: 200, idempotencyKey: expect.any(String) }),
+      ),
     )
     expect(toast.success).toHaveBeenCalledWith('退款已提交，等待 Stripe 最终处理')
     expect(resource.search).toHaveBeenCalledTimes(2)
