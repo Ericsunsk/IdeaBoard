@@ -72,15 +72,23 @@ Rules:
 - Stable raw colors, shadows, motion durations/easing, radii, and z-index stacks should be semantic tokens. Local raw values are acceptable only when they are one-off geometry, canvas drawing constants, test fixtures, or documented vendor fallbacks.
 - Route pages may compose layout and bind state, but repeated visual primitives should move to feature-local shared components or helpers before being copied.
 
-## PrimeVue And Tailwind
+## UI Primitives And Tailwind
 
-- PrimeVue usage defaults to `unstyled`.
+- User shell primitives live in `src/components/ui/*` (`Button`, `Dialog`,
+  `Input`, `Popover`, `DropdownMenu`, `Card`, `Badge`, `Avatar`, `Skeleton`, `Spinner`),
+  built on official `shadcn-vue` standards (`reka-ui` + `cva` + `@/lib/utils` `cn`). No PrimeVue dependency remains.
 - Use Tailwind utilities for layout, spacing, typography, and simple states.
-- Use PrimeVue `pt` helpers or wrapper components for PrimeVue customization.
-- For Admin, prefer `src/features/admin/shared/components/*` and `src/features/admin/shared/lib/*Pt.ts`.
+- Use micro primitives (`DialogRoot`/`DialogContent`/…) composed explicitly per caller
+  with `cn(dialogContentBaseClass, …)` for widths and surfaces. The old managed
+  `Dialog` (`:visible`, `:content-class`, size maps) is deleted; do not reintroduce it.
+- For Admin, prefer `src/features/admin/shared/components/*` (`AdminDialogShell`,
+  `AdminTable`, …) and `src/features/admin/shared/lib/*`.
 - Use feature-local CSS for complex Canvas node/tool/editor interactions, but reference tokens.
-- DO NOT target PrimeVue generated DOM classes from route pages.
+- DO NOT target third-party generated DOM classes from route pages.
 - DO NOT copy table, popover, dialog, toolbar, or chart styling into each Admin page.
+- Dialog widths are keyed by stable `data-size` (`slim/compact/form/medium/wide`) in
+  `src/app/style.css` for `AdminDialogShell`; user-shell dialogs set their own
+  widths via `cn(dialogContentBaseClass, …)` + style.
 
 ## Component Placement
 
@@ -90,7 +98,7 @@ Promote to `src/shared` only when:
 
 - At least two different features use it.
 - The semantics are stable and UI/domain-neutral.
-- It hides reusable accessibility, keyboard, overlay, or PrimeVue `pt` behavior.
+- It hides reusable accessibility, keyboard, or overlay (`reka-ui`) behavior.
 - Its props do not leak feature payloads or feature-specific flags.
 
 Admin local shared is different: `src/features/admin/shared/*` may serve all Admin vertical contexts without becoming global shared.
@@ -130,7 +138,7 @@ Before finishing UI work:
 1. Did you choose the correct surface and follow its tone?
 2. Did you reuse existing tokens/components before adding new ones?
 3. Did you keep page-specific CSS out of `src/app/style.css`?
-4. Did you use PrimeVue unstyled with `pt`/wrappers instead of DOM overrides?
+4. Did you use `components/ui` micro primitives composed explicitly instead of DOM overrides?
 5. Did you keep feature-only components out of `src/shared`?
 6. Did you cover loading, empty, error, disabled, hover, focus, active, selected, and destructive states?
 7. Did you check mobile and desktop for overflow, overlap, and layout shift?

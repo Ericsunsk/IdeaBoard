@@ -1,8 +1,8 @@
 <template>
-  <div :class="[adminDashboardRootClass, 'pb-6']">
-    <Message v-if="hasStatisticsError" severity="error" :closable="false">
+  <div :class="adminDashboardRootClass">
+    <AdminAlert v-if="hasStatisticsError" severity="error">
       {{ statisticsErrorMessage }}
-    </Message>
+    </AdminAlert>
 
     <template v-else>
       <div :class="adminSummaryGridClass">
@@ -19,7 +19,8 @@
       <div :class="adminChartGridClass">
         <RangedLineChartCard
           v-model="timeRange"
-          :title="usageCards.trend.title"
+          title="调用量与消耗趋势"
+          variant="admin"
           class="xl:col-span-12"
           :ranges="rangeOptions"
           :data="trendChartData"
@@ -29,8 +30,8 @@
           size="hero"
         />
 
-        <AdminChartCard :title="usageCards.modelRisk.title" span-class="xl:col-span-7">
-          <Chart
+        <AdminChartCard title="模型风险矩阵" span-class="xl:col-span-7">
+          <ChartRenderer
             v-if="isChartReady"
             type="scatter"
             :class="adminChartCanvasClass"
@@ -41,50 +42,27 @@
         </AdminChartCard>
 
         <RangedLineChartCard
-          v-model="qualityTimeRange"
-          :title="usageCards.qualityTrend.title"
+          v-model="timeRange"
+          title="服务质量趋势"
+          variant="admin"
           class="xl:col-span-5"
-          :ranges="qualityRangeOptions"
+          :ranges="rangeOptions"
           :data="qualityTrendChartData"
           :options="qualityTrendChartOptions"
           :plugins="adminChartPlugins"
           :show-chart="isChartReady"
         />
 
-        <div class="grid grid-cols-1 gap-3.5 xl:col-span-12 xl:grid-cols-3">
-          <AdminChartCard :title="usageCards.slowModels.title" chart-size="compact">
-            <Chart
-              v-if="isChartReady"
-              type="bubble"
-              :class="adminChartCanvasClass"
-              :data="slowModelsChartData"
-              :options="slowModelsChartOptions"
-              :plugins="adminChartPlugins"
-            />
-          </AdminChartCard>
-
-          <AdminChartCard :title="usageCards.bottleneckSource.title" chart-size="compact">
-            <Chart
-              v-if="isChartReady"
-              type="polarArea"
-              :class="adminChartCanvasClass"
-              :data="bottleneckSourceChartData"
-              :options="bottleneckSourceChartOptions"
-              :plugins="adminChartPlugins"
-            />
-          </AdminChartCard>
-
-          <AdminChartCard :title="usageCards.failureCategories.title" chart-size="compact">
-            <Chart
-              v-if="isChartReady"
-              type="polarArea"
-              :class="adminChartCanvasClass"
-              :data="failureCategoryChartData"
-              :options="failureCategoryChartOptions"
-              :plugins="adminChartPlugins"
-            />
-          </AdminChartCard>
-        </div>
+        <AdminChartCard title="瓶颈来源" chart-size="compact" span-class="xl:col-span-4">
+          <ChartRenderer
+            v-if="isChartReady"
+            type="polarArea"
+            :class="adminChartCanvasClass"
+            :data="bottleneckSourceChartData"
+            :options="bottleneckSourceChartOptions"
+            :plugins="adminChartPlugins"
+          />
+        </AdminChartCard>
       </div>
     </template>
   </div>
@@ -92,13 +70,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import Chart from 'primevue/chart'
-import Message from 'primevue/message'
-import RangedLineChartCard from '../../../../shared/components/RangedLineChartCard.vue'
+import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminChartCard from '../../shared/components/AdminChartCard.vue'
 import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
+import ChartRenderer from '../../../../shared/components/ChartRenderer.vue'
+import RangedLineChartCard from '../../../../shared/components/RangedLineChartCard.vue'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
-import { adminCards } from '../../shared/lib/cardMeta'
 import { adminChartPlugins, useAdminChartReady } from '../../shared/lib/chart'
 import {
   adminChartCanvasClass,
@@ -109,31 +86,19 @@ import {
 import { useUsageStatisticsCharts } from '../useUsageStatisticsCharts'
 import { useUsageStatisticsData } from '../useUsageStatisticsData'
 
-const usageCards = adminCards.usageStatistics
 const {
   adminStatistics,
-  qualityStatistics,
   isStatisticsSettled,
-  isQualityStatisticsSettled,
   isStatisticsError,
   statisticsError,
-  isQualityStatisticsError,
-  qualityStatisticsError,
   timeRange,
-  qualityTimeRange,
   rangeOptions,
-  qualityRangeOptions,
 } = useUsageStatisticsData()
-const areStatisticsChartsSettled = computed(
-  () => isStatisticsSettled.value && isQualityStatisticsSettled.value,
-)
+const areStatisticsChartsSettled = computed(() => isStatisticsSettled.value)
 const isChartReady = useAdminChartReady(areStatisticsChartsSettled)
-const hasStatisticsError = computed(() => isStatisticsError.value || isQualityStatisticsError.value)
+const hasStatisticsError = computed(() => isStatisticsError.value)
 const statisticsErrorMessage = computed(() =>
-  formatDisplayErrorMessage(
-    statisticsError.value || qualityStatisticsError.value,
-    '加载统计数据失败',
-  ),
+  formatDisplayErrorMessage(statisticsError.value, '加载统计数据失败'),
 )
 
 const {
@@ -151,16 +116,10 @@ const {
   modelRiskChartOptions,
   qualityTrendChartData,
   qualityTrendChartOptions,
-  slowModelsChartData,
-  slowModelsChartOptions,
   bottleneckSourceChartData,
   bottleneckSourceChartOptions,
-  failureCategoryChartData,
-  failureCategoryChartOptions,
 } = useUsageStatisticsCharts({
   adminStatistics,
-  qualityStatistics,
   timeRange,
-  qualityTimeRange,
 })
 </script>

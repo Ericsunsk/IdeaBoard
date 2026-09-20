@@ -1,6 +1,11 @@
 <template>
   <div aria-live="polite">
-    <AuthModalHost :busy="busy" @close="closeAuth">
+    <AuthModalHost
+      :busy="busy"
+      :aria-label="mode === 'login' ? t('auth.signIn') : t('auth.createAccount')"
+      :description="mode === 'login' ? t('auth.signIn') : t('auth.createAccount')"
+      @close="closeAuth"
+    >
       <LoginAuthPanel
         v-if="mode === 'login'"
         :oauth-redirect-path="oauthRedirectPath"
@@ -22,6 +27,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
 import {
@@ -54,6 +60,7 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const route = useRoute()
+const { t } = useI18n()
 const busy = ref(false)
 
 function goLogin() {

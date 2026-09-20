@@ -2,6 +2,7 @@
 export default {
   dialog: {
     title: '账户',
+    description: '管理个人资料、用量、账单与安全设置。',
     close: '关闭账户弹窗',
     navigation: '账户导航',
   },

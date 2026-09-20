@@ -58,7 +58,7 @@ const chartStub = {
 function renderUsagePane() {
   return renderWithUser(UsagePane, {
     props: { active: true },
-    global: { stubs: { Button: ButtonStub, Chart: chartStub } },
+    global: { stubs: { Button: ButtonStub, ChartRenderer: chartStub } },
   })
 }
 
@@ -109,13 +109,13 @@ describe('UsagePane', () => {
     usageState.error.value = null
 
     renderUsagePane()
-    expect(screen.getByRole('button', { name: 'Week' })).toBeVisible()
+    expect(screen.getByRole('radio', { name: 'Week' })).toBeVisible()
     expect(screen.getByText('Total used')).toBeVisible()
 
     await setUserLocale('es')
     await nextTick()
 
-    expect(screen.getByRole('button', { name: 'Semana' })).toBeVisible()
+    expect(screen.getByRole('radio', { name: 'Semana' })).toBeVisible()
     expect(screen.getByText('Total usado')).toBeVisible()
   })
 
@@ -263,7 +263,7 @@ describe('UsagePane', () => {
     renderUsagePane()
 
     expect(screen.getByRole('region', { name: 'Last 30 days ideas-used trend' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Month' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('radio', { name: 'Month' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByTestId('usage-trend-chart')).toHaveClass('h-full', 'w-full', 'min-w-0')
     expect(screen.getByTestId('usage-trend-chart').parentElement).toHaveClass(
       'h-[240px]',
@@ -291,7 +291,7 @@ describe('UsagePane', () => {
     expect(usageState.retry).toHaveBeenCalledOnce()
   })
 
-  it('reuses the Admin-aligned small SelectButton in the chart card header', async () => {
+  it('renders a native segmented range switcher in the chart card header', async () => {
     usageState.usage.value = {
       timezone: 'Asia/Shanghai',
       lifetime: {
@@ -309,8 +309,8 @@ describe('UsagePane', () => {
     usageState.error.value = null
 
     const { user } = renderUsagePane()
-    const group = screen.getByRole('group', { name: 'Trend time range' })
-    expect(group).toHaveClass('p-selectbutton')
+    const group = screen.getByRole('radiogroup', { name: 'Trend time range' })
+    expect(group).not.toHaveClass('p-selectbutton')
     const trendSection = screen.getByRole('region', { name: 'Last 30 days ideas-used trend' })
     const chartHeading = screen.getByRole('heading', { name: 'Ideas used' })
     const trendHeader = chartHeading.parentElement?.parentElement
@@ -322,20 +322,20 @@ describe('UsagePane', () => {
     expect(screen.getByRole('heading', { name: 'Usage' }).closest('header')).not.toContainElement(
       group,
     )
-    const month = screen.getByRole('button', { name: 'Month' })
-    expect(month).toHaveAttribute('aria-pressed', 'true')
-    expect(month).toHaveClass('p-togglebutton-sm')
+    const month = screen.getByRole('radio', { name: 'Month' })
+    expect(month).toHaveAttribute('aria-checked', 'true')
+    expect(month).toHaveClass('bg-ib-surface', 'font-semibold')
 
-    const year = screen.getByRole('button', { name: 'Year' })
+    const year = screen.getByRole('radio', { name: 'Year' })
     year.focus()
     await user.keyboard('{Enter}')
-    expect(year).toHaveAttribute('aria-pressed', 'true')
+    expect(year).toHaveAttribute('aria-checked', 'true')
     expect(selectedRangeRef?.value).toBe('1y')
 
-    const week = screen.getByRole('button', { name: 'Week' })
+    const week = screen.getByRole('radio', { name: 'Week' })
     week.focus()
     await user.keyboard(' ')
-    expect(week).toHaveAttribute('aria-pressed', 'true')
+    expect(week).toHaveAttribute('aria-checked', 'true')
     expect(selectedRangeRef?.value).toBe('7d')
   })
 
@@ -361,7 +361,7 @@ describe('UsagePane', () => {
 
     expect(screen.getByRole('region', { name: 'Usage summary' })).toHaveTextContent('99')
     expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-points', '30')
-    expect(screen.getByRole('button', { name: 'Month' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('radio', { name: 'Month' })).toHaveAttribute('aria-checked', 'true')
     const alert = screen.getByRole('alert')
     expect(alert).toHaveTextContent('Please try again later.')
     await user.click(screen.getByRole('button', { name: 'Retry current range' }))

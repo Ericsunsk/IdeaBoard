@@ -1,16 +1,16 @@
 <template>
   <main class="grid min-h-[60vh] place-items-center px-6 py-12 text-ib-text">
     <div class="flex max-w-md flex-col items-center gap-4 text-center" aria-live="polite">
-      <ProgressSpinner v-if="status === 'loading'" class="size-8" stroke-width="4" />
+      <Spinner v-if="status === 'loading'" class="size-8" stroke-width="4" />
       <h1 class="m-0 text-xl font-semibold">{{ title }}</h1>
       <p class="m-0 text-sm leading-6 text-ib-text-muted">{{ message }}</p>
       <Button
         v-if="status === 'failed'"
-        :label="t('auth.backToSignIn')"
-        severity="secondary"
-        outlined
+        variant="outline"
         @click="returnToLogin"
-      />
+      >
+        {{ t('auth.backToSignIn') }}
+      </Button>
     </div>
   </main>
 </template>
@@ -19,8 +19,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import Button from 'primevue/button'
-import ProgressSpinner from 'primevue/progressspinner'
+import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { useUserStore } from '../session/userSession'
 import { USER_LOGIN_PATH } from '../../../shared/constants/routePaths'
 import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'

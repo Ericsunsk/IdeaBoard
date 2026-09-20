@@ -1,21 +1,19 @@
-import PrimeVue from 'primevue/config'
-import Column from 'primevue/column'
 import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { userPrimeVueTestOptions } from '../../test/primeVue'
 import { renderWithUser, screen } from '../../test/render'
 import DataTableFrame from './DataTableFrame.vue'
+import UiColumn from './DataTableColumn.vue'
 
 const rows = [{ id: 'row-1', name: '第一条记录' }]
 
 describe('DataTableFrame', () => {
-  it('uses the PrimeVue table container as the only accessible scroll surface', () => {
+  it('uses the scroll container as the only accessible scroll surface', () => {
     const { container } = renderTable({ value: [], scrollable: true })
 
     const scrollRegion = screen.getByRole('region', { name: '记录表格' })
     const afterContent = screen.getByText('表格后置内容')
 
-    expect(scrollRegion).toHaveClass('p-datatable-table-container', 'app-scrollbar')
+    expect(scrollRegion).toHaveClass('app-scrollbar', 'overflow-x-auto')
     expect(scrollRegion).toHaveAttribute('tabindex', '0')
     expect(scrollRegion).toContainElement(screen.getByRole('table', { name: '记录表格' }))
     expect(scrollRegion).not.toContainElement(afterContent)
@@ -28,8 +26,7 @@ describe('DataTableFrame', () => {
   it('does not focus an unlabeled table container', () => {
     renderWithUser(DataTableFrame, {
       props: { value: rows },
-      slots: { default: () => h(Column, { field: 'name', header: '名称' }) },
-      global: { plugins: [[PrimeVue, userPrimeVueTestOptions]] },
+      slots: { default: () => h(UiColumn, { field: 'name', header: '名称' }) },
     })
 
     const tableContainer = screen.getByRole('table').parentElement
@@ -40,73 +37,67 @@ describe('DataTableFrame', () => {
     expect(tableContainer).not.toHaveAttribute('tabindex')
   })
 
-  it('keeps PrimeVue loading feedback inside the themed loading mask', () => {
-    const { container } = renderTable({ value: [], loading: true })
+  it('keeps loading feedback inside the table with aria-busy', () => {
+    renderTable({ value: [], loading: true })
 
-    expect(screen.getByRole('table', { name: '记录表格' })).toBeVisible()
-    const loadingIcon = container.querySelector('svg')
-    expect(loadingIcon).toBeVisible()
-    expect(loadingIcon).toHaveClass('p-datatable-loading-icon')
-    expect(loadingIcon?.parentElement).toHaveClass('p-datatable-mask', 'p-overlay-mask')
+    const table = screen.getByRole('table', { name: '记录表格' })
+    expect(table).toBeVisible()
+    expect(table).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByRole('status')).toBeVisible()
+    expect(document.querySelector('svg')).not.toBeNull()
   })
 
-  it('forwards columns, row data, and DataTable events in styled mode', async () => {
+  it('renders columns, row data, and forwards row-click', async () => {
     const onRowClick = vi.fn()
     const { user } = renderTable({ value: rows }, onRowClick)
 
     const headerCell = screen.getByRole('columnheader', { name: '名称' })
     const bodyCell = screen.getByRole('cell', { name: '第一条记录' })
 
-    expect(headerCell).toHaveClass('p-datatable-header-cell')
-    expect(headerCell).toHaveClass('text-admin-body')
-    expect(headerCell).toHaveStyle({ verticalAlign: 'middle' })
+    expect(headerCell).toBeVisible()
+    expect(headerCell).toHaveClass('text-ib-text-muted')
     expect(bodyCell).toBeVisible()
-    expect(bodyCell).toHaveStyle({ verticalAlign: 'middle' })
 
     await user.click(bodyCell)
     expect(onRowClick).toHaveBeenCalledOnce()
+    expect(onRowClick.mock.calls[0]?.[0]).toMatchObject({ data: rows[0], index: 0 })
   })
 
-  it('preserves native PrimeVue selection state through the wrapper', async () => {
-    const SelectionHarness = defineComponent({
-      components: { DataTableFrame, Column },
+  it('renders scoped body slots with row data', () => {
+    const BodyHarness = defineComponent({
+      components: { DataTableFrame, UiColumn },
       setup() {
-        return {
-          rows,
-          selectedRows: ref<typeof rows>([]),
-        }
+        return { rows }
       },
       template: `
-        <DataTableFrame v-model:selection="selectedRows" :value="rows" data-key="id">
-          <Column selection-mode="multiple" style="width: 3rem" />
-          <Column field="name" header="名称" />
+        <DataTableFrame :value="rows" data-key="id">
+          <UiColumn field="name" header="名称">
+            <template #body="{ data }">记录-{{ data.name }}</template>
+          </UiColumn>
         </DataTableFrame>
-        <output aria-label="选中数量">{{ selectedRows.length }}</output>
       `,
     })
-    const { user } = renderWithUser(SelectionHarness, {
-      global: { plugins: [[PrimeVue, userPrimeVueTestOptions]] },
+    renderWithUser(BodyHarness)
+
+    expect(screen.getByRole('cell', { name: '记录-第一条记录' })).toBeVisible()
+  })
+
+  it('keeps row identity stable through data-key', () => {
+    const KeyHarness = defineComponent({
+      components: { DataTableFrame, UiColumn },
+      setup() {
+        return { rows: ref([...rows]) }
+      },
+      template: `
+        <DataTableFrame :value="rows" data-key="id">
+          <UiColumn field="name" header="名称" />
+        </DataTableFrame>
+      `,
     })
+    const { container } = renderWithUser(KeyHarness)
 
-    const [headerCheckbox, rowCheckbox] = screen.getAllByRole('checkbox')
-    if (!rowCheckbox) throw new Error('expected row selection checkbox')
-    const dataTableRoot = screen.getByRole('table').parentElement?.parentElement
-    expect(dataTableRoot).toHaveClass('p-datatable')
-    expect(dataTableRoot).not.toHaveClass('p-datatable-sm')
-    const headerSelectionCell = headerCheckbox?.closest('th')
-    const rowSelectionCell = rowCheckbox?.closest('td')
-    expect(headerSelectionCell).toHaveStyle({ verticalAlign: 'middle' })
-    expect(headerSelectionCell?.style.width).toBe('3rem')
-    expect(rowSelectionCell).toHaveStyle({ verticalAlign: 'middle' })
-    expect(rowSelectionCell?.style.width).toBe('3rem')
-    expect(rowCheckbox).toHaveClass('p-checkbox-input')
-
-    await user.click(rowCheckbox)
-    expect(rowCheckbox).toBeChecked()
-    expect(screen.getByRole('status', { name: '选中数量' })).toHaveTextContent('1')
-
-    await user.click(rowCheckbox)
-    expect(screen.getByRole('status', { name: '选中数量' })).toHaveTextContent('0')
+    const bodyRows = container.querySelectorAll('tbody tr')
+    expect(bodyRows).toHaveLength(1)
   })
 })
 
@@ -124,10 +115,9 @@ function renderTable(
       tableAriaLabel: '记录表格',
     },
     slots: {
-      default: () => h(Column, { field: 'name', header: '名称' }),
+      default: () => h(UiColumn, { field: 'name', header: '名称' }),
       after: () => h('div', '表格后置内容'),
     },
     attrs: { onRowClick },
-    global: { plugins: [[PrimeVue, userPrimeVueTestOptions]] },
   })
 }

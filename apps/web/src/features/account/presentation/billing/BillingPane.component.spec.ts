@@ -1,7 +1,5 @@
-import PrimeVue from 'primevue/config'
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { userPrimeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen, within } from '../../../../test/render'
 import type { BillingRecordItem } from '../../infrastructure'
 import BillingPane from './BillingPane.vue'
@@ -41,7 +39,6 @@ function makeBillingState(overrides: Record<string, unknown> = {}) {
 function renderPane() {
   return renderWithUser(BillingPane, {
     props: { active: true },
-    global: { plugins: [[PrimeVue, userPrimeVueTestOptions]] },
   })
 }
 
@@ -80,10 +77,10 @@ describe('BillingPane', () => {
       'Ideas change',
       'Balance after',
     ])
-    expect(screen.getAllByRole('columnheader')[0]).toHaveClass('p-datatable-header-cell')
+    expect(screen.getAllByRole('columnheader')[0]).toHaveClass('text-ib-text-muted')
     expect(screen.getByRole('region', { name: 'Transactions table' })).toHaveClass(
-      'p-datatable-table-container',
       'app-scrollbar',
+      'overflow-x-auto',
     )
     expect(screen.getAllByText('07/14/2026, 09:08:07')).toHaveLength(3)
     expect(screen.getByText('-20')).toHaveClass('text-ib-text')
@@ -102,7 +99,7 @@ describe('BillingPane', () => {
     expect(screen.getByRole('status', { name: 'Loading billing records…' })).toBeInTheDocument()
     const skeletonRows = screen.getAllByTestId('billing-skeleton-row')
     expect(skeletonRows).toHaveLength(5)
-    expect(skeletonRows[0]).toHaveClass('p-skeleton')
+    expect(skeletonRows[0]).toHaveAttribute('data-ui', 'skeleton')
   })
 
   it('renders the confirmed empty state inside the shared table frame', () => {
@@ -180,7 +177,7 @@ describe('BillingPane', () => {
 
     const { user } = renderPane()
     const loadMoreButton = screen.getByRole('button', { name: 'Load more' })
-    expect(loadMoreButton).toHaveClass('p-button-outlined')
+    expect(loadMoreButton).toHaveClass('border-input')
     await user.click(loadMoreButton)
 
     expect(loadMore).toHaveBeenCalledOnce()

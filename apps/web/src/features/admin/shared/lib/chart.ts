@@ -1,9 +1,11 @@
 import type { ChartType, Plugin } from 'chart.js'
 import { markRaw, nextTick, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import {
+  chartFontFamilyStack,
   createChartEmptyStatePlugin,
   defineChartNumericScale,
   defineChartOptions,
+  formatCompactNumber,
   resolveChartScaleMax,
   type ChartOptions,
   withAlpha,
@@ -12,16 +14,15 @@ import { resolveChartAnimation } from '../../../../shared/motion/chartMotion'
 import { adminThemeTokenFallbacks } from '../../../../shared/theme/adminThemeTokens'
 
 export const adminChartStrokeWidth = 1
-export const adminChartPointClipPadding = 6
+const adminChartPointClipPadding = 6
 const adminChartBubbleFillOpacity = 0.3
 const adminChartBubbleRadiusMin = 5
 const adminChartBubbleRadiusMax = 18
 const adminChartBubbleHoverRadiusOffset = 2
-export const adminChartBubbleClipPadding =
+const adminChartBubbleClipPadding =
   adminChartBubbleRadiusMax + adminChartBubbleHoverRadiusOffset
 
-const adminChartFontFamily =
-  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+const adminChartFontFamily = chartFontFamilyStack
 
 // Chart.js paints canvas colors and helpers like withAlpha need concrete values.
 export const adminChartTheme = {
@@ -114,7 +115,7 @@ export function defineAdminChartCountScale(input: AdminChartNumericScaleInput = 
     tickColor: adminChartTheme.axisText,
     gridColor: input.gridColor ?? adminChartTheme.splitLine,
     borderColor: input.borderColor,
-    formatTick: formatAdminChartCompactNumber,
+    formatTick: formatCompactNumber,
   })
 }
 
@@ -154,30 +155,9 @@ export function defineAdminChartRadialCountScale(input: AdminChartNumericScaleIn
       color: adminChartTheme.axisText,
       precision: 0,
       stepSize: input.stepSize,
-      callback: (value: string | number) => formatAdminChartCompactNumber(Number(value)),
+      callback: (value: string | number) => formatCompactNumber(Number(value)),
     },
     grid: { color: input.gridColor ?? adminChartTheme.splitLine },
-  }
-}
-
-export function defineAdminChartRadialPercentScale(input: AdminChartNumericScaleInput = {}) {
-  return {
-    min: input.min ?? 0,
-    max: input.max ?? 100,
-    beginAtZero: true,
-    ticks: {
-      backdropColor: 'transparent',
-      color: adminChartTheme.axisText,
-      precision: 0,
-      stepSize: input.stepSize,
-      callback: (value: string | number) => formatAdminChartPercent(Number(value), input.suffix),
-    },
-    grid: { color: input.gridColor ?? adminChartTheme.splitLine },
-    angleLines: { color: input.gridColor ?? adminChartTheme.splitLine },
-    pointLabels: {
-      color: adminChartTheme.axisText,
-      font: { family: adminChartFontFamily, size: 12, weight: 600 },
-    },
   }
 }
 
@@ -187,15 +167,6 @@ export function defineAdminChartPointClipStyle() {
   }
 }
 
-export function defineAdminChartBubbleDatasetStyle(color: string | string[]) {
-  return {
-    backgroundColor: mapChartColor(color, (value) => withAlpha(value, adminChartBubbleFillOpacity)),
-    borderColor: color,
-    borderWidth: adminChartStrokeWidth,
-    clip: adminChartBubbleClipPadding,
-    hoverBorderWidth: adminChartStrokeWidth,
-  }
-}
 
 export function defineAdminChartBubblePointStyle(color: string | string[]) {
   return {
@@ -221,13 +192,6 @@ export function getAdminChartBubbleRadius(value: number, maxValue: number) {
 export function getAdminChartBubbleHoverRadius(value: number, maxValue: number) {
   const radius = getAdminChartBubbleRadius(value, maxValue)
   return radius > 0 ? radius + adminChartBubbleHoverRadiusOffset : 0
-}
-
-function formatAdminChartCompactNumber(value: number) {
-  const rounded = Math.round(toFiniteChartNumber(value))
-  if (rounded >= 1_000_000) return formatCompactUnit(rounded / 1_000_000, 'm')
-  if (rounded >= 1_000) return formatCompactUnit(rounded / 1_000, 'k')
-  return rounded.toString()
 }
 
 function formatAdminChartDurationSeconds(value: number) {
@@ -271,11 +235,34 @@ function mapChartColor(color: string | string[], mapper: (value: string) => stri
   return Array.isArray(color) ? color.map(mapper) : mapper(color)
 }
 
-function formatCompactUnit(value: number, unit: string) {
-  const text = value >= 10 ? Math.round(value).toString() : value.toFixed(1).replace(/\.0$/, '')
-  return `${text}${unit}`
-}
-
 function toFiniteChartNumber(value: number) {
   return Number.isFinite(value) ? value : 0
+}
+
+export function defineAdminChartTooltip(options: Record<string, unknown> = {}) {
+  return {
+    enabled: true,
+    backgroundColor: adminChartTheme.tooltipBg,
+    borderColor: adminChartTheme.tooltipBorder,
+    borderWidth: 1,
+    titleColor: adminChartTheme.mainText,
+    bodyColor: adminChartTheme.tooltipText,
+    titleFont: {
+      size: 11,
+      weight: 'bold' as const,
+      family: adminChartFontFamily,
+    },
+    bodyFont: {
+      size: 11,
+      family: adminChartFontFamily,
+    },
+    padding: 10,
+    cornerRadius: 8,
+    boxWidth: 8,
+    boxHeight: 8,
+    boxPadding: 6,
+    usePointStyle: true,
+    displayColors: true,
+    ...options,
+  }
 }

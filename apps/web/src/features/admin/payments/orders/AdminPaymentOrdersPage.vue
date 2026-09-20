@@ -1,220 +1,219 @@
 <template>
-  <AdminTablePanel viewport-height content-class="min-h-0 flex-1 overflow-hidden px-6 pb-6">
-    <template #toolbar>
-      <AdminResourceToolbar>
-        <template #search>
-          <div class="flex min-w-0 flex-wrap gap-2">
-            <AdminToolbarSearch
-              v-model="orderNumberSearch"
-              input-label="搜索公开订单号"
-              placeholder="IBP-YYYYMMDD-…"
-              @enter="applySearch"
-              @clear="clearOrderNumberSearch"
-            />
-            <AdminToolbarSearch
-              v-model="userSearch"
-              input-label="搜索支付用户"
-              placeholder="用户 ID 或用户名"
-              @enter="applySearch"
-              @clear="clearUserSearch"
-            />
-          </div>
-        </template>
-
-        <template #metrics="{ metricClass }">
-          <span :class="metricClass">
-            <span class="h-2.5 w-2.5 rounded-full bg-admin-success"></span>
-            <span>筛选结果 {{ totalLabel }}</span>
-          </span>
-        </template>
-
-        <template #filters>
-          <AdminFilterPopover
-            :active="hasFilters"
-            filter-label="筛选支付订单"
-            title="订单状态与异常"
-            @reset="resetFilters"
-          >
-            <div class="flex min-w-0 flex-col gap-4">
-              <label class="flex flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
-                <span>订单状态</span>
-                <Select
-                  v-model="statusFilter"
-                  :options="paymentOrderStatusOptions"
-                  option-label="label"
-                  option-value="value"
-                  placeholder="全部状态"
-                  size="small"
-                  show-clear
-                  fluid
-                />
-              </label>
-              <label
-                class="flex items-center justify-between gap-4 text-admin-meta font-[650] text-admin-text-2"
-              >
-                <span>仅看 24 小时异常</span>
-                <ToggleSwitch
-                  v-model="anomalyOnly"
-                  class="shrink-0"
-                  aria-label="仅看 24 小时异常"
-                />
-              </label>
-            </div>
-          </AdminFilterPopover>
-        </template>
-
-        <template #actions="{ iconButtonClass }">
-          <Button
-            text
-            :class="iconButtonClass"
-            :disabled="loading"
-            aria-label="刷新支付订单"
-            @click="refreshOrders"
-          >
-            <template #icon><Refresh class="size-4 text-admin-text-2" /></template>
-          </Button>
-        </template>
-
-        <template #pager>
-          <AdminPagerControls
-            :current-page="pagination.currentPage.value"
-            :total-pages="pagination.knownPageCount.value"
-            :prev-disabled="!pagination.canRetreat.value"
-            :next-disabled="!pagination.canAdvance.value"
-            @prev="previousPage"
-            @next="nextPage"
-          />
-        </template>
-      </AdminResourceToolbar>
+  <AdminCollectionPageShell
+    :current-page="pagination.currentPage.value"
+    :total-pages="pagination.knownPageCount.value"
+    :prev-disabled="!pagination.canRetreat.value"
+    :next-disabled="!pagination.canAdvance.value"
+    @prev="previousPage"
+    @next="nextPage"
+  >
+    <template #toolbar-start>
+      <AdminToolbarSearch
+        v-model="orderNumberSearch"
+        input-label="搜索公开订单号"
+        placeholder="IBP-YYYYMMDD-…"
+        class="w-full sm:w-64"
+        @enter="applySearch"
+        @clear="clearOrderNumberSearch"
+      />
+      <AdminToolbarSearch
+        v-model="userSearch"
+        input-label="搜索支付用户"
+        placeholder="用户 ID 或用户名"
+        class="w-full sm:w-56"
+        @enter="applySearch"
+        @clear="clearUserSearch"
+      />
     </template>
 
-    <Message v-if="initialError" severity="error" :closable="false" class="m-5">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <span>支付订单加载失败，请重试。</span>
-        <Button
-          label="重试"
-          severity="secondary"
-          size="small"
-          outlined
-          :class="adminActionButtonClass"
-          :disabled="loading"
-          @click="refreshOrders"
-        />
-      </div>
-    </Message>
+    <template #toolbar-end>
+      <AdminFilterPopover
+        :active="hasFilters"
+        filter-label="筛选支付订单"
+        title="订单状态与异常"
+        @reset="resetFilters"
+      >
+        <div class="flex min-w-0 flex-col gap-3.5">
+          <label class="flex flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+            <span>订单状态</span>
+            <AdminSelect
+              v-model="statusFilter"
+              :options="paymentOrderStatusOptions"
+              size="small"
+            />
+          </label>
+          <label
+            class="flex items-center justify-between gap-4 text-admin-meta font-[650] text-admin-text-2"
+          >
+            <span>仅看 24 小时异常</span>
+            <AdminSwitch
+              v-model="anomalyOnly"
+              class="shrink-0"
+              aria-label="仅看 24 小时异常"
+            />
+          </label>
+        </div>
+      </AdminFilterPopover>
 
-    <Message v-else-if="backgroundError" severity="warn" :closable="false" class="mx-5 mt-5">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <span>刷新支付订单失败，正在显示上次成功的数据。</span>
-        <Button
-          label="重试"
-          severity="secondary"
-          size="small"
-          outlined
-          :class="adminActionButtonClass"
-          :disabled="loading"
-          @click="refreshOrders"
-        />
-      </div>
-    </Message>
+      <AdminButton
+        variant="ghost"
+        :class="adminFramedIconButtonClass"
+        aria-label="刷新支付订单"
+        :loading="loading"
+        :disabled="loading"
+        @click="refreshOrders"
+      >
+        <Refresh class="size-4 text-admin-text-2" />
+      </AdminButton>
+    </template>
 
-    <AdminEmptyState v-if="showEmptyState" :title="emptyTitle" />
+    <template #alerts>
+      <AdminAlert v-if="initialError" severity="error" class="m-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <span>支付订单加载失败，请重试。</span>
+          <AdminButton
+            variant="outline"
+            size="small"
+            :class="adminActionButtonClass"
+            :disabled="loading"
+            @click="refreshOrders"
+          >
+            重试
+          </AdminButton>
+        </div>
+      </AdminAlert>
 
-    <DataTableFrame
-      v-else-if="!initialError"
-      :value="orders"
-      :loading="loading"
-      data-key="publicOrderNumber"
-      scrollable
-      scroll-height="flex"
-      frame-class="h-full min-h-0"
-      table-aria-label="支付订单列表"
-      scroll-aria-label="支付订单列表横向滚动区域"
-      :table-style="{ minWidth: '1260px' }"
-    >
-      <Column field="createdAt" header="订单时间" :style="{ width: '170px' }">
-        <template #body="{ data }">
-          <time :datetime="data.createdAt" class="text-admin-meta text-admin-text-3">
-            {{ formatPaymentDateTime(data.createdAt) }}
-          </time>
+      <AdminAlert v-else-if="backgroundError" severity="warn" class="mx-4 mt-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <span>刷新支付订单失败，正在显示上次成功的数据。</span>
+          <AdminButton
+            variant="outline"
+            size="small"
+            :class="adminActionButtonClass"
+            :disabled="loading"
+            @click="refreshOrders"
+          >
+            重试
+          </AdminButton>
+        </div>
+      </AdminAlert>
+    </template>
+
+    <AdminTable
+      v-if="!initialError"
+        :value="orders"
+        :loading="loading"
+        data-key="publicOrderNumber"
+        scrollable
+        :frame-class="adminTableFrameClass"
+        table-aria-label="支付订单列表"
+        scroll-aria-label="支付订单列表横向滚动区域"
+        :table-style="adminTableStyle"
+        :class="adminTableClass"
+      >
+        <template #empty>
+          <AdminEmptyState :title="emptyTitle" />
         </template>
-      </Column>
 
-      <Column field="publicOrderNumber" header="公开订单号" :style="{ minWidth: '215px' }">
-        <template #body="{ data }">
-          <Button
-            link
-            class="!p-0 font-mono !text-admin-content !font-bold"
-            :label="data.publicOrderNumber"
-            :aria-label="`查看订单 ${data.publicOrderNumber}`"
-            @click="openDetail(data.publicOrderNumber)"
-          />
-        </template>
-      </Column>
+        <!-- 订单时间列：等宽日期 -->
+        <AdminColumn field="createdAt" header="订单时间" :style="{ width: '160px' }">
+          <template #body="{ data }">
+            <time :datetime="data.createdAt" class="whitespace-nowrap font-mono text-xs text-admin-text-3">
+              {{ formatPaymentDateTime(data.createdAt) }}
+            </time>
+          </template>
+        </AdminColumn>
 
-      <Column header="用户" :style="{ width: '150px' }">
-        <template #body="{ data }">
-          <div class="min-w-0">
-            <div class="truncate text-admin-body font-bold text-admin-text-1">
+        <!-- 公开订单号列：等宽可点击链接 -->
+        <AdminColumn field="publicOrderNumber" header="公开订单号" :style="{ minWidth: '220px' }">
+          <template #body="{ data }">
+            <button
+              type="button"
+              class="font-mono text-xs font-semibold text-admin-text-1 hover:text-admin-accent cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-accent/20 rounded"
+              :aria-label="`查看订单 ${data.publicOrderNumber}`"
+              @click="openDetail(data.publicOrderNumber)"
+            >
+              {{ data.publicOrderNumber }}
+            </button>
+          </template>
+        </AdminColumn>
+
+        <!-- 用户列：姓名 -->
+        <AdminColumn header="用户" :style="{ width: '160px' }">
+          <template #body="{ data }">
+            <div class="truncate font-medium text-admin-text-1">
               {{ data.user.displayName }}
             </div>
-          </div>
-        </template>
-      </Column>
+          </template>
+        </AdminColumn>
 
-      <Column field="ideaQuantity" header="Idea 数量" :style="{ width: '120px' }">
-        <template #body="{ data }">{{ ideaFormatter.format(data.ideaQuantity) }}</template>
-      </Column>
+        <!-- Idea 数量列：等宽数字 -->
+        <AdminColumn field="ideaQuantity" header="Idea 数量" :style="{ width: '120px' }">
+          <template #body="{ data }">
+            <span class="font-mono text-xs font-semibold text-admin-text-1">
+              {{ ideaFormatter.format(data.ideaQuantity) }}
+            </span>
+          </template>
+        </AdminColumn>
 
-      <Column header="原始实付" :style="{ width: '145px' }">
-        <template #body="{ data }">
-          {{ formatPaymentMoney(data.paidAmountMinor, data.paidCurrency) }}
-        </template>
-      </Column>
+        <!-- 原始实付列：等宽金额 -->
+        <AdminColumn header="原始实付" :style="{ width: '130px' }">
+          <template #body="{ data }">
+            <span class="font-mono text-xs font-semibold text-admin-text-1">
+              {{ formatPaymentMoney(data.paidAmountMinor, data.paidCurrency) }}
+            </span>
+          </template>
+        </AdminColumn>
 
-      <Column field="stripeStatus" header="Stripe 状态" :style="{ width: '135px' }">
-        <template #body="{ data }">
-          <Tag
-            :value="getStripeStatusLabel(data.stripeStatus)"
-            :severity="stripeStatusSeverity(data.stripeStatus)"
-            rounded
-          />
-        </template>
-      </Column>
+        <!-- Stripe 状态列：圆角徽标 -->
+        <AdminColumn field="stripeStatus" header="Stripe 状态" :style="{ width: '120px' }">
+          <template #body="{ data }">
+            <AdminBadge
+              :value="getStripeStatusLabel(data.stripeStatus)"
+              :severity="stripeStatusSeverity(data.stripeStatus)"
+              rounded
+            />
+          </template>
+        </AdminColumn>
 
-      <Column field="creditStatus" header="本地到账" :style="{ width: '125px' }">
-        <template #body="{ data }">
-          <Tag
-            :value="getCreditStatusLabel(data.creditStatus)"
-            :severity="creditStatusSeverity(data.creditStatus)"
-            rounded
-          />
-        </template>
-      </Column>
+        <!-- 本地到账列：圆角徽标 -->
+        <AdminColumn field="creditStatus" header="本地到账" :style="{ width: '120px' }">
+          <template #body="{ data }">
+            <AdminBadge
+              :value="getCreditStatusLabel(data.creditStatus)"
+              :severity="creditStatusSeverity(data.creditStatus)"
+              rounded
+            />
+          </template>
+        </AdminColumn>
 
-      <Column header="异常" :style="{ width: '115px' }">
-        <template #body="{ data }">
-          <Tag v-if="data.anomalousAt" value="24h 未收敛" severity="danger" rounded />
-          <span v-else class="text-admin-meta text-admin-text-3">—</span>
-        </template>
-      </Column>
+        <!-- 异常列：Badge 或横线 -->
+        <AdminColumn header="异常" :style="{ width: '110px' }">
+          <template #body="{ data }">
+            <AdminBadge v-if="data.anomalousAt" value="24h 未收敛" severity="danger" rounded />
+            <span v-else class="text-xs text-admin-text-3">—</span>
+          </template>
+        </AdminColumn>
 
-      <Column header="详情" :style="{ width: '72px' }">
-        <template #body="{ data }">
-          <Button
-            text
-            size="small"
-            severity="secondary"
-            :class="adminFramedIconButtonClass"
-            :aria-label="`查看订单 ${data.publicOrderNumber}`"
-            @click="openDetail(data.publicOrderNumber)"
-          >
-            <template #icon><Eye class="size-4 text-admin-text-2" /></template>
-          </Button>
-        </template>
-      </Column>
-    </DataTableFrame>
-  </AdminTablePanel>
+        <!-- 详情操作列 (1:1 对齐用户管理页操作列样式) -->
+        <AdminColumn header="详情" :style="{ width: '64px' }">
+          <template #body="{ data }">
+            <div class="flex items-center justify-start">
+              <button
+                type="button"
+                :class="adminTableRowActionButtonClass"
+                :aria-label="`查看订单 ${data.publicOrderNumber}`"
+                @click="openDetail(data.publicOrderNumber)"
+              >
+                <Eye class="size-4" />
+              </button>
+            </div>
+          </template>
+        </AdminColumn>
+      </AdminTable>
+
+      <template #footer-label>筛选结果 {{ totalLabel }}</template>
+  </AdminCollectionPageShell>
 
   <PaymentOrderDetailDialog
     v-model:visible="detailVisible"
@@ -230,25 +229,29 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useAdminCollectionQuery } from '../../shared/composables/useAdminCollectionQuery'
+import { useAdminCursorCollection } from '../../shared/composables/useAdminCursorCollection'
 import { Eye, Refresh } from '@iconoir/vue'
-import Button from 'primevue/button'
-import Column from 'primevue/column'
-import Message from 'primevue/message'
-import Select from 'primevue/select'
-import Tag from 'primevue/tag'
-import ToggleSwitch from 'primevue/toggleswitch'
-import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
+import AdminCollectionPageShell from '../../shared/components/AdminCollectionPageShell.vue'
+import AdminColumn from '../../shared/components/AdminColumn.vue'
+import AdminAlert from '../../shared/components/AdminAlert.vue'
+import AdminBadge from '../../shared/components/AdminBadge.vue'
+import AdminButton from '../../shared/components/AdminButton.vue'
+import AdminSelect from '../../shared/components/AdminSelect.vue'
+import AdminSwitch from '../../shared/components/AdminSwitch.vue'
+import AdminTable from '../../shared/components/AdminTable.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
-import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
-import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
-import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
-import { useCursorPagination } from '../../shared/composables/useCursorPagination'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
-import { adminActionButtonClass, adminFramedIconButtonClass } from '../../shared/lib/uiClasses'
+import {
+  adminActionButtonClass,
+  adminFramedIconButtonClass,
+  adminTableClass,
+  adminTableFrameClass,
+  adminTableRowActionButtonClass,
+  adminTableStyle,
+} from '../../shared/lib/uiClasses'
 import { createUniqueId } from '../../../../shared/utils/ids'
 import PaymentOrderDetailDialog from './PaymentOrderDetailDialog.vue'
 import {
@@ -256,12 +259,13 @@ import {
   formatPaymentMoney,
   getCreditStatusLabel,
   getStripeStatusLabel,
+  ORDER_STATUS_FILTER_ALL,
   paymentOrderStatusOptions,
+  type PaymentOrderStatusFilter,
 } from './paymentOrderPresentation'
 import { createAdminPaymentOrderResource } from './paymentOrderResource'
 import type {
   AdminPaymentOrderDetail,
-  AdminPaymentOrderStatus,
   SearchAdminPaymentOrdersInput,
 } from './paymentOrderTypes'
 
@@ -270,9 +274,9 @@ const orderNumberSearch = ref('')
 const appliedOrderNumber = ref('')
 const userSearch = ref('')
 const appliedUser = ref('')
-const statusFilter = ref<AdminPaymentOrderStatus>()
+// 筛选哨兵对齐用户管理页：'all' 表示不过滤，落 query key 前再归一为 undefined。
+const statusFilter = ref<PaymentOrderStatusFilter>(ORDER_STATUS_FILTER_ALL)
 const anomalyOnly = ref(false)
-let pagination: ReturnType<typeof useCursorPagination<string>>
 const detailVisible = ref(false)
 const selectedOrderNumber = ref('')
 const detail = ref<AdminPaymentOrderDetail | null>(null)
@@ -287,19 +291,8 @@ const refundIdempotencyKeys = new Map<string, string>()
 let detailRequestEpoch = 0
 let activeDetailRequest: AbortController | undefined
 
-// TanStack Query owns the list lifecycle (pilot for the Admin collection
-// migration): filter/pagination state feeds the query key, so navigation
-// actions below only mutate state — fetching, cancellation, and background
-// refresh semantics come from the query itself. Pagination is assigned before
-// the query because the key reads the cursor during setup.
-pagination = useCursorPagination<string>({ pending: () => loading.value })
-const orderListCriteria = computed((): Omit<SearchAdminPaymentOrdersInput, 'signal' | 'limit'> => ({
-  orderNumber: appliedOrderNumber.value,
-  user: appliedUser.value,
-  status: statusFilter.value,
-  anomalyOnly: anomalyOnly.value,
-  cursor: pagination.cursor.value,
-}))
+// 游标集合生命周期收敛于 useAdminCursorCollection：筛选/分页状态喂给 query key，
+// 翻页与刷新只改状态。
 const ORDER_LIST_QUERY_ROOT = ['admin', 'payments', 'orders'] as const
 const ORDER_LIST_CRITERIA_INDEX = ORDER_LIST_QUERY_ROOT.length
 const {
@@ -308,33 +301,46 @@ const {
   initialError,
   backgroundError,
   refresh: refreshOrderList,
-  query: orderListQuery,
-} = useAdminCollectionQuery({
-  queryKey: computed(() => [...ORDER_LIST_QUERY_ROOT, orderListCriteria.value]),
+  pagination,
+  previousPage,
+  nextPage,
+} = useAdminCursorCollection({
+  buildKey: (cursor) =>
+    [
+      ...ORDER_LIST_QUERY_ROOT,
+      {
+        orderNumber: appliedOrderNumber.value,
+        user: appliedUser.value,
+        status:
+          statusFilter.value === ORDER_STATUS_FILTER_ALL ? undefined : statusFilter.value,
+        anomalyOnly: anomalyOnly.value,
+        cursor,
+      },
+    ] as const,
   queryFn: ({ queryKey, signal }) =>
     resource.search({
-      ...(queryKey[ORDER_LIST_CRITERIA_INDEX] as typeof orderListCriteria.value),
+      ...(queryKey[ORDER_LIST_CRITERIA_INDEX] as Omit<
+        SearchAdminPaymentOrdersInput,
+        'signal' | 'limit'
+      >),
       signal,
     }),
   getNextCursor: (page) => page.nextCursor,
-  pagination,
 })
 const orders = computed(() => orderPage.value?.orders ?? [])
 const total = computed(() => orderPage.value?.total ?? 0)
 
 const totalLabel = computed(() => `${ideaFormatter.format(total.value)} 笔`)
-const hasFilters = computed(() => Boolean(statusFilter.value || anomalyOnly.value))
+const hasFilters = computed(
+  () => statusFilter.value !== ORDER_STATUS_FILTER_ALL || anomalyOnly.value,
+)
 const hasCriteria = computed(() =>
   Boolean(
     appliedOrderNumber.value.trim() ||
-    appliedUser.value.trim() ||
-    statusFilter.value ||
-    anomalyOnly.value,
+      appliedUser.value.trim() ||
+      statusFilter.value !== ORDER_STATUS_FILTER_ALL ||
+      anomalyOnly.value,
   ),
-)
-const showEmptyState = computed(
-  () =>
-    orderListQuery.isSuccess.value && !loading.value && (orderPage.value?.orders.length ?? 0) === 0,
 )
 const emptyTitle = computed(() => (hasCriteria.value ? '未找到匹配的支付订单' : '暂无支付订单'))
 
@@ -388,16 +394,8 @@ function clearUserSearch() {
 }
 
 function resetFilters() {
-  statusFilter.value = undefined
+  statusFilter.value = ORDER_STATUS_FILTER_ALL
   anomalyOnly.value = false
-}
-
-function previousPage() {
-  pagination.retreat()
-}
-
-function nextPage() {
-  pagination.advance()
 }
 
 function openDetail(publicOrderNumber: string) {

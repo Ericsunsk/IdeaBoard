@@ -28,9 +28,8 @@ describe('useUsageStatisticsCharts', () => {
     expect(charts.todaySuccessRate.value).toBe('0.0%')
     expect(charts.todaySuccessRateFoot.value).toBe('昨日无可比数据')
     expect(charts.monthCallsFoot.value).toBe('累计无调用')
-    expect(readDataset(charts.qualityTrendChartData.value, '成功率').data).toEqual(Array(7).fill(0))
+    expect(readDataset(charts.qualityTrendChartData.value, 'Success').data).toEqual(Array(7).fill(0))
     expect(charts.bottleneckSourceChartData.value.labels).toEqual([])
-    expect(charts.failureCategoryChartData.value.labels).toEqual([])
   })
 
   it('builds sparse usage trend series and summary footers from the selected range', () => {
@@ -126,9 +125,143 @@ describe('useUsageStatisticsCharts', () => {
     expect(trendOptions.scales.y.ticks.callback(1_200)).toBe('1.2k')
     expect(trendOptions.scales.x.ticks.font.family).toContain('Segoe UI')
     expect(trendOptions.scales.y.ticks.font.family).toContain('Segoe UI')
+    // 无 capture 数据：cost 系列与右轴都不出现，图表与之前一致。
+    expect(hasDataset(charts.trendChartData.value, '消耗积分')).toBe(false)
+  })
+  it('keeps empty buckets at double zero instead of 100% failure', () => {
+    const statistics = makeStatistics({
+      trend: [],
+      quality_trend: [],
+    })
+    const charts = useUsageStatisticsCharts({
+      adminStatistics: ref(statistics),
+      timeRange: ref(GetAdminStatisticsRange['7d']),
+    })
+    const success = readDataset(charts.qualityTrendChartData.value, 'Success')
+    const errors = readDataset(charts.qualityTrendChartData.value, 'Errors')
+    expect(success.data).toEqual(Array(7).fill(0))
+    expect(errors.data).toEqual(Array(7).fill(0))
   })
 
-  it('uses quality statistics only when provided or when the quality range matches usage', () => {
+  it('shows double zero for cancelled-only days (attempted denominator)', () => {
+    const statistics = makeStatistics({
+      quality_trend: [
+        {
+          date: '2026-07-06',
+          label: '07/06',
+          total: 5,
+          success: 0,
+          fail: 0,
+          success_rate: 0,
+        },
+      ],
+    })
+    const charts = useUsageStatisticsCharts({
+      adminStatistics: ref(statistics),
+      timeRange: ref(GetAdminStatisticsRange['7d']),
+    })
+    const success = readDataset(charts.qualityTrendChartData.value, 'Success')
+    const errors = readDataset(charts.qualityTrendChartData.value, 'Errors')
+    expect(success.data).toEqual(Array(7).fill(0))
+    expect(errors.data).toEqual(Array(7).fill(0))
+  })
+
+  it('represents empty segments as no series without a phantom dataset', () => {
+    const statistics = makeStatistics({
+      trend: [
+        {
+          date: '2026-07-06',
+          label: '07/06',
+          total: 0,
+          segments: [],
+        },
+      ],
+    })
+    const charts = useUsageStatisticsCharts({
+      adminStatistics: ref(statistics),
+      timeRange: ref(GetAdminStatisticsRange['7d']),
+    })
+
+    expect(charts.trendChartData.value.datasets).toEqual([])
+    expect(hasDataset(charts.trendChartData.value, '无数据')).toBe(false)
+  })
+
+  it('warns once when segments sum diverges from total without changing output', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const statistics = makeStatistics({
+        trend: [
+          {
+            date: '2026-07-04',
+            label: '07/04',
+            total: 10,
+            segments: [{ label: 'gpt-image', value: 3 }],
+          },
+        ],
+      })
+      const charts = useUsageStatisticsCharts({
+        adminStatistics: ref(statistics),
+        timeRange: ref(GetAdminStatisticsRange['7d']),
+      })
+
+      // 渲染输出不变：系列取 segments 值，tooltip 总数取 total。
+      expect(readDataset(charts.trendChartData.value, 'gpt-image').data).toEqual([
+        0, 0, 0, 0, 3, 0, 0,
+      ])
+      expect(trendTooltipAfterBody(charts.trendChartOptions.value, 4)).toEqual(['总调用: 10 次'])
+      expect(warnSpy).toHaveBeenCalledTimes(1)
+      expect(warnSpy.mock.calls[0]?.[0]).toContain('2026-07-04')
+
+      // 跨 re-render 去重：同 key 的第二次求值不再刷屏。
+      const rerendered = useUsageStatisticsCharts({
+        adminStatistics: ref(statistics),
+        timeRange: ref(GetAdminStatisticsRange['7d']),
+      })
+      expect(rerendered.trendChartData.value.datasets).toHaveLength(1)
+      expect(warnSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
+  it('adds a cost series on its own axis when trend carries captured credits', () => {
+    const statistics = makeStatistics({
+      trend: [
+        {
+          date: '2026-07-05',
+          label: '07/05',
+          total: 4,
+          captured_credits: 150,
+          segments: [{ label: 'gpt-image', value: 4 }],
+        },
+        {
+          date: '2026-07-06',
+          label: '07/06',
+          total: 7,
+          captured_credits: 0,
+          segments: [{ label: 'gpt-image', value: 7 }],
+        },
+      ],
+    })
+    const charts = useUsageStatisticsCharts({
+      adminStatistics: ref(statistics),
+      timeRange: ref(GetAdminStatisticsRange['7d']),
+    })
+
+    const cost = readDataset(charts.trendChartData.value, '消耗积分')
+    expect(cost.yAxisID).toBe('cost')
+    // 不进调用量堆叠：无 stack 键。
+    expect('stack' in (cost as Record<string, unknown>)).toBe(false)
+    expect(cost.data).toEqual([0, 0, 0, 0, 0, 150, 0])
+    const options = charts.trendChartOptions.value as {
+      scales: Record<string, { position?: string } | undefined>
+    }
+    expect(options.scales.cost?.position).toBe('right')
+    const label = trendTooltipLabel(charts.trendChartOptions.value, 5, '消耗积分')
+    expect(label).toBe('消耗积分: 150 积分')
+  })
+
+  it('reads quality trend from the single admin statistics stream', () => {
     const adminStatistics = makeStatistics({
       quality_trend: [
         {
@@ -137,63 +270,26 @@ describe('useUsageStatisticsCharts', () => {
           total: 10,
           success: 6,
           fail: 4,
-          success_rate: 0.6,
-        },
-      ],
-    })
-    const qualityStatistics = makeStatistics({
-      quality_trend: [
-        {
-          date: '2026-07-06T08',
-          label: '08:00',
-          total: 10,
-          success: 8,
-          fail: 2,
-          success_rate: 80,
+          // 后端 0-100 量级：失败率只能 100 - success_rate，不能用 fail/total 重算。
+          success_rate: 60,
         },
       ],
     })
 
-    const sharedRangeCharts = useUsageStatisticsCharts({
+    const charts = useUsageStatisticsCharts({
       adminStatistics: ref(adminStatistics),
       timeRange: ref(GetAdminStatisticsRange['7d']),
-      qualityTimeRange: ref(GetAdminStatisticsRange['7d']),
     })
-    expect(readDataset(sharedRangeCharts.qualityTrendChartData.value, '成功率').data.at(-1)).toBe(
-      60,
-    )
-    expect(readDataset(sharedRangeCharts.qualityTrendChartData.value, '失败率').data.at(-1)).toBe(
-      40,
-    )
-
-    const unmatchedRangeCharts = useUsageStatisticsCharts({
-      adminStatistics: ref(adminStatistics),
-      qualityStatistics: ref(null),
-      timeRange: ref(GetAdminStatisticsRange['7d']),
-      qualityTimeRange: ref(GetAdminStatisticsRange['1d']),
-    })
-    expect(readDataset(unmatchedRangeCharts.qualityTrendChartData.value, '成功率').data).toEqual(
-      Array(6).fill(0),
-    )
-
-    const providedQualityCharts = useUsageStatisticsCharts({
-      adminStatistics: ref(adminStatistics),
-      qualityStatistics: ref(qualityStatistics),
-      timeRange: ref(GetAdminStatisticsRange['7d']),
-      qualityTimeRange: ref(GetAdminStatisticsRange['1d']),
-    })
-    expect(readDataset(providedQualityCharts.qualityTrendChartData.value, '成功率').data).toEqual([
-      0, 0, 80, 0, 0, 0,
+    expect(readDataset(charts.qualityTrendChartData.value, 'Success').data.at(-1)).toBe(60)
+    expect(readDataset(charts.qualityTrendChartData.value, 'Errors').data.at(-1)).toBe(40)
+    expect(qualityTooltipAfterBody(charts.qualityTrendChartOptions.value, 6)).toEqual([
+      '总调用: 10',
+      '成功: 6',
+      '失败: 4',
     ])
-    expect(readDataset(providedQualityCharts.qualityTrendChartData.value, '失败率').data).toEqual([
-      0, 0, 20, 0, 0, 0,
-    ])
-    expect(
-      qualityTooltipAfterBody(providedQualityCharts.qualityTrendChartOptions.value, 2),
-    ).toEqual(['总调用: 10', '成功: 8', '失败: 2'])
   })
 
-  it('normalizes bottleneck and failure category values before charting and tooltip output', () => {
+  it('normalizes bottleneck values before charting and tooltip output', () => {
     const charts = useUsageStatisticsCharts({
       adminStatistics: ref(
         makeStatistics({
@@ -213,20 +309,6 @@ describe('useUsageStatisticsCharts', () => {
               avg_latency_ms: 2500,
             },
           ],
-          failure_categories: [
-            {
-              category: 'timeout',
-              label: 'should be filtered',
-              total: -1,
-              avg_latency_ms: -200,
-            },
-            {
-              category: 'storage_error',
-              label: '',
-              total: 3,
-              avg_latency_ms: 1200,
-            },
-          ],
         }),
       ),
       timeRange: ref(GetAdminStatisticsRange['7d']),
@@ -238,14 +320,6 @@ describe('useUsageStatisticsCharts', () => {
       '任务: 5',
       '失败: 0',
       '平均耗时: 2.50s',
-    ])
-
-    expect(charts.failureCategoryChartData.value.labels).toEqual(['存储错误'])
-    expect(readDataset(charts.failureCategoryChartData.value, '失败量').data).toEqual([3])
-    expect(failureTooltipLabel(charts.failureCategoryChartOptions.value, 0)).toEqual([
-      '失败: 3',
-      '占比: 100.0%',
-      '平均耗时: 1.20s',
     ])
   })
 })
@@ -302,7 +376,15 @@ function makeStatistics(overrides: Partial<AdminStatistics> = {}): AdminStatisti
 function readDataset(chartData: { datasets: unknown[] }, label: string) {
   const dataset = chartData.datasets.find((item) => (item as { label?: string }).label === label)
   if (!dataset) throw new Error(`missing dataset: ${label}`)
-  return dataset as { data: unknown[] }
+  return dataset as { data: unknown[]; yAxisID?: string; stack?: string }
+}
+
+function hasDataset(chartData: { datasets: unknown[] }, label: string) {
+  return chartData.datasets.some((item) => (item as { label?: string }).label === label)
+}
+
+function trendTooltipLabel(options: unknown, dataIndex: number, label: string) {
+  return tooltipCallbacks(options).label?.({ dataIndex, dataset: { label } }) as string
 }
 
 function trendTooltipAfterBody(options: unknown, dataIndex: number) {
@@ -316,10 +398,6 @@ function qualityTooltipAfterBody(options: unknown, dataIndex: number) {
 }
 
 function bottleneckTooltipLabel(options: unknown, dataIndex: number) {
-  return tooltipCallbacks(options).label?.({ dataIndex }) as string[]
-}
-
-function failureTooltipLabel(options: unknown, dataIndex: number) {
   return tooltipCallbacks(options).label?.({ dataIndex }) as string[]
 }
 

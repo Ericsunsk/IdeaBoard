@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '../../../../test/render'
 import {
-  adminMasonryGridClass,
   adminSurfacePanelClass,
   adminSurfacePanelViewportClass,
   adminSurfaceRootViewportClass,
   adminSurfaceScrollContentClass,
 } from '../lib/uiClasses'
-import AdminResourceGridFrame from './AdminResourceGridFrame.vue'
 import AdminSurfaceFrame from './AdminSurfaceFrame.vue'
 import AdminTablePanel from './AdminTablePanel.vue'
 
@@ -75,28 +73,6 @@ describe('Admin surface frame adapters', () => {
     expectClassContract(content, contentClass)
     expect(content).not.toHaveClass(...classTokens(adminSurfaceScrollContentClass))
     expect(tableFrame).toHaveClass('h-full')
-  })
-
-  it('keeps Resource Grid in the shared scroll viewport', () => {
-    render(AdminResourceGridFrame, {
-      props: {
-        emptyDescription: 'No resources yet',
-        emptyTitle: 'No resources',
-        isEmpty: false,
-        isLoading: false,
-      },
-      slots: {
-        toolbar: 'Grid toolbar',
-        default: 'Grid item',
-      },
-    })
-
-    const grid = screen.getByText('Grid item')
-    const content = grid.parentElement
-
-    expectClassContract(grid, adminMasonryGridClass)
-    expectClassContract(content, adminSurfaceScrollContentClass)
-    expect(screen.getByText('Grid toolbar')).toBeInTheDocument()
   })
 })
 

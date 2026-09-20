@@ -4,6 +4,7 @@ import {
   createBoard,
   getBoardById,
   getBoardState,
+  InvalidBoardStateError,
   replaceBoardStateMap,
   BOARD_STATE_SCHEMA_VERSION,
   type BoardSnapshot,
@@ -160,8 +161,8 @@ describe('createBoardSessionRepository', () => {
     }
   })
 
-  it('migrates v3 local state to the current schema version on load', async () => {
-    const board = createBoard('Migrated Local Snapshot')
+  it('rejects a previous-schema local state instead of migrating it', async () => {
+    const board = createBoard('Retired Local Snapshot')
     localStorage.setItem(
       'ideaboard.canvas.boardStates.v2.public_00000000-0000-0000-0000-000000000001',
       JSON.stringify({
@@ -187,9 +188,7 @@ describe('createBoardSessionRepository', () => {
     )
     const repository = createBoardSessionRepository()
 
-    const loaded = await repository.load(board.id)
-
-    expect(loaded?.schemaVersion).toBe(BOARD_STATE_SCHEMA_VERSION)
+    await expect(repository.load(board.id)).rejects.toBeInstanceOf(InvalidBoardStateError)
   })
 
   it('keeps saving local board drafts when stored auth is temporarily missing', async () => {

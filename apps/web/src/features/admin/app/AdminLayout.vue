@@ -1,260 +1,398 @@
 <template>
   <router-view v-if="isLoginRoute" />
-  <div v-else :class="layoutShellClass">
-    <aside :class="siderClass" aria-label="后台导航">
-      <router-link :class="brandMarkClass" :to="ADMIN_DEFAULT_PATH" :aria-label="brandAriaLabel">
-        <SiteBrandLogo
-          :src="logoURL"
-          :fallback-text="fallbackText"
-          :class="brandMarkClasses.logo"
-        />
-      </router-link>
+  <div v-else class="flex min-h-screen bg-ib-page text-ib-text">
+    <button
+      v-if="drawerOpen"
+      type="button"
+      aria-label="关闭导航"
+      class="fixed inset-0 z-40 bg-black/30 backdrop-blur-xs lg:hidden"
+      @click="drawerOpen = false"
+    />
 
-      <nav :class="navRailClass" aria-label="后台功能">
-        <router-link
-          v-for="item in adminNavigationItems"
-          :key="item.key"
-          v-tooltip.right="item.label"
-          :to="item.path"
-          :aria-label="item.label"
-          :aria-current="activeKey === item.key ? 'page' : undefined"
-          :class="[
-            railButtonClass,
-            activeKey === item.key ? railButtonActiveClass : railButtonIdleClass,
-          ]"
-        >
-          <component :is="item.icon" :class="navIconClassFor(activeKey === item.key)" />
-        </router-link>
-      </nav>
+    <!-- Desktop spacer keeps content width stable; collapsed hover expands as overlay -->
+    <div
+      class="hidden shrink-0 transition-[width] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] lg:block"
+      :class="isCollapsed ? 'w-14' : 'w-52'"
+    />
 
-      <div :class="siderBottomClass">
-        <button
-          v-tooltip.right="'账户菜单'"
-          type="button"
-          :class="userAvatarButtonClass"
-          aria-label="账户菜单"
-          aria-haspopup="menu"
-          :aria-expanded="userMenuOpen"
-          @click="toggleUserMenu"
-        >
-          <img
-            v-if="userStore.user?.avatar"
-            :src="userStore.user.avatar"
-            :class="userAvatarImageClass"
-            alt="用户头像"
-          />
-          <span v-else :class="userAvatarPlaceholderClass" aria-hidden="true">
-            <UserIcon :class="userAvatarIconClass" />
-          </span>
-        </button>
-      </div>
-    </aside>
-
-    <main :class="mainClass">
-      <header :class="headerClass">
-        <div class="flex min-w-0 items-start gap-3.5">
-          <Button
-            :class="mobileMenuButtonClass"
-            type="button"
-            text
-            rounded
-            aria-label="打开导航"
-            @click="mobileMenuOpen = true"
+    <aside
+      ref="siderRef"
+      aria-label="后台导航"
+      class="fixed top-0 left-0 z-50 flex h-screen shrink-0 flex-col justify-between overflow-hidden border-r border-admin-border bg-admin-bg transition-[width,transform,box-shadow] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] lg:z-30"
+      :class="[
+        effectiveCollapsed ? 'w-52 lg:w-14' : 'w-52',
+        isCollapsed && isHovered ? 'lg:z-40' : '',
+        drawerOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full lg:translate-x-0',
+      ]"
+      @mouseleave="handleNavMouseLeave"
+      @focusout="handleSiderFocusOut"
+    >
+      <div
+        class="flex min-h-0 flex-1 flex-col"
+        @mouseenter="handleNavMouseEnter"
+        @mouseleave="handleNavMouseLeave"
+        @focusin="handleNavMouseEnter"
+        @focusout="handleSiderFocusOut"
+      >
+        <div class="flex h-14 shrink-0 items-center border-b border-admin-border px-2">
+          <router-link
+            :to="ADMIN_DEFAULT_PATH"
+            :aria-label="brandAriaLabel"
+            :title="effectiveCollapsed ? projectName || 'IdeaBoard' : undefined"
+            class="group flex h-10 w-full min-w-0 items-center overflow-hidden rounded-xl whitespace-nowrap transition-colors hover:bg-admin-surface-muted active:scale-[0.98]"
           >
-            <template #icon>
-              <MenuIcon :class="shellIconClass" />
-            </template>
-          </Button>
-          <div class="min-w-0 pt-0.5">
-            <p
-              class="m-0 mb-1 text-admin-body font-bold tracking-normal text-admin-text-2 max-[1080px]:hidden"
-            >
-              Overview
-            </p>
-            <h1
-              class="m-0 text-admin-modal-title leading-[1.05] font-[780] tracking-normal text-admin-title-color max-[1080px]:text-2xl"
-            >
-              {{ currentMeta.title }}
-            </h1>
-          </div>
-        </div>
-
-        <div class="flex min-w-0 items-center gap-3.5">
-          <button
-            v-tooltip.bottom="'异常雷达'"
-            :class="[notificationButtonClass, 'cursor-pointer']"
-            type="button"
-            :aria-label="hasAnomalies ? `异常雷达，${anomalyCount} 项活跃异常` : '异常雷达'"
-            aria-haspopup="dialog"
-            @click="toggleAnomalyRadar"
-          >
-            <BellIcon :class="shellIconClass" />
             <span
-              v-if="hasAnomalies"
-              class="absolute top-[7px] right-[7px] size-2.5 rounded-full bg-admin-danger ring-2 ring-white"
-              aria-hidden="true"
-            ></span>
-          </button>
-          <Popover ref="anomalyRadarPopoverRef" :pt="anomalyRadarPopoverPt">
-            <div :class="adminAnomalyPopoverClass">
-              <div
-                class="flex items-start justify-between gap-4 border-b border-admin-border px-4 py-3.5"
-              >
-                <div class="min-w-0">
-                  <div class="text-admin-content font-bold text-admin-title-color">异常雷达</div>
-                </div>
-                <Tag
-                  :value="hasAnomalies ? `${anomalyCount} 项` : '正常'"
-                  :severity="hasAnomalies ? 'danger' : 'success'"
-                  rounded
-                />
-              </div>
-
-              <div v-if="hasAnomalies" class="app-scrollbar min-h-0 flex-1 overflow-y-auto p-2">
-                <button
-                  v-for="item in anomalies"
-                  :key="item.id"
-                  type="button"
-                  class="flex w-full min-w-0 cursor-pointer gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-admin-surface-muted"
-                  @click="handleAnomalySelect(item)"
-                >
-                  <span
-                    class="mt-[7px] size-2 shrink-0 rounded-full bg-admin-danger"
-                    aria-hidden="true"
-                  ></span>
-                  <span class="min-w-0 flex-1">
-                    <span class="flex min-w-0 items-center justify-between gap-3">
-                      <span class="truncate text-admin-body font-bold text-admin-text-1">
-                        {{ item.title }}
-                      </span>
-                      <span class="shrink-0 text-admin-caption font-bold text-admin-text-3">
-                        {{ item.metric || item.actionLabel }}
-                      </span>
-                    </span>
-                    <span class="mt-1 block text-admin-meta leading-5 text-admin-text-2">
-                      {{ item.summary }}
-                    </span>
-                    <span class="mt-1.5 block text-admin-caption font-bold text-admin-text-3">
-                      {{ item.actionLabel }}
-                    </span>
-                  </span>
-                </button>
-              </div>
-
-              <div v-else class="px-5 py-8 text-center">
-                <div class="text-admin-content font-bold text-admin-title-color">运行正常</div>
-                <div class="mt-1.5 text-admin-meta text-admin-subtitle-color">当前没有活跃异常</div>
-              </div>
-            </div>
-          </Popover>
-        </div>
-      </header>
-
-      <section :class="contentClass">
-        <router-view />
-      </section>
-    </main>
-
-    <Popover
-      ref="userMenuRef"
-      :pt="userMenuPt"
-      @show="userMenuOpen = true"
-      @hide="userMenuOpen = false"
-    >
-      <div class="flex min-w-[190px] flex-col p-1.5 select-none" role="menu">
-        <div class="flex items-center gap-2.5 px-3 py-2">
-          <div
-            class="flex size-7.5 shrink-0 items-center justify-center rounded-lg bg-admin-surface-muted text-admin-caption font-black text-admin-accent border border-admin-border-soft"
-          >
-            {{ (userStore.user?.display_name || 'A').substring(0, 1).toUpperCase() }}
-          </div>
-          <div class="flex min-w-0 flex-col">
-            <span class="truncate text-xs font-bold text-admin-title-color">
-              {{ userStore.user?.display_name || 'Administrator' }}
-            </span>
-            <span class="truncate text-[11px] font-medium text-admin-text-3 font-mono">
-              {{ userStore.user?.role === 'admin' ? '系统管理员' : 'Administrator' }}
-            </span>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          role="menuitem"
-          class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-admin-text-2 hover:bg-admin-surface-hover hover:text-admin-title-color transition-colors cursor-pointer"
-          @click="handleUserAction('boards')"
-        >
-          <ViewGrid class="size-4 text-admin-text-3" />
-          <span>返回画布</span>
-        </button>
-
-        <button
-          type="button"
-          role="menuitem"
-          class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-admin-text-2 hover:bg-admin-danger-soft hover:text-admin-danger transition-colors cursor-pointer"
-          @click="handleUserAction('logout')"
-        >
-          <LogOut class="size-4" />
-          <span>退出登录</span>
-        </button>
-      </div>
-    </Popover>
-    <ConfirmDialog />
-
-    <Drawer
-      v-model:visible="mobileMenuOpen"
-      position="left"
-      :pt="mobileDrawerPt"
-      :show-close-icon="false"
-    >
-      <template #container="{ closeCallback }">
-        <div class="flex h-full flex-col gap-6 bg-admin-control-bg p-[22px]">
-          <div class="flex items-center justify-between">
-            <router-link
-              :class="[brandMarkClass, '!ml-0']"
-              :to="ADMIN_DEFAULT_PATH"
-              :aria-label="brandAriaLabel"
-              @click="closeCallback"
+              class="flex size-10 shrink-0 items-center justify-center transition-transform duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] group-hover:scale-105"
             >
               <SiteBrandLogo
                 :src="logoURL"
                 :fallback-text="fallbackText"
                 :class="brandMarkClasses.logo"
               />
-            </router-link>
-            <Button
-              :class="shellButtonClass"
-              type="button"
-              text
-              rounded
-              aria-label="关闭导航"
-              @click="closeCallback"
+            </span>
+            <span
+              class="shrink-0 truncate pl-1.5 text-lg font-bold tracking-tight text-admin-title-color transition-[opacity,transform]"
+              :class="[
+                effectiveCollapsed
+                  ? 'pointer-events-none opacity-0 -translate-x-3 duration-[var(--motion-exit-duration)] ease-[var(--motion-exit-easing)]'
+                  : 'opacity-100 translate-x-0 delay-75 duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)]',
+              ]"
             >
-              <template #icon>
-                <Xmark :class="shellIconClass" />
-              </template>
-            </Button>
-          </div>
+              {{ projectName || 'IdeaBoard' }}
+            </span>
+          </router-link>
+        </div>
 
-          <nav class="flex flex-col items-stretch gap-2" aria-label="后台功能">
+        <nav
+          class="flex min-h-0 flex-1 flex-col gap-1.5 overflow-x-hidden overflow-y-auto p-2"
+          aria-label="后台功能"
+        >
+          <div
+            v-for="(group, groupIndex) in adminNavigationGroups"
+            :key="group.title"
+            class="flex flex-col gap-1"
+          >
+            <div class="flex flex-col">
+              <Transition
+                enter-active-class="transition-[grid-template-rows,opacity] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)]"
+                enter-from-class="grid-rows-[0fr] opacity-0"
+                enter-to-class="grid-rows-[1fr] opacity-100"
+                leave-active-class="transition-[grid-template-rows,opacity] duration-[var(--motion-exit-duration)] ease-[var(--motion-exit-easing)]"
+                leave-from-class="grid-rows-[1fr] opacity-100"
+                leave-to-class="grid-rows-[0fr] opacity-0"
+              >
+                <div v-if="groupIndex > 0 && effectiveCollapsed" class="grid">
+                  <div class="min-h-0 overflow-hidden">
+                    <div class="mx-2 my-1 h-px bg-admin-border-soft" aria-hidden="true" />
+                  </div>
+                </div>
+              </Transition>
+
+              <Transition
+                enter-active-class="transition-[grid-template-rows,opacity,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)]"
+                enter-from-class="grid-rows-[0fr] opacity-0 -translate-x-3 -translate-y-2 scale-95"
+                enter-to-class="grid-rows-[1fr] opacity-100 translate-x-0 translate-y-0 scale-100"
+                leave-active-class="transition-[grid-template-rows,opacity,transform] duration-[var(--motion-exit-duration)] ease-[var(--motion-exit-easing)]"
+                leave-from-class="grid-rows-[1fr] opacity-100 translate-x-0 translate-y-0 scale-100"
+                leave-to-class="grid-rows-[0fr] opacity-0 -translate-x-3 -translate-y-2 scale-95"
+              >
+                <div v-if="!effectiveCollapsed" class="grid origin-top-left">
+                  <div class="min-h-0 overflow-hidden">
+                    <div
+                      class="px-3 pt-2 pb-1 text-xs font-semibold tracking-wider text-admin-text-3 select-none whitespace-nowrap"
+                    >
+                      {{ group.title }}
+                    </div>
+                  </div>
+                </div>
+              </Transition>
+            </div>
+
             <router-link
-              v-for="item in adminNavigationItems"
+              v-for="item in itemsOfGroup(group)"
               :key="item.key"
               :to="item.path"
+              :title="effectiveCollapsed ? `${group.title} · ${item.label}` : item.label"
+              :aria-label="item.label"
               :aria-current="activeKey === item.key ? 'page' : undefined"
-              :class="[
-                mobileNavButtonClass,
-                activeKey === item.key ? mobileNavButtonActiveClass : mobileNavButtonIdleClass,
-              ]"
-              @click="closeCallback"
+              class="group flex h-10 w-full items-center overflow-hidden rounded-xl text-sm font-medium whitespace-nowrap text-admin-title-color transition-colors hover:bg-admin-surface-muted active:scale-[0.98]"
+              @click="drawerOpen = false"
             >
-              <component :is="item.icon" :class="navIconClassFor(activeKey === item.key)" />
-              <span>{{ item.label }}</span>
+              <span class="flex size-10 shrink-0 items-center justify-center">
+                <component
+                  :is="item.icon"
+                  :class="[
+                    navIconSizeClass,
+                    'text-admin-text-2 transition-transform group-hover:scale-110',
+                    activeKey === item.key && 'text-admin-accent scale-105 font-bold',
+                  ]"
+                />
+              </span>
+              <span
+                class="shrink-0 pl-1 origin-top-left transition-[opacity,transform]"
+                :class="[
+                  effectiveCollapsed
+                    ? 'pointer-events-none opacity-0 -translate-x-3 -translate-y-1.5 scale-95 duration-[var(--motion-exit-duration)] ease-[var(--motion-exit-easing)]'
+                    : 'opacity-100 translate-x-0 translate-y-0 scale-100 delay-75 duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)]',
+                ]"
+              >
+                {{ item.label }}
+              </span>
             </router-link>
-          </nav>
+          </div>
+        </nav>
+      </div>
+
+      <div
+        class="hidden h-14 shrink-0 items-center border-t border-admin-border px-2 lg:flex"
+        @mouseenter="handleBottomMouseEnter"
+        @focusin="handleBottomMouseEnter"
+      >
+        <button
+          type="button"
+          :aria-label="isCollapsed ? '展开并固定侧边栏' : '折叠侧边栏'"
+          :title="isCollapsed ? '展开并固定侧边栏' : '折叠侧边栏'"
+          class="group flex size-10 items-center justify-center rounded-xl text-admin-text-2 transition hover:bg-admin-surface-muted hover:text-admin-title-color active:scale-95 cursor-pointer"
+          @click="toggleCollapsed"
+        >
+          <SidebarCollapseIcon
+            class="size-[18px] transition-transform"
+            :class="isCollapsed ? 'rotate-180' : 'rotate-0'"
+          />
+        </button>
+      </div>
+    </aside>
+
+    <div class="flex min-h-screen min-w-0 flex-1 flex-col">
+      <!-- 顶栏组：一级主顶栏 + 二级导航栏统一常驻吸顶 -->
+      <div class="sticky top-0 z-30 flex shrink-0 flex-col bg-admin-bg">
+        <header
+          class="flex h-14 shrink-0 items-center justify-between border-b border-admin-border px-4 sm:px-6 lg:px-8"
+        >
+          <div class="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              aria-label="切换导航菜单"
+              class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-admin-border text-admin-text-1 transition-colors hover:bg-admin-surface-muted lg:hidden"
+              @click="drawerOpen = !drawerOpen"
+            >
+              <MenuIcon v-if="!drawerOpen" class="size-5" />
+              <Xmark v-else class="size-5" />
+            </button>
+
+            <button
+              type="button"
+              title="回到顶部"
+              class="hidden min-w-0 items-center gap-2 text-left transition lg:flex"
+              :class="
+                stickyTitleVisible
+                  ? 'translate-y-0 opacity-100'
+                  : 'pointer-events-none -translate-y-1 opacity-0'
+              "
+              @click="scrollToTop"
+            >
+              <component
+                :is="activeItem.icon"
+                :class="[navIconSizeClass, 'shrink-0 text-admin-text-2']"
+                aria-hidden="true"
+              />
+              <span class="truncate text-base font-semibold text-admin-title-color">
+                {{ dynamicTitle || currentMeta.title }}
+              </span>
+            </button>
+          </div>
+
+          <div class="flex shrink-0 items-center gap-2">
+            <PopoverRoot>
+              <PopoverTrigger as-child>
+                <button
+                  title="异常雷达"
+                  type="button"
+                  :class="[notificationButtonClass, 'cursor-pointer']"
+                  :aria-label="hasAnomalies ? `异常雷达，${anomalyCount} 项活跃异常` : '异常雷达'"
+                  aria-haspopup="dialog"
+                >
+                  <BellIcon :class="shellIconClass" />
+                  <span
+                    v-if="hasAnomalies"
+                    class="absolute top-[7px] right-[7px] size-2.5 rounded-full bg-admin-danger ring-2 ring-white"
+                    aria-hidden="true"
+                  ></span>
+                </button>
+              </PopoverTrigger>
+              <PopoverPortal>
+                <PopoverContent
+                  class="z-50 w-[340px] max-w-[calc(100vw_-_28px)] rounded-xl border border-admin-border bg-admin-card-strong p-0 text-admin-text-1 shadow-lg outline-none overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2"
+                  :side-offset="8"
+                  align="end"
+                >
+                  <div :class="adminAnomalyPopoverClass">
+                    <div
+                      class="flex items-start justify-between gap-4 border-b border-admin-border px-4 py-3.5"
+                    >
+                      <div class="min-w-0">
+                        <div class="text-admin-content font-bold text-admin-title-color">
+                          异常雷达
+                        </div>
+                      </div>
+                      <AdminBadge
+                        :value="hasAnomalies ? `${anomalyCount} 项` : '正常'"
+                        :severity="hasAnomalies ? 'danger' : 'success'"
+                        rounded
+                      />
+                    </div>
+
+                    <div
+                      v-if="hasAnomalies"
+                      class="app-scrollbar min-h-0 flex-1 overflow-y-auto p-2"
+                    >
+                      <button
+                        v-for="item in anomalies"
+                        :key="item.id"
+                        type="button"
+                        class="flex w-full min-w-0 cursor-pointer gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-admin-surface-muted"
+                        @click="handleAnomalySelect(item)"
+                      >
+                        <span
+                          class="mt-[7px] size-2 shrink-0 rounded-full bg-admin-danger"
+                          aria-hidden="true"
+                        ></span>
+                        <span class="min-w-0 flex-1">
+                          <span class="flex min-w-0 items-center justify-between gap-3">
+                            <span class="truncate text-admin-body font-bold text-admin-text-1">
+                              {{ item.title }}
+                            </span>
+                            <span class="shrink-0 text-admin-caption font-bold text-admin-text-3">
+                              {{ item.metric || item.actionLabel }}
+                            </span>
+                          </span>
+                          <span class="mt-1 block text-admin-meta leading-5 text-admin-text-2">
+                            {{ item.summary }}
+                          </span>
+                          <span class="mt-1.5 block text-admin-caption font-bold text-admin-text-3">
+                            {{ item.actionLabel }}
+                          </span>
+                        </span>
+                      </button>
+                    </div>
+
+                    <div v-else class="px-5 py-8 text-center">
+                      <div class="text-admin-content font-bold text-admin-title-color">
+                        运行正常
+                      </div>
+                      <div class="mt-1.5 text-admin-meta text-admin-subtitle-color">
+                        当前没有活跃异常
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </PopoverPortal>
+            </PopoverRoot>
+
+            <PopoverRoot v-model:open="userMenuOpen">
+              <PopoverTrigger as-child>
+                <button
+                  title="账户菜单"
+                  type="button"
+                  :class="userAvatarButtonClass"
+                  aria-label="账户菜单"
+                  aria-haspopup="menu"
+                  :aria-expanded="userMenuOpen"
+                >
+                  <img
+                    v-if="userStore.user?.avatar"
+                    :src="userStore.user.avatar"
+                    :class="userAvatarImageClass"
+                    alt="用户头像"
+                  />
+                  <span v-else :class="userAvatarPlaceholderClass" aria-hidden="true">
+                    <UserIcon :class="userAvatarIconClass" />
+                  </span>
+                </button>
+              </PopoverTrigger>
+              <PopoverPortal>
+                <PopoverContent
+                  class="z-50 min-w-[200px] rounded-xl border border-admin-border bg-admin-card-strong p-1.5 text-admin-text-1 shadow-lg outline-none select-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=right]:slide-in-from-left-2"
+                  :side-offset="8"
+                  side="bottom"
+                  align="end"
+                >
+                  <div class="flex flex-col" role="menu">
+                    <div
+                      class="flex items-center gap-2.5 px-3 py-2 border-b border-admin-border-soft mb-1"
+                    >
+                      <div
+                        class="flex size-7.5 shrink-0 items-center justify-center rounded-lg bg-admin-surface-muted text-admin-caption font-black text-admin-accent border border-admin-border-soft"
+                      >
+                        {{ (userStore.user?.display_name || 'A').substring(0, 1).toUpperCase() }}
+                      </div>
+                      <div class="flex min-w-0 flex-col">
+                        <span class="truncate text-xs font-bold text-admin-title-color">
+                          {{ userStore.user?.display_name || 'Administrator' }}
+                        </span>
+                        <span class="truncate text-[11px] font-medium text-admin-text-3 font-mono">
+                          {{ userStore.user?.role === 'admin' ? '系统管理员' : 'Administrator' }}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-admin-text-2 hover:bg-admin-surface-hover hover:text-admin-title-color transition-colors cursor-pointer"
+                      @click="handleUserAction('boards')"
+                    >
+                      <ViewGrid class="size-4 text-admin-text-3" />
+                      <span>返回画布</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-admin-text-2 hover:bg-admin-danger-soft hover:text-admin-danger transition-colors cursor-pointer"
+                      @click="handleUserAction('logout')"
+                    >
+                      <LogOut class="size-4" />
+                      <span>退出登录</span>
+                    </button>
+                  </div>
+                </PopoverContent>
+              </PopoverPortal>
+            </PopoverRoot>
+          </div>
+        </header>
+        <!-- 二级子导航栏（插槽/Teleport 挂载区：有子页面时挂载，无子页面时 empty:hidden 高度折叠） -->
+        <div id="admin-sub-header" class="border-b border-admin-border empty:hidden"></div>
+      </div>
+
+      <!-- 纯净的主内容容器：统一 pt-6 pb-8 标准留白 -->
+      <main
+        class="mx-auto flex w-full min-w-0 max-w-[1600px] flex-1 flex-col px-4 pt-6 pb-8 sm:px-6 lg:px-8"
+      >
+        <!-- hidePageHeader 路由（如积分运营自带吸顶标题块）：v-show 保留 DOM，
+             顶栏滚动标题照常从 h1 取词 -->
+        <div
+          v-show="!hidePageHeader"
+          class="mb-6 flex shrink-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div class="min-w-0">
+            <h1 class="m-0 text-2xl font-bold tracking-wide text-admin-title-color">
+              {{ currentMeta.title }}
+            </h1>
+            <p class="mt-1 text-sm text-admin-subtitle-color">
+              {{ currentMeta.subtitle }}
+            </p>
+          </div>
+          <div
+            id="admin-header-actions"
+            class="flex shrink-0 items-center gap-2 empty:hidden"
+          ></div>
         </div>
-      </template>
-    </Drawer>
+        <router-view />
+      </main>
+    </div>
+
+    <AdminConfirmDialog />
   </div>
 </template>
 
@@ -262,64 +400,102 @@
 import { useUserStore } from '../../auth/session/userSession'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import Button from 'primevue/button'
-import ConfirmDialog from 'primevue/confirmdialog'
-import Drawer from 'primevue/drawer'
-import Popover from 'primevue/popover'
-import Tag from 'primevue/tag'
-import Tooltip from 'primevue/tooltip'
-import { usePrimeVue } from 'primevue/config'
+import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
+import AdminConfirmDialog from '../shared/components/AdminConfirmDialog.vue'
+import AdminBadge from '../shared/components/AdminBadge.vue'
 import {
-  Bell as BellIcon,
+  BellNotificationSolid as BellIcon,
   LogOut,
   Menu as MenuIcon,
+  SidebarCollapse as SidebarCollapseIcon,
   User as UserIcon,
   ViewGrid,
   Xmark,
 } from '@iconoir/vue'
 import {
   adminNavigationByKey,
-  adminNavigationItems,
+  adminNavigationGroups,
   ADMIN_DEFAULT_PATH,
-  ADMIN_LOGIN_PATH,
   findAdminNavigationItemByPath,
   resolveAdminPageTitle,
+  type AdminNavigationGroup,
+  type AdminNavigationItem,
 } from './navigation'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
-import { USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
+import {
+  ADMIN_CREDITS_PATH,
+  ADMIN_LOGIN_PATH,
+  ADMIN_SETTINGS_PATH,
+  USER_BOARDS_PATH,
+  isPathUnderRoute,
+} from '../../../shared/constants/routePaths'
 import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
-import { brandMarkClasses, createBrandMarkClass } from '../../../shared/lib/brandMark'
+import { brandMarkClasses } from '../../../shared/lib/brandMark'
 import { useAnomalyRadar } from '../shared/composables/useAnomalyRadar'
 import { useAdminToast } from '../shared/lib/toast'
 import { useBrandLogoOverrides } from '../shared/logos/useBrandLogoOverrides'
 import type { AdminAnomalyItem } from '../shared/lib/anomalyRules'
-import { createAdminPopoverPt } from '../shared/lib/overlayPt'
 import { adminAnomalyPopoverClass } from '../shared/lib/uiClasses'
-import { getActiveUserPrimeLocale } from '../../../shared/i18n'
-import { ideaBoardAdminPrimeLocale } from './primeLocale'
 
-const vTooltip = Tooltip
 const toast = useAdminToast()
-
-type PrimePopupMenu = {
-  toggle: (event: Event) => void
-}
-
-type PrimePopupPanel = PrimePopupMenu & {
-  hide?: () => void
-}
 
 const router = useRouter()
 const route = useRoute()
-const primeVue = usePrimeVue()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 
-const mobileMenuOpen = ref(false)
+const drawerOpen = ref(false)
 const userMenuOpen = ref(false)
-const userMenuRef = ref<PrimePopupPanel | null>(null)
-const anomalyRadarPopoverRef = ref<PrimePopupPanel | null>(null)
+const isCollapsed = ref(false)
+const isHovered = ref(false)
+let hoverLeaveTimer: ReturnType<typeof setTimeout> | null = null
+let hoverEnterTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearHoverTimers() {
+  if (hoverLeaveTimer) {
+    clearTimeout(hoverLeaveTimer)
+    hoverLeaveTimer = null
+  }
+  if (hoverEnterTimer) {
+    clearTimeout(hoverEnterTimer)
+    hoverEnterTimer = null
+  }
+}
+
+function handleNavMouseEnter() {
+  clearHoverTimers()
+  if (!isCollapsed.value) return
+  hoverEnterTimer = setTimeout(() => {
+    isHovered.value = true
+    hoverEnterTimer = null
+  }, 150)
+}
+
+function handleNavMouseLeave() {
+  clearHoverTimers()
+  if (!isHovered.value) return
+  hoverLeaveTimer = setTimeout(() => {
+    isHovered.value = false
+    hoverLeaveTimer = null
+  }, 120)
+}
+
+function handleBottomMouseEnter() {
+  clearHoverTimers()
+  isHovered.value = false
+}
+
+const effectiveCollapsed = computed(() => isCollapsed.value && !isHovered.value)
+const showStickyTitle = ref(false)
+const dynamicTitle = ref('')
+// 积分运营与系统设置等二级导航聚合页常驻顶栏标题（不随滚动显隐，其它页保持滚动行为）。
+const pinStickyTitle = computed(
+  () =>
+    isPathUnderRoute(route.path, ADMIN_CREDITS_PATH) ||
+    isPathUnderRoute(route.path, ADMIN_SETTINGS_PATH),
+)
+const stickyTitleVisible = computed(() => pinStickyTitle.value || showStickyTitle.value)
 const isLoginRoute = computed(() => route.path === ADMIN_LOGIN_PATH)
 const isAdminShellRoute = computed(() => !isLoginRoute.value)
 const isAnomalyRadarEnabled = computed(() => isAdminShellRoute.value)
@@ -329,90 +505,21 @@ const { anomalies, anomalyCount, hasAnomalies } = useAnomalyRadar({
 const { fallbackText, logoURL, projectName } = useSiteBranding({
   enabled: isAdminShellRoute,
 })
-const adminBrandLogoOverridesQuery = useBrandLogoOverrides(isAdminShellRoute)
+useBrandLogoOverrides(isAdminShellRoute)
 const brandAriaLabel = computed(() => `${projectName.value} Admin`)
 
-// PrimeVue has one app-level locale. Admin deliberately retains its established Chinese date UI.
-primeVue.config.locale = ideaBoardAdminPrimeLocale
+const userAvatarButtonClass =
+  'relative flex size-9 items-center justify-center rounded-lg text-admin-text-3 transition-colors hover:bg-admin-surface-muted cursor-pointer'
+const userAvatarImageClass = 'size-6 rounded-full object-cover'
+const userAvatarPlaceholderClass = 'flex size-full items-center justify-center text-admin-text-3'
+const userAvatarIconClass = 'size-4'
 
-const layoutShellClass =
-  'grid min-h-screen grid-cols-[133px_minmax(0,1fr)] bg-ib-surface text-ib-text max-[1080px]:grid-cols-1'
-const siderClass =
-  "sticky top-0 flex h-screen self-start flex-col items-start bg-ib-surface py-[42px] max-[1080px]:hidden before:absolute before:top-[21px] before:bottom-[21px] before:left-[21px] before:box-border before:w-[84px] before:rounded-[var(--radius-ib-overlay)] before:bg-admin-control-bg before:content-['']"
-const railButtonSizeClass = '!size-10 !min-w-[40px]'
-const brandMarkClass = computed(() =>
-  createBrandMarkClass(
-    brandMarkClasses.sizes.compact,
-    logoURL.value ? brandMarkClasses.states.image : brandMarkClasses.states.fallbackStrong,
-    'relative z-[1] ml-[42px] focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]',
-  ),
-)
-const navRailClass =
-  'relative z-[1] ml-[21px] flex w-[84px] flex-1 flex-col items-center gap-3 pt-3.5'
-const siderBottomClass = 'relative z-[1] ml-[21px] flex w-[84px] flex-col items-center gap-3'
-const focusRingClass = 'focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]'
-const railButtonClass = [
-  '!ib-motion-control-colors !inline-flex !items-center !justify-center !rounded-[var(--radius-ib-control)] !border !border-transparent !text-ib-text-muted !no-underline !shadow-none',
-  railButtonSizeClass,
-  focusRingClass,
-].join(' ')
-const railButtonIdleClass = '!bg-transparent hover:!bg-ib-surface-hover hover:!text-ib-text'
-const railButtonActiveClass =
-  '!bg-ib-accent-pressed !text-ib-text-inverse !shadow-[0_8px_18px_rgba(0,0,0,0.15)]'
-const userAvatarButtonClass = 'ib-round-control ib-user-avatar-button admin-user-avatar-button'
-const userAvatarImageClass = 'ib-user-avatar-button__image'
-const userAvatarPlaceholderClass = 'ib-user-avatar-button__placeholder'
-const userAvatarIconClass = 'size-[17px]'
-const shellButtonSkinClass = [
-  '!ib-motion-control-colors !size-[42px] !items-center !justify-center !rounded-[9px] !text-ib-text-muted',
-  'hover:!border-ib-border hover:!bg-ib-surface-hover hover:!text-ib-text',
-  focusRingClass,
-].join(' ')
-const shellButtonClass = [
-  '!inline-flex !bg-transparent !border !border-transparent !shadow-none',
-  shellButtonSkinClass,
-].join(' ')
-const mobileMenuButtonClass = [
-  '!hidden max-[1080px]:!inline-flex !bg-ib-surface !border !border-ib-border !shadow-none',
-  shellButtonSkinClass,
-].join(' ')
-const notificationButtonClass = [
-  '!inline-flex !bg-ib-surface !border !border-ib-border !shadow-[var(--shadow-ib-control)]',
-  shellButtonSkinClass,
-  'relative',
-].join(' ')
-const navIconIdleClass = 'size-[17px]'
-const navIconActiveClass = 'size-[17px] !text-ib-text-inverse'
-const shellIconClass = 'size-[19px]'
-const mainClass = 'flex min-h-screen min-w-0 flex-col overflow-visible bg-ib-surface'
-const headerClass =
-  'flex min-h-[88px] items-start justify-between gap-6 bg-ib-surface py-[21px] pr-[42px] pl-0 max-[1080px]:min-h-[92px] max-[1080px]:items-center max-[1080px]:px-[22px] max-[1080px]:pt-[22px] max-[1080px]:pb-4 max-[720px]:gap-3 max-[720px]:px-[14px] max-[720px]:pt-4 max-[720px]:pb-3'
-const contentClass =
-  'min-h-0 flex-1 overflow-visible bg-ib-surface pr-[42px] pb-[38px] max-[1080px]:px-[22px] max-[1080px]:pb-7 max-[720px]:px-[14px] max-[720px]:pb-5'
-const mobileNavButtonClass = [
-  'ib-motion-control-colors flex min-h-12 w-full items-center justify-start gap-3 rounded-xl border border-transparent px-4 text-sm font-bold no-underline',
-  focusRingClass,
-].join(' ')
-const mobileNavButtonIdleClass =
-  'bg-transparent text-ib-text-muted hover:border-ib-border hover:bg-ib-surface hover:text-ib-text'
-const mobileNavButtonActiveClass = 'bg-ib-accent-pressed text-ib-text-inverse'
-const userMenuPt = createAdminPopoverPt({ contentClass: '!p-0' })
-const anomalyRadarPopoverPt = createAdminPopoverPt({
-  rootClass: '!max-h-[calc(100dvh-24px)] !overflow-hidden',
-  contentClass: '!max-h-[calc(100dvh-24px)] !overflow-hidden !p-0',
-})
-const mobileDrawerPt = {
-  root: {
-    class: '!w-[min(320px,calc(100vw-32px))] !border-0 !bg-admin-control-bg',
-  },
-} as const
+// Nav, topbar and avatar glyphs share one size token.
+const navIconSizeClass = 'size-4'
+const shellIconClass = navIconSizeClass
 
-watch(
-  () => route.path,
-  () => {
-    mobileMenuOpen.value = false
-  },
-)
+const notificationButtonClass =
+  'relative flex size-9 items-center justify-center rounded-lg text-admin-text-3 transition-colors hover:bg-admin-surface-muted'
 
 const activeItem = computed(() => {
   return findAdminNavigationItemByPath(route.path) || adminNavigationByKey.statistics
@@ -427,51 +534,120 @@ const currentMeta = computed(() => {
   }
 })
 
-function navIconClassFor(isActive: boolean) {
-  return isActive ? navIconActiveClass : navIconIdleClass
+// 子路由可经 meta.hidePageHeader 藏起本标题块（如自带吸顶标题的聚合页）。
+const hidePageHeader = computed(() => route.matched.some((record) => record.meta.hidePageHeader))
+
+function itemsOfGroup(group: AdminNavigationGroup): AdminNavigationItem[] {
+  return group.keys
+    .map((key) => adminNavigationByKey[key])
+    .filter((item): item is AdminNavigationItem => Boolean(item))
 }
 
-function toggleUserMenu(event: Event) {
-  userMenuOpen.value = !userMenuOpen.value
-  userMenuRef.value?.toggle(event)
-}
-
-function toggleAnomalyRadar(event: Event) {
-  anomalyRadarPopoverRef.value?.toggle(event)
-}
-
-function handleAnomalySelect(item: AdminAnomalyItem) {
-  anomalyRadarPopoverRef.value?.hide?.()
-  void router.push(item.route)
-}
-
-async function handleUserAction(key: 'boards' | 'logout') {
-  userMenuRef.value?.hide?.()
-  if (key === 'logout') {
-    await logoutAndRedirect(ADMIN_LOGIN_PATH)
-  } else {
-    await router.push(USER_BOARDS_PATH)
+function toggleCollapsed() {
+  clearHoverTimers()
+  isHovered.value = false
+  isCollapsed.value = !isCollapsed.value
+  try {
+    localStorage.setItem('admin_sidebar_collapsed', String(isCollapsed.value))
+  } catch {
+    // ignore private-mode storage failures
   }
 }
 
-function setAdminRouteClass(enabled: boolean) {
-  document.documentElement.classList.toggle('admin-route', enabled)
-  document.body.classList.toggle('admin-route', enabled)
+function scrollToTop() {
+  if (typeof window !== 'undefined') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 }
 
-watch(
-  () => adminBrandLogoOverridesQuery.error.value,
-  (error) => {
-    if (error) toast.warning('读取品牌 Logo 配置失败')
-  },
-)
+function updateStickyTitle() {
+  if (typeof window === 'undefined') return
+  if (window.scrollY <= 10) {
+    showStickyTitle.value = false
+    return
+  }
+  showStickyTitle.value = true
+  if (typeof document === 'undefined') return
+  const heading = document.querySelector('main h1')
+  const text = heading?.textContent?.replace(/\s+/g, ' ').trim()
+  dynamicTitle.value = text || ''
+}
+
+function handleUserAction(action: 'boards' | 'logout') {
+  userMenuOpen.value = false
+  if (action === 'boards') {
+    void router.push(USER_BOARDS_PATH)
+    return
+  }
+  void logoutAndRedirect(ADMIN_LOGIN_PATH, { replace: true })
+}
+
+function handleAnomalySelect(item: AdminAnomalyItem) {
+  if (route.path === item.route) {
+    toast.info(`已在当前页面：${item.title}`)
+    return
+  }
+  void router.push(item.route)
+}
+
+function handleKeyDown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && drawerOpen.value) {
+    drawerOpen.value = false
+  }
+}
+
+const siderRef = ref<HTMLElement | null>(null)
+
+function handleSiderFocusOut(event: FocusEvent) {
+  const next = event.relatedTarget
+  if (next instanceof HTMLElement && siderRef.value?.contains(next)) return
+  clearHoverTimers()
+  isHovered.value = false
+}
+
+let scrollTicking = false
+function handleScroll() {
+  if (scrollTicking) return
+  scrollTicking = true
+  requestAnimationFrame(() => {
+    updateStickyTitle()
+    scrollTicking = false
+  })
+}
 
 onMounted(() => {
-  setAdminRouteClass(true)
+  try {
+    const saved = localStorage.getItem('admin_sidebar_collapsed')
+    if (saved !== null) isCollapsed.value = saved === 'true'
+  } catch {
+    // ignore private-mode storage failures
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    window.addEventListener('resize', handleScroll, { passive: true })
+    window.addEventListener('keydown', handleKeyDown)
+  }
+  updateStickyTitle()
 })
 
 onUnmounted(() => {
-  setAdminRouteClass(false)
-  primeVue.config.locale = getActiveUserPrimeLocale()
+  clearHoverTimers()
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('scroll', handleScroll)
+    window.removeEventListener('resize', handleScroll)
+    window.removeEventListener('keydown', handleKeyDown)
+  }
 })
+
+watch(
+  () => route.path,
+  () => {
+    clearHoverTimers()
+    isHovered.value = false
+    drawerOpen.value = false
+    userMenuOpen.value = false
+    showStickyTitle.value = false
+    dynamicTitle.value = ''
+  },
+)
 </script>

@@ -14,20 +14,34 @@ import type {
   UseQueryReturnType,
 } from '@tanstack/vue-query'
 
-import { toValue, unref } from 'vue'
+import { computed, toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
+  ApiResponseBase,
   ApiResponseBrandingSetting,
+  ApiResponseDetectedGatewayModels,
+  ApiResponseGatewayConfigSummary,
+  ApiResponseGatewayConnectionTest,
+  ApiResponseGatewayModelCatalog,
+  ApiResponseGatewayModelMappings,
+  ApiResponseGatewayProviderOptions,
+  ApiResponseGatewayRoutePreview,
   ApiResponseMediaUploadSetting,
   ApiResponseOutboundPolicySetting,
   ApiResponseRateLimitSetting,
   ApiResponseRegistrationSetting,
   BrandingSetting,
+  DetectAdminGatewayModelsParams,
   MediaUploadSetting,
   OutboundPolicyUpdateRequest,
+  PreviewGatewayRouteRequest,
   RateLimitSetting,
+  SaveGatewayModelCatalogRequest,
+  SaveGatewayModelMappingRequest,
+  TestGatewayConnectionRequest,
   UpdateAdminRegistrationSettingBody,
+  UpdateGatewayConfigRequest,
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
@@ -810,6 +824,857 @@ export function useUpdateAdminOutboundPolicy<
     outboundPolicyUpdateRequest,
     options,
   )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetAdminAIGatewayConfigUrl = () => {
+  return `/admin/settings/ai-gateway`
+}
+
+export const getAdminAIGatewayConfig = async (
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseGatewayConfigSummary> => {
+  return orvalMutator<ApiResponseGatewayConfigSummary>(getGetAdminAIGatewayConfigUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetAdminAIGatewayConfigQueryKey = () => {
+  return ['admin', 'settings', 'ai-gateway'] as const
+}
+
+export const getGetAdminAIGatewayConfigQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminAIGatewayConfig>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getAdminAIGatewayConfig>>, TError, TData>
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminAIGatewayConfigQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminAIGatewayConfig>>> = ({
+    signal,
+  }) => getAdminAIGatewayConfig({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminAIGatewayConfig>>,
+    TError,
+    TData
+  >
+}
+
+export type GetAdminAIGatewayConfigQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminAIGatewayConfig>>
+>
+export type GetAdminAIGatewayConfigQueryError = ErrorType<unknown>
+
+export function useGetAdminAIGatewayConfig<
+  TData = Awaited<ReturnType<typeof getAdminAIGatewayConfig>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminAIGatewayConfig>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminAIGatewayConfigQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getUpdateAdminAIGatewayConfigUrl = () => {
+  return `/admin/settings/ai-gateway`
+}
+
+export const updateAdminAIGatewayConfig = async (
+  updateGatewayConfigRequest: UpdateGatewayConfigRequest,
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseBase> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
+  return orvalMutator<ApiResponseBase>(getUpdateAdminAIGatewayConfigUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateGatewayConfigRequest),
+  })
+}
+
+export const getUpdateAdminAIGatewayConfigQueryKey = (
+  updateGatewayConfigRequest?: MaybeRefOrGetter<UpdateGatewayConfigRequest>,
+) => {
+  return ['PUT', 'admin', 'settings', 'ai-gateway', updateGatewayConfigRequest] as const
+}
+
+export const getUpdateAdminAIGatewayConfigQueryOptions = <
+  TData = Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>,
+  TError = ErrorType<unknown>,
+>(
+  updateGatewayConfigRequest: MaybeRefOrGetter<UpdateGatewayConfigRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getUpdateAdminAIGatewayConfigQueryKey(updateGatewayConfigRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>> = ({
+    signal,
+  }) =>
+    updateAdminAIGatewayConfig(toValue(updateGatewayConfigRequest), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>,
+    TError,
+    TData
+  >
+}
+
+export type UpdateAdminAIGatewayConfigQueryResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>
+>
+export type UpdateAdminAIGatewayConfigQueryError = ErrorType<unknown>
+
+export function useUpdateAdminAIGatewayConfig<
+  TData = Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>,
+  TError = ErrorType<unknown>,
+>(
+  updateGatewayConfigRequest: MaybeRefOrGetter<UpdateGatewayConfigRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getUpdateAdminAIGatewayConfigQueryOptions(
+    updateGatewayConfigRequest,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getListAdminGatewayModelMappingsUrl = () => {
+  return `/admin/settings/ai-gateway/models`
+}
+
+export const listAdminGatewayModelMappings = async (
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseGatewayModelMappings> => {
+  return orvalMutator<ApiResponseGatewayModelMappings>(getListAdminGatewayModelMappingsUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getListAdminGatewayModelMappingsQueryKey = () => {
+  return ['admin', 'settings', 'ai-gateway', 'models'] as const
+}
+
+export const getListAdminGatewayModelMappingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminGatewayModelMappings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listAdminGatewayModelMappings>>, TError, TData>
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListAdminGatewayModelMappingsQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminGatewayModelMappings>>> = ({
+    signal,
+  }) => listAdminGatewayModelMappings({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminGatewayModelMappings>>,
+    TError,
+    TData
+  >
+}
+
+export type ListAdminGatewayModelMappingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminGatewayModelMappings>>
+>
+export type ListAdminGatewayModelMappingsQueryError = ErrorType<unknown>
+
+export function useListAdminGatewayModelMappings<
+  TData = Awaited<ReturnType<typeof listAdminGatewayModelMappings>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listAdminGatewayModelMappings>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListAdminGatewayModelMappingsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getSaveAdminGatewayModelMappingUrl = (feature: string) => {
+  return `/admin/settings/ai-gateway/models/${encodeURIComponent(String(feature))}`
+}
+
+export const saveAdminGatewayModelMapping = async (
+  feature: string,
+  saveGatewayModelMappingRequest: SaveGatewayModelMappingRequest,
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseBase> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
+  return orvalMutator<ApiResponseBase>(getSaveAdminGatewayModelMappingUrl(feature), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(saveGatewayModelMappingRequest),
+  })
+}
+
+export const getSaveAdminGatewayModelMappingQueryKey = (
+  feature: MaybeRefOrGetter<string>,
+  saveGatewayModelMappingRequest?: MaybeRefOrGetter<SaveGatewayModelMappingRequest>,
+) => {
+  return [
+    'PUT',
+    'admin',
+    'settings',
+    'ai-gateway',
+    'models',
+    feature,
+    saveGatewayModelMappingRequest,
+  ] as const
+}
+
+export const getSaveAdminGatewayModelMappingQueryOptions = <
+  TData = Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>,
+  TError = ErrorType<unknown>,
+>(
+  feature: MaybeRefOrGetter<string>,
+  saveGatewayModelMappingRequest: MaybeRefOrGetter<SaveGatewayModelMappingRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getSaveAdminGatewayModelMappingQueryKey(feature, saveGatewayModelMappingRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>> = ({
+    signal,
+  }) =>
+    saveAdminGatewayModelMapping(toValue(feature), toValue(saveGatewayModelMappingRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(feature) !== null && toValue(feature) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>, TError, TData>
+}
+
+export type SaveAdminGatewayModelMappingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>
+>
+export type SaveAdminGatewayModelMappingQueryError = ErrorType<unknown>
+
+export function useSaveAdminGatewayModelMapping<
+  TData = Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>,
+  TError = ErrorType<unknown>,
+>(
+  feature: MaybeRefOrGetter<string>,
+  saveGatewayModelMappingRequest: MaybeRefOrGetter<SaveGatewayModelMappingRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getSaveAdminGatewayModelMappingQueryOptions(
+    feature,
+    saveGatewayModelMappingRequest,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getListAdminGatewayModelCatalogUrl = () => {
+  return `/admin/settings/ai-gateway/catalog`
+}
+
+export const listAdminGatewayModelCatalog = async (
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseGatewayModelCatalog> => {
+  return orvalMutator<ApiResponseGatewayModelCatalog>(getListAdminGatewayModelCatalogUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getListAdminGatewayModelCatalogQueryKey = () => {
+  return ['admin', 'settings', 'ai-gateway', 'catalog'] as const
+}
+
+export const getListAdminGatewayModelCatalogQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminGatewayModelCatalog>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listAdminGatewayModelCatalog>>, TError, TData>
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListAdminGatewayModelCatalogQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminGatewayModelCatalog>>> = ({
+    signal,
+  }) => listAdminGatewayModelCatalog({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminGatewayModelCatalog>>,
+    TError,
+    TData
+  >
+}
+
+export type ListAdminGatewayModelCatalogQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminGatewayModelCatalog>>
+>
+export type ListAdminGatewayModelCatalogQueryError = ErrorType<unknown>
+
+export function useListAdminGatewayModelCatalog<
+  TData = Awaited<ReturnType<typeof listAdminGatewayModelCatalog>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listAdminGatewayModelCatalog>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListAdminGatewayModelCatalogQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getSaveAdminGatewayModelCatalogUrl = () => {
+  return `/admin/settings/ai-gateway/catalog`
+}
+
+export const saveAdminGatewayModelCatalog = async (
+  saveGatewayModelCatalogRequest: SaveGatewayModelCatalogRequest,
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseBase> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
+  return orvalMutator<ApiResponseBase>(getSaveAdminGatewayModelCatalogUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(saveGatewayModelCatalogRequest),
+  })
+}
+
+export const getSaveAdminGatewayModelCatalogQueryKey = (
+  saveGatewayModelCatalogRequest?: MaybeRefOrGetter<SaveGatewayModelCatalogRequest>,
+) => {
+  return [
+    'PUT',
+    'admin',
+    'settings',
+    'ai-gateway',
+    'catalog',
+    saveGatewayModelCatalogRequest,
+  ] as const
+}
+
+export const getSaveAdminGatewayModelCatalogQueryOptions = <
+  TData = Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>,
+  TError = ErrorType<unknown>,
+>(
+  saveGatewayModelCatalogRequest: MaybeRefOrGetter<SaveGatewayModelCatalogRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getSaveAdminGatewayModelCatalogQueryKey(saveGatewayModelCatalogRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>> = ({
+    signal,
+  }) =>
+    saveAdminGatewayModelCatalog(toValue(saveGatewayModelCatalogRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>,
+    TError,
+    TData
+  >
+}
+
+export type SaveAdminGatewayModelCatalogQueryResult = NonNullable<
+  Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>
+>
+export type SaveAdminGatewayModelCatalogQueryError = ErrorType<unknown>
+
+export function useSaveAdminGatewayModelCatalog<
+  TData = Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>,
+  TError = ErrorType<unknown>,
+>(
+  saveGatewayModelCatalogRequest: MaybeRefOrGetter<SaveGatewayModelCatalogRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getSaveAdminGatewayModelCatalogQueryOptions(
+    saveGatewayModelCatalogRequest,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getPreviewAdminGatewayRouteUrl = () => {
+  return `/admin/settings/ai-gateway/route-preview`
+}
+
+export const previewAdminGatewayRoute = async (
+  previewGatewayRouteRequest: PreviewGatewayRouteRequest,
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseGatewayRoutePreview> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
+  return orvalMutator<ApiResponseGatewayRoutePreview>(getPreviewAdminGatewayRouteUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(previewGatewayRouteRequest),
+  })
+}
+
+export const getPreviewAdminGatewayRouteQueryKey = (
+  previewGatewayRouteRequest?: MaybeRefOrGetter<PreviewGatewayRouteRequest>,
+) => {
+  return [
+    'POST',
+    'admin',
+    'settings',
+    'ai-gateway',
+    'route-preview',
+    previewGatewayRouteRequest,
+  ] as const
+}
+
+export const getPreviewAdminGatewayRouteQueryOptions = <
+  TData = Awaited<ReturnType<typeof previewAdminGatewayRoute>>,
+  TError = ErrorType<unknown>,
+>(
+  previewGatewayRouteRequest: MaybeRefOrGetter<PreviewGatewayRouteRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof previewAdminGatewayRoute>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getPreviewAdminGatewayRouteQueryKey(previewGatewayRouteRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof previewAdminGatewayRoute>>> = ({
+    signal,
+  }) => previewAdminGatewayRoute(toValue(previewGatewayRouteRequest), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof previewAdminGatewayRoute>>,
+    TError,
+    TData
+  >
+}
+
+export type PreviewAdminGatewayRouteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof previewAdminGatewayRoute>>
+>
+export type PreviewAdminGatewayRouteQueryError = ErrorType<unknown>
+
+export function usePreviewAdminGatewayRoute<
+  TData = Awaited<ReturnType<typeof previewAdminGatewayRoute>>,
+  TError = ErrorType<unknown>,
+>(
+  previewGatewayRouteRequest: MaybeRefOrGetter<PreviewGatewayRouteRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof previewAdminGatewayRoute>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getPreviewAdminGatewayRouteQueryOptions(previewGatewayRouteRequest, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getTestAdminGatewayConnectionUrl = () => {
+  return `/admin/settings/ai-gateway/test-connection`
+}
+
+export const testAdminGatewayConnection = async (
+  testGatewayConnectionRequest: TestGatewayConnectionRequest,
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseGatewayConnectionTest> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Array.isArray(h)) return Object.fromEntries(h)
+    return h
+  }
+  return orvalMutator<ApiResponseGatewayConnectionTest>(getTestAdminGatewayConnectionUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(testGatewayConnectionRequest),
+  })
+}
+
+export const getTestAdminGatewayConnectionQueryKey = (
+  testGatewayConnectionRequest?: MaybeRefOrGetter<TestGatewayConnectionRequest>,
+) => {
+  return [
+    'POST',
+    'admin',
+    'settings',
+    'ai-gateway',
+    'test-connection',
+    testGatewayConnectionRequest,
+  ] as const
+}
+
+export const getTestAdminGatewayConnectionQueryOptions = <
+  TData = Awaited<ReturnType<typeof testAdminGatewayConnection>>,
+  TError = ErrorType<unknown>,
+>(
+  testGatewayConnectionRequest: MaybeRefOrGetter<TestGatewayConnectionRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof testAdminGatewayConnection>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getTestAdminGatewayConnectionQueryKey(testGatewayConnectionRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof testAdminGatewayConnection>>> = ({
+    signal,
+  }) =>
+    testAdminGatewayConnection(toValue(testGatewayConnectionRequest), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof testAdminGatewayConnection>>,
+    TError,
+    TData
+  >
+}
+
+export type TestAdminGatewayConnectionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof testAdminGatewayConnection>>
+>
+export type TestAdminGatewayConnectionQueryError = ErrorType<unknown>
+
+export function useTestAdminGatewayConnection<
+  TData = Awaited<ReturnType<typeof testAdminGatewayConnection>>,
+  TError = ErrorType<unknown>,
+>(
+  testGatewayConnectionRequest: MaybeRefOrGetter<TestGatewayConnectionRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof testAdminGatewayConnection>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getTestAdminGatewayConnectionQueryOptions(
+    testGatewayConnectionRequest,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getDetectAdminGatewayModelsUrl = (params?: DetectAdminGatewayModelsParams) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/admin/settings/ai-gateway/detect-models?${stringifiedParams}`
+    : `/admin/settings/ai-gateway/detect-models`
+}
+
+export const detectAdminGatewayModels = async (
+  params?: DetectAdminGatewayModelsParams,
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseDetectedGatewayModels> => {
+  return orvalMutator<ApiResponseDetectedGatewayModels>(getDetectAdminGatewayModelsUrl(params), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getDetectAdminGatewayModelsQueryKey = (
+  params?: MaybeRefOrGetter<DetectAdminGatewayModelsParams>,
+) => {
+  return ['admin', 'settings', 'ai-gateway', 'detect-models', ...(params ? [params] : [])] as const
+}
+
+export const getDetectAdminGatewayModelsQueryOptions = <
+  TData = Awaited<ReturnType<typeof detectAdminGatewayModels>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: MaybeRefOrGetter<DetectAdminGatewayModelsParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof detectAdminGatewayModels>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getDetectAdminGatewayModelsQueryKey(params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof detectAdminGatewayModels>>> = ({
+    signal,
+  }) => detectAdminGatewayModels(toValue(params), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof detectAdminGatewayModels>>,
+    TError,
+    TData
+  >
+}
+
+export type DetectAdminGatewayModelsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof detectAdminGatewayModels>>
+>
+export type DetectAdminGatewayModelsQueryError = ErrorType<unknown>
+
+export function useDetectAdminGatewayModels<
+  TData = Awaited<ReturnType<typeof detectAdminGatewayModels>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: MaybeRefOrGetter<DetectAdminGatewayModelsParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof detectAdminGatewayModels>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getDetectAdminGatewayModelsQueryOptions(params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getListAdminGatewayProvidersUrl = () => {
+  return `/admin/settings/ai-gateway/providers`
+}
+
+export const listAdminGatewayProviders = async (
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseGatewayProviderOptions> => {
+  return orvalMutator<ApiResponseGatewayProviderOptions>(getListAdminGatewayProvidersUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getListAdminGatewayProvidersQueryKey = () => {
+  return ['admin', 'settings', 'ai-gateway', 'providers'] as const
+}
+
+export const getListAdminGatewayProvidersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminGatewayProviders>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listAdminGatewayProviders>>, TError, TData>
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListAdminGatewayProvidersQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminGatewayProviders>>> = ({
+    signal,
+  }) => listAdminGatewayProviders({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminGatewayProviders>>,
+    TError,
+    TData
+  >
+}
+
+export type ListAdminGatewayProvidersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminGatewayProviders>>
+>
+export type ListAdminGatewayProvidersQueryError = ErrorType<unknown>
+
+export function useListAdminGatewayProviders<
+  TData = Awaited<ReturnType<typeof listAdminGatewayProviders>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listAdminGatewayProviders>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListAdminGatewayProvidersQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

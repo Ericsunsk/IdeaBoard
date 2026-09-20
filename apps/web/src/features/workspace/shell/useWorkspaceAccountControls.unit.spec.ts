@@ -56,14 +56,12 @@ function renderAccountControls(options: Parameters<typeof useWorkspaceAccountCon
   let overlay: AccountOverlay | undefined
   let authOverlay: AuthOverlay | undefined
   // The consumer must be a descendant because Vue does not expose a component's own provides to it.
-  // eslint-disable-next-line vue/one-component-per-file
   const Consumer = defineComponent({
     setup() {
       controls = useWorkspaceAccountControls(options)
       return () => h('div')
     },
   })
-  // eslint-disable-next-line vue/one-component-per-file
   const Harness = defineComponent({
     setup() {
       overlay = createAccountOverlay({

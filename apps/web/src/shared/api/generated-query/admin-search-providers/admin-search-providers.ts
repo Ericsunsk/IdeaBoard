@@ -98,12 +98,12 @@ export function useListAdminSearchProviders<
   return query
 }
 
-export const getUpdateAdminSearchProviderUrl = (provider: 'unsplash' | 'pexels' | 'vision') => {
+export const getUpdateAdminSearchProviderUrl = (provider: 'unsplash' | 'pexels') => {
   return `/admin/search/providers/${encodeURIComponent(String(provider))}`
 }
 
 export const updateAdminSearchProvider = async (
-  provider: 'unsplash' | 'pexels' | 'vision',
+  provider: 'unsplash' | 'pexels',
   updateSearchProviderRequest: UpdateSearchProviderRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseEmpty> => {
@@ -124,7 +124,7 @@ export const updateAdminSearchProvider = async (
 }
 
 export const getUpdateAdminSearchProviderQueryKey = (
-  provider: MaybeRefOrGetter<'unsplash' | 'pexels' | 'vision'>,
+  provider: MaybeRefOrGetter<'unsplash' | 'pexels'>,
   updateSearchProviderRequest?: MaybeRefOrGetter<UpdateSearchProviderRequest>,
 ) => {
   return ['PUT', 'admin', 'search', 'providers', provider, updateSearchProviderRequest] as const
@@ -134,7 +134,7 @@ export const getUpdateAdminSearchProviderQueryOptions = <
   TData = Awaited<ReturnType<typeof updateAdminSearchProvider>>,
   TError = ErrorType<unknown>,
 >(
-  provider: MaybeRefOrGetter<'unsplash' | 'pexels' | 'vision'>,
+  provider: MaybeRefOrGetter<'unsplash' | 'pexels'>,
   updateSearchProviderRequest: MaybeRefOrGetter<UpdateSearchProviderRequest>,
   options?: {
     query?: Partial<
@@ -172,7 +172,7 @@ export function useUpdateAdminSearchProvider<
   TData = Awaited<ReturnType<typeof updateAdminSearchProvider>>,
   TError = ErrorType<unknown>,
 >(
-  provider: MaybeRefOrGetter<'unsplash' | 'pexels' | 'vision'>,
+  provider: MaybeRefOrGetter<'unsplash' | 'pexels'>,
   updateSearchProviderRequest: MaybeRefOrGetter<UpdateSearchProviderRequest>,
   options?: {
     query?: Partial<
@@ -197,12 +197,12 @@ export function useUpdateAdminSearchProvider<
   return query
 }
 
-export const getTestAdminSearchProviderUrl = (provider: 'unsplash' | 'pexels' | 'vision') => {
+export const getTestAdminSearchProviderUrl = (provider: 'unsplash' | 'pexels') => {
   return `/admin/search/providers/${encodeURIComponent(String(provider))}/test`
 }
 
 export const testAdminSearchProvider = async (
-  provider: 'unsplash' | 'pexels' | 'vision',
+  provider: 'unsplash' | 'pexels',
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseSearchProviderTest> => {
   return orvalMutator<ApiResponseSearchProviderTest>(getTestAdminSearchProviderUrl(provider), {
@@ -212,7 +212,7 @@ export const testAdminSearchProvider = async (
 }
 
 export const getTestAdminSearchProviderQueryKey = (
-  provider: MaybeRefOrGetter<'unsplash' | 'pexels' | 'vision'>,
+  provider: MaybeRefOrGetter<'unsplash' | 'pexels'>,
 ) => {
   return ['POST', 'admin', 'search', 'providers', provider, 'test'] as const
 }
@@ -221,7 +221,7 @@ export const getTestAdminSearchProviderQueryOptions = <
   TData = Awaited<ReturnType<typeof testAdminSearchProvider>>,
   TError = ErrorType<unknown>,
 >(
-  provider: MaybeRefOrGetter<'unsplash' | 'pexels' | 'vision'>,
+  provider: MaybeRefOrGetter<'unsplash' | 'pexels'>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof testAdminSearchProvider>>, TError, TData>
@@ -254,7 +254,7 @@ export function useTestAdminSearchProvider<
   TData = Awaited<ReturnType<typeof testAdminSearchProvider>>,
   TError = ErrorType<unknown>,
 >(
-  provider: MaybeRefOrGetter<'unsplash' | 'pexels' | 'vision'>,
+  provider: MaybeRefOrGetter<'unsplash' | 'pexels'>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof testAdminSearchProvider>>, TError, TData>

@@ -1,0 +1,32 @@
+<template>
+  <TabsTrigger
+    :value="value"
+    :disabled="disabled"
+    v-bind="$attrs"
+    :class="
+      cn(
+        'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1 text-admin-caption font-medium text-admin-text-2 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-accent focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 hover:text-admin-text-1 data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-admin-text-1 data-[state=active]:shadow-xs',
+        props.class,
+      )
+    "
+  >
+    <slot />
+  </TabsTrigger>
+</template>
+
+<script setup lang="ts">
+import { type HTMLAttributes } from 'vue'
+import { TabsTrigger } from 'reka-ui'
+import { cn } from '../lib/classNames'
+
+const props = defineProps<{
+  value: string
+  disabled?: boolean
+  class?: HTMLAttributes['class']
+}>()
+
+defineOptions({
+  inheritAttrs: false,
+})
+
+</script>

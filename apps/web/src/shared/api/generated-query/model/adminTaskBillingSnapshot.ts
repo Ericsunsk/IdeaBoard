@@ -32,6 +32,11 @@ export interface AdminTaskBillingSnapshot {
    * @maximum 9000000000000000
    */
   total_credits: number
+  /**
+   * @minimum 0
+   * @maximum 9000000000000000
+   */
+  captured_credits: number
   quoted_at: string
   settlement_state: AdminTaskBillingSnapshotSettlementState
   /** @nullable */

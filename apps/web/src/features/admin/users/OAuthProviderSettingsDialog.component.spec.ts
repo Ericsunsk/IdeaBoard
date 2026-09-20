@@ -1,6 +1,4 @@
-import PrimeVue from 'primevue/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { adminPrimeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen, waitFor, within } from '../../../test/render'
 import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
 
@@ -36,7 +34,7 @@ function renderDialog() {
   return renderWithUser(OAuthProviderSettingsDialog, {
     props: { visible: true, resource },
     global: {
-      plugins: [[PrimeVue, adminPrimeVueTestOptions]],
+      plugins: [],
       stubs: { transition: false },
     },
   })

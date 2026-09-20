@@ -96,9 +96,9 @@
                 </button>
               </div>
 
-              <InputText
+              <input
                 v-model="draftQuery"
-                unstyled
+                type="text"
                 class="min-w-0 flex-1 bg-transparent px-1 text-[13.5px] text-board-control-input-text outline-none"
                 :placeholder="
                   references.length > 0
@@ -134,12 +134,13 @@
                 </button>
                 <Button
                   type="submit"
-                  :label="t('search.actions.search')"
                   :loading="visionState === 'extracting'"
                   :disabled="visionState === 'extracting'"
                   :title="searchButtonTitle"
                   class="!h-8 !min-w-[68px] !rounded-full !border-0 !bg-board-primary !px-4 !text-xs !font-bold !text-ib-text-inverse !shadow-none hover:!bg-board-primary-hover cursor-pointer disabled:!cursor-wait disabled:!opacity-60"
-                />
+                >
+                  {{ t('search.actions.search') }}
+                </Button>
               </div>
             </div>
           </form>
@@ -241,10 +242,11 @@
           </p>
           <div class="mt-6">
             <Button
-              :label="t('search.actions.retry')"
               class="!h-9 !rounded-full !border-0 !bg-board-primary !px-5 !text-xs !font-semibold !text-ib-text-inverse hover:!bg-board-primary-hover cursor-pointer shadow-xs"
               @click="reload"
-            />
+            >
+              {{ t('search.actions.retry') }}
+            </Button>
           </div>
         </div>
       </section>
@@ -331,7 +333,7 @@
             :key="`${result.provider}:${result.id}`"
             :style="style"
             draggable="true"
-            class="group relative overflow-hidden rounded-[var(--search-card-radius)] bg-board-control-bg/80 shadow-xs transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-[var(--shadow-ib-panel)] cursor-grab active:cursor-grabbing select-none"
+            class="group relative overflow-hidden rounded-[var(--search-card-radius)] bg-board-control-bg/80 cursor-grab active:cursor-grabbing select-none"
             @dragstart="handleCardDragStart($event, result)"
             @dragend="handleCardDragEnd"
           >
@@ -462,13 +464,13 @@
                 t('common.errors.imageLoadFailed')
               }}</span>
               <Button
-                :label="t('common.actions.retry')"
-                size="small"
-                severity="secondary"
-                outlined
+                variant="outline"
+                size="sm"
                 class="!rounded-full"
                 @click="retryImage(result.id)"
-              />
+              >
+                {{ t('common.actions.retry') }}
+              </Button>
             </div>
           </article>
         </template>
@@ -478,7 +480,7 @@
         <ProgressSpinner
           class="!h-7 !w-7 text-board-primary"
           stroke-width="4"
-          :aria-label="t('search.loadingMore')"
+          :label="t('search.loadingMore')"
         />
       </div>
       <p
@@ -592,9 +594,8 @@ import '../search.css'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
-import ProgressSpinner from 'primevue/progressspinner'
+import { Button } from '@/components/ui/button'
+import { Spinner as ProgressSpinner } from '@/components/ui/spinner'
 import {
   Bookmark,
   BookmarkSolid,

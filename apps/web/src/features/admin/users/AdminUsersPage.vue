@@ -1,261 +1,233 @@
 <template>
-  <AdminTablePanel viewport-height content-class="min-h-0 flex-1 overflow-hidden px-6 pb-6">
-    <template #toolbar>
-      <AdminResourceToolbar>
-        <template #search>
-          <AdminToolbarSearch
-            v-model="searchKeyword"
-            input-label="搜索用户"
-            @enter="loadUsers"
-            @clear="clearSearch"
-          />
-        </template>
-
-        <template #metrics="{ metricClass }">
-          <span :class="metricClass">
-            <span class="h-2.5 w-2.5 rounded-full bg-admin-success"></span>
-            <span>{{ totalUsersLabel }}</span>
-          </span>
-          <Tag :value="`${activeUserCount} 正常`" severity="success" rounded />
-          <Tag
-            v-if="bannedUserCount > 0"
-            :value="`${bannedUserCount} 封禁`"
-            severity="danger"
-            rounded
-          />
-          <Tag :value="`${adminUserCount} 管理员`" severity="info" rounded />
-          <Tag v-if="selectedUsers.length > 0" :value="`已选 ${selectedUsers.length}`" rounded />
-        </template>
-
-        <template #filters>
-          <Button
-            v-tooltip.top="'OAuth Provider 设置'"
-            text
-            :class="adminFramedIconButtonClass"
-            aria-label="OAuth Provider 设置"
-            aria-haspopup="dialog"
-            @click="oauthSettingsVisible = true"
-          >
-            <template #icon>
-              <Settings class="size-4 text-admin-text-2" />
-            </template>
-          </Button>
-          <AdminFilterPopover
-            :active="hasUserFilter"
-            filter-label="筛选用户"
-            @reset="resetUserFilters"
-          >
-            <label
-              class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
-            >
-              <span>角色</span>
-              <Select
-                v-model="userRoleFilter"
-                :options="userRoleFilterOptions"
-                option-label="label"
-                option-value="value"
-                size="small"
-                fluid
-              />
-            </label>
-
-            <label
-              class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
-            >
-              <span>状态</span>
-              <Select
-                v-model="userStatusFilter"
-                :options="userStatusFilterOptions"
-                option-label="label"
-                option-value="value"
-                size="small"
-                fluid
-              />
-            </label>
-          </AdminFilterPopover>
-        </template>
-
-        <template #actions="{ iconButtonClass }">
-          <Button text :class="iconButtonClass" aria-label="刷新用户" @click="loadUsers">
-            <template #icon>
-              <Refresh class="size-4 text-admin-text-2" />
-            </template>
-          </Button>
-        </template>
-
-        <template #pager>
-          <AdminPagerControls
-            :current-page="currentPage"
-            :total-pages="totalPages"
-            :prev-disabled="!canPrevious"
-            :next-disabled="!canNext"
-            @prev="previous"
-            @next="next"
-          />
-        </template>
-      </AdminResourceToolbar>
+  <AdminCollectionPageShell
+    :current-page="currentPage"
+    :total-pages="totalPages"
+    :prev-disabled="!canPrevious"
+    :next-disabled="!canNext"
+    @prev="previous"
+    @next="next"
+  >
+    <template #toolbar-start>
+      <AdminToolbarSearch
+        v-model="searchKeyword"
+        input-label="搜索用户"
+        placeholder="搜索用户姓名、邮箱、IP..."
+        class="w-full sm:w-80"
+        @enter="loadUsers"
+        @clear="clearSearch"
+      />
     </template>
 
-    <DataTableFrame
-      v-model:selection="selectedUsers"
-      :value="users"
-      :loading="loading"
-      data-key="publicId"
-      lazy
-      scrollable
-      scroll-height="flex"
-      frame-class="h-full min-h-0"
-      :table-style="{ minWidth: '1300px' }"
-    >
-      <Column selection-mode="multiple" style="width: 3rem" />
+    <template #toolbar-end>
+      <AdminButton
+        title="OAuth Provider 设置"
+        variant="ghost"
+        size="sm"
+        :class="adminFramedIconButtonClass"
+        aria-label="OAuth Provider 设置"
+        aria-haspopup="dialog"
+        @click="oauthSettingsVisible = true"
+      >
+        <Settings class="size-4 text-admin-text-2" />
+      </AdminButton>
 
-      <Column field="displayName" header="用户" :style="{ minWidth: '260px' }">
-        <template #body="{ data: user }">
-          <div class="flex min-w-0 items-center gap-3">
-            <div class="relative shrink-0">
-              <Avatar
-                v-if="user.avatarUrl"
-                :image="user.avatarUrl"
-                shape="circle"
-                :style="{ width: '36px', height: '36px' }"
-              />
-              <Avatar
+      <AdminFilterPopover
+        :active="hasUserFilter"
+        filter-label="筛选用户"
+        @reset="resetUserFilters"
+      >
+        <label
+          class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+        >
+          <span>角色</span>
+          <AdminSelect
+            v-model="userRoleFilter"
+            :options="userRoleFilterOptions"
+            option-label="label"
+            option-value="value"
+            size="small"
+          />
+        </label>
+
+        <label
+          class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+        >
+          <span>状态</span>
+          <AdminSelect
+            v-model="userStatusFilter"
+            :options="userStatusFilterOptions"
+            option-label="label"
+            option-value="value"
+            size="small"
+          />
+        </label>
+      </AdminFilterPopover>
+
+      <AdminButton
+        variant="ghost"
+        :class="adminFramedIconButtonClass"
+        aria-label="刷新用户"
+        :loading="loading"
+        @click="loadUsers"
+      >
+        <Refresh class="size-4 text-admin-text-2" />
+      </AdminButton>
+    </template>
+
+    <AdminTable
+        :value="users"
+        :loading="loading"
+        data-key="publicId"
+        scrollable
+        :frame-class="adminTableFrameClass"
+        :table-style="adminTableStyle"
+        :class="adminTableClass"
+      >
+        <template #empty>
+          <AdminEmptyState :title="emptyUserMessage" />
+        </template>
+
+        <!-- 用户列：头像 + 姓名 -->
+        <AdminColumn field="displayName" header="用户" :style="{ minWidth: '240px' }">
+          <template #body="{ data: user }">
+            <div class="flex items-center gap-2.5 font-sans">
+              <div class="relative shrink-0">
+                <img
+                  v-if="user.avatarUrl"
+                  :src="user.avatarUrl"
+                  :alt="user.displayName"
+                  class="size-9 rounded-full object-cover"
+                />
+                <div
+                  v-else
+                  class="flex size-9 items-center justify-center rounded-full bg-admin-surface-muted font-bold text-admin-accent"
+                >
+                  {{ user.initial }}
+                </div>
+                <span
+                  class="absolute top-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-admin-card-strong"
+                  :class="user.isActive ? 'bg-admin-success' : 'bg-admin-danger'"
+                />
+              </div>
+              <span class="truncate font-medium text-admin-text-1">
+                {{ user.displayName }}
+              </span>
+            </div>
+          </template>
+        </AdminColumn>
+
+        <!-- Email 列：登录渠道图标 + 邮箱 -->
+        <AdminColumn field="email" header="Email" :style="{ minWidth: '240px' }">
+          <template #body="{ data: user }">
+            <div class="flex min-w-0 items-center gap-2 font-mono text-xs text-admin-text-1">
+              <span
+                v-for="provider in user.providers"
+                :key="provider"
+                :title="getAuthProviderLabel(provider)"
+                class="flex size-5 shrink-0 items-center justify-center text-admin-text-3"
+                role="img"
+                :aria-label="getAuthProviderLabel(provider)"
+              >
+                <Mail v-if="provider === 'email'" class="size-4" aria-hidden="true" />
+                <Google v-else-if="provider === 'google'" class="size-4" aria-hidden="true" />
+                <Discord v-else-if="provider === 'discord'" class="size-4" aria-hidden="true" />
+                <span v-else class="text-[10px] font-bold uppercase" aria-hidden="true">
+                  {{ provider.slice(0, 1) }}
+                </span>
+              </span>
+              <span class="truncate text-admin-text-2">{{ user.email || '-' }}</span>
+            </div>
+          </template>
+        </AdminColumn>
+
+        <!-- IP 列：国旗 + IP 地址 -->
+        <AdminColumn field="lastLoginIP" header="IP" :style="{ minWidth: '180px' }">
+          <template #body="{ data: user }">
+            <div class="flex min-w-0 items-center gap-1.5 font-mono text-xs text-admin-text-1">
+              <span
+                v-if="getCountryFlag(user.lastLoginCountry)"
+                :title="getCountryLabel(user.lastLoginCountry)"
+                class="shrink-0 text-sm leading-none"
+                role="img"
+                :aria-label="getCountryLabel(user.lastLoginCountry)"
+              >
+                {{ getCountryFlag(user.lastLoginCountry) }}
+              </span>
+              <Globe
                 v-else
-                :label="user.initial"
-                shape="circle"
-                :style="{
-                  width: '36px',
-                  height: '36px',
-                  backgroundColor: 'var(--color-admin-surface-muted)',
-                  color: 'var(--color-admin-accent)',
-                  fontWeight: 700,
-                }"
+                :title="getCountryLabel(user.lastLoginCountry)"
+                class="size-3.5 shrink-0 text-admin-text-3"
+                role="img"
+                :aria-label="getCountryLabel(user.lastLoginCountry)"
               />
               <span
-                class="absolute top-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-admin-card-strong"
-                :class="user.isActive ? 'bg-admin-success' : 'bg-admin-danger'"
-              />
-            </div>
-            <div class="min-w-0">
-              <div class="truncate text-admin-content font-bold text-admin-text-1">
-                {{ user.displayName }}
-              </div>
-            </div>
-          </div>
-        </template>
-      </Column>
-
-      <Column field="email" header="Email" :style="{ minWidth: '260px' }">
-        <template #body="{ data: user }">
-          <div class="flex min-w-0 items-center gap-2">
-            <span
-              v-for="provider in user.providers"
-              :key="provider"
-              v-tooltip.top="getAuthProviderLabel(provider)"
-              class="flex size-5 shrink-0 items-center justify-center text-admin-text-3"
-              role="img"
-              :aria-label="getAuthProviderLabel(provider)"
-            >
-              <Mail v-if="provider === 'email'" class="size-4" aria-hidden="true" />
-              <Google v-else-if="provider === 'google'" class="size-4" aria-hidden="true" />
-              <Discord v-else-if="provider === 'discord'" class="size-4" aria-hidden="true" />
-              <span v-else class="text-[10px] font-bold uppercase" aria-hidden="true">
-                {{ provider.slice(0, 1) }}
+                class="whitespace-nowrap text-admin-text-2"
+                :title="user.lastLoginIP || undefined"
+              >
+                {{ user.lastLoginIP || '-' }}
               </span>
-            </span>
-            <span class="truncate text-admin-body text-admin-text-2">{{ user.email || '-' }}</span>
-          </div>
-        </template>
-      </Column>
+            </div>
+          </template>
+        </AdminColumn>
 
-      <Column field="lastLoginIP" header="IP" :style="{ minWidth: '190px' }">
-        <template #body="{ data: user }">
-          <div class="flex min-w-0 items-center gap-2">
-            <span
-              v-if="getCountryFlag(user.lastLoginCountry)"
-              v-tooltip.top="getCountryLabel(user.lastLoginCountry)"
-              class="shrink-0 text-base leading-none"
-              role="img"
-              :aria-label="getCountryLabel(user.lastLoginCountry)"
+        <!-- 角色列：语义化 Badge 徽标 -->
+        <AdminColumn field="role" header="角色" :style="{ width: '105px' }">
+          <template #body="{ data: user }">
+            <AdminBadge :value="user.roleLabel" :severity="user.roleSeverity" rounded />
+          </template>
+        </AdminColumn>
+
+        <!-- 加入时间列：等宽字体日期 -->
+        <AdminColumn field="createdDateLabel" header="加入时间" :style="{ width: '130px' }">
+          <template #body="{ data: user }">
+            <span class="whitespace-nowrap font-mono text-xs text-admin-text-1">
+              {{ user.createdDateLabel }}
+            </span>
+          </template>
+        </AdminColumn>
+
+        <!-- 状态列：语义化 Badge 状态 -->
+        <AdminColumn field="status" header="状态" :style="{ width: '105px' }">
+          <template #body="{ data: user }">
+            <AdminBadge :value="user.statusLabel" :severity="user.statusSeverity" rounded />
+          </template>
+        </AdminColumn>
+
+        <!-- 账户余额列：可交互打开钱包详情 -->
+        <AdminColumn field="availableCredits" header="账户余额" :style="{ width: '140px' }">
+          <template #body="{ data: user }">
+            <button
+              type="button"
+              class="font-mono text-xs font-semibold text-admin-text-1 hover:text-admin-accent cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-accent/20 rounded"
+              aria-haspopup="dialog"
+              :aria-label="`打开 ${user.displayName} 的账户详情`"
+              @click="openWalletDialog(user)"
             >
-              {{ getCountryFlag(user.lastLoginCountry) }}
-            </span>
-            <Globe
-              v-else
-              v-tooltip.top="getCountryLabel(user.lastLoginCountry)"
-              class="size-4 shrink-0 text-admin-text-3"
-              role="img"
-              :aria-label="getCountryLabel(user.lastLoginCountry)"
-            />
-            <span
-              class="whitespace-nowrap font-mono text-admin-body text-admin-text-2"
-              :title="user.lastLoginIP || undefined"
-            >
-              {{ user.lastLoginIP || '-' }}
-            </span>
-          </div>
-        </template>
-      </Column>
+              {{ user.availableCreditsLabel }}
+            </button>
+          </template>
+        </AdminColumn>
 
-      <Column field="role" header="角色" :style="{ width: '124px' }">
-        <template #body="{ data: user }">
-          <Tag :value="user.roleLabel" :severity="user.roleSeverity" rounded />
-        </template>
-      </Column>
+        <!-- 更多操作列 (1:1 对齐事件表第 8 列 More) -->
+        <AdminColumn header="More" :style="{ width: '64px' }">
+          <template #body="{ data: user }">
+            <div class="flex items-center justify-start">
+              <button
+                type="button"
+                :class="adminTableRowActionButtonClass"
+                aria-haspopup="dialog"
+                :aria-label="`${user.displayName} 操作菜单`"
+                @click="toggleUserActionMenu($event, user)"
+              >
+                <MoreHoriz class="size-4" />
+              </button>
+            </div>
+          </template>
+        </AdminColumn>
+      </AdminTable>
 
-      <Column field="createdDateLabel" header="加入时间" :style="{ width: '136px' }">
-        <template #body="{ data: user }">
-          <span class="whitespace-nowrap font-mono text-admin-body text-admin-text-2">
-            {{ user.createdDateLabel }}
-          </span>
-        </template>
-      </Column>
-
-      <Column field="status" header="状态" :style="{ width: '112px' }">
-        <template #body="{ data: user }">
-          <Tag :value="user.statusLabel" :severity="user.statusSeverity" rounded />
-        </template>
-      </Column>
-
-      <Column field="availableCredits" header="账户余额" :style="{ width: '148px' }">
-        <template #body="{ data: user }">
-          <Button
-            text
-            size="small"
-            severity="secondary"
-            class="!-ml-2 !justify-start !px-2 font-mono !font-[760]"
-            aria-haspopup="dialog"
-            :aria-label="`打开 ${user.displayName} 的账户详情`"
-            @click="openWalletDialog(user)"
-          >
-            {{ user.availableCreditsLabel }}
-          </Button>
-        </template>
-      </Column>
-
-      <Column header="更多" :style="{ width: '72px' }">
-        <template #body="{ data: user }">
-          <Button
-            text
-            size="small"
-            severity="secondary"
-            :class="adminFramedIconButtonClass"
-            aria-haspopup="dialog"
-            :aria-label="`${user.displayName} 操作菜单`"
-            @click="toggleUserActionMenu($event, user)"
-          >
-            <template #icon>
-              <Search class="size-4 text-admin-text-2" />
-            </template>
-          </Button>
-        </template>
-      </Column>
-
-      <template #empty>
-        <AdminEmptyState :title="emptyUserMessage" />
-      </template>
-    </DataTableFrame>
-  </AdminTablePanel>
+      <template #footer-label>共 {{ totalUsersLabel }}</template>
+  </AdminCollectionPageShell>
 
   <AdminRowActionsPopover
     ref="userActionPopoverRef"
@@ -287,42 +259,50 @@
 </template>
 
 <script setup lang="ts">
-import { Discord, Globe, Google, Mail, Refresh, Search, Settings } from '@iconoir/vue'
+import {
+  Discord,
+  Globe,
+  Google,
+  Mail,
+  MoreHoriz,
+  Refresh,
+  Settings,
+} from '@iconoir/vue'
 import { computed, ref } from 'vue'
-import Avatar from 'primevue/avatar'
-import Button from 'primevue/button'
-import Column from 'primevue/column'
-import Select from 'primevue/select'
-import Tag from 'primevue/tag'
-import Tooltip from 'primevue/tooltip'
+import AdminBadge from '../shared/components/AdminBadge.vue'
+import AdminButton from '../shared/components/AdminButton.vue'
+import AdminCollectionPageShell from '../shared/components/AdminCollectionPageShell.vue'
+import AdminColumn from '../shared/components/AdminColumn.vue'
 import AdminEmptyState from '../shared/components/AdminEmptyState.vue'
 import AdminFilterPopover from '../shared/components/AdminFilterPopover.vue'
-import AdminPagerControls from '../shared/components/AdminPagerControls.vue'
 import AdminRowActionsPopover from '../shared/components/AdminRowActionsPopover.vue'
-import AdminResourceToolbar from '../shared/components/AdminResourceToolbar.vue'
-import AdminTablePanel from '../shared/components/AdminTablePanel.vue'
+import AdminSelect from '../shared/components/AdminSelect.vue'
+import AdminTable from '../shared/components/AdminTable.vue'
 import AdminToolbarSearch from '../shared/components/AdminToolbarSearch.vue'
 import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
-import DataTableFrame from '../../../shared/components/DataTableFrame.vue'
+import {
+  adminFramedIconButtonClass,
+  adminTableClass,
+  adminTableFrameClass,
+  adminTableRowActionButtonClass,
+  adminTableStyle,
+} from '../shared/lib/uiClasses'
+import { AdminUserWalletDialog } from '../credits/wallets'
 import AdminUserBanDialog from './AdminUserBanDialog.vue'
-import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
-import { AdminUserWalletDialog } from '../credits-billing/wallets'
 import { banDurationOptions } from './commands'
 import { useAdminUsersContext } from './context'
-import { getCountryFlag, getCountryLabel, type AdminUserRowView, type UserActionKey } from './view'
+import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
 import { useUsersFeedback } from './useUsersFeedback'
-import { adminFramedIconButtonClass } from '../shared/lib/uiClasses'
+import { getCountryFlag, getCountryLabel, type AdminUserRowView, type UserActionKey } from './view'
 
-const vTooltip = Tooltip
-
-type PrimePopupPanel = {
+type ActionPopupPanel = {
   toggle: (event: Event) => void
   hide?: () => void
 }
 
 const feedback = useUsersFeedback()
 const adminConfirm = useAdminConfirm()
-const userActionPopoverRef = ref<PrimePopupPanel | null>(null)
+const userActionPopoverRef = ref<ActionPopupPanel | null>(null)
 const walletDialogUser = ref<AdminUserRowView | null>(null)
 const oauthSettingsVisible = ref(false)
 const walletDialogVisible = computed({
@@ -341,13 +321,9 @@ const {
   searchKeyword,
   userRoleFilter,
   userStatusFilter,
-  selectedUsers,
   hasUserFilter,
   users,
   loading,
-  activeUserCount,
-  bannedUserCount,
-  adminUserCount,
   totalUsersLabel,
   emptyUserMessage,
   resetUserFilters,

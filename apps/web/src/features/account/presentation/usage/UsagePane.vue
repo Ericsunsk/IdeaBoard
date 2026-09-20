@@ -23,14 +23,14 @@
     >
       <p class="m-0 font-semibold text-ib-danger">{{ t('account.errors.usageLoadFailed') }}</p>
       <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(error) }}</p>
-      <Button
+      <UiButton
         type="button"
-        text
+        variant="ghost"
         class="!mt-3 !px-0 !font-semibold !text-ib-creative-accent-pressed"
         @click="retry()"
       >
         {{ t('account.reload') }}
-      </Button>
+      </UiButton>
     </section>
 
     <template v-else-if="usage">
@@ -88,14 +88,14 @@
             role="alert"
           >
             <p class="m-0 min-w-0 text-sm text-ib-danger">{{ errorMessage(error) }}</p>
-            <Button
+            <UiButton
               type="button"
-              text
+              variant="ghost"
               class="!shrink-0 !p-0 !text-sm !font-semibold !text-ib-creative-accent-pressed"
               @click="retry()"
             >
               {{ t('account.usage.retryCurrentRange') }}
-            </Button>
+            </UiButton>
           </div>
         </template>
       </template>
@@ -136,7 +136,7 @@
 <script setup lang="ts">
 import { computed, markRaw, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Button from 'primevue/button'
+import { Button as UiButton } from '@/components/ui/button'
 import RangedLineChartCard from '../../../../shared/components/RangedLineChartCard.vue'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
@@ -201,11 +201,11 @@ const metrics = computed(() => {
   void locale.value
   const lifetime = usage.value?.lifetime
   const values = [
-    formatNumber(lifetime?.total_credits ?? 0),
-    formatNumber(lifetime?.peak_daily_credits ?? 0),
-    formatNumber(lifetime?.average_daily_credits ?? 0),
-    formatNumber(lifetime?.task_count ?? 0),
-    formatNumber(lifetime?.active_days ?? 0),
+    formatLocaleNumber(lifetime?.total_credits ?? 0),
+    formatLocaleNumber(lifetime?.peak_daily_credits ?? 0),
+    formatLocaleNumber(lifetime?.average_daily_credits ?? 0),
+    formatLocaleNumber(lifetime?.task_count ?? 0),
+    formatLocaleNumber(lifetime?.active_days ?? 0),
   ]
   return summaryCellDefinitions.value.map((metric, index) => ({ ...metric, value: values[index] }))
 })
@@ -229,10 +229,6 @@ function rangeText(value: UsageRange) {
 
 function rangeDays(value: UsageRange) {
   return rangeOptions.value.find((candidate) => candidate.key === value)?.days ?? 30
-}
-
-function formatNumber(value: number) {
-  return formatLocaleNumber(value)
 }
 
 function errorMessage(value: unknown) {

@@ -1,25 +1,7 @@
-import type { DialogPassThroughOptions } from 'primevue/dialog'
-import { ibDialogMaskPt } from '../../../../shared/theme/dialogMask'
-import { createDialogMotionPt } from '../../../../shared/motion/dialogMotion'
-
-export const accountDialogStyle = {
-  width: 'min(1120px, calc(100vw - 32px))',
-  '--ib-dialog-motion-from-transform': 'translateY(8px) scale(0.99)',
-} as const
-
-export function createAccountDialogPt(): DialogPassThroughOptions {
-  return {
-    ...ibDialogMaskPt,
-    root: {
-      class:
-        '!max-h-[calc(100dvh-32px)] !overflow-hidden !rounded-[var(--radius-ib-overlay)] !border !border-ib-border-soft !bg-white !shadow-[var(--shadow-ib-overlay)] max-[640px]:!max-h-[calc(100dvh-20px)]',
-    },
-    content: {
-      class: '!overflow-hidden !bg-white !p-0',
-    },
-    ...createDialogMotionPt(),
-  }
-}
+// Dialog 内容区 chrome：mask 沿用 Dialog 内置 ibDialogMaskClass，
+// 动画走 reka data-state + Tailwind animate。
+export const accountDialogContentClass =
+  'w-[min(1120px,calc(100vw-32px))] max-w-[min(1120px,calc(100vw-32px))] grid-rows-[minmax(0,1fr)] shadow-[var(--shadow-ib-overlay)] max-[640px]:!max-h-[calc(100dvh-20px)]'
 
 export const accountMainContentClass =
   'relative grid h-[min(78dvh,720px)] min-h-0 grid-cols-[234px_minmax(0,1fr)] overflow-hidden bg-white max-[820px]:h-[calc(100dvh-64px)] max-[820px]:grid-cols-1 max-[820px]:grid-rows-[auto_minmax(0,1fr)]'
@@ -50,8 +32,3 @@ export const accountDataTableFrameClass =
 
 export const accountPrimaryActionButtonClass =
   'inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-ib-control)] border border-transparent bg-ib-creative-accent-hover px-5 text-sm font-semibold text-ib-text-inverse shadow-[var(--shadow-ib-control)] transition-[background-color,color,box-shadow] duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:bg-ib-creative-accent-pressed focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)] disabled:cursor-not-allowed disabled:border-ib-border-soft disabled:bg-ib-surface-disabled disabled:text-ib-text-subtle disabled:shadow-none'
-
-export const accountButtonPt = {
-  label: { class: 'leading-none' },
-  loadingIcon: { class: 'mr-2 size-4 animate-spin' },
-} as const

@@ -25,11 +25,11 @@ _Avoid_: persisted provider URL, tier-less asset ref
 _Avoid_: per-component disabled logic, missing busy semantics
 
 **Theme Contract**:
-PrimeVue PT 与 CSS token 的单源（`shared/theme`）。overlay/dialog/round-control 等样式必须消费 token；contract spec 反向校验 canvas/search/board/library/workspace 的消费。
+标准 UI primitives 与 CSS token 的单源（`src/components/ui` + `shared/theme`）。overlay/dialog/round-control 等样式必须消费 token；contract spec 反向校验 canvas/search/board/library/workspace 的消费。
 _Avoid_: hand-authored overlay CSS, hardcoded motion durations
 
 **Locale Parity**:
-`en` 常驻、`zh` 懒载；`en/zh-CN/es/ko` key 必须一致（`localeParity` 契约）；locale 切换原子更新 i18n + PrimeVue + `<html lang>` + 存储，失败不写存储。
+`en` 常驻、`zh` 懒载；`en/zh-CN/es/ko` key 必须一致（`localeParity` 契约）；locale 切换原子更新 i18n + `<html lang>` + 存储，失败不写存储。
 _Avoid_: partial translation, half-switched locale
 
 ## Module Ownership

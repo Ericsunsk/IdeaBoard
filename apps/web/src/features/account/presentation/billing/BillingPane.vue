@@ -11,26 +11,26 @@
       :empty-title="t('account.billingRecords.emptyTitle')"
       :empty-description="t('account.billingRecords.emptyDescription')"
     >
-      <Column
+      <UiColumn
         field="occurred_at"
         :header="t('account.billingRecords.columnTime')"
         :style="{ width: '190px' }"
       >
         <template #body="{ data }">
-          <Skeleton v-if="isSkeletonRow(data)" data-testid="billing-skeleton-row" width="8rem" />
+          <UiSkeleton v-if="isSkeletonRow(data)" data-testid="billing-skeleton-row" width="8rem" />
           <time v-else class="whitespace-nowrap font-mono text-[13px] text-ib-text-muted">
             {{ formatLocalDateTime(data.occurred_at) }}
           </time>
         </template>
-      </Column>
+      </UiColumn>
 
-      <Column
+      <UiColumn
         field="title"
         :header="t('account.billingRecords.columnDescription')"
         :style="{ minWidth: '220px' }"
       >
         <template #body="{ data }">
-          <Skeleton v-if="isSkeletonRow(data)" width="7rem" />
+          <UiSkeleton v-if="isSkeletonRow(data)" width="7rem" />
           <span
             v-else
             class="block max-w-[320px] truncate font-semibold"
@@ -39,33 +39,33 @@
             {{ recordDescription(data) }}
           </span>
         </template>
-      </Column>
+      </UiColumn>
 
-      <Column
+      <UiColumn
         field="credit_delta"
         :header="t('account.billingRecords.columnCreditChange')"
         :style="{ width: '140px' }"
       >
         <template #body="{ data }">
-          <Skeleton v-if="isSkeletonRow(data)" width="4rem" />
+          <UiSkeleton v-if="isSkeletonRow(data)" width="4rem" />
           <span v-else class="font-mono font-bold" :class="amountTone(data)">
             {{ formatSignedAmount(data.credit_delta) }}
           </span>
         </template>
-      </Column>
+      </UiColumn>
 
-      <Column
+      <UiColumn
         field="available_credits_after"
         :header="t('account.billingRecords.columnBalanceAfter')"
         :style="{ width: '140px' }"
       >
         <template #body="{ data }">
-          <Skeleton v-if="isSkeletonRow(data)" width="5rem" />
+          <UiSkeleton v-if="isSkeletonRow(data)" width="5rem" />
           <span v-else class="font-mono font-semibold text-ib-text-muted">
-            {{ formatAmount(data.available_credits_after) }}
+            {{ formatLocaleNumber(data.available_credits_after) }}
           </span>
         </template>
-      </Column>
+      </UiColumn>
 
       <template #empty>
         <div
@@ -77,14 +77,11 @@
             {{ t('account.billingRecords.loadFailed') }}
           </p>
           <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(initialError) }}</p>
-          <Button
-            :label="t('account.reload')"
-            severity="secondary"
-            size="small"
-            text
+          <UiButton
+            variant="ghost"
+            size="sm"
             class="mt-3"
-            @click="retryInitial()"
-          />
+            @click="retryInitial()">{{ t('account.reload') }}</UiButton>
         </div>
         <div
           v-else
@@ -116,26 +113,20 @@
           role="alert"
         >
           <span class="text-sm text-ib-danger">{{ errorMessage(loadMoreError) }}</span>
-          <Button
-            :label="t('account.billingRecords.retryLoad')"
-            severity="secondary"
-            size="small"
-            text
-            @click="loadMore()"
-          />
+          <UiButton
+            variant="ghost"
+            size="sm"
+            @click="loadMore()">{{ t('account.billingRecords.retryLoad') }}</UiButton>
         </div>
         <div
           v-else-if="hasNextPage"
           class="flex justify-center border-t border-ib-border-soft px-4 py-3"
         >
-          <Button
-            :label="t('account.billingRecords.loadMore')"
-            severity="secondary"
-            size="small"
-            outlined
+          <UiButton
+            variant="outline"
+            size="sm"
             :loading="isFetchingNextPage"
-            @click="loadMore()"
-          />
+            @click="loadMore()">{{ t('account.billingRecords.loadMore') }}</UiButton>
         </div>
       </template>
     </DataTableFrame>
@@ -145,9 +136,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Button from 'primevue/button'
-import Column from 'primevue/column'
-import Skeleton from 'primevue/skeleton'
+import { Button as UiButton } from '@/components/ui/button'
+import UiColumn from '../../../../shared/components/DataTableColumn.vue'
+import { Skeleton as UiSkeleton } from '@/components/ui/skeleton'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
@@ -186,13 +177,9 @@ function isSkeletonRow(row: BillingTableRow): row is BillingSkeletonRow {
   return 'isSkeleton' in row
 }
 
-function formatAmount(value: number): string {
-  return formatLocaleNumber(value)
-}
-
 function formatSignedAmount(value: number): string {
-  if (value > 0) return `+${formatAmount(value)}`
-  return formatAmount(value)
+  if (value > 0) return `+${formatLocaleNumber(value)}`
+  return formatLocaleNumber(value)
 }
 
 function amountTone(record: BillingRecordItem): string {

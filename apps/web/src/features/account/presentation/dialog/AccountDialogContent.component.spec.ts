@@ -1,10 +1,7 @@
-/* eslint-disable vue/one-component-per-file -- Local stubs keep the layout contract test focused. */
 import { defineComponent, ref } from 'vue'
 import { IconoirProvider } from '@iconoir/vue'
-import PrimeVue from 'primevue/config'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { userPrimeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import { createDeferred } from '../../../../test/deferred'
 import { useUserStore } from '../../../auth/session/userSession'
@@ -156,13 +153,13 @@ function renderAccountDialogContent(initialTab?: AccountTab) {
   return renderWithUser(TestProviders, {
     props: initialTab === undefined ? {} : { initialTab },
     global: {
-      plugins: [[PrimeVue, userPrimeVueTestOptions], router],
+      plugins: [router],
       stubs: {
-        Avatar: AvatarStub,
-        Button: ButtonStub,
+        UiAvatar: AvatarStub,
+        UiButton: ButtonStub,
         Message: MessageStub,
-        Password: PasswordStub,
-        Tag: TagStub,
+        UiPassword: PasswordStub,
+        UiTag: TagStub,
         transition: TransitionStub,
         BillingPane: {
           props: ['active'],

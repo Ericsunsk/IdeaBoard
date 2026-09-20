@@ -14,8 +14,8 @@
       role="status"
       :aria-label="t('account.topUp.pendingOrdersLoading')"
     >
-      <Skeleton height="1.25rem" width="42%" />
-      <Skeleton height="1rem" width="68%" />
+      <UiSkeleton height="1.25rem" width="42%" />
+      <UiSkeleton height="1rem" width="68%" />
     </div>
 
     <div
@@ -27,14 +27,11 @@
         {{ t('account.errors.pendingOrdersLoadFailed') }}
       </p>
       <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(error) }}</p>
-      <Button
-        :label="t('account.reload')"
-        severity="secondary"
-        size="small"
-        text
+      <UiButton
+        variant="ghost"
+        size="sm"
         class="mt-2"
-        @click="emit('retry')"
-      />
+        @click="emit('retry')">{{ t('account.reload') }}</UiButton>
     </div>
 
     <div v-else class="grid gap-2">
@@ -61,26 +58,18 @@
             v-if="item.status === 'checkout_open'"
             class="grid w-36 shrink-0 gap-2 max-[640px]:w-full"
           >
-            <Button
-              unstyled
-              :label="t('account.topUp.continuePayment')"
-              size="small"
+            <UiButton
               :loading="isActionPending(item.public_token, 'continue')"
               :disabled="actionPending"
               :class="[accountPrimaryActionButtonClass, 'w-full']"
-              :pt="accountButtonPt"
-              @click="emit('continue', item.public_token)"
-            />
-            <Button
-              :label="t('account.topUp.abandonOrder')"
-              severity="secondary"
-              size="small"
-              outlined
+              @click="emit('continue', item.public_token)">{{ t('account.topUp.continuePayment') }}</UiButton>
+            <UiButton
+              variant="outline"
+              size="sm"
               class="w-full"
               :loading="isActionPending(item.public_token, 'abandon')"
               :disabled="actionPending"
-              @click="emit('abandon', item.public_token)"
-            />
+              @click="emit('abandon', item.public_token)">{{ t('account.topUp.abandonOrder') }}</UiButton>
           </div>
         </div>
 
@@ -90,19 +79,14 @@
           role="alert"
         >
           <span class="text-sm font-semibold text-ib-danger">{{ errorMessage(actionError) }}</span>
-          <Button
-            :label="
-              actionTarget?.kind === 'continue'
-                ? t('account.topUp.retryContinuePayment')
-                : t('account.topUp.retryAbandonOrder')
-            "
-            severity="secondary"
-            size="small"
-            text
+          <UiButton
+            variant="ghost"
+            size="sm"
             class="!p-0"
             :disabled="actionPending"
-            @click="retryAction(item.public_token)"
-          />
+            @click="retryAction(item.public_token)">{{ actionTarget?.kind === 'continue'
+                ? t('account.topUp.retryContinuePayment')
+                : t('account.topUp.retryAbandonOrder') }}</UiButton>
         </div>
       </article>
     </div>
@@ -112,12 +96,12 @@
 <script setup lang="ts">
 import { useNow } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
-import Button from 'primevue/button'
-import Skeleton from 'primevue/skeleton'
+import { Button as UiButton } from '@/components/ui/button'
+import { Skeleton as UiSkeleton } from '@/components/ui/skeleton'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { formatLocaleDate } from '../../../../shared/i18n/formatters'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
-import { accountButtonPt, accountPrimaryActionButtonClass } from '../common/ui'
+import { accountPrimaryActionButtonClass } from '../common/ui'
 import type { PendingPaymentOrder } from '../../infrastructure'
 
 type PendingOrderAction = { publicToken: string; kind: 'continue' | 'abandon' }

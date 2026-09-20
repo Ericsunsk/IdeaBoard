@@ -10,11 +10,11 @@ import { computed, type Component } from 'vue'
 import {
   AdobePhotoshop,
   BorderInner,
-  DesignPencil,
   EditPencil,
   Expand,
-  Hd,
+  Palette,
   Spark,
+  ZoomIn,
 } from '@iconoir/vue'
 
 const props = defineProps<{
@@ -24,10 +24,10 @@ const props = defineProps<{
 const iconMap: Record<ImageActionMenuIcon, Component> = {
   cutout: BorderInner,
   variations: Spark,
-  render: EditPencil,
-  upscale: Hd,
+  render: Palette,
+  upscale: ZoomIn,
   outpaint: Expand,
-  inpaint: DesignPencil,
+  inpaint: EditPencil,
   retouch: AdobePhotoshop,
 }
 

@@ -6,7 +6,8 @@ import { describe, expect, it } from 'vitest'
 import {
   appOverlayMenuThemeClass,
   appOverlayMenuSurfaceClass,
-  createAppOverlayMenuPt,
+  appOverlayMenuItemClass,
+  appOverlayMenuDangerItemClass,
 } from './appOverlayMenu'
 
 const appStyles = readFileSync(resolve(process.cwd(), 'src/app/style.css'), 'utf8')
@@ -30,18 +31,11 @@ describe('App overlay menu contract', () => {
     expect(appOverlayMenuThemeClass).toContain('var(--color-ib-overlay-item)')
     expect(appOverlayMenuThemeClass).toContain('var(--color-ib-overlay-danger)')
     expect(appOverlayMenuSurfaceClass).toContain(appOverlayMenuThemeClass)
-    expect(createAppOverlayMenuPt('test').root).toEqual({
-      class: expect.stringContaining('var(--shadow-ib-overlay-menu)'),
-    })
   })
 
-  it('builds PrimeVue menu structure while leaving geometry caller-owned', () => {
-    const pt = createAppOverlayMenuPt('test-menu !w-40')
-
-    expect(pt.root).toEqual({
-      class: expect.stringContaining('test-menu !w-40'),
-    })
-    expect(pt.list).toEqual({ class: expect.stringContaining('!flex !flex-col') })
-    expect(pt.itemContent).toEqual({ class: '!rounded-lg' })
+  it('provides accessible menu item and danger item classes', () => {
+    expect(appOverlayMenuItemClass).toContain('ib-control-state')
+    expect(appOverlayMenuItemClass).toContain('rounded-lg')
+    expect(appOverlayMenuDangerItemClass).toContain('var(--app-overlay-menu-danger-color')
   })
 })

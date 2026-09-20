@@ -118,7 +118,7 @@ export default tseslint.config(
             {
               group: ['**/useOverlayInteractionLifecycle'],
               message:
-                'Route, page, and app layers must use a Prime Overlay adapter or feature-owned public Overlay adapter instead of the base lifecycle directly.',
+                'Route, page, and app layers must use a dialog Overlay adapter or feature-owned public Overlay adapter instead of the base lifecycle directly.',
             },
             {
               group: ['**/overlay-lifecycle/useCanvasCustomLayerOverlay'],
@@ -208,6 +208,14 @@ export default tseslint.config(
           message: `Explicitly import ${name} in .ts files instead of relying on auto-import globals.`,
         })),
       ],
+    },
+  },
+  {
+    // Test render stubs are colocated with the specs that shape them by design;
+    // one-component-per-file governs production component organization, not tests.
+    files: ['src/test/**/*.{ts,tsx}', 'src/**/*.spec.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],
+    rules: {
+      'vue/one-component-per-file': 'off',
     },
   },
   prettierConfig,

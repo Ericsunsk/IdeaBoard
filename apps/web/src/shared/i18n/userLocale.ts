@@ -1,6 +1,4 @@
-import type { PrimeVueLocaleOptions } from 'primevue/config'
 import { useAppToast } from '../composables/useAppToast'
-import { getUserPrimeLocale } from './primeLocale'
 import { englishMessages, i18n } from './i18nRuntime'
 import {
   SUPPORTED_LOCALES,
@@ -22,7 +20,6 @@ export type { SupportedLocale }
 
 const messageBundleCache = new Map<SupportedLocale, LocaleBundle>()
 const inFlightLoaders = new Map<SupportedLocale, Promise<LocaleBundle>>()
-let activePrimeVueConfig: { locale?: PrimeVueLocaleOptions } | null = null
 
 /**
  * Dynamically loads and caches the message bundle for the specified locale.
@@ -75,22 +72,6 @@ export async function loadLocaleMessages(locale: SupportedLocale): Promise<Local
 }
 
 /**
- * Registers an active PrimeVue config reference to be synchronized when the user locale changes.
- */
-export function registerPrimeVueConfig(config: { locale?: PrimeVueLocaleOptions } | null): void {
-  activePrimeVueConfig = config
-}
-
-/**
- * Synchronizes the active PrimeVue configuration to match the specified locale.
- */
-export function syncPrimeVueLocale(locale: SupportedLocale): void {
-  if (activePrimeVueConfig) {
-    activePrimeVueConfig.locale = getUserPrimeLocale(locale)
-  }
-}
-
-/**
  * Returns the currently active user locale.
  */
 export function getActiveUserLocale(): SupportedLocale {
@@ -104,26 +85,12 @@ export function getActiveUserLocale(): SupportedLocale {
 }
 
 /**
- * Returns the PrimeVueLocaleOptions matching the active user locale.
- */
-export function getActiveUserPrimeLocale(): PrimeVueLocaleOptions {
-  return getUserPrimeLocale(getActiveUserLocale())
-}
-
-/**
- * Atomically switches the user locale, updating i18n, PrimeVue, <html lang>, and localStorage.
+ * Atomically switches the user locale, updating i18n, <html lang>, and localStorage.
  * On load failure: retains the current locale, displays a toast error, and does NOT mutate storage.
  */
-export async function setUserLocale(
-  locale: SupportedLocale,
-  primeVueConfig?: { locale?: PrimeVueLocaleOptions },
-): Promise<boolean> {
+export async function setUserLocale(locale: SupportedLocale): Promise<boolean> {
   if (!isValidSupportedLocale(locale)) {
     return false
-  }
-
-  if (primeVueConfig) {
-    activePrimeVueConfig = primeVueConfig
   }
 
   if (locale !== 'en') {
@@ -144,8 +111,6 @@ export async function setUserLocale(
   if (i18n && i18n.global) {
     ;(i18n.global.locale as { value: string }).value = locale
   }
-
-  syncPrimeVueLocale(locale)
 
   if (typeof document !== 'undefined' && document.documentElement) {
     document.documentElement.lang = locale
@@ -174,7 +139,6 @@ export async function initUserLocale(): Promise<SupportedLocale> {
       if (typeof document !== 'undefined' && document.documentElement) {
         document.documentElement.lang = targetLocale
       }
-      syncPrimeVueLocale(targetLocale)
       return targetLocale
     } catch {
       // Graceful fallback to English if non-English bundle fails to load during bootstrap
@@ -187,6 +151,5 @@ export async function initUserLocale(): Promise<SupportedLocale> {
   if (typeof document !== 'undefined' && document.documentElement) {
     document.documentElement.lang = 'en'
   }
-  syncPrimeVueLocale('en')
   return 'en'
 }

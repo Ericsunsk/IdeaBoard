@@ -16,19 +16,15 @@
       </div>
       <Button
         type="button"
-        rounded
-        text
-        severity="secondary"
-        class="!size-[26px] !min-w-[26px] !shrink-0 !border !border-ib-creative-accent/35 !bg-ib-surface !p-0 !text-ib-creative-accent-pressed !shadow-none hover:!border-ib-creative-accent/50 hover:!bg-ib-creative-accent-soft active:!border-ib-creative-accent-pressed/55 active:!bg-ib-creative-accent/15 focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)] disabled:!cursor-wait disabled:!opacity-70 max-[720px]:!size-6 max-[720px]:!min-w-6"
+        variant="ghost"
+        size="icon"
+        class="size-[26px] min-w-[26px] shrink-0 rounded-full border border-ib-creative-accent/35 bg-ib-surface p-0 text-ib-creative-accent-pressed shadow-none hover:border-ib-creative-accent/50 hover:bg-ib-creative-accent-soft active:border-ib-creative-accent-pressed/55 active:bg-ib-creative-accent/15 focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)] disabled:cursor-wait disabled:opacity-70 max-[720px]:size-6 max-[720px]:min-w-6"
         :aria-label="t('common.impersonation.exit')"
         :aria-busy="stopImpersonatingLoading"
         :disabled="stopImpersonatingLoading"
-        :loading="stopImpersonatingLoading"
         @click="handleStopImpersonating"
       >
-        <template #icon>
-          <Xmark class="size-3.5 max-[720px]:size-[13px]" aria-hidden="true" />
-        </template>
+        <Xmark class="size-3.5 max-[720px]:size-[13px]" aria-hidden="true" />
       </Button>
     </div>
     <div class="min-h-0 flex-1 overflow-hidden bg-transparent">
@@ -52,7 +48,7 @@ import { useI18n } from 'vue-i18n'
 import { Shield, Xmark } from '@iconoir/vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import Button from 'primevue/button'
+import { Button } from '@/components/ui/button'
 import { useAuthSession, useUserStore } from '../../auth/session/userSession'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import {

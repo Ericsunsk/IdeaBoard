@@ -39,7 +39,7 @@ describe('handleAuthFailure', () => {
 
   it('clears stored admin user state after an admin API 403', () => {
     setStoredAuth(adminUser)
-    window.history.pushState({}, '', '/admin/task-monitor')
+    window.history.pushState({}, '', '/admin/monitor')
 
     const handled = handleAuthFailure({
       status: 403,
@@ -53,7 +53,7 @@ describe('handleAuthFailure', () => {
 
   it('clears stored auth without redirecting after a session probe 401', () => {
     setStoredAuth(adminUser)
-    window.history.pushState({}, '', '/admin/task-monitor')
+    window.history.pushState({}, '', '/admin/monitor')
 
     const handled = handleAuthFailure({
       status: 401,
@@ -62,6 +62,6 @@ describe('handleAuthFailure', () => {
 
     expect(handled).toBe(false)
     expect(getStoredUser()).toBeNull()
-    expect(window.location.pathname).toBe('/admin/task-monitor')
+    expect(window.location.pathname).toBe('/admin/monitor')
   })
 })

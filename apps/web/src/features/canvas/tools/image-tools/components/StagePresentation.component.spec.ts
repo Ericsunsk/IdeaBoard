@@ -1,4 +1,3 @@
-/* eslint-disable vue/one-component-per-file -- Behavior stubs keep presentation tests at the props and DOM seam. */
 import {
   computed,
   defineComponent,

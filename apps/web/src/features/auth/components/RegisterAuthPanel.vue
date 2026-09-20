@@ -31,7 +31,6 @@
           required
           inline-required
           :field-class="authFieldClass"
-          :message-pt="authErrorMessagePt"
         >
           <div class="relative w-full">
             <span :class="authInputIconClass">
@@ -41,7 +40,6 @@
               :id="fieldId"
               v-model="formValue.displayName"
               v-bind="resolveFieldControlState(invalid)"
-              unstyled
               autocomplete="name"
               :required="required"
               :class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
@@ -71,7 +69,6 @@
           required
           inline-required
           :field-class="authFieldClass"
-          :message-pt="authErrorMessagePt"
         >
           <div class="relative w-full">
             <span :class="authInputIconClass"><UserIcon class="size-4.5" /></span>
@@ -79,7 +76,6 @@
               :id="fieldId"
               v-model="formValue.email"
               v-bind="resolveFieldControlState(invalid)"
-              unstyled
               autocomplete="email"
               :required="required"
               :class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
@@ -109,33 +105,22 @@
           required
           inline-required
           :field-class="authFieldClass"
-          :message-pt="authErrorMessagePt"
         >
           <div class="relative w-full">
             <span :class="authInputIconClass">
               <LockIcon class="size-4.5" />
             </span>
             <Password
+              :id="fieldId"
               v-model="formValue.password"
-              unstyled
               autocomplete="new-password"
-              :feedback="false"
-              fluid
-              :pt="authPasswordPt"
-              :input-props="{
-                ...resolveFieldControlState(invalid),
-                id: fieldId,
-                autocomplete: 'new-password',
-                required,
-                'aria-invalid': ariaInvalid,
-                'aria-describedby': describedbyId,
-                'aria-expanded': undefined,
-                'aria-haspopup': undefined,
-              }"
+              :required="required"
+              :disabled="loading"
+              :aria-invalid="ariaInvalid"
+              :aria-describedby="describedbyId"
               :invalid="invalid"
               :input-class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
               :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.password')"
-              toggle-mask
               @blur="handleFieldBlur('password')"
               @update:model-value="handlePasswordInput"
             />
@@ -158,31 +143,22 @@
           required
           inline-required
           :field-class="authFieldClass"
-          :message-pt="authErrorMessagePt"
         >
           <div class="relative w-full">
             <span :class="authInputIconClass">
               <ShieldIcon class="size-4.5" />
             </span>
             <Password
+              :id="fieldId"
               v-model="formValue.confirmPassword"
-              unstyled
               autocomplete="new-password"
-              :feedback="false"
-              fluid
-              :pt="authPasswordPt"
-              :input-props="{
-                ...resolveFieldControlState(invalid),
-                id: fieldId,
-                autocomplete: 'new-password',
-                required,
-                'aria-invalid': ariaInvalid,
-                'aria-describedby': describedbyId,
-              }"
+              :required="required"
+              :disabled="loading"
+              :aria-invalid="ariaInvalid"
+              :aria-describedby="describedbyId"
               :invalid="invalid"
               :input-class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
               :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.password')"
-              toggle-mask
               @blur="handleFieldBlur('confirmPassword')"
               @update:model-value="clearFieldError('confirmPassword')"
             />
@@ -190,15 +166,10 @@
         </IbFormField>
 
         <Button
-          unstyled
           :class="authPrimaryButtonClass"
-          :pt="authButtonPt"
           type="submit"
-          :label="loading ? t('auth.buttons.creating') : t('auth.buttons.createAccount')"
           :loading="loading"
-          v-bind="submitControlState"
-          fluid
-        />
+          v-bind="submitControlState">{{ loading ? t('auth.buttons.creating') : t('auth.buttons.createAccount') }}</Button>
 
         <p class="m-0 text-center text-[11px] leading-4 text-[var(--color-ib-auth-subtle)]">
           {{ t('auth.legal.agreePrefix') }}
@@ -246,7 +217,6 @@
           required
           inline-required
           :field-class="authFieldClass"
-          :message-pt="authErrorMessagePt"
         >
           <InputText
             :id="fieldId"
@@ -264,15 +234,10 @@
           />
         </IbFormField>
         <Button
-          unstyled
           :class="authPrimaryButtonClass"
-          :pt="authButtonPt"
           type="submit"
-          :label="loading ? t('auth.buttons.verifying') : t('auth.buttons.verifyAndSignIn')"
           :loading="loading"
-          v-bind="submitControlState"
-          fluid
-        />
+          v-bind="submitControlState">{{ loading ? t('auth.buttons.verifying') : t('auth.buttons.verifyAndSignIn') }}</Button>
       </form>
 
       <div :class="['mt-5', authFooterClass]">
@@ -292,9 +257,8 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
-import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
-import Password from 'primevue/password'
+import { Button } from '@/components/ui/button'
+import { Input as InputText, PasswordInput as Password } from '@/components/ui/input'
 import { Lock as LockIcon, Shield as ShieldIcon, User as UserIcon } from '@iconoir/vue'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
 import { PRIVACY_POLICY_PATH, TERMS_PATH } from '../../../shared/constants/routePaths'
@@ -309,9 +273,7 @@ import {
   getRequiredError,
 } from './formUtils'
 import {
-  authButtonPt,
   authCompactModalShellClass,
-  authErrorMessagePt,
   authFieldClass,
   authFooterClass,
   authInputClass,
@@ -321,7 +283,6 @@ import {
   authModalHeaderClass,
   authModalKickerClass,
   authModalTitleClass,
-  authPasswordPt,
   authPrimaryButtonClass,
   authSwitchButtonClass,
 } from './modalUi'

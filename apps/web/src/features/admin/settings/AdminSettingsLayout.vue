@@ -1,0 +1,47 @@
+<template>
+  <AdminSubNavigationLayout
+    :items="navigationItems"
+    :active-path="activeNavigationPath"
+    @navigate="navigate($event as NavigationPath)"
+  />
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import AdminSubNavigationLayout from '../shared/components/AdminSubNavigationLayout.vue'
+import {
+  ADMIN_SETTINGS_GENERAL_PATH,
+  ADMIN_SETTINGS_MAIL_PATH,
+  ADMIN_SETTINGS_SECURITY_PATH,
+  ADMIN_SETTINGS_STORAGE_PATH,
+  isPathUnderRoute,
+} from '../../../shared/constants/routePaths'
+
+type NavigationPath =
+  | typeof ADMIN_SETTINGS_GENERAL_PATH
+  | typeof ADMIN_SETTINGS_STORAGE_PATH
+  | typeof ADMIN_SETTINGS_MAIL_PATH
+  | typeof ADMIN_SETTINGS_SECURITY_PATH
+
+const navigationItems: Array<{ key: string; path: NavigationPath; label: string }> = [
+  { key: 'general', path: ADMIN_SETTINGS_GENERAL_PATH, label: '网站设置' },
+  { key: 'storage', path: ADMIN_SETTINGS_STORAGE_PATH, label: '存储配置' },
+  { key: 'mail', path: ADMIN_SETTINGS_MAIL_PATH, label: '邮件服务' },
+  { key: 'security', path: ADMIN_SETTINGS_SECURITY_PATH, label: '安全与网络' },
+]
+
+const route = useRoute()
+const router = useRouter()
+
+const activeNavigationPath = computed<NavigationPath>(
+  () =>
+    navigationItems.find((item) => isPathUnderRoute(route.path, item.path))?.path ??
+    ADMIN_SETTINGS_GENERAL_PATH,
+)
+
+function navigate(path: NavigationPath) {
+  if (isPathUnderRoute(route.path, path)) return
+  void router.push(path)
+}
+</script>

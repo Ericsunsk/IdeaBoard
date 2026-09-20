@@ -33,8 +33,21 @@ describe('Cross-feature page chrome surface contract', () => {
     const boardsPage = readSource('features/board/presentation/catalog/BoardsPage.vue')
 
     expect(boardsPage).toContain(':class="catalogClasses.sortMenuTrigger"')
-    expect(boardsPage).toContain('<Menu')
+    expect(boardsPage).toContain('<DropdownMenu')
     expect(boardsPage).not.toContain("from 'primevue/select'")
+  })
+
+  it('keeps fully-skinned chrome controls on native buttons so no Button base leaks', () => {
+    // pill、头像/语言触发器、游客按钮自带完整视觉：必须用原生 button，
+    // shadcn Button 的 variant 基类会与 @layer components 的 chrome 样式打架（utilities 层优先）。
+    for (const source of [
+      readSource('shared/components/UserCreditBalanceButton.vue'),
+      readSource('shared/components/UserAccountMenu.vue'),
+      readSource('shared/components/UserLocaleSelect.vue'),
+    ]) {
+      expect(source).not.toContain('<UiButton')
+      expect(source).not.toContain("from '@/components/ui/button'")
+    }
   })
 
   it('does not re-declare the shared surface inside feature styles', () => {

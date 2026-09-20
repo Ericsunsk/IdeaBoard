@@ -7,5 +7,6 @@ declare module 'vue-router' {
     guest?: boolean
     title?: string
     seoKey?: RouteSeoKey
+    hidePageHeader?: boolean
   }
 }

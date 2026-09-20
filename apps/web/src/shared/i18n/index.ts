@@ -5,6 +5,4 @@ export {
   setUserLocale,
   getActiveUserLocale,
   initUserLocale,
-  getActiveUserPrimeLocale,
-  registerPrimeVueConfig,
 } from './userLocale'

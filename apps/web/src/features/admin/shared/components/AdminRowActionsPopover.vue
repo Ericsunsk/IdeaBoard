@@ -1,27 +1,38 @@
 <template>
-  <Popover ref="popoverRef" :pt="popoverPt" @hide="emit('hide')">
-    <div class="flex min-w-[176px] flex-col gap-1 p-1.5">
-      <template v-for="item in items" :key="item.key">
-        <div v-if="item.divided" class="my-1 h-px bg-admin-border-soft" aria-hidden="true" />
-        <Button
-          :label="item.label"
-          text
-          :severity="item.danger ? 'danger' : 'secondary'"
-          :disabled="item.disabled"
-          fluid
-          class="justify-start rounded-md px-3 py-2.5 text-admin-meta font-[650]"
-          @click="emit('select', item.key)"
-        />
-      </template>
-    </div>
-  </Popover>
+  <PopoverRoot :open="isOpen" @update:open="handleOpenUpdate">
+    <PopoverAnchor v-if="anchorEl" :reference="anchorEl" />
+    <PopoverPortal>
+      <PopoverContent
+        class="z-50 min-w-[176px] rounded-xl border border-admin-border bg-admin-card-strong p-1.5 text-admin-text-1 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
+        :side-offset="4"
+        align="end"
+      >
+        <div class="flex flex-col gap-1">
+          <template v-for="item in items" :key="item.key">
+            <div v-if="item.divided" class="my-1 h-px bg-admin-border-soft" aria-hidden="true" />
+            <button
+              type="button"
+              :disabled="item.disabled"
+              :class="[
+                'flex w-full items-center justify-start rounded-md px-3 py-2 text-admin-meta font-[650] transition-colors cursor-pointer disabled:pointer-events-none disabled:opacity-40',
+                item.danger
+                  ? 'text-admin-danger hover:bg-admin-danger-soft'
+                  : 'text-admin-text-2 hover:bg-admin-surface-hover hover:text-admin-text-1',
+              ]"
+              @click="handleSelect(item.key)"
+            >
+              {{ item.label }}
+            </button>
+          </template>
+        </div>
+      </PopoverContent>
+    </PopoverPortal>
+  </PopoverRoot>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import Button from 'primevue/button'
-import Popover from 'primevue/popover'
-import { createAdminPopoverPt } from '../lib/overlayPt'
+import { PopoverAnchor, PopoverContent, PopoverPortal, PopoverRoot } from 'reka-ui'
 
 export type AdminRowActionItem = {
   key: string
@@ -31,29 +42,36 @@ export type AdminRowActionItem = {
   danger?: boolean
 }
 
-type PrimePopupPanel = {
-  toggle: (event: Event) => void
-  hide?: () => void
-}
-
 defineProps<{ items: readonly AdminRowActionItem[] }>()
 const emit = defineEmits<{
   select: [key: string]
   hide: []
 }>()
 
-const popoverRef = ref<PrimePopupPanel | null>(null)
-const popoverPt = {
-  ...createAdminPopoverPt(),
-  content: { style: { padding: '0' } },
-}
+const isOpen = ref(false)
+const anchorEl = ref<HTMLElement | null>(null)
 
 function toggle(event: Event) {
-  popoverRef.value?.toggle(event)
+  const target = (event.currentTarget || event.target) as HTMLElement | null
+  anchorEl.value = target
+  isOpen.value = !isOpen.value
 }
 
 function hide() {
-  popoverRef.value?.hide?.()
+  isOpen.value = false
+  emit('hide')
+}
+
+function handleOpenUpdate(value: boolean) {
+  isOpen.value = value
+  if (!value) {
+    emit('hide')
+  }
+}
+
+function handleSelect(key: string) {
+  emit('select', key)
+  hide()
 }
 
 defineExpose({ toggle, hide })

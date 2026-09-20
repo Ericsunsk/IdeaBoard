@@ -1,4 +1,4 @@
-import { useConfirm } from 'primevue/useconfirm'
+import { ref } from 'vue'
 
 export type AdminConfirmIntent = 'warn' | 'danger'
 
@@ -14,27 +14,42 @@ export type AdminConfirmPort = {
   request: (request: AdminConfirmRequest) => void
 }
 
-export function useAdminConfirm(): AdminConfirmPort {
-  const confirm = useConfirm()
+export type AdminConfirmState = {
+  open: boolean
+  title: string
+  message: string
+  confirmLabel: string
+  intent: AdminConfirmIntent
+  loading: boolean
+  confirm: () => Promise<void>
+  cancel: () => void
+}
 
+export const activeAdminConfirm = ref<AdminConfirmState | null>(null)
+
+export function useAdminConfirm(): AdminConfirmPort {
   return {
     request(request) {
-      confirm.require({
-        header: request.title,
+      activeAdminConfirm.value = {
+        open: true,
+        title: request.title,
         message: request.message,
-        rejectLabel: '取消',
-        acceptLabel: request.confirmLabel,
-        acceptProps: {
-          severity: request.intent,
+        confirmLabel: request.confirmLabel,
+        intent: request.intent,
+        loading: false,
+        confirm: async () => {
+          if (!activeAdminConfirm.value) return
+          activeAdminConfirm.value.loading = true
+          try {
+            await request.onConfirm()
+          } finally {
+            activeAdminConfirm.value = null
+          }
         },
-        rejectProps: {
-          severity: 'secondary',
-          outlined: true,
+        cancel: () => {
+          activeAdminConfirm.value = null
         },
-        accept: () => {
-          void request.onConfirm()
-        },
-      })
+      }
     },
   }
 }

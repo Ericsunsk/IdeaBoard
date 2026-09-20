@@ -1,7 +1,5 @@
-import PrimeVue from 'primevue/config'
 import { describe, expect, it, vi } from 'vitest'
 import { h } from 'vue'
-import { adminPrimeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen, within } from '../../../../test/render'
 import AdminDialogShell from './AdminDialogShell.vue'
 
@@ -17,24 +15,24 @@ function renderShell(
   slots: { header?: string } = {},
 ) {
   const onVisibleUpdate = vi.fn()
+  const onClose = vi.fn()
   return {
     onVisibleUpdate,
+    onClose,
     ...renderWithUser(AdminDialogShell, {
       props: {
         visible: true,
         header: '编辑配置',
+        description: '修改配置项后保存生效。',
         ...props,
         'onUpdate:visible': onVisibleUpdate,
+        onClose,
       },
       slots: {
         ...slots,
         default:
           '<button type="button">第一个操作</button><button type="button">第二个操作</button>',
         footer: '<button type="button">取消</button><button type="button">保存</button>',
-      },
-      global: {
-        plugins: [[PrimeVue, adminPrimeVueTestOptions]],
-        stubs: { transition: false },
       },
     }),
   }
@@ -47,19 +45,16 @@ describe('AdminDialogShell', () => {
       props: {
         visible: false,
         header: '编辑配置',
+        description: '修改配置项后保存生效。',
         onReset,
-      },
-      global: {
-        plugins: [[PrimeVue, adminPrimeVueTestOptions]],
-        stubs: { transition: false },
-      },
+      }
     })
 
-    await result.rerender({ visible: true, header: '编辑配置', onReset })
+    await result.rerender({ visible: true, header: '编辑配置', description: '修改配置项后保存生效。', onReset })
     expect(onReset).toHaveBeenCalledTimes(1)
 
-    await result.rerender({ visible: false, header: '编辑配置', onReset })
-    await result.rerender({ visible: true, header: '编辑配置', onReset })
+    await result.rerender({ visible: false, header: '编辑配置', description: '修改配置项后保存生效。', onReset })
+    await result.rerender({ visible: true, header: '编辑配置', description: '修改配置项后保存生效。', onReset })
     expect(onReset).toHaveBeenCalledTimes(2)
   })
 
@@ -83,32 +78,24 @@ describe('AdminDialogShell', () => {
     expect(icon).toHaveClass('!h-5', '!w-5')
   })
 
-  it('uses the real PrimeVue focus trap to wrap both tab directions', async () => {
-    renderShell()
+  it('traps focus inside the dialog in both tab directions', async () => {
+    const { user } = renderShell()
     const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
     const buttons = within(dialog).getAllByRole('button')
-    const lastButton = buttons.at(-1)!
-    const firstFocusGuard = dialog.querySelector<HTMLElement>(
-      '[data-pc-section="firstfocusableelement"]',
-    )!
-    const lastFocusGuard = dialog.querySelector<HTMLElement>(
-      '[data-pc-section="lastfocusableelement"]',
-    )!
 
-    lastButton.focus()
-    lastFocusGuard.focus()
-    const firstFocusable = document.activeElement
-    expect(firstFocusable).toBeInstanceOf(HTMLButtonElement)
-    expect(dialog).toContainElement(firstFocusable as HTMLElement)
+    buttons.at(-1)!.focus()
+    await user.tab()
+    expect(buttons[0]).toHaveFocus()
 
-    firstFocusGuard.focus()
-    expect(lastButton).toHaveFocus()
+    buttons[0]!.focus()
+    await user.tab({ shift: true })
+    expect(buttons.at(-1)).toHaveFocus()
   })
 
   it('closes through Escape while preventing mask dismissal', async () => {
     const { user, onVisibleUpdate } = renderShell()
     const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
-    const mask = dialog.parentElement!
+    const mask = dialog.parentElement!.querySelector('[data-admin-dialog-mask]')!
 
     expect(dialog).toHaveAttribute('aria-modal', 'true')
     await user.click(mask)
@@ -120,7 +107,7 @@ describe('AdminDialogShell', () => {
   })
 
   it('routes the header close control through the lifecycle', async () => {
-    const { user, onVisibleUpdate } = renderShell()
+    const { user, onVisibleUpdate, onClose } = renderShell()
     const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
 
     expect(within(dialog).getByRole('button', { name: /close|关闭/i })).toHaveClass(
@@ -129,6 +116,7 @@ describe('AdminDialogShell', () => {
     )
     await user.click(within(dialog).getByRole('button', { name: /close|关闭/i }))
     expect(onVisibleUpdate).toHaveBeenCalledWith(false)
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('blocks every internal close path while busy', async () => {
@@ -137,6 +125,7 @@ describe('AdminDialogShell', () => {
       props: {
         visible: true,
         header: '编辑配置',
+        description: '修改配置项后保存生效。',
         busy: true,
         'onUpdate:visible': onVisibleUpdate,
       },
@@ -144,14 +133,9 @@ describe('AdminDialogShell', () => {
         footer: ({ requestClose }: { requestClose: () => void }) =>
           h('button', { type: 'button', onClick: requestClose }, '取消'),
       },
-      global: {
-        plugins: [[PrimeVue, adminPrimeVueTestOptions]],
-        stubs: { transition: false },
-      },
     })
     const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
-    const mask = dialog.parentElement!
-
+    const mask = dialog.parentElement!.querySelector('[data-admin-dialog-mask]')!
     expect(dialog).toHaveAttribute('aria-busy', 'true')
     expect(within(dialog).queryByRole('button', { name: /close|关闭/i })).not.toBeInTheDocument()
 
@@ -219,9 +203,11 @@ describe('AdminDialogShell', () => {
     renderShell()
 
     const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
-    expect(dialog.querySelector('[data-pc-section="header"]')).toHaveClass('!px-6')
-    expect(dialog.querySelector('[data-pc-section="content"]')).toHaveClass('!px-6')
-    expect(dialog.querySelector('[data-pc-section="footer"]')).toHaveClass('!px-6')
+    for (const region of ['header', 'content', 'footer']) {
+      expect(dialog.querySelector(`[data-admin-dialog-region="${region}"]`)).toHaveClass(
+        '!px-6',
+      )
+    }
   })
 
   it.each([
@@ -231,7 +217,10 @@ describe('AdminDialogShell', () => {
   ] as const)('owns the %s desktop and mobile width contract', async (size, expectedClass) => {
     renderShell({ size })
 
-    expect(await screen.findByRole('dialog', { name: '编辑配置' })).toHaveClass(expectedClass)
+    const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
+    expect(dialog).toHaveClass(expectedClass)
+    // style.css 宽度契约以 data-size 键控，不依赖具体 width class 字符串。
+    expect(dialog).toHaveAttribute('data-size', size)
   })
 
   it('renders footer actions through the shared footer layout', async () => {

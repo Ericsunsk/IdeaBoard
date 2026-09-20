@@ -1,0 +1,7 @@
+export { default as AdminTableHeader } from './AdminTableHeader.vue'
+export { default as AdminTableBody } from './AdminTableBody.vue'
+export { default as AdminTableFooter } from './AdminTableFooter.vue'
+export { default as AdminTableRow } from './AdminTableRow.vue'
+export { default as AdminTableHead } from './AdminTableHead.vue'
+export { default as AdminTableCell } from './AdminTableCell.vue'
+export { default as AdminTableCaption } from './AdminTableCaption.vue'

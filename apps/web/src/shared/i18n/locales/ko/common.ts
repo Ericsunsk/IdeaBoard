@@ -69,7 +69,10 @@ export default {
     unsavedChangesMessage: '저장되지 않은 변경사항이 있습니다. 정말 떠나시겠습니까?',
   },
   a11y: {
+    dialog: '대화상자',
     chartTimeRange: '차트 시간 범위',
+    showPassword: '비밀번호 표시',
+    hidePassword: '비밀번호 숨기기',
   },
   impersonation: {
     activeBanner: '가상 계정 미리보기 활성화',

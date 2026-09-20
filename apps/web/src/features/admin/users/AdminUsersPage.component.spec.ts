@@ -1,8 +1,6 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import PrimeVue from 'primevue/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
-import { adminPrimeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen, waitFor, within } from '../../../test/render'
 import AdminUsersPage from './AdminUsersPage.vue'
 
@@ -359,8 +357,9 @@ describe('AdminUsersPage', () => {
 
     await waitFor(() => expect(within(dialog).getByText('100 Ideas')).toBeVisible())
     expect(await within(dialog).findByText('运营扣减')).toBeVisible()
+    await user.click(within(dialog).getByRole('button', { name: '关闭' }))
     expect(
-      screen.getByRole('button', { name: '打开 admin_balance_user 的账户详情' }),
+      await screen.findByRole('button', { name: '打开 admin_balance_user 的账户详情' }),
     ).toHaveTextContent('100 Ideas')
   })
 
@@ -387,8 +386,9 @@ describe('AdminUsersPage', () => {
     expect(amount).toHaveValue('25')
     expect(reason).toHaveValue('受限账户扣减')
     expect(within(dialog).getByText('125 Ideas')).toBeVisible()
+    await user.click(within(dialog).getByRole('button', { name: '关闭' }))
     expect(
-      screen.getByRole('button', { name: '打开 admin_balance_user 的账户详情' }),
+      await screen.findByRole('button', { name: '打开 admin_balance_user 的账户详情' }),
     ).toHaveTextContent('125 Ideas')
     expect(within(dialog).queryByText('受限账户扣减')).not.toBeInTheDocument()
   })
@@ -560,8 +560,9 @@ describe('AdminUsersPage', () => {
     expect(refundRow).not.toBeNull()
     expect(within(refundRow as HTMLElement).getByText('退款')).toBeVisible()
     expect(within(dialog).getByText('可退 15 Ideas')).toBeVisible()
+    await user.click(within(dialog).getByRole('button', { name: '关闭' }))
     expect(
-      screen.getByRole('button', { name: '打开 admin_balance_user 的账户详情' }),
+      await screen.findByRole('button', { name: '打开 admin_balance_user 的账户详情' }),
     ).toHaveTextContent('135 Ideas')
   })
 
@@ -784,10 +785,7 @@ function renderPage() {
   })
   return renderWithUser(AdminUsersPage, {
     global: {
-      plugins: [
-        [PrimeVue, adminPrimeVueTestOptions],
-        [VueQueryPlugin, { queryClient }],
-      ],
+      plugins: [[VueQueryPlugin, { queryClient }]],
       stubs: { Refresh: true, Search: true, Settings: true },
     },
   })

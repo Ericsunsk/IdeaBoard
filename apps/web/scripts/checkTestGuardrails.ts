@@ -68,13 +68,19 @@ const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
 const componentRenderHelperExceptions: ExceptionMap<Exception> = {}
 
 const componentClassAssertionExceptions: ExceptionMap<Exception> = {
+  'src/features/account/presentation/dialog/AccountDialog.component.spec.ts': [
+    {
+      reason:
+        'Verifies the Account dialog overlay shadow class that defines the shared visual chrome for the modal surface.',
+    },
+  ],
   'src/features/auth/pages/oauthFlow.component.spec.ts': [
     {
       reason:
         'Verifies the one-provider OAuth layout contract that makes a single login button span the full row.',
     },
   ],
-  'src/features/admin/task-monitor/AdminTaskResultDialog.component.spec.ts': [
+  'src/features/admin/monitor/presentation/AdminTaskResultDialog.component.spec.ts': [
     {
       reason:
         'Verifies the keyboard focus visibility class contract for the image result action; the DOM harness cannot compute Tailwind focus pseudo-state styles.',
@@ -83,13 +89,13 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
   'src/features/account/presentation/rewards/RewardsPane.component.spec.ts': [
     {
       reason:
-        'Verifies that the redemption action stays on the User Shell semantic button contract instead of inheriting the Admin PrimeVue primary theme.',
+        'Verifies that the redemption action stays on the User Shell semantic button contract instead of inheriting the Admin primary theme.',
     },
   ],
   'src/features/account/presentation/security/SecurityPane.component.spec.ts': [
     {
       reason:
-        'Verifies that the password action stays on the User Shell semantic button contract instead of inheriting the Admin PrimeVue primary theme.',
+        'Verifies that the password action stays on the User Shell semantic button contract instead of inheriting the Admin primary theme.',
     },
   ],
   'src/features/account/presentation/billing/BillingPane.component.spec.ts': [
@@ -104,10 +110,28 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the fixed responsive 5-column to 2x2-plus-spanning-row layout and stable loading geometry required by the usage summary contract.',
     },
   ],
+  'src/features/auth/components/authModalsMotion.component.spec.ts': [
+    {
+      reason:
+        'Verifies the auth modal transparent surface and responsive width classes that define its visual/layout contract.',
+    },
+  ],
+  'src/features/admin/app/AdminLayout.component.spec.ts': [
+    {
+      reason:
+        'Verifies the admin sidebar responsive collapse/expand width classes and mobile drawer transform contract.',
+    },
+  ],
   'src/features/admin/shared/components/AdminSurfaceFrame.component.spec.ts': [
     {
       reason:
-        'Verifies the shared Admin surface height and overflow contract across Management, Table, and Resource Grid adapters.',
+        'Verifies the shared Admin surface height and overflow contract across Management and Table adapters.',
+    },
+  ],
+  'src/features/admin/shared/components/AdminToolbarSearch.component.spec.ts': [
+    {
+      reason:
+        'Verifies the shared Admin search fluid width contract used by the management toolbars.',
     },
   ],
   'src/features/admin/shared/components/AdminDialogShell.component.spec.ts': [
@@ -161,7 +185,7 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
   'src/shared/components/DataTableFrame.component.spec.ts': [
     {
       reason:
-        'Verifies the single PrimeVue table-container scroll surface and its mechanical accessibility class.',
+        'Verifies the single table-container scroll surface and its mechanical accessibility class.',
     },
   ],
   'src/shared/components/UserLocaleSelect.component.spec.ts': [
@@ -173,14 +197,14 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
 }
 
 const contractGeneratedQueryMockExceptions: ExceptionMap<GeneratedQueryMockException> = {
-  'src/features/admin/task-monitor/useAdminTaskMonitor.contract.spec.ts': [
+  'src/features/admin/monitor/application/useAdminMonitor.contract.spec.ts': [
     {
-      module: '../../../shared/api/generated-query/admin-tasks/admin-tasks',
+      module: '../../../../shared/api/generated-query/admin-tasks/admin-tasks',
       reason:
         'Hard boundary for task-list polling state; the generated query hook is mocked to drive composable states directly.',
     },
     {
-      module: '../../../shared/api/generated-query/admin-monitor/admin-monitor',
+      module: '../../../../shared/api/generated-query/admin-monitor/admin-monitor',
       reason:
         'Hard boundary for monitor polling state; the generated query hook is mocked to drive composable states directly.',
     },

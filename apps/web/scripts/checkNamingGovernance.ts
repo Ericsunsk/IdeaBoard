@@ -137,13 +137,16 @@ const keptGenericOwnership: Record<string, string> = {
   'features/account/presentation/common': 'account-presentation: cross-pane shared leaf',
   // Cross-cutting client helpers (auth identity, errors, date, form, upload).
   'shared/utils': 'shared: cross-cutting client helpers (see shared/CONTEXT.md)',
+  // Official shadcn-vue helper boundary (`components.json` standard utils location)
+  'lib/utils.ts': 'shadcn: official standard helper entry (cn, cleanProps)',
+  'lib/utils.unit.spec.ts': 'shadcn: test for official standard helper entry',
 }
 
 /** Permanent documented keeps: composable-family files (same responsibility family). */
 const keptComposableFamilies: Record<string, string> = {
-  'features/admin/system-settings/useSystemSettingsFeedback.ts':
+  'features/admin/settings/useSettingsFeedback.ts':
     'admin: settings feedback composable family',
-  'features/admin/task-monitor/useAdminTaskMonitorFeedback.ts':
+  'features/admin/monitor/application/useAdminMonitorFeedback.ts':
     'admin: task feedback composable family',
 }
 
@@ -254,6 +257,8 @@ function checkSameName(
     return null
   // `app/App.vue` is the canonical Vue application entry mounted by main.ts.
   if (relativePath === 'app/App.vue') return null
+  // Official shadcn-vue compound component pattern (e.g. components/ui/button/Button.vue)
+  if (relativePath.startsWith('components/ui/')) return null
   const parent = basename(absoluteDir)
   const stem = fileName.includes('.')
     ? (fileName.split('.')[0] ?? '')

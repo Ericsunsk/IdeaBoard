@@ -328,24 +328,28 @@
   </div>
 
   <!-- 创建新文件夹弹窗 -->
-  <Dialog
-    v-model:visible="folderDialogVisible"
-    modal
-    :show-header="false"
-    :style="{ width: 'min(420px, calc(100vw - 32px))' }"
-    :pt="dialogPt"
-    @focusin="emit('focus-scope-change', true)"
-    @focusout="emit('focus-scope-change', false)"
-  >
-    <form class="p-6" @submit.prevent="submitFolder">
+  <DialogRoot :open="folderDialogVisible" @update:open="folderDialogVisible = $event">
+    <DialogPortal>
+      <DialogOverlay :class="ibDialogMaskClass" />
+      <DialogContent
+        :class="cn(dialogContentBaseClass, dialogContentClass)"
+        :style="{ width: 'min(420px, calc(100vw - 32px))' }"
+        :aria-label="t('library.dialogs.newFolderTitle')"
+        @pointer-down-outside="blockDialogOutsideDismiss"
+      >
+        <div class="min-h-0 overflow-y-auto">
+          <DialogDescription class="sr-only">
+            {{ t('library.dialogs.newFolderTitle') }}
+          </DialogDescription>
+    <form class="p-6" @submit.prevent="submitFolder" @focusin="emit('focus-scope-change', true)" @focusout="emit('focus-scope-change', false)">
       <h3 class="m-0 text-lg font-semibold">{{ t('library.dialogs.newFolderTitle') }}</h3>
       <label class="mt-5 block text-sm font-semibold" for="island-folder-name">{{
         t('library.dialogs.folderNameLabel')
       }}</label>
-      <InputText
+      <input
         id="island-folder-name"
         v-model="folderDraft"
-        unstyled
+        type="text"
         class="mt-2 w-full rounded-xl border border-board-card-border bg-board-control-bg px-3 py-2.5 text-sm outline-none focus:border-board-primary"
         maxlength="100"
         autofocus
@@ -354,42 +358,43 @@
       <p v-if="folderError" class="mt-2 mb-0 text-sm text-board-danger">{{ folderError }}</p>
       <div class="mt-6 flex justify-end gap-2">
         <Button
-          unstyled
           type="button"
-          :label="t('library.dialogs.cancel')"
-          class="rounded-full px-4 py-2 text-sm font-semibold text-board-page-text-muted hover:bg-ib-surface-hover"
-          @click="folderDialogVisible = false"
-        />
+          class="rounded-full bg-transparent px-4 py-2 text-sm font-semibold text-board-page-text-muted hover:bg-ib-surface-hover"
+          @click="folderDialogVisible = false">{{ t('library.dialogs.cancel') }}</Button>
         <Button
-          unstyled
           type="submit"
-          :label="t('library.dialogs.create')"
           :disabled="folderSaving || !folderDraft.trim()"
-          class="rounded-full bg-board-primary px-4 py-2 text-sm font-semibold text-ib-text-inverse disabled:opacity-50"
-        />
+          class="rounded-full bg-board-primary px-4 py-2 text-sm font-semibold text-ib-text-inverse disabled:opacity-50">{{ t('library.dialogs.create') }}</Button>
       </div>
     </form>
-  </Dialog>
+        </div>
+      </DialogContent>
+    </DialogPortal>
+  </DialogRoot>
 
   <!-- 重命名文件夹弹窗 -->
-  <Dialog
-    v-model:visible="renameDialogVisible"
-    modal
-    :show-header="false"
-    :style="{ width: 'min(420px, calc(100vw - 32px))' }"
-    :pt="dialogPt"
-    @focusin="emit('focus-scope-change', true)"
-    @focusout="emit('focus-scope-change', false)"
-  >
-    <form class="p-6" @submit.prevent="submitRenameFolder">
+  <DialogRoot :open="renameDialogVisible" @update:open="renameDialogVisible = $event">
+    <DialogPortal>
+      <DialogOverlay :class="ibDialogMaskClass" />
+      <DialogContent
+        :class="cn(dialogContentBaseClass, dialogContentClass)"
+        :style="{ width: 'min(420px, calc(100vw - 32px))' }"
+        :aria-label="t('library.dialogs.renameFolderTitle')"
+        @pointer-down-outside="blockDialogOutsideDismiss"
+      >
+        <div class="min-h-0 overflow-y-auto">
+          <DialogDescription class="sr-only">
+            {{ t('library.dialogs.renameFolderTitle') }}
+          </DialogDescription>
+    <form class="p-6" @submit.prevent="submitRenameFolder" @focusin="emit('focus-scope-change', true)" @focusout="emit('focus-scope-change', false)">
       <h3 class="m-0 text-lg font-semibold">{{ t('library.dialogs.renameFolderTitle') }}</h3>
       <label class="mt-5 block text-sm font-semibold" for="island-rename-folder-name">{{
         t('library.dialogs.folderNameLabel')
       }}</label>
-      <InputText
+      <input
         id="island-rename-folder-name"
         v-model="renameDraft"
-        unstyled
+        type="text"
         class="mt-2 w-full rounded-xl border border-board-card-border bg-board-control-bg px-3 py-2.5 text-sm outline-none focus:border-board-primary"
         maxlength="100"
         autofocus
@@ -398,22 +403,19 @@
       <p v-if="renameError" class="mt-2 mb-0 text-sm text-board-danger">{{ renameError }}</p>
       <div class="mt-6 flex justify-end gap-2">
         <Button
-          unstyled
           type="button"
-          :label="t('library.dialogs.cancel')"
-          class="rounded-full px-4 py-2 text-sm font-semibold text-board-page-text-muted hover:bg-ib-surface-hover"
-          @click="renameDialogVisible = false"
-        />
+          class="rounded-full bg-transparent px-4 py-2 text-sm font-semibold text-board-page-text-muted hover:bg-ib-surface-hover"
+          @click="renameDialogVisible = false">{{ t('library.dialogs.cancel') }}</Button>
         <Button
-          unstyled
           type="submit"
-          :label="t('library.dialogs.save')"
           :disabled="renameSaving || !renameDraft.trim()"
-          class="rounded-full bg-board-primary px-4 py-2 text-sm font-semibold text-ib-text-inverse disabled:opacity-50"
-        />
+          class="rounded-full bg-board-primary px-4 py-2 text-sm font-semibold text-ib-text-inverse disabled:opacity-50">{{ t('library.dialogs.save') }}</Button>
       </div>
     </form>
-  </Dialog>
+        </div>
+      </DialogContent>
+    </DialogPortal>
+  </DialogRoot>
 
   <!-- 🌟 Demo 同款零遮挡全景高清 Lightbox 弹窗 (bg-black/65 backdrop-blur-2xl) -->
   <Teleport to="body">
@@ -501,9 +503,17 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
-import InputText from 'primevue/inputtext'
+import { Button } from '@/components/ui/button'
+import {
+  DialogContent,
+  DialogDescription,
+  DialogOverlay,
+  DialogPortal,
+  DialogRoot,
+} from '@/components/ui/dialog'
+import { dialogContentBaseClass } from '@/components/ui/dialog/dialogClasses'
+import { cn } from '@/lib/utils'
+import { ibDialogMaskClass } from '../../../shared/theme/dialogMask'
 import {
   Bookmark,
   Check,
@@ -620,12 +630,13 @@ const renameDraft = ref('')
 const renameError = ref('')
 const renameSaving = ref(false)
 
-const dialogPt = {
-  root: {
-    class: '!rounded-2xl !border-board-card-border !bg-board-surface-strong/80 backdrop-blur-md',
-  },
-  content: { class: '!p-0' },
+function blockDialogOutsideDismiss(event: Event) {
+  event.preventDefault()
 }
+
+// UiDialog 以 content-class 拥有造型：圆角 16px、板面描边、半透底加模糊。
+const dialogContentClass =
+  'overflow-hidden rounded-2xl border border-board-card-border bg-board-surface-strong/80 backdrop-blur-md'
 
 function markImageError(assetID: number) {
   failedImages.value = new Set(failedImages.value).add(assetID)

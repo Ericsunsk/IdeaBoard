@@ -1,28 +1,25 @@
 <template>
   <div class="grid min-h-screen place-items-center bg-ib-page p-6 text-ib-text">
     <Card
-      class="w-[min(520px,100%)] rounded-[var(--radius-ib-overlay)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-panel)]"
+      class="w-[min(520px,100%)] p-6 rounded-[var(--radius-ib-overlay)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-panel)]"
     >
-      <template #content>
-        <div class="flex flex-col items-start gap-4">
-          <ProgressSpinner
-            v-if="loading"
-            class="h-8 w-8"
-            stroke-width="4"
-            :aria-label="t('account.shareJoin.spinnerAria')"
-          />
-          <h1 class="m-0 text-[22px] font-bold text-ib-text">{{ titleText }}</h1>
-          <p class="m-0 text-[15px] leading-7 text-ib-text-muted">{{ statusText }}</p>
-          <Button
-            v-if="failed"
-            :label="t('account.shareJoin.backToBoards')"
-            severity="secondary"
-            outlined
-            class="!rounded-[var(--radius-ib-control)] !border-ib-border !bg-ib-surface !text-ib-text-muted !shadow-none hover:!border-ib-border-hover hover:!bg-ib-surface-hover hover:!text-ib-text focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]"
-            @click="goBoards"
-          />
-        </div>
-      </template>
+      <div class="flex flex-col items-start gap-4">
+        <Spinner
+          v-if="loading"
+          class="h-8 w-8"
+          stroke-width="4"
+          :label="t('account.shareJoin.spinnerAria')"
+        />
+        <h1 class="m-0 text-[22px] font-bold text-ib-text">{{ titleText }}</h1>
+        <p class="m-0 text-[15px] leading-7 text-ib-text-muted">{{ statusText }}</p>
+        <Button
+          v-if="failed"
+          variant="outline"
+          @click="goBoards"
+        >
+          {{ t('account.shareJoin.backToBoards') }}
+        </Button>
+      </div>
     </Card>
   </div>
 </template>
@@ -31,9 +28,9 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import Button from 'primevue/button'
-import Card from 'primevue/card'
-import ProgressSpinner from 'primevue/progressspinner'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Spinner } from '@/components/ui/spinner'
 import { USER_BOARDS_PATH, USER_CANVAS_PATH } from '../../../shared/constants/routePaths'
 import { joinSharedBoardByToken } from '../../board'
 

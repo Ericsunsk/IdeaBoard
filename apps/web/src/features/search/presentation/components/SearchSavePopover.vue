@@ -1,12 +1,13 @@
 <template>
-  <Popover
-    ref="popover"
-    unstyled
-    :pt="searchSavePopoverPt"
-    @show="handlePopoverShow"
-    @hide="handlePopoverHide"
-  >
-    <div class="w-48 select-none text-board-page-text" @click.stop>
+  <Popover :open="isOpen" @update:open="onOpenChange">
+    <PopoverAnchor v-if="anchorEl" :reference="anchorEl" />
+    <PopoverContent
+      :class="searchSavePopoverContentClass"
+      align="center"
+      side="bottom"
+      :side-offset="4"
+    >
+      <div class="w-48 select-none text-board-page-text" @click.stop>
       <div class="flex items-center gap-2 px-2 py-1.5">
         <Search class="size-3.5 shrink-0 text-board-page-text-muted" aria-hidden="true" />
         <input
@@ -84,19 +85,18 @@
         </button>
       </div>
     </div>
+    </PopoverContent>
   </Popover>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, ref, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Popover from 'primevue/popover'
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { Bookmark, Folder, Search } from '@iconoir/vue'
 import type { SearchResult } from '../../domain/models'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
-import { createPopoverMotionPt } from '../../../../shared/motion/popoverMotion'
-import type { PopoverPassThroughOptions } from 'primevue/popover'
 import { useSearchLibraryCoordinator } from '../../infrastructure/libraryCoordinator'
 
 export type SearchSavePopoverRequest = {
@@ -111,10 +111,6 @@ export type SearchSavePopoverController = {
 }
 
 type OpenRequest = SearchSavePopoverRequest & { event: Event; anchor: HTMLElement }
-type PrimePopover = {
-  show: (event: Event, target?: HTMLElement) => void
-  hide: () => void
-}
 
 const emit = defineEmits<{
   'auth-required': [result: SearchResult]
@@ -123,7 +119,8 @@ const emit = defineEmits<{
 
 const toast = useAppToast()
 const { t } = useI18n()
-const popover = ref<PrimePopover | null>(null)
+const isOpen = ref(false)
+const anchorEl = ref<HTMLElement | null>(null)
 const searchInputRef = ref<HTMLInputElement>()
 const activeRequest = shallowRef<OpenRequest | null>(null)
 const saving = ref(false)
@@ -134,12 +131,8 @@ const library = useSearchLibraryCoordinator()
 const { folders } = library.folderFacts
 let pendingOpen: OpenRequest | null = null
 
-const searchSavePopoverPt = {
-  ...createPopoverMotionPt(),
-  root: {
-    class: 'search-save-popover ib-page-chrome-surface rounded-[var(--radius-ib-control)] p-1.5',
-  },
-} satisfies PopoverPassThroughOptions
+const searchSavePopoverContentClass =
+  'search-save-popover ib-page-chrome-surface rounded-[var(--radius-ib-control)] p-1.5'
 
 const quickSavesFolder = computed(() =>
   folders.value.find((folder) => folder.name.toLowerCase() === 'quick saves' || folder.is_default),
@@ -191,8 +184,26 @@ function show(request: OpenRequest) {
   isOpenOrOpening.value = true
   folderFactsReady.value = false
   emit('anchor-changed', request.anchor)
-  popover.value?.show(request.event, request.anchor)
+  anchorEl.value = request.anchor
+  isOpen.value = true
+  handlePopoverShow()
   void loadFolders()
+}
+
+function hide() {
+  if (!isOpen.value && !isOpenOrOpening.value) return
+  isOpen.value = false
+  handlePopoverHide()
+}
+
+function onOpenChange(open: boolean) {
+  if (isOpen.value === open) return
+  isOpen.value = open
+  if (open) {
+    handlePopoverShow()
+  } else {
+    handlePopoverHide()
+  }
 }
 
 async function handleUnsave(request: SearchSavePopoverRequest) {
@@ -228,11 +239,11 @@ function toggle(event: Event, request: SearchSavePopoverRequest) {
   if (isOpenOrOpening.value) {
     if (activeKey === nextKey) {
       pendingOpen = null
-      popover.value?.hide()
+      hide()
       return
     }
     pendingOpen = nextRequest
-    popover.value?.hide()
+    hide()
     return
   }
   show(nextRequest)
@@ -255,6 +266,7 @@ function handlePopoverHide() {
     void nextTick(() => show(nextRequest))
     return
   }
+  anchorEl.value = null
   emit('anchor-changed', null)
 }
 
@@ -264,7 +276,7 @@ async function persist(folderId?: number, newFolderName?: string) {
   saving.value = true
   try {
     await library.saveReference(request.result, folderId, newFolderName)
-    popover.value?.hide()
+    hide()
     const targetName =
       newFolderName ||
       folders.value.find((folder) => folder.id === folderId)?.name ||
@@ -295,5 +307,5 @@ async function handleEnterCreate() {
   if (canCreateFromQuery.value) void persist(undefined, name)
 }
 
-defineExpose({ toggle, hide: () => popover.value?.hide() })
+defineExpose({ toggle, hide })
 </script>

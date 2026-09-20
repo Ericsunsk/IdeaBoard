@@ -2,6 +2,7 @@
 export default {
   dialog: {
     title: '계정',
+    description: '프로필, 사용량, 결제 및 보안 설정을 관리합니다.',
     close: '계정 닫기',
     navigation: '계정 탐색',
   },

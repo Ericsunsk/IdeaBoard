@@ -34,7 +34,12 @@ const creditLabels: Record<string, string> = {
   not_applicable: '未触发',
 }
 
+export const ORDER_STATUS_FILTER_ALL = 'all' as const
+
+export type PaymentOrderStatusFilter = typeof ORDER_STATUS_FILTER_ALL | AdminPaymentOrderStatus
+
 export const paymentOrderStatusOptions = [
+  { label: '全部状态', value: ORDER_STATUS_FILTER_ALL },
   { label: '创建中', value: 'creating' },
   { label: '待支付', value: 'checkout_open' },
   { label: '异步确认中', value: 'async_payment_pending' },
@@ -43,7 +48,7 @@ export const paymentOrderStatusOptions = [
   { label: '已取消', value: 'cancelled' },
   { label: '已过期', value: 'expired' },
   { label: '支付失败', value: 'payment_failed' },
-] satisfies Array<{ label: string; value: AdminPaymentOrderStatus }>
+] satisfies Array<{ label: string; value: PaymentOrderStatusFilter }>
 
 export function getPaymentOrderStatusPresentation(status: AdminPaymentOrderStatus) {
   return lifecyclePresentation[status]

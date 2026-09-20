@@ -8,9 +8,9 @@
       :aria-label="t('account.topUp.optionsLoading')"
     >
       <span class="sr-only">{{ t('account.topUp.optionsLoading') }}</span>
-      <Skeleton height="4.5rem" />
-      <Skeleton height="2.75rem" />
-      <Skeleton height="2.75rem" />
+      <UiSkeleton height="4.5rem" />
+      <UiSkeleton height="2.75rem" />
+      <UiSkeleton height="2.75rem" />
     </div>
 
     <div
@@ -21,14 +21,11 @@
         {{ t('account.errors.optionsLoadFailed') }}
       </p>
       <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(error) }}</p>
-      <Button
-        :label="t('account.reload')"
-        severity="secondary"
-        size="small"
-        text
+      <UiButton
+        variant="ghost"
+        size="sm"
         class="mt-3"
-        @click="emit('retry')"
-      />
+        @click="emit('retry')">{{ t('account.reload') }}</UiButton>
     </div>
 
     <div
@@ -106,15 +103,11 @@
       </IbFormField>
 
       <div>
-        <Button
-          unstyled
+        <UiButton
           type="submit"
-          :label="t('account.topUp.payNow')"
           :disabled="!canCheckout"
           :loading="checkoutPending"
-          :class="accountPrimaryActionButtonClass"
-          :pt="accountButtonPt"
-        />
+          :class="accountPrimaryActionButtonClass">{{ t('account.topUp.payNow') }}</UiButton>
         <p class="mt-2 mb-0 text-center text-[12px] leading-5 text-ib-text-subtle">
           {{ t('account.topUp.termsPrefix') }}
           <a
@@ -147,8 +140,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Button from 'primevue/button'
-import Skeleton from 'primevue/skeleton'
+import { Button as UiButton } from '@/components/ui/button'
+import { Skeleton as UiSkeleton } from '@/components/ui/skeleton'
 import IbFormField from '../../../../shared/components/IbFormField.vue'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
 import { resolveInteractiveControlState } from '../../../../shared/interaction/interactiveControlState'
@@ -156,11 +149,7 @@ import { ibFormInputClass } from '../../../../shared/theme/formControls'
 import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
 import { formatUsdForIdeas, MIN_IDEA_QUANTITY, normalizeIdeaQuantity } from '../../domain'
 import type { PaymentPurchaseOptions } from '../../infrastructure'
-import {
-  accountButtonPt,
-  accountCardPanelClass,
-  accountPrimaryActionButtonClass,
-} from '../common/ui'
+import { accountCardPanelClass, accountPrimaryActionButtonClass } from '../common/ui'
 
 const props = defineProps<{
   options?: PaymentPurchaseOptions | undefined

@@ -1,7 +1,5 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import PrimeVue from 'primevue/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { adminPrimeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import AdminPaymentOrdersPage from './AdminPaymentOrdersPage.vue'
 
@@ -78,6 +76,28 @@ describe('AdminPaymentOrdersPage', () => {
     await waitFor(() =>
       expect(resource.search).toHaveBeenLastCalledWith(
         expect.objectContaining({ cursor: 'cursor-2' }),
+      ),
+    )
+  })
+
+  it('clears the status filter back to all from inside the select', async () => {
+    const { user } = renderPage()
+    await screen.findByText(orderNumber)
+
+    await user.click(screen.getByRole('button', { name: '筛选支付订单' }))
+    await user.click(screen.getByRole('combobox'))
+    await user.click(await screen.findByRole('option', { name: '已支付待到账' }))
+    await waitFor(() =>
+      expect(resource.search).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: 'paid_pending_credit' }),
+      ),
+    )
+
+    await user.click(screen.getByRole('combobox'))
+    await user.click(await screen.findByRole('option', { name: '全部状态' }))
+    await waitFor(() =>
+      expect(resource.search).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: undefined, cursor: undefined }),
       ),
     )
   })
@@ -222,12 +242,13 @@ describe('AdminPaymentOrdersPage', () => {
     expect(await screen.findByRole('table', { name: '支付订单列表' })).toBeVisible()
   })
 
-  it('renders the compact filtered empty state without a table shell', async () => {
+  it('keeps the table headers mounted for the empty state', async () => {
     resource.search.mockResolvedValueOnce({ orders: [], total: 0 })
     renderPage()
 
     expect(await screen.findByText('暂无支付订单')).toBeVisible()
-    expect(screen.queryByRole('table', { name: '支付订单列表' })).not.toBeInTheDocument()
+    expect(screen.getByRole('table', { name: '支付订单列表' })).toBeVisible()
+    expect(screen.getByRole('columnheader', { name: '公开订单号' })).toBeVisible()
   })
 })
 
@@ -239,10 +260,7 @@ function renderPage() {
   const queryClient = new QueryClient()
   return renderWithUser(AdminPaymentOrdersPage, {
     global: {
-      plugins: [
-        [PrimeVue, adminPrimeVueTestOptions],
-        [VueQueryPlugin, { queryClient }],
-      ],
+      plugins: [[VueQueryPlugin, { queryClient }]],
     },
   })
 }

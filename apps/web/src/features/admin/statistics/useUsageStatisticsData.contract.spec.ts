@@ -12,16 +12,13 @@ vi.mock('./resource', async (importOriginal) => ({
 }))
 
 beforeEach(() => {
-  mockState.statisticsReturns = [makeStatisticsQuery(), makeStatisticsQuery()]
+  mockState.statisticsReturns = [makeStatisticsQuery()]
 })
 
 describe('useUsageStatisticsData', () => {
   it('exposes statistics API errors so the page does not render missing data as zeroes', () => {
     const error = new Error('statistics failed')
-    mockState.statisticsReturns = [
-      makeStatisticsQuery({ error, isError: true }),
-      makeStatisticsQuery(),
-    ]
+    mockState.statisticsReturns = [makeStatisticsQuery({ error, isError: true })]
 
     const statistics = useUsageStatisticsData()
 

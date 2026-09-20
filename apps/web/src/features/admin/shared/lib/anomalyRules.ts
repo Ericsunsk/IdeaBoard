@@ -5,7 +5,7 @@ import type {
 } from '../../../../shared/api/generated-query/model'
 import {
   ADMIN_STATISTICS_PATH,
-  ADMIN_TASK_MONITOR_PATH,
+  ADMIN_MONITOR_PATH,
 } from '../../../../shared/constants/routePaths'
 
 export type AdminAnomalySeverity = 'critical' | 'warning' | 'info'
@@ -34,12 +34,11 @@ type AdminAnomalyInput = {
 
 type AdminAnomalyDraft = Omit<AdminAnomalyItem, 'detectedAt'>
 
-const TASK_MONITOR_ROUTE = ADMIN_TASK_MONITOR_PATH
+const MONITOR_ROUTE = ADMIN_MONITOR_PATH
 const STATISTICS_ROUTE = ADMIN_STATISTICS_PATH
 
 const QUEUE_WARNING_THRESHOLD = 30
 const QUEUE_CRITICAL_THRESHOLD = 80
-const ACCOUNT_LOAD_WARNING_RATIO = 0.9
 const MODEL_FAILURE_WARNING_RATE = 10
 const MODEL_FAILURE_CRITICAL_RATE = 15
 const QUALITY_SUCCESS_WARNING_RATE = 88
@@ -67,7 +66,7 @@ function pushSystemAnomalies(drafts: AdminAnomalyDraft[], input: AdminAnomalyInp
       source: 'system',
       title: '实时监控不可用',
       summary: '后台未能获取任务运行状态，请检查监控接口。',
-      route: TASK_MONITOR_ROUTE,
+      route: MONITOR_ROUTE,
       actionLabel: '查看任务监控',
     })
   }
@@ -102,22 +101,8 @@ function pushRuntimeAnomalies(
       title: '队列积压偏高',
       summary: '任务等待队列正在堆积，可能影响生成延迟。',
       metric: `${queueTotal} 个等待任务`,
-      route: TASK_MONITOR_ROUTE,
+      route: MONITOR_ROUTE,
       actionLabel: '查看执行压力',
-    })
-  }
-
-  const peakAccountLoad = getPeakAccountLoad(monitorData)
-  if (peakAccountLoad && peakAccountLoad.ratio >= ACCOUNT_LOAD_WARNING_RATIO) {
-    drafts.push({
-      id: `account.load-${peakAccountLoad.accountId}`,
-      severity: 'warning',
-      source: 'account',
-      title: '账号并发接近上限',
-      summary: `账号 ${peakAccountLoad.accountId} 当前负载接近并发上限。`,
-      metric: `${peakAccountLoad.current}/${peakAccountLoad.max}`,
-      route: TASK_MONITOR_ROUTE,
-      actionLabel: '查看实时并发',
     })
   }
 
@@ -132,7 +117,7 @@ function pushRuntimeAnomalies(
         title: '活跃任务量偏高',
         summary: '待处理和执行中的任务量较高。',
         metric: `${activeTotal} 个活跃任务`,
-        route: TASK_MONITOR_ROUTE,
+        route: MONITOR_ROUTE,
         actionLabel: '查看任务分布',
       })
     }
@@ -240,21 +225,6 @@ function pushStatisticsAnomalies(drafts: AdminAnomalyDraft[], statistics: AdminS
   ]) {
     if (draft) drafts.push(draft)
   }
-}
-
-function getPeakAccountLoad(monitorData: MonitorData) {
-  return Object.entries(monitorData.account_loads || {})
-    .map(([accountId, load]) => {
-      const current = Math.max(0, load.current_concurrent || 0)
-      const max = Math.max(0, load.max_concurrent || 0)
-      return {
-        accountId,
-        current,
-        max,
-        ratio: max > 0 ? current / max : 0,
-      }
-    })
-    .sort((a, b) => b.ratio - a.ratio)[0]
 }
 
 function getDominantShare<Row extends { label: string; total: number }>(rows?: Row[] | null) {

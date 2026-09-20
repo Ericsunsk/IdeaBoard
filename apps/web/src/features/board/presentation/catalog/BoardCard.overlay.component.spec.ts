@@ -53,7 +53,7 @@ describe('BoardCard overlay lifecycle', () => {
     const view = renderCard()
 
     await view.user.click(screen.getByRole('button', { name: 'More actions' }))
-    await view.user.click((await screen.findByText('Delete')).closest('a')!)
+    await view.user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
 
     await waitFor(() => expect(view.emitted()['menu-hidden']).toHaveLength(1))
     await waitFor(() => expect(view.emitted()['delete-action']).toHaveLength(1))

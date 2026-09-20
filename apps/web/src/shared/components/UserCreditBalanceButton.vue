@@ -7,9 +7,8 @@
   >
     <LightBulb class="user-credit-pill__icon" aria-hidden="true" />
   </div>
-  <Button
+  <button
     v-else
-    unstyled
     type="button"
     class="ib-page-chrome-surface user-credit-pill"
     :class="`is-${balance.status}`"
@@ -23,12 +22,11 @@
   >
     <LightBulb class="user-credit-pill__icon" aria-hidden="true" />
     <span class="user-credit-pill__balance font-mono">{{ balance.displayValue }}</span>
-  </Button>
+  </button>
 </template>
 
 <script setup lang="ts">
 import { LightBulb } from '@iconoir/vue'
-import Button from 'primevue/button'
 import type { UserIdeaBalanceControl } from './userAccountMenu.types'
 
 defineProps<{

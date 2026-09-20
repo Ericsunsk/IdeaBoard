@@ -1,4 +1,3 @@
-/* eslint-disable vue/one-component-per-file -- Small local stubs keep OAuth behavior tests independent of PrimeVue internals. */
 import { defineComponent, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor } from '../../../test/render'

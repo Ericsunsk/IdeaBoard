@@ -5,8 +5,6 @@ import {
   useOverlayInteractionLifecycle,
   type OverlayDismissal,
 } from '../shared/composables/useOverlayInteractionLifecycle'
-import { usePrimeDialogOverlayLifecycle } from '../shared/composables/usePrimeDialogOverlayLifecycle'
-import { usePrimePopupMenuOverlayLifecycle } from '../shared/composables/usePrimePopupMenuOverlayLifecycle'
 
 describe('overlay interaction lifecycle contract', () => {
   it('blocks shared lifecycle dismissal while busy and resets every reopen', () => {
@@ -49,7 +47,7 @@ describe('overlay interaction lifecycle contract', () => {
     }
   })
 
-  it('restores trigger focus through the Prime Dialog adapter after close completes', () => {
+  it('restores trigger focus through the overlay lifecycle after close completes', () => {
     const visible = ref(false)
     const trigger = document.createElement('button')
     document.body.appendChild(trigger)
@@ -57,7 +55,7 @@ describe('overlay interaction lifecycle contract', () => {
     const focus = vi.spyOn(trigger, 'focus')
     const scope = effectScope()
     const dialog = scope.run(() =>
-      usePrimeDialogOverlayLifecycle({
+      useOverlayInteractionLifecycle({
         visible,
         surface: {
           dismissibleBy: ['close-control'],
@@ -77,51 +75,6 @@ describe('overlay interaction lifecycle contract', () => {
     } finally {
       scope.stop()
       trigger.remove()
-    }
-  })
-
-  it('routes Prime Menu outside-click and Escape through one lifecycle and tears listeners down', async () => {
-    const trigger = document.createElement('button')
-    const container = document.createElement('div')
-    document.body.append(trigger, container)
-    const hide = vi.fn()
-    const scope = effectScope()
-    const menu = scope.run(() => usePrimePopupMenuOverlayLifecycle({}))!
-    menu.popupRef.value = {
-      container,
-      target: trigger,
-      hide,
-      toggle: vi.fn(),
-    }
-
-    try {
-      trigger.focus()
-      menu.toggle(new Event('click'), trigger)
-      await nextTick()
-      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }))
-      await nextTick()
-
-      expect(hide).toHaveBeenCalledOnce()
-      expect(document.activeElement).toBe(trigger)
-
-      menu.toggle(new Event('click'), trigger)
-      await nextTick()
-      document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
-      await nextTick()
-
-      expect(hide).toHaveBeenCalledTimes(2)
-
-      menu.toggle(new Event('click'), trigger)
-      await nextTick()
-      scope.stop()
-      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }))
-      document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
-
-      expect(hide).toHaveBeenCalledTimes(2)
-    } finally {
-      scope.stop()
-      trigger.remove()
-      container.remove()
     }
   })
 

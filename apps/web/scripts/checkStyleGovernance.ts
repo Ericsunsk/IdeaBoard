@@ -58,14 +58,6 @@ const styleCountRules = [
 type StyleCountRuleId = (typeof styleCountRules)[number]['id']
 
 const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
-  'src/features/admin/app/AdminLayout.vue': {
-    counts: {
-      'raw-color': 1,
-      'raw-shadow': 4,
-      'raw-z-index': 3,
-    },
-    reason: 'Admin shell owns bespoke rail layering and visual constants.',
-  },
   'src/features/admin/pages/login/AdminLoginPage.vue': {
     counts: {
       'raw-color': 1,
@@ -73,28 +65,10 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     },
     reason: 'Login first-screen card composition keeps a one-off Admin entry shadow.',
   },
-  'src/features/admin/system-settings/pages/AdminSystemSettingsPage.vue': {
-    counts: {
-      'raw-shadow': 1,
-    },
-    reason: 'Logo upload affordance uses a focus-ring shadow that bridges an Admin token.',
-  },
-  'src/shared/theme/panelCardPt.ts': {
-    counts: {
-      'raw-shadow': 1,
-    },
-    reason: 'Shared panel Card pass-through owns the cross-surface panel shadow contract.',
-  },
-  'src/features/admin/shared/lib/overlayPt.ts': {
-    counts: {
-      'raw-shadow': 2,
-    },
-    reason: 'Admin overlay pass-through owns the menu and dialog overlay shadow contracts.',
-  },
   'src/features/admin/shared/lib/uiClasses.ts': {
     counts: {
       'raw-color': 1,
-      'raw-shadow': 2,
+      'raw-shadow': 1,
     },
     reason: 'Admin shared UI helpers own metric/control shadow primitives.',
   },
@@ -104,12 +78,25 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     },
     reason: 'Avatar CSS contract keeps a fallback color for the cross-feature avatar bridge.',
   },
-  'src/features/admin/task-monitor/status.ts': {
+  'src/features/admin/monitor/domain/status.ts': {
     counts: {
-      'raw-color': 8,
-      'raw-shadow': 4,
+      'raw-color': 10,
+      'raw-shadow': 5,
     },
     reason: 'Task status palette is a domain visual contract shared by table and detail views.',
+  },
+  'src/shared/domain/taskMetricTokens.ts': {
+    counts: {
+      'raw-color': 5,
+    },
+    reason: 'Task metric pill/chart palette is a domain visual contract shared by monitor pills and charts.',
+  },
+  'src/features/admin/app/AdminLayout.vue': {
+    counts: {
+      'raw-motion': 30,
+    },
+    reason:
+      'Sidebar shell motion (width/max-height choreography) uses Motion Policy var() tokens; color/transform feedback inside the shell uses plain Tailwind transition utilities.',
   },
 }
 
@@ -117,7 +104,7 @@ const selectorCountRules = [
   {
     id: 'deep-selector',
     pattern: /:deep\s*\(/g,
-    message: 'Avoid :deep() in business components; expose an explicit class or pt helper.',
+    message: 'Prefer local markup or explicit variant contracts over :deep().',
   },
   {
     id: 'global-selector',
@@ -125,9 +112,9 @@ const selectorCountRules = [
     message: 'Avoid :global() unless the feature owns a documented cross-DOM contract.',
   },
   {
-    id: 'primevue-internal-selector',
+    id: 'legacy-primevue-selector',
     pattern: /\.p-[a-z][\w-]*/g,
-    message: 'PrimeVue internals must be styled through pt helpers or documented vendor bridges.',
+    message: 'Legacy PrimeVue internal selector (.p-*) is strictly forbidden after migrating to shadcn/Reka UI.',
   },
   {
     id: 'vue-flow-internal-selector',
@@ -139,12 +126,6 @@ const selectorCountRules = [
 type SelectorCountRuleId = (typeof selectorCountRules)[number]['id']
 
 const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = {
-  'src/app/style.css': {
-    counts: {
-      'primevue-internal-selector': 17,
-    },
-    reason: 'Admin route typography and tooltip bridge for PrimeVue vendor DOM.',
-  },
   'src/features/canvas/presentation/nodes/primitives/NodeToolIconButton.vue': {
     counts: {
       'deep-selector': 1,

@@ -1,9 +1,5 @@
 import { defineComponent } from 'vue'
-import PrimeVue from 'primevue/config'
-import ConfirmationService from 'primevue/confirmationservice'
-import ToastService from 'primevue/toastservice'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { adminPrimeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen } from '../../../../test/render'
 import AdminStoragePage from './AdminStoragePage.vue'
 
@@ -85,7 +81,7 @@ describe('AdminStoragePage', () => {
   it('renders storage cards with active badge and parameters grid', async () => {
     renderWithUser(Harness, {
       global: {
-        plugins: [[PrimeVue, adminPrimeVueTestOptions], ConfirmationService, ToastService],
+        plugins: [],
       },
     })
 
@@ -98,7 +94,7 @@ describe('AdminStoragePage', () => {
   it('opens redesigned compact dialog with tabbed pagination for cloud providers', async () => {
     const { user } = renderWithUser(Harness, {
       global: {
-        plugins: [[PrimeVue, adminPrimeVueTestOptions], ConfirmationService, ToastService],
+        plugins: [],
       },
     })
 

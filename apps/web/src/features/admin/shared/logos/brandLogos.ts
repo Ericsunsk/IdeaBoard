@@ -67,7 +67,6 @@ export interface AdminBrandCategory {
   key: AdminBrandCategoryKey
   label: string
 }
-
 export interface AdminBrandLogoItem {
   key: AdminBrandLogoOverrideUpdateLogoKey
   label: string
@@ -172,7 +171,7 @@ export const ALL_ADMIN_BRAND_LOGOS: AdminBrandLogoItem[] = [
   { key: 'discord', label: 'Discord', logoSrc: logoDiscord, category: 'auth' },
 ]
 
-export const adminBrandLogoMap: Record<string, string> = Object.fromEntries(
+const adminBrandLogoMap: Record<string, string> = Object.fromEntries(
   ALL_ADMIN_BRAND_LOGOS.map((item) => [item.key, item.logoSrc]),
 )
 
@@ -208,29 +207,29 @@ const ADMIN_BRAND_LOGO_MATCH_RULES: readonly AdminBrandLogoMatchRule[] = [
   { key: 'alibabacloud', allOf: ['aliyuncs.com'], anyOf: ['oss-', 's3-compatible'] },
   { key: 'tencent-cos', allOf: ['myqcloud.com'], anyOf: ['cos.', 'tencent-cos'] },
   { key: 'amazons3', allOf: ['amazonaws.com'], anyOf: ['s3.', 'aws-s3', 's3-compatible'] },
-  { key: 'cloudflare', anyOf: ['cloudflare', 'workers.dev'] },
+  { key: 'cloudflare', anyOf: ['cloudflare', 'workers.dev', 'workers ai', 'workers-ai'] },
   { key: 'flux', anyOf: ['flux', 'bfl', 'blackforestlabs'] },
   { key: 'fal', anyOf: ['fal.ai', 'fal-ai', 'fal_ai', 'fal.'] },
   { key: 'replicate', anyOf: ['replicate'] },
   { key: 'ideogram', anyOf: ['ideogram'] },
   { key: 'recraft', anyOf: ['recraft'] },
   { key: 'runway', anyOf: ['runway', 'runwayml'] },
-  { key: 'zhipu', anyOf: ['zhipu', 'bigmodel', 'cogview', 'glm'] },
-  { key: 'aliyun', anyOf: ['dashscope', 'aliyun', 'wanx', 'qwen'] },
-  { key: 'doubao', anyOf: ['volcengine', 'volces', 'doubao', 'bytedance'] },
-  { key: 'moonshot', anyOf: ['moonshot', 'kimi'] },
-  { key: 'minimax', anyOf: ['minimax', 'hailuo'] },
-  { key: 'baidu', anyOf: ['baidu', 'baidubce', 'qianfan', 'wenxin'] },
-  { key: 'tencent', anyOf: ['tencent', 'hunyuan'] },
+  { key: 'zhipu', anyOf: ['zhipu', 'bigmodel', 'cogview', 'glm', '智谱'] },
+  { key: 'aliyun', anyOf: ['dashscope', 'aliyun', 'wanx', 'qwen', '通义', '千问'] },
+  { key: 'doubao', anyOf: ['volcengine', 'volces', 'doubao', 'bytedance', '豆包'] },
+  { key: 'moonshot', anyOf: ['moonshot', 'kimi', '月之暗面'] },
+  { key: 'minimax', anyOf: ['minimax', 'hailuo', '海螺'] },
+  { key: 'baidu', anyOf: ['baidu', 'baidubce', 'qianfan', 'wenxin', '文心'] },
+  { key: 'tencent', anyOf: ['tencent', 'hunyuan', '混元'] },
   { key: 'lingyi', anyOf: ['lingyi', '01.ai', 'yi-'] },
   { key: 'gemini', anyOf: ['gemini', 'google-ai', 'aiplatform', 'generativelanguage'] },
-  { key: 'google', anyOf: ['google', 'vertex'] },
+  { key: 'google', anyOf: ['google', 'vertex', 'imagen'] },
   { key: 'anthropic', anyOf: ['anthropic', 'claude'] },
   { key: 'deepseek', anyOf: ['deepseek'] },
   { key: 'siliconflow', anyOf: ['siliconflow', 'silicon'] },
-  { key: 'stability', anyOf: ['stability', 'dreamstudio', 'stable-diffusion'] },
+  { key: 'stability', anyOf: ['stability', 'dreamstudio', 'stable-diffusion', 'sdxl', 'sd3'] },
   { key: 'midjourney', anyOf: ['midjourney'] },
-  { key: 'mistral', anyOf: ['mistral'] },
+  { key: 'mistral', anyOf: ['mistral', 'mixtral', 'codestral', 'pixtral'] },
   { key: 'groq', anyOf: ['groq'] },
   { key: 'together', anyOf: ['together'] },
   { key: 'fireworks', anyOf: ['fireworks'] },
@@ -246,7 +245,7 @@ const ADMIN_BRAND_LOGO_MATCH_RULES: readonly AdminBrandLogoMatchRule[] = [
   { key: 'pexels', anyOf: ['pexels'] },
   { key: 'github', anyOf: ['github'] },
   { key: 'discord', anyOf: ['discord'] },
-  { key: 'openai', anyOf: ['openai', 'chatgpt', 'gpt'] },
+  { key: 'openai', anyOf: ['openai', 'chatgpt', 'gpt', 'dall-e', 'dalle', 'o1-', 'o3-', 'sora'] },
 ]
 
 function matchesBrandLogoRule(text: string, rule: AdminBrandLogoMatchRule): boolean {
@@ -287,4 +286,47 @@ export function getAdminBrandLogo(
 
   const detectedKey = detectAdminBrandLogoKey(query)
   return detectedKey ? adminBrandLogoMap[detectedKey] : undefined
+}
+
+const modelBrandLogoCache = new Map<string, string | undefined>()
+
+export function resolveModelBrandLogo(model: {
+  id?: string | undefined
+  name?: string | undefined
+  provider?: string | undefined
+}): string | undefined {
+  // 列表每行模板多次调用：按 identity 缓存，~40 条规则只扫一次。
+  const cacheKey = `${model.id || ''}\n${model.name || ''}\n${model.provider || ''}`
+  const cached = modelBrandLogoCache.get(cacheKey)
+  if (cached !== undefined || modelBrandLogoCache.has(cacheKey)) return cached
+  // 1. 优先根据模型 ID 和模型名称识别具体品牌 (例如 gemini, gpt, claude, deepseek, flux, sdxl 等)
+  const specificText = `${model.id || ''} ${model.name || ''}`.trim()
+  if (specificText) {
+    const key = detectAdminBrandLogoKey({ name: specificText })
+    if (key && adminBrandLogoMap[key]) {
+      const hit = adminBrandLogoMap[key]
+      modelBrandLogoCache.set(cacheKey, hit)
+      return hit
+    }
+  }
+
+  // 2. 若模型名称未命中，尝试根据提供商名称识别 (例如 Fal AI, Cloudflare, OpenAI, 智谱 等)
+  if (model.provider) {
+    const key = detectAdminBrandLogoKey({ provider: model.provider })
+    if (key && adminBrandLogoMap[key]) {
+      const hit = adminBrandLogoMap[key]
+      modelBrandLogoCache.set(cacheKey, hit)
+      return hit
+    }
+  }
+
+  // 3. 兜底尝试所有字段组合
+  const fallbackKey = detectAdminBrandLogoKey({
+    name: model.name,
+    endpoint: model.id,
+    provider: model.provider,
+  })
+  const fallback = fallbackKey ? adminBrandLogoMap[fallbackKey] : undefined
+  modelBrandLogoCache.set(cacheKey, fallback)
+  return fallback
 }

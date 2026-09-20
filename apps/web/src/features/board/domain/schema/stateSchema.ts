@@ -48,16 +48,7 @@ const canvasGroupNodeIdSchema = v.pipe(
 
 const mediaRefSchema = v.strictObject({
   assetId: nonEmptyStringSchema,
-  // 'processing' is retired from delivery (ADR-0007) but stays in the
-  // picklist so persisted board facts carrying it still load; it normalizes
-  // to large-preview at URL build time (see shared/media/mediaRef).
-  derivativeTier: v.picklist([
-    'thumb',
-    'preview',
-    'large-preview',
-    'processing',
-    'processing-input',
-  ]),
+  derivativeTier: v.picklist(['thumb', 'preview', 'large-preview', 'processing-input']),
 })
 
 const imageNodeOutputItemSchema = v.strictObject({

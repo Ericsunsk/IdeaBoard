@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   getActiveUserLocale,
-  getActiveUserPrimeLocale,
   initUserLocale,
   isValidSupportedLocale,
   loadLocaleMessages,
@@ -11,13 +10,6 @@ import {
   type SupportedLocale,
   USER_LOCALE_STORAGE_KEY,
 } from './userLocale'
-import {
-  getUserPrimeLocale,
-  userPrimeLocaleEn,
-  userPrimeLocaleEs,
-  userPrimeLocaleKo,
-  userPrimeLocaleZhCN,
-} from './primeLocale'
 import { englishMessages, i18n } from './index'
 import { LOCALE_MANIFEST } from './localeManifest'
 
@@ -206,25 +198,21 @@ describe('User Locale Infrastructure (Milestone 1)', () => {
   })
 
   describe('setUserLocale', () => {
-    it('atomically switches to English and updates i18n, PrimeVue, DOM, and storage', async () => {
-      const primeVueConfig = { locale: userPrimeLocaleZhCN }
+    it('atomically switches to English and updates i18n, DOM, and storage', async () => {
       ;(i18n.global.locale as { value: string }).value = 'zh-CN'
 
-      const success = await setUserLocale('en', primeVueConfig)
+      const success = await setUserLocale('en')
       expect(success).toBe(true)
       expect((i18n.global.locale as { value: string }).value).toBe('en')
-      expect(primeVueConfig.locale).toEqual(userPrimeLocaleEn)
       expect(document.documentElement.lang).toBe('en')
       expect(localStorage.getItem(USER_LOCALE_STORAGE_KEY)).toBe('en')
     })
 
     it('atomically switches to a dynamic locale and updates state', async () => {
-      const primeVueConfig = { locale: userPrimeLocaleEn }
-      const success = await setUserLocale('es', primeVueConfig)
+      const success = await setUserLocale('es')
 
       expect(success).toBe(true)
       expect(i18n.global.locale.value).toBe('es')
-      expect(primeVueConfig.locale).toEqual(userPrimeLocaleEs)
       expect(document.documentElement.lang).toBe('es')
       expect(localStorage.getItem(USER_LOCALE_STORAGE_KEY)).toBe('es')
     })
@@ -237,12 +225,10 @@ describe('User Locale Infrastructure (Milestone 1)', () => {
       localStorage.setItem(USER_LOCALE_STORAGE_KEY, 'en')
       i18n.global.locale.value = 'en'
       document.documentElement.lang = 'en'
-      const primeVueConfig = { locale: userPrimeLocaleEn }
 
-      const success = await setUserLocale('ko', primeVueConfig)
+      const success = await setUserLocale('ko')
       expect(success).toBe(false)
       expect(i18n.global.locale.value).toBe('en')
-      expect(primeVueConfig.locale).toEqual(userPrimeLocaleEn)
       expect(document.documentElement.lang).toBe('en')
       expect(localStorage.getItem(USER_LOCALE_STORAGE_KEY)).toBe('en')
       expect(toastErrorMock).toHaveBeenCalledWith('The request could not be completed.')
@@ -263,7 +249,6 @@ describe('User Locale Infrastructure (Milestone 1)', () => {
       expect(i18n.global.locale.value).toBe('zh-CN')
       expect(document.documentElement.lang).toBe('zh-CN')
       expect(getActiveUserLocale()).toBe('zh-CN')
-      expect(getActiveUserPrimeLocale()).toEqual(userPrimeLocaleZhCN)
     })
 
     it('gracefully falls back to English when stored dynamic locale fails to load during bootstrap', async () => {
@@ -279,45 +264,4 @@ describe('User Locale Infrastructure (Milestone 1)', () => {
     })
   })
 
-  describe('PrimeVue Locale Configurations (primeLocale.ts)', () => {
-    it('provides distinct PrimeVue options for all four supported locales', () => {
-      expect(getUserPrimeLocale('en')).toBe(userPrimeLocaleEn)
-      expect(getUserPrimeLocale('zh-CN')).toBe(userPrimeLocaleZhCN)
-      expect(getUserPrimeLocale('es')).toBe(userPrimeLocaleEs)
-      expect(getUserPrimeLocale('ko')).toBe(userPrimeLocaleKo)
-    })
-
-    it('has complete day names and month names for all locales', () => {
-      for (const locale of SUPPORTED_LOCALES) {
-        const config = getUserPrimeLocale(locale)
-        expect(config.dayNames).toHaveLength(7)
-        expect(config.dayNamesShort).toHaveLength(7)
-        expect(config.dayNamesMin).toHaveLength(7)
-        expect(config.monthNames).toHaveLength(12)
-        expect(config.monthNamesShort).toHaveLength(12)
-        expect(config.fileSizeTypes).toHaveLength(9)
-        expect(config.aria?.close).toBeTruthy()
-        expect(config.aria?.previous).toBeTruthy()
-        expect(config.aria?.next).toBeTruthy()
-      }
-    })
-
-    it('configures locale-specific calendar conventions', () => {
-      expect(userPrimeLocaleEn.firstDayOfWeek).toBe(0)
-      expect(userPrimeLocaleEn.dateFormat).toBe('mm/dd/yy')
-      expect(userPrimeLocaleEn.showMonthAfterYear).toBe(false)
-
-      expect(userPrimeLocaleZhCN.firstDayOfWeek).toBe(1)
-      expect(userPrimeLocaleZhCN.dateFormat).toBe('yy-mm-dd')
-      expect(userPrimeLocaleZhCN.showMonthAfterYear).toBe(true)
-
-      expect(userPrimeLocaleEs.firstDayOfWeek).toBe(1)
-      expect(userPrimeLocaleEs.dateFormat).toBe('dd/mm/yy')
-      expect(userPrimeLocaleEs.showMonthAfterYear).toBe(false)
-
-      expect(userPrimeLocaleKo.firstDayOfWeek).toBe(0)
-      expect(userPrimeLocaleKo.dateFormat).toBe('yy-mm-dd')
-      expect(userPrimeLocaleKo.showMonthAfterYear).toBe(true)
-    })
-  })
 })

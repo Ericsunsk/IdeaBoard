@@ -8,7 +8,6 @@ import {
 import type { AdminStatistics } from './resource'
 import {
   adminChartTheme,
-  defineAdminChartBubbleDatasetStyle,
   defineAdminChartBubblePointStyle,
   defineAdminChartDurationScale,
   defineAdminChartPercentScale,
@@ -18,14 +17,11 @@ import {
 } from '../shared/lib/chart'
 import {
   baseChartOptions,
-  baseChartPlugins,
   baseTooltipOptions,
-  colorForModel,
   defaultModelColors,
-  normalizeModelName,
-  toNonNegativeInteger,
-  toNonNegativeNumber,
+  getModelColorByName,
 } from './usageStatisticsChartBase'
+import { formatCount, formatPercent1 } from './usageStatisticsTooltipText'
 
 type ModelRiskPoint = {
   x: number
@@ -37,23 +33,7 @@ type ModelRiskPoint = {
   failureRate: number
 }
 
-type SlowModelPoint = {
-  x: number
-  y: number
-  r: number
-  name: string
-  p95Seconds: number
-  avgSeconds: number
-  samples: number
-}
-
 export function useUsageStatisticsModelHealthCharts(adminStatistics: Ref<AdminStatistics | null>) {
-  function getModelColorByName(name: string) {
-    const key = normalizeModelName(name)
-    if (!key) return null
-    return colorForModel(key, defaultModelColors)
-  }
-
   const modelRiskRows = computed(() =>
     (adminStatistics.value?.model_health || [])
       .filter((item) => item.total > 0)
@@ -61,8 +41,9 @@ export function useUsageStatisticsModelHealthCharts(adminStatistics: Ref<AdminSt
         name: item.name === 'Unknown' ? '未识别模型' : item.name,
         total: item.total,
         failed: item.failed,
-        failureRate: Math.max(0, Math.min(100, item.failure_rate || 0)),
-        avgSeconds: Math.max(0, item.avg_seconds || 0),
+        // 后端修正必须可见：只保留 || 0 防 NaN/null 击穿 Chart.js scale，不做 0-100 / max(0) 改写。
+        failureRate: item.failure_rate || 0,
+        avgSeconds: item.avg_seconds || 0,
         color:
           getModelColorByName(item.name) ||
           defaultModelColors[idx % defaultModelColors.length] ||
@@ -115,15 +96,15 @@ export function useUsageStatisticsModelHealthCharts(adminStatistics: Ref<AdminSt
             label: (context) => {
               const point = getModelRiskPoint(context)
               if (!point) return ''
-              return `失败率: ${point.failureRate.toFixed(1)}%`
+              return `失败率: ${formatPercent1(point.failureRate)}`
             },
             afterLabel: (context) => {
               const point = getModelRiskPoint(context)
               if (!point) return []
               return [
                 `平均耗时: ${point.avgSeconds.toFixed(2)}s`,
-                `调用量: ${point.total.toLocaleString()}`,
-                `失败: ${point.failed.toLocaleString()}`,
+                `调用量: ${formatCount(point.total)}`,
+                `失败: ${formatCount(point.failed)}`,
               ]
             },
           },
@@ -144,108 +125,12 @@ export function useUsageStatisticsModelHealthCharts(adminStatistics: Ref<AdminSt
     }),
   )
 
-  const slowModelRows = computed(() =>
-    (adminStatistics.value?.slow_models || [])
-      .map((item, idx) => {
-        const modelName = item.name || '未知模型'
-        const p95Seconds = toNonNegativeNumber(item.p95_seconds)
-        const avgSeconds = toNonNegativeNumber(item.avg_seconds)
-        const samples = toNonNegativeInteger(item.samples)
-        return {
-          name: modelName,
-          p95Seconds,
-          avgSeconds,
-          samples,
-          color:
-            getModelColorByName(modelName) ||
-            defaultModelColors[idx % defaultModelColors.length] ||
-            adminChartTheme.brand,
-        }
-      })
-      .sort((a, b) => b.p95Seconds - a.p95Seconds)
-      .slice(0, 6),
-  )
-
-  const slowModelsChartData = computed<ChartData>(() => {
-    const maxSamples = Math.max(1, ...slowModelRows.value.map((row) => row.samples))
-    const colors = slowModelRows.value.map((row) => row.color)
-
-    return defineChartData({
-      labels: slowModelRows.value.map((row) => row.name),
-      datasets: [
-        {
-          type: 'bubble',
-          label: '模型尾延迟',
-          data: slowModelRows.value.map<SlowModelPoint>((row) => ({
-            x: row.p95Seconds,
-            y: row.avgSeconds,
-            r: getAdminChartBubbleRadius(row.samples, maxSamples),
-            name: row.name,
-            p95Seconds: row.p95Seconds,
-            avgSeconds: row.avgSeconds,
-            samples: row.samples,
-          })),
-          ...defineAdminChartBubbleDatasetStyle(colors),
-        },
-      ],
-    })
-  })
-
-  const slowModelsChartOptions = computed<ChartOptions>(() =>
-    defineAdminChartOptions({
-      ...baseChartOptions(),
-      layout: { padding: { top: 10, right: 18 } },
-      plugins: {
-        ...baseChartPlugins(),
-        legend: { display: false },
-        tooltip: {
-          ...baseTooltipOptions(),
-          callbacks: {
-            title: (items) => getSlowModelPoint(items[0])?.name || '',
-            label: (context) => {
-              const point = getSlowModelPoint(context)
-              if (!point) return []
-              return [
-                `P95: ${point.p95Seconds.toFixed(2)}s`,
-                `平均: ${point.avgSeconds.toFixed(2)}s`,
-                `样本: ${point.samples.toLocaleString()}`,
-              ]
-            },
-          },
-        },
-      },
-      scales: {
-        x: {
-          ...defineAdminChartDurationScale({
-            values: slowModelRows.value.map((row) => row.p95Seconds),
-            min: 1,
-            headroom: 1.15,
-            borderColor: adminChartTheme.axisLine,
-          }),
-        },
-        y: {
-          ...defineAdminChartDurationScale({
-            values: slowModelRows.value.map((row) => row.avgSeconds),
-            min: 1,
-            headroom: 1.15,
-          }),
-        },
-      },
-    }),
-  )
-
   return {
     modelRiskChartData,
     modelRiskChartOptions,
-    slowModelsChartData,
-    slowModelsChartOptions,
   }
 }
 
 function getModelRiskPoint(context: ChartTooltipItem | undefined) {
   return context?.raw as ModelRiskPoint | undefined
-}
-
-function getSlowModelPoint(context: ChartTooltipItem | undefined) {
-  return context?.raw as SlowModelPoint | undefined
 }

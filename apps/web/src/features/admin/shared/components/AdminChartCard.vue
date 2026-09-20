@@ -1,26 +1,25 @@
 <template>
-  <ChartCard :title="title" :class="spanClass" :pt="adminCardPt">
-    <template v-if="$slots.actions" #actions>
-      <slot name="actions" />
-    </template>
-    <ChartPanel :size="chartSize" :height="height">
-      <slot />
-    </ChartPanel>
-  </ChartCard>
+  <div :class="spanClass">
+    <ChartCard :title="title" variant="admin">
+      <template v-if="$slots.actions" #actions>
+        <slot name="actions" />
+      </template>
+      <ChartPanel :size="chartSize" :height="height">
+        <slot />
+      </ChartPanel>
+    </ChartCard>
+  </div>
 </template>
 
 <script setup lang="ts">
 import ChartCard from '../../../../shared/components/ChartCard.vue'
-import ChartPanel from '../../../../shared/components/ChartPanel.vue'
-import { adminCardPt } from '../lib/cardPt'
-
-type AdminChartPanelSize = 'hero' | 'standard' | 'compact' | 'monitor'
+import ChartPanel, { type ChartPanelSize } from '../../../../shared/components/ChartPanel.vue'
 
 withDefaults(
   defineProps<{
     title: string
     spanClass?: string
-    chartSize?: AdminChartPanelSize
+    chartSize?: ChartPanelSize
     height?: string
   }>(),
   {

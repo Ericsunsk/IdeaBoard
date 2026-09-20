@@ -40,14 +40,20 @@ export function baseTooltipOptions() {
   }
 }
 
-export function normalizeModelName(name: string | null | undefined): string {
+function normalizeModelName(name: string | null | undefined): string {
   return (name || '').trim().toLowerCase()
 }
 
-export function colorForModel(name: string, palette: string[]) {
+function colorForModel(name: string, palette: string[]) {
   let hash = 0
   for (let i = 0; i < name.length; i++) hash = (hash << 5) - hash + name.charCodeAt(i)
   return palette[Math.abs(hash) % palette.length]
+}
+
+export function getModelColorByName(name: string) {
+  const key = normalizeModelName(name)
+  if (!key) return null
+  return colorForModel(key, defaultModelColors)
 }
 
 export function buildDeltaFoot(current: number, previous: number, label: string) {
@@ -73,12 +79,9 @@ export function toNonNegativeNumber(value: number | null | undefined): number {
   return Math.max(0, parsed)
 }
 
-export function toNonNegativeInteger(value: number | null | undefined): number {
-  return Math.round(toNonNegativeNumber(value))
-}
 
 export function normalizePercent(value: number | null | undefined): number {
+  // 后端一律 0-100；错量级必须可见（仅 clamp），不得静默 *100 猜测修复。
   const parsed = Number(value) || 0
-  const percent = parsed <= 1 ? parsed * 100 : parsed
-  return Math.max(0, Math.min(100, percent))
+  return Math.max(0, Math.min(100, parsed))
 }

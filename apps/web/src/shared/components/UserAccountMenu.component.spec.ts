@@ -117,12 +117,10 @@ describe('UserAccountMenu', () => {
     const { user } = renderWithUser(UserAccountMenu, { props: { items } })
 
     await user.click(screen.getByRole('button', { name: 'Account menu' }))
-    await screen.findByRole('menuitem', { name: '退出登录' })
-    const logoutItem = screen.getByText('退出登录').closest('a')
+    const logoutItem = await screen.findByRole('menuitem', { name: '退出登录' })
 
-    expect(logoutItem).not.toBeNull()
     expect(logoutItem).toHaveAttribute('data-control-tone', 'danger')
-    await user.click(logoutItem!)
+    await user.click(logoutItem)
     await waitFor(() => expect(logout).toHaveBeenCalledOnce())
   })
 

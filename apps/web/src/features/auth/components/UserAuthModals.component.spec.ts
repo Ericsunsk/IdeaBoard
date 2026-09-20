@@ -1,4 +1,3 @@
-/* eslint-disable vue/one-component-per-file -- The transition stub reproduces PrimeVue's retained leave DOM. */
 import { defineComponent, nextTick } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen } from '../../../test/render'
@@ -21,17 +20,18 @@ vi.mock('../../../shared/composables/useAppToast', () => ({
   useAppToast: () => ({ success: vi.fn(), error: vi.fn() }),
 }))
 
-const TransitioningDialogStub = defineComponent({
+const TransitioningDialogRootStub = defineComponent({
   props: {
-    visible: { type: Boolean, required: true },
+    open: { type: Boolean, required: true },
   },
+  emits: ['update:open'],
   data() {
     return {
-      rendered: this.visible,
+      rendered: this.open,
     }
   },
   watch: {
-    visible(value: boolean) {
+    open(value: boolean) {
       if (value) {
         this.rendered = true
         return
@@ -42,6 +42,10 @@ const TransitioningDialogStub = defineComponent({
     },
   },
   template: '<section v-if="rendered" role="dialog"><slot /></section>',
+})
+
+const PassthroughStub = defineComponent({
+  template: '<slot />',
 })
 
 const AuthPanelStub = defineComponent({
@@ -65,7 +69,11 @@ describe('UserAuthModals', () => {
       props: { mode: 'login' },
       global: {
         stubs: {
-          Dialog: TransitioningDialogStub,
+          DialogRoot: TransitioningDialogRootStub,
+          DialogPortal: PassthroughStub,
+          DialogOverlay: PassthroughStub,
+          DialogContent: PassthroughStub,
+          DialogDescription: PassthroughStub,
           LoginAuthPanel: AuthPanelStub,
           RegisterAuthPanel: AuthPanelStub,
         },
@@ -85,7 +93,11 @@ describe('UserAuthModals', () => {
       props: { mode: 'login', presentation: 'overlay' },
       global: {
         stubs: {
-          Dialog: TransitioningDialogStub,
+          DialogRoot: TransitioningDialogRootStub,
+          DialogPortal: PassthroughStub,
+          DialogOverlay: PassthroughStub,
+          DialogContent: PassthroughStub,
+          DialogDescription: PassthroughStub,
           LoginAuthPanel: OverlayLoginPanelStub,
           RegisterAuthPanel: AuthPanelStub,
         },

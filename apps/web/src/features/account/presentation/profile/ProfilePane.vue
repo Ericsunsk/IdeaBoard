@@ -14,25 +14,19 @@
             :title="t('account.profile.changeAvatar')"
             @click="openAvatarPicker"
           >
-            <Avatar
-              v-if="userStore.user?.avatar"
-              :image="userStore.user.avatar"
-              shape="circle"
-              unstyled
-              class="flex h-full w-full items-center justify-center overflow-hidden rounded-[var(--radius-ib-pill)]"
-              :pt="{
-                image: {
-                  class: 'h-full w-full rounded-[var(--radius-ib-pill)] object-cover',
-                },
-              }"
-            />
-            <Avatar
-              v-else
-              :label="userInitial"
-              shape="circle"
-              unstyled
-              class="flex h-full w-full items-center justify-center rounded-[var(--radius-ib-pill)] bg-[linear-gradient(135deg,var(--color-ib-creative-accent),var(--color-ib-creative-accent-secondary))] text-[34px] font-bold text-ib-text-inverse max-[520px]:text-[28px]"
-            />
+            <Avatar class="h-full w-full">
+              <AvatarImage
+                v-if="userStore.user?.avatar"
+                :src="userStore.user.avatar"
+                :alt="userStore.user.display_name"
+                class="rounded-full object-cover"
+              />
+              <AvatarFallback
+                class="bg-[linear-gradient(135deg,var(--color-ib-creative-accent),var(--color-ib-creative-accent-secondary))] text-[34px] font-bold text-ib-text-inverse max-[520px]:text-[28px]"
+              >
+                {{ userInitial }}
+              </AvatarFallback>
+            </Avatar>
             <span
               class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[var(--radius-ib-pill)] bg-[color-mix(in_srgb,var(--color-ib-text)_52%,transparent)] transition-opacity duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
               :class="
@@ -64,13 +58,15 @@
             {{ userStore.user?.display_name }}
           </p>
           <div class="mt-3 flex min-w-0 flex-wrap items-center gap-2">
-            <Tag
+            <Badge
               v-if="isUserBanned"
-              :value="t('account.profile.banned')"
-              severity="danger"
-              rounded
-            />
-            <Tag :value="userRoleLabel" :severity="userRoleSeverity" rounded />
+              variant="destructive"
+            >
+              {{ t('account.profile.banned') }}
+            </Badge>
+            <Badge :variant="userRoleSeverity === 'danger' ? 'destructive' : userRoleSeverity === 'secondary' ? 'secondary' : 'default'">
+              {{ userRoleLabel }}
+            </Badge>
           </div>
         </div>
       </div>
@@ -105,8 +101,8 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Camera } from '@iconoir/vue'
-import Avatar from 'primevue/avatar'
-import Tag from 'primevue/tag'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import { useUserStore } from '../../../auth/session/userSession'
 import { useAvatarUpload } from '../../application/profile/useAvatarUpload'
 import AccountPane from '../common/AccountPane.vue'

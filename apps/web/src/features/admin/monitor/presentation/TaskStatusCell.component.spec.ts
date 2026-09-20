@@ -1,0 +1,36 @@
+import { describe, expect, it } from 'vitest'
+import { renderWithUser, screen } from '../../../../test/render'
+import TaskStatusCell from './TaskStatusCell.vue'
+import type { AdminTaskRow } from '../application/useAdminTaskList'
+
+function makeRow(overrides: Partial<AdminTaskRow> = {}): AdminTaskRow {
+  return {
+    task_id: 'task-1',
+    user_public_id: '00000000-0000-0000-0000-000000000001',
+    user_display_name: 'User 1',
+    prompt: 'prompt',
+    feature_slug: 'render',
+    credits: 0,
+    priority: 2,
+    status: 'running',
+    error_msg: '',
+    result: '',
+    created_at: '2026-07-27T00:00:00Z',
+    completed_at: null,
+    ...overrides,
+  } as AdminTaskRow
+}
+
+describe('TaskStatusCell', () => {
+  it('renders the metric pill for known statuses', () => {
+    renderWithUser(TaskStatusCell, { props: { row: makeRow({ status: 'failed' }) } })
+
+    expect(screen.getByText('Errors')).toBeInTheDocument()
+  })
+
+  it('falls back to raw status text for unknown statuses', () => {
+    renderWithUser(TaskStatusCell, { props: { row: makeRow({ status: 'mystery' }) } })
+
+    expect(screen.getByText('mystery')).toBeInTheDocument()
+  })
+})

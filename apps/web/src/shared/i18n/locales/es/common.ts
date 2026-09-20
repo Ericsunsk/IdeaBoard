@@ -69,7 +69,10 @@ export default {
     unsavedChangesMessage: 'Tiene cambios sin guardar. ¿Está seguro de que desea salir?',
   },
   a11y: {
+    dialog: 'Diálogo',
     chartTimeRange: 'Rango de tiempo del gráfico',
+    showPassword: 'Mostrar contraseña',
+    hidePassword: 'Ocultar contraseña',
   },
   impersonation: {
     activeBanner: 'Vista previa de suplantación activa',

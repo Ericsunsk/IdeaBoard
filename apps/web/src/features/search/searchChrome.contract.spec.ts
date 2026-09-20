@@ -25,7 +25,6 @@ describe('Search page chrome contract', () => {
 
   it('uses the shared page chrome surface while retaining Search popover treatment', () => {
     expect(searchSavePopover).toContain('<Popover')
-    expect(searchSavePopover).toContain('unstyled')
     expect(searchSavePopover).toContain('ib-page-chrome-surface')
     expect(searchSavePopover).toContain('search-save-popover')
     expect(searchSavePopover).toContain('rounded-[var(--radius-ib-control)]')
@@ -33,10 +32,10 @@ describe('Search page chrome contract', () => {
     expect(searchSavePopover).not.toContain('before:!hidden after:!hidden')
   })
 
-  it('keeps the overlay gutter in CSS so PrimeVue can re-align safely', () => {
+  it('keeps the overlay gutter in CSS for directional alignment', () => {
     expect(searchStyles).toContain('.search-save-popover')
     expect(searchStyles).toContain('margin-block-start: var(--spacing-ib-overlay-gutter)')
-    expect(searchStyles).toContain("[data-p-popover-flipped='true']")
+    expect(searchStyles).toContain("[data-side='top']")
     expect(searchSavePopover).not.toContain('positionPopoverAbove')
   })
 })

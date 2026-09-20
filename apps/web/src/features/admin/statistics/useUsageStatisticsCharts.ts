@@ -20,26 +20,20 @@ import {
   baseChartOptions,
   baseChartPlugins,
   baseTooltipOptions,
-  colorForModel,
   defaultModelColors,
-  normalizeModelName,
+  getModelColorByName,
 } from './usageStatisticsChartBase'
+import { formatCount } from './usageStatisticsTooltipText'
 import { useUsageStatisticsModelHealthCharts } from './usageStatisticsModelHealthCharts'
 import { useUsageStatisticsQualityTrendCharts } from './usageStatisticsQualityTrendCharts'
 import { useUsageStatisticsSummaryMetrics } from './usageStatisticsSummaryMetrics'
 
+const warnedTrendTotalMismatchKeys = new Set<string>()
+
 export function useUsageStatisticsCharts(options: {
   adminStatistics: Ref<AdminStatistics | null>
-  qualityStatistics?: Ref<AdminStatistics | null>
   timeRange: Ref<GetAdminStatisticsRangeValue>
-  qualityTimeRange?: Ref<GetAdminStatisticsRangeValue>
 }) {
-  function getModelColorByName(name: string) {
-    const key = normalizeModelName(name)
-    if (!key) return null
-    return colorForModel(key, defaultModelColors)
-  }
-
   const trendData = computed(() => {
     const trend = options.adminStatistics.value?.trend || []
     const trendMap = new Map(trend.map((day) => [day.date, day]))
@@ -48,6 +42,7 @@ export function useUsageStatisticsCharts(options: {
         date: bucket.date,
         label: bucket.label,
         total: 0,
+        captured_credits: 0,
         segments: [],
       }
       const segments = day.segments.map((seg, idx) => {
@@ -58,9 +53,26 @@ export function useUsageStatisticsCharts(options: {
           color: color || defaultModelColors[idx % defaultModelColors.length],
         }
       })
-      if (segments.length === 0)
-        segments.push({ label: '无数据', value: 0, color: adminChartTheme.emptyText })
-      return { date: day.label || bucket.label, total: day.total, segments }
+      // 后端截断 segments[:3] 是正常契约：只在未截断时检查背离，且 Set 封顶防长期累积。
+      if (import.meta.env.DEV && day.segments.length > 0 && day.segments.length <= 3) {
+        const segmentSum = day.segments.reduce((sum, seg) => sum + (seg.value || 0), 0)
+        if (segmentSum !== day.total) {
+          const warnKey = `${bucket.date}:${day.total}:${segmentSum}`
+          if (!warnedTrendTotalMismatchKeys.has(warnKey)) {
+            if (warnedTrendTotalMismatchKeys.size > 200) warnedTrendTotalMismatchKeys.clear()
+            warnedTrendTotalMismatchKeys.add(warnKey)
+            console.warn(
+              `[useUsageStatisticsCharts] trend day ${bucket.date}: segments sum (${segmentSum}) !== total (${day.total})`,
+            )
+          }
+        }
+      }
+      return {
+        date: day.label || bucket.label,
+        total: day.total,
+        captured: Math.max(0, day.captured_credits || 0),
+        segments,
+      }
     })
   })
 
@@ -82,9 +94,7 @@ export function useUsageStatisticsCharts(options: {
         })
       })
     })
-    return Array.from(byModel.entries())
-      .filter(([label, meta]) => label !== '无数据' || meta.total > 0)
-      .map(([label, meta]) => ({ label, color: meta.color }))
+    return Array.from(byModel.entries()).map(([label, meta]) => ({ label, color: meta.color }))
   })
 
   function shouldShowTrendLabel(index: number) {
@@ -101,6 +111,7 @@ export function useUsageStatisticsCharts(options: {
     const label = context.dataset.label || ''
     const day = trendData.value[context.dataIndex]
     if (!day) return null
+    if (label === '消耗积分') return { value: day.captured, total: day.captured, isCost: true }
     const segment = day.segments.find((seg) => seg.label === label)
     const value = segment?.value || 0
     const total = Math.max(0, day.total || 0)
@@ -110,29 +121,54 @@ export function useUsageStatisticsCharts(options: {
     }
   }
 
-  const trendChartData = computed<ChartData>(() =>
-    defineChartData({
+  const hasCaptureCost = computed(() => trendData.value.some((day) => day.captured > 0))
+
+  const trendChartData = computed<ChartData>(() => {
+    const costColor = adminChartTheme.warning
+    return defineChartData({
       labels: trendData.value.map((day) => day.date),
-      datasets: trendSeriesModelOrder.value.map((model) => ({
-        type: 'line',
-        label: model.label,
-        data: trendData.value.map((day) => {
-          const segment = day.segments.find((seg) => seg.label === model.label)
-          return segment?.value || 0
-        }),
-        borderColor: model.color,
-        backgroundColor: withAlpha(model.color, 0.16),
-        fill: true,
-        tension: 0.38,
-        borderWidth: adminChartStrokeWidth,
-        ...defineAdminChartPointClipStyle(),
-        pointRadius: trendData.value.length <= 1 ? 3 : 0,
-        pointHoverRadius: 4,
-        pointBackgroundColor: model.color,
-        stack: 'usage',
-      })),
-    }),
-  )
+      datasets: [
+        ...trendSeriesModelOrder.value.map((model) => ({
+          type: 'line' as const,
+          label: model.label,
+          data: trendData.value.map((day) => {
+            const segment = day.segments.find((seg) => seg.label === model.label)
+            return segment?.value || 0
+          }),
+          borderColor: model.color,
+          backgroundColor: withAlpha(model.color, 0.16),
+          fill: true,
+          tension: 0.38,
+          borderWidth: adminChartStrokeWidth,
+          ...defineAdminChartPointClipStyle(),
+          pointRadius: trendData.value.length <= 1 ? 3 : 0,
+          pointHoverRadius: 4,
+          pointBackgroundColor: model.color,
+          stack: 'usage',
+        })),
+        // 消耗积分（右轴）：只在有 capture 数据时出现，不进调用量堆叠。
+        ...(hasCaptureCost.value
+          ? [
+              {
+                type: 'line' as const,
+                label: '消耗积分',
+                data: trendData.value.map((day) => day.captured),
+                borderColor: costColor,
+                backgroundColor: withAlpha(costColor, 0.12),
+                fill: false,
+                tension: 0.38,
+                borderWidth: adminChartStrokeWidth,
+                ...defineAdminChartPointClipStyle(),
+                pointRadius: trendData.value.length <= 1 ? 3 : 0,
+                pointHoverRadius: 4,
+                pointBackgroundColor: costColor,
+                yAxisID: 'cost',
+              },
+            ]
+          : []),
+      ],
+    })
+  })
 
   const trendChartOptions = computed<ChartOptions>(() =>
     defineAdminChartOptions({
@@ -145,13 +181,14 @@ export function useUsageStatisticsCharts(options: {
           callbacks: {
             label: (context) => {
               const point = getUsageTrendTooltipPoint(context)
-              if (!point) return `${context.dataset.label || '调用'}: 0`
-              return `${context.dataset.label || '调用'}: ${point.value.toLocaleString()}`
+              if (!point) return `${context.dataset.label || '调用'}: ${formatCount(0)}`
+              if ('isCost' in point) return `消耗积分: ${formatCount(point.value)} 积分`
+              return `${context.dataset.label || '调用'}: ${formatCount(point.value)}`
             },
             afterBody: (items) => {
               const point = getUsageTrendTooltipPoint(items[0])
               if (!point) return []
-              return [`总调用: ${point.total.toLocaleString()} 次`]
+              return [`总调用: ${formatCount(point.total)} 次`]
             },
           },
         },
@@ -177,12 +214,25 @@ export function useUsageStatisticsCharts(options: {
             stacked: true,
           }),
         },
+        ...(hasCaptureCost.value
+          ? {
+              cost: {
+                ...defineAdminChartCountScale({
+                  values: trendData.value.map((day) => day.captured),
+                  min: 10,
+                  headroom: 1.15,
+                }),
+                position: 'right' as const,
+                grid: { drawOnChartArea: false },
+              },
+            }
+          : {}),
       },
     }),
   )
 
   const summaryMetrics = useUsageStatisticsSummaryMetrics(options.adminStatistics)
-  const { modelRiskChartData, modelRiskChartOptions, slowModelsChartData, slowModelsChartOptions } =
+  const { modelRiskChartData, modelRiskChartOptions } =
     useUsageStatisticsModelHealthCharts(options.adminStatistics)
 
   const qualityTrendCharts = useUsageStatisticsQualityTrendCharts(options)
@@ -196,8 +246,6 @@ export function useUsageStatisticsCharts(options: {
     modelRiskChartData,
     modelRiskChartOptions,
     ...qualityTrendCharts,
-    slowModelsChartData,
-    slowModelsChartOptions,
     ...breakdownCharts,
   }
 }

@@ -69,7 +69,10 @@ export default {
     unsavedChangesMessage: '您有未保存的更改，确定要离开吗？',
   },
   a11y: {
+    dialog: '对话框',
     chartTimeRange: '图表时间范围',
+    showPassword: '显示密码',
+    hidePassword: '隐藏密码',
   },
   impersonation: {
     activeBanner: '模拟身份预览中',

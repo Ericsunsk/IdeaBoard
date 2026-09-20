@@ -1,4 +1,3 @@
-/* eslint-disable vue/one-component-per-file -- Local stubs expose public auth behavior without PrimeVue portal mechanics. */
 import { defineComponent } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUserStore } from '../session/userSession'
@@ -15,36 +14,27 @@ vi.mock('../../../shared/composables/useAppToast', () => ({
   useAppToast: () => ({ success: vi.fn(), error: vi.fn() }),
 }))
 
-const DialogStub = defineComponent({
-  inheritAttrs: false,
+const DialogRootStub = defineComponent({
   props: {
-    visible: { type: Boolean, required: true },
-    dismissableMask: { type: Boolean, default: true },
-    closeOnEscape: { type: Boolean, default: true },
-    pt: { type: Object, default: () => ({}) },
+    open: { type: Boolean, required: true },
   },
-  emits: ['update:visible'],
-  computed: {
-    transitionName(): string {
-      return String((this.pt as { transition?: { name?: unknown } }).transition?.name ?? '')
-    },
-    transitionCss(): string {
-      return String((this.pt as { transition?: { css?: unknown } }).transition?.css ?? '')
-    },
-  },
+  emits: ['update:open'],
   template: `
-    <section
-      v-if="visible"
-      v-bind="$attrs"
-      role="dialog"
-      :data-dismissable-mask="String(dismissableMask)"
-      :data-close-on-escape="String(closeOnEscape)"
-      :data-transition-name="transitionName"
-      :data-transition-css="transitionCss"
-    >
-      <button type="button" aria-label="模拟遮罩关闭" @click="$emit('update:visible', false)">
-        模拟遮罩关闭
-      </button>
+    <div v-if="open" @keydown.escape="$emit('update:open', false)">
+      <div data-testid="auth-dialog-mask"></div>
+      <slot />
+    </div>
+  `,
+})
+
+const PassthroughStub = defineComponent({
+  template: '<slot />',
+})
+
+const DialogContentStub = defineComponent({
+  inheritAttrs: false,
+  template: `
+    <section role="dialog" tabindex="-1" v-bind="$attrs" @click.stop>
       <slot />
     </section>
   `,
@@ -98,7 +88,6 @@ const InputTextStub = defineComponent({
 const PasswordStub = defineComponent({
   inheritAttrs: false,
   props: {
-    inputProps: { type: Object, default: () => ({}) },
     modelValue: { type: String, default: '' },
   },
   emits: ['update:modelValue', 'blur'],
@@ -109,7 +98,6 @@ const PasswordStub = defineComponent({
   },
   template: `
     <input
-      v-bind="inputProps"
       type="password"
       :value="modelValue"
       @input="handleInput"
@@ -167,7 +155,11 @@ function renderAuthHost(busy = false) {
     slots: { default: '<div>Auth panel</div>' },
     global: {
       stubs: {
-        Dialog: DialogStub,
+        DialogRoot: DialogRootStub,
+        DialogPortal: PassthroughStub,
+        DialogOverlay: PassthroughStub,
+        DialogContent: DialogContentStub,
+        DialogDescription: PassthroughStub,
       },
     },
   })
@@ -196,31 +188,30 @@ describe('AuthModalHost motion', () => {
     vi.unstubAllGlobals()
   })
 
-  it('uses the Auth Motion Policy transition by default', () => {
+  it('applies the transparent auth chrome through content class', () => {
     renderAuthHost()
 
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-transition-name', 'ib-dialog-motion')
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-transition-css', 'true')
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveClass('bg-transparent')
+    expect(dialog.getAttribute('class')).toContain('w-[min(390px,calc(100vw-32px))]')
   })
 
-  it('keeps the modal visible without CSS transform motion when reduced motion is preferred', () => {
-    stubMotionPreference(true)
-
-    renderAuthHost()
+  it('keeps the modal visible while an auth request is loading', () => {
+    renderAuthHost(true)
 
     expect(screen.getByRole('dialog')).toBeVisible()
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-transition-css', 'false')
   })
 
   it('locks overlay close paths while an auth request is loading', async () => {
     const view = renderAuthHost(true)
 
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-dismissable-mask', 'false')
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-close-on-escape', 'false')
     expect(screen.getByRole('dialog')).toHaveAttribute('aria-busy', 'true')
 
-    await view.user.click(screen.getByRole('button', { name: '模拟遮罩关闭' }))
+    await view.user.click(screen.getByTestId('auth-dialog-mask'))
+    expect(view.emitted().close).toBeUndefined()
 
+    screen.getByRole('dialog').focus()
+    await view.user.keyboard('{Escape}')
     expect(view.emitted().close).toBeUndefined()
   })
 })

@@ -288,48 +288,13 @@ describe('boardStateSchema', () => {
     expect(parsed).toBeNull()
   })
 
-  it('drops the v3 adjustmentRecipe during latest-state normalization', () => {
-    const recipe = {
-      version: 1,
-      sourceMediaAssetId: 42,
-      plan: [{ kind: 'threshold', threshold: 0.5, invert: false }],
-    }
-    const parsed = normalizeLatestBoardState({
-      ...makeBoardState(),
-      schemaVersion: BOARD_STATE_SCHEMA_VERSION - 1,
-      imageNodes: [
-        {
-          id: 1,
-          type: 'image-node',
-          x: 0,
-          y: 0,
-          width: 280,
-          sourceImageUrl: 'https://example.com/source.png',
-          sourceImageRatio: 1,
-          outputStatus: 'ready',
-          outputImages: [{ url: 'https://example.com/output.png', ratio: 1 }],
-          // Intentionally legacy: v3 payloads carry the pre-rename field with
-          // a numeric asset identity that no longer exists.
-          adjustmentRecipe: recipe,
-        },
-      ],
-    })
-
-    expect(parsed).not.toBeNull()
-    const imageNode = parsed?.imageNodes[0]
-    expect(parsed?.schemaVersion).toBe(BOARD_STATE_SCHEMA_VERSION)
-    expect(imageNode).not.toHaveProperty('retouchRecipe')
-    expect(imageNode).not.toHaveProperty('adjustmentRecipe')
-  })
-
-  it('migrates v3 payloads without a recipe during latest-state normalization', () => {
+  it('rejects the immediately previous schema version during latest-state normalization', () => {
     const parsed = normalizeLatestBoardState({
       ...makeBoardState(),
       schemaVersion: BOARD_STATE_SCHEMA_VERSION - 1,
     })
 
-    expect(parsed).not.toBeNull()
-    expect(parsed?.schemaVersion).toBe(BOARD_STATE_SCHEMA_VERSION)
+    expect(parsed).toBeNull()
   })
 
   it('rejects stale adjustmentRecipe keys on current-version payloads', () => {

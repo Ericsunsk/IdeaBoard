@@ -24,11 +24,12 @@
     </div>
 
     <div class="pointer-events-none absolute right-14 bottom-3 left-3 z-[2]">
-      <InputText
+      <input
         v-if="isRenaming"
         ref="renameInputEl"
         :value="renameDraft"
-        unstyled
+        type="text"
+        :aria-label="t('common.actions.rename')"
         class="pointer-events-auto h-[30px] w-full rounded-lg border border-board-card-input-border bg-board-card-input-bg px-2 text-[13px] text-board-card-action-hover outline-none"
         maxlength="60"
         @click.stop
@@ -52,39 +53,30 @@
     </div>
 
     <div class="absolute right-3 bottom-3 z-[3]" @click.stop @pointerdown.stop>
-      <Button
-        unstyled
-        type="button"
-        :title="t('workspace.boards.moreActions')"
-        :aria-label="t('workspace.boards.moreActions')"
-        aria-haspopup="menu"
-        :aria-expanded="isMenuOpen"
-        class="inline-flex size-[34px] cursor-pointer items-center justify-center border-0 bg-transparent text-board-card-action hover:text-board-card-action-hover"
-        @click="toggleMenu"
-      >
-        <MoreHoriz class="size-[18px]" />
-      </Button>
-      <Menu
-        ref="menuRef"
-        :model="menuItems"
-        popup
-        append-to="body"
-        :pt="menuPt"
-        @show="handleShow"
-        @hide="handleHide"
-      >
-        <template #item="{ item, props: itemProps }">
-          <a
-            v-bind="itemProps.action"
-            :class="[
-              appOverlayMenuItemClass,
-              item.key === 'delete' ? appOverlayMenuDangerItemClass : '',
-            ]"
+      <DropdownMenu v-model:open="isMenuOverlayOpen" @update:open="onMenuOpenChange">
+        <DropdownMenuTrigger as-child>
+          <Button
+            variant="ghost"
+            size="icon"
+            :title="t('workspace.boards.moreActions')"
+            :aria-label="t('workspace.boards.moreActions')"
+            class="size-[34px] border-0 bg-transparent text-board-card-action hover:text-board-card-action-hover"
+            @click="emit('toggle-menu')"
+          >
+            <MoreHoriz class="size-[18px]" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            v-for="item in menuItems"
+            :key="item.label"
+            :class="item.tone === 'danger' ? 'text-destructive focus:text-destructive' : ''"
+            @select="item.command?.()"
           >
             {{ item.label }}
-          </a>
-        </template>
-      </Menu>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   </article>
 </template>
@@ -92,21 +84,16 @@
 <script setup lang="ts">
 import { MoreHoriz } from '@iconoir/vue'
 import { computed, nextTick, ref, watch } from 'vue'
-import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
-import Menu from 'primevue/menu'
-import type { MenuItem } from 'primevue/menuitem'
-import { useI18n } from 'vue-i18n'
-import { usePrimePopupMenuOverlayLifecycle } from '../../../../shared/composables/usePrimePopupMenuOverlayLifecycle'
+import { Button } from '@/components/ui/button'
 import {
-  createAppOverlayMenuPt,
-  appOverlayMenuDangerItemClass,
-  appOverlayMenuItemClass,
-} from '../../../../shared/theme/appOverlayMenu'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { useI18n } from 'vue-i18n'
 import type { CatalogEntry } from './contract'
 import { blankBoardPreviewSurfaceClass } from './skin'
-
-type RenameInputRef = HTMLInputElement | { $el?: HTMLInputElement } | null
 
 const props = defineProps<{
   board: CatalogEntry
@@ -129,53 +116,36 @@ const emit = defineEmits<{
   (e: 'menu-hidden'): void
 }>()
 
-const renameInputEl = ref<RenameInputRef>(null)
 const { t } = useI18n()
-const {
-  popupRef: menuRef,
-  isOpen: isMenuOverlayOpen,
-  requestClose: requestMenuClose,
-  select: selectMenuItem,
-  toggle: toggleMenuOverlay,
-  handleShow,
-  handleHide,
-} = usePrimePopupMenuOverlayLifecycle({
-  onVisibilityChange: (visible) => {
-    if (!visible) emit('menu-hidden')
-  },
-})
-void menuRef
-const menuPt = createAppOverlayMenuPt('!z-40 !w-32 !min-w-[8rem] !max-w-[8rem] !p-0')
 
-const menuItems = computed<MenuItem[]>(() => [
+const menuItems = computed(() => [
   {
     key: 'rename',
     label: t('common.actions.rename'),
-    command: () => selectMenuItem(() => emit('rename-action')),
+    command: () => emit('rename-action'),
   },
   {
     key: 'duplicate',
     label: t('workspace.boards.duplicate'),
-    command: () => selectMenuItem(() => emit('duplicate-action')),
+    command: () => emit('duplicate-action'),
   },
   {
     key: 'delete',
     label: t('common.actions.delete'),
-    command: () => selectMenuItem(() => emit('delete-action')),
+    tone: 'danger',
+    command: () => emit('delete-action'),
   },
 ])
+
+const renameInputEl = ref<HTMLInputElement | null>(null)
 
 watch(
   () => props.isRenaming,
   (isRenaming) => {
     if (!isRenaming) return
     void nextTick(() => {
-      const input =
-        renameInputEl.value instanceof HTMLInputElement
-          ? renameInputEl.value
-          : renameInputEl.value?.$el
-      input?.focus()
-      input?.select()
+      renameInputEl.value?.focus()
+      renameInputEl.value?.select()
     })
   },
 )
@@ -184,19 +154,20 @@ function onRenameInput(event: Event) {
   emit('rename-input', (event.target as HTMLInputElement).value)
 }
 
-function toggleMenu(event: Event) {
-  emit('toggle-menu')
-  toggleMenuOverlay(event)
-}
+const isMenuOverlayOpen = ref(false)
 
 watch(
   () => props.isMenuOpen,
   (isMenuOpen) => {
-    if (!isMenuOpen) {
-      if (isMenuOverlayOpen.value) requestMenuClose('outside-pointer')
+    if (!isMenuOpen && isMenuOverlayOpen.value) {
+      isMenuOverlayOpen.value = false
     }
   },
 )
+
+function onMenuOpenChange(open: boolean) {
+  if (!open) emit('menu-hidden')
+}
 </script>
 
 <style scoped>

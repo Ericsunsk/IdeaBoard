@@ -25,62 +25,46 @@
       <section :class="catalogClasses.toolbar">
         <Button
           type="button"
-          :label="t('workspace.boards.newCanvas')"
           :class="catalogClasses.createButton"
-          @click="createAndOpenBoard"
-        />
+          @click="createAndOpenBoard">{{ t('workspace.boards.newCanvas') }}</Button>
         <label :class="catalogClasses.searchWrap">
           <Search :class="catalogClasses.searchIcon" />
-          <InputText
-            :model-value="searchKeyword"
-            unstyled
+      <input
+            :value="searchKeyword"
             type="text"
             :placeholder="t('workspace.boards.searchPlaceholder')"
             :class="catalogClasses.searchInput"
-            @update:model-value="onSearchInput"
+            @input="onSearchInput(($event.target as HTMLInputElement).value)"
           />
         </label>
-        <Button
-          ref="sortMenuTriggerRef"
-          unstyled
-          type="button"
-          :class="catalogClasses.sortMenuTrigger"
-          :aria-label="t('workspace.boards.sortLabel')"
-          aria-haspopup="menu"
-          :aria-expanded="isSortMenuOpen"
-          @click="toggleSortMenu"
-        >
-          <span class="truncate">{{ activeSortLabel }}</span>
-          <NavArrowDown
-            class="size-3.5 shrink-0 transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
-            :class="isSortMenuOpen ? 'rotate-180' : ''"
-            aria-hidden="true"
-          />
-        </Button>
-        <Menu
-          ref="sortMenuRef"
-          :model="sortMenuItems"
-          popup
-          append-to="body"
-          :pt="catalogSortMenuPt"
-          @show="handleSortMenuShow"
-          @hide="handleSortMenuHide"
-        >
-          <template #item="{ item, props: itemProps }">
-            <a
-              v-bind="itemProps.action"
-              :class="[
-                appOverlayMenuItemClass,
-                item.value === sortMode
-                  ? 'bg-[var(--app-overlay-menu-item-hover-bg)] text-[var(--app-overlay-menu-item-hover-color)]'
-                  : '',
-              ]"
-              :aria-current="item.value === sortMode ? 'true' : undefined"
+        <DropdownMenu v-slot="{ open }">
+          <DropdownMenuTrigger as-child>
+            <button
+              type="button"
+              :class="catalogClasses.sortMenuTrigger"
+              :aria-label="t('workspace.boards.sortLabel')"
+              aria-haspopup="menu"
+              :aria-expanded="open ? 'true' : 'false'"
+            >
+              <span class="truncate">{{ activeSortLabel }}</span>
+              <NavArrowDown
+                class="size-3.5 shrink-0 transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
+                :class="open ? 'rotate-180' : ''"
+                aria-hidden="true"
+              />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" class="w-[140px]">
+            <DropdownMenuItem
+              v-for="item in sortMenuItems"
+              :key="item.value"
+              :class="item.value === sortMode ? 'font-medium bg-accent' : ''"
+              @select="item.command?.()"
             >
               {{ item.label }}
-            </a>
-          </template>
-        </Menu>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </section>
 
       <div v-if="catalogRecoveryBoardId" :class="catalogClasses.recoveryState" role="alert">
@@ -88,17 +72,12 @@
           t('workspace.catalog.reloadRequired')
         }}</span>
         <Button
-          unstyled
           type="button"
-          :label="
-            isCatalogReloadPending
-              ? t('workspace.catalog.reloading')
-              : t('workspace.catalog.reload')
-          "
           :disabled="isCatalogReloadPending"
           :class="catalogClasses.recoveryButton"
-          @click="reloadCatalog"
-        />
+          @click="reloadCatalog">{{ isCatalogReloadPending
+              ? t('workspace.catalog.reloading')
+              : t('workspace.catalog.reload') }}</Button>
       </div>
 
       <section v-if="isBoardsLoading" :class="catalogClasses.loadingState" aria-live="polite">
@@ -107,7 +86,6 @@
 
       <section v-else :class="catalogClasses.boardsGrid">
         <Button
-          unstyled
           type="button"
           :class="catalogClasses.createCard"
           @click="createAndOpenBoard"
@@ -156,88 +134,94 @@
       </p>
     </main>
 
-    <Dialog
-      ref="deleteDialogRef"
-      :visible="deleteDialogVisible"
-      modal
-      :dismissable-mask="canDismissDeleteDialog('mask')"
-      :closable="canDismissDeleteDialog('close-control')"
-      :close-on-escape="canDismissDeleteDialog('escape')"
-      :draggable="false"
-      :show-header="false"
-      :style="catalogDeleteDialogStyle"
-      :pt="catalogDeleteDialogPt"
-      :aria-busy="deleteDialogAriaBusy"
-      aria-labelledby="board-delete-dialog-title"
-      @update:visible="handleDeleteDialogVisibilityChange"
-      @hide="disableDeleteDialogVendorFocusRestore"
-      @after-hide="handleDeleteDialogAfterHide"
-    >
-      <div :class="catalogClasses.deleteDialogShell">
-        <h2 id="board-delete-dialog-title" :class="catalogClasses.deleteDialogTitle">
-          {{ t('workspace.deleteDialog.title') }}
-        </h2>
-        <p :class="catalogClasses.deleteDialogDescription">
-          {{
-            t('workspace.deleteDialog.description', {
-              name: pendingDeleteBoard?.name || t('workspace.boards.untitledCanvas'),
-            })
-          }}
-        </p>
+    <DialogRoot :open="deleteDialogVisible" @update:open="handleDeleteDialogOpenUpdate">
+      <DialogPortal>
+        <DialogOverlay :class="ibDialogMaskClass" @click="handleDeleteDialogMaskClick" />
+        <DialogContent
+          :class="cn(dialogContentBaseClass, catalogDeleteDialogContentClass)"
+          :style="catalogDeleteDialogStyle"
+          aria-labelledby="board-delete-dialog-title"
+          :aria-busy="deleteDialogAriaBusy"
+          @escape-key-down="handleDeleteDialogEscape"
+          @pointer-down-outside="blockDeleteDialogOutsideDismiss"
+        >
+          <div class="min-h-0 overflow-y-auto">
+            <DialogDescription class="sr-only">
+              {{
+                t('workspace.deleteDialog.description', {
+                  name: pendingDeleteBoard?.name || t('workspace.boards.untitledCanvas'),
+                })
+              }}
+            </DialogDescription>
+            <div :class="catalogClasses.deleteDialogShell">
+              <h2 id="board-delete-dialog-title" :class="catalogClasses.deleteDialogTitle">
+                {{ t('workspace.deleteDialog.title') }}
+              </h2>
+              <p :class="catalogClasses.deleteDialogDescription">
+                {{
+                  t('workspace.deleteDialog.description', {
+                    name: pendingDeleteBoard?.name || t('workspace.boards.untitledCanvas'),
+                  })
+                }}
+              </p>
 
-        <div :class="catalogClasses.deleteDialogFooter">
-          <Button
-            unstyled
-            type="button"
-            :label="t('common.actions.cancel')"
-            :disabled="isDeletePending"
-            :class="catalogClasses.deleteCancelButton"
-            @click="requestDeleteDialogClose('close-control')"
-          />
-          <Button
-            unstyled
-            type="button"
-            :label="
-              isDeletePending ? t('workspace.deleteDialog.deleting') : t('common.actions.delete')
-            "
-            :disabled="isDeletePending"
-            :class="catalogClasses.deleteConfirmButton"
-            @click="confirmDelete"
-          />
-        </div>
-      </div>
-    </Dialog>
+              <div :class="catalogClasses.deleteDialogFooter">
+                <Button
+                  type="button"
+                  :disabled="isDeletePending"
+                  :class="catalogClasses.deleteCancelButton"
+                  @click="closeDeleteDialogView">{{ t('common.actions.cancel') }}</Button>
+                <Button
+                  type="button"
+                  :disabled="isDeletePending"
+                  :class="catalogClasses.deleteConfirmButton"
+                  @click="confirmDelete">{{ isDeletePending ? t('workspace.deleteDialog.deleting') : t('common.actions.delete') }}</Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </DialogPortal>
+    </DialogRoot>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import BoardCard from './BoardCard.vue'
 import {
   catalogClasses,
-  catalogDeleteDialogPt,
+  catalogDeleteDialogContentClass,
   catalogDeleteDialogStyle,
-  catalogSortMenuPt,
 } from './skin'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
-import { usePrimeDialogOverlayLifecycle } from '../../../../shared/composables/usePrimeDialogOverlayLifecycle'
-import { usePrimePopupMenuOverlayLifecycle } from '../../../../shared/composables/usePrimePopupMenuOverlayLifecycle'
+import { useOverlayInteractionLifecycle } from '../../../../shared/composables/useOverlayInteractionLifecycle'
 import { HOME_PATH, USER_CANVAS_PATH } from '../../../../shared/constants/routePaths'
-import { appOverlayMenuItemClass } from '../../../../shared/theme/appOverlayMenu'
 import { useUserStore } from '../../../auth/session/userSession'
 import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
 import UserLocaleSelect from '../../../../shared/components/UserLocaleSelect.vue'
 import StudioName from '../../../../shared/components/StudioName.vue'
 import { WorkspaceNavigation, useWorkspaceAccountControls } from '../../../workspace'
 import { NavArrowDown, Search } from '@iconoir/vue'
-import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
-import InputText from 'primevue/inputtext'
-import Menu from 'primevue/menu'
-import type { MenuItem } from 'primevue/menuitem'
-import ProgressSpinner from 'primevue/progressspinner'
+import { Button } from '@/components/ui/button'
+import {
+  DialogContent,
+  DialogDescription,
+  DialogOverlay,
+  DialogPortal,
+  DialogRoot,
+} from '@/components/ui/dialog'
+import { dialogContentBaseClass } from '@/components/ui/dialog/dialogClasses'
+import { cn } from '@/lib/utils'
+import { ibDialogMaskClass } from '../../../../shared/theme/dialogMask'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Spinner as ProgressSpinner } from '@/components/ui/spinner'
 import { formatCatalogDate, useCatalog, type CatalogSortMode } from './useCatalog'
 
 const router = useRouter()
@@ -289,11 +273,8 @@ const {
   ariaBusy: deleteDialogAriaBusy,
   canDismiss: canDismissDeleteDialog,
   completeClose: completeDeleteDialogClose,
-  dialogRef: deleteDialogRef,
-  disableVendorFocusRestore: disableDeleteDialogVendorFocusRestore,
   handleVisibilityChange: handleDeleteDialogVisibilityChange,
-  requestClose: requestDeleteDialogClose,
-} = usePrimeDialogOverlayLifecycle({
+} = useOverlayInteractionLifecycle({
   visible: deleteDialogVisible,
   busy: isDeletePending,
   surface: {
@@ -304,7 +285,26 @@ const {
     if (!visible) closeDeleteDialog()
   },
 })
-void deleteDialogRef
+
+function closeDeleteDialogView() {
+  if (handleDeleteDialogVisibilityChange(false)) handleDeleteDialogAfterHide()
+}
+
+function handleDeleteDialogOpenUpdate(open: boolean) {
+  if (!open) closeDeleteDialogView()
+}
+
+function handleDeleteDialogMaskClick() {
+  closeDeleteDialogView()
+}
+
+function handleDeleteDialogEscape(event: KeyboardEvent) {
+  if (!canDismissDeleteDialog('escape')) event.preventDefault()
+}
+
+function blockDeleteDialogOutsideDismiss(event: Event) {
+  event.preventDefault()
+}
 
 function handleDeleteDialogAfterHide() {
   completeDeleteDialogClose()
@@ -318,28 +318,12 @@ const sortOptions = computed<Array<{ label: string; value: CatalogSortMode }>>((
 const activeSortLabel = computed(
   () => sortOptions.value.find((option) => option.value === sortMode.value)?.label ?? '',
 )
-const sortMenuTriggerRef = ref<HTMLElement | { $el?: HTMLElement } | null>(null)
-const {
-  popupRef: sortMenuRef,
-  isOpen: isSortMenuOpen,
-  toggle: toggleSortMenuOverlay,
-  handleShow: handleSortMenuShow,
-  handleHide: handleSortMenuHide,
-  select: selectSortMenuItem,
-} = usePrimePopupMenuOverlayLifecycle({})
-void sortMenuRef
-const sortMenuItems = computed<MenuItem[]>(() =>
+const sortMenuItems = computed(() =>
   sortOptions.value.map((option) => ({
     ...option,
-    command: () => selectSortMenuItem(() => setSortMode(option.value)),
+    command: () => setSortMode(option.value),
   })),
 )
-
-function toggleSortMenu(event: Event) {
-  const trigger = sortMenuTriggerRef.value
-  const target = trigger instanceof HTMLElement ? trigger : trigger?.$el
-  toggleSortMenuOverlay(event, target)
-}
 
 const accountControls = useWorkspaceAccountControls({
   navigation: {

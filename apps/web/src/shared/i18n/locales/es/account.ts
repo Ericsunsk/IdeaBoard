@@ -2,6 +2,7 @@
 export default {
   dialog: {
     title: 'Cuenta',
+    description: 'Gestiona tu perfil, uso, facturación y configuración de seguridad.',
     close: 'Cerrar cuenta',
     navigation: 'Navegación de cuenta',
   },

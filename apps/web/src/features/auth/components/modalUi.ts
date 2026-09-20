@@ -1,39 +1,14 @@
-import type { DialogPassThroughOptions } from 'primevue/dialog'
 import {
-  createIbPasswordPt,
-  ibFormErrorMessagePt,
   ibFormInputClass,
   ibFormInputErrorClass,
   ibFormInputIconClass,
 } from '../../../shared/theme/formControls'
-import { ibDialogMaskPt } from '../../../shared/theme/dialogMask'
-import { createDialogMotionPt } from '../../../shared/motion/dialogMotion'
 import './auth-modal-motion.css'
 
-export function createAuthDialogPt() {
-  return {
-    ...ibDialogMaskPt,
-    root: {
-      class: 'm-4 w-[min(390px,calc(100vw-32px))] overflow-visible bg-transparent p-0',
-      style: {
-        '--ib-dialog-motion-from-transform': 'translateY(12px) scale(0.985)',
-      },
-    },
-    content: {
-      class: 'overflow-visible bg-transparent p-0',
-    },
-    ...createDialogMotionPt(),
-  } satisfies DialogPassThroughOptions
-}
-
-export const authErrorMessagePt = ibFormErrorMessagePt
-
-export const authButtonPt = {
-  label: { class: 'leading-none' },
-  loadingIcon: { class: 'mr-2 size-4 animate-spin' },
-} as const
-
-export const authPasswordPt = createIbPasswordPt('pl-10 pr-11')
+// Dialog 以 content-class 拥有造型：mask 沿用 Dialog 内置 ibDialogMaskClass，
+// 动画走 reka data-state + Tailwind animate；m-4 在 reka 居中定位下会偏移，不再保留。
+export const authDialogContentClass =
+  'w-[min(390px,calc(100vw-32px))] overflow-visible border-0 bg-transparent p-0 shadow-none'
 
 const authModalShellBaseClass =
   'relative overflow-hidden rounded-[20px] border border-[var(--color-ib-auth-shell-border)] bg-[var(--color-ib-auth-shell)] backdrop-blur-xl px-7 text-[var(--color-ib-auth-text)] shadow-[var(--shadow-ib-auth-shell)] max-[520px]:px-5'

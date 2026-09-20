@@ -1,42 +1,32 @@
-/* eslint-disable vue/one-component-per-file -- Local stubs keep the dialog wrapper test focused. */
 import { defineComponent } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import AccountDialog from './AccountDialog.vue'
 import { renderWithUser, screen } from '../../../../test/render'
 import { defaultAccountTab, type AccountTab } from '../../domain'
 
-const DialogStub = defineComponent({
-  inheritAttrs: false,
+const DialogRootStub = defineComponent({
   props: {
-    visible: { type: Boolean, required: true },
-    dismissableMask: { type: Boolean, default: true },
-    closeOnEscape: { type: Boolean, default: false },
-    showHeader: { type: Boolean, default: true },
-    pt: { type: Object, default: () => ({}) },
+    open: { type: Boolean, required: true },
   },
-  emits: ['update:visible'],
+  emits: ['update:open'],
   template: `
-    <div
-      v-if="visible"
-      data-testid="account-dialog-mask"
-      :data-dismissable-mask="String(dismissableMask)"
-      @click="dismissableMask && $emit('update:visible', false)"
-    >
-      <section
-        role="dialog"
-        tabindex="-1"
-        :data-transition-name="String(pt.transition?.name ?? '')"
-        :data-transition-css="String(pt.transition?.css ?? '')"
-        :data-close-on-escape="String(closeOnEscape)"
-        :data-show-header="String(showHeader)"
-        @click.stop
-        @keydown.escape="closeOnEscape && $emit('update:visible', false)"
-        v-bind="$attrs"
-      >
-        <slot v-if="showHeader" name="header" />
-        <slot />
-      </section>
+    <div v-if="open" @keydown.escape="$emit('update:open', false)">
+      <div data-testid="account-dialog-mask"></div>
+      <slot />
     </div>
+  `,
+})
+
+const PassthroughStub = defineComponent({
+  template: '<slot />',
+})
+
+const DialogContentStub = defineComponent({
+  inheritAttrs: false,
+  template: `
+    <section role="dialog" tabindex="-1" v-bind="$attrs" @click.stop>
+      <slot />
+    </section>
   `,
 })
 
@@ -95,7 +85,12 @@ function renderAccountDialog(
       },
       global: {
         stubs: {
-          Dialog: DialogStub,
+          DialogRoot: DialogRootStub,
+          DialogPortal: PassthroughStub,
+          DialogOverlay: PassthroughStub,
+          DialogContent: DialogContentStub,
+          DialogDescription: PassthroughStub,
+          DialogTitle: PassthroughStub,
           AccountDialogContent: AccountDialogContentStub,
         },
       },
@@ -110,7 +105,12 @@ function renderAccountDialogWithStatefulContent(visible: boolean) {
     },
     global: {
       stubs: {
-        Dialog: DialogStub,
+        DialogRoot: DialogRootStub,
+        DialogPortal: PassthroughStub,
+        DialogOverlay: PassthroughStub,
+        DialogContent: DialogContentStub,
+        DialogDescription: PassthroughStub,
+        DialogTitle: PassthroughStub,
         AccountDialogContent: StatefulAccountDialogContentStub,
       },
     },
@@ -122,34 +122,11 @@ describe('AccountDialog', () => {
     vi.unstubAllGlobals()
   })
 
-  it('uses the shared Motion Policy for dialog entry and exit', () => {
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn(() => ({ matches: false })),
-    )
+  it('applies the shared overlay chrome through content class', () => {
     renderAccountDialog(true)
 
-    expect(screen.getByRole('dialog', { name: 'Account' })).toHaveAttribute(
-      'data-transition-name',
-      'ib-dialog-motion',
-    )
-    expect(screen.getByRole('dialog', { name: 'Account' })).toHaveAttribute(
-      'data-transition-css',
-      'true',
-    )
-  })
-
-  it('keeps account content visible without CSS transform motion under reduced motion', () => {
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn(() => ({ matches: true })),
-    )
-    renderAccountDialog(true)
-
-    expect(screen.getByTestId('account-dialog-content')).toBeVisible()
-    expect(screen.getByRole('dialog', { name: 'Account' })).toHaveAttribute(
-      'data-transition-css',
-      'false',
+    expect(screen.getByRole('dialog', { name: 'Account' })).toHaveClass(
+      'shadow-[var(--shadow-ib-overlay)]',
     )
   })
 
@@ -157,10 +134,6 @@ describe('AccountDialog', () => {
     renderAccountDialog(true)
 
     expect(screen.getByRole('dialog', { name: 'Account' })).toBeVisible()
-    expect(screen.getByRole('dialog', { name: 'Account' })).toHaveAttribute(
-      'data-show-header',
-      'false',
-    )
     expect(screen.getByTestId('account-dialog-content')).toBeVisible()
   })
 
@@ -191,12 +164,6 @@ describe('AccountDialog', () => {
     const { user, onVisibleUpdate } = renderAccountDialog(true)
     const dialog = screen.getByRole('dialog', { name: 'Account' })
 
-    expect(screen.getByTestId('account-dialog-mask')).toHaveAttribute(
-      'data-dismissable-mask',
-      'false',
-    )
-    expect(dialog).toHaveAttribute('data-close-on-escape', 'true')
-
     await user.click(screen.getByTestId('account-dialog-mask'))
     expect(onVisibleUpdate).not.toHaveBeenCalled()
 
@@ -211,7 +178,6 @@ describe('AccountDialog', () => {
 
     await user.click(screen.getByRole('button', { name: '开始异步操作' }))
     expect(dialog).toHaveAttribute('aria-busy', 'true')
-    expect(dialog).toHaveAttribute('data-close-on-escape', 'false')
 
     await user.click(screen.getByRole('button', { name: '关闭账户管理' }))
     dialog.focus()

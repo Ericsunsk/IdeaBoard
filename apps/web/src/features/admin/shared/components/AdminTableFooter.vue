@@ -1,0 +1,21 @@
+<template>
+  <tfoot
+    :class="
+      cn(
+        'border-t border-admin-border bg-admin-surface-muted font-medium [&>tr]:last:border-b-0',
+        props.class,
+      )
+    "
+  >
+    <slot />
+  </tfoot>
+</template>
+
+<script setup lang="ts">
+import type { HTMLAttributes } from 'vue'
+import { cn } from '../lib/classNames'
+
+const props = defineProps<{
+  class?: HTMLAttributes['class'] | undefined
+}>()
+</script>

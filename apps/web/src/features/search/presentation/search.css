@@ -38,13 +38,12 @@
   box-shadow: var(--shadow-board-focus);
 }
 
-/* PrimeVue still owns the coordinates in unstyled mode; this restores its
- * direction-aware anchor gap without competing with its ResizeObserver. */
+/* Direction-aware anchor gap for Search popover. */
 .search-save-popover {
   margin-block-start: var(--spacing-ib-overlay-gutter);
 }
 
-.search-save-popover[data-p-popover-flipped='true'] {
+.search-save-popover[data-side='top'] {
   margin-block-start: calc(var(--spacing-ib-overlay-gutter) * -1);
   margin-block-end: var(--spacing-ib-overlay-gutter);
 }

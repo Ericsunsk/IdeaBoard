@@ -1,4 +1,3 @@
-/* eslint-disable vue/one-component-per-file */
 import { defineComponent, h, reactive, ref, type PropType } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'

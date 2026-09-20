@@ -4,6 +4,7 @@ import {
 } from '../../../../shared/api/generated-query/model'
 import {
   buildChartTimeBuckets,
+  resolveChartTimeTickDensity,
   shouldShowChartTimeTick,
   type ChartTimeBucket,
   type ChartTimeTickDensity,
@@ -65,7 +66,7 @@ export function shouldShowAdminTimeRangeTick(input: {
 }
 
 function getAdminTimeRangeTickDensity(range: GetAdminStatisticsRangeValue): ChartTimeTickDensity {
-  if (range === GetAdminStatisticsRange['30d']) return { mode: 'interval', interval: 6 }
-  if (range === GetAdminStatisticsRange['1y']) return { mode: 'month-start' }
-  return { mode: 'all' }
+  // range→天数→共享函数：7d=7桶→all，30d=30桶→interval 6，1y=365桶→month-start，
+  // 与旧按 range 分支逐档等价。
+  return resolveChartTimeTickDensity(getAdminTimeRangeOption(range).days)
 }

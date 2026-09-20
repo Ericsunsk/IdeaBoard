@@ -1,9 +1,5 @@
 [
   {
-    "path": "src/shared/i18n/primeLocale.ts",
-    "reason": "User PrimeVue locale definition for Simplified Chinese (zh-CN)."
-  },
-  {
     "path": "src/shared/composables/useSiteBranding.ts",
     "reason": "validateSiteBrandingSetting messages are consumed only by features/admin branding settings."
   },

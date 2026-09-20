@@ -1,7 +1,5 @@
-import PrimeVue from 'primevue/config'
-import { defineComponent, ref } from 'vue'
+import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { userPrimeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen } from '../../../../test/render'
 import SecurityPane from './SecurityPane.vue'
 
@@ -10,11 +8,6 @@ const usePasswordChangeMock = vi.hoisted(() => vi.fn())
 vi.mock('../../application/security/usePasswordChange', () => ({
   usePasswordChange: usePasswordChangeMock,
 }))
-
-const PasswordStub = defineComponent({
-  props: { modelValue: { type: String, default: '' } },
-  template: '<input :value="modelValue" />',
-})
 
 describe('SecurityPane', () => {
   beforeEach(() => {
@@ -31,12 +24,7 @@ describe('SecurityPane', () => {
   })
 
   it('keeps the user-shell primary action visual contract', () => {
-    renderWithUser(SecurityPane, {
-      global: {
-        plugins: [[PrimeVue, userPrimeVueTestOptions]],
-        stubs: { Password: PasswordStub },
-      },
-    })
+    renderWithUser(SecurityPane)
 
     const submitButton = screen.getByRole('button', { name: 'Update password' })
     expect(submitButton).not.toHaveClass('p-button')

@@ -1,0 +1,199 @@
+<template>
+  <section :aria-label="props.title ? `${props.title}定价` : '功能定价'">
+    <div v-if="props.title" class="mb-2 flex items-center gap-2">
+      <h3 class="text-sm font-bold text-admin-title-color">{{ props.title }}</h3>
+      <span class="text-xs text-admin-text-3">共 {{ props.items.length }} 个功能</span>
+    </div>
+    <div :class="adminTableCardClass">
+      <AdminTable
+        :value="props.items"
+        :loading="props.loading"
+        data-key="sku"
+        scrollable
+        :frame-class="adminTableFrameClass"
+        :table-style="adminTableStyle"
+        :class="adminTableClass"
+      >
+        <template #empty>
+          <AdminEmptyState title="该分组暂无功能" />
+        </template>
+
+        <AdminColumn
+          field="service"
+          header="Service"
+          :style="{ width: billingPricingColumnWidths.service }"
+        >
+          <template #body="{ data }">
+            <BillingServiceCell :sku="data.sku" :namespace="data.namespace" />
+          </template>
+        </AdminColumn>
+
+        <AdminColumn
+          field="status"
+          header="Status"
+          :style="{ width: billingPricingColumnWidths.status }"
+        >
+          <template #body="{ data }">
+            <BillingStatusCell :status="data.status" />
+          </template>
+        </AdminColumn>
+
+        <!-- 价格档位列必须显式展开：AdminTable 只认直系 AdminColumn vnode，v-for 会被 Fragment 包一层整体过滤。 -->
+        <AdminColumn
+          field="price-default"
+          header="固定"
+          :style="{ width: billingPricingColumnWidths.variant }"
+        >
+          <template #body="{ data }">
+            <span :class="priceValueClass(formatPricingCellValue(data, 'default'))">{{
+              formatPricingCellValue(data, 'default')
+            }}</span>
+          </template>
+        </AdminColumn>
+
+        <AdminColumn
+          field="price-1k"
+          header="1K"
+          :style="{ width: billingPricingColumnWidths.variant }"
+        >
+          <template #body="{ data }">
+            <span :class="priceValueClass(formatPricingCellValue(data, '1k'))">{{
+              formatPricingCellValue(data, '1k')
+            }}</span>
+          </template>
+        </AdminColumn>
+
+        <AdminColumn
+          field="price-2k"
+          header="2K"
+          :style="{ width: billingPricingColumnWidths.variant }"
+        >
+          <template #body="{ data }">
+            <span :class="priceValueClass(formatPricingCellValue(data, '2k'))">{{
+              formatPricingCellValue(data, '2k')
+            }}</span>
+          </template>
+        </AdminColumn>
+
+        <AdminColumn
+          field="price-4k"
+          header="4K"
+          :style="{ width: billingPricingColumnWidths.variant }"
+        >
+          <template #body="{ data }">
+            <span :class="priceValueClass(formatPricingCellValue(data, '4k'))">{{
+              formatPricingCellValue(data, '4k')
+            }}</span>
+          </template>
+        </AdminColumn>
+
+        <AdminColumn
+          field="model"
+          header="Model"
+          :style="{ width: billingPricingColumnWidths.model }"
+        >
+          <template #body="{ data }">
+            <slot name="model" :item="data" />
+          </template>
+        </AdminColumn>
+
+        <AdminColumn
+          field="actions"
+          header="操作"
+          :style="{ width: billingPricingColumnWidths.actions }"
+        >
+          <template #body="{ data }">
+            <div v-if="data.status !== 'archived'" class="flex items-center gap-2">
+              <AdminButton
+                size="small"
+                :class="adminActionButtonClass"
+                @click="emit('publish', data)"
+              >
+                {{ data.status === 'unpriced' ? '设置' : '调整' }}
+              </AdminButton>
+            </div>
+            <div v-else>
+              <AdminButton
+                size="small"
+                variant="destructive"
+                :class="adminActionButtonClass"
+                :loading="props.deletePending[data.sku] === true"
+                :disabled="props.deletePending[data.sku] === true"
+                @click="emit('delete', data)"
+              >
+                删除
+              </AdminButton>
+            </div>
+          </template>
+        </AdminColumn>
+
+        <AdminColumn
+          field="enabled"
+          header="启用"
+          :style="{ width: billingPricingColumnWidths.enabled }"
+        >
+          <template #body="{ data }">
+            <AdminSwitch
+              :model-value="data.status === 'active'"
+              :disabled="
+                (data.status !== 'active' && data.status !== 'disabled') ||
+                props.availabilityPending[data.sku] === true
+              "
+              :aria-label="`${data.displayName}功能状态`"
+              @update:model-value="emit('availability', data, $event)"
+            />
+          </template>
+        </AdminColumn>
+      </AdminTable>
+    </div>
+  </section>
+</template>
+
+<script setup lang="ts">
+import AdminTable from '../../shared/components/AdminTable.vue'
+import AdminColumn from '../../shared/components/AdminColumn.vue'
+import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
+import AdminButton from '../../shared/components/AdminButton.vue'
+import AdminSwitch from '../../shared/components/AdminSwitch.vue'
+import {
+  adminActionButtonClass,
+  adminTableCardClass,
+  adminTableClass,
+  adminTableFrameClass,
+  adminTableStyle,
+} from '../../shared/lib/uiClasses'
+import BillingStatusCell from './BillingStatusCell.vue'
+import { billingPricingColumnWidths, formatPricingCellValue } from './billingPricingColumns'
+import BillingServiceCell from './BillingServiceCell.vue'
+import type { AdminBillableItemCard } from './billableCatalogTypes'
+
+// 对齐任务监控页事件表：同壳、同列模式；分组与状态语义归 pricingColumns 单源。
+const props = withDefaults(
+  defineProps<{
+    title?: string | undefined
+    items: AdminBillableItemCard[]
+    loading?: boolean | undefined
+    availabilityPending?: Record<string, boolean | undefined> | undefined
+    deletePending?: Record<string, boolean | undefined> | undefined
+  }>(),
+  {
+    loading: false,
+    availabilityPending: () => ({}),
+    deletePending: () => ({}),
+    title: undefined,
+  },
+)
+
+const emit = defineEmits<{
+  publish: [item: AdminBillableItemCard]
+  availability: [item: AdminBillableItemCard, enabled: boolean]
+  delete: [item: AdminBillableItemCard]
+}>()
+
+// 未设置态与 Model 列未配置同样式（灰 mono 非粗体），有值才高亮。
+function priceValueClass(value: string): string {
+  return value === '—' || value === '未设置'
+    ? 'truncate font-mono text-xs text-admin-text-3'
+    : 'truncate font-mono text-xs font-bold text-admin-title-color'
+}
+</script>

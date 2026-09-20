@@ -1,19 +1,18 @@
 import type { Component } from 'vue'
 import {
   ChatBubble,
+  Cube,
   DashboardSpeed,
-  Database,
   Group,
-  Link,
   Settings,
   StatsDownSquare,
   Wallet,
 } from '@iconoir/vue'
-import { ADMIN_DEFAULT_PATH, ADMIN_LOGIN_PATH, adminNavigationRouteDefs } from './navigationMeta'
+import { ADMIN_DEFAULT_PATH, adminNavigationRouteDefs } from './navigationMeta'
 import { isPathUnderRoute } from '../../../shared/constants/routePaths'
 import type { AdminNavigationKey, AdminNavigationRouteDef } from './navigationMeta'
 
-export { ADMIN_DEFAULT_PATH, ADMIN_LOGIN_PATH }
+export { ADMIN_DEFAULT_PATH }
 export type { AdminNavigationKey }
 
 export type AdminNavigationItem = AdminNavigationRouteDef & {
@@ -23,15 +22,14 @@ export type AdminNavigationItem = AdminNavigationRouteDef & {
 const adminNavigationIcons = {
   users: Group,
   credits: Wallet,
-  'provider-endpoints': Link,
   statistics: DashboardSpeed,
-  'task-monitor': StatsDownSquare,
+  'monitor': StatsDownSquare,
+  models: Cube,
   'feature-prompts': ChatBubble,
-  'system-settings': Settings,
-  'oss-config': Database,
+  'settings': Settings,
 } satisfies Record<AdminNavigationKey, Component>
 
-export const adminNavigationItems: AdminNavigationItem[] = adminNavigationRouteDefs.map((item) => ({
+const adminNavigationItems: AdminNavigationItem[] = adminNavigationRouteDefs.map((item) => ({
   ...item,
   icon: adminNavigationIcons[item.key],
 }))
@@ -43,6 +41,17 @@ export const adminNavigationByKey = adminNavigationItems.reduce(
   },
   {} as Record<AdminNavigationKey, AdminNavigationItem>,
 )
+
+export type AdminNavigationGroup = {
+  title: string
+  keys: AdminNavigationKey[]
+}
+
+export const adminNavigationGroups: AdminNavigationGroup[] = [
+  { title: '业务监控', keys: ['statistics', 'monitor'] },
+  { title: '运营管理', keys: ['users', 'credits'] },
+  { title: '系统配置', keys: ['models', 'feature-prompts', 'settings'] },
+]
 
 export function findAdminNavigationItemByPath(path: string) {
   return adminNavigationItems.find((item) => isPathUnderRoute(path, item.path))

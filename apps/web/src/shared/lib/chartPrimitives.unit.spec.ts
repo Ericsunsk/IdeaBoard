@@ -3,6 +3,7 @@ import {
   createChartEmptyStatePlugin,
   defineChartNumericScale,
   defineChartOptions,
+  formatCompactNumber,
   getParsedY,
   type ChartTooltipItem,
   withAlpha,
@@ -131,5 +132,15 @@ describe('chart primitives', () => {
     expect(withAlpha('#336699', -1)).toBe('rgba(51, 102, 153, 0)')
     expect(withAlpha('var(--color-admin-accent)', 0.5)).toBe('var(--color-admin-accent)')
     expect(withAlpha('not-a-color', 0.5)).toBe('not-a-color')
+  })
+
+  it('compacts axis numbers with k/m suffixes and clamps garbage to zero', () => {
+    expect(formatCompactNumber(0)).toBe('0')
+    expect(formatCompactNumber(999)).toBe('999')
+    expect(formatCompactNumber(1200)).toBe('1.2k')
+    expect(formatCompactNumber(2500000)).toBe('2.5m')
+    expect(formatCompactNumber(2000000)).toBe('2m')
+    expect(formatCompactNumber(-5)).toBe('0')
+    expect(formatCompactNumber(NaN)).toBe('0')
   })
 })

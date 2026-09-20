@@ -2,30 +2,31 @@
   <AdminDialogShell
     :visible="visible"
     :header="header"
+    :description="description"
     size="form"
     :busy="busy"
     @reset="emit('reset')"
     @update:visible="emit('update:visible', $event)"
   >
     <div v-if="loading" class="flex min-h-36 items-center justify-center">
-      <ProgressSpinner :aria-label="loadingLabel" stroke-width="3" />
+      <AdminSpinner :aria-label="loadingLabel" class="size-8" />
     </div>
 
     <template v-else>
-      <Message v-if="error" severity="error" :closable="false">
+      <AdminAlert v-if="error" severity="error">
         <div class="flex flex-wrap items-center gap-2">
           <span>{{ error }}</span>
-          <Button
-            label="重新加载"
-            severity="secondary"
+          <AdminButton
+            variant="ghost"
             size="small"
-            text
             :class="adminTextButtonClass"
             :disabled="busy"
             @click="emit('retry')"
-          />
+          >
+            重新加载
+          </AdminButton>
         </div>
-      </Message>
+      </AdminAlert>
 
       <slot />
     </template>
@@ -37,15 +38,16 @@
 </template>
 
 <script setup lang="ts">
-import Button from 'primevue/button'
-import Message from 'primevue/message'
-import ProgressSpinner from 'primevue/progressspinner'
+import AdminAlert from './AdminAlert.vue'
+import AdminButton from './AdminButton.vue'
 import AdminDialogShell from './AdminDialogShell.vue'
+import AdminSpinner from './AdminSpinner.vue'
 import { adminTextButtonClass } from '../lib/uiClasses'
 
 defineProps<{
   visible: boolean
   header: string
+  description: string
   busy: boolean
   loading: boolean
   loadingLabel: string

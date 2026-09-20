@@ -10,6 +10,11 @@ import { markRaw } from 'vue'
 import { i18n } from '../i18n'
 
 export type ChartData = ChartJsData<ChartType, unknown[], string>
+
+// Canvas 拿不到 CSS var：字体栈必须用 concrete value，与 style.css 的
+// html/body 基准同源。改这里时同步改 style.css，两处保持逐字节一致。
+export const chartFontFamilyStack =
+  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
 export type ChartOptions = ChartJsOptions<ChartType>
 export type ChartTooltipItem = TooltipItem<ChartType>
 
@@ -136,6 +141,19 @@ function ceilToNiceChartMax(value: number) {
 
 function toFiniteChartNumber(value: number) {
   return Number.isFinite(value) ? value : 0
+}
+
+// 紧凑数字（k/m 后缀）：轴刻度单源。非负钳制——轴上不展示负数，
+// 垃圾输入归零而不是透出；精确值展示用 formatCount（千分位全数字）。
+export function formatCompactNumber(value: number): string {
+  const rounded = Math.max(0, Math.round(toFiniteChartNumber(value)))
+  if (rounded >= 1_000_000) return formatCompactUnit(rounded / 1_000_000, 'm')
+  if (rounded >= 1_000) return formatCompactUnit(rounded / 1_000, 'k')
+  return rounded.toString()
+}
+
+function formatCompactUnit(value: number, suffix: string): string {
+  return `${Number.isInteger(value) ? value : value.toFixed(1)}${suffix}`
 }
 
 function expandShortHex(value: string) {

@@ -70,7 +70,10 @@ export default {
     unsavedChangesMessage: 'You have unsaved changes. Are you sure you want to leave?',
   },
   a11y: {
+    dialog: 'Dialog',
     chartTimeRange: 'Chart time range',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
   },
   impersonation: {
     activeBanner: 'Impersonation preview active',

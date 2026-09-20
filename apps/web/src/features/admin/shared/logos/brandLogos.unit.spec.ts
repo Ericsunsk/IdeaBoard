@@ -6,6 +6,7 @@ import {
   getAdminBrandLogo,
   getAdminBrandLogoOverride,
   replaceAdminBrandLogoOverrides,
+  resolveModelBrandLogo,
 } from './brandLogos'
 
 describe('adminBrandLogos', () => {
@@ -78,5 +79,49 @@ describe('adminBrandLogos', () => {
 
     replaceAdminBrandLogoOverrides([])
     expect(getAdminBrandLogoOverride('storage-profile', 'storage-101')).toBeUndefined()
+  })
+
+  it('resolves model brand logo dynamically based on model name, id, and provider', () => {
+    const getLogo = (key: string) => ALL_ADMIN_BRAND_LOGOS.find((l) => l.key === key)?.logoSrc
+
+    // 1. 用户真实截图场景：模型名为 Google/Gemini，但提供商为 OpenRouter
+    const geminiLogo = resolveModelBrandLogo({
+      id: 'google/gemini-3.1-flash-lite-image',
+      name: 'Google: Nano Banana 2 Lite (Gemini 3.1 Flash Lite Image)',
+      provider: 'OpenRouter',
+    })
+    expect(geminiLogo).toBe(getLogo('gemini'))
+
+    // 2. OpenAI 模型
+    const openaiLogo = resolveModelBrandLogo({
+      id: 'openai/gpt-4o',
+      name: 'GPT-4o Omnimodal',
+      provider: 'OpenRouter',
+    })
+    expect(openaiLogo).toBe(getLogo('openai'))
+
+    // 3. Anthropic Claude 模型
+    const claudeLogo = resolveModelBrandLogo({
+      id: 'anthropic/claude-3.5-sonnet',
+      name: 'Claude 3.5 Sonnet',
+      provider: 'Cloudflare',
+    })
+    expect(claudeLogo).toBe(getLogo('anthropic'))
+
+    // 4. 模型名称为通用名，但提供商为 Fal AI -> 兜底为 Fal 图标
+    const falLogo = resolveModelBrandLogo({
+      id: 'fal-ai/birefnet',
+      name: 'BiRefNet 高清智能抠图',
+      provider: 'Fal AI',
+    })
+    expect(falLogo).toBe(getLogo('fal'))
+
+    // 5. 完全未知的自建模型 -> 返回 undefined (回退到 Cube 图标)
+    const unknownLogo = resolveModelBrandLogo({
+      id: 'custom-vendor/custom-model-xyz',
+      name: 'My Custom Model',
+      provider: 'PrivateHost',
+    })
+    expect(unknownLogo).toBeUndefined()
   })
 })

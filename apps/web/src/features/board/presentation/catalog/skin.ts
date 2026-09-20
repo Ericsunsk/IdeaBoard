@@ -1,6 +1,4 @@
 import { blankBoardPreviewSurfaceClass } from '../../infrastructure/preview'
-import { ibDialogMaskPt } from '../../../../shared/theme/dialogMask'
-import { createAppOverlayMenuPt } from '../../../../shared/theme/appOverlayMenu'
 
 export { blankBoardPreviewSurfaceClass }
 
@@ -34,8 +32,8 @@ export const catalogClasses = {
   loadingSpinner: '!h-9 !w-9 text-board-primary',
   boardsGrid: 'grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3.5',
   createCard:
-    'relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-board-card-border bg-board-card-bg p-0 text-left transition-colors hover:border-board-card-border-hover focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]',
-  createPreview: `flex h-[186px] items-center justify-center border-b border-board-card-preview-divider ${blankBoardPreviewSurfaceClass}`,
+    'relative flex h-[244px] w-full flex-col cursor-pointer overflow-hidden rounded-xl border border-board-card-border bg-board-card-bg p-0 text-left transition-colors hover:border-board-card-border-hover focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]',
+  createPreview: `flex h-[186px] w-full items-center justify-center border-b border-board-card-preview-divider ${blankBoardPreviewSurfaceClass}`,
   createPreviewIcon:
     "relative flex size-[54px] items-center justify-center rounded-[var(--radius-ib-panel)] border border-board-create-icon bg-board-surface-strong before:absolute before:top-1/2 before:left-1/2 before:h-[25px] before:w-[2.5px] before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:bg-board-create-icon before:content-[''] after:absolute after:top-1/2 after:left-1/2 after:h-[2.5px] after:w-[25px] after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bg-board-create-icon after:content-['']",
   createMeta: 'px-3 pt-2.5 pb-3',
@@ -53,18 +51,9 @@ export const catalogClasses = {
     'inline-flex h-9 min-w-[72px] cursor-pointer items-center justify-center rounded-full border-0 bg-board-danger px-3.5 text-sm font-bold text-ib-text-inverse transition-colors hover:bg-board-danger-hover disabled:cursor-not-allowed disabled:opacity-70',
 } as const
 
-export const catalogSortMenuPt = createAppOverlayMenuPt(
-  '!z-40 !w-[108px] !min-w-[108px] !max-w-[108px] !p-0',
-)
-
-export const catalogDeleteDialogPt = {
-  ...ibDialogMaskPt,
-  root: {
-    class:
-      '!overflow-hidden !rounded-[var(--radius-board-dialog)] !border !border-board-card-border !bg-board-surface-strong !shadow-[var(--shadow-board-dialog)]',
-  },
-  content: { class: '!bg-transparent !p-0' },
-} as const
+// UiDialog 以 content-class 拥有造型：mask 沿用 UiDialog 内置 ibDialogMaskClass。
+export const catalogDeleteDialogContentClass =
+  'overflow-hidden rounded-[var(--radius-board-dialog)] border border-board-card-border bg-board-surface-strong shadow-[var(--shadow-board-dialog)]'
 
 export const catalogDeleteDialogStyle = {
   width: '360px',

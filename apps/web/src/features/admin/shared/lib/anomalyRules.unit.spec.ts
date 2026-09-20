@@ -7,12 +7,12 @@ import type {
 } from '../../../../shared/api/generated-query/model'
 import {
   ADMIN_STATISTICS_PATH,
-  ADMIN_TASK_MONITOR_PATH,
+  ADMIN_MONITOR_PATH,
 } from '../../../../shared/constants/routePaths'
 
 type AdminAnomalyInput = Parameters<typeof buildAdminAnomalyItems>[0]
 
-const TASK_MONITOR_ROUTE = ADMIN_TASK_MONITOR_PATH
+const MONITOR_ROUTE = ADMIN_MONITOR_PATH
 const STATISTICS_ROUTE = ADMIN_STATISTICS_PATH
 
 describe('admin anomaly rules', () => {
@@ -28,7 +28,7 @@ describe('admin anomaly rules', () => {
     expect(anomalies).toContainEqual(
       expect.objectContaining({
         id: 'runtime.queue-backlog',
-        route: TASK_MONITOR_ROUTE,
+        route: MONITOR_ROUTE,
         metric: '42 个等待任务',
       }),
     )
@@ -137,7 +137,6 @@ function createMonitorData(overrides: Partial<MonitorData> = {}): MonitorData {
     global_queue_len: 0,
     wait_queue_len: 0,
     running_attempts: 0,
-    account_loads: {},
     execution_pressure: [],
     golden_signals: {
       window_seconds: 3600,

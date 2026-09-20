@@ -1,4 +1,3 @@
-/* eslint-disable vue/one-component-per-file -- Local chrome stubs keep the presentation contract test focused. */
 import { computed, defineComponent, nextTick, shallowRef, type ComputedRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '../../../../../test/render'

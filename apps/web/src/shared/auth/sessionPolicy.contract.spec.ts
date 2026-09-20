@@ -50,8 +50,8 @@ describe('resolveAuthFailureAction', () => {
       resolveAuthFailureAction({
         status: 403,
         requestUrl: '/api/admin/tasks',
-        currentPathname: '/admin/task-monitor',
-        currentFullPath: '/admin/task-monitor',
+        currentPathname: '/admin/monitor',
+        currentFullPath: '/admin/monitor',
       }),
     ).toEqual({ kind: 'redirect-home', targetPath: '/' })
   })
@@ -61,8 +61,8 @@ describe('resolveAuthFailureAction', () => {
       resolveAuthFailureAction({
         status: 401,
         requestUrl: '/api/user/info',
-        currentPathname: '/admin/task-monitor',
-        currentFullPath: '/admin/task-monitor',
+        currentPathname: '/admin/monitor',
+        currentFullPath: '/admin/monitor',
       }),
     ).toEqual({ kind: 'clear-only' })
   })

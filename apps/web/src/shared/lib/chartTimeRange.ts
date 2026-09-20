@@ -15,6 +15,14 @@ export type BuildChartTimeBucketsInput = {
 export type ChartTimeTickDensity =
   { mode: 'all' } | { mode: 'interval'; interval: number } | { mode: 'month-start' }
 
+// 按桶数解析 tick 密度（count 驱动，与 range 驱动等价：7d=7桶→all，
+// 30d=30桶→interval 6，1y=365桶→month-start）。
+export function resolveChartTimeTickDensity(count: number): ChartTimeTickDensity {
+  if (count <= 7) return { mode: 'all' }
+  if (count >= 365) return { mode: 'month-start' }
+  return { mode: 'interval', interval: 6 }
+}
+
 export type ChartTimeTickInput = {
   index: number
   count: number

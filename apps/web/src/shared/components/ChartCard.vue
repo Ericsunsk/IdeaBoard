@@ -1,33 +1,47 @@
 <template>
-  <Card :pt="pt">
-    <template #title>
+  <Card :class="cn(variant === 'admin' && 'shadow-none', props.class)">
+    <CardHeader :class="variant === 'admin' ? 'p-6 pb-4' : 'p-6 pb-2'">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
-          <component :is="titleTag" class="m-0 block truncate">{{ title }}</component>
+          <CardTitle
+            :as="titleTag"
+            :class="
+              variant === 'admin'
+                ? 'text-base font-bold text-admin-text-1'
+                : 'text-[1.25rem] font-medium text-ib-text'
+            "
+          >
+            {{ title }}
+          </CardTitle>
         </div>
         <div v-if="slots.actions" class="shrink-0">
           <slot name="actions" />
         </div>
       </div>
-    </template>
-    <template #content>
+    </CardHeader>
+    <CardContent class="p-6 pt-0">
       <slot />
-    </template>
+    </CardContent>
   </Card>
 </template>
 
 <script setup lang="ts">
 import { useSlots } from 'vue'
-import Card from 'primevue/card'
-import type { CardPassThroughOptions } from 'primevue/card'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     title: string
     titleTag?: 'h2' | 'h3' | 'span'
-    pt?: CardPassThroughOptions | undefined
+    variant?: 'default' | 'admin'
+    class?: string | undefined
   }>(),
-  { titleTag: 'span', pt: undefined },
+  {
+    titleTag: 'span',
+    variant: 'default',
+    class: undefined,
+  },
 )
 
 const slots = useSlots()

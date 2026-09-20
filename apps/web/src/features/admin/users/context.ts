@@ -83,7 +83,6 @@ export function useAdminUsersContext(
     hasAppliedUserQuery,
     userQueryParams,
   } = createAdminUsersQueryState()
-  const selectedUsers = ref<AdminUserRowView[]>([])
   const usersQuery = useAdminUsersResource(userQueryParams)
   const usersData = computed(() => usersQuery.data.value)
   const users = computed<AdminUserRowView[]>(() =>
@@ -92,9 +91,6 @@ export function useAdminUsersContext(
   const loading = computed(() => usersQuery.isLoading.value || usersQuery.isFetching.value)
   const paginationTotalRecords = computed(() => usersData.value?.total)
   const totalRecordCount = computed(() => paginationTotalRecords.value ?? 0)
-  const activeUserCount = computed(() => usersData.value?.active_count ?? 0)
-  const bannedUserCount = computed(() => usersData.value?.banned_count ?? 0)
-  const adminUserCount = computed(() => usersData.value?.admin_count ?? 0)
   const totalUsersLabel = computed(() =>
     hasAppliedUserQuery.value
       ? `${totalRecordCount.value} 匹配用户`
@@ -115,10 +111,6 @@ export function useAdminUsersContext(
     },
     { flush: 'sync' },
   )
-
-  watch(userQueryParams, () => {
-    selectedUsers.value = []
-  })
 
   watch(
     () => usersQuery.error.value,
@@ -157,14 +149,10 @@ export function useAdminUsersContext(
     appliedSearchKeyword,
     userRoleFilter,
     userStatusFilter,
-    selectedUsers,
     hasUserFilter,
     hasAppliedUserQuery,
     users,
     loading,
-    activeUserCount,
-    bannedUserCount,
-    adminUserCount,
     totalUsersLabel,
     emptyUserMessage,
     resetUserFilters,

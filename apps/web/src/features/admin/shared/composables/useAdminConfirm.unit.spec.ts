@@ -1,18 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import { useAdminConfirm } from './useAdminConfirm'
-
-const confirmMock = vi.hoisted(() => ({
-  require: vi.fn(),
-}))
-
-vi.mock('primevue/useconfirm', () => ({
-  useConfirm: () => confirmMock,
-}))
+import { activeAdminConfirm, useAdminConfirm } from './useAdminConfirm'
 
 describe('useAdminConfirm', () => {
-  it('maps admin confirm requests to the PrimeVue confirmation adapter', () => {
+  it('updates reactive confirm state and executes onConfirm when approved', async () => {
     const onConfirm = vi.fn().mockResolvedValue(undefined)
     const adminConfirm = useAdminConfirm()
+
+    expect(activeAdminConfirm.value).toBeNull()
 
     adminConfirm.request({
       title: '确认删除',
@@ -22,21 +16,35 @@ describe('useAdminConfirm', () => {
       onConfirm,
     })
 
-    expect(confirmMock.require).toHaveBeenCalledWith(
-      expect.objectContaining({
-        header: '确认删除',
-        message: '确定删除吗？',
-        rejectLabel: '取消',
-        acceptLabel: '确定',
-        acceptProps: { severity: 'danger' },
-        rejectProps: { severity: 'secondary', outlined: true },
-      }),
-    )
+    expect(activeAdminConfirm.value).not.toBeNull()
+    expect(activeAdminConfirm.value?.title).toBe('确认删除')
+    expect(activeAdminConfirm.value?.message).toBe('确定删除吗？')
+    expect(activeAdminConfirm.value?.confirmLabel).toBe('确定')
+    expect(activeAdminConfirm.value?.intent).toBe('danger')
+    expect(activeAdminConfirm.value?.open).toBe(true)
 
-    const accept = confirmMock.require.mock.calls[0]?.[0].accept
-    expect(typeof accept).toBe('function')
-    accept()
+    await activeAdminConfirm.value?.confirm()
 
     expect(onConfirm).toHaveBeenCalledTimes(1)
+    expect(activeAdminConfirm.value).toBeNull()
+  })
+
+  it('clears reactive confirm state when cancelled', () => {
+    const onConfirm = vi.fn()
+    const adminConfirm = useAdminConfirm()
+
+    adminConfirm.request({
+      title: '确认重置',
+      message: '确定重置吗？',
+      confirmLabel: '重置',
+      intent: 'warn',
+      onConfirm,
+    })
+
+    expect(activeAdminConfirm.value?.open).toBe(true)
+    activeAdminConfirm.value?.cancel()
+
+    expect(onConfirm).not.toHaveBeenCalled()
+    expect(activeAdminConfirm.value).toBeNull()
   })
 })

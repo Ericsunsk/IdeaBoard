@@ -1,4 +1,3 @@
-/* eslint-disable vue/one-component-per-file */
 import { createApp, defineComponent, h, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {

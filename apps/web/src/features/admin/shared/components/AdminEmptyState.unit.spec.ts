@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/vue'
+import { render, screen } from '../../../../test/render'
 import AdminEmptyState from './AdminEmptyState.vue'
 
 describe('AdminEmptyState', () => {

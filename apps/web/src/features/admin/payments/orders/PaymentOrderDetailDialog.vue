@@ -2,6 +2,7 @@
   <AdminDialogShell
     :visible="visible"
     :header="detail ? `支付订单 · ${detail.publicOrderNumber}` : '支付订单详情'"
+    description="查看支付订单的完整详情与对账信息。"
     size="wide"
     content-layout="scrollable"
     :busy="loading"
@@ -11,18 +12,18 @@
       <span class="text-admin-body text-admin-text-3">正在加载订单详情…</span>
     </div>
 
-    <Message v-else-if="error" severity="error" :closable="false">
+    <AdminAlert v-else-if="error" severity="error">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <span>支付订单详情加载失败，请重试。</span>
-        <Button
-          label="重试"
+        <AdminButton
+          variant="outline"
           :class="adminActionButtonClass"
-          severity="secondary"
-          outlined
           @click="$emit('retry')"
-        />
+        >
+          重试
+        </AdminButton>
       </div>
-    </Message>
+    </AdminAlert>
 
     <div v-else-if="detail" class="flex min-w-0 flex-col gap-5">
       <section class="rounded-[var(--radius-ib-control)] border border-admin-border-soft p-4">
@@ -33,11 +34,11 @@
             </div>
             <div class="mt-1 text-admin-meta text-admin-text-3">{{ detail.user.displayName }}</div>
           </div>
-          <Tag
-            :value="getPaymentOrderStatusPresentation(detail.status).label"
+          <AdminBadge
             :severity="getPaymentOrderStatusPresentation(detail.status).severity"
-            rounded
-          />
+          >
+            {{ getPaymentOrderStatusPresentation(detail.status).label }}
+          </AdminBadge>
         </div>
         <dl class="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 max-[640px]:grid-cols-1">
           <div v-for="row in overviewRows" :key="row.label" class="min-w-0">
@@ -68,11 +69,11 @@
           <h3 id="payment-reconciliation" class="text-admin-body font-bold text-admin-title-color">
             对账与异常
           </h3>
-          <Tag
-            :value="detail.reconciliation.anomalous ? '超过 24 小时未收敛' : '无异常标记'"
+          <AdminBadge
             :severity="detail.reconciliation.anomalous ? 'danger' : 'secondary'"
-            rounded
-          />
+          >
+            {{ detail.reconciliation.anomalous ? '超过 24 小时未收敛' : '无异常标记' }}
+          </AdminBadge>
         </div>
         <dl class="mt-3 grid grid-cols-2 gap-x-5 gap-y-3 max-[640px]:grid-cols-1">
           <div v-for="row in reconciliationRows" :key="row.label" class="min-w-0">
@@ -152,7 +153,9 @@
               发起退款
             </h3>
           </div>
-          <Tag :value="`${formatIdeas(refundableIdeas)} 可退`" severity="info" rounded />
+          <AdminBadge severity="info">
+            {{ `${formatIdeas(refundableIdeas)} 可退` }}
+          </AdminBadge>
         </div>
         <form class="mt-3 flex flex-wrap items-end gap-3" novalidate @submit.prevent="submitRefund">
           <label
@@ -160,46 +163,44 @@
             class="flex min-w-44 flex-1 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
           >
             <span>退款 Idea 数量</span>
-            <InputNumber
+            <AdminNumberInput
+              id="admin-payment-refund-ideas"
               v-model="refundIdeaQuantity"
-              input-id="admin-payment-refund-ideas"
               aria-label="退款 Idea 数量"
               :min="1"
               :max="refundableIdeas"
               :disabled="refunding"
               :use-grouping="true"
-              fluid
               :invalid="Boolean(refundValidationError)"
             />
             <small v-if="refundValidationError" class="text-admin-danger">{{
               refundValidationError
             }}</small>
           </label>
-          <Button
+          <AdminButton
             type="submit"
-            label="确认退款"
             :class="adminActionButtonClass"
-            severity="danger"
+            variant="destructive"
             :loading="refunding"
             :disabled="refunding || !canSubmitRefund"
-          />
+          >
+            确认退款
+          </AdminButton>
         </form>
-        <Message v-if="refundError" class="mt-3" severity="error" :closable="false">
+        <AdminAlert v-if="refundError" class="mt-3" severity="error">
           {{ refundError }}
-        </Message>
+        </AdminAlert>
       </section>
 
       <div v-if="detail.receiptUrl" class="flex justify-end">
-        <Button
-          as="a"
+        <AdminButton
+          variant="outline"
           :href="detail.receiptUrl"
           target="_blank"
           rel="noopener noreferrer"
-          label="打开 Stripe 收据"
-          :class="adminActionButtonClass"
-          severity="secondary"
-          outlined
-        />
+        >
+          打开 Stripe 收据
+        </AdminButton>
       </div>
     </div>
   </AdminDialogShell>
@@ -207,10 +208,10 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import Button from 'primevue/button'
-import InputNumber from 'primevue/inputnumber'
-import Message from 'primevue/message'
-import Tag from 'primevue/tag'
+import AdminAlert from '../../shared/components/AdminAlert.vue'
+import AdminBadge from '../../shared/components/AdminBadge.vue'
+import AdminButton from '../../shared/components/AdminButton.vue'
+import AdminNumberInput from '../../shared/components/AdminNumberInput.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import {

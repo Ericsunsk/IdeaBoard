@@ -4,8 +4,8 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { AdminTaskMonitorDetail } from './adminTaskMonitorDetail'
+import type { AdminMonitorDetail } from './adminMonitorDetail'
 
 export type ApiResponseAdminTaskData = {
-  task: AdminTaskMonitorDetail
+  task: AdminMonitorDetail
 }

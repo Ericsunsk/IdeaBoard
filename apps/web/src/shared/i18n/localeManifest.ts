@@ -3,8 +3,7 @@ import type { LocaleBundle, LocaleLoader, SupportedLocale } from './localeCore'
 
 /**
  * Single source of truth mapping each SupportedLocale to its runtime artifacts.
- * Adding a locale touches only this registry plus the PrimeVue options in
- * app/primeLocale.ts — every consumer below derives from here.
+ * Adding a locale touches only this registry — every consumer below derives from here.
  */
 export interface LocaleArtifact {
   /** Lazy message-bundle loader; 'en' is bundled synchronously. */

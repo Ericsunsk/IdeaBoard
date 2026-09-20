@@ -1,15 +1,17 @@
 import {
+  chartFontFamilyStack,
   createChartEmptyStatePlugin,
   defineChartData,
   defineChartNumericScale,
   defineChartOptions,
+  formatCompactNumber,
   getParsedY,
   type ChartData,
   type ChartOptions,
 } from '../../../../shared/lib/chartPrimitives'
 import {
+  resolveChartTimeTickDensity,
   shouldShowChartTimeTick,
-  type ChartTimeTickDensity,
 } from '../../../../shared/lib/chartTimeRange'
 import { resolveChartAnimation } from '../../../../shared/motion/chartMotion'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
@@ -49,8 +51,7 @@ const defaultTheme: UsageChartTheme = {
   grid: '#e7edf4',
   surface: '#ffffff',
   text: '#1d2939',
-  fontFamily:
-    "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+  fontFamily: chartFontFamilyStack,
 }
 
 export function buildUsageTrendChart(
@@ -120,7 +121,7 @@ export function buildUsageTrendChart(
                 index,
                 count: labels.length,
                 label: labels[index],
-                density: usageTrendTickDensity(labels.length),
+                density: resolveChartTimeTickDensity(labels.length),
               })
                 ? labels[index] || ''
                 : '',
@@ -136,7 +137,7 @@ export function buildUsageTrendChart(
           tickColor: theme.axisText,
           gridColor: theme.grid,
           borderColor: theme.axisLine,
-          formatTick: formatCompactCredits,
+          formatTick: formatCompactNumber,
         }),
       },
     },
@@ -144,12 +145,6 @@ export function buildUsageTrendChart(
   )
 
   return { data, options }
-}
-
-function usageTrendTickDensity(count: number): ChartTimeTickDensity {
-  if (count <= 7) return { mode: 'all' }
-  if (count >= 365) return { mode: 'month-start' }
-  return { mode: 'interval', interval: 6 }
 }
 
 export function resolveUsageChartTheme(
@@ -188,15 +183,4 @@ function formatTrendDateLabel(date: string) {
 
 function normalizeCredits(value: number) {
   return Number.isSafeInteger(value) && value >= 0 ? value : 0
-}
-
-function formatCompactCredits(value: number) {
-  const rounded = Math.max(0, Math.round(Number.isFinite(value) ? value : 0))
-  if (rounded >= 1_000_000) return formatCompactUnit(rounded / 1_000_000, 'm')
-  if (rounded >= 1_000) return formatCompactUnit(rounded / 1_000, 'k')
-  return rounded.toString()
-}
-
-function formatCompactUnit(value: number, suffix: string) {
-  return `${Number.isInteger(value) ? value : value.toFixed(1)}${suffix}`
 }

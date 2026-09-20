@@ -1,12 +1,10 @@
 <template>
-  <Dialog
+  <AdminDialogShell
     :visible="visible"
-    modal
-    block-scroll
-    :closable="!isProcessing"
-    :draggable="false"
-    :pt="logoCropDialogPt"
-    :style="{ width: 'min(720px, calc(100vw - 28px))' }"
+    description="调整裁剪区域后确认使用。"
+    size="medium"
+    content-layout="scrollable"
+    :busy="isProcessing"
     @update:visible="handleVisibleUpdate"
   >
     <template #header>
@@ -31,106 +29,102 @@
         <div
           class="absolute bottom-3 left-3 flex items-center gap-1 rounded-md border border-admin-border/80 bg-white/90 p-1 backdrop-blur"
         >
-          <Button
+          <AdminButton
+            variant="ghost"
+            size="icon"
             :class="[adminTextButtonClass, '!size-8 !rounded-md !p-0']"
             aria-label="缩小"
             title="缩小"
-            severity="contrast"
-            text
             :disabled="isProcessing"
             @click="zoomLogo(0.86)"
           >
             <template #icon>
               <Minus class="size-4" />
             </template>
-          </Button>
-          <Button
+          </AdminButton>
+          <AdminButton
+            variant="ghost"
+            size="icon"
             :class="[adminTextButtonClass, '!size-8 !rounded-md !p-0']"
             aria-label="放大"
             title="放大"
-            severity="contrast"
-            text
             :disabled="isProcessing"
             @click="zoomLogo(1.16)"
           >
             <template #icon>
               <Plus class="size-4" />
             </template>
-          </Button>
-          <Button
+          </AdminButton>
+          <AdminButton
+            variant="ghost"
+            size="icon"
             :class="[adminTextButtonClass, '!size-8 !rounded-md !p-0']"
             aria-label="向左旋转"
             title="向左旋转"
-            severity="contrast"
-            text
             :disabled="isProcessing"
             @click="rotateLogo(-90)"
           >
             <template #icon>
               <RotateCameraLeft class="size-4" />
             </template>
-          </Button>
-          <Button
+          </AdminButton>
+          <AdminButton
+            variant="ghost"
+            size="icon"
             :class="[adminTextButtonClass, '!size-8 !rounded-md !p-0']"
             aria-label="重置"
             title="重置"
-            severity="contrast"
-            text
             :disabled="isProcessing"
             @click="resetLogoCrop"
           >
             <template #icon>
               <Refresh class="size-4" />
             </template>
-          </Button>
+          </AdminButton>
         </div>
       </div>
 
       <p v-if="cropError" class="min-w-0 text-admin-caption font-[650] text-admin-danger">
         {{ cropError }}
       </p>
-
-      <div :class="adminDialogFooterActionsClass">
-        <Button
-          :class="[adminTextButtonClass, adminActionButtonClass]"
-          label="取消"
-          severity="contrast"
-          text
-          :disabled="isProcessing"
-          @click="closeDialog"
-        >
-          <template #icon>
-            <Xmark class="size-4" />
-          </template>
-        </Button>
-        <Button
-          :class="adminActionButtonClass"
-          label="确认上传"
-          severity="contrast"
-          :disabled="isProcessing || !sourceURL"
-          :loading="isProcessing"
-          @click="confirmCrop"
-        >
-          <template #icon>
-            <Check class="size-4" />
-          </template>
-        </Button>
-      </div>
     </div>
-  </Dialog>
+
+    <template #footer>
+      <AdminButton
+        variant="ghost"
+        :class="[adminTextButtonClass, adminActionButtonClass]"
+        label="取消"
+        :disabled="isProcessing"
+        @click="closeDialog"
+      >
+        <template #icon>
+          <Xmark class="size-4" />
+        </template>
+      </AdminButton>
+      <AdminButton
+        :class="adminActionButtonClass"
+        label="确认上传"
+        :disabled="isProcessing || !sourceURL"
+        :loading="isProcessing"
+        @click="confirmCrop"
+      >
+        <template #icon>
+          <Check class="size-4" />
+        </template>
+      </AdminButton>
+    </template>
+  </AdminDialogShell>
 </template>
 
 <script setup lang="ts">
 import { Check, Minus, Plus, Refresh, RotateCameraLeft, Xmark } from '@iconoir/vue'
-import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { Cropper } from 'vue-advanced-cropper'
 import 'vue-advanced-cropper/dist/style.css'
-import { createAdminDialogPt } from '../lib/overlayPt'
+import AdminButton from './AdminButton.vue'
+import AdminDialogShell from './AdminDialogShell.vue'
 import {
   adminActionButtonClass,
-  adminDialogFooterActionsClass,
   adminDialogTitleClass,
   adminTextButtonClass,
 } from '../lib/uiClasses'
@@ -154,11 +148,6 @@ const CROPPED_LOGO_MIME = 'image/png'
 const logoStencilProps = {
   aspectRatio: 1,
 } as const
-
-const logoCropDialogPt = createAdminDialogPt({
-  rootClass: '!rounded-lg !border-0 !bg-admin-card !shadow-none',
-  contentClass: '!pt-0',
-})
 
 const cropperRef = ref<CropperInstance | null>(null)
 const sourceURL = ref('')

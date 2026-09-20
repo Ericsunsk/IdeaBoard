@@ -10,10 +10,9 @@
           {{ t('account.rewards.codeLabel') }}
         </label>
         <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_112px] gap-3 max-[640px]:grid-cols-1">
-          <InputText
+          <UiInput
             id="account-reward-code"
             v-model="code"
-            unstyled
             type="text"
             autocomplete="off"
             autocapitalize="characters"
@@ -22,15 +21,11 @@
             :class="ibFormInputClass"
             :placeholder="t('account.rewards.codePlaceholder')"
           />
-          <Button
-            unstyled
+          <UiButton
             type="submit"
-            :label="t('account.rewards.redeem')"
             :disabled="!canSubmit"
             :loading="pending"
-            :class="accountPrimaryActionButtonClass"
-            :pt="accountButtonPt"
-          />
+            :class="accountPrimaryActionButtonClass">{{ t('account.rewards.redeem') }}</UiButton>
         </div>
       </form>
     </section>
@@ -50,26 +45,26 @@
         :empty-title="t('account.rewards.emptyTitle')"
         :empty-description="t('account.rewards.emptyDescription')"
       >
-        <Column
+        <UiColumn
           field="redeemed_at"
           :header="t('account.rewards.columnRedeemedAt')"
           :style="{ width: '190px' }"
         >
           <template #body="{ data }">
-            <Skeleton v-if="isSkeletonRow(data)" width="8rem" />
+            <UiSkeleton v-if="isSkeletonRow(data)" width="8rem" />
             <time v-else class="whitespace-nowrap font-mono text-[13px] text-ib-text-muted">
               {{ formatShanghaiDateTime(data.redeemed_at) }}
             </time>
           </template>
-        </Column>
+        </UiColumn>
 
-        <Column
+        <UiColumn
           field="reward_code_display_name"
           :header="t('account.rewards.columnReward')"
           :style="{ minWidth: '220px' }"
         >
           <template #body="{ data }">
-            <Skeleton v-if="isSkeletonRow(data)" width="7rem" />
+            <UiSkeleton v-if="isSkeletonRow(data)" width="7rem" />
             <span
               v-else
               class="block max-w-[320px] truncate font-semibold"
@@ -78,33 +73,33 @@
               {{ data.reward_code_display_name }}
             </span>
           </template>
-        </Column>
+        </UiColumn>
 
-        <Column
+        <UiColumn
           field="credited_amount"
           :header="t('account.rewards.columnCredited')"
           :style="{ width: '130px' }"
         >
           <template #body="{ data }">
-            <Skeleton v-if="isSkeletonRow(data)" width="4rem" />
+            <UiSkeleton v-if="isSkeletonRow(data)" width="4rem" />
             <span v-else class="whitespace-nowrap font-mono font-bold text-ib-success">
               {{ formatCreditedAmount(data.credited_amount) }}
             </span>
           </template>
-        </Column>
+        </UiColumn>
 
-        <Column
+        <UiColumn
           field="masked_code_hint"
           :header="t('account.rewards.columnCode')"
           :style="{ width: '150px' }"
         >
           <template #body="{ data }">
-            <Skeleton v-if="isSkeletonRow(data)" width="5rem" />
+            <UiSkeleton v-if="isSkeletonRow(data)" width="5rem" />
             <span v-else class="whitespace-nowrap font-mono text-[13px] text-ib-text-muted">
               {{ data.masked_code_hint }}
             </span>
           </template>
-        </Column>
+        </UiColumn>
 
         <template #empty>
           <div
@@ -116,14 +111,11 @@
             <p class="mt-1 mb-0 text-sm text-ib-text-muted">
               {{ errorMessage(initialError) }}
             </p>
-            <Button
-              :label="t('account.reload')"
-              severity="secondary"
-              size="small"
-              text
+            <UiButton
+              variant="ghost"
+              size="sm"
               class="mt-3"
-              @click="retryInitial()"
-            />
+              @click="retryInitial()">{{ t('account.reload') }}</UiButton>
           </div>
           <div
             v-else
@@ -153,26 +145,20 @@
             role="alert"
           >
             <span class="text-sm text-ib-danger">{{ errorMessage(loadMoreError) }}</span>
-            <Button
-              :label="t('account.rewards.retryLoad')"
-              severity="secondary"
-              size="small"
-              text
-              @click="loadMore()"
-            />
+            <UiButton
+              variant="ghost"
+              size="sm"
+              @click="loadMore()">{{ t('account.rewards.retryLoad') }}</UiButton>
           </div>
           <div
             v-else-if="hasNextPage"
             class="flex justify-center border-t border-ib-border-soft px-4 py-3"
           >
-            <Button
-              :label="t('account.rewards.loadMore')"
-              severity="secondary"
-              size="small"
-              outlined
+            <UiButton
+              variant="outline"
+              size="sm"
               :loading="isFetchingNextPage"
-              @click="loadMore()"
-            />
+              @click="loadMore()">{{ t('account.rewards.loadMore') }}</UiButton>
           </div>
         </template>
       </DataTableFrame>
@@ -183,10 +169,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Button from 'primevue/button'
-import Column from 'primevue/column'
-import InputText from 'primevue/inputtext'
-import Skeleton from 'primevue/skeleton'
+import { Button as UiButton } from '@/components/ui/button'
+import UiColumn from '../../../../shared/components/DataTableColumn.vue'
+import { Input as UiInput } from '@/components/ui/input'
+import { Skeleton as UiSkeleton } from '@/components/ui/skeleton'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
 import { ibFormInputClass } from '../../../../shared/theme/formControls'
@@ -198,7 +184,6 @@ import { useRewardHistory } from '../../application/rewards/useRewardHistory'
 import type { RewardRedemptionItem } from '../../infrastructure'
 import AccountPane from '../common/AccountPane.vue'
 import {
-  accountButtonPt,
   accountCardPanelClass,
   accountDataTableFrameClass,
   accountPrimaryActionButtonClass,

@@ -1,3 +1,4 @@
+import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
@@ -5,6 +6,11 @@ import { visualizer } from 'rollup-plugin-visualizer'
 import { seoStaticHtmlVitePlugin } from './scripts/seoStaticHtmlVitePlugin.ts'
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
   plugins: [
     vue(),
     tailwindcss(),

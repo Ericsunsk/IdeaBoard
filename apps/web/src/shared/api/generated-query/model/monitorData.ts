@@ -4,7 +4,6 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { MonitorDataAccountLoads } from './monitorDataAccountLoads'
 import type { MonitorExecutionPressurePoint } from './monitorExecutionPressurePoint'
 import type { MonitorGoldenSignals } from './monitorGoldenSignals'
 
@@ -15,7 +14,6 @@ export interface MonitorData {
   wait_queue_len: number
   /** Running task attempts currently recorded in PostgreSQL. */
   running_attempts: number
-  account_loads: MonitorDataAccountLoads
   execution_pressure: MonitorExecutionPressurePoint[]
   golden_signals: MonitorGoldenSignals
 }

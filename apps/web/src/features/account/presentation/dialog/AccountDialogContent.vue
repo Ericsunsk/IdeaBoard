@@ -1,9 +1,8 @@
 <template>
   <section :class="accountMainContentClass" :aria-label="t('account.dialog.title')">
-    <Button
+    <UiButton
       type="button"
-      text
-      rounded
+      variant="ghost"
       autofocus
       :disabled="logoutLoading"
       :class="accountCloseButtonClass"
@@ -11,7 +10,7 @@
       @click="emit('close')"
     >
       <Xmark class="h-4 w-4" />
-    </Button>
+    </UiButton>
 
     <aside
       class="flex min-h-0 flex-col overflow-y-auto bg-white px-4 py-5 [scrollbar-width:none] max-[820px]:max-h-[48dvh] max-[820px]:px-4 max-[820px]:py-4"
@@ -48,26 +47,26 @@
             {{ t(group.labelKey) }}
           </p>
           <div class="grid gap-1.5 max-[640px]:grid-cols-2">
-            <Button
+            <UiButton
               v-for="item in group.tabs"
               :key="item.key"
               type="button"
-              text
+              variant="ghost"
               :class="accountNavTabClass(activeTab === item.key)"
               :aria-current="activeTab === item.key ? 'page' : undefined"
               @click="activeTab = item.key"
             >
               <component :is="item.icon" class="h-4 w-4 shrink-0" />
               <span class="truncate">{{ t(item.labelKey) }}</span>
-            </Button>
+            </UiButton>
           </div>
         </section>
       </nav>
 
       <div class="mt-auto pt-4">
-        <Button
+        <UiButton
           type="button"
-          text
+          variant="ghost"
           :disabled="logoutLoading"
           :class="accountLogoutButtonClass"
           :aria-label="logoutLoading ? t('account.signingOut') : t('account.signOut')"
@@ -77,7 +76,7 @@
           <span class="truncate">{{
             logoutLoading ? t('account.signingOut') : t('account.signOut')
           }}</span>
-        </Button>
+        </UiButton>
       </div>
     </aside>
 
@@ -106,7 +105,7 @@
 import { useUserStore } from '../../../auth/session/userSession'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Button from 'primevue/button'
+import { Button as UiButton } from '@/components/ui/button'
 import { LogOut, Xmark } from '@iconoir/vue'
 import SiteBrandLogo from '../../../../shared/components/SiteBrandLogo.vue'
 import { useAsyncAction } from '../../../../shared/composables/useAsyncAction'

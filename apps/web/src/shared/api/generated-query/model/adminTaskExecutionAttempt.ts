@@ -11,32 +11,22 @@ import type { AdminTaskExecutionAttemptStatus } from './adminTaskExecutionAttemp
 export interface AdminTaskExecutionAttempt {
   /** @minimum 1 */
   attempt_no: number
-  /** @minimum 1 */
-  account_id: number
   status: AdminTaskExecutionAttemptStatus
   stage: AdminTaskExecutionAttemptStage
   failure_category: AdminTaskExecutionAttemptFailureCategory
-  /** @minimum 1 */
-  provider_endpoint_id: number
-  provider_endpoint_name: string
+  provider: string
+  gateway_step: string
   resolved_model: string
-  api_type: string
   /** @nullable */
   provider_started_at: string | null
   /** @nullable */
   provider_finished_at: string | null
-  /** @nullable */
-  finalize_started_at: string | null
-  /** @nullable */
-  finalize_finished_at: string | null
   /** @nullable */
   completed_at: string | null
   /** @nullable */
   cancelled_at: string | null
   /** @minimum 0 */
   provider_latency_ms: number
-  /** @minimum 0 */
-  finalize_latency_ms: number
   /** @minimum 0 */
   total_latency_ms: number
 }

@@ -4,10 +4,10 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { AdminTaskMonitorListItem } from './adminTaskMonitorListItem'
+import type { AdminMonitorListItem } from './adminMonitorListItem'
 
 export type ApiResponseAdminTaskListData = {
-  list: AdminTaskMonitorListItem[]
+  list: AdminMonitorListItem[]
   total: number
   pending_count: number
   running_count: number

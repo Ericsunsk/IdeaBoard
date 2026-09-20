@@ -8,34 +8,3 @@ export const ibFormInputClass =
 
 export const ibFormInputErrorClass =
   'border-ib-danger bg-ib-danger/5 placeholder:text-ib-danger/75 focus:border-ib-danger focus:bg-ib-danger/5'
-
-export const ibFormErrorMessagePt = {
-  root: {
-    class: 'm-0 mt-1.5 border-0 bg-transparent p-0 text-[12px] font-semibold text-ib-danger',
-  },
-  contentWrapper: { class: 'contents' },
-  content: { class: 'contents' },
-  text: { class: 'contents' },
-} as const
-
-const passwordToggleIconClass =
-  'absolute top-1/2 right-3.5 size-5 -translate-y-1/2 cursor-pointer text-ib-text-subtle transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-ib-text'
-
-export function createIbPasswordPt(inputClass = 'pr-12') {
-  return {
-    root: { class: 'relative block w-full' },
-    pcInputText: {
-      root: {
-        class: inputClass,
-      },
-    },
-    maskIcon: {
-      class: passwordToggleIconClass,
-    },
-    unmaskIcon: {
-      class: passwordToggleIconClass,
-    },
-  } as const
-}
-
-export const ibPasswordPt = createIbPasswordPt()

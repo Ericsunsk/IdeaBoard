@@ -1,48 +1,42 @@
 <template>
-  <IconField class="relative w-full sm:w-[260px]">
-    <InputIcon>
-      <Search class="size-4 text-admin-text-3" />
-    </InputIcon>
-    <InputText
+  <div :class="['relative', fluid ? 'min-w-[220px] max-w-md flex-1' : 'w-full sm:w-[260px]']">
+    <Search class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-admin-text-3" />
+    <AdminInput
       :model-value="modelValue"
       :aria-label="inputLabel"
       :placeholder="placeholder"
-      fluid
-      :class="adminToolbarSearchInputClass"
+      class="pl-9 pr-8"
       @update:model-value="handleValueUpdate"
-      @keydown.enter="$emit('enter')"
+      @enter="$emit('enter')"
     />
-    <Button
+    <AdminButton
       v-if="modelValue"
-      text
-      rounded
-      :class="[adminTextButtonClass, 'absolute top-1/2 right-1 !h-8 !w-8 -translate-y-1/2']"
+      variant="ghost"
+      size="icon"
+      class="absolute top-1/2 right-1 size-7 -translate-y-1/2 rounded-md text-admin-text-3 hover:text-admin-text-1"
       aria-label="清空搜索"
       @click="handleClear"
     >
-      <template #icon>
-        <Xmark />
-      </template>
-    </Button>
-  </IconField>
+      <Xmark class="size-3.5" />
+    </AdminButton>
+  </div>
 </template>
 
 <script setup lang="ts">
-import Button from 'primevue/button'
-import IconField from 'primevue/iconfield'
-import InputIcon from 'primevue/inputicon'
-import InputText from 'primevue/inputtext'
 import { Search, Xmark } from '@iconoir/vue'
-import { adminTextButtonClass, adminToolbarSearchInputClass } from '../lib/uiClasses'
+import AdminButton from './AdminButton.vue'
+import AdminInput from './AdminInput.vue'
 
 withDefaults(
   defineProps<{
     modelValue: string
     inputLabel: string
     placeholder?: string
+    fluid?: boolean
   }>(),
   {
     placeholder: 'Search',
+    fluid: false,
   },
 )
 
@@ -52,8 +46,8 @@ const emit = defineEmits<{
   enter: []
 }>()
 
-function handleValueUpdate(value: string | undefined) {
-  emit('update:modelValue', value ?? '')
+function handleValueUpdate(value: string | number | null | undefined) {
+  emit('update:modelValue', String(value ?? ''))
 }
 
 function handleClear() {

@@ -59,7 +59,7 @@ export type PendingWorkflowAssembly = {
 /**
  * Shared assembly for the pending-result execution path: result reservation,
  * task transport, and the workflow runner. Both the workspace runtime and the
- * legacy workflow entrypoint build the same seam; diverging copies caused
+ * image workflow entrypoint build the same seam; diverging copies caused
  * completion reconciliation to fragment (issue #676).
  */
 export function assemblePendingImageWorkflow(

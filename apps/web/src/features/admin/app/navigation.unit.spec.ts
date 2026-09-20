@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { resolveAdminPageTitle } from './navigation'
+import { adminNavigationGroups, resolveAdminPageTitle } from './navigation'
 import { adminRoutes } from './routes'
 import { adminNavigationRouteDefs } from './navigationMeta'
+
+describe('adminNavigationGroups', () => {
+  it('covers every navigation section exactly once', () => {
+    const grouped = adminNavigationGroups.flatMap((group) => group.keys).sort()
+    const all = adminNavigationRouteDefs.map((item) => item.key).sort()
+    expect(grouped).toEqual(all)
+  })
+})
 
 describe('resolveAdminPageTitle', () => {
   it('keeps the Credits page title stable across child navigation', () => {
@@ -17,11 +25,27 @@ describe('resolveAdminPageTitle', () => {
 
   it('resolves the canonical title for other top-level pages', () => {
     expect(resolveAdminPageTitle('/admin/users')).toBe('用户管理')
-    expect(resolveAdminPageTitle('/admin/task-monitor/detail')).toBe('任务监控')
+    expect(resolveAdminPageTitle('/admin/monitor/detail')).toBe('任务监控')
   })
 
   it('falls back for unknown paths', () => {
     expect(resolveAdminPageTitle('/admin/unknown')).toBe('管理后台')
+  })
+})
+
+describe('Admin models route', () => {
+  it('publishes the models page at the canonical models path', () => {
+    const navigation = adminNavigationRouteDefs.find((item) => item.key === 'models')
+    const route = adminRoutes[0]?.children?.find((item) => item.path === 'models')
+
+    expect(navigation).toMatchObject({
+      path: '/admin/models',
+      childPath: 'models',
+      label: '模型管理',
+      title: '模型管理',
+      routeName: 'AdminModels',
+    })
+    expect(route?.name).toBe('AdminModels')
   })
 })
 

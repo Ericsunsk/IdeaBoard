@@ -1,4 +1,3 @@
-/* eslint-disable vue/one-component-per-file -- Test stub factories intentionally create small local components. */
 
 import { defineComponent, h, type Component } from 'vue'
 

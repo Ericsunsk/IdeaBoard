@@ -2,6 +2,7 @@
   <AdminSettingsDialogFrame
     :visible="visible"
     header="Stripe 设置"
+    description="配置 Stripe 密钥与税务编码后保存。"
     :busy="isBusy"
     :loading="isLoading && !summary"
     loading-label="加载 Stripe 设置"
@@ -50,7 +51,7 @@
         :error="errors.paymentMethodConfigurationId"
         required
       >
-        <InputText
+        <AdminInput
           id="admin-stripe-payment-method-configuration-id"
           v-model="form.paymentMethodConfigurationId"
           class="w-full"
@@ -58,7 +59,7 @@
           maxlength="255"
           aria-label="Payment Method Configuration ID"
           :disabled="isBusy"
-          :invalid="invalid"
+          :class="invalid ? 'border-admin-danger focus-visible:ring-admin-danger/20' : undefined"
           :aria-describedby="describedbyId"
           @update:model-value="clearError('paymentMethodConfigurationId')"
         />
@@ -72,7 +73,7 @@
         hint="支持 sk_ 或 rk_ 格式。"
         :required="!summary?.apiKeyConfigured"
       >
-        <InputText
+        <AdminInput
           id="admin-stripe-api-key"
           v-model="form.apiKey"
           class="w-full"
@@ -81,7 +82,7 @@
           aria-label="Stripe API Key"
           :placeholder="apiKeyPlaceholder"
           :disabled="isBusy"
-          :invalid="invalid"
+          :class="invalid ? 'border-admin-danger focus-visible:ring-admin-danger/20' : undefined"
           :aria-describedby="describedbyId"
           @update:model-value="clearError('apiKey')"
         />
@@ -94,14 +95,14 @@
         :error="errors.productTaxCode"
         required
       >
-        <InputText
+        <AdminInput
           id="admin-stripe-product-tax-code"
           v-model="form.productTaxCode"
           class="w-full"
           placeholder="例如：txcd_10105001"
           aria-label="Product Tax Code"
           :disabled="isBusy"
-          :invalid="invalid"
+          :class="invalid ? 'border-admin-danger focus-visible:ring-admin-danger/20' : undefined"
           :aria-describedby="describedbyId"
           @update:model-value="clearError('productTaxCode')"
         />
@@ -114,45 +115,45 @@
           <span class="text-admin-body text-admin-text-2">
             {{ form.purchasesEnabled ? '已开放' : '已关闭' }}
           </span>
-          <ToggleSwitch
+          <AdminSwitch
+            id="admin-stripe-purchases-enabled"
             v-model="form.purchasesEnabled"
-            input-id="admin-stripe-purchases-enabled"
             aria-label="充值开放"
             :disabled="isBusy"
           />
         </div>
       </AdminFormField>
 
-      <Message v-if="saveError" severity="error" :closable="false">{{ saveError }}</Message>
+      <AdminAlert v-if="saveError" severity="error">{{ saveError }}</AdminAlert>
     </form>
 
     <template #footer="{ requestClose }">
-      <Button
-        label="取消"
+      <AdminButton
+        variant="outline"
         :class="adminActionButtonClass"
-        severity="secondary"
-        outlined
         :disabled="isBusy"
         @click="requestClose"
-      />
-      <Button
-        label="保存设置"
+      >
+        取消
+      </AdminButton>
+      <AdminButton
         :class="adminActionButtonClass"
-        severity="contrast"
         :loading="isSaving"
         :disabled="isLoading || Boolean(loadError)"
         @click="submit"
-      />
+      >
+        保存设置
+      </AdminButton>
     </template>
   </AdminSettingsDialogFrame>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
-import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
-import Message from 'primevue/message'
-import ToggleSwitch from 'primevue/toggleswitch'
+import AdminAlert from '../../shared/components/AdminAlert.vue'
+import AdminButton from '../../shared/components/AdminButton.vue'
+import AdminInput from '../../shared/components/AdminInput.vue'
+import AdminSwitch from '../../shared/components/AdminSwitch.vue'
 import AdminSettingsDialogFrame from '../../shared/components/AdminSettingsDialogFrame.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'

@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import { BOARD_STATE_SCHEMA_VERSION, type BoardSnapshot, type BoardState } from './nodes'
+import type { BoardSnapshot, BoardState } from './nodes'
 import { boardSnapshotSchema, boardStateSchema } from '../schema/stateSchema'
 
 export type BoardStateValidationIssue = {
@@ -131,46 +131,15 @@ function successResult<T>(
   return options?.mode === 'result' ? { ok: true, value } : value
 }
 
-function isMigrationRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value)
-}
-
-function migrateV3ImageNode(node: unknown): unknown {
-  // Legacy v3 key — intentionally not renamed.
-  if (!isMigrationRecord(node) || !('adjustmentRecipe' in node)) return node
-  // The v3 recipe carries a numeric asset identity that no longer exists.
-  // Without backward compatibility the recipe is dropped; the board itself
-  // stays loadable and the user can re-edit from the current image.
-  const { adjustmentRecipe: _dropped, ...rest } = node
-  return rest
-}
-
-/**
- * v3 → v4: `imageNodes[].adjustmentRecipe` renamed to `retouchRecipe`.
- * Only v3 payloads are rewritten; anything else passes through to strict
- * validation unchanged.
- */
-const PRE_RETOUCH_RECIPE_SCHEMA_VERSION = 3
-
-function migrateLegacyBoardState(stateLike: unknown): unknown {
-  if (!isMigrationRecord(stateLike)) return stateLike
-  if (stateLike.schemaVersion !== PRE_RETOUCH_RECIPE_SCHEMA_VERSION) return stateLike
-  const imageNodes = Array.isArray(stateLike.imageNodes)
-    ? stateLike.imageNodes.map(migrateV3ImageNode)
-    : stateLike.imageNodes
-  return { ...stateLike, schemaVersion: BOARD_STATE_SCHEMA_VERSION, imageNodes }
-}
-
 function normalizeWithLatestSchema<T>(
   schema: v.GenericSchema<unknown, T>,
   stateLike: unknown,
   options: LatestBoardStateNormalizationOptions | undefined,
 ): T | null | LatestBoardStateValidationResult<T> {
   const boundary = options?.boundary ?? DEFAULT_VALIDATION_BOUNDARY
-  const migrated = migrateLegacyBoardState(stateLike)
-  const directParsed = v.safeParse(schema, migrated)
+  const directParsed = v.safeParse(schema, stateLike)
   if (directParsed.success) {
-    return successResult(migrated, directParsed.output, options, boundary)
+    return successResult(stateLike, directParsed.output, options, boundary)
   }
   const error = toValidationErrorContext(directParsed.issues, boundary)
   return options?.mode === 'result' ? { ok: false, error } : null

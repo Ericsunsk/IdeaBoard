@@ -10,5 +10,6 @@ export type AdminStatisticsTrendItem = {
   date: string
   label: string
   total: number
+  captured_credits?: number
   segments: AdminStatisticsTrendItemSegmentsItem[]
 }

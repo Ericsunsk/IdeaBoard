@@ -2,6 +2,7 @@
 export default {
   dialog: {
     title: 'Account',
+    description: 'Manage your profile, usage, billing, and security settings.',
     close: 'Close account',
     navigation: 'Account navigation',
   },

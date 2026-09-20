@@ -1,16 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import PrimeVue from 'primevue/config'
 import { render, renderWithUser, screen } from '../../test/render'
-import { userPrimeVueTestOptions } from '../../test/primeVue'
 import UserLocaleSelect from './UserLocaleSelect.vue'
 import * as i18nModule from '../i18n/userLocale'
 
 function renderLocaleSelect(props = {}, options = {}) {
   return render(UserLocaleSelect, {
     props,
-    global: {
-      plugins: [[PrimeVue, userPrimeVueTestOptions]],
-    },
     ...options,
   })
 }
@@ -18,9 +13,6 @@ function renderLocaleSelect(props = {}, options = {}) {
 function renderLocaleSelectWithUser(props = {}, options = {}) {
   return renderWithUser(UserLocaleSelect, {
     props,
-    global: {
-      plugins: [[PrimeVue, userPrimeVueTestOptions]],
-    },
     ...options,
   })
 }
@@ -76,14 +68,13 @@ describe('UserLocaleSelect', () => {
     await user.click(screen.getByTestId('user-locale-select'))
 
     const englishItem = await screen.findByRole('menuitem', { name: 'English' })
-    const englishAction = englishItem.querySelector('a')
-    expect(englishAction).toHaveAttribute('aria-current', 'true')
-    expect(englishAction).toHaveAttribute('data-control-state', 'active')
+    expect(englishItem).toHaveAttribute('aria-current', 'true')
+    expect(englishItem).toHaveAttribute('data-control-state', 'active')
     expect(screen.queryByTestId('icon-locale-selected')).toBeNull()
 
     const spanishItem = screen.getByRole('menuitem', { name: 'Español' })
-    expect(spanishItem.querySelector('a')).not.toHaveAttribute('aria-current')
-    expect(spanishItem.querySelector('a')).toHaveAttribute('data-control-state', 'idle')
+    expect(spanishItem).not.toHaveAttribute('aria-current')
+    expect(spanishItem).toHaveAttribute('data-control-state', 'idle')
   })
 
   it('selecting an option invokes setUserLocale and emits events', async () => {
@@ -100,9 +91,7 @@ describe('UserLocaleSelect', () => {
     await user.click(selectRoot)
 
     const spanishOption = await screen.findByRole('menuitem', { name: 'Español' })
-    const spanishLink = spanishOption.querySelector('a') as HTMLElement | null
-    expect(spanishLink).not.toBeNull()
-    await user.click(spanishLink!)
+    await user.click(spanishOption)
 
     expect(setUserLocaleSpy).toHaveBeenCalledWith('es')
     expect(onUpdateModelValue).toHaveBeenCalledWith('es')

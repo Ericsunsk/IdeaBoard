@@ -1,6 +1,4 @@
-import PrimeVue from 'primevue/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { userPrimeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen } from '../../../../test/render'
 import RewardsPane from './RewardsPane.vue'
 
@@ -54,7 +52,6 @@ vi.mock('../../application/rewards/useRewardHistory', async () => {
 function renderRewardsPane() {
   return renderWithUser(RewardsPane, {
     global: {
-      plugins: [[PrimeVue, userPrimeVueTestOptions]],
       stubs: {
         Gift: true,
       },

@@ -22,38 +22,43 @@ import {
   normalizePercent,
   toNonNegativeNumber,
 } from './usageStatisticsChartBase'
+import { formatCount, formatPercent1 } from './usageStatisticsTooltipText'
+import { monitorChartSpecs, taskMetricDefinitions } from '../../../shared/domain/taskMetricTokens'
+
+// 系列命名与颜色复用任务监控的状态定义（completed/failed），单源，改名只改一处。
+function qualitySeriesStyle(key: 'completed' | 'failed') {
+  const metric = taskMetricDefinitions.find((item) => item.key === key)
+  return {
+    label: metric?.chartLabel ?? (key === 'completed' ? '成功率' : '失败率'),
+    color: metric?.chartColor ?? (key === 'completed' ? adminChartTheme.success : adminChartTheme.danger),
+  }
+}
 
 export function useUsageStatisticsQualityTrendCharts(options: {
   adminStatistics: Ref<AdminStatistics | null>
-  qualityStatistics?: Ref<AdminStatistics | null>
   timeRange: Ref<GetAdminStatisticsRangeValue>
-  qualityTimeRange?: Ref<GetAdminStatisticsRangeValue>
 }) {
-  const qualityTrendRange = computed(
-    () => options.qualityTimeRange?.value ?? options.timeRange.value,
-  )
-  const qualityTrendSource = computed(() => {
-    if (options.qualityStatistics?.value) return options.qualityStatistics.value
-    if (qualityTrendRange.value === options.timeRange.value) return options.adminStatistics.value
-    return null
-  })
+  const qualityTrendSource = computed(() => options.adminStatistics.value)
   const qualityTrendRows = computed(() => {
     const trend = qualityTrendSource.value?.quality_trend || []
     const trendMap = new Map(trend.map((item) => [item.date, item]))
 
-    return buildAdminTimeRangeBuckets(qualityTrendRange.value).map((bucket) => {
+    return buildAdminTimeRangeBuckets(options.timeRange.value).map((bucket) => {
       const item = trendMap.get(bucket.date)
       const total = toNonNegativeNumber(item?.total)
       const success = toNonNegativeNumber(item?.success)
       const fail = toNonNegativeNumber(item?.fail)
-
+      // success_rate 后端已是 0-100（分母 success+fail）；失败率同分母，只能 100 - success_rate，不能用 fail/total 重算。
+      const successRate = normalizePercent(item?.success_rate)
       return {
         label: item?.label || bucket.label,
         total,
         success,
         fail,
-        successRate: normalizePercent(item?.success_rate),
-        failureRate: total > 0 ? normalizePercent((fail / total) * 100) : 0,
+        successRate,
+        // 后端分母是 success+fail（total 还含 cancelled）：只看 attempted，
+        // 全取消的天显示双零而非 100% 失败。
+        failureRate: success + fail > 0 ? 100 - successRate : 0,
       }
     })
   })
@@ -61,36 +66,28 @@ export function useUsageStatisticsQualityTrendCharts(options: {
   const qualityTrendChartData = computed<ChartData>(() =>
     defineChartData({
       labels: qualityTrendRows.value.map((item) => item.label),
-      datasets: [
-        {
-          type: 'line',
-          label: '成功率',
-          data: qualityTrendRows.value.map((item) => item.successRate),
-          borderColor: adminChartTheme.success,
-          backgroundColor: withAlpha(adminChartTheme.success, 0.12),
+      datasets: (['completed', 'failed'] as const).map((key) => {
+        const style = qualitySeriesStyle(key)
+        const isSuccess = key === 'completed'
+        return {
+          type: 'line' as const,
+          label: style.label,
+          data: qualityTrendRows.value.map((item) => (isSuccess ? item.successRate : item.failureRate)),
+          borderColor: style.color,
+          backgroundColor: withAlpha(style.color, isSuccess ? 0.12 : 0.08),
           borderWidth: adminChartStrokeWidth,
           ...defineAdminChartPointClipStyle(),
           fill: true,
           tension: 0.36,
-          pointRadius: 2.5,
-          pointHoverRadius: 5,
+          // 线上不画点：hover 才显示；点的实心样式与 hover 大小对齐任务监控。
+          pointRadius: 0,
+          pointHoverRadius: monitorChartSpecs.pointHoverRadius,
+          pointBackgroundColor: style.color,
+          pointBorderColor: 'transparent',
+          pointBorderWidth: 0,
           yAxisID: 'y',
-        },
-        {
-          type: 'line',
-          label: '失败率',
-          data: qualityTrendRows.value.map((item) => item.failureRate),
-          borderColor: adminChartTheme.danger,
-          backgroundColor: withAlpha(adminChartTheme.danger, 0.08),
-          borderWidth: adminChartStrokeWidth,
-          ...defineAdminChartPointClipStyle(),
-          fill: true,
-          tension: 0.36,
-          pointRadius: 2.5,
-          pointHoverRadius: 5,
-          yAxisID: 'y',
-        },
-      ],
+        }
+      }),
     }),
   )
 
@@ -106,16 +103,16 @@ export function useUsageStatisticsQualityTrendCharts(options: {
             label: (context) => {
               const label = context.dataset.label || ''
               const value = getParsedY(context)
-              return `${label}: ${value.toFixed(1)}%`
+              return `${label}: ${formatPercent1(value)}`
             },
             afterBody: (items) => {
               const index = items[0]?.dataIndex ?? -1
               const row = qualityTrendRows.value[index]
               if (!row) return []
               return [
-                `总调用: ${row.total.toLocaleString()}`,
-                `成功: ${row.success.toLocaleString()}`,
-                `失败: ${row.fail.toLocaleString()}`,
+                `总调用: ${formatCount(row.total)}`,
+                `成功: ${formatCount(row.success)}`,
+                `失败: ${formatCount(row.fail)}`,
               ]
             },
           },
@@ -131,7 +128,7 @@ export function useUsageStatisticsQualityTrendCharts(options: {
               shouldShowAdminTimeRangeTick({
                 index,
                 count: qualityTrendRows.value.length,
-                range: qualityTrendRange.value,
+                range: options.timeRange.value,
                 label: qualityTrendRows.value[index]?.label,
               })
                 ? qualityTrendRows.value[index]?.label || ''

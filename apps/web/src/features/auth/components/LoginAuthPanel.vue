@@ -25,7 +25,6 @@
           <Button
             v-for="provider in enabledSocialProviders"
             :key="provider"
-            unstyled
             type="button"
             :class="authSocialIconButtonClass"
             :disabled="loading"
@@ -61,7 +60,6 @@
           required
           inline-required
           :field-class="authFieldClass"
-          :message-pt="authErrorMessagePt"
         >
           <div class="relative w-full">
             <span :class="authInputIconClass">
@@ -71,7 +69,6 @@
               :id="fieldId"
               v-model="formValue.identifier"
               v-bind="resolveFieldControlState(invalid)"
-              unstyled
               autocomplete="email"
               :required="required"
               :class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
@@ -92,7 +89,6 @@
           required
           inline-required
           :field-class="authFieldClass"
-          :message-pt="authErrorMessagePt"
         >
           <template #header-extra>
             <button
@@ -120,26 +116,16 @@
                 <LockIcon class="size-4.5" />
               </span>
               <Password
+                :id="fieldId"
                 v-model="formValue.password"
-                unstyled
                 autocomplete="current-password"
-                :feedback="false"
-                fluid
-                :pt="authPasswordPt"
-                :input-props="{
-                  ...resolveFieldControlState(invalid),
-                  id: fieldId,
-                  autocomplete: 'current-password',
-                  required,
-                  'aria-invalid': ariaInvalid,
-                  'aria-describedby': describedbyId,
-                  'aria-expanded': undefined,
-                  'aria-haspopup': undefined,
-                }"
+                :required="required"
+                :disabled="loading"
+                :aria-invalid="ariaInvalid"
+                :aria-describedby="describedbyId"
                 :invalid="invalid"
                 :input-class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
                 :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.password')"
-                toggle-mask
                 @blur="handleFieldBlur('password')"
                 @update:model-value="clearFieldError('password')"
               />
@@ -148,15 +134,10 @@
         </IbFormField>
 
         <Button
-          unstyled
           :class="authPrimaryButtonClass"
-          :pt="authButtonPt"
           type="submit"
-          :label="loading ? t('auth.buttons.signingIn') : t('auth.buttons.signIn')"
           :loading="loading"
-          v-bind="submitControlState"
-          fluid
-        />
+          v-bind="submitControlState">{{ loading ? t('auth.buttons.signingIn') : t('auth.buttons.signIn') }}</Button>
       </form>
 
       <form
@@ -182,12 +163,10 @@
           required
           inline-required
           :field-class="authFieldClass"
-          :message-pt="authErrorMessagePt"
         >
           <InputText
             :id="fieldId"
             v-model="resetForm.email"
-            unstyled
             autocomplete="email"
             :required="required"
             :class="[authInputClass, inlineError ? authInputErrorClass : '']"
@@ -198,15 +177,10 @@
           />
         </IbFormField>
         <Button
-          unstyled
           :class="authPrimaryButtonClass"
-          :pt="authButtonPt"
           type="submit"
-          :label="loading ? t('auth.buttons.sending') : t('auth.buttons.sendCode')"
           :loading="loading"
-          v-bind="submitControlState"
-          fluid
-        />
+          v-bind="submitControlState">{{ loading ? t('auth.buttons.sending') : t('auth.buttons.sendCode') }}</Button>
         <button
           type="button"
           class="self-center border-0 bg-transparent p-0 text-xs font-semibold text-ib-creative-accent hover:underline"
@@ -239,12 +213,10 @@
           required
           inline-required
           :field-class="authFieldClass"
-          :message-pt="authErrorMessagePt"
         >
           <InputText
             :id="fieldId"
             v-model="resetForm.otp"
-            unstyled
             inputmode="numeric"
             autocomplete="one-time-code"
             maxlength="6"
@@ -272,37 +244,23 @@
           required
           inline-required
           :field-class="authFieldClass"
-          :message-pt="authErrorMessagePt"
         >
           <Password
+            :id="fieldId"
             v-model="resetForm.password"
-            unstyled
-            :feedback="false"
-            fluid
-            :pt="authPasswordPt"
-            :input-props="{
-              id: fieldId,
-              autocomplete: 'new-password',
-              required,
-              'aria-invalid': ariaInvalid,
-              'aria-describedby': describedbyId,
-            }"
+            :required="required"
+            :aria-invalid="ariaInvalid"
+            :aria-describedby="describedbyId"
             :invalid="invalid"
             :input-class="[authInputClass, inlineError ? authInputErrorClass : '']"
             :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.newPassword')"
-            toggle-mask
           />
         </IbFormField>
         <Button
-          unstyled
           :class="authPrimaryButtonClass"
-          :pt="authButtonPt"
           type="submit"
-          :label="loading ? t('auth.buttons.resetting') : t('auth.buttons.resetPassword')"
           :loading="loading"
-          v-bind="submitControlState"
-          fluid
-        />
+          v-bind="submitControlState">{{ loading ? t('auth.buttons.resetting') : t('auth.buttons.resetPassword') }}</Button>
       </form>
 
       <div :class="['mt-5', authFooterClass]">
@@ -322,9 +280,8 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
-import Password from 'primevue/password'
+import { Button } from '@/components/ui/button'
+import { Input as InputText, PasswordInput as Password } from '@/components/ui/input'
 import { Lock as LockIcon, User as UserIcon } from '@iconoir/vue'
 import googleLogoUrl from '../../../shared/assets/oauth/google.svg'
 import discordLogoUrl from '../../../shared/assets/oauth/discord.svg'
@@ -337,8 +294,6 @@ import { getEmailError, getRequiredError } from './formUtils'
 import { useAuthPanelControls } from './panelControls'
 import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../shared/auth/oauthProviders'
 import {
-  authButtonPt,
-  authErrorMessagePt,
   authFieldClass,
   authFooterClass,
   authInputClass,
@@ -349,7 +304,6 @@ import {
   authModalKickerClass,
   authModalShellClass,
   authModalTitleClass,
-  authPasswordPt,
   authPrimaryButtonClass,
   authSocialIconButtonClass,
   authSwitchButtonClass,

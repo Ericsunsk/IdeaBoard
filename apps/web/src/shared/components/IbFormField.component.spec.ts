@@ -1,7 +1,5 @@
-import PrimeVue from 'primevue/config'
 import { defineComponent } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { userPrimeVueTestOptions } from '../../test/primeVue'
 import { renderWithUser, screen } from '../../test/render'
 import IbFormField from './IbFormField.vue'
 
@@ -62,9 +60,7 @@ const FormHarness = defineComponent({
 
 describe('IbFormField', () => {
   it('connects labels, required state, and inline required errors without a redundant Message', async () => {
-    const { user } = renderWithUser(FormHarness, {
-      global: { plugins: [[PrimeVue, userPrimeVueTestOptions]] },
-    })
+    const { user } = renderWithUser(FormHarness)
 
     const username = screen.getByLabelText(/账号/)
     const password = screen.getByLabelText(/^密码/)
@@ -84,9 +80,7 @@ describe('IbFormField', () => {
   })
 
   it('gives every non-inline error a unique Message and screen-reader association', () => {
-    renderWithUser(FormHarness, {
-      global: { plugins: [[PrimeVue, userPrimeVueTestOptions]] },
-    })
+    renderWithUser(FormHarness)
 
     const password = screen.getByLabelText(/^密码/)
     const confirmPassword = screen.getByLabelText(/^确认密码/)
@@ -106,7 +100,6 @@ describe('IbFormField', () => {
   it('keeps a screen-reader error when the visible Message is disabled', () => {
     renderWithUser(FormHarness, {
       props: { hideConfirmMessage: true },
-      global: { plugins: [[PrimeVue, userPrimeVueTestOptions]] },
     })
 
     const input = screen.getByLabelText(/^确认密码/)

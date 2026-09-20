@@ -2,6 +2,7 @@
   <AdminSettingsDialogFrame
     :visible="visible"
     header="OAuth Provider 设置"
+    description="配置 OAuth 登录渠道后保存。"
     :busy="isSaving"
     :loading="isLoading && !summary"
     loading-label="加载 OAuth Provider 设置"
@@ -44,10 +45,10 @@
           </div>
 
           <div class="shrink-0 pl-2" @click.stop>
-            <ToggleSwitch
-              :model-value="providerEnabled[provider.value] ?? false"
-              :input-id="`admin-oauth-enabled-${provider.value}`"
+            <AdminSwitch
+              :id="`admin-oauth-enabled-${provider.value}`"
               :name="`oauth_enabled_${provider.value}`"
+              :model-value="providerEnabled[provider.value] ?? false"
               :aria-label="`${provider.label} 登录`"
               :disabled="isBusy"
               @update:model-value="setProviderEnabled(provider.value, $event)"
@@ -58,9 +59,9 @@
 
       <!-- 语义化 Provider 切换器（可访问性与测试合约） -->
       <AdminFormField label="OAuth Provider" for="admin-oauth-provider" class="sr-only">
-        <Select
+        <AdminSelect
+          id="admin-oauth-provider"
           v-model="selectedProvider"
-          input-id="admin-oauth-provider"
           name="oauth_provider"
           aria-label="OAuth Provider"
           :options="oauthLoginProviders"
@@ -107,7 +108,7 @@
           :error="errors.clientId"
           :required="form.enabled"
         >
-          <InputText
+          <AdminInput
             id="admin-oauth-client-id"
             v-model="form.clientId"
             name="oauth_client_id"
@@ -129,7 +130,7 @@
           :error="errors.clientSecret"
           :required="form.enabled && !summary.clientSecretConfigured"
         >
-          <InputText
+          <AdminInput
             id="admin-oauth-client-secret"
             v-model="form.clientSecret"
             name="oauth_client_secret"
@@ -147,7 +148,7 @@
 
         <AdminFormField label="Callback URL" for="admin-oauth-callback-url">
           <div class="relative flex items-center">
-            <InputText
+            <AdminInput
               id="admin-oauth-callback-url"
               name="oauth_callback_url"
               :model-value="summary.callbackUrl"
@@ -155,15 +156,15 @@
               aria-label="Callback URL"
               readonly
             />
-            <Button
-              label="复制"
+            <AdminButton
               type="button"
-              size="small"
-              severity="secondary"
-              text
+              size="sm"
+              variant="ghost"
               class="!absolute right-1 !h-7 !px-2.5 text-admin-caption font-semibold"
               @click="copyCallbackUrl"
-            />
+            >
+              复制
+            </AdminButton>
           </div>
           <p class="m-0 mt-1 text-admin-micro text-admin-text-3">
             请在
@@ -173,26 +174,27 @@
         </AdminFormField>
       </div>
 
-      <Message v-if="saveError" severity="error" :closable="false">{{ saveError }}</Message>
+      <AdminAlert v-if="saveError" severity="error">{{ saveError }}</AdminAlert>
     </form>
 
     <template #footer="{ requestClose }">
-      <Button
-        label="取消"
+      <AdminButton
+        variant="outline"
         :class="adminActionButtonClass"
-        severity="secondary"
-        outlined
         :disabled="isBusy"
         @click="requestClose"
-      />
-      <Button
-        label="保存设置"
+      >
+        取消
+      </AdminButton>
+      <AdminButton
+        variant="default"
         :class="adminActionButtonClass"
-        severity="contrast"
         :loading="isSaving"
         :disabled="isLoading || Boolean(loadError) || !summary"
         @click="submit"
-      />
+      >
+        保存设置
+      </AdminButton>
     </template>
   </AdminSettingsDialogFrame>
 
@@ -208,15 +210,15 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
-import Message from 'primevue/message'
-import Select from 'primevue/select'
-import ToggleSwitch from 'primevue/toggleswitch'
+import AdminAlert from '../shared/components/AdminAlert.vue'
+import AdminButton from '../shared/components/AdminButton.vue'
+import AdminInput from '../shared/components/AdminInput.vue'
+import AdminSelect from '../shared/components/AdminSelect.vue'
+import AdminSwitch from '../shared/components/AdminSwitch.vue'
 import AdminSettingsDialogFrame from '../shared/components/AdminSettingsDialogFrame.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
 import AdminStatusPill from '../shared/components/AdminStatusPill.vue'
-import AdminLogoPickerPopover from '../provider-config/AdminLogoPickerPopover.vue'
+import AdminLogoPickerPopover from '../shared/components/AdminLogoPickerPopover.vue'
 import { formatAdminDisplayError, useAdminToast } from '../shared/lib/toast'
 import { useAppClipboard } from '../../../shared/composables/useAppClipboard'
 import { adminActionButtonClass } from '../shared/lib/uiClasses'

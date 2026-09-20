@@ -39,16 +39,16 @@ const restrictedBoundaryCases: BoundaryCase[] = [
 
 const allowedBoundaryCases: BoundaryCase[] = [
   {
-    name: 'Canvas route page can use Prime adapters and the Canvas overlay public barrel',
+    name: 'Canvas route page can use dialog adapters and the Canvas overlay public barrel',
     filePath: path.join(
       webRoot,
       'src/features/canvas/presentation/pages/import-boundary.fixture.ts',
     ),
     code: `
-      import { usePrimeDialogOverlayLifecycle } from '../../../shared/composables/usePrimeDialogOverlayLifecycle'
+      import { useDialogOverlayLifecycle } from '../../../shared/composables/useDialogOverlayLifecycle'
       import { useCanvasCustomLayerOverlay } from '../overlay-lifecycle'
 
-      console.log(usePrimeDialogOverlayLifecycle, useCanvasCustomLayerOverlay)
+      console.log(useDialogOverlayLifecycle, useCanvasCustomLayerOverlay)
     `,
   },
 ]

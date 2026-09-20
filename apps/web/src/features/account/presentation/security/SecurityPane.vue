@@ -17,28 +17,19 @@
         required
         inline-required
         :field-class="passwordFieldClass"
-        :message-pt="ibFormErrorMessagePt"
       >
-        <Password
+        <UiPassword
+          :id="fieldId"
           v-model="pwdForm.oldPassword"
           autocomplete="current-password"
-          :feedback="false"
-          fluid
-          unstyled
-          :pt="ibPasswordPt"
-          :input-props="{
-            id: fieldId,
-            autocomplete: 'current-password',
-            required,
-            'aria-invalid': ariaInvalid,
-            'aria-describedby': describedbyId,
-          }"
+          :aria-invalid="ariaInvalid"
+          :aria-describedby="describedbyId"
+          :required="required"
           :invalid="invalid"
           :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
           :placeholder="
             inlineError ? inlineErrorText : t('account.security.currentPasswordPlaceholder')
           "
-          toggle-mask
           @blur="validatePasswordField('oldPassword')"
           @update:model-value="clearPasswordFieldError('oldPassword')"
         />
@@ -61,28 +52,19 @@
           required
           inline-required
           :field-class="passwordFieldClass"
-          :message-pt="ibFormErrorMessagePt"
         >
-          <Password
-            v-model="pwdForm.newPassword"
-            autocomplete="new-password"
-            :feedback="false"
-            fluid
-            unstyled
-            :pt="ibPasswordPt"
-            :input-props="{
-              id: fieldId,
-              autocomplete: 'new-password',
-              required,
-              'aria-invalid': ariaInvalid,
-              'aria-describedby': describedbyId,
-            }"
+        <UiPassword
+          :id="fieldId"
+          v-model="pwdForm.newPassword"
+          autocomplete="new-password"
+          :aria-invalid="ariaInvalid"
+          :aria-describedby="describedbyId"
+          :required="required"
             :invalid="invalid"
             :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
             :placeholder="
               inlineError ? inlineErrorText : t('account.security.newPasswordPlaceholder')
             "
-            toggle-mask
             @blur="validatePasswordField('newPassword')"
             @update:model-value="handleNewPasswordInput"
           />
@@ -104,43 +86,30 @@
           required
           inline-required
           :field-class="passwordFieldClass"
-          :message-pt="ibFormErrorMessagePt"
         >
-          <Password
-            v-model="pwdForm.confirmPassword"
-            autocomplete="new-password"
-            :feedback="false"
-            fluid
-            unstyled
-            :pt="ibPasswordPt"
-            :input-props="{
-              id: fieldId,
-              autocomplete: 'new-password',
-              required,
-              'aria-invalid': ariaInvalid,
-              'aria-describedby': describedbyId,
-            }"
+        <UiPassword
+          :id="fieldId"
+          v-model="pwdForm.confirmPassword"
+          autocomplete="new-password"
+          :aria-invalid="ariaInvalid"
+          :aria-describedby="describedbyId"
+          :required="required"
             :invalid="invalid"
             :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
             :placeholder="
               inlineError ? inlineErrorText : t('account.security.confirmPasswordPlaceholder')
             "
-            toggle-mask
             @blur="validatePasswordField('confirmPassword')"
             @update:model-value="clearPasswordFieldError('confirmPassword')"
           />
         </IbFormField>
       </div>
 
-      <Button
-        unstyled
+      <UiButton
         type="submit"
-        :label="pwdLoading ? t('account.security.updating') : t('account.security.updatePassword')"
         :loading="pwdLoading"
         :disabled="pwdLoading"
-        :class="accountPrimaryActionButtonClass"
-        :pt="accountButtonPt"
-      />
+        :class="accountPrimaryActionButtonClass">{{ pwdLoading ? t('account.security.updating') : t('account.security.updatePassword') }}</UiButton>
     </form>
 
     <div class="my-8 border-t border-ib-border-soft" aria-hidden="true"></div>
@@ -167,28 +136,19 @@
         required
         inline-required
         :field-class="passwordFieldClass"
-        :message-pt="ibFormErrorMessagePt"
       >
-        <Password
+        <UiPassword
+          :id="fieldId"
           v-model="emailForm.currentPassword"
           autocomplete="current-password"
-          :feedback="false"
-          fluid
-          unstyled
-          :pt="ibPasswordPt"
-          :input-props="{
-            id: fieldId,
-            autocomplete: 'current-password',
-            required,
-            'aria-invalid': ariaInvalid,
-            'aria-describedby': describedbyId,
-          }"
+          :aria-invalid="ariaInvalid"
+          :aria-describedby="describedbyId"
+          :required="required"
           :invalid="invalid"
           :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
           :placeholder="
             inlineError ? inlineErrorText : t('account.security.currentPasswordPlaceholder')
           "
-          toggle-mask
         />
       </IbFormField>
       <IbFormField
@@ -207,12 +167,10 @@
         required
         inline-required
         :field-class="passwordFieldClass"
-        :message-pt="ibFormErrorMessagePt"
       >
-        <InputText
+        <UiInput
           :id="fieldId"
           v-model="emailForm.newEmail"
-          unstyled
           type="email"
           autocomplete="email"
           :required="required"
@@ -223,15 +181,11 @@
           :aria-describedby="describedbyId"
         />
       </IbFormField>
-      <Button
-        unstyled
+      <UiButton
         type="submit"
-        :label="emailLoading ? t('account.security.sending') : t('account.security.sendCode')"
         :loading="emailLoading"
         :disabled="emailLoading"
-        :class="accountPrimaryActionButtonClass"
-        :pt="accountButtonPt"
-      />
+        :class="accountPrimaryActionButtonClass">{{ emailLoading ? t('account.security.sending') : t('account.security.sendCode') }}</UiButton>
     </form>
 
     <form v-else class="grid gap-5" novalidate @submit.prevent="handleConfirmEmailChange">
@@ -254,12 +208,10 @@
         required
         inline-required
         :field-class="passwordFieldClass"
-        :message-pt="ibFormErrorMessagePt"
       >
-        <InputText
+        <UiInput
           :id="fieldId"
           v-model="emailForm.otp"
-          unstyled
           inputmode="numeric"
           autocomplete="one-time-code"
           maxlength="6"
@@ -271,17 +223,11 @@
           :aria-describedby="describedbyId"
         />
       </IbFormField>
-      <Button
-        unstyled
+      <UiButton
         type="submit"
-        :label="
-          emailLoading ? t('account.security.updating') : t('account.security.confirmEmailChange')
-        "
         :loading="emailLoading"
         :disabled="emailLoading"
-        :class="accountPrimaryActionButtonClass"
-        :pt="accountButtonPt"
-      />
+        :class="accountPrimaryActionButtonClass">{{ emailLoading ? t('account.security.updating') : t('account.security.confirmEmailChange') }}</UiButton>
     </form>
   </AccountPane>
 </template>
@@ -289,15 +235,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
-import Password from 'primevue/password'
+import { Button as UiButton } from '@/components/ui/button'
+import { Input as UiInput, PasswordInput as UiPassword } from '@/components/ui/input'
 import {
-  ibFormErrorMessagePt,
   ibFormFieldClass,
   ibFormInputClass,
   ibFormInputErrorClass,
-  ibPasswordPt,
 } from '../../../../shared/theme/formControls'
 import IbFormField from '../../../../shared/components/IbFormField.vue'
 import { useUserStore } from '../../../auth/session/userSession'
@@ -306,7 +249,7 @@ import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
 import { usePasswordChange } from '../../application/security/usePasswordChange'
 import AccountPane from '../common/AccountPane.vue'
-import { accountButtonPt, accountPrimaryActionButtonClass } from '../common/ui'
+import { accountPrimaryActionButtonClass } from '../common/ui'
 
 const { t } = useI18n()
 const {

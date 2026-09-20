@@ -12,35 +12,35 @@
       frame-class="rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-control)]"
       :empty-title="t('account.topUp.historyEmptyTitle')"
     >
-      <Column
+      <UiColumn
         field="occurred_at"
         :header="t('account.topUp.columnTime')"
         :style="{ width: '180px' }"
       >
         <template #body="{ data }"
-          ><Skeleton v-if="isSkeleton(data)" width="8rem" /><time
+          ><UiSkeleton v-if="isSkeleton(data)" width="8rem" /><time
             v-else
             class="whitespace-nowrap font-mono text-[13px] text-ib-text-muted"
             >{{ formatDateTime(data.occurred_at) }}</time
           ></template
         >
-      </Column>
-      <Column field="idea_quantity" header="Ideas" :style="{ width: '130px' }">
+      </UiColumn>
+      <UiColumn field="idea_quantity" header="Ideas" :style="{ width: '130px' }">
         <template #body="{ data }"
-          ><Skeleton v-if="isSkeleton(data)" width="4rem" /><span
+          ><UiSkeleton v-if="isSkeleton(data)" width="4rem" /><span
             v-else
             class="font-mono font-bold text-ib-text"
             >{{ formatLocaleNumber(data.idea_quantity) }}</span
           ></template
         >
-      </Column>
-      <Column
+      </UiColumn>
+      <UiColumn
         field="paid_amount_minor"
         :header="t('account.topUp.columnPaid')"
         :style="{ width: '170px' }"
       >
         <template #body="{ data }"
-          ><Skeleton v-if="isSkeleton(data)" width="6rem" /><span
+          ><UiSkeleton v-if="isSkeleton(data)" width="6rem" /><span
             v-else-if="data.paid_amount_minor !== undefined && data.paid_currency"
             class="whitespace-nowrap font-mono font-semibold text-ib-text-muted"
             >{{ formatCurrencyMinor(data.paid_amount_minor, data.paid_currency) }}</span
@@ -48,20 +48,20 @@
             t('account.topUp.unpaid')
           }}</span></template
         >
-      </Column>
-      <Column field="status" :header="t('account.topUp.columnStatus')" :style="{ width: '190px' }">
+      </UiColumn>
+      <UiColumn field="status" :header="t('account.topUp.columnStatus')" :style="{ width: '190px' }">
         <template #body="{ data }"
-          ><Skeleton v-if="isSkeleton(data)" width="4rem" /><span
+          ><UiSkeleton v-if="isSkeleton(data)" width="4rem" /><span
             v-else
             class="font-semibold"
             :class="data.status === 'credited' ? 'text-ib-success' : 'text-ib-text-muted'"
             >{{ rechargeStatusLabel(data) }}</span
           ></template
         >
-      </Column>
-      <Column :header="t('account.topUp.columnReceipt')" :style="{ width: '100px' }">
+      </UiColumn>
+      <UiColumn :header="t('account.topUp.columnReceipt')" :style="{ width: '100px' }">
         <template #body="{ data }"
-          ><Skeleton v-if="isSkeleton(data)" width="3rem" /><a
+          ><UiSkeleton v-if="isSkeleton(data)" width="3rem" /><a
             v-else-if="data.receipt_url"
             :href="data.receipt_url"
             target="_blank"
@@ -70,7 +70,7 @@
             >{{ t('account.topUp.viewReceipt') }}</a
           ><span v-else class="text-ib-text-subtle">—</span></template
         >
-      </Column>
+      </UiColumn>
 
       <template #empty>
         <div
@@ -81,14 +81,11 @@
           <p class="m-0 font-semibold text-ib-danger">
             {{ t('account.errors.historyLoadFailed') }}
           </p>
-          <Button
-            :label="t('account.reload')"
-            severity="secondary"
-            size="small"
-            text
+          <UiButton
+            variant="ghost"
+            size="sm"
             class="mt-3"
-            @click="emit('retry')"
-          />
+            @click="emit('retry')">{{ t('account.reload') }}</UiButton>
         </div>
         <div
           v-else
@@ -114,26 +111,20 @@
           role="alert"
         >
           <span class="text-sm text-ib-danger">{{ t('account.topUp.loadMoreFailed') }}</span>
-          <Button
-            :label="t('account.topUp.retryLoad')"
-            severity="secondary"
-            size="small"
-            text
-            @click="emit('load-more')"
-          />
+          <UiButton
+            variant="ghost"
+            size="sm"
+            @click="emit('load-more')">{{ t('account.topUp.retryLoad') }}</UiButton>
         </div>
         <div
           v-else-if="hasNextPage"
           class="flex justify-center border-t border-ib-border-soft px-4 py-3"
         >
-          <Button
-            :label="t('account.topUp.loadMore')"
-            severity="secondary"
-            size="small"
-            outlined
+          <UiButton
+            variant="outline"
+            size="sm"
             :loading="fetchingNextPage"
-            @click="emit('load-more')"
-          />
+            @click="emit('load-more')">{{ t('account.topUp.loadMore') }}</UiButton>
         </div>
       </template>
     </DataTableFrame>
@@ -143,9 +134,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Button from 'primevue/button'
-import Column from 'primevue/column'
-import Skeleton from 'primevue/skeleton'
+import { Button as UiButton } from '@/components/ui/button'
+import UiColumn from '../../../../shared/components/DataTableColumn.vue'
+import { Skeleton as UiSkeleton } from '@/components/ui/skeleton'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
 import { formatAccountRechargeDateTime, formatCurrencyMinor } from '../../domain'

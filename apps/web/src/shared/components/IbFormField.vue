@@ -19,16 +19,15 @@
     </span>
 
     <div v-else-if="shouldShowMessage" :id="errorId">
-      <Message unstyled severity="error" size="small" :closable="false" :pt="messagePt">
+      <p class="m-0 mt-1.5 border-0 bg-transparent p-0 text-xs font-semibold text-ib-danger" role="alert" data-severity="error">
         {{ errorMessage }}
-      </Message>
+      </p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, useId } from 'vue'
-import Message from 'primevue/message'
 import { displayErrorMessage, isRequiredErrorMessage } from '../utils/formValidation'
 
 export type IbFormFieldSlotProps = {
@@ -52,7 +51,6 @@ const props = withDefaults(
     showMessage?: boolean
     fieldClass?: string
     labelClass?: string
-    messagePt?: object | undefined
   }>(),
   {
     error: '',
@@ -62,7 +60,6 @@ const props = withDefaults(
     showMessage: true,
     fieldClass: '',
     labelClass: '',
-    messagePt: undefined,
   },
 )
 
