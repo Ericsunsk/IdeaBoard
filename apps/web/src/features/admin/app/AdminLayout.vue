@@ -9,11 +9,7 @@
       @click="drawerOpen = false"
     />
 
-    <AdminSidebar
-      ref="sidebarRef"
-      v-model:drawer-open="drawerOpen"
-      :active-key="activeKey"
-    />
+    <AdminSidebar ref="sidebarRef" v-model:drawer-open="drawerOpen" :active-key="activeKey" />
 
     <div class="flex min-h-screen min-w-0 flex-1 flex-col">
       <!-- 顶栏组：一级主顶栏 + 二级导航栏统一常驻吸顶 -->

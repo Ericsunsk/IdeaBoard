@@ -74,5 +74,4 @@ const toggleAriaLabel = computed(() =>
 )
 
 const showPassword = ref(false)
-
 </script>

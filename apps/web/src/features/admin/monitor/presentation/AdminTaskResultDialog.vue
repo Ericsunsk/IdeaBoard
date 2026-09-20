@@ -14,7 +14,10 @@
             class="inline-flex size-7 shrink-0 items-center justify-center rounded-lg border border-admin-border-soft bg-admin-surface-muted"
             :style="{ color: getTaskStatusDefinition(detailTask?.status || '').color }"
           >
-            <CheckCircle v-if="detailTask?.status === adminTaskStatuses.completed" class="size-3.5" />
+            <CheckCircle
+              v-if="detailTask?.status === adminTaskStatuses.completed"
+              class="size-3.5"
+            />
             <XmarkCircle
               v-else-if="
                 detailTask?.status === adminTaskStatuses.failed ||
@@ -130,7 +133,9 @@
       >
         <div class="flex items-center gap-1.5">
           <span class="text-admin-text-3">总耗时:</span>
-          <span class="font-mono font-medium text-admin-text-1">{{ calcDuration(detailTask) }}</span>
+          <span class="font-mono font-medium text-admin-text-1">{{
+            calcDuration(detailTask)
+          }}</span>
         </div>
         <div class="flex items-center gap-1.5">
           <span class="text-admin-text-3">创建于:</span>
@@ -146,7 +151,9 @@
           <Fingerprint class="size-3.5 text-admin-text-2" />
           <span id="task-detail-identity">身份与归属</span>
         </div>
-        <div class="flex flex-col divide-y divide-admin-border-soft/60 rounded-xl border border-admin-border-soft bg-white px-3 py-1 text-xs">
+        <div
+          class="flex flex-col divide-y divide-admin-border-soft/60 rounded-xl border border-admin-border-soft bg-white px-3 py-1 text-xs"
+        >
           <div class="flex items-center justify-between py-1.5">
             <span class="text-admin-text-3">用户</span>
             <div class="flex items-center gap-1">
@@ -165,23 +172,33 @@
           </div>
           <div class="flex items-center justify-between py-1.5">
             <span class="text-admin-text-3">优先级</span>
-            <span class="font-medium text-admin-text-1">{{ getTaskPriorityLabel(detailTask) }}</span>
+            <span class="font-medium text-admin-text-1">{{
+              getTaskPriorityLabel(detailTask)
+            }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
             <span class="text-admin-text-3">供应商</span>
-            <span class="font-mono text-admin-text-1">{{ getDetailExecutionProviderLabel(detailTask) }}</span>
+            <span class="font-mono text-admin-text-1">{{
+              getDetailExecutionProviderLabel(detailTask)
+            }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
             <span class="text-admin-text-3">模型</span>
-            <span class="font-mono text-admin-text-1">{{ getDetailExecutionModelLabel(detailTask) }}</span>
+            <span class="font-mono text-admin-text-1">{{
+              getDetailExecutionModelLabel(detailTask)
+            }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
             <span class="text-admin-text-3">创建时间</span>
-            <span class="font-mono text-admin-text-1">{{ formatDateTime(detailTask.created_at) }}</span>
+            <span class="font-mono text-admin-text-1">{{
+              formatDateTime(detailTask.created_at)
+            }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
             <span class="text-admin-text-3">完成时间</span>
-            <span class="font-mono text-admin-text-1">{{ formatDateTime(detailTask.completed_at) }}</span>
+            <span class="font-mono text-admin-text-1">{{
+              formatDateTime(detailTask.completed_at)
+            }}</span>
           </div>
         </div>
       </section>
@@ -202,8 +219,12 @@
             复制全文
           </button>
         </div>
-        <div class="max-h-[120px] overflow-y-auto rounded-xl border border-admin-border-soft bg-admin-surface-muted/60 p-2.5">
-          <div class="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-slate-800">
+        <div
+          class="max-h-[120px] overflow-y-auto rounded-xl border border-admin-border-soft bg-admin-surface-muted/60 p-2.5"
+        >
+          <div
+            class="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-slate-800"
+          >
             {{ detailTask.prompt || '无提示词' }}
           </div>
         </div>
@@ -268,7 +289,9 @@
             <div class="flex items-center justify-between gap-2">
               <div class="flex min-w-0 items-center gap-1.5">
                 <span class="font-mono text-admin-text-3">#{{ attempt.attempt_no }}</span>
-                <span class="font-semibold text-admin-text-1">{{ getAttemptProviderLabel(attempt) }}</span>
+                <span class="font-semibold text-admin-text-1">{{
+                  getAttemptProviderLabel(attempt)
+                }}</span>
                 <span class="text-admin-text-3">/</span>
                 <span class="truncate font-mono text-[11px] text-admin-text-2">
                   {{ attempt.resolved_model || '-' }}
@@ -280,7 +303,9 @@
                 rounded
               />
             </div>
-            <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-admin-text-2 pt-1 border-t border-admin-border-soft/50">
+            <div
+              class="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-admin-text-2 pt-1 border-t border-admin-border-soft/50"
+            >
               <div class="flex items-center justify-between">
                 <span class="text-admin-text-3">阶段:</span>
                 <span>{{ getAttemptStageLabel(attempt.stage) }}</span>
@@ -291,7 +316,9 @@
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-admin-text-3">Provider 耗时:</span>
-                <span class="font-mono">{{ formatAttemptLatency(attempt.provider_latency_ms) }}</span>
+                <span class="font-mono">{{
+                  formatAttemptLatency(attempt.provider_latency_ms)
+                }}</span>
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-admin-text-3">总耗时:</span>
@@ -326,7 +353,9 @@
             功能已删除
           </span>
         </div>
-        <div class="flex flex-col divide-y divide-admin-border-soft/60 rounded-xl border border-admin-border-soft bg-white px-3 py-1 text-xs">
+        <div
+          class="flex flex-col divide-y divide-admin-border-soft/60 rounded-xl border border-admin-border-soft bg-white px-3 py-1 text-xs"
+        >
           <div class="flex items-center justify-between py-1.5">
             <span class="text-admin-text-3">功能</span>
             <span class="font-medium text-admin-text-1">{{ detailTask.billing.display_name }}</span>
@@ -337,7 +366,9 @@
           </div>
           <div class="flex items-center justify-between py-1.5">
             <span class="text-admin-text-3">单价</span>
-            <span class="font-mono text-admin-text-1">{{ formatIdeaAmount(detailTask.billing.unit_credits) }}</span>
+            <span class="font-mono text-admin-text-1">{{
+              formatIdeaAmount(detailTask.billing.unit_credits)
+            }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
             <span class="text-admin-text-3">调用数量</span>
@@ -357,11 +388,15 @@
           </div>
           <div class="flex items-center justify-between py-1.5">
             <span class="text-admin-text-3">报价时间</span>
-            <span class="font-mono text-admin-text-1">{{ formatDateTime(detailTask.billing.quoted_at) }}</span>
+            <span class="font-mono text-admin-text-1">{{
+              formatDateTime(detailTask.billing.quoted_at)
+            }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
             <span class="text-admin-text-3">结算时间</span>
-            <span class="font-mono text-admin-text-1">{{ formatDateTime(detailTask.billing.settled_at) }}</span>
+            <span class="font-mono text-admin-text-1">{{
+              formatDateTime(detailTask.billing.settled_at)
+            }}</span>
           </div>
         </div>
       </section>
@@ -382,7 +417,9 @@
             复制 JSON
           </button>
         </div>
-        <div class="max-h-[140px] overflow-x-auto rounded-xl border border-admin-border-soft bg-admin-surface-muted/60 p-2.5 font-mono text-xs">
+        <div
+          class="max-h-[140px] overflow-x-auto rounded-xl border border-admin-border-soft bg-admin-surface-muted/60 p-2.5 font-mono text-xs"
+        >
           <pre class="m-0 leading-relaxed text-slate-800">{{
             resultSummaryText || '暂无 API 响应结果'
           }}</pre>
@@ -446,7 +483,10 @@ import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { getTaskPriorityLabel } from './columns'
 import { adminTaskStatuses, getTaskStatusDefinition } from '../domain/status'
-import type { AdminMonitorDetailModel, AdminMonitorExecutionAttempt } from '../infrastructure/resource'
+import type {
+  AdminMonitorDetailModel,
+  AdminMonitorExecutionAttempt,
+} from '../infrastructure/resource'
 import { useAdminTaskResultFeedback } from '../application/useAdminMonitorFeedback'
 import { useTaskResultDetail } from '../application/useTaskResultDetail'
 

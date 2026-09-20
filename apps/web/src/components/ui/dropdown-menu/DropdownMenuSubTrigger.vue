@@ -16,10 +16,7 @@
 
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
-import {
-  DropdownMenuSubTrigger,
-  type DropdownMenuSubTriggerProps,
-} from 'reka-ui'
+import { DropdownMenuSubTrigger, type DropdownMenuSubTriggerProps } from 'reka-ui'
 import { NavArrowRight } from '@iconoir/vue'
 import { cn, cleanProps } from '@/lib/utils'
 

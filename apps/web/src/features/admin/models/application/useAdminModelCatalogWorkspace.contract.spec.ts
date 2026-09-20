@@ -2,9 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { renderWithUser, waitFor } from '../../../../test/render'
-import {
-  useAdminModelCatalogWorkspace,
-} from './useAdminModelCatalogWorkspace'
+import { useAdminModelCatalogWorkspace } from './useAdminModelCatalogWorkspace'
 import type { AdminGatewayCatalog } from '../infrastructure/adminGatewayResource'
 import type { AdminModelItem } from '../domain/catalogData'
 
@@ -15,7 +13,7 @@ vi.mock('../../shared/composables/useAdminConfirm', () => ({
 }))
 
 vi.mock('../../shared/lib/toast', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../shared/lib/toast')>()) as object,
+  ...((await importOriginal<typeof import('../../shared/lib/toast')>()) as object),
   useAdminToast: () => toast,
 }))
 
@@ -98,9 +96,11 @@ describe('useAdminModelCatalogWorkspace refresh enrichment', () => {
       model({ id: 'openai/gpt-4o', description: '旧版官方简介', descriptionEnriched: true }),
     ]
     const { workspace } = mountWorkspace(
-      fakeCatalog(stored, [
-        { id: 'openai/gpt-4o', description: '实时官方简介', context_or_resolution: '128K' },
-      ], saved),
+      fakeCatalog(
+        stored,
+        [{ id: 'openai/gpt-4o', description: '实时官方简介', context_or_resolution: '128K' }],
+        saved,
+      ),
     )
     await waitFor(() => expect(workspace.allModels.value).toHaveLength(1))
 

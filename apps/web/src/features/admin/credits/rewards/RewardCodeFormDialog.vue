@@ -50,8 +50,12 @@
             variant="outline"
             class="aspect-square shrink-0 !rounded-lg !p-0 flex items-center justify-center"
             :disabled="pending"
-            :aria-label="isEditing ? t('admin.rewardCode.generateNew') : t('admin.rewardCode.regenerate')"
-            :title="isEditing ? t('admin.rewardCode.generateNew') : t('admin.rewardCode.regenerate')"
+            :aria-label="
+              isEditing ? t('admin.rewardCode.generateNew') : t('admin.rewardCode.regenerate')
+            "
+            :title="
+              isEditing ? t('admin.rewardCode.generateNew') : t('admin.rewardCode.regenerate')
+            "
             type="button"
             @click="regenerate"
           >
@@ -59,7 +63,9 @@
           </AdminButton>
         </div>
         <p id="reward-code-value-hint" class="m-0 text-admin-caption text-admin-text-3">
-          {{ isEditing ? t('admin.rewardCode.codeHintEdit') : t('admin.rewardCode.codeHintCreate') }}
+          {{
+            isEditing ? t('admin.rewardCode.codeHintEdit') : t('admin.rewardCode.codeHintCreate')
+          }}
         </p>
         <AdminAlert
           v-if="isEditing && form.values.code.trim()"
@@ -68,11 +74,7 @@
         >
           {{ t('admin.rewardCode.rotationWarning') }}
         </AdminAlert>
-        <AdminAlert
-          v-if="form.errors.value.code"
-          id="reward-code-value-error"
-          severity="error"
-        >
+        <AdminAlert v-if="form.errors.value.code" id="reward-code-value-error" severity="error">
           {{ form.errors.value.code }}
         </AdminAlert>
       </div>
@@ -293,10 +295,13 @@ const rewardCodeSchema = computed(() => {
         (val) => typeof val === 'number' && Number.isSafeInteger(val) && val >= 0,
         t('admin.rewardCode.validation.capNonNegative'),
       ),
-      v.check((val) => {
-        if (typeof val === 'number' && val > 0 && val < minimumCap) return false
-        return true
-      }, t('admin.rewardCode.validation.capBelowCurrent', { count: minimumCap })),
+      v.check(
+        (val) => {
+          if (typeof val === 'number' && val > 0 && val < minimumCap) return false
+          return true
+        },
+        t('admin.rewardCode.validation.capBelowCurrent', { count: minimumCap }),
+      ),
     ),
     expiresAt: v.string(),
     idempotencyKey: v.string(),

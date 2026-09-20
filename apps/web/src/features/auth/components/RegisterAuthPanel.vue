@@ -169,7 +169,9 @@
           :class="authPrimaryButtonClass"
           type="submit"
           :loading="loading"
-          v-bind="submitControlState">{{ loading ? t('auth.buttons.creating') : t('auth.buttons.createAccount') }}</Button>
+          v-bind="submitControlState"
+          >{{ loading ? t('auth.buttons.creating') : t('auth.buttons.createAccount') }}</Button
+        >
 
         <p class="m-0 text-center text-[11px] leading-4 text-[var(--color-ib-auth-subtle)]">
           {{ t('auth.legal.agreePrefix') }}
@@ -237,7 +239,9 @@
           :class="authPrimaryButtonClass"
           type="submit"
           :loading="loading"
-          v-bind="submitControlState">{{ loading ? t('auth.buttons.verifying') : t('auth.buttons.verifyAndSignIn') }}</Button>
+          v-bind="submitControlState"
+          >{{ loading ? t('auth.buttons.verifying') : t('auth.buttons.verifyAndSignIn') }}</Button
+        >
       </form>
 
       <div :class="['mt-5', authFooterClass]">

@@ -53,13 +53,13 @@
           inline-required
           :field-class="passwordFieldClass"
         >
-        <PasswordInput
-          :id="fieldId"
-          v-model="pwdForm.newPassword"
-          autocomplete="new-password"
-          :aria-invalid="ariaInvalid"
-          :aria-describedby="describedbyId"
-          :required="required"
+          <PasswordInput
+            :id="fieldId"
+            v-model="pwdForm.newPassword"
+            autocomplete="new-password"
+            :aria-invalid="ariaInvalid"
+            :aria-describedby="describedbyId"
+            :required="required"
             :invalid="invalid"
             :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
             :placeholder="
@@ -87,13 +87,13 @@
           inline-required
           :field-class="passwordFieldClass"
         >
-        <PasswordInput
-          :id="fieldId"
-          v-model="pwdForm.confirmPassword"
-          autocomplete="new-password"
-          :aria-invalid="ariaInvalid"
-          :aria-describedby="describedbyId"
-          :required="required"
+          <PasswordInput
+            :id="fieldId"
+            v-model="pwdForm.confirmPassword"
+            autocomplete="new-password"
+            :aria-invalid="ariaInvalid"
+            :aria-describedby="describedbyId"
+            :required="required"
             :invalid="invalid"
             :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
             :placeholder="
@@ -109,7 +109,11 @@
         type="submit"
         :loading="pwdLoading"
         :disabled="pwdLoading"
-        :class="accountPrimaryActionButtonClass">{{ pwdLoading ? t('account.security.updating') : t('account.security.updatePassword') }}</Button>
+        :class="accountPrimaryActionButtonClass"
+        >{{
+          pwdLoading ? t('account.security.updating') : t('account.security.updatePassword')
+        }}</Button
+      >
     </form>
 
     <div class="my-8 border-t border-ib-border-soft" aria-hidden="true"></div>
@@ -185,7 +189,9 @@
         type="submit"
         :loading="emailLoading"
         :disabled="emailLoading"
-        :class="accountPrimaryActionButtonClass">{{ emailLoading ? t('account.security.sending') : t('account.security.sendCode') }}</Button>
+        :class="accountPrimaryActionButtonClass"
+        >{{ emailLoading ? t('account.security.sending') : t('account.security.sendCode') }}</Button
+      >
     </form>
 
     <form v-else class="grid gap-5" novalidate @submit.prevent="handleConfirmEmailChange">
@@ -227,7 +233,11 @@
         type="submit"
         :loading="emailLoading"
         :disabled="emailLoading"
-        :class="accountPrimaryActionButtonClass">{{ emailLoading ? t('account.security.updating') : t('account.security.confirmEmailChange') }}</Button>
+        :class="accountPrimaryActionButtonClass"
+        >{{
+          emailLoading ? t('account.security.updating') : t('account.security.confirmEmailChange')
+        }}</Button
+      >
     </form>
   </AccountPane>
 </template>

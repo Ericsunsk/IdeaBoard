@@ -35,11 +35,9 @@
       <p class="m-0 font-semibold text-ib-danger">
         {{ t('account.errors.orderStatusLoadFailed') }}
       </p>
-      <Button
-        variant="ghost"
-        size="sm"
-        class="mt-2"
-        @click="emit('retry')">{{ t('account.returnStatus.recheck') }}</Button>
+      <Button variant="ghost" size="sm" class="mt-2" @click="emit('retry')">{{
+        t('account.returnStatus.recheck')
+      }}</Button>
     </template>
     <template v-else-if="status?.status === 'failed'">
       <p class="m-0 font-semibold text-ib-danger">{{ t('account.returnStatus.failedTitle') }}</p>

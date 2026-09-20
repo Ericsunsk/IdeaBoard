@@ -55,7 +55,7 @@ describe('DataTableFrame', () => {
     const bodyCell = screen.getByRole('cell', { name: '第一条记录' })
 
     expect(headerCell).toBeVisible()
-    expect(headerCell).toHaveClass('text-ib-text-muted')
+    expect(headerCell).toHaveClass('text-ib-text')
     expect(bodyCell).toBeVisible()
 
     await user.click(bodyCell)

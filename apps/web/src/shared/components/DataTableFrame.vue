@@ -197,7 +197,12 @@ function toColumnDef(vnode: VNode, index: number): ColumnDef | undefined {
   const bodyClass = readStringProp(vnodeProps, 'bodyClass') ?? readStringProp(vnodeProps, 'class')
   // 纯选择列（仅 selection-mode，无 field/header/slot）直接丢弃：原生表不支持行选择，
   // 与 Prime DataTable 的 selection 行为差异是刻意的，见 UiColumn 注释。
-  if (field === undefined && header === undefined && bodySlot === undefined && headerSlot === undefined) {
+  if (
+    field === undefined &&
+    header === undefined &&
+    bodySlot === undefined &&
+    headerSlot === undefined
+  ) {
     return undefined
   }
   return {
@@ -219,9 +224,7 @@ function readStringProp(props: Record<string, unknown>, key: string): string | u
 
 function extractColumnSlots(vnode: VNode): ColumnSlotFns {
   const children = vnode.children as
-    | Record<string, ((slotProps: Record<string, unknown>) => unknown) | unknown>
-    | null
-    | undefined
+    Record<string, ((slotProps: Record<string, unknown>) => unknown) | unknown> | null | undefined
   const namedSlots =
     children !== null && typeof children === 'object' && !Array.isArray(children) ? children : {}
   return {
@@ -270,11 +273,11 @@ const scrollContainerClass = computed(() =>
 // size 只有 small/large 显式档位，其余（含 undefined）走 default：新增档位只加表项。
 const headerCellClasses = {
   small:
-    'border-b border-ib-border-soft px-3 py-2 text-left align-middle text-[13px] font-semibold text-ib-text-muted',
+    'border-b border-ib-border-soft px-3 py-2 text-left align-middle text-[13px] font-semibold text-ib-text',
   large:
-    'border-b border-ib-border-soft px-5 py-4 text-left align-middle text-[15px] font-semibold text-ib-text-muted',
+    'border-b border-ib-border-soft px-5 py-4 text-left align-middle text-[15px] font-semibold text-ib-text',
   default:
-    'border-b border-ib-border-soft px-4 py-3 text-left align-middle text-[13px] font-semibold text-ib-text-muted',
+    'border-b border-ib-border-soft px-4 py-3 text-left align-middle text-[13px] font-semibold text-ib-text',
 } as const
 const headerCellClass = computed(() => headerCellClasses[props.size ?? 'default'])
 const bodyCellClasses = {

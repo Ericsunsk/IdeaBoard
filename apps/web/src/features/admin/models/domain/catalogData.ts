@@ -52,7 +52,9 @@ export function matchesModelKeyword(model: AdminModelItem, keyword: string): boo
 
 // 价格展示单源：USD/token 换算为 $/1M tokens，缺失即未知（返回 '' 不展示）。
 // Why 按 1M 计：社区价多为 1e-7 量级，直接展示 token 单价不可读。
-export function formatModelPricing(item: Pick<AdminModelItem, 'inputCostPerToken' | 'outputCostPerToken'>): string {
+export function formatModelPricing(
+  item: Pick<AdminModelItem, 'inputCostPerToken' | 'outputCostPerToken'>,
+): string {
   const parts: string[] = []
   if (isPriced(item.inputCostPerToken)) parts.push(`$${perMillion(item.inputCostPerToken)} in`)
   if (isPriced(item.outputCostPerToken)) parts.push(`$${perMillion(item.outputCostPerToken)} out`)
@@ -60,10 +62,14 @@ export function formatModelPricing(item: Pick<AdminModelItem, 'inputCostPerToken
   return `${parts.join(' · ')} /1M`
 }
 
-export function formatCachePricing(item: Pick<AdminModelItem, 'cacheReadCostPerToken' | 'cacheCreateCostPerToken'>): string {
+export function formatCachePricing(
+  item: Pick<AdminModelItem, 'cacheReadCostPerToken' | 'cacheCreateCostPerToken'>,
+): string {
   const parts: string[] = []
-  if (isPriced(item.cacheReadCostPerToken)) parts.push(`读 $${perMillion(item.cacheReadCostPerToken)}`)
-  if (isPriced(item.cacheCreateCostPerToken)) parts.push(`写 $${perMillion(item.cacheCreateCostPerToken)}`)
+  if (isPriced(item.cacheReadCostPerToken))
+    parts.push(`读 $${perMillion(item.cacheReadCostPerToken)}`)
+  if (isPriced(item.cacheCreateCostPerToken))
+    parts.push(`写 $${perMillion(item.cacheCreateCostPerToken)}`)
   if (parts.length === 0) return ''
   return `缓存 ${parts.join(' · ')} /1M`
 }
@@ -86,7 +92,8 @@ export function modelProviderBadgeClass(provider: string): string {
   if (p.includes('fal')) return 'bg-purple-50 text-purple-700 border border-purple-200'
   if (p.includes('anthropic')) return 'bg-orange-50 text-orange-700 border border-orange-200'
   if (p.includes('deepseek')) return 'bg-blue-50 text-blue-700 border border-blue-200'
-  if (p.includes('google') || p.includes('vertex')) return 'bg-sky-50 text-sky-700 border border-sky-200'
+  if (p.includes('google') || p.includes('vertex'))
+    return 'bg-sky-50 text-sky-700 border border-sky-200'
   if (p.includes('groq')) return 'bg-rose-50 text-rose-700 border border-rose-200'
   return 'bg-admin-surface-muted text-admin-text-2 border border-admin-border-soft'
 }

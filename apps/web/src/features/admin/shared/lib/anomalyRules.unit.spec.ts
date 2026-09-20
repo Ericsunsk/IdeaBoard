@@ -5,10 +5,7 @@ import type {
   MonitorData,
   MonitorStats,
 } from '../../../../shared/api/generated-query/model'
-import {
-  ADMIN_STATISTICS_PATH,
-  ADMIN_MONITOR_PATH,
-} from '../../../../shared/constants/routePaths'
+import { ADMIN_STATISTICS_PATH, ADMIN_MONITOR_PATH } from '../../../../shared/constants/routePaths'
 
 type AdminAnomalyInput = Parameters<typeof buildAdminAnomalyItems>[0]
 

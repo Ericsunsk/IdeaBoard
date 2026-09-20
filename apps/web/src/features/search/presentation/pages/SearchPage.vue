@@ -257,7 +257,9 @@
             :index="index"
             :card-style="style"
             :is-selected="isResultSelected(result)"
-            :is-used-as-reference="references.some((ref) => ref.key === searchReferenceKey(result.provider, result.id))"
+            :is-used-as-reference="
+              references.some((ref) => ref.key === searchReferenceKey(result.provider, result.id))
+            "
             :is-saved="savedKeys.has(libraryAssetKey(result.provider, result.id))"
             :has-image-error="failedImages.has(result.id)"
             :image-retry-count="imageRetryCount(result.id)"
@@ -274,10 +276,7 @@
       </SearchResultViewport>
 
       <div v-if="loadingMore" class="flex justify-center py-5">
-        <Spinner
-          class="!h-7 !w-7 text-board-primary"
-          :label="t('search.loadingMore')"
-        />
+        <Spinner class="!h-7 !w-7 text-board-primary" :label="t('search.loadingMore')" />
       </div>
       <p
         v-else-if="results.length > 0 && !hasMore"
@@ -330,14 +329,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
-import {
-  Bookmark,
-  BookmarkSolid,
-  Camera,
-  Plus,
-  Search,
-  Xmark,
-} from '@iconoir/vue'
+import { Bookmark, BookmarkSolid, Camera, Plus, Search, Xmark } from '@iconoir/vue'
 import StudioName from '../../../../shared/components/StudioName.vue'
 import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
 import UserLocaleSelect from '../../../../shared/components/UserLocaleSelect.vue'

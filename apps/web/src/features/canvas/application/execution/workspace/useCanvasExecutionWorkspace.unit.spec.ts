@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot } from '../../../../board'
 import { CanvasGraphSession } from '../../../domain/graph'
 import {
@@ -8,6 +8,35 @@ import {
   createPendingImageExecutionCore,
 } from '../pending-execution'
 import { useCanvasExecutionWorkspace } from './useCanvasExecutionWorkspace'
+import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
+
+const mediaAssetMetadataHandler = http.get('/api/user/media-assets/:assetId', ({ params }) =>
+  HttpResponse.json({
+    code: 0,
+    msg: 'ok',
+    data: {
+      asset_id: String(params.assetId),
+      status: 'ready',
+      mime_type: 'image/webp',
+      width: 400,
+      height: 200,
+      size_bytes: 1,
+      original: { status: 'ready', url: '/original.webp', width: 400, height: 200 },
+      derivatives: {
+        preview: {
+          status: 'ready',
+          url: `/api/user/media-assets/${String(params.assetId)}/derivatives/preview/content`,
+          width: 400,
+          height: 200,
+        },
+      },
+    },
+  }),
+)
+
+beforeEach(() => {
+  useMswHandlers(mediaAssetMetadataHandler)
+})
 
 const rendererMetrics = { readNodeMetrics: () => null }
 

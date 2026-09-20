@@ -8,9 +8,13 @@
       <div class="flex w-full flex-wrap items-center justify-between gap-2.5">
         <div class="flex items-center gap-2">
           <h3 class="text-admin-title font-bold text-admin-title-color">上传并发设置</h3>
-          <span class="text-admin-meta text-admin-subtitle-color">媒体资产文件并发上传连接数上限控制</span>
+          <span class="text-admin-meta text-admin-subtitle-color"
+            >媒体资产文件并发上传连接数上限控制</span
+          >
         </div>
-        <span class="text-admin-meta text-admin-text-3">共 {{ settingRows.length }} 个参数配置</span>
+        <span class="text-admin-meta text-admin-text-3"
+          >共 {{ settingRows.length }} 个参数配置</span
+        >
       </div>
 
       <div :class="adminTableCardClass">
@@ -30,22 +34,18 @@
           </template>
 
           <!-- 配置项列 -->
-          <AdminColumn
-            field="title"
-            header="配置项"
-            :style="{ width: '280px', minWidth: '220px' }"
-          >
+          <AdminColumn field="title" header="配置项" :style="{ width: '280px', minWidth: '220px' }">
             <template #body="{ data }">
-              <AdminItemCell :icon="data.icon" :title="data.title" :description="data.description" />
+              <AdminItemCell
+                :icon="data.icon"
+                :title="data.title"
+                :description="data.description"
+              />
             </template>
           </AdminColumn>
 
           <!-- 参数键名列 -->
-          <AdminColumn
-            field="key"
-            header="参数键名"
-            :style="{ width: '220px', minWidth: '180px' }"
-          >
+          <AdminColumn field="key" header="参数键名" :style="{ width: '220px', minWidth: '180px' }">
             <template #body="{ data }">
               <span
                 class="inline-block rounded border border-admin-border-soft bg-admin-surface-muted px-2 py-0.5 font-mono text-admin-caption font-medium text-admin-text-2"

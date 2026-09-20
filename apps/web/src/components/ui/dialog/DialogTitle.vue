@@ -1,12 +1,7 @@
 <template>
   <DialogTitle
     v-bind="cleanProps(props)"
-    :class="
-      cn(
-        'text-lg font-semibold leading-none tracking-tight',
-        props.class,
-      )
-    "
+    :class="cn('text-lg font-semibold leading-none tracking-tight', props.class)"
   >
     <slot />
   </DialogTitle>

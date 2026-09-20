@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ref } from 'vue'
-import {
-  calculateTimelineYScale,
-  toGmt8Date,
-  useMonitorTimeline,
-} from './useMonitorTimeline'
+import { calculateTimelineYScale, toGmt8Date, useMonitorTimeline } from './useMonitorTimeline'
 import type { AdminTaskRow } from './useAdminTaskList'
 
 describe('useMonitorTimeline', () => {

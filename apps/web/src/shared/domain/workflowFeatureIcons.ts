@@ -1,14 +1,5 @@
 import type { Component } from 'vue'
-import {
-  Combine,
-  Copy,
-  Cut,
-  EditPencil,
-  Expand,
-  Palette,
-  Spark,
-  ZoomIn,
-} from '@iconoir/vue'
+import { Combine, Copy, Cut, EditPencil, Expand, Palette, Spark, ZoomIn } from '@iconoir/vue'
 import { WORKFLOW_FEATURE } from './workflowFeatures'
 
 // Workflow feature 到图标的单源：任务监控 Service 列与定价 Service 列共用，

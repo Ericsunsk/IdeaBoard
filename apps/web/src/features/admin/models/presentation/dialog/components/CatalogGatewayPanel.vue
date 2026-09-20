@@ -9,17 +9,17 @@
         <Settings class="size-4 text-admin-text-3" />
         <span>高级网关适配与参数微调 (可选)</span>
       </div>
-      <NavArrowDown
-        class="size-4 transition-transform"
-        :class="isOpen ? 'rotate-180' : ''"
-      />
+      <NavArrowDown class="size-4 transition-transform" :class="isOpen ? 'rotate-180' : ''" />
     </button>
 
     <div v-if="isOpen" class="mt-3 flex flex-col gap-3.5 border-t border-admin-border-soft pt-3">
       <!-- 自定义网关路径 (Path Override) -->
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center justify-between">
-          <label class="text-admin-caption font-semibold text-admin-text-1" for="model-custom-path-input">
+          <label
+            class="text-admin-caption font-semibold text-admin-text-1"
+            for="model-custom-path-input"
+          >
             自定义网关端点路径 (Path Override)
           </label>
           <span class="text-[11px] text-admin-text-3">留空则由系统智能推导</span>
@@ -46,7 +46,10 @@
       <!-- 额外自定义参数 (JSON) -->
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center justify-between">
-          <label class="text-admin-caption font-semibold text-admin-text-1" for="model-custom-params-input">
+          <label
+            class="text-admin-caption font-semibold text-admin-text-1"
+            for="model-custom-params-input"
+          >
             额外自定义请求参数 (Custom JSON)
           </label>
           <button

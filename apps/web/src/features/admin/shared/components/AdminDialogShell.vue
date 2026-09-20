@@ -26,9 +26,14 @@
         >
           <div :class="[adminDialogHeaderSplitClass, adminDialogChromeHeaderSplitClass]">
             <div :class="adminDialogHeaderContentClass">
-              <slot name="header">
-                <DialogTitle :class="[adminDialogTitleClass, adminDialogChromeTitleClass]">{{ props.header }}</DialogTitle>
-              </slot>
+              <template v-if="hasCustomHeader">
+                <!-- Custom headers own visual layout; the hidden title supplies the dialog's accessible name. -->
+                <DialogTitle class="sr-only">{{ contentAriaLabel }}</DialogTitle>
+                <slot name="header" />
+              </template>
+              <DialogTitle v-else :class="[adminDialogTitleClass, adminDialogChromeTitleClass]">
+                {{ props.header }}
+              </DialogTitle>
             </div>
             <button
               v-if="canDismiss('close-control')"
@@ -45,10 +50,7 @@
           </div>
         </div>
 
-        <div
-          data-admin-dialog-region="content"
-          :class="adminDialogChromeContentClass"
-        >
+        <div data-admin-dialog-region="content" :class="adminDialogChromeContentClass">
           <div :class="contentClass">
             <DialogDescription v-if="props.description" class="sr-only">
               {{ props.description }}

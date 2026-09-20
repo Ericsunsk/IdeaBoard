@@ -16,11 +16,7 @@
 
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
-import {
-  DropdownMenuItem,
-  type DropdownMenuItemEmits,
-  type DropdownMenuItemProps,
-} from 'reka-ui'
+import { DropdownMenuItem, type DropdownMenuItemEmits, type DropdownMenuItemProps } from 'reka-ui'
 import { cn, cleanProps } from '@/lib/utils'
 
 const props = defineProps<

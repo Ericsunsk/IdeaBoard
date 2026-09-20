@@ -53,7 +53,11 @@
 
         <!-- 右侧：刷新 + 新增模型 (主操作按钮) -->
         <div class="flex shrink-0 items-center gap-2">
-          <AdminRefreshButton :loading="isRefreshing" aria-label="刷新模型" @click="handleRefresh" />
+          <AdminRefreshButton
+            :loading="isRefreshing"
+            aria-label="刷新模型"
+            @click="handleRefresh"
+          />
 
           <!-- 新增网关按钮 -->
           <button
@@ -82,7 +86,9 @@
       <!-- 次级统计提示条：我们找到了 X 个模型 (Cloudflare 1:1 原生文案与布局) -->
       <div class="flex items-center justify-between pt-1">
         <div class="flex items-center gap-2 text-sm text-admin-text-2">
-          <span class="font-medium text-admin-text-1">我们找到了 {{ filteredModels.length }} 个模型</span>
+          <span class="font-medium text-admin-text-1"
+            >我们找到了 {{ filteredModels.length }} 个模型</span
+          >
           <span v-if="hasActiveFilter" class="text-xs text-admin-text-3">
             (共 {{ allModels.length }} 个)
           </span>
@@ -103,7 +109,9 @@
         <!-- 卡片主体区域 (Upper Section) -->
         <AdminModelCardBody :model="model" hoverable />
         <!-- 卡片底栏 (1:1 复刻 Cloudflare ModelCard Secondary Footer: 条款/文档链接 + 复制 ID / 编辑 / 删除 按钮) -->
-        <div class="flex items-center justify-between border-t border-admin-border-soft bg-admin-bg/50 px-4 py-2 text-xs">
+        <div
+          class="flex items-center justify-between border-t border-admin-border-soft bg-admin-bg/50 px-4 py-2 text-xs"
+        >
           <!-- 左侧：条款/文档外部链接 (若无则留白) -->
           <div class="flex items-center">
             <a
@@ -161,7 +169,9 @@
       v-else
       class="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-admin-border-soft bg-white p-10 text-center"
     >
-      <div class="mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-admin-surface-muted text-admin-text-3">
+      <div
+        class="mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-admin-surface-muted text-admin-text-3"
+      >
         <Cube v-if="!hasActiveFilter && allModels.length === 0" class="size-6" />
         <Search v-else class="size-6" />
       </div>
@@ -214,9 +224,7 @@
     />
 
     <!-- 6. 新增/配置网关弹窗 -->
-    <AdminGatewayConfigDialog
-      v-model:visible="gatewayDialogVisible"
-    />
+    <AdminGatewayConfigDialog v-model:visible="gatewayDialogVisible" />
   </div>
 </template>
 
@@ -235,10 +243,7 @@ import {
 } from '@iconoir/vue'
 import AdminAlert from '../../../shared/components/AdminAlert.vue'
 import AdminButton from '../../../shared/components/AdminButton.vue'
-import {
-  adminActionButtonClass,
-  adminDashboardRootClass,
-} from '../../../shared/lib/uiClasses'
+import { adminActionButtonClass, adminDashboardRootClass } from '../../../shared/lib/uiClasses'
 import AdminModelAddDialog from '../dialog/AdminModelAddDialog.vue'
 import AdminModelEditDialog from '../dialog/AdminModelEditDialog.vue'
 import AdminGatewayConfigDialog from '../dialog/AdminGatewayConfigDialog.vue'

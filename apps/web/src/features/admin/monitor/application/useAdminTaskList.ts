@@ -6,7 +6,10 @@ import type {
 import { usePagePagination } from '../../shared/composables/usePagePagination'
 import { stripUndefined } from '../../../../shared/api/stripUndefined'
 import { useQueryPolling } from '../../shared/composables/useQueryPolling'
-import { useAdminTaskListResource, type AdminMonitorListItemModel } from '../infrastructure/resource'
+import {
+  useAdminTaskListResource,
+  type AdminMonitorListItemModel,
+} from '../infrastructure/resource'
 import {
   ADMIN_MONITOR_PAGE_SIZE,
   ADMIN_MONITOR_REFRESH_INTERVAL_MS,

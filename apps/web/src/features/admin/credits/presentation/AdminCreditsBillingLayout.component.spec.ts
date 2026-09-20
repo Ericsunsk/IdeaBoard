@@ -46,9 +46,7 @@ describe('AdminCreditsBillingLayout', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     renderWithUser(AdminCreditsBillingLayout, {
       global: {
-        plugins: [
-          [VueQueryPlugin, { queryClient }],
-        ],
+        plugins: [[VueQueryPlugin, { queryClient }]],
         stubs: { RouterView: true },
       },
     })
@@ -74,9 +72,7 @@ describe('AdminCreditsBillingLayout', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const { user } = renderWithUser(AdminCreditsBillingLayout, {
       global: {
-        plugins: [
-          [VueQueryPlugin, { queryClient }],
-        ],
+        plugins: [[VueQueryPlugin, { queryClient }]],
         stubs: { RouterView: true },
       },
     })
@@ -106,9 +102,7 @@ describe('AdminCreditsBillingLayout', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const { user } = renderWithUser(AdminCreditsBillingLayout, {
       global: {
-        plugins: [
-          [VueQueryPlugin, { queryClient }],
-        ],
+        plugins: [[VueQueryPlugin, { queryClient }]],
         stubs: { RouterView: true },
       },
     })
@@ -151,9 +145,7 @@ describe('AdminCreditsBillingLayout', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const { user } = renderWithUser(AdminCreditsBillingLayout, {
       global: {
-        plugins: [
-          [VueQueryPlugin, { queryClient }],
-        ],
+        plugins: [[VueQueryPlugin, { queryClient }]],
         stubs: { RouterView: true, transition: false },
       },
     })

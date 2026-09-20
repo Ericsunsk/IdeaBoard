@@ -149,9 +149,7 @@ function createTaskResultFeedback() {
   }
 }
 
-function makeTaskDetail(
-  overrides: Partial<AdminMonitorDetailModel> = {},
-): AdminMonitorDetailModel {
+function makeTaskDetail(overrides: Partial<AdminMonitorDetailModel> = {}): AdminMonitorDetailModel {
   return {
     task_id: 'task-1',
     correlation_id: 'task-1',

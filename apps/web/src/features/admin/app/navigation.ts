@@ -23,10 +23,10 @@ const adminNavigationIcons = {
   users: Group,
   credits: Wallet,
   statistics: DashboardSpeed,
-  'monitor': StatsDownSquare,
+  monitor: StatsDownSquare,
   models: Cube,
   'feature-prompts': ChatBubble,
-  'settings': Settings,
+  settings: Settings,
 } satisfies Record<AdminNavigationKey, Component>
 
 const adminNavigationItems: AdminNavigationItem[] = adminNavigationRouteDefs.map((item) => ({

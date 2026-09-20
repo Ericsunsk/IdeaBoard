@@ -7,7 +7,7 @@
 
 export type ExtractUserVisionSearchBody = {
   /** @maxItems 4 */
-  images?: Blob[]
+  images?: (Blob | File)[]
   /**
    * @maxItems 4
    * @items.minimum 1

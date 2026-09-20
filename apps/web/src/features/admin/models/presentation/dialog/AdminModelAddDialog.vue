@@ -9,7 +9,9 @@
   >
     <div class="flex flex-col gap-4">
       <!-- 顶部操作栏：供应商过滤 + 关键词搜索 + 重新探测 -->
-      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-admin-border-soft pb-3.5">
+      <div
+        class="flex flex-wrap items-center justify-between gap-3 border-b border-admin-border-soft pb-3.5"
+      >
         <div class="flex flex-1 flex-wrap items-center gap-2.5">
           <!-- 供应商筛选 -->
           <div class="w-40 sm:w-44">
@@ -64,130 +66,137 @@
 
       <!-- 结果区与 loading 互斥：必须包在 template v-else 里 -->
       <template v-else>
-      <!-- 空结果提示：失败态只保留顶部 error alert（含重试），此处不再叠加 -->
-      <div
-        v-if="!error && filteredModels.length === 0"
-        class="flex flex-col items-center justify-center py-14 text-admin-text-3 text-center"
-      >
-        <Cube class="size-8 text-admin-text-3/60 mb-2" />
-        <p class="text-xs font-medium text-admin-text-2">
-          {{ emptyDetectionTitle }}
-        </p>
-        <p class="text-[11px] text-admin-text-3 mt-1 max-w-sm">
-          {{ emptyDetectionHint }}
-        </p>
-      </div>
+        <!-- 空结果提示：失败态只保留顶部 error alert（含重试），此处不再叠加 -->
+        <div
+          v-if="!error && filteredModels.length === 0"
+          class="flex flex-col items-center justify-center py-14 text-admin-text-3 text-center"
+        >
+          <Cube class="size-8 text-admin-text-3/60 mb-2" />
+          <p class="text-xs font-medium text-admin-text-2">
+            {{ emptyDetectionTitle }}
+          </p>
+          <p class="text-[11px] text-admin-text-3 mt-1 max-w-sm">
+            {{ emptyDetectionHint }}
+          </p>
+        </div>
 
-      <!-- 紧凑 Checkbox 列表表格 -->
-      <div v-else-if="!error" class="max-h-[380px] overflow-y-auto rounded-lg border border-admin-border-soft bg-white">
-        <table class="w-full text-left text-xs border-collapse">
-          <thead class="sticky top-0 z-10 bg-admin-surface-muted/80 backdrop-blur-xs border-b border-admin-border-soft text-admin-text-2 font-medium">
-            <tr>
-              <th class="w-10 px-3 py-2.5 text-center">
-                <input
-                  type="checkbox"
-                  class="size-3.5 rounded border-admin-border text-admin-accent focus:ring-admin-accent cursor-pointer"
-                  :checked="isAllSelected"
-                  :indeterminate="isIndeterminate"
-                  :disabled="availableFilteredCount === 0"
-                  aria-label="全选本页可用模型"
-                  @change="toggleSelectAll"
-                />
-              </th>
-              <th class="px-3 py-2.5">模型信息</th>
-              <th class="px-3 py-2.5 w-32">供应商</th>
-              <th class="px-3 py-2.5 w-24 text-right">状态</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-admin-border-soft/60">
-            <tr
-              v-for="model in filteredModels"
-              :key="model.id"
-              class="transition-colors hover:bg-admin-surface-muted/40 cursor-pointer"
-              :class="{
-                'bg-admin-accent/[0.03]': selectedModelIds.has(model.id),
-                'opacity-60 bg-admin-surface-muted/20 cursor-not-allowed': isModelExisting(model.id),
-              }"
-              @click="toggleRowSelection(model.id)"
+        <!-- 紧凑 Checkbox 列表表格 -->
+        <div
+          v-else-if="!error"
+          class="max-h-[380px] overflow-y-auto rounded-lg border border-admin-border-soft bg-white"
+        >
+          <table class="w-full text-left text-xs border-collapse">
+            <thead
+              class="sticky top-0 z-10 bg-admin-surface-muted/80 backdrop-blur-xs border-b border-admin-border-soft text-admin-text-2 font-medium"
             >
-              <!-- Checkbox -->
-              <td class="w-10 px-3 py-2.5 text-center" @click.stop>
-                <input
-                  type="checkbox"
-                  class="size-3.5 rounded border-admin-border text-admin-accent focus:ring-admin-accent cursor-pointer disabled:cursor-not-allowed"
-                  :checked="selectedModelIds.has(model.id)"
-                  :disabled="isModelExisting(model.id)"
-                  :aria-label="`选择 ${model.name || model.id}`"
-                  @change="toggleModelSelection(model.id)"
-                />
-              </td>
+              <tr>
+                <th class="w-10 px-3 py-2.5 text-center">
+                  <input
+                    type="checkbox"
+                    class="size-3.5 rounded border-admin-border text-admin-accent focus:ring-admin-accent cursor-pointer"
+                    :checked="isAllSelected"
+                    :indeterminate="isIndeterminate"
+                    :disabled="availableFilteredCount === 0"
+                    aria-label="全选本页可用模型"
+                    @change="toggleSelectAll"
+                  />
+                </th>
+                <th class="px-3 py-2.5">模型信息</th>
+                <th class="px-3 py-2.5 w-32">供应商</th>
+                <th class="px-3 py-2.5 w-24 text-right">状态</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-admin-border-soft/60">
+              <tr
+                v-for="model in filteredModels"
+                :key="model.id"
+                class="transition-colors hover:bg-admin-surface-muted/40 cursor-pointer"
+                :class="{
+                  'bg-admin-accent/[0.03]': selectedModelIds.has(model.id),
+                  'opacity-60 bg-admin-surface-muted/20 cursor-not-allowed': isModelExisting(
+                    model.id,
+                  ),
+                }"
+                @click="toggleRowSelection(model.id)"
+              >
+                <!-- Checkbox -->
+                <td class="w-10 px-3 py-2.5 text-center" @click.stop>
+                  <input
+                    type="checkbox"
+                    class="size-3.5 rounded border-admin-border text-admin-accent focus:ring-admin-accent cursor-pointer disabled:cursor-not-allowed"
+                    :checked="selectedModelIds.has(model.id)"
+                    :disabled="isModelExisting(model.id)"
+                    :aria-label="`选择 ${model.name || model.id}`"
+                    @change="toggleModelSelection(model.id)"
+                  />
+                </td>
 
-              <!-- 模型信息 -->
-              <td class="px-3 py-2.5">
-                <div class="flex items-center gap-2.5 min-w-0">
-                  <div
-                    class="flex size-6 shrink-0 items-center justify-center rounded-md overflow-hidden"
-                    :class="
-                      resolveModelBrandLogo(model)
-                        ? 'bg-admin-surface-muted/60 border border-admin-border-soft/60'
-                        : 'bg-admin-accent/10 text-admin-accent'
-                    "
+                <!-- 模型信息 -->
+                <td class="px-3 py-2.5">
+                  <div class="flex items-center gap-2.5 min-w-0">
+                    <div
+                      class="flex size-6 shrink-0 items-center justify-center rounded-md overflow-hidden"
+                      :class="
+                        resolveModelBrandLogo(model)
+                          ? 'bg-admin-surface-muted/60 border border-admin-border-soft/60'
+                          : 'bg-admin-accent/10 text-admin-accent'
+                      "
+                    >
+                      <img
+                        v-if="resolveModelBrandLogo(model)"
+                        :src="resolveModelBrandLogo(model)"
+                        :alt="model.provider"
+                        class="size-3.5 object-contain"
+                        loading="lazy"
+                      />
+                      <Cube v-else class="size-3.5" />
+                    </div>
+                    <div class="flex flex-col gap-0.5 min-w-0">
+                      <span class="font-medium text-admin-text-1 truncate">
+                        {{ model.name || model.id }}
+                      </span>
+                      <span class="font-mono text-[11px] text-admin-text-3 truncate">
+                        {{ model.id }}
+                      </span>
+                    </div>
+                  </div>
+                </td>
+
+                <!-- 供应商 -->
+                <td class="px-3 py-2.5">
+                  <span
+                    class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium"
+                    :class="modelProviderBadgeClass(model.provider)"
                   >
-                    <img
-                      v-if="resolveModelBrandLogo(model)"
-                      :src="resolveModelBrandLogo(model)"
-                      :alt="model.provider"
-                      class="size-3.5 object-contain"
-                      loading="lazy"
-                    />
-                    <Cube v-else class="size-3.5" />
-                  </div>
-                  <div class="flex flex-col gap-0.5 min-w-0">
-                    <span class="font-medium text-admin-text-1 truncate">
-                      {{ model.name || model.id }}
-                    </span>
-                    <span class="font-mono text-[11px] text-admin-text-3 truncate">
-                      {{ model.id }}
-                    </span>
-                  </div>
-                </div>
-              </td>
+                    {{ model.provider }}
+                  </span>
+                </td>
 
-              <!-- 供应商 -->
-              <td class="px-3 py-2.5">
-                <span
-                  class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium"
-                  :class="modelProviderBadgeClass(model.provider)"
-                >
-                  {{ model.provider }}
-                </span>
-              </td>
-
-              <!-- 状态 -->
-              <td class="px-3 py-2.5 text-right">
-                <span
-                  v-if="isModelExisting(model.id)"
-                  class="inline-flex items-center gap-1 rounded-full bg-admin-surface-muted px-2 py-0.5 text-[10px] font-medium text-admin-text-3"
-                >
-                  已在库中
-                </span>
-                <span
-                  v-else-if="selectedModelIds.has(model.id)"
-                  class="inline-flex items-center gap-1 rounded-full bg-admin-accent/10 px-2 py-0.5 text-[10px] font-medium text-admin-accent"
-                >
-                  <Check class="size-3" />
-                  已勾选
-                </span>
-                <span
-                  v-else
-                  class="inline-flex items-center rounded-full bg-admin-border-soft/40 px-2 py-0.5 text-[10px] font-medium text-admin-text-3"
-                >
-                  未添加
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                <!-- 状态 -->
+                <td class="px-3 py-2.5 text-right">
+                  <span
+                    v-if="isModelExisting(model.id)"
+                    class="inline-flex items-center gap-1 rounded-full bg-admin-surface-muted px-2 py-0.5 text-[10px] font-medium text-admin-text-3"
+                  >
+                    已在库中
+                  </span>
+                  <span
+                    v-else-if="selectedModelIds.has(model.id)"
+                    class="inline-flex items-center gap-1 rounded-full bg-admin-accent/10 px-2 py-0.5 text-[10px] font-medium text-admin-accent"
+                  >
+                    <Check class="size-3" />
+                    已勾选
+                  </span>
+                  <span
+                    v-else
+                    class="inline-flex items-center rounded-full bg-admin-border-soft/40 px-2 py-0.5 text-[10px] font-medium text-admin-text-3"
+                  >
+                    未添加
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </template>
     </div>
@@ -200,19 +209,11 @@
         </div>
 
         <div class="flex items-center gap-2">
-          <AdminButton
-            variant="outline"
-            :disabled="pending"
-            @click="emit('create')"
-          >
+          <AdminButton variant="outline" :disabled="pending" @click="emit('create')">
             手动新增
           </AdminButton>
 
-          <AdminButton
-            variant="secondary"
-            :disabled="pending"
-            @click="handleClose"
-          >
+          <AdminButton variant="secondary" :disabled="pending" @click="handleClose">
             取消
           </AdminButton>
 
@@ -289,10 +290,7 @@ function isModelExisting(modelId: string): boolean {
 // 供应商下拉项
 const providerOptions = computed(() => {
   const providers = Array.from(new Set(detectedModels.value.map((m) => m.provider))).filter(Boolean)
-  return [
-    { label: '全部供应商', value: 'all' },
-    ...providers.map((p) => ({ label: p, value: p })),
-  ]
+  return [{ label: '全部供应商', value: 'all' }, ...providers.map((p) => ({ label: p, value: p }))]
 })
 
 // 过滤后的模型

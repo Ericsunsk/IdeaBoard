@@ -15,11 +15,7 @@
     <AdminAlert v-else-if="error" severity="error">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <span>支付订单详情加载失败，请重试。</span>
-        <AdminButton
-          variant="outline"
-          :class="adminActionButtonClass"
-          @click="$emit('retry')"
-        >
+        <AdminButton variant="outline" :class="adminActionButtonClass" @click="$emit('retry')">
           重试
         </AdminButton>
       </div>
@@ -34,9 +30,7 @@
             </div>
             <div class="mt-1 text-admin-meta text-admin-text-3">{{ detail.user.displayName }}</div>
           </div>
-          <AdminBadge
-            :severity="getPaymentOrderStatusPresentation(detail.status).severity"
-          >
+          <AdminBadge :severity="getPaymentOrderStatusPresentation(detail.status).severity">
             {{ getPaymentOrderStatusPresentation(detail.status).label }}
           </AdminBadge>
         </div>
@@ -69,9 +63,7 @@
           <h3 id="payment-reconciliation" class="text-admin-body font-bold text-admin-title-color">
             对账与异常
           </h3>
-          <AdminBadge
-            :severity="detail.reconciliation.anomalous ? 'danger' : 'secondary'"
-          >
+          <AdminBadge :severity="detail.reconciliation.anomalous ? 'danger' : 'secondary'">
             {{ detail.reconciliation.anomalous ? '超过 24 小时未收敛' : '无异常标记' }}
           </AdminBadge>
         </div>

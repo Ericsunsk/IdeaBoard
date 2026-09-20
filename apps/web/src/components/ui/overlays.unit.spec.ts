@@ -11,11 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from './dialog'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from './popover'
+import { Popover, PopoverContent, PopoverTrigger } from './popover'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,9 +47,7 @@ describe('Overlay compound components', () => {
                     h(DialogDescription, () => 'Dialog description info'),
                   ]),
                   h('p', 'Dialog Body Text'),
-                  h(DialogFooter, () => [
-                    h(DialogClose, () => h('button', 'Cancel')),
-                  ]),
+                  h(DialogFooter, () => [h(DialogClose, () => h('button', 'Cancel'))]),
                 ]),
               ],
             )

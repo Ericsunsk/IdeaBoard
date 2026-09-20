@@ -1,6 +1,6 @@
 import { defineComponent } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen } from '../../../../test/render'
+import { renderWithUser, screen, within } from '../../../../test/render'
 import AdminStoragePage from './AdminStoragePage.vue'
 
 vi.mock('../../shared/logos/brandLogoResource', () => ({
@@ -102,7 +102,10 @@ describe('AdminStoragePage', () => {
     const createBtn = screen.getByRole('button', { name: '新增存储' })
     await user.click(createBtn)
 
-    expect(await screen.findByText('添加对象存储')).toBeInTheDocument()
+    const storageDialog = await screen.findByRole('dialog', { name: '添加对象存储' })
+    expect(
+      within(storageDialog).getByText('添加对象存储', { selector: 'h2:not(.sr-only)' }),
+    ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '阿里云 OSS' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cloudflare R2' })).toBeInTheDocument()
     expect(screen.getByLabelText(/存储配置名称/)).toBeInTheDocument()

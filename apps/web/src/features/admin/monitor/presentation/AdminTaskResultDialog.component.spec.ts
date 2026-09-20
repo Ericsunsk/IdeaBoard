@@ -3,7 +3,10 @@ import { renderWithUser, screen } from '../../../../test/render'
 import { stripUndefined } from '../../../../shared/api/stripUndefined'
 import AdminTaskResultDialog from './AdminTaskResultDialog.vue'
 import { adminTaskStatuses } from '../domain/status'
-import type { AdminMonitorDetailModel, AdminMonitorExecutionAttempt } from '../infrastructure/resource'
+import type {
+  AdminMonitorDetailModel,
+  AdminMonitorExecutionAttempt,
+} from '../infrastructure/resource'
 
 const toast = vi.hoisted(() => ({
   success: vi.fn(),

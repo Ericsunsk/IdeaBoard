@@ -1,14 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import { h } from 'vue'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from './index'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './index'
 
 describe('Card compound components', () => {
   it('renders all Card micro-primitives properly', () => {

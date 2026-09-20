@@ -1,6 +1,8 @@
 <template>
   <div :class="['relative', fluid ? 'min-w-[220px] max-w-md flex-1' : 'w-full sm:w-[260px]']">
-    <Search class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-admin-text-3" />
+    <Search
+      class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-admin-text-3"
+    />
     <AdminInput
       :model-value="modelValue"
       :aria-label="inputLabel"

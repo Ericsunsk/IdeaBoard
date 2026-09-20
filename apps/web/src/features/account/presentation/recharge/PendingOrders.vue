@@ -27,11 +27,9 @@
         {{ t('account.errors.pendingOrdersLoadFailed') }}
       </p>
       <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(error) }}</p>
-      <Button
-        variant="ghost"
-        size="sm"
-        class="mt-2"
-        @click="emit('retry')">{{ t('account.reload') }}</Button>
+      <Button variant="ghost" size="sm" class="mt-2" @click="emit('retry')">{{
+        t('account.reload')
+      }}</Button>
     </div>
 
     <div v-else class="grid gap-2">
@@ -62,14 +60,18 @@
               :loading="isActionPending(item.public_token, 'continue')"
               :disabled="actionPending"
               :class="[accountPrimaryActionButtonClass, 'w-full']"
-              @click="emit('continue', item.public_token)">{{ t('account.topUp.continuePayment') }}</Button>
+              @click="emit('continue', item.public_token)"
+              >{{ t('account.topUp.continuePayment') }}</Button
+            >
             <Button
               variant="outline"
               size="sm"
               class="w-full"
               :loading="isActionPending(item.public_token, 'abandon')"
               :disabled="actionPending"
-              @click="emit('abandon', item.public_token)">{{ t('account.topUp.abandonOrder') }}</Button>
+              @click="emit('abandon', item.public_token)"
+              >{{ t('account.topUp.abandonOrder') }}</Button
+            >
           </div>
         </div>
 
@@ -84,9 +86,13 @@
             size="sm"
             class="!p-0"
             :disabled="actionPending"
-            @click="retryAction(item.public_token)">{{ actionTarget?.kind === 'continue'
+            @click="retryAction(item.public_token)"
+            >{{
+              actionTarget?.kind === 'continue'
                 ? t('account.topUp.retryContinuePayment')
-                : t('account.topUp.retryAbandonOrder') }}</Button>
+                : t('account.topUp.retryAbandonOrder')
+            }}</Button
+          >
         </div>
       </article>
     </div>

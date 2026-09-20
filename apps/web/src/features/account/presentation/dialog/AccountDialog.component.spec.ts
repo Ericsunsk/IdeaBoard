@@ -125,9 +125,7 @@ describe('AccountDialog', () => {
   it('applies the shared overlay chrome through content class', () => {
     renderAccountDialog(true)
 
-    expect(screen.getByRole('dialog', { name: 'Account' })).toHaveClass(
-      'shadow-ib-overlay',
-    )
+    expect(screen.getByRole('dialog', { name: 'Account' })).toHaveClass('shadow-ib-overlay')
   })
 
   it('renders dialog-ready account management content when visible', () => {

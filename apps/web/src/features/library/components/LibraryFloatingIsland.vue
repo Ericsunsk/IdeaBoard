@@ -231,7 +231,17 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Bookmark, Folder, NavArrowDown, NavArrowLeft, NavArrowRight, NavArrowUp, Plus, ReportColumns, Xmark } from '@iconoir/vue'
+import {
+  Bookmark,
+  Folder,
+  NavArrowDown,
+  NavArrowLeft,
+  NavArrowRight,
+  NavArrowUp,
+  Plus,
+  ReportColumns,
+  Xmark,
+} from '@iconoir/vue'
 import { useLibraryWorkspace, type LibraryFolderTab } from '../useLibraryWorkspace'
 import type { LibraryFolderFacts, LibraryMutationPublisher } from '../folderFacts'
 import type { LibraryAssetView } from '../resource'

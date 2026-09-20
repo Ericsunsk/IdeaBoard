@@ -77,7 +77,7 @@ describe('BillingPane', () => {
       'Ideas change',
       'Balance after',
     ])
-    expect(screen.getAllByRole('columnheader')[0]).toHaveClass('text-ib-text-muted')
+    expect(screen.getAllByRole('columnheader')[0]).toHaveClass('text-ib-text')
     expect(screen.getByRole('region', { name: 'Transactions table' })).toHaveClass(
       'app-scrollbar',
       'overflow-x-auto',

@@ -113,13 +113,20 @@ const baseButtonSize = computed<ButtonVariants['size']>(() => {
 })
 
 const adminColorClasses: Record<AdminButtonVariant, string> = {
-  default: 'bg-admin-accent !text-white hover:bg-admin-accent-hover active:bg-admin-accent-pressed shadow-xs',
-  primary: 'bg-admin-accent !text-white hover:bg-admin-accent-hover active:bg-admin-accent-pressed shadow-xs',
-  secondary: 'bg-admin-surface-muted text-admin-text-1 hover:bg-admin-surface-hover active:bg-admin-surface-pressed border border-admin-border-soft',
-  destructive: 'bg-admin-danger !text-white hover:bg-admin-danger-hover active:bg-admin-danger-pressed shadow-xs',
-  danger: 'bg-admin-danger !text-white hover:bg-admin-danger-hover active:bg-admin-danger-pressed shadow-xs',
-  outline: 'border border-admin-border bg-white text-admin-text-1 hover:bg-admin-surface-hover active:bg-admin-surface-pressed shadow-xs',
-  ghost: 'text-admin-text-2 hover:bg-admin-surface-hover hover:text-admin-text-1 active:bg-admin-surface-pressed',
+  default:
+    'bg-admin-accent !text-white hover:bg-admin-accent-hover active:bg-admin-accent-pressed shadow-xs',
+  primary:
+    'bg-admin-accent !text-white hover:bg-admin-accent-hover active:bg-admin-accent-pressed shadow-xs',
+  secondary:
+    'bg-admin-surface-muted text-admin-text-1 hover:bg-admin-surface-hover active:bg-admin-surface-pressed border border-admin-border-soft',
+  destructive:
+    'bg-admin-danger !text-white hover:bg-admin-danger-hover active:bg-admin-danger-pressed shadow-xs',
+  danger:
+    'bg-admin-danger !text-white hover:bg-admin-danger-hover active:bg-admin-danger-pressed shadow-xs',
+  outline:
+    'border border-admin-border bg-white text-admin-text-1 hover:bg-admin-surface-hover active:bg-admin-surface-pressed shadow-xs',
+  ghost:
+    'text-admin-text-2 hover:bg-admin-surface-hover hover:text-admin-text-1 active:bg-admin-surface-pressed',
   link: 'text-admin-accent underline-offset-4 hover:underline',
   success: 'bg-admin-success !text-white hover:bg-admin-success/90 shadow-xs',
 }
@@ -135,8 +142,12 @@ const computedClasses = computed(() => {
     (props.size === 'large' || props.size === 'lg') && 'text-admin-title-sm',
     (!props.size || props.size === 'default') && 'text-admin-body',
     adminColorClasses[effVariant],
-    props.text && props.severity === 'danger' && 'text-admin-danger hover:bg-admin-danger-soft active:bg-admin-danger-soft/80',
-    props.outlined && props.severity === 'danger' && 'border-admin-danger/30 text-admin-danger hover:bg-admin-danger-soft',
+    props.text &&
+      props.severity === 'danger' &&
+      'text-admin-danger hover:bg-admin-danger-soft active:bg-admin-danger-soft/80',
+    props.outlined &&
+      props.severity === 'danger' &&
+      'border-admin-danger/30 text-admin-danger hover:bg-admin-danger-soft',
     props.href && isDisabledOrLoading.value && 'pointer-events-none opacity-50 !cursor-not-allowed',
     props.class,
   )

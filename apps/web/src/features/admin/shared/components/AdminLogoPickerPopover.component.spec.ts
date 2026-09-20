@@ -2,10 +2,7 @@ import { defineComponent, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen } from '../../../../test/render'
 import AdminLogoPickerPopover from './AdminLogoPickerPopover.vue'
-import {
-  getAdminBrandLogoOverride,
-  replaceAdminBrandLogoOverrides,
-} from '../logos/brandLogos'
+import { getAdminBrandLogoOverride, replaceAdminBrandLogoOverrides } from '../logos/brandLogos'
 
 const logoResource = vi.hoisted(() => ({
   save: vi.fn().mockResolvedValue(undefined),
@@ -66,8 +63,7 @@ describe('AdminLogoPickerPopover', () => {
   })
 
   it('renders brand logos, supports category filtering and logo picking', async () => {
-    const { user } = renderWithUser(Harness, {
-    })
+    const { user } = renderWithUser(Harness, {})
 
     await user.click(screen.getByRole('button', { name: '打开 Logo 选择器' }))
 
@@ -102,8 +98,7 @@ describe('AdminLogoPickerPopover', () => {
 
   it('keeps the current logo when the server mutation fails', async () => {
     logoResource.save.mockRejectedValueOnce(new Error('保存失败'))
-    const { user } = renderWithUser(Harness, {
-    })
+    const { user } = renderWithUser(Harness, {})
 
     await user.click(screen.getByRole('button', { name: '打开 Logo 选择器' }))
     await user.click(screen.getByRole('button', { name: 'Flux (Black Forest Labs)' }))

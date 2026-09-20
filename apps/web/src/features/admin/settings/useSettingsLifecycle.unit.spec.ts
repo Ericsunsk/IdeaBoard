@@ -235,9 +235,7 @@ describe('Admin System Settings adapters', () => {
       harness.value.form.value.upload_max_concurrent = '' as unknown as number
       await expect(harness.value.save()).resolves.toBe(false)
 
-      expect(harness.value.validationError.value).toBe(
-        '上传并发上限必须在 1 到 64 之间',
-      )
+      expect(harness.value.validationError.value).toBe('上传并发上限必须在 1 到 64 之间')
       expect(feedback.validationFailed).toHaveBeenCalledOnce()
       expect(updateRequests).toEqual([])
 

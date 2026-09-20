@@ -37,7 +37,9 @@ export function buildModelItemFromDetected(model: DetectedGatewayModel): AdminMo
     descriptionEnriched: true,
     contextOrResolution: model.context_or_resolution || '',
     capabilities: [],
-    hosting: isCloudflareHosted(model.provider) ? MODEL_HOSTING_CLOUDFLARE : MODEL_HOSTING_THIRD_PARTY,
+    hosting: isCloudflareHosted(model.provider)
+      ? MODEL_HOSTING_CLOUDFLARE
+      : MODEL_HOSTING_THIRD_PARTY,
     termsUrl: '',
     docsUrl: '',
     inputCostPerToken: model.input_cost_per_token,
@@ -90,10 +92,7 @@ export function validateModelForm(input: ModelFormInput): string {
 }
 
 // 提交归一：trim 全字段、无上下文回退默认分辨率、空能力保持空。
-export function finalizeModelSubmit(
-  form: AdminModelItem,
-  capabilities: string[],
-): AdminModelItem {
+export function finalizeModelSubmit(form: AdminModelItem, capabilities: string[]): AdminModelItem {
   return {
     ...form,
     id: form.id.trim(),

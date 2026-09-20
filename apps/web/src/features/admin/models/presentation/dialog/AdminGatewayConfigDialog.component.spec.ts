@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, within } from '@testing-library/vue'
 import { renderWithUser, screen } from '../../../../../test/render'
 import AdminGatewayConfigDialog from './AdminGatewayConfigDialog.vue'
-import type { AdminGatewayConnection, GatewayConnectionSummary } from '../../infrastructure/adminGatewayResource'
+import type {
+  AdminGatewayConnection,
+  GatewayConnectionSummary,
+} from '../../infrastructure/adminGatewayResource'
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 
@@ -34,12 +37,14 @@ describe('AdminGatewayConfigDialog', () => {
     })
   })
 
-  function renderDialog(props: {
-    visible?: boolean
-    resource?: AdminGatewayConnection
-    onSaved?: (data: GatewayConnectionSummary) => void
-    'onUpdate:visible'?: (visible: boolean) => void
-  } = {}) {
+  function renderDialog(
+    props: {
+      visible?: boolean
+      resource?: AdminGatewayConnection
+      onSaved?: (data: GatewayConnectionSummary) => void
+      'onUpdate:visible'?: (visible: boolean) => void
+    } = {},
+  ) {
     return renderWithUser(AdminGatewayConfigDialog, {
       props: {
         visible: props.visible ?? true,
@@ -56,12 +61,17 @@ describe('AdminGatewayConfigDialog', () => {
   it('renders base url and key fields from loaded configuration', async () => {
     renderDialog()
 
-    expect(await screen.findByDisplayValue('https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway')).toBeVisible()
+    expect(
+      await screen.findByDisplayValue(
+        'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
+      ),
+    ).toBeVisible()
     expect(screen.getByText('已识别 Cloudflare 网关')).toBeVisible()
     expect(screen.getByText(/已配置/)).toBeVisible()
   })
 
-  it('saves custom domain Base URL with Account ID and Gateway ID', async () => {    vi.mocked(mockResource.get).mockResolvedValue({
+  it('saves custom domain Base URL with Account ID and Gateway ID', async () => {
+    vi.mocked(mockResource.get).mockResolvedValue({
       base_url: 'https://my-custom-gateway.company.com',
       token_configured: true,
     })
@@ -141,15 +151,21 @@ describe('AdminGatewayConfigDialog', () => {
   it('keeps existing token when token is left blank during update', async () => {
     const { user } = renderDialog()
 
-    const baseUrlInput = await screen.findByDisplayValue('https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway')
-    await fireEvent.update(baseUrlInput, 'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway-v2')
+    const baseUrlInput = await screen.findByDisplayValue(
+      'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
+    )
+    await fireEvent.update(
+      baseUrlInput,
+      'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway-v2',
+    )
 
     const saveButton = screen.getByRole('button', { name: '添加网关' })
     await user.click(saveButton)
 
     expect(mockResource.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        base_url: 'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway-v2',
+        base_url:
+          'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway-v2',
       }),
     )
     const updateCall = vi.mocked(mockResource.update).mock.calls[0]?.[0]
@@ -191,7 +207,8 @@ describe('AdminGatewayConfigDialog', () => {
 
     expect(mockResource.testConnection).toHaveBeenCalledWith(
       expect.objectContaining({
-        base_url: 'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
+        base_url:
+          'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
       }),
     )
     expect(toast.success).toHaveBeenCalledWith('网关连接正常 (38ms)')

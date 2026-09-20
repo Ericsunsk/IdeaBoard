@@ -6,5 +6,5 @@
  */
 
 export type UploadUserProfileAvatarBody = {
-  file: Blob
+  file: Blob | File
 }

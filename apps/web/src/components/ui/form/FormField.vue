@@ -4,11 +4,7 @@
 
 <script setup lang="ts">
 import { computed, inject, provide, useId } from 'vue'
-import {
-  FORM_CONTEXT_KEY,
-  FORM_FIELD_CONTEXT_KEY,
-  FORM_ITEM_CONTEXT_KEY,
-} from './context'
+import { FORM_CONTEXT_KEY, FORM_FIELD_CONTEXT_KEY, FORM_ITEM_CONTEXT_KEY } from './context'
 
 const props = defineProps<{
   name: string

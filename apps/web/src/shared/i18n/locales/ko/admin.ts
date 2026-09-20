@@ -89,8 +89,10 @@ export default {
     statusFrozen: '동결됨',
     activeRestrictionsNotice: '유효한 계정 제한 적용 중',
     restrictionLedgerIntegrity: '원장 무결성',
-    statusFrozenDisabled: '사용자가 비활성화되었거나 탈퇴 중이므로 신원 수명주기에 의해 동결되었습니다.',
-    statusFrozenStandard: '신원 수명주기에 의해 계정이 동결되었습니다. 사용자 상태를 확인해 주세요.',
+    statusFrozenDisabled:
+      '사용자가 비활성화되었거나 탈퇴 중이므로 신원 수명주기에 의해 동결되었습니다.',
+    statusFrozenStandard:
+      '신원 수명주기에 의해 계정이 동결되었습니다. 사용자 상태를 확인해 주세요.',
     originalChargeNotice: '원래 청구: {id}, 남은 환불 가능액: {amount}.',
     amountPlaceholder: '예: 100',
     refundReasonLabel: '환불 사유',

@@ -26,9 +26,11 @@ export default {
     codeLabel: 'Código',
     generateNew: 'Generar nuevo código',
     regenerate: 'Regenerar',
-    codeHintEdit: 'Dejar en blanco para conservar el código actual; llenar o generar para reemplazar el código',
+    codeHintEdit:
+      'Dejar en blanco para conservar el código actual; llenar o generar para reemplazar el código',
     codeHintCreate: 'Solo los últimos cuatro dígitos serán visibles después de guardar',
-    rotationWarning: 'Después de guardar, el código anterior caducará de inmediato y el nuevo código entrará en vigencia de inmediato.',
+    rotationWarning:
+      'Después de guardar, el código anterior caducará de inmediato y el nuevo código entrará en vigencia de inmediato.',
     creditAmountLabel: 'Recompensa Idea',
     maxRedemptionsLabel: 'Límite de canje',
     capHintZero: 'Ingrese 0 para canjes ilimitados',
@@ -78,7 +80,8 @@ export default {
     dialogAria: 'Cuenta de Idea de {name}',
     dialogDescription: 'Ver activos de la cuenta de Idea del usuario y realizar ajustes.',
     userAssetsTitle: 'Activos de la cuenta de {name}',
-    loadFailedError: 'Error al cargar la cuenta o el historial del libro mayor. Actualice e inténtelo de nuevo.',
+    loadFailedError:
+      'Error al cargar la cuenta o el historial del libro mayor. Actualice e inténtelo de nuevo.',
     actionPanelAria: 'Panel de operaciones de la cuenta Idea',
     tabLedger: 'Historial del libro mayor',
     tabGrant: 'Otorgar créditos',
@@ -89,8 +92,10 @@ export default {
     statusFrozen: 'Congelado',
     activeRestrictionsNotice: 'Restricciones activas en vigor',
     restrictionLedgerIntegrity: 'Integridad del libro mayor',
-    statusFrozenDisabled: 'La cuenta de usuario está desactivada o cerrándose, congelada por ciclo de vida.',
-    statusFrozenStandard: 'Cuenta congelada por ciclo de vida de identidad, verifique el estado del usuario.',
+    statusFrozenDisabled:
+      'La cuenta de usuario está desactivada o cerrándose, congelada por ciclo de vida.',
+    statusFrozenStandard:
+      'Cuenta congelada por ciclo de vida de identidad, verifique el estado del usuario.',
     originalChargeNotice: 'Cargo original: {id}, restante reembolsable: {amount}.',
     amountPlaceholder: 'p. ej. 100',
     refundReasonLabel: 'Motivo del reembolso',

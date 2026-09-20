@@ -49,6 +49,7 @@
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="end"
+          :side-offset="appOverlayMenuSideOffset"
           :class="menuContentClass"
           @pointer-down-outside="handlePointerDownOutside"
         >
@@ -83,7 +84,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { appOverlayMenuDangerItemClass, appOverlayMenuItemClass } from '../theme/appOverlayMenu'
+import {
+  appOverlayMenuDangerItemClass,
+  appOverlayMenuItemClass,
+  appOverlayMenuSideOffset,
+} from '../theme/appOverlayMenu'
 import { pageChromeAccountMenuClasses } from '../lib/pageChrome'
 import { useMenuTriggerFocusRestore } from '../composables/useMenuTriggerFocusRestore'
 import UserCreditBalanceButton from './UserCreditBalanceButton.vue'
@@ -126,6 +131,5 @@ const registerItem = computed(() => props.items.find((item) => item.key === 'reg
 const isGuest = computed(() => Boolean(loginItem.value && registerItem.value))
 
 const triggerRef = useTemplateRef('triggerRef')
-const { handleMenuOpenUpdate, handlePointerDownOutside } =
-  useMenuTriggerFocusRestore(triggerRef)
+const { handleMenuOpenUpdate, handlePointerDownOutside } = useMenuTriggerFocusRestore(triggerRef)
 </script>

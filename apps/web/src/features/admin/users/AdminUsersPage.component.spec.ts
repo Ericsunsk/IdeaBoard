@@ -108,12 +108,12 @@ describe('AdminUsersPage', () => {
                 },
         }),
       ),
-      http.get('/api/admin/users/oauth-providers/google', () =>
+      http.get('/api/admin/users/oauth-providers/:provider', ({ params }) =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',
           data: {
-            provider: 'google',
+            provider: String(params.provider),
             enabled: false,
             configured: false,
             available: false,
@@ -202,9 +202,7 @@ describe('AdminUsersPage', () => {
     await user.type(within(dialog).getByRole('textbox', { name: /操作原因/ }), '运营补偿')
     await user.click(within(dialog).getByRole('button', { name: '核对操作' }))
     await waitFor(() =>
-      expect(confirmMock).toHaveBeenCalledWith(
-        expect.objectContaining({ title: '确认赠送Idea' }),
-      ),
+      expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: '确认赠送Idea' })),
     )
 
     await waitFor(() =>
@@ -366,9 +364,7 @@ describe('AdminUsersPage', () => {
     await user.type(within(dialog).getByRole('textbox', { name: /操作原因/ }), '运营扣减')
     await user.click(within(dialog).getByRole('button', { name: '核对操作' }))
     await waitFor(() =>
-      expect(confirmMock).toHaveBeenCalledWith(
-        expect.objectContaining({ title: '确认扣减Idea' }),
-      ),
+      expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: '确认扣减Idea' })),
     )
 
     await waitFor(() => expect(within(dialog).getByText('100 Ideas')).toBeVisible())
@@ -397,9 +393,7 @@ describe('AdminUsersPage', () => {
     await user.type(reason, '受限账户扣减')
     await user.click(within(dialog).getByRole('button', { name: '核对操作' }))
     await waitFor(() =>
-      expect(confirmMock).toHaveBeenCalledWith(
-        expect.objectContaining({ title: '确认扣减Idea' }),
-      ),
+      expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: '确认扣减Idea' })),
     )
 
     await waitFor(() => expect(toastMocks.error).toHaveBeenCalled())
@@ -570,9 +564,7 @@ describe('AdminUsersPage', () => {
     await user.type(within(dialog).getByRole('textbox', { name: /退款原因/ }), '任务取消退款')
     await user.click(within(dialog).getByRole('button', { name: '核对退款' }))
     await waitFor(() =>
-      expect(confirmMock).toHaveBeenCalledWith(
-        expect.objectContaining({ title: '确认退款Idea' }),
-      ),
+      expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: '确认退款Idea' })),
     )
 
     await waitFor(() => expect(within(dialog).getByText('135 Ideas')).toBeVisible())

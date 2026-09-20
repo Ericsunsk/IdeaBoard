@@ -40,13 +40,11 @@
     </div>
 
     <!-- 2. 错误告警状态 -->
-    <div
-      v-if="loadFailed && prompts.length === 0"
-      :class="adminEmptyStateClass"
-      role="alert"
-    >
+    <div v-if="loadFailed && prompts.length === 0" :class="adminEmptyStateClass" role="alert">
       <div class="text-admin-title font-semibold text-admin-title-color">系统提示词加载失败</div>
-      <div class="mt-2 text-admin-meta text-admin-subtitle-color">未能从服务端加载配置，请重试。</div>
+      <div class="mt-2 text-admin-meta text-admin-subtitle-color">
+        未能从服务端加载配置，请重试。
+      </div>
       <AdminButton class="mt-4" variant="outline" :disabled="loading" @click="loadPrompts()">
         <Refresh class="size-4" />
         重新加载
@@ -114,11 +112,7 @@
             </template>
 
             <!-- 1. Service (1:1 对齐功能定价页 Service 规范) -->
-            <AdminColumn
-              field="service"
-              header="Service"
-              :style="{ width: '200px' }"
-            >
+            <AdminColumn field="service" header="Service" :style="{ width: '200px' }">
               <template #body="{ data }">
                 <div class="flex min-w-0 items-center gap-1.5 font-mono text-xs text-admin-text-1">
                   <component
@@ -134,11 +128,7 @@
             </AdminColumn>
 
             <!-- 2. Status (1:1 对齐功能定价页 Status 规范) -->
-            <AdminColumn
-              field="status"
-              header="Status"
-              :style="{ width: '105px' }"
-            >
+            <AdminColumn field="status" header="Status" :style="{ width: '105px' }">
               <template #body="{ data }">
                 <span
                   :class="[
@@ -146,9 +136,7 @@
                     rowView(data.slug).metric.activePillClass,
                   ]"
                 >
-                  <span
-                    :class="['size-1.5 rounded-full', rowView(data.slug).metric.dotClass]"
-                  />
+                  <span :class="['size-1.5 rounded-full', rowView(data.slug).metric.dotClass]" />
                   <span>{{ rowView(data.slug).configured ? '已配置' : '未配置' }}</span>
                 </span>
               </template>
@@ -194,11 +182,7 @@
             </AdminColumn>
 
             <!-- 5. 操作 (Actions, 1:1 对齐功能定价表规范) -->
-            <AdminColumn
-              field="actions"
-              header="操作"
-              :style="{ width: '120px' }"
-            >
+            <AdminColumn field="actions" header="操作" :style="{ width: '120px' }">
               <template #body="{ data }">
                 <div class="flex items-center gap-2">
                   <AdminButton
@@ -239,10 +223,7 @@
               系统提示词
             </label>
             <!-- 变量快捷填充标签 (对齐功能定价页交互) -->
-            <div
-              v-if="activeVars.length > 0"
-              class="flex min-w-0 flex-wrap items-center gap-1.5"
-            >
+            <div v-if="activeVars.length > 0" class="flex min-w-0 flex-wrap items-center gap-1.5">
               <span class="text-[11px] font-medium text-admin-text-3">插入变量:</span>
               <button
                 v-for="variable in activeVars"
@@ -302,9 +283,7 @@
           :class="adminActionButtonClass"
           :loading="saving[activeItem.slug]"
           :disabled="
-            saving[activeItem.slug] ||
-            !activeValidation?.canSave ||
-            !activeValidation?.isDirty
+            saving[activeItem.slug] || !activeValidation?.canSave || !activeValidation?.isDirty
           "
           @click="handleSave(activeItem.slug)"
         >
@@ -317,12 +296,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, shallowRef, type Component } from 'vue'
-import {
-  Refresh,
-  Search,
-  Spark,
-  Xmark,
-} from '@iconoir/vue'
+import { Refresh, Search, Spark, Xmark } from '@iconoir/vue'
 import { usePromptConfigFeedback } from '../usePromptConfigFeedback'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
@@ -399,8 +373,8 @@ const statusFilterOptions: Array<{ label: string; value: StatusFilterType }> = [
   { label: '未配置', value: 'unconfigured' },
 ]
 
-const hasActiveFilter = computed(
-  () => Boolean(searchKeyword.value.trim() || statusFilter.value !== 'all'),
+const hasActiveFilter = computed(() =>
+  Boolean(searchKeyword.value.trim() || statusFilter.value !== 'all'),
 )
 
 function clearFilters() {
@@ -454,9 +428,7 @@ const filteredFeatureGroups = computed(() => {
 
   const results: FeatureGroup[] = []
   for (const group of featureGroups.value) {
-    const matchedItems = group.items.filter((item) =>
-      matchesItem(item, query, filter, group.title),
-    )
+    const matchedItems = group.items.filter((item) => matchesItem(item, query, filter, group.title))
 
     if (matchedItems.length > 0) {
       results.push({
@@ -515,9 +487,7 @@ function rowView(slug: string): typeof emptyRowView {
   return rowViewMap.value[slug] ?? emptyRowView
 }
 
-const isEditorBusy = computed(
-  () => Boolean(activeItem.value && saving[activeItem.value.slug]),
-)
+const isEditorBusy = computed(() => Boolean(activeItem.value && saving[activeItem.value.slug]))
 
 function openEditor(item: FeatureItem) {
   resetDrafts([item.slug])

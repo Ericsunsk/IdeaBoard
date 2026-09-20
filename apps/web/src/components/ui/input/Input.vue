@@ -2,12 +2,7 @@
   <input
     v-model="modelValue"
     :aria-invalid="props.invalid || undefined"
-    :class="
-      cn(
-        inputVariants({ size: props.size, invalid: props.invalid }),
-        props.class,
-      )
-    "
+    :class="cn(inputVariants({ size: props.size, invalid: props.invalid }), props.class)"
   />
 </template>
 

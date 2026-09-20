@@ -14,7 +14,8 @@
         adminInputChromeClass,
         'h-9 px-3 py-1.5 text-admin-body',
         size === 'small' && 'h-8 px-2.5 text-admin-meta',
-        invalid && 'border-admin-danger focus-visible:border-admin-danger focus-visible:ring-admin-danger/20',
+        invalid &&
+          'border-admin-danger focus-visible:border-admin-danger focus-visible:ring-admin-danger/20',
         props.class,
       )
     "
@@ -81,7 +82,11 @@ const inputRef = ref<HTMLInputElement | null>(null)
 const isEditing = ref(false)
 
 const displayValue = computed(() => {
-  if (props.modelValue === null || props.modelValue === undefined || props.modelValue === ('' as unknown as number)) {
+  if (
+    props.modelValue === null ||
+    props.modelValue === undefined ||
+    props.modelValue === ('' as unknown as number)
+  ) {
     return ''
   }
   if (props.suffix && !isEditing.value) {

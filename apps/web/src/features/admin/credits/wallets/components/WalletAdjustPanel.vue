@@ -1,5 +1,7 @@
 <template>
-  <section class="flex flex-col gap-4 rounded-2xl border border-admin-border-soft bg-white p-5 shadow-2xs">
+  <section
+    class="flex flex-col gap-4 rounded-2xl border border-admin-border-soft bg-white p-5 shadow-2xs"
+  >
     <div class="flex items-center justify-between border-b border-admin-border-soft pb-3">
       <div class="flex items-center gap-2">
         <span
@@ -73,7 +75,11 @@
           <AdminActionReasonField
             :model-value="reason"
             input-id="admin-user-wallet-command-reason"
-            :label="activeTab === 'refund' ? t('admin.wallet.refundReasonLabel') : t('admin.wallet.reasonLabel')"
+            :label="
+              activeTab === 'refund'
+                ? t('admin.wallet.refundReasonLabel')
+                : t('admin.wallet.reasonLabel')
+            "
             :error="showErrors ? validation.reasonError : ''"
             :disabled="commandPending"
             :rows="1"
@@ -92,7 +98,11 @@
           @click="emit('cancel')"
         />
         <AdminButton
-          :label="activeTab === 'refund' ? t('admin.wallet.reviewRefund') : t('admin.wallet.reviewOperation')"
+          :label="
+            activeTab === 'refund'
+              ? t('admin.wallet.reviewRefund')
+              : t('admin.wallet.reviewOperation')
+          "
           :class="adminActionButtonClass"
           type="submit"
           :variant="activeTab === 'grant' ? 'default' : 'destructive'"

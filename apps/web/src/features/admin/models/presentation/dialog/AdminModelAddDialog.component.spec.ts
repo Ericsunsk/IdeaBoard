@@ -55,12 +55,14 @@ describe('AdminModelAddDialog', () => {
     },
   ]
 
-  function renderDialog(props: {
-    visible?: boolean
-    existingModels?: AdminModelItem[]
-    pending?: boolean
-    onImport?: (items: AdminModelItem[]) => void
-  } = {}) {
+  function renderDialog(
+    props: {
+      visible?: boolean
+      existingModels?: AdminModelItem[]
+      pending?: boolean
+      onImport?: (items: AdminModelItem[]) => void
+    } = {},
+  ) {
     const { onImport, ...rest } = props
     return renderWithUser(AdminModelAddDialog, {
       props: {
@@ -100,12 +102,8 @@ describe('AdminModelAddDialog', () => {
     renderDialog()
 
     const dialog = await screen.findByRole('dialog')
-    expect(
-      await within(dialog).findByText('正在比对社区模型目录...'),
-    ).toBeVisible()
-    expect(
-      within(dialog).queryByText('正在获取已连接供应商的模型列表...'),
-    ).not.toBeInTheDocument()
+    expect(await within(dialog).findByText('正在比对社区模型目录...')).toBeVisible()
+    expect(within(dialog).queryByText('正在获取已连接供应商的模型列表...')).not.toBeInTheDocument()
     // 加载中与空态互斥：结果未回来前不得出现空态块
     expect(within(dialog).queryByText('未探测到可用的网关模型')).not.toBeInTheDocument()
   })

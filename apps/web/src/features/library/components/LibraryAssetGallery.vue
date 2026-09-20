@@ -111,9 +111,7 @@
                   @click.stop="emit('select-reference', asset)"
                 >
                   <Check
-                    v-if="
-                      referenceKeys?.includes(libraryAssetKey(asset.provider, asset.source_id))
-                    "
+                    v-if="referenceKeys?.includes(libraryAssetKey(asset.provider, asset.source_id))"
                     class="size-3"
                     aria-hidden="true"
                   />
@@ -151,15 +149,8 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check, Plus, Search, Xmark } from '@iconoir/vue'
-import {
-  libraryAssetKey,
-  resolveLibraryAssetCardURL,
-  type LibraryAssetView,
-} from '../resource'
-import {
-  toCanvasLibraryImportDescriptor,
-  type CanvasLibraryImportDescriptor,
-} from '../transfer'
+import { libraryAssetKey, resolveLibraryAssetCardURL, type LibraryAssetView } from '../resource'
+import { toCanvasLibraryImportDescriptor, type CanvasLibraryImportDescriptor } from '../transfer'
 
 const props = defineProps<{
   assets: LibraryAssetView[]

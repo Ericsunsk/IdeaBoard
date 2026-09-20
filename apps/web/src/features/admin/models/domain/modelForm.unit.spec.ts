@@ -47,12 +47,10 @@ describe('modelForm', () => {
   })
 
   it('validates required fields and custom JSON', () => {
-    expect(
-      validateModelForm({ id: '', name: 'n', provider: 'p' }),
-    ).toBe('请输入模型标识 (ID)')
-    expect(
-      validateModelForm({ id: 'a/b', name: 'n', provider: 'p', customParams: '{x' }),
-    ).toBe('额外自定义参数 JSON 格式不合法')
+    expect(validateModelForm({ id: '', name: 'n', provider: 'p' })).toBe('请输入模型标识 (ID)')
+    expect(validateModelForm({ id: 'a/b', name: 'n', provider: 'p', customParams: '{x' })).toBe(
+      '额外自定义参数 JSON 格式不合法',
+    )
     expect(
       validateModelForm({ id: 'a/b', name: 'n', provider: 'p', customParams: '{"k":1}' }),
     ).toBe('')

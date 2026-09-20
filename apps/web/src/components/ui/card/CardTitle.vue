@@ -1,8 +1,5 @@
 <template>
-  <component
-    :is="as"
-    :class="cn('font-semibold leading-none tracking-tight', props.class)"
-  >
+  <component :is="as" :class="cn('font-semibold leading-none tracking-tight', props.class)">
     <slot />
   </component>
 </template>

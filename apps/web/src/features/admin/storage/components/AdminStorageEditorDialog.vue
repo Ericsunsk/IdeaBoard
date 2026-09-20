@@ -169,11 +169,7 @@
       <!-- 4. Tab 2: 端点与网络 -->
       <template v-else-if="activeConfigTab === 'endpoint'">
         <div class="flex flex-col gap-3">
-          <div
-            v-for="field in endpointFields"
-            :key="field.key"
-            class="flex min-w-0 flex-col gap-1"
-          >
+          <div v-for="field in endpointFields" :key="field.key" class="flex min-w-0 flex-col gap-1">
             <div class="flex items-center justify-between">
               <label
                 :for="`admin-storage-${field.key}`"
@@ -292,7 +288,12 @@ import {
   adminTextButtonClass,
 } from '../../shared/lib/uiClasses'
 import { storageVendorLogo, vendorIconMap, vendorPresetCatalog } from '../meta'
-import type { StorageCard, StorageProvider, StorageProviderField, StorageProviderMeta } from '../profiles'
+import type {
+  StorageCard,
+  StorageProvider,
+  StorageProviderField,
+  StorageProviderMeta,
+} from '../profiles'
 
 type StorageConfigTab = 'basic' | 'endpoint' | 'advanced'
 

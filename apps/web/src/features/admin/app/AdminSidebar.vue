@@ -90,7 +90,7 @@
                 <div v-if="!effectiveCollapsed" class="grid origin-top-left">
                   <div class="min-h-0 overflow-hidden">
                     <div
-                      class="px-3 pt-2 pb-1 text-xs font-semibold tracking-wider text-admin-text-3 select-none whitespace-nowrap"
+                      class="px-3 pt-2 pb-1 text-xs font-semibold tracking-wider text-admin-text-2-strong select-none whitespace-nowrap"
                     >
                       {{ group.title }}
                     </div>

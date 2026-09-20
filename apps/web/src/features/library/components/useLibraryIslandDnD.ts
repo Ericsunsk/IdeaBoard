@@ -1,11 +1,7 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { LibraryMutationPublisher } from '../folderFacts'
-import {
-  libraryAssetKey,
-  saveSearchReference,
-  type LibraryAssetView,
-} from '../resource'
+import { libraryAssetKey, saveSearchReference, type LibraryAssetView } from '../resource'
 import {
   toCanvasLibraryImportDescriptor,
   getLibraryDropEffect,

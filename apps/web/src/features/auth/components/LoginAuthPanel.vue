@@ -137,7 +137,9 @@
           :class="authPrimaryButtonClass"
           type="submit"
           :loading="loading"
-          v-bind="submitControlState">{{ loading ? t('auth.buttons.signingIn') : t('auth.buttons.signIn') }}</Button>
+          v-bind="submitControlState"
+          >{{ loading ? t('auth.buttons.signingIn') : t('auth.buttons.signIn') }}</Button
+        >
       </form>
 
       <form
@@ -180,7 +182,9 @@
           :class="authPrimaryButtonClass"
           type="submit"
           :loading="loading"
-          v-bind="submitControlState">{{ loading ? t('auth.buttons.sending') : t('auth.buttons.sendCode') }}</Button>
+          v-bind="submitControlState"
+          >{{ loading ? t('auth.buttons.sending') : t('auth.buttons.sendCode') }}</Button
+        >
         <button
           type="button"
           class="self-center border-0 bg-transparent p-0 text-xs font-semibold text-ib-creative-accent hover:underline"
@@ -260,7 +264,9 @@
           :class="authPrimaryButtonClass"
           type="submit"
           :loading="loading"
-          v-bind="submitControlState">{{ loading ? t('auth.buttons.resetting') : t('auth.buttons.resetPassword') }}</Button>
+          v-bind="submitControlState"
+          >{{ loading ? t('auth.buttons.resetting') : t('auth.buttons.resetPassword') }}</Button
+        >
       </form>
 
       <div :class="['mt-5', authFooterClass]">

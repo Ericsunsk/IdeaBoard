@@ -72,12 +72,7 @@ describe('task monitor model column', () => {
   })
 
   it('previews at most 3 result images with overflow count', () => {
-    const urls = [
-      '/uploads/a.jpg',
-      '/uploads/b.jpg',
-      '/uploads/c.jpg',
-      '/uploads/d.jpg',
-    ]
+    const urls = ['/uploads/a.jpg', '/uploads/b.jpg', '/uploads/c.jpg', '/uploads/d.jpg']
     const row = makeTask({
       status: 'completed',
       result: JSON.stringify({ image_urls: urls }),
@@ -113,9 +108,7 @@ describe('task monitor model column', () => {
   })
 })
 
-function makeTask(
-  overrides: Partial<AdminMonitorListItemModel> = {},
-): AdminMonitorListItemModel {
+function makeTask(overrides: Partial<AdminMonitorListItemModel> = {}): AdminMonitorListItemModel {
   return {
     task_id: 'task-1',
     user_public_id: '00000000-0000-0000-0000-000000000001',

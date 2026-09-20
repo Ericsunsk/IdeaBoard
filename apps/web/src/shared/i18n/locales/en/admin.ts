@@ -28,7 +28,8 @@ export default {
     regenerate: 'Regenerate',
     codeHintEdit: 'Leave blank to retain current Code; fill or generate to replace Code',
     codeHintCreate: 'Only the last four digits will be visible after saving',
-    rotationWarning: 'After saving, the old Code will expire immediately and the new Code will take effect immediately.',
+    rotationWarning:
+      'After saving, the old Code will expire immediately and the new Code will take effect immediately.',
     creditAmountLabel: 'Reward Idea',
     maxRedemptionsLabel: 'Redemption Limit',
     capHintZero: '0 means unlimited',
@@ -90,7 +91,8 @@ export default {
     activeRestrictionsNotice: 'Active Restrictions in Effect',
     restrictionLedgerIntegrity: 'Ledger Integrity',
     statusFrozenDisabled: 'User account is deactivated or closing, frozen by identity lifecycle.',
-    statusFrozenStandard: 'Account frozen by identity lifecycle, verify user status and account state.',
+    statusFrozenStandard:
+      'Account frozen by identity lifecycle, verify user status and account state.',
     originalChargeNotice: 'Original Charge: {id}, remaining refundable: {amount}.',
     amountPlaceholder: 'e.g. 100',
     refundReasonLabel: 'Refund Reason',

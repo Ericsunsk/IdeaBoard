@@ -81,14 +81,15 @@ import { useAdminTaskCancellationFeedback } from '../../application/useAdminMoni
 import AdminTaskResultDialog from '../AdminTaskResultDialog.vue'
 import AdminAlert from '../../../shared/components/AdminAlert.vue'
 import AdminButton from '../../../shared/components/AdminButton.vue'
-import {
-  adminDashboardRootClass,
-  adminTextButtonClass,
-} from '../../../shared/lib/uiClasses'
+import { adminDashboardRootClass, adminTextButtonClass } from '../../../shared/lib/uiClasses'
 import TaskControlToolbar from '../components/TaskControlToolbar.vue'
 import TaskEventsCard from '../components/TaskEventsCard.vue'
 import TaskActivityTable from '../components/TaskActivityTable.vue'
-import { type AdminTaskRow, buildAdminTaskListParams, useAdminTaskList } from '../../application/useAdminTaskList'
+import {
+  type AdminTaskRow,
+  buildAdminTaskListParams,
+  useAdminTaskList,
+} from '../../application/useAdminTaskList'
 import { timeRangePresets } from '../../domain/timeRange'
 import { useAdminTaskCancel } from '../../application/useAdminTaskCancel'
 import { useAdminTaskDetailResource, useAdminTaskListResource } from '../../infrastructure/resource'

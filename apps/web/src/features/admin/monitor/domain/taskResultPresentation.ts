@@ -21,9 +21,7 @@ export type TaskDurationInfo = {
 }
 type MonitorResultRow = AdminMonitorListItemModel | AdminMonitorDetailModel
 
-export function getTaskResultImageUrl(
-  row: Pick<MonitorResultRow, 'status' | 'result'>,
-): string {
+export function getTaskResultImageUrl(row: Pick<MonitorResultRow, 'status' | 'result'>): string {
   return getTaskResultImageUrls(row)[0] ?? ''
 }
 
@@ -37,9 +35,7 @@ export function getTaskResultDetailImageUrl(
 // 表格 Result 列：最多展示前 3 张，超出部分由调用方用 +N 提示。
 export const TASK_RESULT_PREVIEW_COUNT = 3
 
-export function getTaskResultImageUrls(
-  row: Pick<MonitorResultRow, 'status' | 'result'>,
-): string[] {
+export function getTaskResultImageUrls(row: Pick<MonitorResultRow, 'status' | 'result'>): string[] {
   if (row.status !== adminTaskStatuses.completed || !row.result) return []
   return getSafeTaskResultImageUrls(row.result)
 }
@@ -61,9 +57,7 @@ export function formatTaskDuration(
   return formatDurationSeconds(row.created_at, row.completed_at)
 }
 
-export function getTaskSanitizedError(
-  row: Pick<MonitorResultRow, 'status' | 'error_msg'>,
-): string {
+export function getTaskSanitizedError(row: Pick<MonitorResultRow, 'status' | 'error_msg'>): string {
   if (row.status !== adminTaskStatuses.failed || !row.error_msg) return ''
   return sanitizeTaskErrorMessage(row.error_msg)
 }

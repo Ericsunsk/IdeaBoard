@@ -16,11 +16,7 @@
         @enter="searchRewardCodes"
         @clear="clearSearch"
       />
-      <AdminButton
-        :class="adminActionButtonClass"
-        :disabled="saving"
-        @click="openCreateDialog"
-      >
+      <AdminButton :class="adminActionButtonClass" :disabled="saving" @click="openCreateDialog">
         创建兑换码
       </AdminButton>
     </template>
@@ -31,15 +27,9 @@
         filter-label="筛选兑换码状态"
         @reset="resetStatusFilter"
       >
-        <label
-          class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
-        >
+        <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
           <span>有效状态</span>
-          <AdminSelect
-            v-model="statusFilter"
-            :options="statusOptions"
-            size="small"
-          />
+          <AdminSelect v-model="statusFilter" :options="statusOptions" size="small" />
         </label>
       </AdminFilterPopover>
 
@@ -88,100 +78,100 @@
 
     <AdminTable
       v-if="!initialError"
-        :value="rewardCodes"
-        :loading="loading"
-        data-key="id"
-        scrollable
-        :frame-class="adminTableFrameClass"
-        table-aria-label="兑换码列表"
-        scroll-aria-label="兑换码列表横向滚动区域"
-        :table-style="adminTableStyle"
-        :class="adminTableClass"
-      >
-        <template #empty>
-          <AdminEmptyState :title="emptyTitle" />
+      :value="rewardCodes"
+      :loading="loading"
+      data-key="id"
+      scrollable
+      :frame-class="adminTableFrameClass"
+      table-aria-label="兑换码列表"
+      scroll-aria-label="兑换码列表横向滚动区域"
+      :table-style="adminTableStyle"
+      :class="adminTableClass"
+    >
+      <template #empty>
+        <AdminEmptyState :title="emptyTitle" />
+      </template>
+
+      <!-- 兑换码列：名称 + 掩码 Code -->
+      <AdminColumn field="displayName" header="兑换码" :style="{ minWidth: '220px' }">
+        <template #body="{ data }">
+          <div class="min-w-0">
+            <div class="truncate font-medium text-admin-text-1">
+              {{ data.displayName }}
+            </div>
+            <div class="mt-0.5 font-mono text-xs text-admin-text-3">
+              {{ data.maskedCodeHint }}
+            </div>
+          </div>
         </template>
+      </AdminColumn>
 
-        <!-- 兑换码列：名称 + 掩码 Code -->
-        <AdminColumn field="displayName" header="兑换码" :style="{ minWidth: '220px' }">
-          <template #body="{ data }">
-            <div class="min-w-0">
-              <div class="truncate font-medium text-admin-text-1">
-                {{ data.displayName }}
-              </div>
-              <div class="mt-0.5 font-mono text-xs text-admin-text-3">
-                {{ data.maskedCodeHint }}
-              </div>
-            </div>
-          </template>
-        </AdminColumn>
+      <!-- 奖励 Idea 列：等宽字体金额 -->
+      <AdminColumn field="creditAmount" header="奖励 Idea" :style="{ width: '140px' }">
+        <template #body="{ data }">
+          <span class="font-mono text-xs font-semibold text-admin-text-1">
+            {{ formatIdeaAmount(data.creditAmount) }}
+          </span>
+        </template>
+      </AdminColumn>
 
-        <!-- 奖励 Idea 列：等宽字体金额 -->
-        <AdminColumn field="creditAmount" header="奖励 Idea" :style="{ width: '140px' }">
-          <template #body="{ data }">
-            <span class="font-mono text-xs font-semibold text-admin-text-1">
-              {{ formatIdeaAmount(data.creditAmount) }}
-            </span>
-          </template>
-        </AdminColumn>
+      <!-- 状态列：Badge + 开关 -->
+      <AdminColumn field="status" header="状态" :style="{ width: '180px' }">
+        <template #body="{ data }">
+          <div class="flex items-center gap-3">
+            <AdminBadge
+              :value="statusPresentation(data.status).label"
+              :severity="statusPresentation(data.status).severity"
+              rounded
+            />
+            <AdminSwitch
+              :key="`${data.id}:${data.enabled}:${Boolean(enabledPending[data.id])}`"
+              :model-value="data.enabled"
+              :disabled="Boolean(enabledPending[data.id])"
+              :aria-label="`${data.displayName}启用状态`"
+              @update:model-value="setRewardCodeEnabled(data, $event)"
+            />
+          </div>
+        </template>
+      </AdminColumn>
 
-        <!-- 状态列：Badge + 开关 -->
-        <AdminColumn field="status" header="状态" :style="{ width: '180px' }">
-          <template #body="{ data }">
-            <div class="flex items-center gap-3">
-              <AdminBadge
-                :value="statusPresentation(data.status).label"
-                :severity="statusPresentation(data.status).severity"
-                rounded
-              />
-              <AdminSwitch
-                :key="`${data.id}:${data.enabled}:${Boolean(enabledPending[data.id])}`"
-                :model-value="data.enabled"
-                :disabled="Boolean(enabledPending[data.id])"
-                :aria-label="`${data.displayName}启用状态`"
-                @update:model-value="setRewardCodeEnabled(data, $event)"
-              />
-            </div>
-          </template>
-        </AdminColumn>
+      <!-- 兑换进度列：等宽字体分子分母 -->
+      <AdminColumn header="兑换进度" :style="{ width: '150px' }">
+        <template #body="{ data }">
+          <span class="font-mono text-xs text-admin-text-1">
+            {{ data.redemptionCount }} / {{ data.maxRedemptions === 0 ? '∞' : data.maxRedemptions }}
+          </span>
+        </template>
+      </AdminColumn>
 
-        <!-- 兑换进度列：等宽字体分子分母 -->
-        <AdminColumn header="兑换进度" :style="{ width: '150px' }">
-          <template #body="{ data }">
-            <span class="font-mono text-xs text-admin-text-1">
-              {{ data.redemptionCount }} / {{ data.maxRedemptions === 0 ? '∞' : data.maxRedemptions }}
-            </span>
-          </template>
-        </AdminColumn>
+      <!-- 过期时间列：等宽日期 -->
+      <AdminColumn field="expiresAt" header="过期时间" :style="{ width: '180px' }">
+        <template #body="{ data }">
+          <span class="whitespace-nowrap font-mono text-xs text-admin-text-2">
+            {{ formatExpiresAt(data.expiresAt) }}
+          </span>
+        </template>
+      </AdminColumn>
 
-        <!-- 过期时间列：等宽日期 -->
-        <AdminColumn field="expiresAt" header="过期时间" :style="{ width: '180px' }">
-          <template #body="{ data }">
-            <span class="whitespace-nowrap font-mono text-xs text-admin-text-2">
-              {{ formatExpiresAt(data.expiresAt) }}
-            </span>
-          </template>
-        </AdminColumn>
+      <!-- 更多操作列 (1:1 对齐用户管理页 More 列) -->
+      <AdminColumn header="More" :style="{ width: '64px' }">
+        <template #body="{ data }">
+          <div class="flex items-center justify-start">
+            <button
+              type="button"
+              :class="adminTableRowActionButtonClass"
+              aria-haspopup="dialog"
+              :aria-label="`${data.displayName} 操作菜单`"
+              @click="toggleActionMenu($event, data)"
+            >
+              <MoreHoriz class="size-4" />
+            </button>
+          </div>
+        </template>
+      </AdminColumn>
+    </AdminTable>
 
-        <!-- 更多操作列 (1:1 对齐用户管理页 More 列) -->
-        <AdminColumn header="More" :style="{ width: '64px' }">
-          <template #body="{ data }">
-            <div class="flex items-center justify-start">
-              <button
-                type="button"
-                :class="adminTableRowActionButtonClass"
-                aria-haspopup="dialog"
-                :aria-label="`${data.displayName} 操作菜单`"
-                @click="toggleActionMenu($event, data)"
-              >
-                <MoreHoriz class="size-4" />
-              </button>
-            </div>
-          </template>
-        </AdminColumn>
-      </AdminTable>
-
-      <template #footer-label>{{ totalRewardCodesLabel }}</template>
+    <template #footer-label>{{ totalRewardCodesLabel }}</template>
   </AdminCollectionPageShell>
 
   <AdminRowActionsPopover

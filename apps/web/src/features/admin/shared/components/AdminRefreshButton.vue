@@ -14,11 +14,14 @@
 <script setup lang="ts">
 import { Refresh } from '@iconoir/vue'
 
-const props = withDefaults(defineProps<{
-  loading?: boolean
-  disabled?: boolean
-  ariaLabel?: string
-}>(), { loading: false, disabled: false, ariaLabel: '' })
+const props = withDefaults(
+  defineProps<{
+    loading?: boolean
+    disabled?: boolean
+    ariaLabel?: string
+  }>(),
+  { loading: false, disabled: false, ariaLabel: '' },
+)
 
 const emit = defineEmits<{
   click: []

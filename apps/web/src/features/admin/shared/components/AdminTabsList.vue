@@ -24,5 +24,4 @@ const props = defineProps<{
 defineOptions({
   inheritAttrs: false,
 })
-
 </script>

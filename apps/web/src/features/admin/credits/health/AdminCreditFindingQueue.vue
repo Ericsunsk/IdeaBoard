@@ -96,7 +96,9 @@
               :aria-label="`查看${getFindingTypePresentation(data.finding_type).title}诊断`"
               @click="openFinding(data)"
             >
-              <span class="font-semibold text-admin-text-1 group-hover:text-admin-accent transition-colors">
+              <span
+                class="font-semibold text-admin-text-1 group-hover:text-admin-accent transition-colors"
+              >
                 {{ getFindingTypePresentation(data.finding_type).title }}
               </span>
               <span class="mt-1 block line-clamp-2 text-xs leading-5 text-admin-text-3">
@@ -215,7 +217,9 @@
               />
             </section>
 
-            <section class="grid gap-x-5 gap-y-4 border-y border-admin-border-soft py-5 sm:grid-cols-2">
+            <section
+              class="grid gap-x-5 gap-y-4 border-y border-admin-border-soft py-5 sm:grid-cols-2"
+            >
               <div>
                 <div class="text-admin-caption font-[700] text-admin-text-3">影响对象</div>
                 <div class="mt-1 break-all text-admin-body font-[680] text-admin-text-1">
@@ -251,7 +255,8 @@
             <section v-if="selectedFinding.wallet_public_id">
               <div class="text-admin-caption font-[700] text-admin-text-3">关联 Wallet</div>
               <div class="mt-2 text-admin-body font-[680] text-admin-text-1">
-                Wallet · {{ selectedFinding.wallet_display_name || selectedFinding.wallet_public_id }}
+                Wallet ·
+                {{ selectedFinding.wallet_display_name || selectedFinding.wallet_public_id }}
               </div>
             </section>
 

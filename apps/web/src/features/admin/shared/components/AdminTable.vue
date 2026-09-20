@@ -35,10 +35,7 @@
                 <component :is="column.headerSlot" v-if="column.headerSlot" />
                 <template v-else-if="!column.expander">{{ column.header }}</template>
               </AdminTableHead>
-              <AdminTableHead
-                v-if="columns.length === 0"
-                scope="col"
-              >
+              <AdminTableHead v-if="columns.length === 0" scope="col">
                 <span class="sr-only">数据</span>
               </AdminTableHead>
             </AdminTableRow>
@@ -68,21 +65,17 @@
             </template>
             <template v-else>
               <template v-for="(row, rowIndex) in rows" :key="rowKey(row, rowIndex)">
-                <AdminTableRow
-                  :aria-selected="isSelected(row, rowIndex) || undefined"
-                >
-                  <AdminTableCell
-                    v-for="column in columns"
-                    :key="column.key"
-                    :style="column.style"
-                  >
+                <AdminTableRow :aria-selected="isSelected(row, rowIndex) || undefined">
+                  <AdminTableCell v-for="column in columns" :key="column.key" :style="column.style">
                     <input
                       v-if="column.selectionMode === 'multiple'"
                       type="checkbox"
                       :checked="isSelected(row, rowIndex)"
                       :aria-label="selectionRowLabel(row, rowIndex)"
                       class="size-4 accent-admin-accent"
-                      @change="toggleSelectRow(row, rowIndex, ($event.target as HTMLInputElement).checked)"
+                      @change="
+                        toggleSelectRow(row, rowIndex, ($event.target as HTMLInputElement).checked)
+                      "
                     />
                     <AdminButton
                       v-else-if="column.expander"
@@ -110,7 +103,10 @@
                   </AdminTableCell>
                 </AdminTableRow>
                 <AdminTableRow v-if="isExpanded(row, rowIndex) && hasExpansionSlot">
-                  <AdminTableCell :colspan="columnCount" class="border-b border-admin-divider px-0 py-0">
+                  <AdminTableCell
+                    :colspan="columnCount"
+                    class="border-b border-admin-divider px-0 py-0"
+                  >
                     <slot name="expansion" :data="row" :index="rowIndex" />
                   </AdminTableCell>
                 </AdminTableRow>
@@ -219,9 +215,7 @@ function normalizeStyleKey(index: number, field?: string, header?: string): stri
 }
 
 const columns = computed<AdminTableColumnDef[]>(() => {
-  const vnodes = (slots.default?.() ?? []).filter(
-    (vnode) => vnode.type === AdminColumn,
-  )
+  const vnodes = (slots.default?.() ?? []).filter((vnode) => vnode.type === AdminColumn)
   return vnodes.map((vnode, index) => {
     const columnProps = (vnode.props ?? {}) as {
       field?: string
@@ -231,8 +225,7 @@ const columns = computed<AdminTableColumnDef[]>(() => {
       expander?: boolean
     }
     const children = vnode.children as
-      | { body?: (slotProps: Record<string, unknown>) => VNode[]; header?: () => VNode[] }
-      | undefined
+      { body?: (slotProps: Record<string, unknown>) => VNode[]; header?: () => VNode[] } | undefined
     return {
       key: normalizeStyleKey(index, columnProps.field, columnProps.header),
       field: columnProps.field,
@@ -258,7 +251,9 @@ const isDataDriven = computed(
 
 const columnCount = computed(() => Math.max(columns.value.length, 1))
 const rows = computed<readonly TRow[]>(() => props.value ?? [])
-const hasSelection = computed(() => columns.value.some((column) => column.selectionMode === 'multiple'))
+const hasSelection = computed(() =>
+  columns.value.some((column) => column.selectionMode === 'multiple'),
+)
 
 function resolveKey(row: TRow, index: number): string {
   if (typeof props.dataKey === 'function') {

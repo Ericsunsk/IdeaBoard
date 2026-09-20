@@ -79,7 +79,6 @@ export function toNonNegativeNumber(value: number | null | undefined): number {
   return Math.max(0, parsed)
 }
 
-
 export function normalizePercent(value: number | null | undefined): number {
   // 后端一律 0-100；错量级必须可见（仅 clamp），不得静默 *100 猜测修复。
   const parsed = Number(value) || 0

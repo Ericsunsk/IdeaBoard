@@ -58,13 +58,18 @@
             {{ userStore.user?.display_name }}
           </p>
           <div class="mt-3 flex min-w-0 flex-wrap items-center gap-2">
-            <Badge
-              v-if="isUserBanned"
-              variant="destructive"
-            >
+            <Badge v-if="isUserBanned" variant="destructive">
               {{ t('account.profile.banned') }}
             </Badge>
-            <Badge :variant="userRoleSeverity === 'danger' ? 'destructive' : userRoleSeverity === 'secondary' ? 'secondary' : 'default'">
+            <Badge
+              :variant="
+                userRoleSeverity === 'danger'
+                  ? 'destructive'
+                  : userRoleSeverity === 'secondary'
+                    ? 'secondary'
+                    : 'default'
+              "
+            >
               {{ userRoleLabel }}
             </Badge>
           </div>

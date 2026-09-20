@@ -73,7 +73,10 @@ const emit = defineEmits<{
 const isOpen = ref(false)
 const active = computed(() => props.modelValue !== props.allValue)
 const selectedLabel = computed(
-  () => props.options.find((option) => option.value === props.modelValue)?.label ?? props.options[0]?.label ?? '',
+  () =>
+    props.options.find((option) => option.value === props.modelValue)?.label ??
+    props.options[0]?.label ??
+    '',
 )
 
 function select(value: string) {

@@ -2,6 +2,7 @@ import { defineComponent } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUserStore } from '../session/userSession'
 import { renderWithUser, screen, waitFor } from '../../../test/render'
+import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import AuthModalHost from './AuthModalHost.vue'
 import LoginAuthPanel from './LoginAuthPanel.vue'
 import RegisterAuthPanel from './RegisterAuthPanel.vue'
@@ -29,6 +30,12 @@ const DialogRootStub = defineComponent({
 
 const PassthroughStub = defineComponent({
   template: '<slot />',
+})
+
+const DialogOverlayStub = defineComponent({
+  inheritAttrs: false,
+  emits: ['click'],
+  template: '<div v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></div>',
 })
 
 const DialogContentStub = defineComponent({
@@ -157,7 +164,7 @@ function renderAuthHost(busy = false) {
       stubs: {
         DialogRoot: DialogRootStub,
         DialogPortal: PassthroughStub,
-        DialogOverlay: PassthroughStub,
+        DialogOverlay: DialogOverlayStub,
         DialogContent: DialogContentStub,
         DialogDescription: PassthroughStub,
       },
@@ -166,6 +173,15 @@ function renderAuthHost(busy = false) {
 }
 
 function renderAuthPanel(testCase: AuthPanelCase) {
+  useMswHandlers(
+    http.get('/api/auth/capabilities', () =>
+      HttpResponse.json({
+        code: 0,
+        msg: 'ok',
+        data: { social: { google: false, discord: false }, providers: [] },
+      }),
+    ),
+  )
   return renderWithUser(testCase.component, {
     global: {
       stubs: {
@@ -173,6 +189,7 @@ function renderAuthPanel(testCase: AuthPanelCase) {
         InputText: InputTextStub,
         Message: { template: '<p><slot /></p>' },
         Password: PasswordStub,
+        RouterLink: { template: '<a v-bind="$attrs"><slot /></a>' },
       },
     },
   })

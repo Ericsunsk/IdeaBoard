@@ -1,4 +1,3 @@
-
 import { defineComponent, h, type Component } from 'vue'
 
 export function defineIconStub(name: string): Component {

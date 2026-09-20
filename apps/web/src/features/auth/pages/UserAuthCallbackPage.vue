@@ -4,11 +4,7 @@
       <Spinner v-if="status === 'loading'" class="size-8" />
       <h1 class="m-0 text-xl font-semibold">{{ title }}</h1>
       <p class="m-0 text-sm leading-6 text-ib-text-muted">{{ message }}</p>
-      <Button
-        v-if="status === 'failed'"
-        variant="outline"
-        @click="returnToLogin"
-      >
+      <Button v-if="status === 'failed'" variant="outline" @click="returnToLogin">
         {{ t('auth.backToSignIn') }}
       </Button>
     </div>

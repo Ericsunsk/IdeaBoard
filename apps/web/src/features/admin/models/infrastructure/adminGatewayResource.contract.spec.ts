@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
-import {
-  createAdminGatewayResource,
-} from './adminGatewayResource'
+import { createAdminGatewayResource } from './adminGatewayResource'
 
 describe('Admin gateway resource', () => {
   it('lists per-feature model mappings', async () => {
@@ -45,9 +43,7 @@ describe('Admin gateway resource', () => {
       ),
     )
 
-    await expect(
-      createAdminGatewayResource().mappings.save('generation', 'bad'),
-    ).rejects.toThrow()
+    await expect(createAdminGatewayResource().mappings.save('generation', 'bad')).rejects.toThrow()
   })
 
   it('rejects gateway config updates when the HTTP 200 envelope reports an error', async () => {

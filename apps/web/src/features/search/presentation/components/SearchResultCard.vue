@@ -10,9 +10,7 @@
     <button
       type="button"
       class="block w-full cursor-zoom-in text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-board-primary"
-      :aria-label="
-        t('search.viewResult', { title: result.title || t('search.fallbackTitle') })
-      "
+      :aria-label="t('search.viewResult', { title: result.title || t('search.fallbackTitle') })"
       @click="$emit('openLightbox')"
     >
       <div
@@ -49,14 +47,10 @@
               : 'bg-[var(--search-overlay-btn-bg)] text-white/80 hover:bg-[var(--search-overlay-btn-bg-hover)] hover:text-white backdrop-blur-[var(--ib-glass-blur)]'
           "
           :title="
-            isSelected
-              ? t('search.tooltips.deselectImage')
-              : t('search.tooltips.selectImage')
+            isSelected ? t('search.tooltips.deselectImage') : t('search.tooltips.selectImage')
           "
           :aria-label="
-            isSelected
-              ? t('search.tooltips.deselectImage')
-              : t('search.tooltips.selectImage')
+            isSelected ? t('search.tooltips.deselectImage') : t('search.tooltips.selectImage')
           "
           @click.stop="$emit('toggleSelect')"
         >
@@ -102,14 +96,10 @@
               : 'bg-board-primary text-ib-text-inverse hover:bg-board-primary-hover shadow-board-primary/30'
           "
           :aria-label="
-            isSaved
-              ? t('search.tooltips.removeFromLibrary')
-              : t('search.tooltips.saveToLibrary')
+            isSaved ? t('search.tooltips.removeFromLibrary') : t('search.tooltips.saveToLibrary')
           "
           :title="
-            isSaved
-              ? t('search.tooltips.removeFromLibrary')
-              : t('search.tooltips.saveToLibrary')
+            isSaved ? t('search.tooltips.removeFromLibrary') : t('search.tooltips.saveToLibrary')
           "
           @click.stop="$emit('toggleSave', $event)"
         >
@@ -126,12 +116,7 @@
       <span class="text-xs font-semibold text-board-page-text-muted">{{
         t('common.errors.imageLoadFailed')
       }}</span>
-      <Button
-        variant="outline"
-        size="sm"
-        class="!rounded-full"
-        @click="$emit('retryImage')"
-      >
+      <Button variant="outline" size="sm" class="!rounded-full" @click="$emit('retryImage')">
         {{ t('common.actions.retry') }}
       </Button>
     </div>

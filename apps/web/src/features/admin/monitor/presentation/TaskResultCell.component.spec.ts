@@ -33,9 +33,7 @@ describe('TaskResultCell', () => {
     expect(screen.getByText('+1')).toBeInTheDocument()
 
     await view.user.click(screen.getAllByRole('button')[0]!)
-    expect(view.emitted()['inspect']?.[0]).toEqual([
-      expect.objectContaining({ task_id: 'task-1' }),
-    ])
+    expect(view.emitted()['inspect']?.[0]).toEqual([expect.objectContaining({ task_id: 'task-1' })])
   })
 
   it('renders a dash when there is no result', () => {

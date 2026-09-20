@@ -232,8 +232,9 @@ export function useUsageStatisticsCharts(options: {
   )
 
   const summaryMetrics = useUsageStatisticsSummaryMetrics(options.adminStatistics)
-  const { modelRiskChartData, modelRiskChartOptions } =
-    useUsageStatisticsModelHealthCharts(options.adminStatistics)
+  const { modelRiskChartData, modelRiskChartOptions } = useUsageStatisticsModelHealthCharts(
+    options.adminStatistics,
+  )
 
   const qualityTrendCharts = useUsageStatisticsQualityTrendCharts(options)
 

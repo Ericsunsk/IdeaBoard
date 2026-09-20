@@ -17,7 +17,10 @@
       <!-- 网关 Base URL -->
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center justify-between">
-          <label class="text-admin-caption font-semibold text-admin-text-1" for="gateway-base-url-input">
+          <label
+            class="text-admin-caption font-semibold text-admin-text-1"
+            for="gateway-base-url-input"
+          >
             网关 Base URL
           </label>
           <span
@@ -40,7 +43,10 @@
       <!-- API 密钥 -->
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center justify-between">
-          <label class="text-admin-caption font-semibold text-admin-text-1" for="gateway-token-input">
+          <label
+            class="text-admin-caption font-semibold text-admin-text-1"
+            for="gateway-token-input"
+          >
             API 密钥
           </label>
           <span
@@ -64,7 +70,10 @@
 
       <!-- CF 身份：官方域名可空（后端从 URL 派生）；自定义域名如需模型探测请填写 -->
       <div class="flex flex-col gap-1.5">
-        <label class="text-admin-caption font-semibold text-admin-text-1" for="gateway-account-id-input">
+        <label
+          class="text-admin-caption font-semibold text-admin-text-1"
+          for="gateway-account-id-input"
+        >
           Account ID <span class="font-normal text-admin-text-3">（自定义域名探测选填）</span>
         </label>
         <AdminInput

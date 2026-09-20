@@ -1,10 +1,9 @@
 <template>
   <div :class="adminDashboardRootClass">
-    <div class="flex w-full flex-col overflow-hidden rounded-xl border border-admin-border-soft bg-white">
-      <div
-        v-if="showLoading"
-        class="flex min-h-72 items-center justify-center"
-      >
+    <div
+      class="flex w-full flex-col overflow-hidden rounded-xl border border-admin-border-soft bg-white"
+    >
+      <div v-if="showLoading" class="flex min-h-72 items-center justify-center">
         <AdminSpinner class="size-9 text-admin-accent" aria-label="加载账本健康状态" />
       </div>
 
@@ -72,11 +71,7 @@
           </div>
         </div>
 
-        <AdminAlert
-          v-if="resource.query.isError.value"
-          class="mx-6 mb-5"
-          severity="secondary"
-        >
+        <AdminAlert v-if="resource.query.isError.value" class="mx-6 mb-5" severity="secondary">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <span>状态刷新失败，当前显示上次加载的数据。</span>
             <AdminButton
@@ -114,10 +109,7 @@
           </div>
         </div>
 
-        <section
-          aria-label="最近检查"
-          class="border-t border-admin-border-soft px-6 py-4"
-        >
+        <section aria-label="最近检查" class="border-t border-admin-border-soft px-6 py-4">
           <h3 class="text-sm font-bold text-admin-title-color">最近检查</h3>
           <ul v-if="recentRuns.length > 0" class="mt-2 divide-y divide-admin-border-soft">
             <li
@@ -130,10 +122,10 @@
                 :severity="getRunStatusSeverity(run.status)"
                 rounded
               />
-              <span class="font-mono text-xs font-bold text-admin-text-1">
-                Run #{{ run.id }}
-              </span>
-              <span class="text-xs text-admin-text-3">{{ getReconciliationTriggerLabel(run) }}</span>
+              <span class="font-mono text-xs font-bold text-admin-text-1"> Run #{{ run.id }} </span>
+              <span class="text-xs text-admin-text-3">{{
+                getReconciliationTriggerLabel(run)
+              }}</span>
               <span class="min-w-0 flex-1 truncate text-xs text-admin-text-2">
                 {{ formatReconciliationRunResult(run) }}
               </span>
@@ -163,7 +155,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { CheckCircle, Clock, WarningTriangle, XmarkCircle } from '@iconoir/vue'
-import type { CreditReconciliationRun } from '../../../../shared/api/generated-query/model'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminBadge from '../../shared/components/AdminBadge.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
@@ -184,6 +175,7 @@ import AdminCreditFindingQueue from './AdminCreditFindingQueue.vue'
 import AdminCreditRunHistoryDialog from './AdminCreditRunHistoryDialog.vue'
 import { useAdminCreditHealthResource } from './resource'
 import { getCreditHealthPresentation } from './creditHealthPresentation'
+import type { AdminCreditRun } from './runHistoryResource'
 import {
   formatReconciliationRunDuration,
   formatReconciliationRunResult,
@@ -225,17 +217,17 @@ const facts = computed(() => {
 type RecentRunKind = 'active' | 'success' | 'failed'
 
 // 最近检查：进行中（如有）+ 最近成功 + 最近失败，一眼可及，无需打开检查记录。
-const recentRuns = computed<Array<{ kind: RecentRunKind; run: CreditReconciliationRun }>>(() => {
+const recentRuns = computed<Array<{ kind: RecentRunKind; run: AdminCreditRun }>>(() => {
   const value = health.value
   if (!value) return []
-  const runs: Array<{ kind: RecentRunKind; run: CreditReconciliationRun }> = []
+  const runs: Array<{ kind: RecentRunKind; run: AdminCreditRun }> = []
   if (value.active_run) runs.push({ kind: 'active', run: value.active_run })
   if (value.latest_successful_run) runs.push({ kind: 'success', run: value.latest_successful_run })
   if (value.latest_failed_run) runs.push({ kind: 'failed', run: value.latest_failed_run })
   return runs
 })
 
-function formatRecentRunTime(run: CreditReconciliationRun): string {
+function formatRecentRunTime(run: AdminCreditRun): string {
   return formatAdminDateTimeWithSeconds(run.completed_at ?? run.started_at ?? run.requested_at)
 }
 

@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { h } from 'vue'
 import { renderWithUser, screen } from '../../../../test/render'
-import {
-  AdminPopover,
-  AdminPopoverContent,
-  AdminPopoverTrigger,
-} from './adminPopoverAtoms'
+import { AdminPopover, AdminPopoverContent, AdminPopoverTrigger } from './adminPopoverAtoms'
 
 describe('AdminPopover', () => {
   it('renders content when open is true', async () => {
@@ -22,13 +18,9 @@ describe('AdminPopover', () => {
                 default: () => h('button', { type: 'button' }, 'Trigger'),
               },
             ),
-            h(
-              AdminPopoverContent,
-              null,
-              {
-                default: () => h('div', 'Popover Body Content'),
-              },
-            ),
+            h(AdminPopoverContent, null, {
+              default: () => h('div', 'Popover Body Content'),
+            }),
           ],
         },
       ),
@@ -51,13 +43,9 @@ describe('AdminPopover', () => {
                 default: () => h('button', { type: 'button' }, 'Trigger'),
               },
             ),
-            h(
-              AdminPopoverContent,
-              null,
-              {
-                default: () => h('div', 'Popover Body Content'),
-              },
-            ),
+            h(AdminPopoverContent, null, {
+              default: () => h('div', 'Popover Body Content'),
+            }),
           ],
         },
       ),

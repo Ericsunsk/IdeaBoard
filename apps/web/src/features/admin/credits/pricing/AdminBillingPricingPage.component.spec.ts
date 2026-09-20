@@ -25,6 +25,14 @@ describe('AdminBillingPricingPage', () => {
     toast.success.mockReset()
     toast.warning.mockReset()
     toast.error.mockReset()
+    useMswHandlers(
+      http.get('/api/admin/settings/ai-gateway/models', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: [] }),
+      ),
+      http.get('/api/admin/settings/ai-gateway/catalog', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: [] }),
+      ),
+    )
   })
   it('preserves the grid surface while the Catalog is loading', () => {
     useMswHandlers(
@@ -490,7 +498,7 @@ function renderPricingPage() {
   return renderWithUser(AdminBillingPricingPage, {
     global: {
       plugins: [[VueQueryPlugin, { queryClient }]],
-      stubs: { Refresh: true },
+      stubs: { Refresh: true, 'router-link': { template: '<a v-bind="$attrs"><slot /></a>' } },
     },
   })
 }

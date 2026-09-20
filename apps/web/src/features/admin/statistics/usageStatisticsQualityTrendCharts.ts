@@ -30,7 +30,9 @@ function qualitySeriesStyle(key: 'completed' | 'failed') {
   const metric = taskMetricDefinitions.find((item) => item.key === key)
   return {
     label: metric?.chartLabel ?? (key === 'completed' ? '成功率' : '失败率'),
-    color: metric?.chartColor ?? (key === 'completed' ? adminChartTheme.success : adminChartTheme.danger),
+    color:
+      metric?.chartColor ??
+      (key === 'completed' ? adminChartTheme.success : adminChartTheme.danger),
   }
 }
 
@@ -72,7 +74,9 @@ export function useUsageStatisticsQualityTrendCharts(options: {
         return {
           type: 'line' as const,
           label: style.label,
-          data: qualityTrendRows.value.map((item) => (isSuccess ? item.successRate : item.failureRate)),
+          data: qualityTrendRows.value.map((item) =>
+            isSuccess ? item.successRate : item.failureRate,
+          ),
           borderColor: style.color,
           backgroundColor: withAlpha(style.color, isSuccess ? 0.12 : 0.08),
           borderWidth: adminChartStrokeWidth,

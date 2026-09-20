@@ -49,7 +49,11 @@
           }}</span></template
         >
       </DataTableColumn>
-      <DataTableColumn field="status" :header="t('account.topUp.columnStatus')" :style="{ width: '190px' }">
+      <DataTableColumn
+        field="status"
+        :header="t('account.topUp.columnStatus')"
+        :style="{ width: '190px' }"
+      >
         <template #body="{ data }"
           ><Skeleton v-if="isSkeleton(data)" width="4rem" /><span
             v-else
@@ -81,11 +85,9 @@
           <p class="m-0 font-semibold text-ib-danger">
             {{ t('account.errors.historyLoadFailed') }}
           </p>
-          <Button
-            variant="ghost"
-            size="sm"
-            class="mt-3"
-            @click="emit('retry')">{{ t('account.reload') }}</Button>
+          <Button variant="ghost" size="sm" class="mt-3" @click="emit('retry')">{{
+            t('account.reload')
+          }}</Button>
         </div>
         <div
           v-else
@@ -111,10 +113,9 @@
           role="alert"
         >
           <span class="text-sm text-ib-danger">{{ t('account.topUp.loadMoreFailed') }}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            @click="emit('load-more')">{{ t('account.topUp.retryLoad') }}</Button>
+          <Button variant="ghost" size="sm" @click="emit('load-more')">{{
+            t('account.topUp.retryLoad')
+          }}</Button>
         </div>
         <div
           v-else-if="hasNextPage"
@@ -124,7 +125,9 @@
             variant="outline"
             size="sm"
             :loading="fetchingNextPage"
-            @click="emit('load-more')">{{ t('account.topUp.loadMore') }}</Button>
+            @click="emit('load-more')"
+            >{{ t('account.topUp.loadMore') }}</Button
+          >
         </div>
       </template>
     </DataTableFrame>

@@ -64,7 +64,9 @@
               class="size-4 shrink-0 text-admin-text-2"
             />
             <FastArrowRight v-else class="size-3.5 text-orange-500 shrink-0" />
-            <span class="truncate text-slate-700">{{ getTaskRowView(data).featureSlug || '-' }}</span>
+            <span class="truncate text-slate-700">{{
+              getTaskRowView(data).featureSlug || '-'
+            }}</span>
           </div>
         </template>
       </AdminColumn>
@@ -72,7 +74,10 @@
       <!-- 模型列：实际解析模型 -->
       <AdminColumn header="Model" :style="{ width: adminMonitorColumnWidths.model }">
         <template #body="{ data }">
-          <span class="truncate font-mono text-xs text-admin-text-1" :title="getTaskModelLabel(data) || '-'">
+          <span
+            class="truncate font-mono text-xs text-admin-text-1"
+            :title="getTaskModelLabel(data) || '-'"
+          >
             {{ getTaskModelLabel(data) || '-' }}
           </span>
         </template>
@@ -81,7 +86,10 @@
       <!-- 第 4 列：Message (事件 Prompt / 诊断内容，服务名前缀已由 Service 列承载) -->
       <AdminColumn header="Message" :style="{ width: adminMonitorColumnWidths.message }">
         <template #body="{ data }">
-          <div class="max-w-[160px] truncate font-mono text-xs text-slate-800" :title="data.prompt || '-'">
+          <div
+            class="max-w-[160px] truncate font-mono text-xs text-slate-800"
+            :title="data.prompt || '-'"
+          >
             {{ getTaskRowView(data).message || '-' }}
           </div>
         </template>
@@ -140,10 +148,10 @@
     </AdminTable>
 
     <!-- 表格底栏 (Card Footer)：灰底带上边框，左侧记录总数，右侧分页控制器 -->
-    <div class="flex items-center justify-between border-t border-admin-border-soft bg-admin-bg px-4 py-2.5">
-      <span class="text-xs font-normal text-admin-text-3">
-        共 {{ totalCount }} 条记录
-      </span>
+    <div
+      class="flex items-center justify-between border-t border-admin-border-soft bg-admin-bg px-4 py-2.5"
+    >
+      <span class="text-xs font-normal text-admin-text-3"> 共 {{ totalCount }} 条记录 </span>
 
       <div class="flex items-center gap-2">
         <AdminPagerControls

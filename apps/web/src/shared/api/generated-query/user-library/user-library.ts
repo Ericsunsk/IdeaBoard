@@ -113,8 +113,19 @@ export const createLibraryFolder = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseLibraryFolder>(getCreateLibraryFolderUrl(), {
     ...options,
@@ -195,8 +206,19 @@ export const renameLibraryFolder = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseLibraryFolder>(getRenameLibraryFolderUrl(folderId), {
     ...options,
@@ -436,8 +458,19 @@ export const saveLibraryAsset = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseLibraryAsset>(getSaveLibraryAssetUrl(), {
     ...options,
@@ -515,8 +548,19 @@ export const lookupLibraryAssets = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseLibraryAssetList>(getLookupLibraryAssetsUrl(), {
     ...options,
@@ -672,8 +716,19 @@ export const moveLibraryAsset = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseLibraryAsset>(getMoveLibraryAssetUrl(assetId), {
     ...options,

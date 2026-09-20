@@ -20,9 +20,7 @@
             </AdminButton>
           </div>
         </AdminAlert>
-        <AdminAlert v-else-if="loading" severity="secondary">
-          正在加载邮件配置…
-        </AdminAlert>
+        <AdminAlert v-else-if="loading" severity="secondary"> 正在加载邮件配置… </AdminAlert>
 
         <div class="grid gap-4 md:grid-cols-2">
           <AdminFormField label="发件人名称" for="admin-mail-from-name" required>

@@ -66,7 +66,7 @@
             <MoreHoriz class="size-[18px]" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent side="top" align="end">
           <DropdownMenuItem
             v-for="item in menuItems"
             :key="item.label"

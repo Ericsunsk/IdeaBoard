@@ -1,5 +1,4 @@
-export const adminSurfaceRootViewportClass =
-  'flex max-w-full min-w-0 flex-col gap-4 p-0'
+export const adminSurfaceRootViewportClass = 'flex max-w-full min-w-0 flex-col gap-4 p-0'
 
 export const adminSurfacePanelClass =
   'min-w-0 overflow-hidden rounded-ib-panel border border-ib-border-soft bg-ib-surface p-0'
@@ -40,8 +39,6 @@ export const adminSummaryGridClass = 'grid grid-cols-1 gap-3.5 md:grid-cols-2 xl
 export const adminChartGridClass = 'grid grid-cols-1 gap-3.5 xl:grid-cols-12'
 
 export const adminChartCanvasClass = 'h-full w-full min-w-0'
-
-
 
 export const adminToolbarMetricClass =
   'flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-admin-border bg-white px-3 py-1.5 text-admin-body font-bold text-admin-text-1 shadow-[0_2px_8px_rgba(45,64,89,0.02)]'

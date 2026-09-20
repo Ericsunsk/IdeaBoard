@@ -20,7 +20,9 @@
           <!-- 当前选中的模型名称 / 标识 -->
           <span v-if="currentModel" class="truncate font-semibold text-admin-text-1">
             {{ currentModel.name }}
-            <span class="font-normal text-admin-text-3 font-mono text-[11px]">({{ currentModel.id }})</span>
+            <span class="font-normal text-admin-text-3 font-mono text-[11px]"
+              >({{ currentModel.id }})</span
+            >
           </span>
           <span v-else-if="modelValue" class="truncate font-mono text-[11px] text-admin-text-1">
             {{ modelValue }}
@@ -67,14 +69,16 @@
           @click="selectModel(model.id)"
         >
           <div class="flex min-w-0 items-center gap-2">
-          <div
-            class="flex size-5 shrink-0 items-center justify-center rounded-md bg-admin-accent/10 text-admin-accent"
-          >
-            <Cube class="size-3" />
-          </div>
+            <div
+              class="flex size-5 shrink-0 items-center justify-center rounded-md bg-admin-accent/10 text-admin-accent"
+            >
+              <Cube class="size-3" />
+            </div>
             <div class="flex min-w-0 flex-col">
               <span class="truncate text-admin-title-color font-medium">{{ model.name }}</span>
-              <span class="truncate font-mono text-[10px] text-admin-text-3">{{ model.id }} · {{ model.provider }}</span>
+              <span class="truncate font-mono text-[10px] text-admin-text-3"
+                >{{ model.id }} · {{ model.provider }}</span
+              >
             </div>
           </div>
 
@@ -98,11 +102,17 @@
         >
           <div class="flex min-w-0 items-center gap-2">
             <Plus class="size-3.5 text-admin-accent shrink-0" />
-            <span class="truncate">使用自定义模型: <strong class="font-mono font-semibold">{{ searchKeyword.trim() }}</strong></span>
+            <span class="truncate"
+              >使用自定义模型:
+              <strong class="font-mono font-semibold">{{ searchKeyword.trim() }}</strong></span
+            >
           </div>
         </button>
 
-        <div v-if="filteredModels.length === 0 && !showCustomOption" class="py-4 text-center text-xs text-admin-text-3">
+        <div
+          v-if="filteredModels.length === 0 && !showCustomOption"
+          class="py-4 text-center text-xs text-admin-text-3"
+        >
           {{ allowCustom ? '未找到匹配的模型' : '未找到匹配的模型，请前往「模型管理」先入库' }}
         </div>
       </div>

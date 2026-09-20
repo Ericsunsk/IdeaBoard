@@ -1,11 +1,6 @@
 <template>
   <div
-    :class="
-      cn(
-        'rounded-xl border border-border bg-card text-card-foreground shadow',
-        props.class,
-      )
-    "
+    :class="cn('rounded-xl border border-border bg-card text-card-foreground shadow', props.class)"
   >
     <slot />
   </div>

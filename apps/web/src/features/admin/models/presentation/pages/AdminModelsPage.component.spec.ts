@@ -77,6 +77,17 @@ describe('AdminModelsPage', () => {
           },
         })
       }),
+      http.get('/api/admin/settings/ai-gateway/providers', () =>
+        HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: [
+            { slug: 'fal', display_name: 'Fal AI', id_prefix: 'fal_ai/' },
+            { slug: 'openai', display_name: 'OpenAI', id_prefix: 'openai/' },
+            { slug: 'google-vertex-ai', display_name: 'Google Vertex AI', id_prefix: 'vertex_ai/' },
+          ],
+        }),
+      ),
     )
   })
 
@@ -169,7 +180,10 @@ describe('AdminModelsPage', () => {
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: '添加模型' })).toBeInTheDocument()
     await waitFor(() => expect(dialog.textContent).toMatch(/Claude/))
-    console.log('CLAUDE-HTML:', JSON.stringify(dialog.innerHTML?.match(/.{0,400}Claude Image V1.{0,200}/s)?.[0]))
+    console.log(
+      'CLAUDE-HTML:',
+      JSON.stringify(dialog.innerHTML?.match(/.{0,400}Claude Image V1.{0,200}/s)?.[0]),
+    )
 
     // 自动探测出模型并展示（行内文本经 Portal 渲染，用角色查询代替文本匹配）
     const claudeCheckbox = await within(dialog).findByRole('checkbox', {
@@ -265,6 +279,7 @@ function renderModelsPage() {
   return renderWithUser(AdminModelsPage, {
     global: {
       plugins: [[VueQueryPlugin, { queryClient }]],
+      stubs: { 'router-link': { template: '<a v-bind="$attrs"><slot /></a>' } },
     },
   })
 }

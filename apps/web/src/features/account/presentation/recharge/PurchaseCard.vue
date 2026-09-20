@@ -21,11 +21,9 @@
         {{ t('account.errors.optionsLoadFailed') }}
       </p>
       <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(error) }}</p>
-      <Button
-        variant="ghost"
-        size="sm"
-        class="mt-3"
-        @click="emit('retry')">{{ t('account.reload') }}</Button>
+      <Button variant="ghost" size="sm" class="mt-3" @click="emit('retry')">{{
+        t('account.reload')
+      }}</Button>
     </div>
 
     <div
@@ -107,7 +105,9 @@
           type="submit"
           :disabled="!canCheckout"
           :loading="checkoutPending"
-          :class="accountPrimaryActionButtonClass">{{ t('account.topUp.payNow') }}</Button>
+          :class="accountPrimaryActionButtonClass"
+          >{{ t('account.topUp.payNow') }}</Button
+        >
         <p class="mt-2 mb-0 text-center text-[12px] leading-5 text-ib-text-subtle">
           {{ t('account.topUp.termsPrefix') }}
           <a

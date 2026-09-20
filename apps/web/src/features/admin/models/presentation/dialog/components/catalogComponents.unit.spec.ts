@@ -20,9 +20,7 @@ describe('AdminModelEditDialog subcomponents', () => {
           modelDescription: 'Test desc',
           isEditing: false,
           idPrefixOptions: ['fal_ai/'],
-          providerOptions: [
-            { slug: 'fal', display_name: 'Fal AI', id_prefix: 'fal_ai/' },
-          ],
+          providerOptions: [{ slug: 'fal', display_name: 'Fal AI', id_prefix: 'fal_ai/' }],
           'onUpdate:modelId': onUpdateId,
         },
       })

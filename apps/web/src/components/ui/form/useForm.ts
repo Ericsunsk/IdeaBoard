@@ -1,12 +1,4 @@
-import {
-  computed,
-  getCurrentInstance,
-  provide,
-  reactive,
-  ref,
-  unref,
-  type Ref,
-} from 'vue'
+import { computed, getCurrentInstance, provide, reactive, ref, unref, type Ref } from 'vue'
 import * as v from 'valibot'
 import { FORM_CONTEXT_KEY, type FormContext } from './context'
 
@@ -32,7 +24,9 @@ interface StandardSchema {
 
 function isStandardSchema(schema: unknown): schema is StandardSchema {
   if (!schema || typeof schema !== 'object') return false
-  return '~standard' in schema && typeof (schema as StandardSchema)['~standard']?.validate === 'function'
+  return (
+    '~standard' in schema && typeof (schema as StandardSchema)['~standard']?.validate === 'function'
+  )
 }
 
 function parseStandardIssues(issues?: readonly StandardSchemaIssue[]): Record<string, string> {
@@ -61,7 +55,10 @@ async function extractStandardSchemaIssues(
   return parseStandardIssues(issues)
 }
 
-async function extractValibotDirectIssues(schema: unknown, data: unknown): Promise<Record<string, string>> {
+async function extractValibotDirectIssues(
+  schema: unknown,
+  data: unknown,
+): Promise<Record<string, string>> {
   const errors: Record<string, string> = {}
   try {
     const result = await v.safeParseAsync(schema as v.GenericSchema, data)
@@ -119,7 +116,9 @@ export function areFormValuesEqual(a: unknown, b: unknown): boolean {
   if (keysA.length !== keysB.length) return false
   for (const key of keysA) {
     if (!Object.prototype.hasOwnProperty.call(b, key)) return false
-    if (!areFormValuesEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])) {
+    if (
+      !areFormValuesEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])
+    ) {
       return false
     }
   }

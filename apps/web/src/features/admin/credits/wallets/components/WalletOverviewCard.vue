@@ -7,7 +7,9 @@
       <!-- 核心余额与状态 -->
       <div class="flex flex-wrap items-center gap-6 sm:gap-8">
         <div class="flex flex-col gap-0.5">
-          <span class="text-admin-caption font-semibold text-admin-text-3"> {{ t('admin.wallet.accountBalance') }} </span>
+          <span class="text-admin-caption font-semibold text-admin-text-3">
+            {{ t('admin.wallet.accountBalance') }}
+          </span>
           <div class="flex items-baseline gap-2">
             <span
               class="text-2xl font-black tracking-tight text-admin-title-color font-mono tabular-nums"
@@ -26,7 +28,9 @@
         <div class="hidden h-9 w-px bg-admin-border-soft sm:block" />
 
         <div class="flex flex-col gap-0.5">
-          <span class="text-admin-caption font-semibold text-admin-text-3"> {{ t('admin.wallet.accountStatus') }} </span>
+          <span class="text-admin-caption font-semibold text-admin-text-3">
+            {{ t('admin.wallet.accountStatus') }}
+          </span>
           <div class="flex items-center gap-1.5 pt-0.5">
             <AdminStatusPill :label="accountStatus" :variant="accountStatusVariant" />
           </div>
@@ -69,7 +73,9 @@
     >
       <WarningTriangle class="size-4 shrink-0 text-admin-warning mt-0.5" />
       <div class="flex flex-col gap-1">
-        <span class="font-bold text-admin-warning">{{ t('admin.wallet.activeRestrictionsNotice') }}</span>
+        <span class="font-bold text-admin-warning">{{
+          t('admin.wallet.activeRestrictionsNotice')
+        }}</span>
         <ul class="space-y-0.5 pl-4 text-admin-text-2 list-disc">
           <li v-for="restriction in activeRestrictions" :key="restriction.restriction_id">
             <span class="font-semibold text-admin-title-color"

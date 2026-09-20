@@ -6,5 +6,5 @@
  */
 
 export type UploadUserBoardAssetBody = {
-  file: Blob
+  file: Blob | File
 }

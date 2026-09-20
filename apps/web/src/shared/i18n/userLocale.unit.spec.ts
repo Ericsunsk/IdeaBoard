@@ -263,5 +263,4 @@ describe('User Locale Infrastructure (Milestone 1)', () => {
       expect(localStorage.getItem(USER_LOCALE_STORAGE_KEY)).toBe('ko')
     })
   })
-
 })

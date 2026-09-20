@@ -23,13 +23,12 @@
       <p :class="catalogClasses.pageSubtitle">{{ t('workspace.boards.subtitle') }}</p>
 
       <section :class="catalogClasses.toolbar">
-        <Button
-          type="button"
-          :class="catalogClasses.createButton"
-          @click="createAndOpenBoard">{{ t('workspace.boards.newCanvas') }}</Button>
+        <Button type="button" :class="catalogClasses.createButton" @click="createAndOpenBoard">{{
+          t('workspace.boards.newCanvas')
+        }}</Button>
         <label :class="catalogClasses.searchWrap">
           <Search :class="catalogClasses.searchIcon" />
-      <input
+          <input
             :value="searchKeyword"
             type="text"
             :placeholder="t('workspace.boards.searchPlaceholder')"
@@ -75,9 +74,13 @@
           type="button"
           :disabled="isCatalogReloadPending"
           :class="catalogClasses.recoveryButton"
-          @click="reloadCatalog">{{ isCatalogReloadPending
+          @click="reloadCatalog"
+          >{{
+            isCatalogReloadPending
               ? t('workspace.catalog.reloading')
-              : t('workspace.catalog.reload') }}</Button>
+              : t('workspace.catalog.reload')
+          }}</Button
+        >
       </div>
 
       <section v-if="isBoardsLoading" :class="catalogClasses.loadingState" aria-live="polite">
@@ -85,11 +88,7 @@
       </section>
 
       <section v-else :class="catalogClasses.boardsGrid">
-        <button
-          type="button"
-          :class="catalogClasses.createCard"
-          @click="createAndOpenBoard"
-        >
+        <button type="button" :class="catalogClasses.createCard" @click="createAndOpenBoard">
           <div :class="catalogClasses.createPreview">
             <div :class="catalogClasses.createPreviewIcon" aria-hidden="true"></div>
           </div>
@@ -170,12 +169,20 @@
                   type="button"
                   :disabled="isDeletePending"
                   :class="catalogClasses.deleteCancelButton"
-                  @click="closeDeleteDialogView">{{ t('common.actions.cancel') }}</Button>
+                  @click="closeDeleteDialogView"
+                  >{{ t('common.actions.cancel') }}</Button
+                >
                 <Button
                   type="button"
                   :disabled="isDeletePending"
                   :class="catalogClasses.deleteConfirmButton"
-                  @click="confirmDelete">{{ isDeletePending ? t('workspace.deleteDialog.deleting') : t('common.actions.delete') }}</Button>
+                  @click="confirmDelete"
+                  >{{
+                    isDeletePending
+                      ? t('workspace.deleteDialog.deleting')
+                      : t('common.actions.delete')
+                  }}</Button
+                >
               </div>
             </div>
           </div>
@@ -190,11 +197,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import BoardCard from './BoardCard.vue'
-import {
-  catalogClasses,
-  catalogDeleteDialogContentClass,
-  catalogDeleteDialogStyle,
-} from './skin'
+import { catalogClasses, catalogDeleteDialogContentClass, catalogDeleteDialogStyle } from './skin'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
 import { useOverlayInteractionLifecycle } from '../../../../shared/composables/useOverlayInteractionLifecycle'
 import { HOME_PATH, USER_CANVAS_PATH } from '../../../../shared/constants/routePaths'

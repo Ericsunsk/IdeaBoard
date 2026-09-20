@@ -20,13 +20,7 @@ import { computed, type HTMLAttributes } from 'vue'
 import { cn } from '@/lib/utils'
 
 export type AdminAlertSeverity =
-  | 'info'
-  | 'success'
-  | 'warn'
-  | 'warning'
-  | 'error'
-  | 'danger'
-  | 'secondary'
+  'info' | 'success' | 'warn' | 'warning' | 'error' | 'danger' | 'secondary'
 
 const props = withDefaults(
   defineProps<{

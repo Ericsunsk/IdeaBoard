@@ -131,8 +131,19 @@ export const updateAdminRegistrationSetting = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseRegistrationSetting>(getUpdateAdminRegistrationSettingUrl(), {
     ...options,
@@ -293,8 +304,19 @@ export const updateAdminBrandingSetting = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseBrandingSetting>(getUpdateAdminBrandingSettingUrl(), {
     ...options,
@@ -448,8 +470,19 @@ export const updateAdminMediaUploadSetting = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseMediaUploadSetting>(getUpdateAdminMediaUploadSettingUrl(), {
     ...options,
@@ -603,8 +636,19 @@ export const updateAdminRateLimitSettings = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseRateLimitSetting>(getUpdateAdminRateLimitSettingsUrl(), {
     ...options,
@@ -757,8 +801,19 @@ export const updateAdminOutboundPolicy = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseOutboundPolicySetting>(getUpdateAdminOutboundPolicyUrl(), {
     ...options,
@@ -916,8 +971,19 @@ export const updateAdminAIGatewayConfig = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseBase>(getUpdateAdminAIGatewayConfigUrl(), {
     ...options,
@@ -1076,8 +1142,19 @@ export const saveAdminGatewayModelMapping = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseBase>(getSaveAdminGatewayModelMappingUrl(feature), {
     ...options,
@@ -1251,8 +1328,19 @@ export const saveAdminGatewayModelCatalog = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseBase>(getSaveAdminGatewayModelCatalogUrl(), {
     ...options,
@@ -1351,8 +1439,19 @@ export const previewAdminGatewayRoute = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseGatewayRoutePreview>(getPreviewAdminGatewayRouteUrl(), {
     ...options,
@@ -1444,8 +1543,19 @@ export const testAdminGatewayConnection = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseGatewayConnectionTest>(getTestAdminGatewayConnectionUrl(), {
     ...options,

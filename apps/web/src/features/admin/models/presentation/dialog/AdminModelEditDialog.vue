@@ -56,11 +56,7 @@
       >
         取消
       </AdminButton>
-      <AdminButton
-        :class="adminActionButtonClass"
-        :loading="pending"
-        @click="handleSubmit"
-      >
+      <AdminButton :class="adminActionButtonClass" :loading="pending" @click="handleSubmit">
         {{ isEditing ? '保存修改' : '确认新增' }}
       </AdminButton>
     </template>
@@ -73,7 +69,10 @@ import { watchDebounced } from '@vueuse/core'
 import AdminButton from '../../../shared/components/AdminButton.vue'
 import AdminDialogShell from '../../../shared/components/AdminDialogShell.vue'
 import { adminActionButtonClass } from '../../../shared/lib/uiClasses'
-import { createAdminGatewayResource, type GatewayProviderOption } from '../../infrastructure/adminGatewayResource'
+import {
+  createAdminGatewayResource,
+  type GatewayProviderOption,
+} from '../../infrastructure/adminGatewayResource'
 import { type AdminModelItem } from '../../domain/catalogData'
 import {
   blankModelForm,
@@ -84,7 +83,9 @@ import {
 import CatalogIdentityPanel from './components/CatalogIdentityPanel.vue'
 import CatalogSpecsPanel from './components/CatalogSpecsPanel.vue'
 import CatalogGatewayPanel from './components/CatalogGatewayPanel.vue'
-import CatalogPreviewCard, { type GatewayRoutePreviewState } from './components/CatalogPreviewCard.vue'
+import CatalogPreviewCard, {
+  type GatewayRoutePreviewState,
+} from './components/CatalogPreviewCard.vue'
 
 const props = defineProps<{
   visible: boolean
@@ -230,6 +231,12 @@ function handleSubmit() {
     return
   }
 
-  emit('submit', finalizeModelSubmit({ ...form.value, descriptionEnriched: false }, splitCapabilities(capabilitiesDraft.value)))
+  emit(
+    'submit',
+    finalizeModelSubmit(
+      { ...form.value, descriptionEnriched: false },
+      splitCapabilities(capabilitiesDraft.value),
+    ),
+  )
 }
 </script>

@@ -28,7 +28,9 @@ describe('useUsageStatisticsCharts', () => {
     expect(charts.todaySuccessRate.value).toBe('0.0%')
     expect(charts.todaySuccessRateFoot.value).toBe('昨日无可比数据')
     expect(charts.monthCallsFoot.value).toBe('累计无调用')
-    expect(readDataset(charts.qualityTrendChartData.value, 'Success').data).toEqual(Array(7).fill(0))
+    expect(readDataset(charts.qualityTrendChartData.value, 'Success').data).toEqual(
+      Array(7).fill(0),
+    )
     expect(charts.bottleneckSourceChartData.value.labels).toEqual([])
   })
 

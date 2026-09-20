@@ -33,7 +33,9 @@
         position="popper"
         :side-offset="4"
       >
-        <SelectViewport class="p-1.5 h-[var(--reka-select-trigger-height)] w-full min-w-[var(--reka-select-trigger-width)]">
+        <SelectViewport
+          class="p-1.5 h-[var(--reka-select-trigger-height)] w-full min-w-[var(--reka-select-trigger-width)]"
+        >
           <slot>
             <SelectItem
               v-for="opt in normalizedOptions"
@@ -125,7 +127,9 @@ const normalizedOptions = computed(() => {
 })
 
 const selectedLabel = computed(() => {
-  const current = normalizedOptions.value.find((opt) => String(opt.value) === String(props.modelValue))
+  const current = normalizedOptions.value.find(
+    (opt) => String(opt.value) === String(props.modelValue),
+  )
   return current ? current.label : undefined
 })
 

@@ -20,11 +20,23 @@ describe('AdminPromptConfigPage', () => {
     toast.warning.mockReset()
     toast.error.mockReset()
     storedPrompts = [
-      { feature_slug: 'render', prompt: 'Masterpiece, best quality, {{prompt}}', updated_at: '2026-03-30T00:00:00Z' },
+      {
+        feature_slug: 'render',
+        prompt: 'Masterpiece, best quality, {{prompt}}',
+        updated_at: '2026-03-30T00:00:00Z',
+      },
       { feature_slug: 'variations', prompt: '', updated_at: '2026-03-30T00:00:00Z' },
-      { feature_slug: 'inpaint', prompt: 'Inpaint prompt: {{prompt}}', updated_at: '2026-03-30T00:00:00Z' },
+      {
+        feature_slug: 'inpaint',
+        prompt: 'Inpaint prompt: {{prompt}}',
+        updated_at: '2026-03-30T00:00:00Z',
+      },
       { feature_slug: 'outpaint', prompt: '', updated_at: '2026-03-30T00:00:00Z' },
-      { feature_slug: 'generation', prompt: 'Generate creative prompt: {{input}}', updated_at: '2026-03-30T00:00:00Z' },
+      {
+        feature_slug: 'generation',
+        prompt: 'Generate creative prompt: {{input}}',
+        updated_at: '2026-03-30T00:00:00Z',
+      },
       { feature_slug: 'fusion', prompt: '', updated_at: '2026-03-30T00:00:00Z' },
     ]
 
@@ -43,7 +55,11 @@ describe('AdminPromptConfigPage', () => {
         if (existing) {
           existing.prompt = body.prompt
         } else {
-          storedPrompts.push({ feature_slug: slug, prompt: body.prompt, updated_at: new Date().toISOString() })
+          storedPrompts.push({
+            feature_slug: slug,
+            prompt: body.prompt,
+            updated_at: new Date().toISOString(),
+          })
         }
         return HttpResponse.json({
           code: 0,

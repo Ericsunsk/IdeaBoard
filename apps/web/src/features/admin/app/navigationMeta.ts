@@ -11,13 +11,7 @@ import {
 export const ADMIN_DEFAULT_PATH = ADMIN_STATISTICS_PATH
 
 export type AdminNavigationKey =
-  | 'users'
-  | 'credits'
-  | 'statistics'
-  | 'monitor'
-  | 'models'
-  | 'feature-prompts'
-  | 'settings'
+  'users' | 'credits' | 'statistics' | 'monitor' | 'models' | 'feature-prompts' | 'settings'
 
 export type AdminNavigationRouteDef = {
   key: AdminNavigationKey

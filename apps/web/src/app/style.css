@@ -48,6 +48,7 @@
   --color-admin-preview-bg: #f5f5f5;
   --color-admin-divider: rgba(0, 0, 0, 0.08);
   --color-admin-success: #2f9e73;
+  --color-admin-success-strong: #176b4a;
   --color-admin-success-soft: rgba(47, 158, 115, 0.12);
   --color-admin-warning: #d48830;
   --color-admin-warning-soft: rgba(212, 136, 48, 0.12);
@@ -488,7 +489,9 @@
   opacity: 0;
 }
 
-[data-sonner-toaster].ideaboard-toaster [data-sonner-toast].ideaboard-toast [data-close-button]:focus-visible {
+[data-sonner-toaster].ideaboard-toaster
+  [data-sonner-toast].ideaboard-toast
+  [data-close-button]:focus-visible {
   opacity: 1;
 }
 

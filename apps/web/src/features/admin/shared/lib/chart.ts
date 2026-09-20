@@ -19,8 +19,7 @@ const adminChartBubbleFillOpacity = 0.3
 const adminChartBubbleRadiusMin = 5
 const adminChartBubbleRadiusMax = 18
 const adminChartBubbleHoverRadiusOffset = 2
-const adminChartBubbleClipPadding =
-  adminChartBubbleRadiusMax + adminChartBubbleHoverRadiusOffset
+const adminChartBubbleClipPadding = adminChartBubbleRadiusMax + adminChartBubbleHoverRadiusOffset
 
 const adminChartFontFamily = chartFontFamilyStack
 
@@ -166,7 +165,6 @@ export function defineAdminChartPointClipStyle() {
     clip: adminChartPointClipPadding,
   }
 }
-
 
 export function defineAdminChartBubblePointStyle(color: string | string[]) {
   return {

@@ -89,7 +89,8 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     counts: {
       'raw-color': 5,
     },
-    reason: 'Task metric pill/chart palette is a domain visual contract shared by monitor pills and charts.',
+    reason:
+      'Task metric pill/chart palette is a domain visual contract shared by monitor pills and charts.',
   },
   'src/features/admin/app/AdminSidebar.vue': {
     counts: {
@@ -114,7 +115,8 @@ const selectorCountRules = [
   {
     id: 'legacy-primevue-selector',
     pattern: /\.p-[a-z][\w-]*/g,
-    message: 'Legacy PrimeVue internal selector (.p-*) is strictly forbidden after migrating to shadcn/Reka UI.',
+    message:
+      'Legacy PrimeVue internal selector (.p-*) is strictly forbidden after migrating to shadcn/Reka UI.',
   },
   {
     id: 'vue-flow-internal-selector',

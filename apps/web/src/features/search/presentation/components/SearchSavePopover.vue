@@ -8,83 +8,83 @@
       :side-offset="4"
     >
       <div class="w-48 select-none text-board-page-text" @click.stop>
-      <div class="flex items-center gap-2 px-2 py-1.5">
-        <Search class="size-3.5 shrink-0 text-board-page-text-muted" aria-hidden="true" />
-        <input
-          ref="searchInputRef"
-          v-model="searchQuery"
-          type="text"
-          :placeholder="t('search.savePopover.searchPlaceholder')"
-          :aria-label="t('search.savePopover.searchAria')"
-          class="w-full bg-transparent text-xs font-normal text-board-page-text placeholder:text-board-page-text-muted outline-none"
-          @keydown.enter.prevent="handleEnterCreate"
-        />
-      </div>
-
-      <div v-if="folderFactsReady && canCreateFromQuery" class="my-0.5 px-1">
-        <button
-          type="button"
-          class="flex w-full cursor-pointer items-center justify-between rounded-lg border-none bg-board-primary/10 px-2 py-1.5 text-xs font-medium text-board-primary transition hover:bg-board-primary/20"
-          :disabled="saving || !folderFactsReady"
-          @click="handleEnterCreate"
-        >
-          <span class="truncate">{{
-            t('search.savePopover.createNamedFolder', { name: searchQuery.trim() })
-          }}</span>
-          <span class="font-mono text-[10px] text-board-primary">↵</span>
-        </button>
-      </div>
-
-      <div class="app-scrollbar max-h-48 space-y-0.5 overflow-y-auto pt-1">
-        <div
-          v-if="
-            folderFactsReady &&
-            !showQuickSaves &&
-            filteredFolders.length === 0 &&
-            !canCreateFromQuery
-          "
-          class="py-2.5 text-center text-xs text-board-page-text-muted"
-        >
-          {{ t('search.savePopover.noMatchingFolders') }}
+        <div class="flex items-center gap-2 px-2 py-1.5">
+          <Search class="size-3.5 shrink-0 text-board-page-text-muted" aria-hidden="true" />
+          <input
+            ref="searchInputRef"
+            v-model="searchQuery"
+            type="text"
+            :placeholder="t('search.savePopover.searchPlaceholder')"
+            :aria-label="t('search.savePopover.searchAria')"
+            class="w-full bg-transparent text-xs font-normal text-board-page-text placeholder:text-board-page-text-muted outline-none"
+            @keydown.enter.prevent="handleEnterCreate"
+          />
         </div>
 
-        <button
-          v-if="showQuickSaves"
-          type="button"
-          class="group/fitem flex w-full cursor-pointer items-center justify-between rounded-lg border-none bg-transparent px-2.5 py-1.5 text-left text-xs text-board-page-text transition hover:bg-ib-surface-hover hover:text-board-primary disabled:opacity-50"
-          :disabled="saving || !folderFactsReady"
-          @click="saveTo()"
-        >
-          <div class="flex min-w-0 items-center gap-2">
-            <Bookmark class="size-3.5 shrink-0 text-board-primary" aria-hidden="true" />
-            <span class="truncate font-medium">{{ t('search.savePopover.quickSaves') }}</span>
-          </div>
-          <span class="shrink-0 font-sans text-[11px] text-board-page-text-muted">{{
-            quickSavesCount
-          }}</span>
-        </button>
+        <div v-if="folderFactsReady && canCreateFromQuery" class="my-0.5 px-1">
+          <button
+            type="button"
+            class="flex w-full cursor-pointer items-center justify-between rounded-lg border-none bg-board-primary/10 px-2 py-1.5 text-xs font-medium text-board-primary transition hover:bg-board-primary/20"
+            :disabled="saving || !folderFactsReady"
+            @click="handleEnterCreate"
+          >
+            <span class="truncate">{{
+              t('search.savePopover.createNamedFolder', { name: searchQuery.trim() })
+            }}</span>
+            <span class="font-mono text-[10px] text-board-primary">↵</span>
+          </button>
+        </div>
 
-        <button
-          v-for="folder in filteredFolders"
-          :key="folder.id"
-          type="button"
-          class="group/fitem flex w-full cursor-pointer items-center justify-between rounded-lg border-none bg-transparent px-2.5 py-1.5 text-left text-xs text-board-page-text transition hover:bg-ib-surface-hover hover:text-board-primary disabled:opacity-50"
-          :disabled="saving || !folderFactsReady"
-          @click="saveTo(folder.id)"
-        >
-          <div class="flex min-w-0 items-center gap-2">
-            <Folder
-              class="size-3.5 shrink-0 text-board-page-text-muted transition-colors group-hover/fitem:text-board-primary"
-              aria-hidden="true"
-            />
-            <span class="truncate font-medium">{{ folder.name }}</span>
+        <div class="app-scrollbar max-h-48 space-y-0.5 overflow-y-auto pt-1">
+          <div
+            v-if="
+              folderFactsReady &&
+              !showQuickSaves &&
+              filteredFolders.length === 0 &&
+              !canCreateFromQuery
+            "
+            class="py-2.5 text-center text-xs text-board-page-text-muted"
+          >
+            {{ t('search.savePopover.noMatchingFolders') }}
           </div>
-          <span class="shrink-0 font-sans text-[11px] text-board-page-text-muted">{{
-            folder.asset_count
-          }}</span>
-        </button>
+
+          <button
+            v-if="showQuickSaves"
+            type="button"
+            class="group/fitem flex w-full cursor-pointer items-center justify-between rounded-lg border-none bg-transparent px-2.5 py-1.5 text-left text-xs text-board-page-text transition hover:bg-ib-surface-hover hover:text-board-primary disabled:opacity-50"
+            :disabled="saving || !folderFactsReady"
+            @click="saveTo()"
+          >
+            <div class="flex min-w-0 items-center gap-2">
+              <Bookmark class="size-3.5 shrink-0 text-board-primary" aria-hidden="true" />
+              <span class="truncate font-medium">{{ t('search.savePopover.quickSaves') }}</span>
+            </div>
+            <span class="shrink-0 font-sans text-[11px] text-board-page-text-muted">{{
+              quickSavesCount
+            }}</span>
+          </button>
+
+          <button
+            v-for="folder in filteredFolders"
+            :key="folder.id"
+            type="button"
+            class="group/fitem flex w-full cursor-pointer items-center justify-between rounded-lg border-none bg-transparent px-2.5 py-1.5 text-left text-xs text-board-page-text transition hover:bg-ib-surface-hover hover:text-board-primary disabled:opacity-50"
+            :disabled="saving || !folderFactsReady"
+            @click="saveTo(folder.id)"
+          >
+            <div class="flex min-w-0 items-center gap-2">
+              <Folder
+                class="size-3.5 shrink-0 text-board-page-text-muted transition-colors group-hover/fitem:text-board-primary"
+                aria-hidden="true"
+              />
+              <span class="truncate font-medium">{{ folder.name }}</span>
+            </div>
+            <span class="shrink-0 font-sans text-[11px] text-board-page-text-muted">{{
+              folder.asset_count
+            }}</span>
+          </button>
+        </div>
       </div>
-    </div>
     </PopoverContent>
   </Popover>
 </template>

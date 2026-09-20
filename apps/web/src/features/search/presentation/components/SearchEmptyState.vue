@@ -43,9 +43,7 @@
       </div>
 
       <h3 class="m-0 text-base font-semibold text-board-page-text tracking-tight">
-        {{
-          hasActiveSearch ? t('search.empty.noResultsTitle') : t('search.empty.emptyFeedTitle')
-        }}
+        {{ hasActiveSearch ? t('search.empty.noResultsTitle') : t('search.empty.emptyFeedTitle') }}
       </h3>
 
       <p class="mt-2 mb-0 text-xs sm:text-[13px] text-board-page-text-muted leading-relaxed">

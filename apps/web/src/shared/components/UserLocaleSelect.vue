@@ -23,6 +23,7 @@
     </DropdownMenuTrigger>
     <DropdownMenuContent
       align="end"
+      :side-offset="appOverlayMenuSideOffset"
       :class="menuContentClass"
       @pointer-down-outside="handlePointerDownOutside"
     >
@@ -31,7 +32,8 @@
         :key="item.value"
         :class="[
           menuItemClass,
-          item.value === activeLocale && 'bg-ib-surface-hover text-[var(--app-overlay-menu-item-hover-color,var(--color-ib-text))] font-medium',
+          item.value === activeLocale &&
+            'bg-ib-surface-hover text-[var(--app-overlay-menu-item-hover-color,var(--color-ib-text))] font-medium',
         ]"
         :data-control-state="item.value === activeLocale ? 'active' : 'idle'"
         :aria-current="item.value === activeLocale ? 'true' : undefined"
@@ -56,7 +58,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { createPageChromeAccountRoundControlClass } from '../lib/pageChrome'
-import { appOverlayMenuItemClass } from '../theme/appOverlayMenu'
+import { appOverlayMenuItemClass, appOverlayMenuSideOffset } from '../theme/appOverlayMenu'
 import { getActiveUserLocale, setUserLocale, type SupportedLocale } from '../i18n/userLocale'
 import { LOCALE_MANIFEST } from '../i18n/localeManifest'
 import { useMenuTriggerFocusRestore } from '../composables/useMenuTriggerFocusRestore'
@@ -109,8 +111,7 @@ function handleMenuSelect(item: LocaleItem) {
 }
 
 const triggerRef = useTemplateRef('triggerRef')
-const { handleMenuOpenUpdate, handlePointerDownOutside } =
-  useMenuTriggerFocusRestore(triggerRef)
+const { handleMenuOpenUpdate, handlePointerDownOutside } = useMenuTriggerFocusRestore(triggerRef)
 
 async function handleLocaleChange(newLocale: SupportedLocale) {
   if (!newLocale || newLocale === activeLocale.value || isSwitching.value) return

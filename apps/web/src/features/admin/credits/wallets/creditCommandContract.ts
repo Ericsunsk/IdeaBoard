@@ -58,7 +58,6 @@ export function validateAdminCreditCommand(
   }
 }
 
-
 export function isRefundableCharge(transaction: {
   command_type: string
   charge?: { remaining_refundable_credits?: number | null } | null

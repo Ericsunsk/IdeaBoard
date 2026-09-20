@@ -21,12 +21,12 @@ import type {
 import type { UpdateGatewayConfigRequest } from '../../../../shared/api/generated-query/model/updateGatewayConfigRequest'
 import { resolveApiData, resolveApiOk } from '../../../../shared/api/apiResponse'
 import type { AdminModelItem } from '../domain/catalogData'
-import {
-  MODEL_HOSTING_CLOUDFLARE,
-  MODEL_HOSTING_THIRD_PARTY,
-} from '../domain/catalogData'
+import { MODEL_HOSTING_CLOUDFLARE, MODEL_HOSTING_THIRD_PARTY } from '../domain/catalogData'
 
-export type { DetectedGatewayModel, GatewayProviderOption } from '../../../../shared/api/generated-query/model'
+export type {
+  DetectedGatewayModel,
+  GatewayProviderOption,
+} from '../../../../shared/api/generated-query/model'
 
 export type GatewayConnectionSummary = GatewayConfigSummary
 
@@ -99,7 +99,10 @@ function toAdminModelItem(item: GatewayModelCatalogItem): AdminModelItem {
     description: item.description,
     contextOrResolution: item.context_or_resolution,
     capabilities: [...item.capabilities],
-    hosting: item.hosting === MODEL_HOSTING_THIRD_PARTY ? MODEL_HOSTING_THIRD_PARTY : MODEL_HOSTING_CLOUDFLARE,
+    hosting:
+      item.hosting === MODEL_HOSTING_THIRD_PARTY
+        ? MODEL_HOSTING_THIRD_PARTY
+        : MODEL_HOSTING_CLOUDFLARE,
     termsUrl: item.terms_url,
     docsUrl: item.docs_url,
     customPath: item.custom_path || '',
@@ -130,9 +133,15 @@ function toGatewayCatalogItem(item: AdminModelItem): GatewayModelCatalogItem {
     ...(item.descriptionEnriched != null ? { description_enriched: item.descriptionEnriched } : {}),
     ...(item.inputCostPerToken != null ? { input_cost_per_token: item.inputCostPerToken } : {}),
     ...(item.outputCostPerToken != null ? { output_cost_per_token: item.outputCostPerToken } : {}),
-    ...(item.cacheReadCostPerToken != null ? { cache_read_input_token_cost: item.cacheReadCostPerToken } : {}),
-    ...(item.cacheCreateCostPerToken != null ? { cache_creation_input_token_cost: item.cacheCreateCostPerToken } : {}),
-    ...(item.supportsPromptCaching != null ? { supports_prompt_caching: item.supportsPromptCaching } : {}),
+    ...(item.cacheReadCostPerToken != null
+      ? { cache_read_input_token_cost: item.cacheReadCostPerToken }
+      : {}),
+    ...(item.cacheCreateCostPerToken != null
+      ? { cache_creation_input_token_cost: item.cacheCreateCostPerToken }
+      : {}),
+    ...(item.supportsPromptCaching != null
+      ? { supports_prompt_caching: item.supportsPromptCaching }
+      : {}),
   }
 }
 
@@ -221,8 +230,5 @@ async function listGatewayModelMappings(): Promise<AdminGatewayModelMapping[]> {
 }
 
 async function saveGatewayModelMapping(feature: string, model: string): Promise<void> {
-  await resolveApiOk(
-    saveAdminGatewayModelMapping(feature, { model }),
-    '保存模型映射失败',
-  )
+  await resolveApiOk(saveAdminGatewayModelMapping(feature, { model }), '保存模型映射失败')
 }

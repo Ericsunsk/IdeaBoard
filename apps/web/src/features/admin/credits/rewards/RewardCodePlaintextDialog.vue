@@ -15,22 +15,13 @@
       >
         {{ plaintext }}
       </code>
-      <AdminButton
-        variant="outline"
-        :class="adminActionButtonClass"
-        @click="copy"
-      >
+      <AdminButton variant="outline" :class="adminActionButtonClass" @click="copy">
         {{ copied ? '已复制' : '复制' }}
       </AdminButton>
     </div>
-    <AdminAlert v-if="copyError" severity="error">
-      复制失败，请手动选择并复制 Code。
-    </AdminAlert>
+    <AdminAlert v-if="copyError" severity="error"> 复制失败，请手动选择并复制 Code。 </AdminAlert>
     <template #footer>
-      <AdminButton
-        :class="adminActionButtonClass"
-        @click="emit('update:visible', false)"
-      >
+      <AdminButton :class="adminActionButtonClass" @click="emit('update:visible', false)">
         我已保存
       </AdminButton>
     </template>

@@ -1,11 +1,16 @@
 <template>
-  <div class="flex w-full flex-col overflow-hidden rounded-xl border border-admin-border-soft bg-admin-bg">
+  <div
+    class="flex w-full flex-col overflow-hidden rounded-xl border border-admin-border-soft bg-admin-bg"
+  >
     <!-- 表头：带外层边框，底色同页面背景 (bg-transparent) -->
     <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
       <!-- 标题 Events + ℹ 提示图标 -->
       <div class="flex items-center gap-1.5">
         <span class="text-sm font-semibold text-admin-text-1">Events</span>
-        <span title="查看事件时序概览" class="flex size-4 cursor-pointer items-center justify-center rounded-full text-admin-text-3 hover:text-admin-text-1">
+        <span
+          title="查看事件时序概览"
+          class="flex size-4 cursor-pointer items-center justify-center rounded-full text-admin-text-3 hover:text-admin-text-1"
+        >
           <InfoCircle class="size-3.5" />
         </span>
       </div>

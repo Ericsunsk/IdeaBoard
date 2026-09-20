@@ -1,8 +1,7 @@
 import { resolveMediaAssetDerivativeURL } from '../api/mediaAssetDelivery'
 
 /** Immutable browser-safe reference to a concrete Media derivative. */
-export type MediaRefDerivativeTier =
-  'thumb' | 'preview' | 'large-preview' | 'processing-input'
+export type MediaRefDerivativeTier = 'thumb' | 'preview' | 'large-preview' | 'processing-input'
 
 export interface MediaRef {
   assetId: string

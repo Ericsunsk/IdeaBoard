@@ -21,17 +21,20 @@ export function useAdminCursorCollection<TPage, TCursor extends AdminCursorValue
   // Pagination is created before the query because the key reads the cursor
   // during setup; the explicit annotation breaks the inference cycle with the
   // `pending` closure below (same pattern the call sites used inline before).
-  const pagination: ReturnType<typeof useCursorPagination<TCursor>> =
-    useCursorPagination<TCursor>({ pending: () => loading.value })
+  const pagination: ReturnType<typeof useCursorPagination<TCursor>> = useCursorPagination<TCursor>({
+    pending: () => loading.value,
+  })
   const queryKey = computed(() => options.buildKey(pagination.cursor.value))
-  const { data, loading, initialError, backgroundError, refresh, query } =
-    useAdminCollectionQuery<TPage, TCursor>({
-      queryKey,
-      queryFn: options.queryFn,
-      ...(options.enabled !== undefined ? { enabled: options.enabled } : {}),
-      getNextCursor: options.getNextCursor,
-      pagination,
-    })
+  const { data, loading, initialError, backgroundError, refresh, query } = useAdminCollectionQuery<
+    TPage,
+    TCursor
+  >({
+    queryKey,
+    queryFn: options.queryFn,
+    ...(options.enabled !== undefined ? { enabled: options.enabled } : {}),
+    getNextCursor: options.getNextCursor,
+    pagination,
+  })
 
   function previousPage() {
     pagination.retreat()

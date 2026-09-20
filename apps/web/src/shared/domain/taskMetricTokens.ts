@@ -54,7 +54,8 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     label: 'All',
     pillTitle: 'Show all tasks',
     dotClass: 'bg-admin-text-3',
-    activePillClass: 'bg-admin-surface-muted text-admin-text-1 font-semibold ring-1 ring-admin-border-soft',
+    activePillClass:
+      'bg-admin-surface-muted text-admin-text-1 font-semibold ring-1 ring-admin-border-soft',
     hasChartLine: false,
     getCount: (stats) => stats.total,
   },
@@ -76,7 +77,8 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     label: 'Running',
     pillTitle: 'Filter running tasks',
     dotClass: 'bg-admin-warning',
-    activePillClass: 'bg-admin-warning-soft text-admin-warning font-semibold ring-1 ring-admin-warning-soft',
+    activePillClass:
+      'bg-admin-warning-soft text-admin-warning font-semibold ring-1 ring-admin-warning-soft',
     hasChartLine: true,
     chartColor: '#d48830',
     chartLabel: 'Running',
@@ -88,7 +90,8 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     label: 'Success',
     pillTitle: 'Filter completed tasks',
     dotClass: 'bg-admin-success',
-    activePillClass: 'bg-admin-success-soft text-admin-success font-semibold ring-1 ring-admin-success-soft',
+    activePillClass:
+      'bg-admin-success-soft text-admin-success font-semibold ring-1 ring-admin-success-soft',
     hasChartLine: true,
     chartColor: '#2f9e73',
     chartLabel: 'Success',
@@ -100,7 +103,8 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     label: 'Errors',
     pillTitle: 'Filter failed tasks',
     dotClass: 'bg-admin-danger',
-    activePillClass: 'bg-admin-danger-soft text-admin-danger font-semibold ring-1 ring-admin-danger-soft',
+    activePillClass:
+      'bg-admin-danger-soft text-admin-danger font-semibold ring-1 ring-admin-danger-soft',
     hasChartLine: true,
     chartColor: '#d14d5a',
     chartLabel: 'Errors',
@@ -112,7 +116,8 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     label: 'Cancelled',
     pillTitle: 'Filter cancelled tasks',
     dotClass: 'bg-admin-text-3 opacity-60',
-    activePillClass: 'bg-admin-surface-muted text-admin-text-2 font-semibold ring-1 ring-admin-border-soft',
+    activePillClass:
+      'bg-admin-surface-muted text-admin-text-2 font-semibold ring-1 ring-admin-border-soft',
     hasChartLine: true,
     chartColor: '#8f8f8f',
     chartLabel: 'Cancelled',

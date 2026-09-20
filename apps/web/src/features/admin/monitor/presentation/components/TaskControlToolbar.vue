@@ -99,7 +99,10 @@
               @click="emit('selectTimeRange', preset.key)"
             >
               <span>{{ preset.label }}</span>
-              <Check v-if="selectedTimeRangeKey === preset.key" class="size-3.5 text-blue-600 shrink-0" />
+              <Check
+                v-if="selectedTimeRangeKey === preset.key"
+                class="size-3.5 text-blue-600 shrink-0"
+              />
             </button>
           </div>
         </AdminPopoverContent>

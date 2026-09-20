@@ -53,11 +53,13 @@ describe('AdminModelEditDialog', () => {
     customParams: '{"guidance_scale": 7.5}',
   }
 
-  function renderDialog(props: {
-    visible?: boolean
-    model?: AdminModelItem | null
-    onSubmit?: (item: AdminModelItem) => void
-  } = {}) {
+  function renderDialog(
+    props: {
+      visible?: boolean
+      model?: AdminModelItem | null
+      onSubmit?: (item: AdminModelItem) => void
+    } = {},
+  ) {
     const { onSubmit, ...rest } = props
     return renderWithUser(AdminModelEditDialog, {
       props: {

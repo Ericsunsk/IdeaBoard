@@ -111,9 +111,7 @@
         <template #model="{ item }">
           <span
             class="truncate font-mono text-xs"
-            :class="
-              modelValueFor(item.sku) ? 'text-admin-text-1' : 'text-admin-text-3'
-            "
+            :class="modelValueFor(item.sku) ? 'text-admin-text-1' : 'text-admin-text-3'"
           >
             {{ modelDisplayFor(item.sku) }}
           </span>
@@ -127,15 +125,9 @@
       :item="selectedItem"
       :pending="publishPending"
       :error-message="publishError"
-      :model-value="
-        selectedItem ? modelValueFor(selectedItem.sku) : undefined
-      "
-      :model-pending="
-        selectedItem ? modelPendingFor(selectedItem.sku) : undefined
-      "
-      :model-error="
-        selectedItem ? modelErrorFor(selectedItem.sku) : undefined
-      "
+      :model-value="selectedItem ? modelValueFor(selectedItem.sku) : undefined"
+      :model-pending="selectedItem ? modelPendingFor(selectedItem.sku) : undefined"
+      :model-error="selectedItem ? modelErrorFor(selectedItem.sku) : undefined"
       :available-models="availableModels"
       @submit="publishPrice"
       @save-model="onDialogSaveModel"

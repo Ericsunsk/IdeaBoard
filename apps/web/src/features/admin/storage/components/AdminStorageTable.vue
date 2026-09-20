@@ -75,9 +75,7 @@
                 v-if="!data.isPresetOnly && data.storage"
                 type="button"
                 :class="[adminLogoButtonClass, 'size-8 p-1.5 shrink-0 rounded-lg shadow-xs']"
-                :data-control-state="
-                  activeLogoTargetId === data.storage.id ? 'selected' : 'idle'
-                "
+                :data-control-state="activeLogoTargetId === data.storage.id ? 'selected' : 'idle'"
                 :aria-expanded="activeLogoTargetId === data.storage.id ? 'true' : 'false'"
                 title="点击切换存储 Logo"
                 aria-label="切换存储 Logo"
@@ -94,10 +92,7 @@
                   v-else-if="data.vendorIcon"
                   class="size-4 text-admin-text-2"
                 />
-                <span
-                  v-else
-                  class="text-[11px] font-bold text-admin-accent uppercase select-none"
-                >
+                <span v-else class="text-[11px] font-bold text-admin-accent uppercase select-none">
                   {{ data.avatarLabel }}
                 </span>
               </button>
@@ -116,10 +111,7 @@
                   v-else-if="data.vendorIcon"
                   class="size-4 text-admin-text-3"
                 />
-                <span
-                  v-else
-                  class="text-[11px] font-bold text-admin-text-3 uppercase select-none"
-                >
+                <span v-else class="text-[11px] font-bold text-admin-text-3 uppercase select-none">
                   {{ data.avatarLabel }}
                 </span>
               </div>
@@ -314,7 +306,10 @@ defineProps<{
 
 const emit = defineEmits<{
   'clear-filters': []
-  'open-logo-picker': [event: Event, card: { storage?: { id: string; name: string; config?: Record<string, unknown> } }]
+  'open-logo-picker': [
+    event: Event,
+    card: { storage?: { id: string; name: string; config?: Record<string, unknown> } },
+  ]
   'apply-storage': [storage: StorageCard]
   'configure-preset': [presetKey?: string]
   'open-edit': [id: string]

@@ -47,14 +47,29 @@ describe('AdminDialogShell', () => {
         header: '编辑配置',
         description: '修改配置项后保存生效。',
         onReset,
-      }
+      },
     })
 
-    await result.rerender({ visible: true, header: '编辑配置', description: '修改配置项后保存生效。', onReset })
+    await result.rerender({
+      visible: true,
+      header: '编辑配置',
+      description: '修改配置项后保存生效。',
+      onReset,
+    })
     expect(onReset).toHaveBeenCalledTimes(1)
 
-    await result.rerender({ visible: false, header: '编辑配置', description: '修改配置项后保存生效。', onReset })
-    await result.rerender({ visible: true, header: '编辑配置', description: '修改配置项后保存生效。', onReset })
+    await result.rerender({
+      visible: false,
+      header: '编辑配置',
+      description: '修改配置项后保存生效。',
+      onReset,
+    })
+    await result.rerender({
+      visible: true,
+      header: '编辑配置',
+      description: '修改配置项后保存生效。',
+      onReset,
+    })
     expect(onReset).toHaveBeenCalledTimes(2)
   })
 
@@ -204,9 +219,7 @@ describe('AdminDialogShell', () => {
 
     const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
     for (const region of ['header', 'content', 'footer']) {
-      expect(dialog.querySelector(`[data-admin-dialog-region="${region}"]`)).toHaveClass(
-        '!px-6',
-      )
+      expect(dialog.querySelector(`[data-admin-dialog-region="${region}"]`)).toHaveClass('!px-6')
     }
   })
 

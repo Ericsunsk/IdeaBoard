@@ -6,5 +6,5 @@
  */
 
 export type UploadAdminAssetBody = {
-  file: Blob
+  file: Blob | File
 }

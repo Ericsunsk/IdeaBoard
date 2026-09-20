@@ -23,7 +23,9 @@
             <label class="flex flex-col gap-2 text-xs font-bold text-admin-text-2">
               <span>Email</span>
               <div class="relative flex items-center">
-                <span class="pointer-events-none absolute left-3 flex items-center text-admin-text-3">
+                <span
+                  class="pointer-events-none absolute left-3 flex items-center text-admin-text-3"
+                >
                   <User class="h-4 w-4" />
                 </span>
                 <AdminInput

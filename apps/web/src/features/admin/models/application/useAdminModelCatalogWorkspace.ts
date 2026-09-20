@@ -86,9 +86,9 @@ export function useAdminModelCatalogWorkspace(
   const hasActiveFilter = computed(() => {
     return Boolean(
       searchKeyword.value.trim() ||
-        selectedMode.value ||
-        selectedProvider.value ||
-        selectedHosting.value,
+      selectedMode.value ||
+      selectedProvider.value ||
+      selectedHosting.value,
     )
   })
 

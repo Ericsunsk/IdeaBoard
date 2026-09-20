@@ -112,9 +112,7 @@ describe('task result presentation', () => {
   })
 })
 
-function makeTask(
-  overrides: Partial<AdminMonitorListItemModel> = {},
-): AdminMonitorListItemModel {
+function makeTask(overrides: Partial<AdminMonitorListItemModel> = {}): AdminMonitorListItemModel {
   return {
     task_id: 'task_1',
     user_public_id: '00000000-0000-0000-0000-000000000001',

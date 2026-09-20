@@ -65,9 +65,7 @@
                   class="flex items-start justify-between gap-4 border-b border-admin-border px-4 py-3.5"
                 >
                   <div class="min-w-0">
-                    <div class="text-admin-content font-bold text-admin-title-color">
-                      异常雷达
-                    </div>
+                    <div class="text-admin-content font-bold text-admin-title-color">异常雷达</div>
                   </div>
                   <AdminBadge
                     :value="hasAnomalies ? `${anomalyCount} 项` : '正常'"
@@ -76,10 +74,7 @@
                   />
                 </div>
 
-                <div
-                  v-if="hasAnomalies"
-                  class="app-scrollbar min-h-0 flex-1 overflow-y-auto p-2"
-                >
+                <div v-if="hasAnomalies" class="app-scrollbar min-h-0 flex-1 overflow-y-auto p-2">
                   <button
                     v-for="item in anomalies"
                     :key="item.id"
@@ -111,9 +106,7 @@
                 </div>
 
                 <div v-else class="px-5 py-8 text-center">
-                  <div class="text-admin-content font-bold text-admin-title-color">
-                    运行正常
-                  </div>
+                  <div class="text-admin-content font-bold text-admin-title-color">运行正常</div>
                   <div class="mt-1.5 text-admin-meta text-admin-subtitle-color">
                     当前没有活跃异常
                   </div>
@@ -149,18 +142,13 @@
                 <span class="truncate text-xs font-semibold text-admin-title-color">
                   {{ userEmail }}
                 </span>
-                <span class="truncate text-[11px] text-admin-text-3 font-mono">
-                  admin
-                </span>
+                <span class="truncate text-[11px] text-admin-text-3 font-mono"> admin </span>
               </div>
             </DropdownMenuLabel>
 
             <DropdownMenuSeparator />
 
-            <DropdownMenuItem
-              class="cursor-pointer gap-2"
-              @select="handleUserAction('boards')"
-            >
+            <DropdownMenuItem class="cursor-pointer gap-2" @select="handleUserAction('boards')">
               <ViewGrid class="size-4 text-admin-text-3" />
               <span>返回画布</span>
             </DropdownMenuItem>

@@ -424,9 +424,7 @@ describe('AdminMonitorPage', () => {
     })
 
     expect(screen.getByText(/共 42 条记录/)).toBeInTheDocument()
-    expect(
-      screen.getAllByText(/产品主图草图成图/).length,
-    ).toBeGreaterThan(0)
+    expect(screen.getAllByText(/产品主图草图成图/).length).toBeGreaterThan(0)
     // Service 列展示 feature slug
     expect(screen.getAllByText('render').length).toBeGreaterThan(0)
     expect(screen.queryByText('暂无事件日志')).not.toBeInTheDocument()

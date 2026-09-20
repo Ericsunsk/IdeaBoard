@@ -1,11 +1,7 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import { usePagePagination } from '../../shared/composables/usePagePagination'
 import { ADMIN_MONITOR_PAGE_SIZE } from '../domain/displayPolicy'
-import {
-  createDemoTaskDetail,
-  createDemoMonitorList,
-  createDemoMonitorStats,
-} from './demoData'
+import { createDemoTaskDetail, createDemoMonitorList, createDemoMonitorStats } from './demoData'
 import type { TimeRangePreset } from '../domain/timeRange'
 import type { AdminTaskRow } from './useAdminTaskList'
 import type { AdminMonitorDetailModel } from '../infrastructure/resource'

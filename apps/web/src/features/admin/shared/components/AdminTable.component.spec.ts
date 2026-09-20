@@ -46,12 +46,16 @@ describe('AdminTable', () => {
 
   it('supports select-all and per-row selection through v-model', async () => {
     const { user, emitted } = renderWithUser(
-      h(AdminTable as unknown as Parameters<typeof h>[0], { value: rows, dataKey: 'id' }, {
-        default: () => [
-          h(AdminColumn as unknown as Parameters<typeof h>[0], { selectionMode: 'multiple' }),
-          h(AdminColumn as unknown as Parameters<typeof h>[0], { field: 'name', header: '名称' }),
-        ],
-      }),
+      h(
+        AdminTable as unknown as Parameters<typeof h>[0],
+        { value: rows, dataKey: 'id' },
+        {
+          default: () => [
+            h(AdminColumn as unknown as Parameters<typeof h>[0], { selectionMode: 'multiple' }),
+            h(AdminColumn as unknown as Parameters<typeof h>[0], { field: 'name', header: '名称' }),
+          ],
+        },
+      ),
     )
 
     await user.click(await screen.findByRole('checkbox', { name: '选择全部行' }))
@@ -123,29 +127,35 @@ describe('AdminTable', () => {
   })
 
   it('renders directly composed shadcn atomic table components', async () => {
-    const { AdminTableHeader, AdminTableHead, AdminTableBody, AdminTableRow, AdminTableCell, AdminTableFooter, AdminTableCaption } = await import('./adminTableAtoms')
+    const {
+      AdminTableHeader,
+      AdminTableHead,
+      AdminTableBody,
+      AdminTableRow,
+      AdminTableCell,
+      AdminTableFooter,
+      AdminTableCaption,
+    } = await import('./adminTableAtoms')
 
     renderWithUser(
-      h(AdminTable, {}, {
-        default: () => [
-          h(AdminTableCaption, {}, () => '测试说明'),
-          h(AdminTableHeader, {}, () => [
-            h(AdminTableRow, {}, () => [
-              h(AdminTableHead, {}, () => '标题列'),
+      h(
+        AdminTable,
+        {},
+        {
+          default: () => [
+            h(AdminTableCaption, {}, () => '测试说明'),
+            h(AdminTableHeader, {}, () => [
+              h(AdminTableRow, {}, () => [h(AdminTableHead, {}, () => '标题列')]),
             ]),
-          ]),
-          h(AdminTableBody, {}, () => [
-            h(AdminTableRow, {}, () => [
-              h(AdminTableCell, {}, () => '内容格'),
+            h(AdminTableBody, {}, () => [
+              h(AdminTableRow, {}, () => [h(AdminTableCell, {}, () => '内容格')]),
             ]),
-          ]),
-          h(AdminTableFooter, {}, () => [
-            h(AdminTableRow, {}, () => [
-              h(AdminTableCell, {}, () => '汇总格'),
+            h(AdminTableFooter, {}, () => [
+              h(AdminTableRow, {}, () => [h(AdminTableCell, {}, () => '汇总格')]),
             ]),
-          ]),
-        ],
-      }),
+          ],
+        },
+      ),
     )
 
     expect(await screen.findByRole('columnheader', { name: '标题列' })).toBeVisible()
@@ -158,12 +168,19 @@ describe('AdminTable', () => {
     const otherRow = { id: 'c', name: 'Gamma' }
     const renderSelectable = (selection: Row[]) =>
       renderWithUser(
-        h(AdminTable as unknown as Parameters<typeof h>[0], { value: rows, dataKey: 'id', selection }, {
-          default: () => [
-            h(AdminColumn as unknown as Parameters<typeof h>[0], { selectionMode: 'multiple' }),
-            h(AdminColumn as unknown as Parameters<typeof h>[0], { field: 'name', header: '名称' }),
-          ],
-        }),
+        h(
+          AdminTable as unknown as Parameters<typeof h>[0],
+          { value: rows, dataKey: 'id', selection },
+          {
+            default: () => [
+              h(AdminColumn as unknown as Parameters<typeof h>[0], { selectionMode: 'multiple' }),
+              h(AdminColumn as unknown as Parameters<typeof h>[0], {
+                field: 'name',
+                header: '名称',
+              }),
+            ],
+          },
+        ),
       )
 
     // 本页全选 + 他页残留：表头仍勾选

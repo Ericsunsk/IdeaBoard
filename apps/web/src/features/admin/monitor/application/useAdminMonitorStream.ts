@@ -2,7 +2,10 @@ import { useQueryClient } from '@tanstack/vue-query'
 import { useDocumentVisibility, useEventSource } from '@vueuse/core'
 import { computed, onScopeDispose, ref, watch } from 'vue'
 import { getGetAdminMonitorQueryKey } from '../../../../shared/api/generated-query/admin-monitor/admin-monitor'
-import type { ApiResponseMonitor, MonitorResponse } from '../../../../shared/api/generated-query/model/index'
+import type {
+  ApiResponseMonitor,
+  MonitorResponse,
+} from '../../../../shared/api/generated-query/model/index'
 import { requireApiData } from '../../../../shared/api/apiResponse'
 import { resolveApiUrl } from '../../../../shared/config/runtimeUrls'
 

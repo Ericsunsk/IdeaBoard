@@ -1,5 +1,12 @@
 <template>
-  <div :class="cn(badgeVariants({ variant: resolvedVariant, rounded: props.rounded ? 'full' : 'default' }), props.class)">
+  <div
+    :class="
+      cn(
+        badgeVariants({ variant: resolvedVariant, rounded: props.rounded ? 'full' : 'default' }),
+        props.class,
+      )
+    "
+  >
     <slot />
   </div>
 </template>

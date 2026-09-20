@@ -18,11 +18,7 @@
 
 <script setup lang="ts">
 import { type HTMLAttributes } from 'vue'
-import {
-  PopoverContent,
-  PopoverPortal,
-  type PopoverContentProps,
-} from 'reka-ui'
+import { PopoverContent, PopoverPortal, type PopoverContentProps } from 'reka-ui'
 import { cn } from '@/lib/utils'
 
 const props = withDefaults(

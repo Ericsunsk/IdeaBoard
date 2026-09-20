@@ -77,11 +77,9 @@
             {{ t('account.billingRecords.loadFailed') }}
           </p>
           <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(initialError) }}</p>
-          <Button
-            variant="ghost"
-            size="sm"
-            class="mt-3"
-            @click="retryInitial()">{{ t('account.reload') }}</Button>
+          <Button variant="ghost" size="sm" class="mt-3" @click="retryInitial()">{{
+            t('account.reload')
+          }}</Button>
         </div>
         <div
           v-else
@@ -113,20 +111,17 @@
           role="alert"
         >
           <span class="text-sm text-ib-danger">{{ errorMessage(loadMoreError) }}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            @click="loadMore()">{{ t('account.billingRecords.retryLoad') }}</Button>
+          <Button variant="ghost" size="sm" @click="loadMore()">{{
+            t('account.billingRecords.retryLoad')
+          }}</Button>
         </div>
         <div
           v-else-if="hasNextPage"
           class="flex justify-center border-t border-ib-border-soft px-4 py-3"
         >
-          <Button
-            variant="outline"
-            size="sm"
-            :loading="isFetchingNextPage"
-            @click="loadMore()">{{ t('account.billingRecords.loadMore') }}</Button>
+          <Button variant="outline" size="sm" :loading="isFetchingNextPage" @click="loadMore()">{{
+            t('account.billingRecords.loadMore')
+          }}</Button>
         </div>
       </template>
     </DataTableFrame>

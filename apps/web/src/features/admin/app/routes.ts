@@ -11,10 +11,10 @@ const adminPageComponents = {
   users: () => import('../users/AdminUsersPage.vue'),
   credits: () => import('../credits/presentation/AdminCreditsBillingLayout.vue'),
   statistics: () => import('../statistics/pages/AdminStatisticsPage.vue'),
-  'monitor': () => import('../monitor/presentation/pages/AdminMonitorPage.vue'),
+  monitor: () => import('../monitor/presentation/pages/AdminMonitorPage.vue'),
   models: () => import('../models/presentation/pages/AdminModelsPage.vue'),
   'feature-prompts': () => import('../prompts/pages/AdminPromptConfigPage.vue'),
-  'settings': () => import('../settings/AdminSettingsLayout.vue'),
+  settings: () => import('../settings/AdminSettingsLayout.vue'),
 } satisfies Record<AdminNavigationKey, RouteRecordRaw['component']>
 
 export const adminRoutes: RouteRecordRaw[] = [

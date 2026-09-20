@@ -1,10 +1,6 @@
 import { computed, ref, toValue, type MaybeRefOrGetter, type Ref } from 'vue'
 import type { ChartDataset } from 'chart.js'
-import {
-  adminChartPlugins,
-  adminChartTheme,
-  defineAdminChartTooltip,
-} from '../../shared/lib/chart'
+import { adminChartPlugins, adminChartTheme, defineAdminChartTooltip } from '../../shared/lib/chart'
 import {
   formatCompactNumber,
   resolveChartScaleMax,

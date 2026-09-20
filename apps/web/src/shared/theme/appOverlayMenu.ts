@@ -8,3 +8,6 @@ export const appOverlayMenuItemClass =
 
 export const appOverlayMenuDangerItemClass =
   '!text-[var(--app-overlay-menu-danger-color,var(--color-ib-danger))] hover:!bg-[var(--app-overlay-menu-danger-hover-bg,var(--color-ib-surface-hover))] hover:!text-[var(--app-overlay-menu-danger-hover-color,var(--color-ib-danger))]'
+
+// Keep portal menus visually separated from their trigger across page chrome surfaces.
+export const appOverlayMenuSideOffset = 10

@@ -40,18 +40,20 @@ function withTestProviders<C>(component: C) {
   // 而不是把 vnode 当作组件定义再次 h()（那会渲染出空壳）。
   if (isVNode(component)) {
     const vnode = component
-    const innerEmits = readEmitsOf(
-      (vnode as { type?: unknown }).type,
-    )
+    const innerEmits = readEmitsOf((vnode as { type?: unknown }).type)
     const WrappedVNode = defineComponent({
       name: 'TestProvidersWrapper',
       inheritAttrs: false,
       emits: innerEmits,
       setup(_, { emit }) {
         return () =>
-          h(IconoirProvider, { iconProps: { ...testIconProps } }, {
-            default: () => [cloneVNode(vnode, buildEmitForwarders(innerEmits, emit))],
-          })
+          h(
+            IconoirProvider,
+            { iconProps: { ...testIconProps } },
+            {
+              default: () => [cloneVNode(vnode, buildEmitForwarders(innerEmits, emit))],
+            },
+          )
       },
     })
     return WrappedVNode as never as C
@@ -63,9 +65,14 @@ function withTestProviders<C>(component: C) {
     emits: innerEmits,
     setup(_, { slots, attrs, emit }) {
       return () =>
-        h(IconoirProvider, { iconProps: { ...testIconProps } }, {
-          default: () => h(component as never, { ...attrs, ...buildEmitForwarders(innerEmits, emit) }, slots),
-        })
+        h(
+          IconoirProvider,
+          { iconProps: { ...testIconProps } },
+          {
+            default: () =>
+              h(component as never, { ...attrs, ...buildEmitForwarders(innerEmits, emit) }, slots),
+          },
+        )
     },
   })
   return Wrapped as never as C

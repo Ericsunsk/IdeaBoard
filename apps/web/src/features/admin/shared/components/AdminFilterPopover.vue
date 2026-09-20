@@ -3,7 +3,11 @@
     <PopoverTrigger as-child>
       <button
         type="button"
-        :class="[adminFramedIconButtonClass, active ? '!border-admin-text-1' : '', 'cursor-pointer']"
+        :class="[
+          adminFramedIconButtonClass,
+          active ? '!border-admin-text-1' : '',
+          'cursor-pointer',
+        ]"
         :aria-label="filterLabel"
         :aria-pressed="active"
       >
@@ -67,11 +71,7 @@ function handleInteractOutside(event: CustomEvent<{ originalEvent: Event }>) {
   const target = (event.detail?.originalEvent?.target ?? event.target) as HTMLElement | null
   // Keep the filter popover open while interacting with select overlays
   // (reka-ui select content and standard listbox/option roles).
-  if (
-    target?.closest(
-      '[data-reka-select-content], [role=listbox], [role=option]',
-    )
-  ) {
+  if (target?.closest('[data-reka-select-content], [role=listbox], [role=option]')) {
     event.preventDefault()
   }
 }

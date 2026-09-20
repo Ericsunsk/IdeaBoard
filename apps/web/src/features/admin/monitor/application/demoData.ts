@@ -120,7 +120,10 @@ export function createDemoMonitorList(durationMs: number, count = 42): AdminTask
       : null
     // 已完成行挂 1-4 张结果图，演示 Result 列 3 张上限 + +N 溢出
     const resultCount = completed ? 1 + (index % 4) : 0
-    const resultImages = DEMO_RESULT_IMAGES.slice(0, Math.min(resultCount, DEMO_RESULT_IMAGES.length))
+    const resultImages = DEMO_RESULT_IMAGES.slice(
+      0,
+      Math.min(resultCount, DEMO_RESULT_IMAGES.length),
+    )
     return {
       task_id: `demo-task-${String(index + 1).padStart(3, '0')}`,
       user_public_id: '00000000-0000-0000-0000-000000000000',

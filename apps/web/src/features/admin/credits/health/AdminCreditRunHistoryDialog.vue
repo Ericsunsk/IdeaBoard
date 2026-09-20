@@ -125,10 +125,7 @@
             >
               <AdminSpinner class="h-7 w-7" aria-label="加载 Run 详情" />
             </div>
-            <AdminAlert
-              v-else-if="runDetailError && selectedRunId === data.id"
-              severity="error"
-            >
+            <AdminAlert v-else-if="runDetailError && selectedRunId === data.id" severity="error">
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <span>Run 详情加载失败。</span>
                 <AdminButton

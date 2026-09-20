@@ -50,8 +50,19 @@ export const createAdminRewardCode = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseCreatedRewardCode>(getCreateAdminRewardCodeUrl(), {
     ...options,
@@ -135,8 +146,19 @@ export const searchAdminRewardCodes = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseRewardCodePage>(getSearchAdminRewardCodesUrl(), {
     ...options,
@@ -221,8 +243,19 @@ export const updateAdminRewardCode = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseUpdatedRewardCode>(getUpdateAdminRewardCodeUrl(id), {
     ...options,
@@ -582,8 +615,19 @@ export const setAdminRewardCodeEnabled = async (
   ): Record<string, string | readonly string[]> => {
     if (!h) return {}
     if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
   }
   return orvalMutator<ApiResponseRewardCode>(getSetAdminRewardCodeEnabledUrl(id), {
     ...options,

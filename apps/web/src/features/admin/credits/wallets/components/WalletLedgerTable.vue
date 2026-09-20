@@ -46,7 +46,11 @@
         <AdminColumn :header="t('admin.wallet.balanceAfter')" style="width: 150px">
           <template #body="{ data }">
             <span class="font-mono text-admin-caption text-admin-text-2">
-              {{ t('admin.wallet.availableAmount', { amount: formatIdeaAmount(data.available_credits_after) }) }}
+              {{
+                t('admin.wallet.availableAmount', {
+                  amount: formatIdeaAmount(data.available_credits_after),
+                })
+              }}
             </span>
           </template>
         </AdminColumn>
@@ -59,11 +63,12 @@
             >
               {{ data.reason || '-' }}
             </div>
-            <div
-              v-if="data.charge"
-              class="mt-0.5 text-admin-caption text-admin-text-3 font-mono"
-            >
-              {{ t('admin.wallet.refundableAmount', { amount: formatIdeaAmount(data.charge.remaining_refundable_credits) }) }}
+            <div v-if="data.charge" class="mt-0.5 text-admin-caption text-admin-text-3 font-mono">
+              {{
+                t('admin.wallet.refundableAmount', {
+                  amount: formatIdeaAmount(data.charge.remaining_refundable_credits),
+                })
+              }}
             </div>
           </template>
         </AdminColumn>

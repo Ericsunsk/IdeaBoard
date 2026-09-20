@@ -10,7 +10,10 @@
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <!-- 分辨率 / 最大上下文 -->
         <div class="flex flex-col gap-1.5">
-          <label class="text-admin-caption font-semibold text-admin-text-1" for="model-resolution-input">
+          <label
+            class="text-admin-caption font-semibold text-admin-text-1"
+            for="model-resolution-input"
+          >
             分辨率 / 最大上下文
           </label>
           <AdminInput
@@ -34,10 +37,10 @@
 
         <!-- 托管类型 (Hosting) -->
         <div class="flex flex-col gap-1.5">
-          <label class="text-admin-caption font-semibold text-admin-text-1">
-            托管类型
-          </label>
-          <div class="flex h-9 items-center rounded-lg border border-admin-border-soft bg-admin-surface-muted/40 p-1">
+          <label class="text-admin-caption font-semibold text-admin-text-1"> 托管类型 </label>
+          <div
+            class="flex h-9 items-center rounded-lg border border-admin-border-soft bg-admin-surface-muted/40 p-1"
+          >
             <button
               type="button"
               class="flex-1 rounded-md py-1 text-xs font-medium transition-colors cursor-pointer text-center"
