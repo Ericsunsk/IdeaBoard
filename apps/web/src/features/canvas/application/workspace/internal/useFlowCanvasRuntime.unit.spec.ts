@@ -541,6 +541,52 @@ function selectFlowNodes(nodes: Node[], nodeIds: string[]): Node[] {
   return nodes.map((node) => ({ ...node, selected: selectedIds.has(node.id) }))
 }
 
+function selectFlowEdges(edges: Edge[], edgeIds: string[]): Edge[] {
+  const selectedIds = new Set(edgeIds)
+  return edges.map((edge) => ({ ...edge, selected: selectedIds.has(edge.id) }))
+}
+
+// Drives selection through the real native-change pipeline (apply +
+// reconcile) instead of assigning flags, so the store mirror that group
+// actions read stays in sync exactly as in production.
+function selectFlowItemsThroughRuntime(
+  harness: ReturnType<typeof createRuntimeHarness>,
+  nodeIds: readonly string[],
+  edgeIds: readonly string[] = [],
+) {
+  const prevNodes = new Map(
+    harness.fullNodes.value.map(
+      (node) => [node.id, (node as { selected?: boolean }).selected === true] as const,
+    ),
+  )
+  const prevEdges = new Map(
+    harness.fullEdges.value.map((edge) => [
+      edge.id,
+      (edge as { selected?: boolean }).selected === true,
+    ]),
+  )
+  harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, [...nodeIds])
+  harness.fullEdges.value = selectFlowEdges(harness.fullEdges.value, [...edgeIds])
+  const nodeChanges: NodeChange[] = []
+  for (const node of harness.fullNodes.value) {
+    const wasSelected = prevNodes.get(node.id) ?? false
+    const isSelected = (node as { selected?: boolean }).selected === true
+    if (wasSelected !== isSelected) {
+      nodeChanges.push({ id: node.id, type: 'select', selected: isSelected })
+    }
+  }
+  const edgeChanges: EdgeChange[] = []
+  for (const edge of harness.fullEdges.value) {
+    const wasSelected = prevEdges.get(edge.id) ?? false
+    const isSelected = (edge as { selected?: boolean }).selected === true
+    if (wasSelected !== isSelected) {
+      edgeChanges.push({ id: edge.id, type: 'select', selected: isSelected })
+    }
+  }
+  if (nodeChanges.length > 0) harness.runtime.flowPane.onNodesChange(nodeChanges)
+  if (edgeChanges.length > 0) harness.runtime.flowPane.onEdgesChange(edgeChanges)
+}
+
 function readNodeSelected(nodes: Node[], nodeId: string) {
   return readSelectedFlag(nodes.find((node) => node.id === nodeId))
 }
@@ -556,9 +602,7 @@ function readEdgeSelected(edges: Edge[], edgeId: string) {
 }
 
 function clickPaneThroughGrouping(runtime: ReturnType<typeof useFlowCanvasRuntime>) {
-  const selectPane = vi.fn()
-  runtime.graphEditing.grouping.commands.handlePaneClick(selectPane)
-  expect(selectPane).toHaveBeenCalledOnce()
+  runtime.graphEditing.grouping.commands.handlePaneClick()
 }
 
 function clickNodeThroughGrouping(
@@ -567,12 +611,7 @@ function clickNodeThroughGrouping(
 ) {
   const node = harness.fullNodes.value.find((item) => item.id === nodeId)
   expect(node).toBeDefined()
-  const selectNode = vi.fn()
-  harness.runtime.graphEditing.grouping.commands.handleNodeClick({
-    node: node as Node,
-    selectNode,
-  })
-  expect(selectNode).toHaveBeenCalledOnce()
+  harness.runtime.graphEditing.grouping.commands.handleNodeClick(nodeId)
 }
 
 describe('useFlowCanvasRuntime', () => {
@@ -1185,17 +1224,17 @@ describe('useFlowCanvasRuntime', () => {
 
     expect(harness.runtime.graphEditing.grouping.view.selectionGroupAction.value).toBeNull()
 
-    harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, ['image-1'])
+    selectFlowItemsThroughRuntime(harness, ['image-1'])
     expect(harness.runtime.graphEditing.grouping.view.selectionGroupAction.value).toBeNull()
 
-    harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, ['image-1', 'prompt-1'])
+    selectFlowItemsThroughRuntime(harness, ['image-1', 'prompt-1'])
     expect(harness.runtime.graphEditing.grouping.view.selectionGroupAction.value).toEqual({
       kind: 'group',
       label: 'Group',
       nodeIds: ['image-1', 'prompt-1'],
     })
 
-    harness.fullEdges.value = markFlowItemSelected(harness.fullEdges.value, 'connection-3')
+    selectFlowItemsThroughRuntime(harness, ['image-1', 'prompt-1'], ['connection-3'])
     expect(harness.runtime.graphEditing.grouping.view.selectionGroupAction.value).toBeNull()
   })
 
@@ -1206,7 +1245,7 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
 
-    harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, ['image-1', 'prompt-2'])
+    selectFlowItemsThroughRuntime(harness, ['image-1', 'prompt-2'])
 
     expect(harness.runtime.graphEditing.grouping.view.selectionGroupAction.value).toBeNull()
   })
@@ -1215,7 +1254,7 @@ describe('useFlowCanvasRuntime', () => {
     const harness = createRuntimeHarness()
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
-    harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, ['image-1', 'prompt-1'])
+    selectFlowItemsThroughRuntime(harness, ['image-1', 'prompt-1'])
     const historyPush = vi.spyOn(harness.runtime.persistence.history, 'record')
 
     expect(harness.runtime.graphEditing.grouping.commands.groupSelectedNodes()).toBe(true)
@@ -1246,7 +1285,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(historyPush).toHaveBeenCalledOnce()
     expect(harness.saveStatus.value).toBe('pending')
 
-    harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, [])
+    selectFlowItemsThroughRuntime(harness, [])
 
     expect(harness.runtime.graphEditing.grouping.internal.selectedGroupId.value).toBe('group-1')
     expect(harness.runtime.graphEditing.grouping.view.selectionGroupAction.value).toEqual({
@@ -1276,7 +1315,7 @@ describe('useFlowCanvasRuntime', () => {
     const harness = createRuntimeHarness()
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
-    harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, ['image-1', 'prompt-1'])
+    selectFlowItemsThroughRuntime(harness, ['image-1', 'prompt-1'])
 
     expect(harness.runtime.graphEditing.grouping.commands.groupSelectedNodes()).toBe(true)
     expect(harness.runtime.graphEditing.grouping.internal.selectedGroupId.value).toBe('group-1')
@@ -1316,10 +1355,7 @@ describe('useFlowCanvasRuntime', () => {
     const harness = createRuntimeHarness(snapshot)
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
-    harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, [
-      'prompt-1000.25',
-      'prompt-1001.5',
-    ])
+    selectFlowItemsThroughRuntime(harness, ['prompt-1000.25', 'prompt-1001.5'])
 
     expect(harness.runtime.graphEditing.grouping.commands.groupSelectedNodes()).toBe(true)
     await harness.runtime.persistence.flushAutosave({ silent: true })
@@ -1336,7 +1372,7 @@ describe('useFlowCanvasRuntime', () => {
     const harness = createRuntimeHarness(snapshot)
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
-    harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, ['image-1', 'prompt-1'])
+    selectFlowItemsThroughRuntime(harness, ['image-1', 'prompt-1'])
     const historyPush = vi.spyOn(harness.runtime.persistence.history, 'record')
 
     expect(harness.runtime.graphEditing.grouping.commands.ungroupSelectedGroup()).toBe(true)

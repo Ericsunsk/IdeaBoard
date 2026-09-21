@@ -238,7 +238,8 @@ import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
+import { formatAdminDisplayError } from '../../shared/lib/toast'
+import { usePaymentOrdersFeedback } from '../useStripeSettingsFeedback'
 import {
   adminActionButtonClass,
   adminFramedIconButtonClass,
@@ -278,7 +279,7 @@ const refundLoading = ref(false)
 const refundError = ref('')
 const ideaFormatter = new Intl.NumberFormat('zh-CN')
 const adminConfirm = useAdminConfirm()
-const toast = useAdminToast()
+const feedback = usePaymentOrdersFeedback()
 const refundIdempotencyKeys = new Map<string, string>()
 let detailRequestEpoch = 0
 let activeDetailRequest: AbortController | undefined
@@ -424,7 +425,7 @@ async function executeRefund(publicOrderNumber: string, ideaQuantity: number) {
   try {
     detail.value = await resource.refund(publicOrderNumber, { ideaQuantity, idempotencyKey })
     refundIdempotencyKeys.delete(key)
-    toast.success('退款已提交，等待 Stripe 最终处理')
+    feedback.refundSubmitted()
     refreshOrders()
   } catch (error) {
     refundError.value = formatAdminDisplayError(error, '发起退款失败，请稍后重试')

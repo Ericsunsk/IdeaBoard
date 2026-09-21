@@ -4,6 +4,7 @@ import {
   MODEL_HOSTING_THIRD_PARTY,
   type AdminModelItem,
 } from './catalogData'
+import * as v from 'valibot'
 import type { DetectedGatewayModel } from '../infrastructure/adminGatewayResource'
 
 // 模型表单规则单源：Add 导入构造与 Edit 手工录入共用校验、归一与 hosting 推导。
@@ -57,39 +58,39 @@ export function splitCapabilities(draft: string): string[] {
     .filter(Boolean)
 }
 
-function parseAndValidateCustomParams(input: string): {
-  valid: boolean
-  error?: string
-} {
-  const trimmed = input.trim()
-  if (!trimmed) return { valid: true }
+function isJsonParsable(input: string): boolean {
   try {
-    const parsed = JSON.parse(trimmed)
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      return { valid: false, error: '额外自定义参数必须是有效的 JSON 对象（键值对）' }
-    }
-    return { valid: true }
+    JSON.parse(input)
+    return true
   } catch {
-    return { valid: false, error: '额外自定义参数 JSON 格式不合法' }
+    return false
   }
 }
 
-export interface ModelFormInput {
-  id: string
-  name: string
-  provider: string
-  customParams?: string | undefined
+function isJsonObjectString(input: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(input)
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+  } catch {
+    return false
+  }
 }
 
-// 返回 '' 表示通过，否则为展示文案。
-export function validateModelForm(input: ModelFormInput): string {
-  if (!input.id.trim()) return '请输入模型标识 (ID)'
-  if (!input.name.trim()) return '请输入模型显示名称'
-  if (!input.provider.trim()) return '请输入提供商 (Provider)'
-  const paramCheck = parseAndValidateCustomParams(input.customParams?.trim() || '')
-  if (!paramCheck.valid) return paramCheck.error || ''
-  return ''
-}
+// 模型表单规则单源（schema 即真相）：Add 导入构造与 Edit 手工录入共用，调用方经标准 useForm 消费。
+export const modelFormSchema = v.object({
+  id: v.pipe(v.string(), v.trim(), v.minLength(1, '请输入模型标识 (ID)')),
+  name: v.pipe(v.string(), v.trim(), v.minLength(1, '请输入模型显示名称')),
+  provider: v.pipe(v.string(), v.trim(), v.minLength(1, '请输入提供商 (Provider)')),
+  customParams: v.pipe(
+    v.optional(v.string(), ''),
+    v.trim(),
+    v.check((value) => value === '' || isJsonParsable(value), '额外自定义参数 JSON 格式不合法'),
+    v.check(
+      (value) => value === '' || isJsonObjectString(value),
+      '额外自定义参数必须是有效的 JSON 对象（键值对）',
+    ),
+  ),
+})
 
 // 提交归一：trim 全字段、无上下文回退默认分辨率、空能力保持空。
 export function finalizeModelSubmit(form: AdminModelItem, capabilities: string[]): AdminModelItem {

@@ -4,12 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
@@ -24,7 +27,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -207,74 +210,70 @@ export const setAdminFeaturePrompt = async (
   })
 }
 
-export const getSetAdminFeaturePromptQueryKey = (
-  slug: MaybeRefOrGetter<string>,
-  setAdminFeaturePromptBody?: MaybeRefOrGetter<SetAdminFeaturePromptBody>,
-) => {
-  return ['PUT', 'admin', 'feature-prompts', slug, setAdminFeaturePromptBody] as const
-}
+export const getSetAdminFeaturePromptMutationKey = () => ['setAdminFeaturePrompt'] as const
 
-export const getSetAdminFeaturePromptQueryOptions = <
-  TData = Awaited<ReturnType<typeof setAdminFeaturePrompt>>,
+export const getSetAdminFeaturePromptMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  slug: MaybeRefOrGetter<string>,
-  setAdminFeaturePromptBody: MaybeRefOrGetter<SetAdminFeaturePromptBody>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof setAdminFeaturePrompt>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setAdminFeaturePrompt>>,
+    TError,
+    SetAdminFeaturePromptMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setAdminFeaturePrompt>>,
+  TError,
+  SetAdminFeaturePromptMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetAdminFeaturePromptMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getSetAdminFeaturePromptQueryKey(slug, setAdminFeaturePromptBody)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setAdminFeaturePrompt>>,
+    SetAdminFeaturePromptMutationVariables
+  > = (props) => {
+    const { slug, data } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof setAdminFeaturePrompt>>> = ({ signal }) =>
-    setAdminFeaturePrompt(toValue(slug), toValue(setAdminFeaturePromptBody), {
-      signal,
-      ...requestOptions,
-    })
+    return setAdminFeaturePrompt(slug, data, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(slug) !== null && toValue(slug) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof setAdminFeaturePrompt>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type SetAdminFeaturePromptQueryResult = NonNullable<
+export type SetAdminFeaturePromptMutationResult = NonNullable<
   Awaited<ReturnType<typeof setAdminFeaturePrompt>>
 >
-export type SetAdminFeaturePromptQueryError = ErrorType<unknown>
+export type SetAdminFeaturePromptMutationBody = BodyType<SetAdminFeaturePromptBody>
+export type SetAdminFeaturePromptMutationError = ErrorType<unknown>
+export type SetAdminFeaturePromptMutationVariables = {
+  slug: string
+  data: BodyType<SetAdminFeaturePromptBody>
+}
 
-export function useSetAdminFeaturePrompt<
-  TData = Awaited<ReturnType<typeof setAdminFeaturePrompt>>,
-  TError = ErrorType<unknown>,
->(
-  slug: MaybeRefOrGetter<string>,
-  setAdminFeaturePromptBody: MaybeRefOrGetter<SetAdminFeaturePromptBody>,
+export const useSetAdminFeaturePrompt = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof setAdminFeaturePrompt>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setAdminFeaturePrompt>>,
+      TError,
+      SetAdminFeaturePromptMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getSetAdminFeaturePromptQueryOptions(
-    slug,
-    setAdminFeaturePromptBody,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof setAdminFeaturePrompt>>,
+  TError,
+  SetAdminFeaturePromptMutationVariables,
+  TContext
+> => {
+  return useMutation(getSetAdminFeaturePromptMutationOptions(options), queryClient)
 }

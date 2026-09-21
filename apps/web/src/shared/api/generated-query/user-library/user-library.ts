@@ -4,17 +4,20 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
 
-import { computed, toValue, unref } from 'vue'
+import { toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
@@ -32,7 +35,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -135,63 +138,70 @@ export const createLibraryFolder = async (
   })
 }
 
-export const getCreateLibraryFolderQueryKey = (
-  libraryFolderRequest?: MaybeRefOrGetter<LibraryFolderRequest>,
-) => {
-  return ['POST', 'user', 'library', 'folders', libraryFolderRequest] as const
-}
+export const getCreateLibraryFolderMutationKey = () => ['createLibraryFolder'] as const
 
-export const getCreateLibraryFolderQueryOptions = <
-  TData = Awaited<ReturnType<typeof createLibraryFolder>>,
+export const getCreateLibraryFolderMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  libraryFolderRequest: MaybeRefOrGetter<LibraryFolderRequest>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof createLibraryFolder>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getCreateLibraryFolderQueryKey(libraryFolderRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof createLibraryFolder>>> = ({ signal }) =>
-    createLibraryFolder(toValue(libraryFolderRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof createLibraryFolder>>,
     TError,
-    TData
+    CreateLibraryFolderMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createLibraryFolder>>,
+  TError,
+  CreateLibraryFolderMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateLibraryFolderMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createLibraryFolder>>,
+    CreateLibraryFolderMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return createLibraryFolder(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type CreateLibraryFolderQueryResult = NonNullable<
+export type CreateLibraryFolderMutationResult = NonNullable<
   Awaited<ReturnType<typeof createLibraryFolder>>
 >
-export type CreateLibraryFolderQueryError = ErrorType<unknown>
+export type CreateLibraryFolderMutationBody = BodyType<LibraryFolderRequest>
+export type CreateLibraryFolderMutationError = ErrorType<unknown>
+export type CreateLibraryFolderMutationVariables = { data: BodyType<LibraryFolderRequest> }
 
-export function useCreateLibraryFolder<
-  TData = Awaited<ReturnType<typeof createLibraryFolder>>,
-  TError = ErrorType<unknown>,
->(
-  libraryFolderRequest: MaybeRefOrGetter<LibraryFolderRequest>,
+export const useCreateLibraryFolder = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof createLibraryFolder>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createLibraryFolder>>,
+      TError,
+      CreateLibraryFolderMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getCreateLibraryFolderQueryOptions(libraryFolderRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof createLibraryFolder>>,
+  TError,
+  CreateLibraryFolderMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateLibraryFolderMutationOptions(options), queryClient)
 }
-
 export const getRenameLibraryFolderUrl = (folderId: number) => {
   return `/user/library/folders/${encodeURIComponent(String(folderId))}`
 }
@@ -228,70 +238,73 @@ export const renameLibraryFolder = async (
   })
 }
 
-export const getRenameLibraryFolderQueryKey = (
-  folderId: MaybeRefOrGetter<number>,
-  libraryFolderRequest?: MaybeRefOrGetter<LibraryFolderRequest>,
-) => {
-  return ['PATCH', 'user', 'library', 'folders', folderId, libraryFolderRequest] as const
-}
+export const getRenameLibraryFolderMutationKey = () => ['renameLibraryFolder'] as const
 
-export const getRenameLibraryFolderQueryOptions = <
-  TData = Awaited<ReturnType<typeof renameLibraryFolder>>,
+export const getRenameLibraryFolderMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  folderId: MaybeRefOrGetter<number>,
-  libraryFolderRequest: MaybeRefOrGetter<LibraryFolderRequest>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof renameLibraryFolder>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof renameLibraryFolder>>,
+    TError,
+    RenameLibraryFolderMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof renameLibraryFolder>>,
+  TError,
+  RenameLibraryFolderMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRenameLibraryFolderMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getRenameLibraryFolderQueryKey(folderId, libraryFolderRequest)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof renameLibraryFolder>>,
+    RenameLibraryFolderMutationVariables
+  > = (props) => {
+    const { folderId, data } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof renameLibraryFolder>>> = ({ signal }) =>
-    renameLibraryFolder(toValue(folderId), toValue(libraryFolderRequest), {
-      signal,
-      ...requestOptions,
-    })
+    return renameLibraryFolder(folderId, data, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(folderId) !== null && toValue(folderId) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof renameLibraryFolder>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type RenameLibraryFolderQueryResult = NonNullable<
+export type RenameLibraryFolderMutationResult = NonNullable<
   Awaited<ReturnType<typeof renameLibraryFolder>>
 >
-export type RenameLibraryFolderQueryError = ErrorType<unknown>
+export type RenameLibraryFolderMutationBody = BodyType<LibraryFolderRequest>
+export type RenameLibraryFolderMutationError = ErrorType<unknown>
+export type RenameLibraryFolderMutationVariables = {
+  folderId: number
+  data: BodyType<LibraryFolderRequest>
+}
 
-export function useRenameLibraryFolder<
-  TData = Awaited<ReturnType<typeof renameLibraryFolder>>,
-  TError = ErrorType<unknown>,
->(
-  folderId: MaybeRefOrGetter<number>,
-  libraryFolderRequest: MaybeRefOrGetter<LibraryFolderRequest>,
+export const useRenameLibraryFolder = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof renameLibraryFolder>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof renameLibraryFolder>>,
+      TError,
+      RenameLibraryFolderMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getRenameLibraryFolderQueryOptions(folderId, libraryFolderRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof renameLibraryFolder>>,
+  TError,
+  RenameLibraryFolderMutationVariables,
+  TContext
+> => {
+  return useMutation(getRenameLibraryFolderMutationOptions(options), queryClient)
 }
-
 export const getDeleteLibraryFolderUrl = (folderId: number) => {
   return `/user/library/folders/${encodeURIComponent(String(folderId))}`
 }
@@ -306,62 +319,70 @@ export const deleteLibraryFolder = async (
   })
 }
 
-export const getDeleteLibraryFolderQueryKey = (folderId: MaybeRefOrGetter<number>) => {
-  return ['DELETE', 'user', 'library', 'folders', folderId] as const
-}
+export const getDeleteLibraryFolderMutationKey = () => ['deleteLibraryFolder'] as const
 
-export const getDeleteLibraryFolderQueryOptions = <
-  TData = Awaited<ReturnType<typeof deleteLibraryFolder>>,
+export const getDeleteLibraryFolderMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  folderId: MaybeRefOrGetter<number>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteLibraryFolder>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteLibraryFolder>>,
+    TError,
+    DeleteLibraryFolderMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteLibraryFolder>>,
+  TError,
+  DeleteLibraryFolderMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeleteLibraryFolderMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getDeleteLibraryFolderQueryKey(folderId)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteLibraryFolder>>,
+    DeleteLibraryFolderMutationVariables
+  > = (props) => {
+    const { folderId } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteLibraryFolder>>> = ({ signal }) =>
-    deleteLibraryFolder(toValue(folderId), { signal, ...requestOptions })
+    return deleteLibraryFolder(folderId, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(folderId) !== null && toValue(folderId) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof deleteLibraryFolder>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type DeleteLibraryFolderQueryResult = NonNullable<
+export type DeleteLibraryFolderMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteLibraryFolder>>
 >
-export type DeleteLibraryFolderQueryError = ErrorType<unknown>
 
-export function useDeleteLibraryFolder<
-  TData = Awaited<ReturnType<typeof deleteLibraryFolder>>,
-  TError = ErrorType<unknown>,
->(
-  folderId: MaybeRefOrGetter<number>,
+export type DeleteLibraryFolderMutationError = ErrorType<unknown>
+export type DeleteLibraryFolderMutationVariables = { folderId: number }
+
+export const useDeleteLibraryFolder = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteLibraryFolder>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deleteLibraryFolder>>,
+      TError,
+      DeleteLibraryFolderMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getDeleteLibraryFolderQueryOptions(folderId, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof deleteLibraryFolder>>,
+  TError,
+  DeleteLibraryFolderMutationVariables,
+  TContext
+> => {
+  return useMutation(getDeleteLibraryFolderMutationOptions(options), queryClient)
 }
-
 export const getListLibraryAssetsUrl = (params?: ListLibraryAssetsParams) => {
   const normalizedParams = new URLSearchParams()
 
@@ -480,61 +501,70 @@ export const saveLibraryAsset = async (
   })
 }
 
-export const getSaveLibraryAssetQueryKey = (
-  librarySaveAssetRequest?: MaybeRefOrGetter<LibrarySaveAssetRequest>,
-) => {
-  return ['POST', 'user', 'library', 'assets', librarySaveAssetRequest] as const
-}
+export const getSaveLibraryAssetMutationKey = () => ['saveLibraryAsset'] as const
 
-export const getSaveLibraryAssetQueryOptions = <
-  TData = Awaited<ReturnType<typeof saveLibraryAsset>>,
+export const getSaveLibraryAssetMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  librarySaveAssetRequest: MaybeRefOrGetter<LibrarySaveAssetRequest>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof saveLibraryAsset>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getSaveLibraryAssetQueryKey(librarySaveAssetRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof saveLibraryAsset>>> = ({ signal }) =>
-    saveLibraryAsset(toValue(librarySaveAssetRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof saveLibraryAsset>>,
     TError,
-    TData
+    SaveLibraryAssetMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof saveLibraryAsset>>,
+  TError,
+  SaveLibraryAssetMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSaveLibraryAssetMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof saveLibraryAsset>>,
+    SaveLibraryAssetMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return saveLibraryAsset(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type SaveLibraryAssetQueryResult = NonNullable<Awaited<ReturnType<typeof saveLibraryAsset>>>
-export type SaveLibraryAssetQueryError = ErrorType<unknown>
+export type SaveLibraryAssetMutationResult = NonNullable<
+  Awaited<ReturnType<typeof saveLibraryAsset>>
+>
+export type SaveLibraryAssetMutationBody = BodyType<LibrarySaveAssetRequest>
+export type SaveLibraryAssetMutationError = ErrorType<unknown>
+export type SaveLibraryAssetMutationVariables = { data: BodyType<LibrarySaveAssetRequest> }
 
-export function useSaveLibraryAsset<
-  TData = Awaited<ReturnType<typeof saveLibraryAsset>>,
-  TError = ErrorType<unknown>,
->(
-  librarySaveAssetRequest: MaybeRefOrGetter<LibrarySaveAssetRequest>,
+export const useSaveLibraryAsset = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof saveLibraryAsset>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof saveLibraryAsset>>,
+      TError,
+      SaveLibraryAssetMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getSaveLibraryAssetQueryOptions(librarySaveAssetRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof saveLibraryAsset>>,
+  TError,
+  SaveLibraryAssetMutationVariables,
+  TContext
+> => {
+  return useMutation(getSaveLibraryAssetMutationOptions(options), queryClient)
 }
-
 export const getLookupLibraryAssetsUrl = () => {
   return `/user/library/assets/lookup`
 }
@@ -570,63 +600,70 @@ export const lookupLibraryAssets = async (
   })
 }
 
-export const getLookupLibraryAssetsQueryKey = (
-  libraryLookupRequest?: MaybeRefOrGetter<LibraryLookupRequest>,
-) => {
-  return ['POST', 'user', 'library', 'assets', 'lookup', libraryLookupRequest] as const
-}
+export const getLookupLibraryAssetsMutationKey = () => ['lookupLibraryAssets'] as const
 
-export const getLookupLibraryAssetsQueryOptions = <
-  TData = Awaited<ReturnType<typeof lookupLibraryAssets>>,
+export const getLookupLibraryAssetsMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  libraryLookupRequest: MaybeRefOrGetter<LibraryLookupRequest>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupLibraryAssets>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getLookupLibraryAssetsQueryKey(libraryLookupRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof lookupLibraryAssets>>> = ({ signal }) =>
-    lookupLibraryAssets(toValue(libraryLookupRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof lookupLibraryAssets>>,
     TError,
-    TData
+    LookupLibraryAssetsMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof lookupLibraryAssets>>,
+  TError,
+  LookupLibraryAssetsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getLookupLibraryAssetsMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof lookupLibraryAssets>>,
+    LookupLibraryAssetsMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return lookupLibraryAssets(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type LookupLibraryAssetsQueryResult = NonNullable<
+export type LookupLibraryAssetsMutationResult = NonNullable<
   Awaited<ReturnType<typeof lookupLibraryAssets>>
 >
-export type LookupLibraryAssetsQueryError = ErrorType<unknown>
+export type LookupLibraryAssetsMutationBody = BodyType<LibraryLookupRequest>
+export type LookupLibraryAssetsMutationError = ErrorType<unknown>
+export type LookupLibraryAssetsMutationVariables = { data: BodyType<LibraryLookupRequest> }
 
-export function useLookupLibraryAssets<
-  TData = Awaited<ReturnType<typeof lookupLibraryAssets>>,
-  TError = ErrorType<unknown>,
->(
-  libraryLookupRequest: MaybeRefOrGetter<LibraryLookupRequest>,
+export const useLookupLibraryAssets = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupLibraryAssets>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof lookupLibraryAssets>>,
+      TError,
+      LookupLibraryAssetsMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getLookupLibraryAssetsQueryOptions(libraryLookupRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof lookupLibraryAssets>>,
+  TError,
+  LookupLibraryAssetsMutationVariables,
+  TContext
+> => {
+  return useMutation(getLookupLibraryAssetsMutationOptions(options), queryClient)
 }
-
 export const getMaterializeLibraryAssetUrl = (assetId: number) => {
   return `/user/library/assets/${encodeURIComponent(String(assetId))}/materialize`
 }
@@ -641,67 +678,70 @@ export const materializeLibraryAsset = async (
   })
 }
 
-export const getMaterializeLibraryAssetQueryKey = (assetId: MaybeRefOrGetter<number>) => {
-  return ['POST', 'user', 'library', 'assets', assetId, 'materialize'] as const
-}
+export const getMaterializeLibraryAssetMutationKey = () => ['materializeLibraryAsset'] as const
 
-export const getMaterializeLibraryAssetQueryOptions = <
-  TData = Awaited<ReturnType<typeof materializeLibraryAsset>>,
+export const getMaterializeLibraryAssetMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  assetId: MaybeRefOrGetter<number>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof materializeLibraryAsset>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof materializeLibraryAsset>>,
+    TError,
+    MaterializeLibraryAssetMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof materializeLibraryAsset>>,
+  TError,
+  MaterializeLibraryAssetMutationVariables,
+  TContext
+> => {
+  const mutationKey = getMaterializeLibraryAssetMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getMaterializeLibraryAssetQueryKey(assetId)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof materializeLibraryAsset>>,
+    MaterializeLibraryAssetMutationVariables
+  > = (props) => {
+    const { assetId } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof materializeLibraryAsset>>> = ({
-    signal,
-  }) => materializeLibraryAsset(toValue(assetId), { signal, ...requestOptions })
+    return materializeLibraryAsset(assetId, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(assetId) !== null && toValue(assetId) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof materializeLibraryAsset>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type MaterializeLibraryAssetQueryResult = NonNullable<
+export type MaterializeLibraryAssetMutationResult = NonNullable<
   Awaited<ReturnType<typeof materializeLibraryAsset>>
 >
-export type MaterializeLibraryAssetQueryError = ErrorType<unknown>
 
-export function useMaterializeLibraryAsset<
-  TData = Awaited<ReturnType<typeof materializeLibraryAsset>>,
-  TError = ErrorType<unknown>,
->(
-  assetId: MaybeRefOrGetter<number>,
+export type MaterializeLibraryAssetMutationError = ErrorType<unknown>
+export type MaterializeLibraryAssetMutationVariables = { assetId: number }
+
+export const useMaterializeLibraryAsset = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof materializeLibraryAsset>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof materializeLibraryAsset>>,
+      TError,
+      MaterializeLibraryAssetMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getMaterializeLibraryAssetQueryOptions(assetId, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof materializeLibraryAsset>>,
+  TError,
+  MaterializeLibraryAssetMutationVariables,
+  TContext
+> => {
+  return useMutation(getMaterializeLibraryAssetMutationOptions(options), queryClient)
 }
-
 export const getMoveLibraryAssetUrl = (assetId: number) => {
   return `/user/library/assets/${encodeURIComponent(String(assetId))}`
 }
@@ -738,68 +778,73 @@ export const moveLibraryAsset = async (
   })
 }
 
-export const getMoveLibraryAssetQueryKey = (
-  assetId: MaybeRefOrGetter<number>,
-  libraryMoveAssetRequest?: MaybeRefOrGetter<LibraryMoveAssetRequest>,
-) => {
-  return ['PATCH', 'user', 'library', 'assets', assetId, libraryMoveAssetRequest] as const
+export const getMoveLibraryAssetMutationKey = () => ['moveLibraryAsset'] as const
+
+export const getMoveLibraryAssetMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof moveLibraryAsset>>,
+    TError,
+    MoveLibraryAssetMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof moveLibraryAsset>>,
+  TError,
+  MoveLibraryAssetMutationVariables,
+  TContext
+> => {
+  const mutationKey = getMoveLibraryAssetMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof moveLibraryAsset>>,
+    MoveLibraryAssetMutationVariables
+  > = (props) => {
+    const { assetId, data } = props ?? {}
+
+    return moveLibraryAsset(assetId, data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export const getMoveLibraryAssetQueryOptions = <
-  TData = Awaited<ReturnType<typeof moveLibraryAsset>>,
-  TError = ErrorType<unknown>,
->(
-  assetId: MaybeRefOrGetter<number>,
-  libraryMoveAssetRequest: MaybeRefOrGetter<LibraryMoveAssetRequest>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof moveLibraryAsset>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getMoveLibraryAssetQueryKey(assetId, libraryMoveAssetRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof moveLibraryAsset>>> = ({ signal }) =>
-    moveLibraryAsset(toValue(assetId), toValue(libraryMoveAssetRequest), {
-      signal,
-      ...requestOptions,
-    })
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(assetId) !== null && toValue(assetId) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof moveLibraryAsset>>, TError, TData>
+export type MoveLibraryAssetMutationResult = NonNullable<
+  Awaited<ReturnType<typeof moveLibraryAsset>>
+>
+export type MoveLibraryAssetMutationBody = BodyType<LibraryMoveAssetRequest>
+export type MoveLibraryAssetMutationError = ErrorType<unknown>
+export type MoveLibraryAssetMutationVariables = {
+  assetId: number
+  data: BodyType<LibraryMoveAssetRequest>
 }
 
-export type MoveLibraryAssetQueryResult = NonNullable<Awaited<ReturnType<typeof moveLibraryAsset>>>
-export type MoveLibraryAssetQueryError = ErrorType<unknown>
-
-export function useMoveLibraryAsset<
-  TData = Awaited<ReturnType<typeof moveLibraryAsset>>,
-  TError = ErrorType<unknown>,
->(
-  assetId: MaybeRefOrGetter<number>,
-  libraryMoveAssetRequest: MaybeRefOrGetter<LibraryMoveAssetRequest>,
+export const useMoveLibraryAsset = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof moveLibraryAsset>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof moveLibraryAsset>>,
+      TError,
+      MoveLibraryAssetMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getMoveLibraryAssetQueryOptions(assetId, libraryMoveAssetRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof moveLibraryAsset>>,
+  TError,
+  MoveLibraryAssetMutationVariables,
+  TContext
+> => {
+  return useMutation(getMoveLibraryAssetMutationOptions(options), queryClient)
 }
-
 export const getDeleteLibraryAssetUrl = (assetId: number) => {
   return `/user/library/assets/${encodeURIComponent(String(assetId))}`
 }
@@ -814,58 +859,67 @@ export const deleteLibraryAsset = async (
   })
 }
 
-export const getDeleteLibraryAssetQueryKey = (assetId: MaybeRefOrGetter<number>) => {
-  return ['DELETE', 'user', 'library', 'assets', assetId] as const
-}
+export const getDeleteLibraryAssetMutationKey = () => ['deleteLibraryAsset'] as const
 
-export const getDeleteLibraryAssetQueryOptions = <
-  TData = Awaited<ReturnType<typeof deleteLibraryAsset>>,
+export const getDeleteLibraryAssetMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  assetId: MaybeRefOrGetter<number>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteLibraryAsset>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteLibraryAsset>>,
+    TError,
+    DeleteLibraryAssetMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteLibraryAsset>>,
+  TError,
+  DeleteLibraryAssetMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeleteLibraryAssetMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getDeleteLibraryAssetQueryKey(assetId)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteLibraryAsset>>,
+    DeleteLibraryAssetMutationVariables
+  > = (props) => {
+    const { assetId } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteLibraryAsset>>> = ({ signal }) =>
-    deleteLibraryAsset(toValue(assetId), { signal, ...requestOptions })
+    return deleteLibraryAsset(assetId, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(assetId) !== null && toValue(assetId) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof deleteLibraryAsset>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type DeleteLibraryAssetQueryResult = NonNullable<
+export type DeleteLibraryAssetMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteLibraryAsset>>
 >
-export type DeleteLibraryAssetQueryError = ErrorType<unknown>
 
-export function useDeleteLibraryAsset<
-  TData = Awaited<ReturnType<typeof deleteLibraryAsset>>,
-  TError = ErrorType<unknown>,
->(
-  assetId: MaybeRefOrGetter<number>,
+export type DeleteLibraryAssetMutationError = ErrorType<unknown>
+export type DeleteLibraryAssetMutationVariables = { assetId: number }
+
+export const useDeleteLibraryAsset = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteLibraryAsset>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deleteLibraryAsset>>,
+      TError,
+      DeleteLibraryAssetMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getDeleteLibraryAssetQueryOptions(assetId, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof deleteLibraryAsset>>,
+  TError,
+  DeleteLibraryAssetMutationVariables,
+  TContext
+> => {
+  return useMutation(getDeleteLibraryAssetMutationOptions(options), queryClient)
 }

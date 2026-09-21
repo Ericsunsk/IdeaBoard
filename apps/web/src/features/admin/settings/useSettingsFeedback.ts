@@ -1,11 +1,33 @@
 import { formatAdminDisplayError, type AdminToastPort, useAdminToast } from '../shared/lib/toast'
 import { unsupportedUploadImageMessage } from '../../../shared/utils/imageUploadSupport'
 
+// 反馈公约（admin）：领域文案收口到本文件的 feedback 工厂，调用方只表达意图
+// （saved/saveFailed/testPassed/…），不直接拼 toast 文案。`useAdminToast` 直调仅
+// 保留给无领域归属的一次性提示；新增领域提示先在这里加工厂方法。
+
 type AdminSettingFeedback = {
   loadFailed: (error: unknown) => void
   validationFailed: (message: string) => void
   saved: () => void
   saveFailed: (error: unknown) => void
+}
+
+export type AdminMailSettingsFeedback = {
+  saved: () => void
+  saveFailed: (error: unknown) => void
+  testSent: () => void
+  testFailed: (error: unknown) => void
+  cleared: () => void
+  clearFailed: (error: unknown) => void
+}
+
+export type AdminSearchProviderFeedback = {
+  keySaved: (providerLabel: string, wasEnabled: boolean) => void
+  saveFailed: (error: unknown) => void
+  testPassed: (providerLabel: string) => void
+  testFailed: (error: unknown) => void
+  toggled: (providerLabel: string, enabled: boolean) => void
+  toggleFailed: (error: unknown, enabled: boolean) => void
 }
 
 export type AdminBrandingSettingsFeedback = AdminSettingFeedback & {
@@ -77,6 +99,43 @@ export function useAdminMediaUploadSettingsFeedback() {
 
 export function useAdminOutboundPolicyFeedback() {
   return createAdminOutboundPolicyFeedback(useAdminToast())
+}
+
+function createAdminMailSettingsFeedback(toast: AdminToastPort): AdminMailSettingsFeedback {
+  return {
+    saved: () => toast.success('邮件配置已保存，请发送 Test Email'),
+    saveFailed: (error) => toast.error(formatAdminDisplayError(error, '保存邮件配置失败')),
+    testSent: () => toast.success('Test Email 已发送'),
+    testFailed: (error) => toast.error(formatAdminDisplayError(error, '发送 Test Email 失败')),
+    cleared: () => toast.success('邮件配置已删除'),
+    clearFailed: (error) => toast.error(formatAdminDisplayError(error, '删除邮件配置失败')),
+  }
+}
+
+function createAdminSearchProviderFeedback(toast: AdminToastPort): AdminSearchProviderFeedback {
+  return {
+    keySaved: (providerLabel, wasEnabled) =>
+      toast.success(
+        wasEnabled
+          ? `${providerLabel} API Key 已保存并已停用，请测试连接后重新启用`
+          : `${providerLabel} API Key 已保存，请测试连接`,
+      ),
+    saveFailed: (error) => toast.error(formatAdminDisplayError(error, '保存 API Key 失败')),
+    testPassed: (providerLabel) => toast.success(`${providerLabel} 连接测试通过`),
+    testFailed: (error) => toast.error(formatAdminDisplayError(error, '连接测试失败')),
+    toggled: (providerLabel, enabled) =>
+      toast.success(enabled ? `${providerLabel} 已启用` : `${providerLabel} 已停用`),
+    toggleFailed: (error, enabled) =>
+      toast.error(formatAdminDisplayError(error, enabled ? '启用失败' : '停用失败')),
+  }
+}
+
+export function useAdminMailSettingsFeedback() {
+  return createAdminMailSettingsFeedback(useAdminToast())
+}
+
+export function useAdminSearchProviderFeedback() {
+  return createAdminSearchProviderFeedback(useAdminToast())
 }
 
 export function useAdminUnsupportedLogoFileFeedback() {

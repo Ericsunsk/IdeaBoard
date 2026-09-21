@@ -4,17 +4,20 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
 
-import { computed, toValue, unref } from 'vue'
+import { toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
@@ -45,7 +48,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -153,75 +156,74 @@ export const updateAdminRegistrationSetting = async (
   })
 }
 
-export const getUpdateAdminRegistrationSettingQueryKey = (
-  updateAdminRegistrationSettingBody?: MaybeRefOrGetter<UpdateAdminRegistrationSettingBody>,
-) => {
-  return ['PUT', 'admin', 'settings', 'registration', updateAdminRegistrationSettingBody] as const
-}
+export const getUpdateAdminRegistrationSettingMutationKey = () =>
+  ['updateAdminRegistrationSetting'] as const
 
-export const getUpdateAdminRegistrationSettingQueryOptions = <
-  TData = Awaited<ReturnType<typeof updateAdminRegistrationSetting>>,
+export const getUpdateAdminRegistrationSettingMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  updateAdminRegistrationSettingBody: MaybeRefOrGetter<UpdateAdminRegistrationSettingBody>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminRegistrationSetting>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getUpdateAdminRegistrationSettingQueryKey(updateAdminRegistrationSettingBody)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminRegistrationSetting>>> = ({
-    signal,
-  }) =>
-    updateAdminRegistrationSetting(toValue(updateAdminRegistrationSettingBody), {
-      signal,
-      ...requestOptions,
-    })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateAdminRegistrationSetting>>,
     TError,
-    TData
+    UpdateAdminRegistrationSettingMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAdminRegistrationSetting>>,
+  TError,
+  UpdateAdminRegistrationSettingMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateAdminRegistrationSettingMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAdminRegistrationSetting>>,
+    UpdateAdminRegistrationSettingMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return updateAdminRegistrationSetting(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type UpdateAdminRegistrationSettingQueryResult = NonNullable<
+export type UpdateAdminRegistrationSettingMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateAdminRegistrationSetting>>
 >
-export type UpdateAdminRegistrationSettingQueryError = ErrorType<unknown>
+export type UpdateAdminRegistrationSettingMutationBody =
+  BodyType<UpdateAdminRegistrationSettingBody>
+export type UpdateAdminRegistrationSettingMutationError = ErrorType<unknown>
+export type UpdateAdminRegistrationSettingMutationVariables = {
+  data: BodyType<UpdateAdminRegistrationSettingBody>
+}
 
-export function useUpdateAdminRegistrationSetting<
-  TData = Awaited<ReturnType<typeof updateAdminRegistrationSetting>>,
-  TError = ErrorType<unknown>,
->(
-  updateAdminRegistrationSettingBody: MaybeRefOrGetter<UpdateAdminRegistrationSettingBody>,
+export const useUpdateAdminRegistrationSetting = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminRegistrationSetting>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateAdminRegistrationSetting>>,
+      TError,
+      UpdateAdminRegistrationSettingMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUpdateAdminRegistrationSettingQueryOptions(
-    updateAdminRegistrationSettingBody,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateAdminRegistrationSetting>>,
+  TError,
+  UpdateAdminRegistrationSettingMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateAdminRegistrationSettingMutationOptions(options), queryClient)
 }
-
 export const getGetAdminBrandingSettingUrl = () => {
   return `/admin/settings/branding`
 }
@@ -326,68 +328,71 @@ export const updateAdminBrandingSetting = async (
   })
 }
 
-export const getUpdateAdminBrandingSettingQueryKey = (
-  brandingSetting?: MaybeRefOrGetter<BrandingSetting>,
-) => {
-  return ['PUT', 'admin', 'settings', 'branding', brandingSetting] as const
-}
+export const getUpdateAdminBrandingSettingMutationKey = () =>
+  ['updateAdminBrandingSetting'] as const
 
-export const getUpdateAdminBrandingSettingQueryOptions = <
-  TData = Awaited<ReturnType<typeof updateAdminBrandingSetting>>,
+export const getUpdateAdminBrandingSettingMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  brandingSetting: MaybeRefOrGetter<BrandingSetting>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminBrandingSetting>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getUpdateAdminBrandingSettingQueryKey(brandingSetting)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminBrandingSetting>>> = ({
-    signal,
-  }) => updateAdminBrandingSetting(toValue(brandingSetting), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateAdminBrandingSetting>>,
     TError,
-    TData
+    UpdateAdminBrandingSettingMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAdminBrandingSetting>>,
+  TError,
+  UpdateAdminBrandingSettingMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateAdminBrandingSettingMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAdminBrandingSetting>>,
+    UpdateAdminBrandingSettingMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return updateAdminBrandingSetting(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type UpdateAdminBrandingSettingQueryResult = NonNullable<
+export type UpdateAdminBrandingSettingMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateAdminBrandingSetting>>
 >
-export type UpdateAdminBrandingSettingQueryError = ErrorType<unknown>
+export type UpdateAdminBrandingSettingMutationBody = BodyType<BrandingSetting>
+export type UpdateAdminBrandingSettingMutationError = ErrorType<unknown>
+export type UpdateAdminBrandingSettingMutationVariables = { data: BodyType<BrandingSetting> }
 
-export function useUpdateAdminBrandingSetting<
-  TData = Awaited<ReturnType<typeof updateAdminBrandingSetting>>,
-  TError = ErrorType<unknown>,
->(
-  brandingSetting: MaybeRefOrGetter<BrandingSetting>,
+export const useUpdateAdminBrandingSetting = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminBrandingSetting>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateAdminBrandingSetting>>,
+      TError,
+      UpdateAdminBrandingSettingMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUpdateAdminBrandingSettingQueryOptions(brandingSetting, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateAdminBrandingSetting>>,
+  TError,
+  UpdateAdminBrandingSettingMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateAdminBrandingSettingMutationOptions(options), queryClient)
 }
-
 export const getGetAdminMediaUploadSettingUrl = () => {
   return `/admin/settings/media-upload`
 }
@@ -492,68 +497,71 @@ export const updateAdminMediaUploadSetting = async (
   })
 }
 
-export const getUpdateAdminMediaUploadSettingQueryKey = (
-  mediaUploadSetting?: MaybeRefOrGetter<MediaUploadSetting>,
-) => {
-  return ['PUT', 'admin', 'settings', 'media-upload', mediaUploadSetting] as const
-}
+export const getUpdateAdminMediaUploadSettingMutationKey = () =>
+  ['updateAdminMediaUploadSetting'] as const
 
-export const getUpdateAdminMediaUploadSettingQueryOptions = <
-  TData = Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>,
+export const getUpdateAdminMediaUploadSettingMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  mediaUploadSetting: MaybeRefOrGetter<MediaUploadSetting>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getUpdateAdminMediaUploadSettingQueryKey(mediaUploadSetting)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>> = ({
-    signal,
-  }) => updateAdminMediaUploadSetting(toValue(mediaUploadSetting), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>,
     TError,
-    TData
+    UpdateAdminMediaUploadSettingMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>,
+  TError,
+  UpdateAdminMediaUploadSettingMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateAdminMediaUploadSettingMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>,
+    UpdateAdminMediaUploadSettingMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return updateAdminMediaUploadSetting(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type UpdateAdminMediaUploadSettingQueryResult = NonNullable<
+export type UpdateAdminMediaUploadSettingMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>
 >
-export type UpdateAdminMediaUploadSettingQueryError = ErrorType<unknown>
+export type UpdateAdminMediaUploadSettingMutationBody = BodyType<MediaUploadSetting>
+export type UpdateAdminMediaUploadSettingMutationError = ErrorType<unknown>
+export type UpdateAdminMediaUploadSettingMutationVariables = { data: BodyType<MediaUploadSetting> }
 
-export function useUpdateAdminMediaUploadSetting<
-  TData = Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>,
-  TError = ErrorType<unknown>,
->(
-  mediaUploadSetting: MaybeRefOrGetter<MediaUploadSetting>,
+export const useUpdateAdminMediaUploadSetting = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>,
+      TError,
+      UpdateAdminMediaUploadSettingMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUpdateAdminMediaUploadSettingQueryOptions(mediaUploadSetting, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>,
+  TError,
+  UpdateAdminMediaUploadSettingMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateAdminMediaUploadSettingMutationOptions(options), queryClient)
 }
-
 export const getGetAdminRateLimitSettingsUrl = () => {
   return `/admin/settings/rate-limit`
 }
@@ -658,68 +666,71 @@ export const updateAdminRateLimitSettings = async (
   })
 }
 
-export const getUpdateAdminRateLimitSettingsQueryKey = (
-  rateLimitSetting?: MaybeRefOrGetter<RateLimitSetting>,
-) => {
-  return ['PUT', 'admin', 'settings', 'rate-limit', rateLimitSetting] as const
-}
+export const getUpdateAdminRateLimitSettingsMutationKey = () =>
+  ['updateAdminRateLimitSettings'] as const
 
-export const getUpdateAdminRateLimitSettingsQueryOptions = <
-  TData = Awaited<ReturnType<typeof updateAdminRateLimitSettings>>,
+export const getUpdateAdminRateLimitSettingsMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  rateLimitSetting: MaybeRefOrGetter<RateLimitSetting>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminRateLimitSettings>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getUpdateAdminRateLimitSettingsQueryKey(rateLimitSetting)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminRateLimitSettings>>> = ({
-    signal,
-  }) => updateAdminRateLimitSettings(toValue(rateLimitSetting), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateAdminRateLimitSettings>>,
     TError,
-    TData
+    UpdateAdminRateLimitSettingsMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAdminRateLimitSettings>>,
+  TError,
+  UpdateAdminRateLimitSettingsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateAdminRateLimitSettingsMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAdminRateLimitSettings>>,
+    UpdateAdminRateLimitSettingsMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return updateAdminRateLimitSettings(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type UpdateAdminRateLimitSettingsQueryResult = NonNullable<
+export type UpdateAdminRateLimitSettingsMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateAdminRateLimitSettings>>
 >
-export type UpdateAdminRateLimitSettingsQueryError = ErrorType<unknown>
+export type UpdateAdminRateLimitSettingsMutationBody = BodyType<RateLimitSetting>
+export type UpdateAdminRateLimitSettingsMutationError = ErrorType<unknown>
+export type UpdateAdminRateLimitSettingsMutationVariables = { data: BodyType<RateLimitSetting> }
 
-export function useUpdateAdminRateLimitSettings<
-  TData = Awaited<ReturnType<typeof updateAdminRateLimitSettings>>,
-  TError = ErrorType<unknown>,
->(
-  rateLimitSetting: MaybeRefOrGetter<RateLimitSetting>,
+export const useUpdateAdminRateLimitSettings = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminRateLimitSettings>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateAdminRateLimitSettings>>,
+      TError,
+      UpdateAdminRateLimitSettingsMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUpdateAdminRateLimitSettingsQueryOptions(rateLimitSetting, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateAdminRateLimitSettings>>,
+  TError,
+  UpdateAdminRateLimitSettingsMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateAdminRateLimitSettingsMutationOptions(options), queryClient)
 }
-
 export const getGetAdminOutboundPolicyUrl = () => {
   return `/admin/settings/outbound-policy`
 }
@@ -823,72 +834,72 @@ export const updateAdminOutboundPolicy = async (
   })
 }
 
-export const getUpdateAdminOutboundPolicyQueryKey = (
-  outboundPolicyUpdateRequest?: MaybeRefOrGetter<OutboundPolicyUpdateRequest>,
-) => {
-  return ['PUT', 'admin', 'settings', 'outbound-policy', outboundPolicyUpdateRequest] as const
-}
+export const getUpdateAdminOutboundPolicyMutationKey = () => ['updateAdminOutboundPolicy'] as const
 
-export const getUpdateAdminOutboundPolicyQueryOptions = <
-  TData = Awaited<ReturnType<typeof updateAdminOutboundPolicy>>,
+export const getUpdateAdminOutboundPolicyMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  outboundPolicyUpdateRequest: MaybeRefOrGetter<OutboundPolicyUpdateRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminOutboundPolicy>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getUpdateAdminOutboundPolicyQueryKey(outboundPolicyUpdateRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminOutboundPolicy>>> = ({
-    signal,
-  }) =>
-    updateAdminOutboundPolicy(toValue(outboundPolicyUpdateRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateAdminOutboundPolicy>>,
     TError,
-    TData
+    UpdateAdminOutboundPolicyMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAdminOutboundPolicy>>,
+  TError,
+  UpdateAdminOutboundPolicyMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateAdminOutboundPolicyMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAdminOutboundPolicy>>,
+    UpdateAdminOutboundPolicyMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return updateAdminOutboundPolicy(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type UpdateAdminOutboundPolicyQueryResult = NonNullable<
+export type UpdateAdminOutboundPolicyMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateAdminOutboundPolicy>>
 >
-export type UpdateAdminOutboundPolicyQueryError = ErrorType<unknown>
+export type UpdateAdminOutboundPolicyMutationBody = BodyType<OutboundPolicyUpdateRequest>
+export type UpdateAdminOutboundPolicyMutationError = ErrorType<unknown>
+export type UpdateAdminOutboundPolicyMutationVariables = {
+  data: BodyType<OutboundPolicyUpdateRequest>
+}
 
-export function useUpdateAdminOutboundPolicy<
-  TData = Awaited<ReturnType<typeof updateAdminOutboundPolicy>>,
-  TError = ErrorType<unknown>,
->(
-  outboundPolicyUpdateRequest: MaybeRefOrGetter<OutboundPolicyUpdateRequest>,
+export const useUpdateAdminOutboundPolicy = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminOutboundPolicy>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateAdminOutboundPolicy>>,
+      TError,
+      UpdateAdminOutboundPolicyMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUpdateAdminOutboundPolicyQueryOptions(
-    outboundPolicyUpdateRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateAdminOutboundPolicy>>,
+  TError,
+  UpdateAdminOutboundPolicyMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateAdminOutboundPolicyMutationOptions(options), queryClient)
 }
-
 export const getGetAdminAIGatewayConfigUrl = () => {
   return `/admin/settings/ai-gateway`
 }
@@ -993,72 +1004,73 @@ export const updateAdminAIGatewayConfig = async (
   })
 }
 
-export const getUpdateAdminAIGatewayConfigQueryKey = (
-  updateGatewayConfigRequest?: MaybeRefOrGetter<UpdateGatewayConfigRequest>,
-) => {
-  return ['PUT', 'admin', 'settings', 'ai-gateway', updateGatewayConfigRequest] as const
-}
+export const getUpdateAdminAIGatewayConfigMutationKey = () =>
+  ['updateAdminAIGatewayConfig'] as const
 
-export const getUpdateAdminAIGatewayConfigQueryOptions = <
-  TData = Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>,
+export const getUpdateAdminAIGatewayConfigMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  updateGatewayConfigRequest: MaybeRefOrGetter<UpdateGatewayConfigRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getUpdateAdminAIGatewayConfigQueryKey(updateGatewayConfigRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>> = ({
-    signal,
-  }) =>
-    updateAdminAIGatewayConfig(toValue(updateGatewayConfigRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>,
     TError,
-    TData
+    UpdateAdminAIGatewayConfigMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>,
+  TError,
+  UpdateAdminAIGatewayConfigMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateAdminAIGatewayConfigMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>,
+    UpdateAdminAIGatewayConfigMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return updateAdminAIGatewayConfig(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type UpdateAdminAIGatewayConfigQueryResult = NonNullable<
+export type UpdateAdminAIGatewayConfigMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>
 >
-export type UpdateAdminAIGatewayConfigQueryError = ErrorType<unknown>
+export type UpdateAdminAIGatewayConfigMutationBody = BodyType<UpdateGatewayConfigRequest>
+export type UpdateAdminAIGatewayConfigMutationError = ErrorType<unknown>
+export type UpdateAdminAIGatewayConfigMutationVariables = {
+  data: BodyType<UpdateGatewayConfigRequest>
+}
 
-export function useUpdateAdminAIGatewayConfig<
-  TData = Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>,
-  TError = ErrorType<unknown>,
->(
-  updateGatewayConfigRequest: MaybeRefOrGetter<UpdateGatewayConfigRequest>,
+export const useUpdateAdminAIGatewayConfig = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>,
+      TError,
+      UpdateAdminAIGatewayConfigMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUpdateAdminAIGatewayConfigQueryOptions(
-    updateGatewayConfigRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateAdminAIGatewayConfig>>,
+  TError,
+  UpdateAdminAIGatewayConfigMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateAdminAIGatewayConfigMutationOptions(options), queryClient)
 }
-
 export const getListAdminGatewayModelMappingsUrl = () => {
   return `/admin/settings/ai-gateway/models`
 }
@@ -1164,88 +1176,74 @@ export const saveAdminGatewayModelMapping = async (
   })
 }
 
-export const getSaveAdminGatewayModelMappingQueryKey = (
-  feature: MaybeRefOrGetter<string>,
-  saveGatewayModelMappingRequest?: MaybeRefOrGetter<SaveGatewayModelMappingRequest>,
-) => {
-  return [
-    'PUT',
-    'admin',
-    'settings',
-    'ai-gateway',
-    'models',
-    feature,
-    saveGatewayModelMappingRequest,
-  ] as const
-}
+export const getSaveAdminGatewayModelMappingMutationKey = () =>
+  ['saveAdminGatewayModelMapping'] as const
 
-export const getSaveAdminGatewayModelMappingQueryOptions = <
-  TData = Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>,
+export const getSaveAdminGatewayModelMappingMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  feature: MaybeRefOrGetter<string>,
-  saveGatewayModelMappingRequest: MaybeRefOrGetter<SaveGatewayModelMappingRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>,
+    TError,
+    SaveAdminGatewayModelMappingMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>,
+  TError,
+  SaveAdminGatewayModelMappingMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSaveAdminGatewayModelMappingMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getSaveAdminGatewayModelMappingQueryKey(feature, saveGatewayModelMappingRequest)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>,
+    SaveAdminGatewayModelMappingMutationVariables
+  > = (props) => {
+    const { feature, data } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>> = ({
-    signal,
-  }) =>
-    saveAdminGatewayModelMapping(toValue(feature), toValue(saveGatewayModelMappingRequest), {
-      signal,
-      ...requestOptions,
-    })
+    return saveAdminGatewayModelMapping(feature, data, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(feature) !== null && toValue(feature) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type SaveAdminGatewayModelMappingQueryResult = NonNullable<
+export type SaveAdminGatewayModelMappingMutationResult = NonNullable<
   Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>
 >
-export type SaveAdminGatewayModelMappingQueryError = ErrorType<unknown>
+export type SaveAdminGatewayModelMappingMutationBody = BodyType<SaveGatewayModelMappingRequest>
+export type SaveAdminGatewayModelMappingMutationError = ErrorType<unknown>
+export type SaveAdminGatewayModelMappingMutationVariables = {
+  feature: string
+  data: BodyType<SaveGatewayModelMappingRequest>
+}
 
-export function useSaveAdminGatewayModelMapping<
-  TData = Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>,
-  TError = ErrorType<unknown>,
->(
-  feature: MaybeRefOrGetter<string>,
-  saveGatewayModelMappingRequest: MaybeRefOrGetter<SaveGatewayModelMappingRequest>,
+export const useSaveAdminGatewayModelMapping = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>,
+      TError,
+      SaveAdminGatewayModelMappingMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getSaveAdminGatewayModelMappingQueryOptions(
-    feature,
-    saveGatewayModelMappingRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof saveAdminGatewayModelMapping>>,
+  TError,
+  SaveAdminGatewayModelMappingMutationVariables,
+  TContext
+> => {
+  return useMutation(getSaveAdminGatewayModelMappingMutationOptions(options), queryClient)
 }
-
 export const getListAdminGatewayModelCatalogUrl = () => {
   return `/admin/settings/ai-gateway/catalog`
 }
@@ -1350,82 +1348,73 @@ export const saveAdminGatewayModelCatalog = async (
   })
 }
 
-export const getSaveAdminGatewayModelCatalogQueryKey = (
-  saveGatewayModelCatalogRequest?: MaybeRefOrGetter<SaveGatewayModelCatalogRequest>,
-) => {
-  return [
-    'PUT',
-    'admin',
-    'settings',
-    'ai-gateway',
-    'catalog',
-    saveGatewayModelCatalogRequest,
-  ] as const
-}
+export const getSaveAdminGatewayModelCatalogMutationKey = () =>
+  ['saveAdminGatewayModelCatalog'] as const
 
-export const getSaveAdminGatewayModelCatalogQueryOptions = <
-  TData = Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>,
+export const getSaveAdminGatewayModelCatalogMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  saveGatewayModelCatalogRequest: MaybeRefOrGetter<SaveGatewayModelCatalogRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getSaveAdminGatewayModelCatalogQueryKey(saveGatewayModelCatalogRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>> = ({
-    signal,
-  }) =>
-    saveAdminGatewayModelCatalog(toValue(saveGatewayModelCatalogRequest), {
-      signal,
-      ...requestOptions,
-    })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>,
     TError,
-    TData
+    SaveAdminGatewayModelCatalogMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>,
+  TError,
+  SaveAdminGatewayModelCatalogMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSaveAdminGatewayModelCatalogMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>,
+    SaveAdminGatewayModelCatalogMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return saveAdminGatewayModelCatalog(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type SaveAdminGatewayModelCatalogQueryResult = NonNullable<
+export type SaveAdminGatewayModelCatalogMutationResult = NonNullable<
   Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>
 >
-export type SaveAdminGatewayModelCatalogQueryError = ErrorType<unknown>
+export type SaveAdminGatewayModelCatalogMutationBody = BodyType<SaveGatewayModelCatalogRequest>
+export type SaveAdminGatewayModelCatalogMutationError = ErrorType<unknown>
+export type SaveAdminGatewayModelCatalogMutationVariables = {
+  data: BodyType<SaveGatewayModelCatalogRequest>
+}
 
-export function useSaveAdminGatewayModelCatalog<
-  TData = Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>,
-  TError = ErrorType<unknown>,
->(
-  saveGatewayModelCatalogRequest: MaybeRefOrGetter<SaveGatewayModelCatalogRequest>,
+export const useSaveAdminGatewayModelCatalog = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>,
+      TError,
+      SaveAdminGatewayModelCatalogMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getSaveAdminGatewayModelCatalogQueryOptions(
-    saveGatewayModelCatalogRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof saveAdminGatewayModelCatalog>>,
+  TError,
+  SaveAdminGatewayModelCatalogMutationVariables,
+  TContext
+> => {
+  return useMutation(getSaveAdminGatewayModelCatalogMutationOptions(options), queryClient)
 }
-
 export const getPreviewAdminGatewayRouteUrl = () => {
   return `/admin/settings/ai-gateway/route-preview`
 }
@@ -1461,75 +1450,72 @@ export const previewAdminGatewayRoute = async (
   })
 }
 
-export const getPreviewAdminGatewayRouteQueryKey = (
-  previewGatewayRouteRequest?: MaybeRefOrGetter<PreviewGatewayRouteRequest>,
-) => {
-  return [
-    'POST',
-    'admin',
-    'settings',
-    'ai-gateway',
-    'route-preview',
-    previewGatewayRouteRequest,
-  ] as const
-}
+export const getPreviewAdminGatewayRouteMutationKey = () => ['previewAdminGatewayRoute'] as const
 
-export const getPreviewAdminGatewayRouteQueryOptions = <
-  TData = Awaited<ReturnType<typeof previewAdminGatewayRoute>>,
+export const getPreviewAdminGatewayRouteMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  previewGatewayRouteRequest: MaybeRefOrGetter<PreviewGatewayRouteRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof previewAdminGatewayRoute>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getPreviewAdminGatewayRouteQueryKey(previewGatewayRouteRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof previewAdminGatewayRoute>>> = ({
-    signal,
-  }) => previewAdminGatewayRoute(toValue(previewGatewayRouteRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof previewAdminGatewayRoute>>,
     TError,
-    TData
+    PreviewAdminGatewayRouteMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof previewAdminGatewayRoute>>,
+  TError,
+  PreviewAdminGatewayRouteMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPreviewAdminGatewayRouteMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof previewAdminGatewayRoute>>,
+    PreviewAdminGatewayRouteMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return previewAdminGatewayRoute(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type PreviewAdminGatewayRouteQueryResult = NonNullable<
+export type PreviewAdminGatewayRouteMutationResult = NonNullable<
   Awaited<ReturnType<typeof previewAdminGatewayRoute>>
 >
-export type PreviewAdminGatewayRouteQueryError = ErrorType<unknown>
+export type PreviewAdminGatewayRouteMutationBody = BodyType<PreviewGatewayRouteRequest>
+export type PreviewAdminGatewayRouteMutationError = ErrorType<unknown>
+export type PreviewAdminGatewayRouteMutationVariables = {
+  data: BodyType<PreviewGatewayRouteRequest>
+}
 
-export function usePreviewAdminGatewayRoute<
-  TData = Awaited<ReturnType<typeof previewAdminGatewayRoute>>,
-  TError = ErrorType<unknown>,
->(
-  previewGatewayRouteRequest: MaybeRefOrGetter<PreviewGatewayRouteRequest>,
+export const usePreviewAdminGatewayRoute = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof previewAdminGatewayRoute>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof previewAdminGatewayRoute>>,
+      TError,
+      PreviewAdminGatewayRouteMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getPreviewAdminGatewayRouteQueryOptions(previewGatewayRouteRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof previewAdminGatewayRoute>>,
+  TError,
+  PreviewAdminGatewayRouteMutationVariables,
+  TContext
+> => {
+  return useMutation(getPreviewAdminGatewayRouteMutationOptions(options), queryClient)
 }
-
 export const getTestAdminGatewayConnectionUrl = () => {
   return `/admin/settings/ai-gateway/test-connection`
 }
@@ -1565,79 +1551,73 @@ export const testAdminGatewayConnection = async (
   })
 }
 
-export const getTestAdminGatewayConnectionQueryKey = (
-  testGatewayConnectionRequest?: MaybeRefOrGetter<TestGatewayConnectionRequest>,
-) => {
-  return [
-    'POST',
-    'admin',
-    'settings',
-    'ai-gateway',
-    'test-connection',
-    testGatewayConnectionRequest,
-  ] as const
-}
+export const getTestAdminGatewayConnectionMutationKey = () =>
+  ['testAdminGatewayConnection'] as const
 
-export const getTestAdminGatewayConnectionQueryOptions = <
-  TData = Awaited<ReturnType<typeof testAdminGatewayConnection>>,
+export const getTestAdminGatewayConnectionMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  testGatewayConnectionRequest: MaybeRefOrGetter<TestGatewayConnectionRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof testAdminGatewayConnection>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getTestAdminGatewayConnectionQueryKey(testGatewayConnectionRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof testAdminGatewayConnection>>> = ({
-    signal,
-  }) =>
-    testAdminGatewayConnection(toValue(testGatewayConnectionRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof testAdminGatewayConnection>>,
     TError,
-    TData
+    TestAdminGatewayConnectionMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof testAdminGatewayConnection>>,
+  TError,
+  TestAdminGatewayConnectionMutationVariables,
+  TContext
+> => {
+  const mutationKey = getTestAdminGatewayConnectionMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof testAdminGatewayConnection>>,
+    TestAdminGatewayConnectionMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return testAdminGatewayConnection(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type TestAdminGatewayConnectionQueryResult = NonNullable<
+export type TestAdminGatewayConnectionMutationResult = NonNullable<
   Awaited<ReturnType<typeof testAdminGatewayConnection>>
 >
-export type TestAdminGatewayConnectionQueryError = ErrorType<unknown>
+export type TestAdminGatewayConnectionMutationBody = BodyType<TestGatewayConnectionRequest>
+export type TestAdminGatewayConnectionMutationError = ErrorType<unknown>
+export type TestAdminGatewayConnectionMutationVariables = {
+  data: BodyType<TestGatewayConnectionRequest>
+}
 
-export function useTestAdminGatewayConnection<
-  TData = Awaited<ReturnType<typeof testAdminGatewayConnection>>,
-  TError = ErrorType<unknown>,
->(
-  testGatewayConnectionRequest: MaybeRefOrGetter<TestGatewayConnectionRequest>,
+export const useTestAdminGatewayConnection = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof testAdminGatewayConnection>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof testAdminGatewayConnection>>,
+      TError,
+      TestAdminGatewayConnectionMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getTestAdminGatewayConnectionQueryOptions(
-    testGatewayConnectionRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof testAdminGatewayConnection>>,
+  TError,
+  TestAdminGatewayConnectionMutationVariables,
+  TContext
+> => {
+  return useMutation(getTestAdminGatewayConnectionMutationOptions(options), queryClient)
 }
-
 export const getDetectAdminGatewayModelsUrl = (params?: DetectAdminGatewayModelsParams) => {
   const normalizedParams = new URLSearchParams()
 

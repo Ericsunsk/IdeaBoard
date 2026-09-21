@@ -10,8 +10,8 @@
   >
     <div class="flex flex-col gap-4">
       <!-- 错误警告提示 -->
-      <AdminAlert v-if="error || validationError" severity="error">
-        {{ error || validationError }}
+      <AdminAlert v-if="error || form.errors.value.base_url" severity="error">
+        {{ error || form.errors.value.base_url }}
       </AdminAlert>
 
       <!-- 网关 Base URL -->
@@ -33,7 +33,7 @@
         </div>
         <AdminInput
           id="gateway-base-url-input"
-          v-model="form.base_url"
+          v-model="form.values.base_url"
           placeholder="例如: https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}"
           :disabled="loading || saving"
           class="w-full"
@@ -59,7 +59,7 @@
         </div>
         <AdminInput
           id="gateway-token-input"
-          v-model="form.token"
+          v-model="form.values.token"
           type="password"
           placeholder="输入网关鉴权 Token（若开启鉴权）"
           autocomplete="off"
@@ -78,7 +78,7 @@
         </label>
         <AdminInput
           id="gateway-account-id-input"
-          v-model="form.account_id"
+          v-model="form.values.account_id"
           placeholder="32 位小写十六进制"
           autocomplete="off"
           :disabled="loading || saving"
@@ -91,7 +91,7 @@
         </label>
         <AdminInput
           id="gateway-id-input"
-          v-model="form.gateway_id"
+          v-model="form.values.gateway_id"
           placeholder="网关标识"
           autocomplete="off"
           :disabled="loading || saving"
@@ -133,13 +133,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import * as v from 'valibot'
+import { useForm } from '@/components/ui/form'
 import { Check, ShieldCheck } from '@iconoir/vue'
 import AdminAlert from '../../../shared/components/AdminAlert.vue'
 import AdminButton from '../../../shared/components/AdminButton.vue'
 import AdminDialogShell from '../../../shared/components/AdminDialogShell.vue'
 import AdminInput from '../../../shared/components/AdminInput.vue'
-import { formatAdminDisplayError, useAdminToast } from '../../../shared/lib/toast'
+import { formatAdminDisplayError } from '../../../shared/lib/toast'
+import { useAdminGatewayConfigFeedback } from '../../application/useAdminModelCatalogFeedback'
 import { adminActionButtonClass } from '../../../shared/lib/uiClasses'
 import {
   createAdminGatewayResource,
@@ -159,20 +162,26 @@ const emit = defineEmits<{
 
 const defaultResource = createAdminGatewayResource().connection
 const resource = computed(() => props.resource ?? defaultResource)
-const toast = useAdminToast()
+const feedback = useAdminGatewayConfigFeedback()
 
 const summary = ref<GatewayConnectionSummary | null>(null)
 const loading = ref(false)
 const saving = ref(false)
 const testing = ref(false)
 const error = ref('')
-const validationError = ref('')
-
-const form = reactive({
-  base_url: '',
-  token: '',
-  account_id: '',
-  gateway_id: '',
+const form = useForm({
+  initialValues: { base_url: '', token: '', account_id: '', gateway_id: '' },
+  schema: v.object({
+    base_url: v.pipe(
+      v.string(),
+      v.trim(),
+      v.minLength(1, '请输入网关 Base URL'),
+      v.check(
+        (value) => /^https?:\/\//i.test(value),
+        '网关 Base URL 必须以 http:// 或 https:// 开头',
+      ),
+    ),
+  }),
 })
 
 const isTokenConfigured = computed(() => Boolean(summary.value?.token_configured))
@@ -190,14 +199,15 @@ watch(
 async function loadGatewayConfig() {
   loading.value = true
   error.value = ''
-  validationError.value = ''
   try {
     const data = await resource.value.get()
     summary.value = data
-    form.base_url = data.base_url ?? ''
-    form.account_id = data.account_id ?? ''
-    form.gateway_id = data.gateway_id ?? ''
-    form.token = ''
+    form.resetForm({
+      base_url: data.base_url ?? '',
+      token: '',
+      account_id: data.account_id ?? '',
+      gateway_id: data.gateway_id ?? '',
+    })
   } catch (err) {
     error.value = formatAdminDisplayError(err, '读取网关配置失败')
   } finally {
@@ -205,62 +215,39 @@ async function loadGatewayConfig() {
   }
 }
 
-function validate(): boolean {
-  validationError.value = ''
-  const baseUrl = form.base_url.trim()
-
-  if (!baseUrl) {
-    validationError.value = '请输入网关 Base URL'
-    return false
-  }
-
-  if (!/^https?:\/\//i.test(baseUrl)) {
-    validationError.value = '网关 Base URL 必须以 http:// 或 https:// 开头'
-    return false
-  }
-
-  return true
-}
-
-async function handleTestConnection() {
-  if (!validate()) return
-
+const handleTestConnection = form.handleSubmit(async (values) => {
   testing.value = true
   error.value = ''
-  validationError.value = ''
 
   try {
-    const finalBaseUrl = form.base_url.trim().replace(/\/+$/, '')
+    const finalBaseUrl = values.base_url.trim().replace(/\/+$/, '')
 
     // testConnection 是 connection interface 必需成员：直调服务端探活，无假成功回退。
     const res = await resource.value.testConnection({
       base_url: finalBaseUrl,
-      token: form.token.trim() || undefined,
+      token: values.token.trim() || undefined,
     })
     if (res.success) {
-      toast.success(res.message || '网关连接测试成功')
+      feedback.testPassed(res.message)
     } else {
       error.value = res.message || '网关连接测试失败'
-      toast.error(res.message || '网关连接测试失败')
+      feedback.testFailed(res.message)
     }
   } catch (err) {
     const msg = formatAdminDisplayError(err, '网关连接测试失败')
     error.value = msg
-    toast.error(msg)
+    feedback.testFailed(msg)
   } finally {
     testing.value = false
   }
-}
+})
 
-async function handleSave() {
-  if (!validate()) return
-
+const handleSave = form.handleSubmit(async (values) => {
   saving.value = true
   error.value = ''
-  validationError.value = ''
 
   try {
-    const finalBaseUrl = form.base_url.trim().replace(/\/+$/, '')
+    const finalBaseUrl = values.base_url.trim().replace(/\/+$/, '')
 
     const payload: {
       base_url?: string
@@ -270,16 +257,16 @@ async function handleSave() {
     } = {
       base_url: finalBaseUrl,
     }
-    if (form.token.trim()) {
-      payload.token = form.token.trim()
+    if (values.token.trim()) {
+      payload.token = values.token.trim()
     }
     // 身份字段显式透传（含清空）：自定义域名场景靠它们建 control-plane 身份。
-    payload.account_id = form.account_id.trim().toLowerCase()
-    payload.gateway_id = form.gateway_id.trim().toLowerCase()
+    payload.account_id = values.account_id.trim().toLowerCase()
+    payload.gateway_id = values.gateway_id.trim().toLowerCase()
 
     await resource.value.update(payload)
 
-    toast.success('AI 网关配置已保存')
+    feedback.saved()
     // saved 必须是服务端确认的真相：重读失败就报错、不关弹窗、不 emit。
     try {
       emit('saved', await resource.value.get())
@@ -293,5 +280,5 @@ async function handleSave() {
   } finally {
     saving.value = false
   }
-}
+})
 </script>

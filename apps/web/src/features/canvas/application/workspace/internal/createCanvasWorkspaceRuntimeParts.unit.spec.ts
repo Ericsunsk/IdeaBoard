@@ -96,6 +96,7 @@ function createBoardRuntime() {
     graphEditing: {
       adapter: {},
       readCanvasGraphStore: vi.fn(),
+      isGraphSessionAttached: vi.fn(() => true),
       deleteNode: vi.fn(),
       grouping,
     },
@@ -424,7 +425,9 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
       expect.objectContaining({
         nodes: board.flowPane.nodes,
         edges: board.flowPane.edges,
-        graphAdapter: board.graphEditing.adapter,
+        readCanvasGraphStore: board.graphEditing.readCanvasGraphStore,
+        isGraphSessionAttached: board.graphEditing.isGraphSessionAttached,
+        writeCanvasGraphStore: board.graphEditing.readCanvasGraphStore,
         browser: runtimeOptions.graphInteractionBrowser,
         feedback: mocks.feedback.graph,
         isNodeExecutionActive: expect.any(Function),

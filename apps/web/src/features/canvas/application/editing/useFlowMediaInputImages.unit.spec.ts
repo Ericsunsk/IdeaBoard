@@ -13,7 +13,6 @@ import type { FlowNodeData } from '../../domain/nodes/flowTypes.ts'
 import { CanvasGraphSession } from '../../domain/graph'
 import { flowConnectionToCanvasConnection } from '../../infrastructure/vue-flow-adapter/flowConnectionAdapter.ts'
 import { useFlowMediaInputImages } from './useFlowMediaInputImages'
-import { useCanvasVueFlowGraphAdapter } from '../../infrastructure/vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import type { MediaRef } from '../../../../shared/media/mediaRef'
 
 function makeImageSnapshot(overrides: Partial<ImageNodeItem> = {}): ImageNodeItem {
@@ -89,15 +88,6 @@ function createGraphSession(nodes: Node[], edges: Edge[]) {
 }
 
 function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
-  const graphActions = {
-    setNodes: vi.fn(),
-    setEdges: vi.fn(),
-  }
-  const graphAdapter = useCanvasVueFlowGraphAdapter({
-    nodes,
-    edges,
-    actions: graphActions,
-  })
   const markFlowExecutionNodeDirty = vi.fn()
   const graphSession = createGraphSession(nodes.value, edges.value)
   const updateSnapshotNodeBase = vi.fn(
@@ -147,7 +137,6 @@ function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
     uploadImageToBoard,
     updateSnapshotNodeBase,
     readCanvasGraphStore: () => graphSession.store,
-    graphAdapter,
     markFlowExecutionNodeDirty,
     getImageNodeDisplayPayload: (nodeId) => {
       const node = nodes.value.find((item) => item.id === nodeId)
@@ -167,7 +156,6 @@ function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
     ...api,
     uploadImageToBoard,
     updateSnapshotNodeBase,
-    graphActions,
     markFlowExecutionNodeDirty,
     graphSession,
     project: () => {
@@ -320,7 +308,7 @@ describe('useFlowMediaInputImages', () => {
         targetHandle: 'in:image',
       },
     ] as Edge[])
-    const { onFlowMediaInputImageRemove, graphActions, markFlowExecutionNodeDirty } = createHarness(
+    const { onFlowMediaInputImageRemove, markFlowExecutionNodeDirty, graphSession } = createHarness(
       nodes,
       edges,
     )
@@ -328,12 +316,8 @@ describe('useFlowMediaInputImages', () => {
     onFlowMediaInputImageRemove('prompt-1', 'node:image-1')
     await nextTick()
 
-    expect(nodes.value.find((node) => node.id === 'prompt-1')?.data?.snapshotNode).toMatchObject({
-      inputImages: [],
-    })
-    expect(edges.value).toEqual([])
-    expect(graphActions.setNodes).toHaveBeenCalledOnce()
-    expect(graphActions.setEdges).toHaveBeenCalledOnce()
+    expect(graphSession.store.exportSnapshot().promptNodes[0]?.inputImages).toEqual([])
+    expect(graphSession.store.exportSnapshot().connections).toEqual([])
     expect(markFlowExecutionNodeDirty).toHaveBeenCalledWith('prompt-1', { includeSelf: true })
   })
 
@@ -377,7 +361,7 @@ describe('useFlowMediaInputImages', () => {
 
     expect(graphSession.store.exportSnapshot().promptNodes[0]?.inputImages).toEqual([])
     expect(graphSession.store.exportSnapshot().connections).toEqual([])
-    expect(nodes.value.map((node) => node.id)).toEqual(['image-1', 'prompt-1'])
+    expect(nodes.value.map((node) => node.id)).toEqual(['prompt-1'])
     expect(edges.value).toEqual([])
   })
 

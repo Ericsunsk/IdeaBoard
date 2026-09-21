@@ -202,9 +202,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
-import { useQueryClient } from '@tanstack/vue-query'
-import { useAdminCursorCollection } from '../../shared/composables/useAdminCursorCollection'
+import { computed, ref } from 'vue'
 import { MoreHoriz, Refresh } from '@iconoir/vue'
 import AdminCollectionPageShell from '../../shared/components/AdminCollectionPageShell.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'
@@ -219,7 +217,6 @@ import AdminRowActionsPopover from '../../shared/components/AdminRowActionsPopov
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
-import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
 import {
   adminActionButtonClass,
@@ -236,16 +233,34 @@ import {
   createAdminRewardCodeResource,
   REWARD_CODE_STATUS_FILTER_ALL,
   type RewardCode,
-  type RewardCodePage,
-  type RewardCodeStatusFilter,
-  type SearchRewardCodesInput,
 } from './resource'
+import { useRewardCodeList } from './useRewardCodeList'
+import { useRewardCodeRowActions } from './useRewardCodeRowActions'
 
 const resource = createAdminRewardCodeResource()
+const {
+  searchKeyword,
+  statusFilter,
+  statusOptions,
+  rewardCodes,
+  totalRewardCodesLabel,
+  emptyTitle,
+  loading,
+  initialError,
+  backgroundError,
+  pagination,
+  previousPage,
+  nextPage,
+  rewardCodeListQuery,
+  updateRewardCodes,
+  refreshRewardCodes,
+  searchRewardCodes,
+  clearSearch,
+  resetStatusFilter,
+} = useRewardCodeList({ resource })
+const { enabledPending, deletePending, replaceRewardCode, setRewardCodeEnabled, confirmDelete } =
+  useRewardCodeRowActions({ resource, updateRewardCodes, refreshRewardCodes })
 const toast = useAdminToast()
-const searchKeyword = ref('')
-const appliedSearchKeyword = ref('')
-const statusFilter = ref<RewardCodeStatusFilter>(REWARD_CODE_STATUS_FILTER_ALL)
 const saving = ref(false)
 const saveError = ref('')
 const createDialogVisible = ref(false)
@@ -253,8 +268,6 @@ const editingRewardCode = ref<RewardCode | null>(null)
 const plaintextDialogVisible = ref(false)
 const createdPlaintext = ref('')
 const plaintextHeader = ref('保存兑换码')
-const enabledPending = reactive<Record<number, boolean>>({})
-const deletePending = reactive<Record<number, boolean>>({})
 const activeRewardCode = ref<RewardCode | null>(null)
 const redemptionsRewardCode = ref<RewardCode | null>(null)
 const redemptionsDialogVisible = ref(false)
@@ -269,101 +282,7 @@ const rewardCodeActionItems = computed(() => [
     disabled: Boolean(deletePending[activeRewardCode.value?.id ?? 0]),
   },
 ])
-const confirm = useAdminConfirm()
-const queryClient = useQueryClient()
-// 游标集合生命周期收敛于 useAdminCursorCollection：筛选/分页状态喂给 query key，
-// 翻页与刷新只改状态。
-const REWARD_CODE_LIST_QUERY_ROOT = ['admin', 'credits', 'reward-codes'] as const
-const REWARD_CODE_LIST_CRITERIA_INDEX = REWARD_CODE_LIST_QUERY_ROOT.length
-const {
-  data: rewardCodePage,
-  loading,
-  initialError,
-  backgroundError,
-  pagination,
-  previousPage,
-  nextPage,
-  query: rewardCodeListQuery,
-  queryKey: rewardCodeListKey,
-} = useAdminCursorCollection({
-  buildKey: (beforeId) =>
-    [
-      ...REWARD_CODE_LIST_QUERY_ROOT,
-      {
-        query: appliedSearchKeyword.value,
-        status:
-          statusFilter.value === REWARD_CODE_STATUS_FILTER_ALL ? undefined : statusFilter.value,
-        beforeId,
-      },
-    ] as const,
-  queryFn: ({ queryKey, signal }) =>
-    resource.search({
-      ...(queryKey[REWARD_CODE_LIST_CRITERIA_INDEX] as Omit<
-        SearchRewardCodesInput,
-        'signal' | 'limit'
-      >),
-      signal,
-    }),
-  getNextCursor: (page) => page.nextBeforeId,
-})
-// Matches the previous `onInitialError` toast; the error Message stays mounted
-// for repeated failures while the toast fires on each new failure transition.
-watch(initialError, (failed, wasFailed) => {
-  if (failed && !wasFailed) {
-    toast.error(formatAdminDisplayError(rewardCodeListQuery.error.value, '兑换码加载失败'))
-  }
-})
-const rewardCodes = computed(() => rewardCodePage.value?.rewardCodes ?? [])
-const totalRewardCodes = computed(() => rewardCodePage.value?.total ?? 0)
-const totalRewardCodesLabel = computed(() => '共 ' + totalRewardCodes.value + ' 个兑换码')
-const emptyTitle = computed(() =>
-  appliedSearchKeyword.value.trim() || statusFilter.value !== REWARD_CODE_STATUS_FILTER_ALL
-    ? '未找到匹配的兑换码'
-    : '暂无兑换码',
-)
-const statusOptions = [
-  { label: '全部状态', value: REWARD_CODE_STATUS_FILTER_ALL },
-  { label: '可兑换', value: 'enabled' },
-  { label: '已停用', value: 'disabled' },
-  { label: '已过期', value: 'expired' },
-  { label: '已耗尽', value: 'exhausted' },
-] satisfies Array<{ label: string; value: RewardCodeStatusFilter }>
 type ActionPopupPanel = { toggle: (event: Event) => void; hide?: () => void }
-
-watch(statusFilter, () => {
-  resetCriteriaAndReload()
-})
-
-function updateRewardCodes(update: (page: RewardCodePage) => RewardCodePage) {
-  queryClient.setQueryData(rewardCodeListKey.value, (current: RewardCodePage | undefined) =>
-    current ? update(current) : current,
-  )
-}
-
-function refreshRewardCodes() {
-  // Same-key refetch: stale rows stay mounted with the table loading state,
-  // matching the previous background-refresh behavior.
-  void rewardCodeListQuery.refetch()
-}
-
-function searchRewardCodes() {
-  appliedSearchKeyword.value = searchKeyword.value
-  resetCriteriaAndReload()
-}
-
-function clearSearch() {
-  appliedSearchKeyword.value = ''
-  resetCriteriaAndReload()
-}
-
-function resetStatusFilter() {
-  statusFilter.value = REWARD_CODE_STATUS_FILTER_ALL
-}
-
-function resetCriteriaAndReload() {
-  // Cursor/filter changes feed the query key and refetch by themselves.
-  pagination.reset()
-}
 
 function openCreateDialog() {
   if (saving.value) return
@@ -437,59 +356,6 @@ function selectAction(action: string) {
     return
   }
   if (action === 'delete') void confirmDelete(rewardCode)
-}
-
-async function confirmDelete(rewardCode: RewardCode) {
-  if (deletePending[rewardCode.id]) return
-  const confirmed = await confirm.confirm({
-    title: '删除兑换码',
-    message: `确定永久删除“${rewardCode.displayName}”吗？没有 Redemption 的兑换码才可删除。`,
-    confirmLabel: '确认删除',
-    intent: 'danger',
-  })
-  if (!confirmed) return
-  await deleteRewardCode(rewardCode)
-}
-
-async function deleteRewardCode(rewardCode: RewardCode) {
-  if (deletePending[rewardCode.id]) return
-  deletePending[rewardCode.id] = true
-  try {
-    await resource.delete(rewardCode.id)
-    updateRewardCodes((page) => ({
-      ...page,
-      rewardCodes: page.rewardCodes.filter((candidate) => candidate.id !== rewardCode.id),
-    }))
-    toast.success('兑换码已删除')
-    refreshRewardCodes()
-  } catch (error) {
-    toast.error(formatAdminDisplayError(error, '删除兑换码失败'))
-  } finally {
-    deletePending[rewardCode.id] = false
-  }
-}
-
-async function setRewardCodeEnabled(rewardCode: RewardCode, enabled: boolean) {
-  if (enabledPending[rewardCode.id]) return
-  enabledPending[rewardCode.id] = true
-  try {
-    replaceRewardCode(await resource.setEnabled(rewardCode.id, enabled))
-    toast.success(enabled ? '兑换码已启用' : '兑换码已停用')
-    refreshRewardCodes()
-  } catch (error) {
-    toast.error(formatAdminDisplayError(error, enabled ? '启用兑换码失败' : '停用兑换码失败'))
-  } finally {
-    enabledPending[rewardCode.id] = false
-  }
-}
-
-function replaceRewardCode(updated: RewardCode) {
-  updateRewardCodes((page) => ({
-    ...page,
-    rewardCodes: page.rewardCodes.map((candidate) =>
-      candidate.id === updated.id ? updated : candidate,
-    ),
-  }))
 }
 
 function handlePlaintextDialogVisible(visible: boolean) {

@@ -4,12 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
@@ -26,7 +29,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -65,61 +68,70 @@ export const redeemUserReward = async (
   })
 }
 
-export const getRedeemUserRewardQueryKey = (
-  rewardRedeemRequest?: MaybeRefOrGetter<RewardRedeemRequest>,
-) => {
-  return ['POST', 'user', 'rewards', 'redeem', rewardRedeemRequest] as const
-}
+export const getRedeemUserRewardMutationKey = () => ['redeemUserReward'] as const
 
-export const getRedeemUserRewardQueryOptions = <
-  TData = Awaited<ReturnType<typeof redeemUserReward>>,
+export const getRedeemUserRewardMutationOptions = <
   TError = ErrorType<ApiResponseBase>,
->(
-  rewardRedeemRequest: MaybeRefOrGetter<RewardRedeemRequest>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof redeemUserReward>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getRedeemUserRewardQueryKey(rewardRedeemRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof redeemUserReward>>> = ({ signal }) =>
-    redeemUserReward(toValue(rewardRedeemRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof redeemUserReward>>,
     TError,
-    TData
+    RedeemUserRewardMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof redeemUserReward>>,
+  TError,
+  RedeemUserRewardMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRedeemUserRewardMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof redeemUserReward>>,
+    RedeemUserRewardMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return redeemUserReward(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type RedeemUserRewardQueryResult = NonNullable<Awaited<ReturnType<typeof redeemUserReward>>>
-export type RedeemUserRewardQueryError = ErrorType<ApiResponseBase>
+export type RedeemUserRewardMutationResult = NonNullable<
+  Awaited<ReturnType<typeof redeemUserReward>>
+>
+export type RedeemUserRewardMutationBody = BodyType<RewardRedeemRequest>
+export type RedeemUserRewardMutationError = ErrorType<ApiResponseBase>
+export type RedeemUserRewardMutationVariables = { data: BodyType<RewardRedeemRequest> }
 
-export function useRedeemUserReward<
-  TData = Awaited<ReturnType<typeof redeemUserReward>>,
-  TError = ErrorType<ApiResponseBase>,
->(
-  rewardRedeemRequest: MaybeRefOrGetter<RewardRedeemRequest>,
+export const useRedeemUserReward = <TError = ErrorType<ApiResponseBase>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof redeemUserReward>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof redeemUserReward>>,
+      TError,
+      RedeemUserRewardMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getRedeemUserRewardQueryOptions(rewardRedeemRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof redeemUserReward>>,
+  TError,
+  RedeemUserRewardMutationVariables,
+  TContext
+> => {
+  return useMutation(getRedeemUserRewardMutationOptions(options), queryClient)
 }
-
 export const getListUserRewardRedemptionsUrl = (params?: ListUserRewardRedemptionsParams) => {
   const normalizedParams = new URLSearchParams()
 

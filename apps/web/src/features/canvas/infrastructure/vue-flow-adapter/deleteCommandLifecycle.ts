@@ -81,26 +81,23 @@ export function createCanvasDeleteCommandLifecycle(
   }
 
   function collectPendingResultNodeIds(sourceFlowNodeIds: readonly string[]): CanvasGraphNodeId[] {
+    // Live execution state comes from the PendingImageExecutionCore lease, never
+    // from snapshot running fields (those are hydration-only facts). Candidates
+    // are pure topology: image-kind targets fed by a deleted source.
     const sourceIds = new Set(sourceFlowNodeIds)
-    const nodesById = new Map(options.readNodes().map((node) => [node.id, node]))
-    const pendingIds = new Set<CanvasGraphNodeId>()
-    options.readEdges().forEach((edge) => {
-      if (!sourceIds.has(edge.source) || edge.targetHandle !== 'in:image') return
-      const target = nodesById.get(edge.target)
-      const snapshot = (
-        target?.data as
-          { snapshotNode?: { outputStatus?: string; pendingTaskId?: string } } | undefined
-      )?.snapshotNode
-      if (
-        target?.data &&
-        (target.data as { kind?: string }).kind === 'image' &&
-        (snapshot?.outputStatus === 'running' || !!snapshot?.pendingTaskId) &&
-        isCanvasGraphNodeId(edge.target)
-      ) {
-        pendingIds.add(edge.target)
-      }
-    })
-    return [...pendingIds]
+    const store = options.readGraphStore()
+    const candidateIds = new Set<CanvasGraphNodeId>()
+    for (const edge of options.readEdges()) {
+      if (!sourceIds.has(edge.source) || edge.targetHandle !== 'in:image') continue
+      if (!isCanvasGraphNodeId(edge.target)) continue
+      if (store.getNode(edge.target)?.kind !== 'image') continue
+      candidateIds.add(edge.target)
+    }
+    if (candidateIds.size === 0) return []
+    const activeIds = new Set<string>(
+      options.captureActiveNodeExecutions([...candidateIds]).map((lease) => lease.resultNodeId),
+    )
+    return [...candidateIds].filter((nodeId) => activeIds.has(nodeId))
   }
 
   function applyDelete(command: {

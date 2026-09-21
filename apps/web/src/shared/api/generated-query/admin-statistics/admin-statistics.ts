@@ -4,12 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
@@ -25,7 +28,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -147,68 +150,70 @@ export const backfillAdminStatistics = async (
   })
 }
 
-export const getBackfillAdminStatisticsQueryKey = (
-  adminStatisticsBackfillRequest?: MaybeRefOrGetter<AdminStatisticsBackfillRequest>,
-) => {
-  return ['POST', 'admin', 'statistics', 'backfill', adminStatisticsBackfillRequest] as const
-}
+export const getBackfillAdminStatisticsMutationKey = () => ['backfillAdminStatistics'] as const
 
-export const getBackfillAdminStatisticsQueryOptions = <
-  TData = Awaited<ReturnType<typeof backfillAdminStatistics>>,
+export const getBackfillAdminStatisticsMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  adminStatisticsBackfillRequest?: MaybeRefOrGetter<AdminStatisticsBackfillRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof backfillAdminStatistics>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getBackfillAdminStatisticsQueryKey(adminStatisticsBackfillRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof backfillAdminStatistics>>> = ({
-    signal,
-  }) =>
-    backfillAdminStatistics(toValue(adminStatisticsBackfillRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof backfillAdminStatistics>>,
     TError,
-    TData
+    BackfillAdminStatisticsMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof backfillAdminStatistics>>,
+  TError,
+  BackfillAdminStatisticsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getBackfillAdminStatisticsMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof backfillAdminStatistics>>,
+    BackfillAdminStatisticsMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return backfillAdminStatistics(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type BackfillAdminStatisticsQueryResult = NonNullable<
+export type BackfillAdminStatisticsMutationResult = NonNullable<
   Awaited<ReturnType<typeof backfillAdminStatistics>>
 >
-export type BackfillAdminStatisticsQueryError = ErrorType<unknown>
+export type BackfillAdminStatisticsMutationBody =
+  BodyType<AdminStatisticsBackfillRequest> | undefined
+export type BackfillAdminStatisticsMutationError = ErrorType<unknown>
+export type BackfillAdminStatisticsMutationVariables = {
+  data?: BodyType<AdminStatisticsBackfillRequest>
+}
 
-export function useBackfillAdminStatistics<
-  TData = Awaited<ReturnType<typeof backfillAdminStatistics>>,
-  TError = ErrorType<unknown>,
->(
-  adminStatisticsBackfillRequest?: MaybeRefOrGetter<AdminStatisticsBackfillRequest>,
+export const useBackfillAdminStatistics = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof backfillAdminStatistics>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof backfillAdminStatistics>>,
+      TError,
+      BackfillAdminStatisticsMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getBackfillAdminStatisticsQueryOptions(
-    adminStatisticsBackfillRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof backfillAdminStatistics>>,
+  TError,
+  BackfillAdminStatisticsMutationVariables,
+  TContext
+> => {
+  return useMutation(getBackfillAdminStatisticsMutationOptions(options), queryClient)
 }

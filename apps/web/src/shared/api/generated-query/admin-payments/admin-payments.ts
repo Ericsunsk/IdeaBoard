@@ -4,12 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
@@ -29,7 +32,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -140,75 +143,76 @@ export const updateAdminStripeConfiguration = async (
   )
 }
 
-export const getUpdateAdminStripeConfigurationQueryKey = (
-  updateStripeConfigurationRequest?: MaybeRefOrGetter<UpdateStripeConfigurationRequest>,
-) => {
-  return ['PUT', 'admin', 'payments', 'stripe-config', updateStripeConfigurationRequest] as const
-}
+export const getUpdateAdminStripeConfigurationMutationKey = () =>
+  ['updateAdminStripeConfiguration'] as const
 
-export const getUpdateAdminStripeConfigurationQueryOptions = <
-  TData = Awaited<ReturnType<typeof updateAdminStripeConfiguration>>,
+export const getUpdateAdminStripeConfigurationMutationOptions = <
   TError = ErrorType<ApiResponseBase>,
->(
-  updateStripeConfigurationRequest: MaybeRefOrGetter<UpdateStripeConfigurationRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminStripeConfiguration>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getUpdateAdminStripeConfigurationQueryKey(updateStripeConfigurationRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminStripeConfiguration>>> = ({
-    signal,
-  }) =>
-    updateAdminStripeConfiguration(toValue(updateStripeConfigurationRequest), {
-      signal,
-      ...requestOptions,
-    })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateAdminStripeConfiguration>>,
     TError,
-    TData
+    UpdateAdminStripeConfigurationMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAdminStripeConfiguration>>,
+  TError,
+  UpdateAdminStripeConfigurationMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateAdminStripeConfigurationMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAdminStripeConfiguration>>,
+    UpdateAdminStripeConfigurationMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return updateAdminStripeConfiguration(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type UpdateAdminStripeConfigurationQueryResult = NonNullable<
+export type UpdateAdminStripeConfigurationMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateAdminStripeConfiguration>>
 >
-export type UpdateAdminStripeConfigurationQueryError = ErrorType<ApiResponseBase>
+export type UpdateAdminStripeConfigurationMutationBody = BodyType<UpdateStripeConfigurationRequest>
+export type UpdateAdminStripeConfigurationMutationError = ErrorType<ApiResponseBase>
+export type UpdateAdminStripeConfigurationMutationVariables = {
+  data: BodyType<UpdateStripeConfigurationRequest>
+}
 
-export function useUpdateAdminStripeConfiguration<
-  TData = Awaited<ReturnType<typeof updateAdminStripeConfiguration>>,
+export const useUpdateAdminStripeConfiguration = <
   TError = ErrorType<ApiResponseBase>,
+  TContext = unknown,
 >(
-  updateStripeConfigurationRequest: MaybeRefOrGetter<UpdateStripeConfigurationRequest>,
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminStripeConfiguration>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateAdminStripeConfiguration>>,
+      TError,
+      UpdateAdminStripeConfigurationMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUpdateAdminStripeConfigurationQueryOptions(
-    updateStripeConfigurationRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateAdminStripeConfiguration>>,
+  TError,
+  UpdateAdminStripeConfigurationMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateAdminStripeConfigurationMutationOptions(options), queryClient)
 }
-
 export const getListAdminPaymentOrdersUrl = (params?: ListAdminPaymentOrdersParams) => {
   const normalizedParams = new URLSearchParams()
 
@@ -409,84 +413,73 @@ export const createAdminPaymentRefund = async (
   )
 }
 
-export const getCreateAdminPaymentRefundQueryKey = (
-  orderNumber: MaybeRefOrGetter<string>,
-  createAdminPaymentRefundRequest?: MaybeRefOrGetter<CreateAdminPaymentRefundRequest>,
-) => {
-  return [
-    'POST',
-    'admin',
-    'payments',
-    'orders',
-    orderNumber,
-    'refunds',
-    createAdminPaymentRefundRequest,
-  ] as const
-}
+export const getCreateAdminPaymentRefundMutationKey = () => ['createAdminPaymentRefund'] as const
 
-export const getCreateAdminPaymentRefundQueryOptions = <
-  TData = Awaited<ReturnType<typeof createAdminPaymentRefund>>,
+export const getCreateAdminPaymentRefundMutationOptions = <
   TError = ErrorType<ApiResponseBase>,
->(
-  orderNumber: MaybeRefOrGetter<string>,
-  createAdminPaymentRefundRequest: MaybeRefOrGetter<CreateAdminPaymentRefundRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof createAdminPaymentRefund>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createAdminPaymentRefund>>,
+    TError,
+    CreateAdminPaymentRefundMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createAdminPaymentRefund>>,
+  TError,
+  CreateAdminPaymentRefundMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateAdminPaymentRefundMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getCreateAdminPaymentRefundQueryKey(orderNumber, createAdminPaymentRefundRequest)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createAdminPaymentRefund>>,
+    CreateAdminPaymentRefundMutationVariables
+  > = (props) => {
+    const { orderNumber, data } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof createAdminPaymentRefund>>> = ({
-    signal,
-  }) =>
-    createAdminPaymentRefund(toValue(orderNumber), toValue(createAdminPaymentRefundRequest), {
-      signal,
-      ...requestOptions,
-    })
+    return createAdminPaymentRefund(orderNumber, data, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(orderNumber) !== null && toValue(orderNumber) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof createAdminPaymentRefund>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type CreateAdminPaymentRefundQueryResult = NonNullable<
+export type CreateAdminPaymentRefundMutationResult = NonNullable<
   Awaited<ReturnType<typeof createAdminPaymentRefund>>
 >
-export type CreateAdminPaymentRefundQueryError = ErrorType<ApiResponseBase>
+export type CreateAdminPaymentRefundMutationBody = BodyType<CreateAdminPaymentRefundRequest>
+export type CreateAdminPaymentRefundMutationError = ErrorType<ApiResponseBase>
+export type CreateAdminPaymentRefundMutationVariables = {
+  orderNumber: string
+  data: BodyType<CreateAdminPaymentRefundRequest>
+}
 
-export function useCreateAdminPaymentRefund<
-  TData = Awaited<ReturnType<typeof createAdminPaymentRefund>>,
+export const useCreateAdminPaymentRefund = <
   TError = ErrorType<ApiResponseBase>,
+  TContext = unknown,
 >(
-  orderNumber: MaybeRefOrGetter<string>,
-  createAdminPaymentRefundRequest: MaybeRefOrGetter<CreateAdminPaymentRefundRequest>,
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof createAdminPaymentRefund>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createAdminPaymentRefund>>,
+      TError,
+      CreateAdminPaymentRefundMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getCreateAdminPaymentRefundQueryOptions(
-    orderNumber,
-    createAdminPaymentRefundRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof createAdminPaymentRefund>>,
+  TError,
+  CreateAdminPaymentRefundMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateAdminPaymentRefundMutationOptions(options), queryClient)
 }

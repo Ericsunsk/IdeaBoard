@@ -26,7 +26,7 @@
           <AdminFormField label="发件人名称" for="admin-mail-from-name" required>
             <AdminInput
               id="admin-mail-from-name"
-              v-model="form.from_name"
+              v-model="form.values.from_name"
               aria-label="发件人名称"
               :disabled="controlsDisabled"
               class="w-full"
@@ -35,7 +35,7 @@
           <AdminFormField label="发件人 Email" for="admin-mail-from-email" required>
             <AdminInput
               id="admin-mail-from-email"
-              v-model="form.from_email"
+              v-model="form.values.from_email"
               type="email"
               aria-label="发件人 Email"
               :disabled="controlsDisabled"
@@ -50,7 +50,7 @@
         >
           <AdminInput
             id="admin-mail-api-key"
-            v-model="form.api_key"
+            v-model="form.values.api_key"
             type="password"
             aria-label="Resend API Key"
             autocomplete="off"
@@ -61,15 +61,15 @@
         <AdminFormField label="Reply-To Email" for="admin-mail-reply-to">
           <AdminInput
             id="admin-mail-reply-to"
-            v-model="form.reply_to"
+            v-model="form.values.reply_to"
             type="email"
             aria-label="Reply-To Email"
             :disabled="controlsDisabled"
             class="w-full"
           />
         </AdminFormField>
-        <AdminAlert v-if="validationError" severity="error">
-          {{ validationError }}
+        <AdminAlert v-if="firstValidationError" severity="error">
+          {{ firstValidationError }}
         </AdminAlert>
 
         <div
@@ -138,13 +138,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, type HTMLAttributes } from 'vue'
+import { computed, onMounted, ref, type HTMLAttributes } from 'vue'
+import * as v from 'valibot'
+import { useForm, firstFormError } from '@/components/ui/form'
 import AdminButton from '../shared/components/AdminButton.vue'
 import AdminInput from '../shared/components/AdminInput.vue'
 import AdminAlert from '../shared/components/AdminAlert.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
 import { adminActionButtonClass } from '../shared/lib/uiClasses'
-import { formatAdminDisplayError, useAdminToast } from '../shared/lib/toast'
+import { secretField } from '../shared/lib/secretSchema'
+import { formatAdminDisplayError } from '../shared/lib/toast'
+import { useAdminMailSettingsFeedback } from './useSettingsFeedback'
 import SettingEditorCard from './SettingEditorCard.vue'
 import { createAdminMailConfigResource } from './mailConfigResource'
 import type { AdminMailConfigResource } from './mailConfigResource'
@@ -155,21 +159,37 @@ const props = defineProps<{
   resource?: AdminMailConfigResource
 }>()
 const defaultResource = createAdminMailConfigResource()
-const toast = useAdminToast()
+const feedback = useAdminMailSettingsFeedback()
 const summary = ref<MailConfigSummary | null>(null)
 const loading = ref(false)
 const saving = ref(false)
 const testing = ref(false)
 const error = ref('')
-const validationError = ref('')
 const testError = ref('')
 const recipient = ref('')
-const form = reactive({
-  from_name: '',
-  from_email: '',
-  api_key: '',
-  reply_to: '',
+// Key 是否必填取决于服务端状态（首次配置必须、已有可留空保持），schema 以函数
+// 形式传入，读取时按当前 summary 重建。
+const form = useForm({
+  initialValues: { from_name: '', from_email: '', api_key: '', reply_to: '' },
+  schema: () =>
+    v.object({
+      from_name: v.pipe(v.string(), v.trim(), v.minLength(1, '发件人名称不能为空')),
+      from_email: v.pipe(
+        v.string(),
+        v.trim(),
+        v.check((value) => value.includes('@'), '请输入有效的发件人 Email'),
+      ),
+      api_key: secretField(!summary.value?.api_key_configured, '请输入 Resend API Key'),
+      reply_to: v.pipe(
+        v.string(),
+        v.trim(),
+        v.check((value) => value === '' || value.includes('@'), '请输入有效的 Reply-To Email'),
+      ),
+    }),
 })
+const firstValidationError = computed(() =>
+  firstFormError(form.errors.value, ['from_name', 'from_email', 'api_key', 'reply_to']),
+)
 
 const resource = computed(() => props.resource ?? defaultResource)
 const controlsDisabled = computed(
@@ -194,11 +214,12 @@ const statusSeverity = computed(() => {
 
 function populate(data: MailConfigSummary) {
   summary.value = data
-  form.from_name = data.from_name
-  form.from_email = data.from_email
-  form.api_key = ''
-  form.reply_to = data.reply_to ?? ''
-  validationError.value = ''
+  form.resetForm({
+    from_name: data.from_name,
+    from_email: data.from_email,
+    api_key: '',
+    reply_to: data.reply_to ?? '',
+  })
   testError.value = ''
 }
 
@@ -219,39 +240,11 @@ function reset() {
   if (summary.value) {
     populate(summary.value)
   } else {
-    form.from_name = ''
-    form.from_email = ''
-    form.api_key = ''
-    form.reply_to = ''
-    validationError.value = ''
+    form.resetForm({ from_name: '', from_email: '', api_key: '', reply_to: '' })
   }
 }
 
-function validate(): boolean {
-  validationError.value = ''
-  if (!summary.value?.api_key_configured && !form.api_key.trim()) {
-    validationError.value = '请输入 Resend API Key'
-    return false
-  }
-  if (!form.from_name.trim()) {
-    validationError.value = '发件人名称不能为空'
-    return false
-  }
-  const email = form.from_email.trim()
-  if (!email || !email.includes('@')) {
-    validationError.value = '请输入有效的发件人 Email'
-    return false
-  }
-  const replyTo = form.reply_to.trim()
-  if (replyTo && !replyTo.includes('@')) {
-    validationError.value = '请输入有效的 Reply-To Email'
-    return false
-  }
-  return true
-}
-
-async function save() {
-  if (!validate()) return
+const save = form.handleSubmit(async (values) => {
   saving.value = true
   try {
     const payload: {
@@ -260,34 +253,33 @@ async function save() {
       api_key?: string
       reply_to?: string
     } = {
-      from_name: form.from_name.trim(),
-      from_email: form.from_email.trim(),
+      from_name: values.from_name.trim(),
+      from_email: values.from_email.trim(),
     }
-    if (form.api_key.trim()) {
-      payload.api_key = form.api_key.trim()
+    if (values.api_key.trim()) {
+      payload.api_key = values.api_key.trim()
     }
-    if (form.reply_to.trim()) {
-      payload.reply_to = form.reply_to.trim()
+    if (values.reply_to.trim()) {
+      payload.reply_to = values.reply_to.trim()
     }
     const updated = await resource.value.update(payload)
     populate(updated)
-    form.api_key = ''
-    toast.success('邮件配置已保存，请发送 Test Email')
+    feedback.saved()
   } catch (err) {
-    toast.error(formatAdminDisplayError(err, '保存邮件配置失败'))
+    feedback.saveFailed(err)
   } finally {
     saving.value = false
   }
-}
+})
 
 async function clear() {
   saving.value = true
   try {
     await resource.value.clear()
     await load()
-    toast.success('邮件配置已删除')
+    feedback.cleared()
   } catch (err) {
-    toast.error(formatAdminDisplayError(err, '删除邮件配置失败'))
+    feedback.clearFailed(err)
   } finally {
     saving.value = false
   }
@@ -304,7 +296,7 @@ async function sendTest() {
   try {
     await resource.value.test(target)
     await load()
-    toast.success('Test Email 已发送')
+    feedback.testSent()
   } catch (err) {
     testError.value = formatAdminDisplayError(err, '发送 Test Email 失败')
   } finally {

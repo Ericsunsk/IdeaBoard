@@ -4,18 +4,20 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
 
-import { toValue, unref } from 'vue'
-import type { MaybeRefOrGetter } from 'vue'
+import { unref } from 'vue'
 
 import type {
   ApiResponseEmpty,
@@ -27,7 +29,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -128,75 +130,72 @@ export const recordSearchImageFailure = async (
   })
 }
 
-export const getRecordSearchImageFailureQueryKey = (
-  recordSearchImageFailureRequest?: MaybeRefOrGetter<RecordSearchImageFailureRequest>,
-) => {
-  return ['POST', 'user', 'search', 'metrics', recordSearchImageFailureRequest] as const
-}
+export const getRecordSearchImageFailureMutationKey = () => ['recordSearchImageFailure'] as const
 
-export const getRecordSearchImageFailureQueryOptions = <
-  TData = Awaited<ReturnType<typeof recordSearchImageFailure>>,
+export const getRecordSearchImageFailureMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  recordSearchImageFailureRequest: MaybeRefOrGetter<RecordSearchImageFailureRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof recordSearchImageFailure>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getRecordSearchImageFailureQueryKey(recordSearchImageFailureRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof recordSearchImageFailure>>> = ({
-    signal,
-  }) =>
-    recordSearchImageFailure(toValue(recordSearchImageFailureRequest), {
-      signal,
-      ...requestOptions,
-    })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof recordSearchImageFailure>>,
     TError,
-    TData
+    RecordSearchImageFailureMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof recordSearchImageFailure>>,
+  TError,
+  RecordSearchImageFailureMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRecordSearchImageFailureMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof recordSearchImageFailure>>,
+    RecordSearchImageFailureMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return recordSearchImageFailure(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type RecordSearchImageFailureQueryResult = NonNullable<
+export type RecordSearchImageFailureMutationResult = NonNullable<
   Awaited<ReturnType<typeof recordSearchImageFailure>>
 >
-export type RecordSearchImageFailureQueryError = ErrorType<unknown>
+export type RecordSearchImageFailureMutationBody = BodyType<RecordSearchImageFailureRequest>
+export type RecordSearchImageFailureMutationError = ErrorType<unknown>
+export type RecordSearchImageFailureMutationVariables = {
+  data: BodyType<RecordSearchImageFailureRequest>
+}
 
-export function useRecordSearchImageFailure<
-  TData = Awaited<ReturnType<typeof recordSearchImageFailure>>,
-  TError = ErrorType<unknown>,
->(
-  recordSearchImageFailureRequest: MaybeRefOrGetter<RecordSearchImageFailureRequest>,
+export const useRecordSearchImageFailure = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof recordSearchImageFailure>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof recordSearchImageFailure>>,
+      TError,
+      RecordSearchImageFailureMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getRecordSearchImageFailureQueryOptions(
-    recordSearchImageFailureRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof recordSearchImageFailure>>,
+  TError,
+  RecordSearchImageFailureMutationVariables,
+  TContext
+> => {
+  return useMutation(getRecordSearchImageFailureMutationOptions(options), queryClient)
 }
-
 export const getExtractUserVisionSearchUrl = () => {
   return `/user/search/vision-extract`
 }
@@ -230,64 +229,72 @@ export const extractUserVisionSearch = async (
   })
 }
 
-export const getExtractUserVisionSearchQueryKey = (
-  extractUserVisionSearchBody?: MaybeRefOrGetter<ExtractUserVisionSearchBody>,
-) => {
-  return ['POST', 'user', 'search', 'vision-extract', extractUserVisionSearchBody] as const
-}
+export const getExtractUserVisionSearchMutationKey = () => ['extractUserVisionSearch'] as const
 
-export const getExtractUserVisionSearchQueryOptions = <
-  TData = Awaited<ReturnType<typeof extractUserVisionSearch>>,
+export const getExtractUserVisionSearchMutationOptions = <
   TError = ErrorType<VisionSearchError>,
->(
-  extractUserVisionSearchBody: MaybeRefOrGetter<ExtractUserVisionSearchBody>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof extractUserVisionSearch>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getExtractUserVisionSearchQueryKey(extractUserVisionSearchBody)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof extractUserVisionSearch>>> = ({
-    signal,
-  }) => extractUserVisionSearch(toValue(extractUserVisionSearchBody), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof extractUserVisionSearch>>,
     TError,
-    TData
+    ExtractUserVisionSearchMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof extractUserVisionSearch>>,
+  TError,
+  ExtractUserVisionSearchMutationVariables,
+  TContext
+> => {
+  const mutationKey = getExtractUserVisionSearchMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof extractUserVisionSearch>>,
+    ExtractUserVisionSearchMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return extractUserVisionSearch(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type ExtractUserVisionSearchQueryResult = NonNullable<
+export type ExtractUserVisionSearchMutationResult = NonNullable<
   Awaited<ReturnType<typeof extractUserVisionSearch>>
 >
-export type ExtractUserVisionSearchQueryError = ErrorType<VisionSearchError>
+export type ExtractUserVisionSearchMutationBody = BodyType<ExtractUserVisionSearchBody>
+export type ExtractUserVisionSearchMutationError = ErrorType<VisionSearchError>
+export type ExtractUserVisionSearchMutationVariables = {
+  data: BodyType<ExtractUserVisionSearchBody>
+}
 
-export function useExtractUserVisionSearch<
-  TData = Awaited<ReturnType<typeof extractUserVisionSearch>>,
+export const useExtractUserVisionSearch = <
   TError = ErrorType<VisionSearchError>,
+  TContext = unknown,
 >(
-  extractUserVisionSearchBody: MaybeRefOrGetter<ExtractUserVisionSearchBody>,
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof extractUserVisionSearch>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof extractUserVisionSearch>>,
+      TError,
+      ExtractUserVisionSearchMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getExtractUserVisionSearchQueryOptions(extractUserVisionSearchBody, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof extractUserVisionSearch>>,
+  TError,
+  ExtractUserVisionSearchMutationVariables,
+  TContext
+> => {
+  return useMutation(getExtractUserVisionSearchMutationOptions(options), queryClient)
 }

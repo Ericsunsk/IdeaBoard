@@ -92,6 +92,40 @@ describe('useForm with Valibot Schema', () => {
     expect(form.isDirty.value).toBe(false)
     expect(form.errors.value).toEqual({})
   })
+
+  it('hydrates reset values as the new clean baseline', () => {
+    const form = useForm({
+      initialValues: { username: 'initial', age: 25 },
+    })
+
+    form.resetForm({ username: 'hydrated' })
+    expect(form.values).toEqual({ username: 'hydrated', age: 25 })
+    expect(form.isDirty.value).toBe(false)
+
+    form.setFieldValue('username', 'changed')
+    expect(form.isDirty.value).toBe(true)
+
+    form.resetForm()
+    expect(form.values).toEqual({ username: 'hydrated', age: 25 })
+    expect(form.isDirty.value).toBe(false)
+  })
+
+  it('propagates schema parse exceptions and never treats them as valid', async () => {
+    const schemaError = new Error('schema parser failed')
+    const schema = v.custom(() => {
+      throw schemaError
+    })
+    const form = useForm({
+      schema,
+      initialValues: { username: 'value' },
+    })
+    const onValid = vi.fn()
+
+    await expect(form.validate()).rejects.toBe(schemaError)
+    await expect(form.handleSubmit(onValid)()).rejects.toBe(schemaError)
+    expect(onValid).not.toHaveBeenCalled()
+    expect(form.isSubmitting.value).toBe(false)
+  })
 })
 
 describe('Form compound components', () => {

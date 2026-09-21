@@ -4,23 +4,18 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation } from '@tanstack/vue-query'
 import type {
-  DataTag,
+  MutationFunction,
   QueryClient,
-  QueryFunction,
-  QueryKey,
-  UseQueryOptions,
-  UseQueryReturnType,
+  UseMutationOptions,
+  UseMutationReturnType,
 } from '@tanstack/vue-query'
-
-import { toValue, unref } from 'vue'
-import type { MaybeRefOrGetter } from 'vue'
 
 import type { ApiResponseBillingQuote, BillingQuoteRequest } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -59,59 +54,67 @@ export const createBillingQuote = async (
   })
 }
 
-export const getCreateBillingQuoteQueryKey = (
-  billingQuoteRequest?: MaybeRefOrGetter<BillingQuoteRequest>,
-) => {
-  return ['POST', 'user', 'billing', 'quotes', billingQuoteRequest] as const
-}
+export const getCreateBillingQuoteMutationKey = () => ['createBillingQuote'] as const
 
-export const getCreateBillingQuoteQueryOptions = <
-  TData = Awaited<ReturnType<typeof createBillingQuote>>,
+export const getCreateBillingQuoteMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  billingQuoteRequest: MaybeRefOrGetter<BillingQuoteRequest>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof createBillingQuote>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getCreateBillingQuoteQueryKey(billingQuoteRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof createBillingQuote>>> = ({ signal }) =>
-    createBillingQuote(toValue(billingQuoteRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof createBillingQuote>>,
     TError,
-    TData
+    CreateBillingQuoteMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createBillingQuote>>,
+  TError,
+  CreateBillingQuoteMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateBillingQuoteMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createBillingQuote>>,
+    CreateBillingQuoteMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return createBillingQuote(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type CreateBillingQuoteQueryResult = NonNullable<
+export type CreateBillingQuoteMutationResult = NonNullable<
   Awaited<ReturnType<typeof createBillingQuote>>
 >
-export type CreateBillingQuoteQueryError = ErrorType<unknown>
+export type CreateBillingQuoteMutationBody = BodyType<BillingQuoteRequest>
+export type CreateBillingQuoteMutationError = ErrorType<unknown>
+export type CreateBillingQuoteMutationVariables = { data: BodyType<BillingQuoteRequest> }
 
-export function useCreateBillingQuote<
-  TData = Awaited<ReturnType<typeof createBillingQuote>>,
-  TError = ErrorType<unknown>,
->(
-  billingQuoteRequest: MaybeRefOrGetter<BillingQuoteRequest>,
+export const useCreateBillingQuote = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof createBillingQuote>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createBillingQuote>>,
+      TError,
+      CreateBillingQuoteMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getCreateBillingQuoteQueryOptions(billingQuoteRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof createBillingQuote>>,
+  TError,
+  CreateBillingQuoteMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateBillingQuoteMutationOptions(options), queryClient)
 }

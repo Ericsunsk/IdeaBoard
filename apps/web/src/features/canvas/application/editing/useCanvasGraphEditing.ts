@@ -117,7 +117,6 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     updateSnapshotNodeBase: nodeMutations.updateSnapshotNode,
     readCanvasGraphStore: options.readCanvasGraphStore,
     writeCanvasGraphStore: options.readCanvasGraphStore,
-    graphAdapter: options.graphAdapter,
     markFlowExecutionNodeDirty: nodeMutations.markFlowExecutionNodeDirty,
     getImageNodeDisplayPayload,
     openImageUrlPreview: options.preview.openImageUrl,

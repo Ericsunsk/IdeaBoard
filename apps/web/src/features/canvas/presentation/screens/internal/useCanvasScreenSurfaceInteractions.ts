@@ -180,10 +180,8 @@ export function useCanvasScreenSurfaceInteractions(options: CanvasScreenSurfaceI
   )
 
   function onFlowNodeClick(payload: NodeMouseEvent) {
-    commands.graphEditing.grouping.handleNodeClick({
-      node: payload.node,
-      selectNode: selection.commands.onFlowNodeClick,
-    })
+    commands.graphEditing.grouping.handleNodeClick(payload.node.id)
+    selection.commands.onFlowNodeClick()
   }
 
   function onDeleteInlineSelection() {
@@ -235,8 +233,10 @@ export function useCanvasScreenSurfaceInteractions(options: CanvasScreenSurfaceI
     onFlowMoveStart: commands.viewportControls.onFlowMoveStart,
     onMiniMapDragStart: commands.viewportControls.onMiniMapDragStart,
     onNodeDragStart,
-    onCanvasPaneClick: () =>
-      commands.graphEditing.grouping.handlePaneClick(selection.commands.onPaneClick),
+    onCanvasPaneClick: () => {
+      commands.graphEditing.grouping.handlePaneClick()
+      selection.commands.onPaneClick()
+    },
     toggleCanvasMinimap: toggleCanvasMinimapBase,
     onPaneContextMenu: shell.onPaneContextMenu,
     setActiveTool: shell.setActiveTool,

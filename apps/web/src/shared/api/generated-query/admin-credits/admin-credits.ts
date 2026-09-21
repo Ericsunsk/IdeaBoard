@@ -4,12 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
@@ -36,7 +39,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -75,63 +78,70 @@ export const grantAdminCredits = async (
   })
 }
 
-export const getGrantAdminCreditsQueryKey = (
-  adminCreditGrantRequest?: MaybeRefOrGetter<AdminCreditGrantRequest>,
-) => {
-  return ['POST', 'admin', 'credits', 'grants', adminCreditGrantRequest] as const
-}
+export const getGrantAdminCreditsMutationKey = () => ['grantAdminCredits'] as const
 
-export const getGrantAdminCreditsQueryOptions = <
-  TData = Awaited<ReturnType<typeof grantAdminCredits>>,
+export const getGrantAdminCreditsMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  adminCreditGrantRequest: MaybeRefOrGetter<AdminCreditGrantRequest>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof grantAdminCredits>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getGrantAdminCreditsQueryKey(adminCreditGrantRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof grantAdminCredits>>> = ({ signal }) =>
-    grantAdminCredits(toValue(adminCreditGrantRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof grantAdminCredits>>,
     TError,
-    TData
+    GrantAdminCreditsMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof grantAdminCredits>>,
+  TError,
+  GrantAdminCreditsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getGrantAdminCreditsMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof grantAdminCredits>>,
+    GrantAdminCreditsMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return grantAdminCredits(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type GrantAdminCreditsQueryResult = NonNullable<
+export type GrantAdminCreditsMutationResult = NonNullable<
   Awaited<ReturnType<typeof grantAdminCredits>>
 >
-export type GrantAdminCreditsQueryError = ErrorType<unknown>
+export type GrantAdminCreditsMutationBody = BodyType<AdminCreditGrantRequest>
+export type GrantAdminCreditsMutationError = ErrorType<unknown>
+export type GrantAdminCreditsMutationVariables = { data: BodyType<AdminCreditGrantRequest> }
 
-export function useGrantAdminCredits<
-  TData = Awaited<ReturnType<typeof grantAdminCredits>>,
-  TError = ErrorType<unknown>,
->(
-  adminCreditGrantRequest: MaybeRefOrGetter<AdminCreditGrantRequest>,
+export const useGrantAdminCredits = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof grantAdminCredits>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof grantAdminCredits>>,
+      TError,
+      GrantAdminCreditsMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getGrantAdminCreditsQueryOptions(adminCreditGrantRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof grantAdminCredits>>,
+  TError,
+  GrantAdminCreditsMutationVariables,
+  TContext
+> => {
+  return useMutation(getGrantAdminCreditsMutationOptions(options), queryClient)
 }
-
 export const getDeductAdminCreditsUrl = () => {
   return `/admin/credits/deductions`
 }
@@ -167,63 +177,70 @@ export const deductAdminCredits = async (
   })
 }
 
-export const getDeductAdminCreditsQueryKey = (
-  adminCreditDeductionRequest?: MaybeRefOrGetter<AdminCreditDeductionRequest>,
-) => {
-  return ['POST', 'admin', 'credits', 'deductions', adminCreditDeductionRequest] as const
-}
+export const getDeductAdminCreditsMutationKey = () => ['deductAdminCredits'] as const
 
-export const getDeductAdminCreditsQueryOptions = <
-  TData = Awaited<ReturnType<typeof deductAdminCredits>>,
+export const getDeductAdminCreditsMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  adminCreditDeductionRequest: MaybeRefOrGetter<AdminCreditDeductionRequest>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deductAdminCredits>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getDeductAdminCreditsQueryKey(adminCreditDeductionRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof deductAdminCredits>>> = ({ signal }) =>
-    deductAdminCredits(toValue(adminCreditDeductionRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof deductAdminCredits>>,
     TError,
-    TData
+    DeductAdminCreditsMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deductAdminCredits>>,
+  TError,
+  DeductAdminCreditsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeductAdminCreditsMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deductAdminCredits>>,
+    DeductAdminCreditsMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return deductAdminCredits(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type DeductAdminCreditsQueryResult = NonNullable<
+export type DeductAdminCreditsMutationResult = NonNullable<
   Awaited<ReturnType<typeof deductAdminCredits>>
 >
-export type DeductAdminCreditsQueryError = ErrorType<unknown>
+export type DeductAdminCreditsMutationBody = BodyType<AdminCreditDeductionRequest>
+export type DeductAdminCreditsMutationError = ErrorType<unknown>
+export type DeductAdminCreditsMutationVariables = { data: BodyType<AdminCreditDeductionRequest> }
 
-export function useDeductAdminCredits<
-  TData = Awaited<ReturnType<typeof deductAdminCredits>>,
-  TError = ErrorType<unknown>,
->(
-  adminCreditDeductionRequest: MaybeRefOrGetter<AdminCreditDeductionRequest>,
+export const useDeductAdminCredits = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deductAdminCredits>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deductAdminCredits>>,
+      TError,
+      DeductAdminCreditsMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getDeductAdminCreditsQueryOptions(adminCreditDeductionRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof deductAdminCredits>>,
+  TError,
+  DeductAdminCreditsMutationVariables,
+  TContext
+> => {
+  return useMutation(getDeductAdminCreditsMutationOptions(options), queryClient)
 }
-
 export const getRefundAdminCreditsUrl = () => {
   return `/admin/credits/refunds`
 }
@@ -259,63 +276,70 @@ export const refundAdminCredits = async (
   })
 }
 
-export const getRefundAdminCreditsQueryKey = (
-  adminCreditRefundRequest?: MaybeRefOrGetter<AdminCreditRefundRequest>,
-) => {
-  return ['POST', 'admin', 'credits', 'refunds', adminCreditRefundRequest] as const
-}
+export const getRefundAdminCreditsMutationKey = () => ['refundAdminCredits'] as const
 
-export const getRefundAdminCreditsQueryOptions = <
-  TData = Awaited<ReturnType<typeof refundAdminCredits>>,
+export const getRefundAdminCreditsMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  adminCreditRefundRequest: MaybeRefOrGetter<AdminCreditRefundRequest>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof refundAdminCredits>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getRefundAdminCreditsQueryKey(adminCreditRefundRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof refundAdminCredits>>> = ({ signal }) =>
-    refundAdminCredits(toValue(adminCreditRefundRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof refundAdminCredits>>,
     TError,
-    TData
+    RefundAdminCreditsMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof refundAdminCredits>>,
+  TError,
+  RefundAdminCreditsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRefundAdminCreditsMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof refundAdminCredits>>,
+    RefundAdminCreditsMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return refundAdminCredits(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type RefundAdminCreditsQueryResult = NonNullable<
+export type RefundAdminCreditsMutationResult = NonNullable<
   Awaited<ReturnType<typeof refundAdminCredits>>
 >
-export type RefundAdminCreditsQueryError = ErrorType<unknown>
+export type RefundAdminCreditsMutationBody = BodyType<AdminCreditRefundRequest>
+export type RefundAdminCreditsMutationError = ErrorType<unknown>
+export type RefundAdminCreditsMutationVariables = { data: BodyType<AdminCreditRefundRequest> }
 
-export function useRefundAdminCredits<
-  TData = Awaited<ReturnType<typeof refundAdminCredits>>,
-  TError = ErrorType<unknown>,
->(
-  adminCreditRefundRequest: MaybeRefOrGetter<AdminCreditRefundRequest>,
+export const useRefundAdminCredits = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof refundAdminCredits>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof refundAdminCredits>>,
+      TError,
+      RefundAdminCreditsMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getRefundAdminCreditsQueryOptions(adminCreditRefundRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof refundAdminCredits>>,
+  TError,
+  RefundAdminCreditsMutationVariables,
+  TContext
+> => {
+  return useMutation(getRefundAdminCreditsMutationOptions(options), queryClient)
 }
-
 export const getCorrectAdminCreditsUrl = () => {
   return `/admin/credits/corrections`
 }
@@ -351,63 +375,70 @@ export const correctAdminCredits = async (
   })
 }
 
-export const getCorrectAdminCreditsQueryKey = (
-  adminCreditCorrectionRequest?: MaybeRefOrGetter<AdminCreditCorrectionRequest>,
-) => {
-  return ['POST', 'admin', 'credits', 'corrections', adminCreditCorrectionRequest] as const
-}
+export const getCorrectAdminCreditsMutationKey = () => ['correctAdminCredits'] as const
 
-export const getCorrectAdminCreditsQueryOptions = <
-  TData = Awaited<ReturnType<typeof correctAdminCredits>>,
+export const getCorrectAdminCreditsMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  adminCreditCorrectionRequest: MaybeRefOrGetter<AdminCreditCorrectionRequest>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof correctAdminCredits>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getCorrectAdminCreditsQueryKey(adminCreditCorrectionRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof correctAdminCredits>>> = ({ signal }) =>
-    correctAdminCredits(toValue(adminCreditCorrectionRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof correctAdminCredits>>,
     TError,
-    TData
+    CorrectAdminCreditsMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof correctAdminCredits>>,
+  TError,
+  CorrectAdminCreditsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCorrectAdminCreditsMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof correctAdminCredits>>,
+    CorrectAdminCreditsMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return correctAdminCredits(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type CorrectAdminCreditsQueryResult = NonNullable<
+export type CorrectAdminCreditsMutationResult = NonNullable<
   Awaited<ReturnType<typeof correctAdminCredits>>
 >
-export type CorrectAdminCreditsQueryError = ErrorType<unknown>
+export type CorrectAdminCreditsMutationBody = BodyType<AdminCreditCorrectionRequest>
+export type CorrectAdminCreditsMutationError = ErrorType<unknown>
+export type CorrectAdminCreditsMutationVariables = { data: BodyType<AdminCreditCorrectionRequest> }
 
-export function useCorrectAdminCredits<
-  TData = Awaited<ReturnType<typeof correctAdminCredits>>,
-  TError = ErrorType<unknown>,
->(
-  adminCreditCorrectionRequest: MaybeRefOrGetter<AdminCreditCorrectionRequest>,
+export const useCorrectAdminCredits = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof correctAdminCredits>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof correctAdminCredits>>,
+      TError,
+      CorrectAdminCreditsMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getCorrectAdminCreditsQueryOptions(adminCreditCorrectionRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof correctAdminCredits>>,
+  TError,
+  CorrectAdminCreditsMutationVariables,
+  TContext
+> => {
+  return useMutation(getCorrectAdminCreditsMutationOptions(options), queryClient)
 }
-
 export const getGetAdminCreditWalletUrl = (publicId: string) => {
   return `/admin/credits/wallets/${encodeURIComponent(String(publicId))}`
 }
@@ -678,82 +709,73 @@ export const startAdminCreditReconciliation = async (
   })
 }
 
-export const getStartAdminCreditReconciliationQueryKey = (
-  creditReconciliationRequest?: MaybeRefOrGetter<CreditReconciliationRequest>,
-) => {
-  return [
-    'POST',
-    'admin',
-    'credits',
-    'reconciliation',
-    'runs',
-    creditReconciliationRequest,
-  ] as const
-}
+export const getStartAdminCreditReconciliationMutationKey = () =>
+  ['startAdminCreditReconciliation'] as const
 
-export const getStartAdminCreditReconciliationQueryOptions = <
-  TData = Awaited<ReturnType<typeof startAdminCreditReconciliation>>,
+export const getStartAdminCreditReconciliationMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  creditReconciliationRequest: MaybeRefOrGetter<CreditReconciliationRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof startAdminCreditReconciliation>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getStartAdminCreditReconciliationQueryKey(creditReconciliationRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof startAdminCreditReconciliation>>> = ({
-    signal,
-  }) =>
-    startAdminCreditReconciliation(toValue(creditReconciliationRequest), {
-      signal,
-      ...requestOptions,
-    })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof startAdminCreditReconciliation>>,
     TError,
-    TData
+    StartAdminCreditReconciliationMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof startAdminCreditReconciliation>>,
+  TError,
+  StartAdminCreditReconciliationMutationVariables,
+  TContext
+> => {
+  const mutationKey = getStartAdminCreditReconciliationMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof startAdminCreditReconciliation>>,
+    StartAdminCreditReconciliationMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return startAdminCreditReconciliation(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type StartAdminCreditReconciliationQueryResult = NonNullable<
+export type StartAdminCreditReconciliationMutationResult = NonNullable<
   Awaited<ReturnType<typeof startAdminCreditReconciliation>>
 >
-export type StartAdminCreditReconciliationQueryError = ErrorType<unknown>
+export type StartAdminCreditReconciliationMutationBody = BodyType<CreditReconciliationRequest>
+export type StartAdminCreditReconciliationMutationError = ErrorType<unknown>
+export type StartAdminCreditReconciliationMutationVariables = {
+  data: BodyType<CreditReconciliationRequest>
+}
 
-export function useStartAdminCreditReconciliation<
-  TData = Awaited<ReturnType<typeof startAdminCreditReconciliation>>,
-  TError = ErrorType<unknown>,
->(
-  creditReconciliationRequest: MaybeRefOrGetter<CreditReconciliationRequest>,
+export const useStartAdminCreditReconciliation = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof startAdminCreditReconciliation>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof startAdminCreditReconciliation>>,
+      TError,
+      StartAdminCreditReconciliationMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getStartAdminCreditReconciliationQueryOptions(
-    creditReconciliationRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof startAdminCreditReconciliation>>,
+  TError,
+  StartAdminCreditReconciliationMutationVariables,
+  TContext
+> => {
+  return useMutation(getStartAdminCreditReconciliationMutationOptions(options), queryClient)
 }
-
 export const getListAdminCreditReconciliationRunsUrl = (
   params?: ListAdminCreditReconciliationRunsParams,
 ) => {

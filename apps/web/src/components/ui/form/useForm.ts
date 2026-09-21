@@ -60,18 +60,14 @@ async function extractValibotDirectIssues(
   data: unknown,
 ): Promise<Record<string, string>> {
   const errors: Record<string, string> = {}
-  try {
-    const result = await v.safeParseAsync(schema as v.GenericSchema, data)
-    if (!result.success && result.issues) {
-      for (const issue of result.issues) {
-        const key = issue.path?.[0]?.key
-        if (key != null && !errors[String(key)]) {
-          errors[String(key)] = issue.message
-        }
+  const result = await v.safeParseAsync(schema as v.GenericSchema, data)
+  if (!result.success && result.issues) {
+    for (const issue of result.issues) {
+      const key = issue.path?.[0]?.key
+      if (key != null && !errors[String(key)]) {
+        errors[String(key)] = issue.message
       }
     }
-  } catch {
-    // If schema parsing threw, return empty
   }
   return errors
 }
@@ -128,7 +124,7 @@ export function areFormValuesEqual(a: unknown, b: unknown): boolean {
 export function useForm<TValues extends Record<string, unknown>>(
   options: UseFormOptions<TValues>,
 ): FormContext<TValues> {
-  const initial = cloneFormValue(options.initialValues)
+  let baseline = cloneFormValue(options.initialValues)
   const values = reactive<TValues>(cloneFormValue(options.initialValues)) as TValues
   const errors = ref<Partial<Record<keyof TValues, string>>>({}) as Ref<
     Partial<Record<keyof TValues, string>>
@@ -139,7 +135,7 @@ export function useForm<TValues extends Record<string, unknown>>(
   const isSubmitting = ref(false)
 
   const isDirty = computed(() => {
-    return !areFormValuesEqual(values, initial)
+    return !areFormValuesEqual(values, baseline)
   })
 
   const isValid = computed(() => {
@@ -213,7 +209,8 @@ export function useForm<TValues extends Record<string, unknown>>(
   }
 
   function resetForm(nextValues?: Partial<TValues>) {
-    const target = nextValues ? { ...initial, ...nextValues } : initial
+    const target = nextValues ? { ...baseline, ...nextValues } : baseline
+    baseline = cloneFormValue(target)
     Object.assign(values, cloneFormValue(target))
     errors.value = {}
     touched.value = {}
@@ -241,4 +238,17 @@ export function useForm<TValues extends Record<string, unknown>>(
   }
 
   return context
+}
+
+// First validation message in caller-specified field order, for single-alert
+// summaries. Field order is presentation order, so it stays at the call site.
+export function firstFormError(
+  errors: Partial<Record<string, string>>,
+  fields: readonly string[],
+): string {
+  for (const field of fields) {
+    const message = errors[field]
+    if (message) return message
+  }
+  return ''
 }

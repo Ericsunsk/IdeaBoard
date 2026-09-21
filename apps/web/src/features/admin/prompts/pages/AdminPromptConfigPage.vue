@@ -202,110 +202,34 @@
       </section>
     </div>
 
-    <!-- 5. 提示词编辑弹窗 (遵循 AdminDialogShell Token，单功能独立弹窗，1:1 对齐功能定价页 BillingPriceDialog 规范) -->
-    <AdminDialogShell
-      :visible="Boolean(activeItem)"
+    <!-- 5. 提示词编辑弹窗 -->
+    <PromptConfigEditorDialog
+      :item="activeItem"
+      :draft="activeItem ? (promptMap[activeItem.slug] ?? '') : ''"
+      :validation="activeValidation"
+      :saving="Boolean(activeItem && saving[activeItem.slug])"
+      :variables="activeVars"
       :header="editorHeader"
-      description="编辑该功能的系统提示词模板后保存。"
-      size="form"
-      content-layout="plain"
-      :busy="isEditorBusy"
-      @update:visible="handleEditorDialogVisibleUpdate"
-    >
-      <div v-if="activeItem" class="flex flex-col gap-4">
-        <!-- 提示词编辑与变量注入 -->
-        <div class="flex flex-col gap-1.5">
-          <div class="flex items-center justify-between">
-            <label
-              class="text-admin-meta font-[680] text-admin-text-2"
-              :for="`prompt-textarea-${activeItem.slug}`"
-            >
-              系统提示词
-            </label>
-            <!-- 变量快捷填充标签 (对齐功能定价页交互) -->
-            <div v-if="activeVars.length > 0" class="flex min-w-0 flex-wrap items-center gap-1.5">
-              <span class="text-[11px] font-medium text-admin-text-3">插入变量:</span>
-              <button
-                v-for="variable in activeVars"
-                :key="variable.key"
-                type="button"
-                :disabled="saving[activeItem.slug]"
-                class="rounded-md border border-admin-border-soft bg-admin-surface-muted/50 px-1.5 py-0.5 font-mono text-[11px] font-medium text-admin-text-2 transition-colors hover:border-admin-accent/40 hover:bg-admin-accent/5 hover:text-admin-accent cursor-pointer disabled:opacity-50"
-                @click="insertVariable(activeItem.slug, variable.key)"
-              >
-                {{ variable.key }}
-              </button>
-            </div>
-          </div>
-
-          <AdminTextarea
-            :id="`prompt-textarea-${activeItem.slug}`"
-            :ref="bindActiveTextareaRef"
-            v-model="promptMap[activeItem.slug]"
-            class="w-full text-xs font-mono min-h-[160px] max-h-96"
-            :rows="6"
-            auto-grow
-            :aria-label="activeItem.title + ' 提示词模板'"
-            placeholder="输入系统提示词模板，可点击上方变量按钮插入..."
-            :disabled="saving[activeItem.slug]"
-          />
-        </div>
-
-        <!-- 字符统计与校验提示信息 -->
-        <div class="flex items-center justify-between text-admin-meta text-admin-text-3 font-mono">
-          <span>{{ (promptMap[activeItem.slug] || '').length }} 字符</span>
-          <span
-            v-if="activeValidation?.severity === 'error' && activeValidation?.message"
-            class="text-admin-danger font-sans text-xs"
-          >
-            {{ activeValidation?.message }}
-          </span>
-          <span
-            v-else-if="activeValidation?.severity === 'warning' && activeValidation?.message"
-            class="text-admin-warning font-sans text-xs"
-          >
-            {{ activeValidation?.message }}
-          </span>
-        </div>
-      </div>
-
-      <template #footer>
-        <AdminButton
-          variant="outline"
-          :class="adminActionButtonClass"
-          :disabled="isEditorBusy"
-          @click="closeEditor"
-        >
-          取消
-        </AdminButton>
-        <AdminButton
-          v-if="activeItem"
-          :class="adminActionButtonClass"
-          :loading="saving[activeItem.slug]"
-          :disabled="
-            saving[activeItem.slug] || !activeValidation?.canSave || !activeValidation?.isDirty
-          "
-          @click="handleSave(activeItem.slug)"
-        >
-          保存
-        </AdminButton>
-      </template>
-    </AdminDialogShell>
+      @update:draft="onDraftInput"
+      @save="onEditorSave"
+      @close="closeEditor"
+      @insert-variable="onInsertVariable"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, shallowRef, type Component } from 'vue'
+import { computed, ref, type Component } from 'vue'
 import { Refresh, Search, Spark, Xmark } from '@iconoir/vue'
 import { usePromptConfigFeedback } from '../usePromptConfigFeedback'
-import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminTable from '../../shared/components/AdminTable.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'
 import AdminOptionFilter from '../../shared/components/AdminOptionFilter.vue'
 import AdminRefreshButton from '../../shared/components/AdminRefreshButton.vue'
-import AdminTextarea from '../../shared/components/AdminTextarea.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
+import PromptConfigEditorDialog from '../components/PromptConfigEditorDialog.vue'
+import { usePromptConfigFilters } from '../filtering'
 import {
   adminActionButtonClass,
   adminDashboardRootClass,
@@ -347,11 +271,7 @@ const {
   saving,
 } = promptConfigWorkspace
 
-type TextareaRefLike = HTMLTextAreaElement | { $el?: Element }
-// 单弹窗仅一个 textarea: 单 ref 足够, 无需按 slug 建字典 (旧多 Panel 残留)。
-const activeTextarea = shallowRef<TextareaRefLike | null>(null)
 const activeItem = ref<FeatureItem | null>(null)
-const searchKeyword = ref('')
 
 function formatServiceName(slug: string): string {
   if (!slug) return ''
@@ -362,25 +282,6 @@ const editorHeader = computed(() => {
   if (!activeItem.value) return ''
   return `编辑 · ${formatServiceName(activeItem.value.slug)}`
 })
-
-// 状态筛选选项
-type StatusFilterType = 'all' | 'configured' | 'unconfigured'
-const statusFilter = ref<StatusFilterType>('all')
-
-const statusFilterOptions: Array<{ label: string; value: StatusFilterType }> = [
-  { label: '全部状态', value: 'all' },
-  { label: '已配置', value: 'configured' },
-  { label: '未配置', value: 'unconfigured' },
-]
-
-const hasActiveFilter = computed(() =>
-  Boolean(searchKeyword.value.trim() || statusFilter.value !== 'all'),
-)
-
-function clearFilters() {
-  searchKeyword.value = ''
-  statusFilter.value = 'all'
-}
 
 function isConfigured(slug: FeatureSlug): boolean {
   return getSavedPrompt(slug).trim().length > 0
@@ -395,49 +296,22 @@ function getFeatureIcon(slug: string): Component {
   return getWorkflowFeatureIcon(slug) ?? Spark
 }
 
-function matchesItem(
-  item: FeatureItem,
-  query: string,
-  filter: StatusFilterType,
-  groupTitle: string,
-): boolean {
-  if (filter === 'configured' && !isConfigured(item.slug)) return false
-  if (filter === 'unconfigured' && isConfigured(item.slug)) return false
-  if (!query) return true
-
-  if (groupTitle.toLowerCase().includes(query)) return true
-  if (item.title.toLowerCase().includes(query)) return true
-  if (item.label.toLowerCase().includes(query)) return true
-  if (item.slug.toLowerCase().includes(query)) return true
-  // 搜索只匹配已保存提示词, 避免未保存 draft 泄漏到表格预览/搜索结果。
-  const promptContent = getSavedPrompt(item.slug).toLowerCase()
-  if (promptContent.includes(query)) return true
-  const vars = getVarsForSlug(item.slug)
-  return vars.some((v) => v.key.toLowerCase().includes(query))
-}
-
 const featureGroups = computed<FeatureGroup[]>(() =>
   groupedFeatureGroups.filter((group) => group.items.length > 0),
 )
 
-const filteredFeatureGroups = computed(() => {
-  const query = searchKeyword.value.trim().toLowerCase()
-  const filter = statusFilter.value
-
-  if (!query && filter === 'all') return featureGroups.value
-
-  const results: FeatureGroup[] = []
-  for (const group of featureGroups.value) {
-    const matchedItems = group.items.filter((item) => matchesItem(item, query, filter, group.title))
-
-    if (matchedItems.length > 0) {
-      results.push({
-        ...group,
-        items: matchedItems,
-      })
-    }
-  }
-  return results
+const {
+  searchKeyword,
+  statusFilter,
+  statusFilterOptions,
+  hasActiveFilter,
+  clearFilters,
+  filteredFeatureGroups,
+} = usePromptConfigFilters({
+  groups: featureGroups,
+  isConfigured,
+  getSavedPrompt,
+  getPromptVariables,
 })
 
 // 行级 view-model: 模板每行只读一次 map, 避免同一单元格内重复调用
@@ -487,14 +361,9 @@ function rowView(slug: string): typeof emptyRowView {
   return rowViewMap.value[slug] ?? emptyRowView
 }
 
-const isEditorBusy = computed(() => Boolean(activeItem.value && saving[activeItem.value.slug]))
-
 function openEditor(item: FeatureItem) {
   resetDrafts([item.slug])
   activeItem.value = item
-  void nextTick(() => {
-    resolveTextareaElement(activeTextarea.value)?.focus()
-  })
 }
 
 function closeEditor() {
@@ -504,15 +373,23 @@ function closeEditor() {
   activeItem.value = null
 }
 
-async function handleSave(slug: FeatureSlug) {
-  const result = await savePrompt(slug)
+function onDraftInput(value: string) {
+  if (activeItem.value) {
+    promptMap[activeItem.value.slug] = value
+  }
+}
+
+async function onEditorSave() {
+  if (!activeItem.value) return
+  const result = await savePrompt(activeItem.value.slug)
   if (result) {
     activeItem.value = null
   }
 }
 
-function handleEditorDialogVisibleUpdate(visible: boolean) {
-  if (!visible) closeEditor()
+function onInsertVariable(payload: { key: string; position: number }) {
+  if (!activeItem.value) return
+  insertVariableIntoDraft(activeItem.value.slug, payload.key, payload.position)
 }
 
 // 初载：数据到达前不渲染 0 值计数，避免闪动误导。
@@ -520,27 +397,5 @@ const isInitialLoading = computed(() => loading.value && prompts.value.length ==
 
 function getVarsForSlug(slug: FeatureSlug): readonly FeaturePromptVariable[] {
   return getPromptVariables(slug)
-}
-
-function insertVariable(slug: FeatureSlug, variableKey: string) {
-  const currentPrompt = promptMap[slug] || ''
-  const textareaElement = resolveTextareaElement(activeTextarea.value)
-  const position =
-    textareaElement instanceof HTMLTextAreaElement
-      ? (textareaElement.selectionStart ?? currentPrompt.length)
-      : currentPrompt.length
-  insertVariableIntoDraft(slug, variableKey, position)
-}
-
-function resolveTextareaElement(ref: TextareaRefLike | null | undefined) {
-  if (!ref) return null
-  if (ref instanceof HTMLTextAreaElement) return ref
-  const root = ref.$el
-  if (root instanceof HTMLTextAreaElement) return root
-  return root?.querySelector?.('textarea') ?? null
-}
-
-function bindActiveTextareaRef(element: unknown) {
-  activeTextarea.value = (element as TextareaRefLike | null) ?? null
 }
 </script>

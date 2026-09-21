@@ -53,7 +53,6 @@ describe('groupMembershipRuntime', () => {
       selectedGroupId,
       groupFrames,
       readGroup: (id) => (id ? (snapshot.groups.find((g) => g.id === id) ?? null) : null),
-      resolveGraphNodeIdForFlowNode: (node) => (node.id === 'prompt-1' ? 'prompt-1' : null),
       resolveGraphNodeIdForFlowNodeId: (id) => (id === 'prompt-1' ? 'prompt-1' : null),
       selectOnlyFlowNodesByGraphIds,
       clearSelectedGroup,
@@ -76,7 +75,7 @@ describe('groupMembershipRuntime', () => {
   })
 
   it('captures pending group join and joins node when clicked', () => {
-    const { runtime, session, selectOnlyFlowNodesByGraphIds } = createHarness()
+    const { runtime, session } = createHarness()
 
     const captured = runtime.capturePendingGroupJoinFromSelectedGroup()
     expect(captured).toBe(true)
@@ -85,12 +84,12 @@ describe('groupMembershipRuntime', () => {
       nodeIds: ['prompt-1'],
     })
 
-    const joined = runtime.joinPendingGroupNode({ id: 'prompt-1', data: undefined })
+    const joined = runtime.joinPendingGroupNode('prompt-1')
     expect(joined).toBe(true)
     expect(runtime.pendingGroupJoin.value).toBe(null)
 
     expect(session.store.getGroupIdForNode('prompt-1')).toBe('group-1')
-    expect(selectOnlyFlowNodesByGraphIds).toHaveBeenCalledWith(['prompt-1'])
+    expect(session.store.getNode('prompt-1')?.selected).toBe(true)
   })
 
   it('resolves removed flow node changes into graph node ids', () => {

@@ -4,12 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
@@ -27,7 +30,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -143,61 +146,68 @@ export const submitAdminTask = async (
   })
 }
 
-export const getSubmitAdminTaskQueryKey = (
-  submitTaskRequest?: MaybeRefOrGetter<SubmitTaskRequest>,
-) => {
-  return ['POST', 'admin', 'tasks', 'submit', submitTaskRequest] as const
-}
+export const getSubmitAdminTaskMutationKey = () => ['submitAdminTask'] as const
 
-export const getSubmitAdminTaskQueryOptions = <
-  TData = Awaited<ReturnType<typeof submitAdminTask>>,
+export const getSubmitAdminTaskMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  submitTaskRequest: MaybeRefOrGetter<SubmitTaskRequest>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof submitAdminTask>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getSubmitAdminTaskQueryKey(submitTaskRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof submitAdminTask>>> = ({ signal }) =>
-    submitAdminTask(toValue(submitTaskRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof submitAdminTask>>,
     TError,
-    TData
+    SubmitAdminTaskMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitAdminTask>>,
+  TError,
+  SubmitAdminTaskMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSubmitAdminTaskMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitAdminTask>>,
+    SubmitAdminTaskMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return submitAdminTask(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type SubmitAdminTaskQueryResult = NonNullable<Awaited<ReturnType<typeof submitAdminTask>>>
-export type SubmitAdminTaskQueryError = ErrorType<unknown>
+export type SubmitAdminTaskMutationResult = NonNullable<Awaited<ReturnType<typeof submitAdminTask>>>
+export type SubmitAdminTaskMutationBody = BodyType<SubmitTaskRequest>
+export type SubmitAdminTaskMutationError = ErrorType<unknown>
+export type SubmitAdminTaskMutationVariables = { data: BodyType<SubmitTaskRequest> }
 
-export function useSubmitAdminTask<
-  TData = Awaited<ReturnType<typeof submitAdminTask>>,
-  TError = ErrorType<unknown>,
->(
-  submitTaskRequest: MaybeRefOrGetter<SubmitTaskRequest>,
+export const useSubmitAdminTask = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof submitAdminTask>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof submitAdminTask>>,
+      TError,
+      SubmitAdminTaskMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getSubmitAdminTaskQueryOptions(submitTaskRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof submitAdminTask>>,
+  TError,
+  SubmitAdminTaskMutationVariables,
+  TContext
+> => {
+  return useMutation(getSubmitAdminTaskMutationOptions(options), queryClient)
 }
-
 export const getCancelAdminTaskUrl = (taskId: string) => {
   return `/admin/tasks/${encodeURIComponent(String(taskId))}/cancel`
 }
@@ -212,60 +222,68 @@ export const cancelAdminTask = async (
   })
 }
 
-export const getCancelAdminTaskQueryKey = (taskId: MaybeRefOrGetter<string>) => {
-  return ['POST', 'admin', 'tasks', taskId, 'cancel'] as const
+export const getCancelAdminTaskMutationKey = () => ['cancelAdminTask'] as const
+
+export const getCancelAdminTaskMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelAdminTask>>,
+    TError,
+    CancelAdminTaskMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cancelAdminTask>>,
+  TError,
+  CancelAdminTaskMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCancelAdminTaskMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cancelAdminTask>>,
+    CancelAdminTaskMutationVariables
+  > = (props) => {
+    const { taskId } = props ?? {}
+
+    return cancelAdminTask(taskId, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export const getCancelAdminTaskQueryOptions = <
-  TData = Awaited<ReturnType<typeof cancelAdminTask>>,
-  TError = ErrorType<unknown>,
->(
-  taskId: MaybeRefOrGetter<string>,
+export type CancelAdminTaskMutationResult = NonNullable<Awaited<ReturnType<typeof cancelAdminTask>>>
+
+export type CancelAdminTaskMutationError = ErrorType<unknown>
+export type CancelAdminTaskMutationVariables = { taskId: string }
+
+export const useCancelAdminTask = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof cancelAdminTask>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getCancelAdminTaskQueryKey(taskId)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof cancelAdminTask>>> = ({ signal }) =>
-    cancelAdminTask(toValue(taskId), { signal, ...requestOptions })
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(taskId) !== null && toValue(taskId) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof cancelAdminTask>>, TError, TData>
-}
-
-export type CancelAdminTaskQueryResult = NonNullable<Awaited<ReturnType<typeof cancelAdminTask>>>
-export type CancelAdminTaskQueryError = ErrorType<unknown>
-
-export function useCancelAdminTask<
-  TData = Awaited<ReturnType<typeof cancelAdminTask>>,
-  TError = ErrorType<unknown>,
->(
-  taskId: MaybeRefOrGetter<string>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof cancelAdminTask>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof cancelAdminTask>>,
+      TError,
+      CancelAdminTaskMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getCancelAdminTaskQueryOptions(taskId, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof cancelAdminTask>>,
+  TError,
+  CancelAdminTaskMutationVariables,
+  TContext
+> => {
+  return useMutation(getCancelAdminTaskMutationOptions(options), queryClient)
 }
-
 export const getGetAdminTaskUrl = (taskId: string) => {
   return `/admin/tasks/${encodeURIComponent(String(taskId))}`
 }

@@ -2,7 +2,7 @@ import type { Edge, Node } from '@vue-flow/core'
 import { ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot, type BoardSnapshot } from '../../../../board'
-import { CanvasGraphSession } from '..'
+import { CanvasGraphSession, type CanvasGraphStore } from '..'
 import { useCanvasGroupRuntime } from './useCanvasGroupRuntime'
 import type { CanvasVueFlowGraphAdapter } from '../../../infrastructure/vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 
@@ -68,7 +68,12 @@ function createSnapshot(): BoardSnapshot {
   return snapshot
 }
 
-function createHarness(options: { isGraphSessionAttached?: () => boolean } = {}) {
+function createHarness(
+  options: {
+    isGraphSessionAttached?: () => boolean
+    readCanvasGraphStore?: () => CanvasGraphStore
+  } = {},
+) {
   const nodes = shallowRef<SelectableHarnessNode[]>([
     createPromptNode(1, 40, 40, true),
     createPromptNode(2, 400, 40, true),
@@ -76,6 +81,17 @@ function createHarness(options: { isGraphSessionAttached?: () => boolean } = {})
   const edges = shallowRef<Edge[]>([])
   const boardBaseSnapshot = ref(createSnapshot())
   const graphSession = CanvasGraphSession.hydrate('board-a', boardBaseSnapshot.value)
+  // Simulate post-reconcile state: the harness presets Flow selection, and in
+  // production reconcile would already have mirrored it into the store.
+  {
+    const initial = graphSession.store.beginTransaction('node-update', {
+      recordHistory: false,
+      markDirty: false,
+    })
+    initial.selectNode('prompt-1', true)
+    initial.selectNode('prompt-2', true)
+    initial.commit()
+  }
   graphSession.subscribe((event) => {
     if (event.patch.groups.records.length === 0) return
     boardBaseSnapshot.value = {
@@ -84,6 +100,24 @@ function createHarness(options: { isGraphSessionAttached?: () => boolean } = {})
         const group = graphSession.store.getGroup(id)
         return group ? [group] : []
       }),
+    }
+  })
+  // Mirrors the production commit projection for selection: group intents now
+  // write selection to the store, and Flow is updated from the commit patch.
+  graphSession.subscribe((event) => {
+    for (const record of event.patch.nodes.records) {
+      if (!record.after) continue
+      const selected = record.after.selected
+      nodes.value = nodes.value.map((node) =>
+        node.id === record.id ? { ...node, selected } : node,
+      ) as SelectableHarnessNode[]
+    }
+    for (const record of event.patch.edges.records) {
+      if (!record.after) continue
+      const selected = record.after.selected
+      edges.value = edges.value.map((edge) =>
+        edge.id === record.id ? { ...edge, selected } : edge,
+      )
     }
   })
   const graphAdapter = {
@@ -105,7 +139,7 @@ function createHarness(options: { isGraphSessionAttached?: () => boolean } = {})
     edges,
     boardBaseSnapshot,
     graphAdapter,
-    readCanvasGraphStore: () => graphSession.store,
+    readCanvasGraphStore: options.readCanvasGraphStore ?? (() => graphSession.store),
     isGraphSessionAttached: options.isGraphSessionAttached ?? (() => true),
     onWarning: vi.fn(),
     captureActiveNodeExecutions: vi.fn(() => []),
@@ -129,6 +163,20 @@ describe('useCanvasGroupRuntime', () => {
       nodeIds: ['prompt-1', 'prompt-2'],
     })
     expect(harness.runtime.commands.groupSelectedNodes()).toBe(false)
+  })
+
+  it('does not read the graph store while resolving detached selection actions', () => {
+    const readCanvasGraphStore = vi.fn(() => {
+      throw new Error('Canvas Graph Session is not attached to the current Board')
+    }) as unknown as () => CanvasGraphStore
+    const harness = createHarness({
+      isGraphSessionAttached: () => false,
+      readCanvasGraphStore,
+    })
+
+    expect(() => harness.runtime.view.selectionGroupAction.value).not.toThrow()
+    expect(harness.runtime.view.selectionGroupAction.value?.kind).toBe('group')
+    expect(readCanvasGraphStore).not.toHaveBeenCalled()
   })
 
   it('owns grouping commands through injected graph and side-effect adapters', () => {

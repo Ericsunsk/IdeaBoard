@@ -133,15 +133,13 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { NodeUiState, PromptNodeUiState } from '../../domain/nodes/canvasNodeUi.ts'
 import type { FlowNodeData } from '../../domain/nodes/flowTypes.ts'
-import type { OutpaintDragAnchor } from '../../application/image-workflow/useImageOutpaintOverlay.ts'
 import { useFlowCanvasNodeAdapter } from '../../infrastructure/vue-flow-adapter/useFlowCanvasNodeAdapter'
-import type { PromptAspectRatio } from '../../../board'
 import type {
   CanvasNodePresentationIntent,
   FusionNodePresentationBinding,
   ImageNodePresentationBinding,
 } from '.'
-import type { FlowSnapshotParamPatch } from '../../infrastructure/vue-flow-adapter/flowSnapshotParamMutations.ts'
+import { useFlowCanvasNodeIntents } from './useFlowCanvasNodeIntents'
 import {
   resolveCanvasNodeUiScale,
   useCanvasViewportContext,
@@ -226,232 +224,45 @@ const hasRenderedNode = computed(
     promptSnapshot.value !== null || imageSnapshot.value !== null || fusionSnapshot.value !== null,
 )
 
-function onPromptTextEdited(text: string) {
-  emit('node-intent', { type: 'text-edited', nodeId: props.nodeId, text })
-}
-
-function onPromptParameterChanged<Key extends FlowSnapshotParamPatch['key']>(
-  key: Key,
-  value: Extract<FlowSnapshotParamPatch, { key: Key }>['value'],
-) {
-  emit('node-intent', {
-    type: 'parameter-changed',
-    nodeId: props.nodeId,
-    patch: { key, value } as Extract<FlowSnapshotParamPatch, { key: Key }>,
-  })
-}
-
-function onImageParameterChanged<Key extends FlowSnapshotParamPatch['key']>(
-  key: Key,
-  value: Extract<FlowSnapshotParamPatch, { key: Key }>['value'],
-) {
-  emit('node-intent', {
-    type: 'parameter-changed',
-    nodeId: props.nodeId,
-    patch: { key, value } as Extract<FlowSnapshotParamPatch, { key: Key }>,
-  })
-}
-
-function onImageDeleteRequest() {
-  emit('node-intent', { type: 'delete-requested', nodeId: props.nodeId })
-}
-
-function onPromptDeleteRequest() {
-  emit('node-intent', { type: 'delete-requested', nodeId: props.nodeId })
-}
-
-function onImageStageDropped(event: DragEvent) {
-  emit('node-intent', { type: 'stage-dropped', nodeId: props.nodeId, event })
-}
-
-function onImageFileOpenRequest() {
-  emit('node-intent', { type: 'file-open-requested', nodeId: props.nodeId })
-}
-
-function onImagePreviewRequest() {
-  emit('node-intent', { type: 'preview-requested', nodeId: props.nodeId })
-}
-
-function onImageAppendToCanvasRequest() {
-  emit('node-intent', {
-    type: 'append-to-canvas-requested',
-    nodeId: props.nodeId,
-  })
-}
-
-function onImageResetRequest() {
-  emit('node-intent', { type: 'reset-requested', nodeId: props.nodeId })
-}
-
-function onImageImportRetryRequest() {
-  emit('node-intent', { type: 'image-import-retry-requested', nodeId: props.nodeId })
-}
-
-function onImageContextMenuRequest(event: MouseEvent) {
-  emit('node-intent', {
-    type: 'image-context-menu-requested',
-    nodeId: props.nodeId,
-    event,
-  })
-}
-
-function onPromptMediaInputDrop(event: DragEvent) {
-  emit('node-intent', {
-    type: 'media-input-dropped',
-    nodeId: props.nodeId,
-    event,
-  })
-}
-
-function onPromptMediaInputOpen() {
-  emit('node-intent', {
-    type: 'media-input-open-requested',
-    nodeId: props.nodeId,
-  })
-}
-
-function onPromptMediaInputPreview(image: { url: string; ratio: number }) {
-  emit('node-intent', {
-    type: 'media-input-preview-requested',
-    nodeId: props.nodeId,
-    image,
-  })
-}
-
-function onPromptMediaInputRemove(image: { id: string }) {
-  emit('node-intent', {
-    type: 'media-input-remove-requested',
-    nodeId: props.nodeId,
-    imageId: image.id,
-  })
-}
-
-function onNodeMouseDown(event: MouseEvent) {
-  emit('node-mousedown', props.nodeId, event)
-}
-
-function onImageOutpaintSubmit(prompt: string) {
-  emit('node-intent', {
-    type: 'outpaint-submitted',
-    nodeId: props.nodeId,
-    prompt,
-  })
-}
-function onFusionParameterChanged<Key extends FlowSnapshotParamPatch['key']>(
-  key: Key,
-  value: Extract<FlowSnapshotParamPatch, { key: Key }>['value'],
-) {
-  emit('node-intent', {
-    type: 'parameter-changed',
-    nodeId: props.nodeId,
-    patch: { key, value } as Extract<FlowSnapshotParamPatch, { key: Key }>,
-  })
-}
-
-function onFusionDeleteRequest() {
-  emit('node-intent', { type: 'delete-requested', nodeId: props.nodeId })
-}
-
-function onFusionMediaInputDrop(event: DragEvent) {
-  emit('node-intent', {
-    type: 'media-input-dropped',
-    nodeId: props.nodeId,
-    event,
-  })
-}
-
-function onFusionMediaInputRemove(image: { id: string }) {
-  emit('node-intent', {
-    type: 'media-input-remove-requested',
-    nodeId: props.nodeId,
-    imageId: image.id,
-  })
-}
-
-function onFusionContextMenuRequest(event: MouseEvent) {
-  emit('node-intent', {
-    type: 'fusion-context-menu-requested',
-    nodeId: props.nodeId,
-    event,
-  })
-}
-
-function onFusionGenerationRequest(
-  prompt: string,
-  outputCount: number,
-  aspectRatio: PromptAspectRatio,
-) {
-  emit('node-intent', {
-    type: 'fusion-generation-requested',
-    nodeId: props.nodeId,
-    prompt,
-    outputCount,
-    aspectRatio,
-  })
-}
-function onPromptGenerate() {
-  if (!promptSnapshot.value) return
-  emit('node-intent', {
-    type: 'generation-requested',
-    nodeId: props.nodeId,
-    prompt: promptSnapshot.value.text,
-    outputCount: promptSnapshot.value.outputCount ?? 1,
-    aspectRatio: promptSnapshot.value.aspectRatio ?? 'auto',
-  })
-}
-
-type ImageActionRequest = Extract<CanvasNodePresentationIntent, { type: 'action-requested' }>
-
-function onImageActionRequest(
-  action: ImageActionRequest['action'],
-  prompt: string,
-  outputCount: number,
-  strength?: number,
-) {
-  emit('node-intent', {
-    type: 'action-requested',
-    nodeId: props.nodeId,
-    action,
-    prompt,
-    outputCount,
-    strength,
-  })
-}
-function onImageOutpaintHandlePointerDown(payload: {
-  anchor: OutpaintDragAnchor
-  event: PointerEvent
-}) {
-  emit('node-intent', {
-    type: 'outpaint-handle-pointerdown',
-    nodeId: props.nodeId,
-    anchor: payload.anchor,
-    event: payload.event,
-  })
-}
-
-function onImageOutpaintHandlePointerMove(event: PointerEvent) {
-  emit('node-intent', {
-    type: 'outpaint-handle-pointermove',
-    nodeId: props.nodeId,
-    event,
-  })
-}
-
-function onImageOutpaintHandlePointerUp(event: PointerEvent) {
-  emit('node-intent', {
-    type: 'outpaint-handle-pointerup',
-    nodeId: props.nodeId,
-    event,
-  })
-}
-
-function onImageOutpaintFramePointerDown(event: PointerEvent) {
-  emit('node-intent', {
-    type: 'outpaint-frame-pointerdown',
-    nodeId: props.nodeId,
-    event,
-  })
-}
+const {
+  onPromptTextEdited,
+  onPromptParameterChanged,
+  onImageParameterChanged,
+  onImageDeleteRequest,
+  onPromptDeleteRequest,
+  onImageStageDropped,
+  onImageFileOpenRequest,
+  onImagePreviewRequest,
+  onImageAppendToCanvasRequest,
+  onImageResetRequest,
+  onImageImportRetryRequest,
+  onImageContextMenuRequest,
+  onPromptMediaInputDrop,
+  onPromptMediaInputOpen,
+  onPromptMediaInputPreview,
+  onPromptMediaInputRemove,
+  onNodeMouseDown,
+  onImageOutpaintSubmit,
+  onFusionParameterChanged,
+  onFusionDeleteRequest,
+  onFusionMediaInputDrop,
+  onFusionMediaInputRemove,
+  onFusionContextMenuRequest,
+  onFusionGenerationRequest,
+  onPromptGenerate,
+  onImageActionRequest,
+  onImageOutpaintHandlePointerDown,
+  onImageOutpaintHandlePointerMove,
+  onImageOutpaintHandlePointerUp,
+  onImageOutpaintFramePointerDown,
+} = useFlowCanvasNodeIntents({
+  nodeId: () => props.nodeId,
+  promptSnapshot: () => promptSnapshot.value,
+  emit: {
+    nodeIntent: (intent) => emit('node-intent', intent),
+    nodeMousedown: (nodeId, event) => emit('node-mousedown', nodeId, event),
+  },
+})
 
 function noop() {}
 function noopMouse() {}

@@ -4,18 +4,20 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
 
-import { computed, toValue, unref } from 'vue'
-import type { MaybeRefOrGetter } from 'vue'
+import { unref } from 'vue'
 
 import type {
   AdminBrandLogoOverrideUpdate,
@@ -26,7 +28,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -142,109 +144,74 @@ export const setAdminBrandLogoOverride = async (
   )
 }
 
-export const getSetAdminBrandLogoOverrideQueryKey = (
-  scope: MaybeRefOrGetter<
-    'provider-endpoint' | 'storage-profile' | 'search-provider' | 'oauth-provider'
-  >,
-  targetKey: MaybeRefOrGetter<string>,
-  adminBrandLogoOverrideUpdate?: MaybeRefOrGetter<AdminBrandLogoOverrideUpdate>,
-) => {
-  return [
-    'PUT',
-    'admin',
-    'brand-logo-overrides',
-    scope,
-    targetKey,
-    adminBrandLogoOverrideUpdate,
-  ] as const
-}
+export const getSetAdminBrandLogoOverrideMutationKey = () => ['setAdminBrandLogoOverride'] as const
 
-export const getSetAdminBrandLogoOverrideQueryOptions = <
-  TData = Awaited<ReturnType<typeof setAdminBrandLogoOverride>>,
+export const getSetAdminBrandLogoOverrideMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  scope: MaybeRefOrGetter<
-    'provider-endpoint' | 'storage-profile' | 'search-provider' | 'oauth-provider'
-  >,
-  targetKey: MaybeRefOrGetter<string>,
-  adminBrandLogoOverrideUpdate: MaybeRefOrGetter<AdminBrandLogoOverrideUpdate>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof setAdminBrandLogoOverride>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setAdminBrandLogoOverride>>,
+    TError,
+    SetAdminBrandLogoOverrideMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setAdminBrandLogoOverride>>,
+  TError,
+  SetAdminBrandLogoOverrideMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetAdminBrandLogoOverrideMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getSetAdminBrandLogoOverrideQueryKey(
-    scope,
-    targetKey,
-    adminBrandLogoOverrideUpdate,
-  )
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setAdminBrandLogoOverride>>,
+    SetAdminBrandLogoOverrideMutationVariables
+  > = (props) => {
+    const { scope, targetKey, data } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof setAdminBrandLogoOverride>>> = ({
-    signal,
-  }) =>
-    setAdminBrandLogoOverride(
-      toValue(scope),
-      toValue(targetKey),
-      toValue(adminBrandLogoOverrideUpdate),
-      { signal, ...requestOptions },
-    )
+    return setAdminBrandLogoOverride(scope, targetKey, data, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(
-      () =>
-        toValue(scope) !== null &&
-        toValue(scope) !== undefined &&
-        toValue(targetKey) !== null &&
-        toValue(targetKey) !== undefined,
-    ),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof setAdminBrandLogoOverride>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type SetAdminBrandLogoOverrideQueryResult = NonNullable<
+export type SetAdminBrandLogoOverrideMutationResult = NonNullable<
   Awaited<ReturnType<typeof setAdminBrandLogoOverride>>
 >
-export type SetAdminBrandLogoOverrideQueryError = ErrorType<unknown>
+export type SetAdminBrandLogoOverrideMutationBody = BodyType<AdminBrandLogoOverrideUpdate>
+export type SetAdminBrandLogoOverrideMutationError = ErrorType<unknown>
+export type SetAdminBrandLogoOverrideMutationVariables = {
+  scope: 'provider-endpoint' | 'storage-profile' | 'search-provider' | 'oauth-provider'
+  targetKey: string
+  data: BodyType<AdminBrandLogoOverrideUpdate>
+}
 
-export function useSetAdminBrandLogoOverride<
-  TData = Awaited<ReturnType<typeof setAdminBrandLogoOverride>>,
-  TError = ErrorType<unknown>,
->(
-  scope: MaybeRefOrGetter<
-    'provider-endpoint' | 'storage-profile' | 'search-provider' | 'oauth-provider'
-  >,
-  targetKey: MaybeRefOrGetter<string>,
-  adminBrandLogoOverrideUpdate: MaybeRefOrGetter<AdminBrandLogoOverrideUpdate>,
+export const useSetAdminBrandLogoOverride = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof setAdminBrandLogoOverride>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setAdminBrandLogoOverride>>,
+      TError,
+      SetAdminBrandLogoOverrideMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getSetAdminBrandLogoOverrideQueryOptions(
-    scope,
-    targetKey,
-    adminBrandLogoOverrideUpdate,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof setAdminBrandLogoOverride>>,
+  TError,
+  SetAdminBrandLogoOverrideMutationVariables,
+  TContext
+> => {
+  return useMutation(getSetAdminBrandLogoOverrideMutationOptions(options), queryClient)
 }
-
 export const getDeleteAdminBrandLogoOverrideUrl = (
   scope: 'provider-endpoint' | 'storage-profile' | 'search-provider' | 'oauth-provider',
   targetKey: string,
@@ -263,81 +230,71 @@ export const deleteAdminBrandLogoOverride = async (
   })
 }
 
-export const getDeleteAdminBrandLogoOverrideQueryKey = (
-  scope: MaybeRefOrGetter<
-    'provider-endpoint' | 'storage-profile' | 'search-provider' | 'oauth-provider'
-  >,
-  targetKey: MaybeRefOrGetter<string>,
-) => {
-  return ['DELETE', 'admin', 'brand-logo-overrides', scope, targetKey] as const
-}
+export const getDeleteAdminBrandLogoOverrideMutationKey = () =>
+  ['deleteAdminBrandLogoOverride'] as const
 
-export const getDeleteAdminBrandLogoOverrideQueryOptions = <
-  TData = Awaited<ReturnType<typeof deleteAdminBrandLogoOverride>>,
+export const getDeleteAdminBrandLogoOverrideMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  scope: MaybeRefOrGetter<
-    'provider-endpoint' | 'storage-profile' | 'search-provider' | 'oauth-provider'
-  >,
-  targetKey: MaybeRefOrGetter<string>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof deleteAdminBrandLogoOverride>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAdminBrandLogoOverride>>,
+    TError,
+    DeleteAdminBrandLogoOverrideMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteAdminBrandLogoOverride>>,
+  TError,
+  DeleteAdminBrandLogoOverrideMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeleteAdminBrandLogoOverrideMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getDeleteAdminBrandLogoOverrideQueryKey(scope, targetKey)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteAdminBrandLogoOverride>>,
+    DeleteAdminBrandLogoOverrideMutationVariables
+  > = (props) => {
+    const { scope, targetKey } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteAdminBrandLogoOverride>>> = ({
-    signal,
-  }) =>
-    deleteAdminBrandLogoOverride(toValue(scope), toValue(targetKey), { signal, ...requestOptions })
+    return deleteAdminBrandLogoOverride(scope, targetKey, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(
-      () =>
-        toValue(scope) !== null &&
-        toValue(scope) !== undefined &&
-        toValue(targetKey) !== null &&
-        toValue(targetKey) !== undefined,
-    ),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof deleteAdminBrandLogoOverride>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type DeleteAdminBrandLogoOverrideQueryResult = NonNullable<
+export type DeleteAdminBrandLogoOverrideMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteAdminBrandLogoOverride>>
 >
-export type DeleteAdminBrandLogoOverrideQueryError = ErrorType<unknown>
 
-export function useDeleteAdminBrandLogoOverride<
-  TData = Awaited<ReturnType<typeof deleteAdminBrandLogoOverride>>,
-  TError = ErrorType<unknown>,
->(
-  scope: MaybeRefOrGetter<
-    'provider-endpoint' | 'storage-profile' | 'search-provider' | 'oauth-provider'
-  >,
-  targetKey: MaybeRefOrGetter<string>,
+export type DeleteAdminBrandLogoOverrideMutationError = ErrorType<unknown>
+export type DeleteAdminBrandLogoOverrideMutationVariables = {
+  scope: 'provider-endpoint' | 'storage-profile' | 'search-provider' | 'oauth-provider'
+  targetKey: string
+}
+
+export const useDeleteAdminBrandLogoOverride = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof deleteAdminBrandLogoOverride>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deleteAdminBrandLogoOverride>>,
+      TError,
+      DeleteAdminBrandLogoOverrideMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getDeleteAdminBrandLogoOverrideQueryOptions(scope, targetKey, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof deleteAdminBrandLogoOverride>>,
+  TError,
+  DeleteAdminBrandLogoOverrideMutationVariables,
+  TContext
+> => {
+  return useMutation(getDeleteAdminBrandLogoOverrideMutationOptions(options), queryClient)
 }

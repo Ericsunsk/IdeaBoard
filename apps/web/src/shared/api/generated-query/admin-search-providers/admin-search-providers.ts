@@ -4,18 +4,20 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
 
-import { computed, toValue, unref } from 'vue'
-import type { MaybeRefOrGetter } from 'vue'
+import { unref } from 'vue'
 
 import type {
   ApiResponseEmpty,
@@ -25,7 +27,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -134,80 +136,73 @@ export const updateAdminSearchProvider = async (
   })
 }
 
-export const getUpdateAdminSearchProviderQueryKey = (
-  provider: MaybeRefOrGetter<'unsplash' | 'pexels'>,
-  updateSearchProviderRequest?: MaybeRefOrGetter<UpdateSearchProviderRequest>,
-) => {
-  return ['PUT', 'admin', 'search', 'providers', provider, updateSearchProviderRequest] as const
-}
+export const getUpdateAdminSearchProviderMutationKey = () => ['updateAdminSearchProvider'] as const
 
-export const getUpdateAdminSearchProviderQueryOptions = <
-  TData = Awaited<ReturnType<typeof updateAdminSearchProvider>>,
+export const getUpdateAdminSearchProviderMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  provider: MaybeRefOrGetter<'unsplash' | 'pexels'>,
-  updateSearchProviderRequest: MaybeRefOrGetter<UpdateSearchProviderRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminSearchProvider>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAdminSearchProvider>>,
+    TError,
+    UpdateAdminSearchProviderMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAdminSearchProvider>>,
+  TError,
+  UpdateAdminSearchProviderMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateAdminSearchProviderMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getUpdateAdminSearchProviderQueryKey(provider, updateSearchProviderRequest)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAdminSearchProvider>>,
+    UpdateAdminSearchProviderMutationVariables
+  > = (props) => {
+    const { provider, data } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminSearchProvider>>> = ({
-    signal,
-  }) =>
-    updateAdminSearchProvider(toValue(provider), toValue(updateSearchProviderRequest), {
-      signal,
-      ...requestOptions,
-    })
+    return updateAdminSearchProvider(provider, data, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(provider) !== null && toValue(provider) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof updateAdminSearchProvider>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type UpdateAdminSearchProviderQueryResult = NonNullable<
+export type UpdateAdminSearchProviderMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateAdminSearchProvider>>
 >
-export type UpdateAdminSearchProviderQueryError = ErrorType<unknown>
+export type UpdateAdminSearchProviderMutationBody = BodyType<UpdateSearchProviderRequest>
+export type UpdateAdminSearchProviderMutationError = ErrorType<unknown>
+export type UpdateAdminSearchProviderMutationVariables = {
+  provider: 'unsplash' | 'pexels'
+  data: BodyType<UpdateSearchProviderRequest>
+}
 
-export function useUpdateAdminSearchProvider<
-  TData = Awaited<ReturnType<typeof updateAdminSearchProvider>>,
-  TError = ErrorType<unknown>,
->(
-  provider: MaybeRefOrGetter<'unsplash' | 'pexels'>,
-  updateSearchProviderRequest: MaybeRefOrGetter<UpdateSearchProviderRequest>,
+export const useUpdateAdminSearchProvider = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminSearchProvider>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateAdminSearchProvider>>,
+      TError,
+      UpdateAdminSearchProviderMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUpdateAdminSearchProviderQueryOptions(
-    provider,
-    updateSearchProviderRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateAdminSearchProvider>>,
+  TError,
+  UpdateAdminSearchProviderMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateAdminSearchProviderMutationOptions(options), queryClient)
 }
-
 export const getTestAdminSearchProviderUrl = (provider: 'unsplash' | 'pexels') => {
   return `/admin/search/providers/${encodeURIComponent(String(provider))}/test`
 }
@@ -222,65 +217,67 @@ export const testAdminSearchProvider = async (
   })
 }
 
-export const getTestAdminSearchProviderQueryKey = (
-  provider: MaybeRefOrGetter<'unsplash' | 'pexels'>,
-) => {
-  return ['POST', 'admin', 'search', 'providers', provider, 'test'] as const
-}
+export const getTestAdminSearchProviderMutationKey = () => ['testAdminSearchProvider'] as const
 
-export const getTestAdminSearchProviderQueryOptions = <
-  TData = Awaited<ReturnType<typeof testAdminSearchProvider>>,
+export const getTestAdminSearchProviderMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  provider: MaybeRefOrGetter<'unsplash' | 'pexels'>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof testAdminSearchProvider>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof testAdminSearchProvider>>,
+    TError,
+    TestAdminSearchProviderMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof testAdminSearchProvider>>,
+  TError,
+  TestAdminSearchProviderMutationVariables,
+  TContext
+> => {
+  const mutationKey = getTestAdminSearchProviderMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getTestAdminSearchProviderQueryKey(provider)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof testAdminSearchProvider>>,
+    TestAdminSearchProviderMutationVariables
+  > = (props) => {
+    const { provider } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof testAdminSearchProvider>>> = ({
-    signal,
-  }) => testAdminSearchProvider(toValue(provider), { signal, ...requestOptions })
+    return testAdminSearchProvider(provider, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(provider) !== null && toValue(provider) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof testAdminSearchProvider>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type TestAdminSearchProviderQueryResult = NonNullable<
+export type TestAdminSearchProviderMutationResult = NonNullable<
   Awaited<ReturnType<typeof testAdminSearchProvider>>
 >
-export type TestAdminSearchProviderQueryError = ErrorType<unknown>
 
-export function useTestAdminSearchProvider<
-  TData = Awaited<ReturnType<typeof testAdminSearchProvider>>,
-  TError = ErrorType<unknown>,
->(
-  provider: MaybeRefOrGetter<'unsplash' | 'pexels'>,
+export type TestAdminSearchProviderMutationError = ErrorType<unknown>
+export type TestAdminSearchProviderMutationVariables = { provider: 'unsplash' | 'pexels' }
+
+export const useTestAdminSearchProvider = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof testAdminSearchProvider>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof testAdminSearchProvider>>,
+      TError,
+      TestAdminSearchProviderMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getTestAdminSearchProviderQueryOptions(provider, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof testAdminSearchProvider>>,
+  TError,
+  TestAdminSearchProviderMutationVariables,
+  TContext
+> => {
+  return useMutation(getTestAdminSearchProviderMutationOptions(options), queryClient)
 }

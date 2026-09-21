@@ -27,8 +27,11 @@ export default defineConfig({
           includeHttpResponseReturnType: false,
         },
         query: {
-          useQuery: true,
-          shouldExportQueryKey: true,
+          // Do NOT set `useQuery: true` here: it forces every operation
+          // (including PUT/POST/DELETE) into cached query hooks, which fire on
+          // mount and must never carry mutations. Orval defaults already do
+          // the right thing: GET -> useQuery, non-GET -> useMutation.
+          shouldExportKeys: true,
         },
       },
     },

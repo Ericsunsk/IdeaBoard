@@ -4,12 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
@@ -30,7 +33,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -219,82 +222,76 @@ export const getUserMediaAssetMetadataBatch = async (
   })
 }
 
-export const getGetUserMediaAssetMetadataBatchQueryKey = (
-  mediaAssetMetadataBatchRequest?: MaybeRefOrGetter<MediaAssetMetadataBatchRequest>,
-) => {
-  return [
-    'POST',
-    'user',
-    'media-assets',
-    'delivery',
-    'batch',
-    mediaAssetMetadataBatchRequest,
-  ] as const
-}
+export const getGetUserMediaAssetMetadataBatchMutationKey = () =>
+  ['getUserMediaAssetMetadataBatch'] as const
 
-export const getGetUserMediaAssetMetadataBatchQueryOptions = <
-  TData = Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>,
+export const getGetUserMediaAssetMetadataBatchMutationOptions = <
   TError = ErrorType<ApiResponseBase>,
->(
-  mediaAssetMetadataBatchRequest: MaybeRefOrGetter<MediaAssetMetadataBatchRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getGetUserMediaAssetMetadataBatchQueryKey(mediaAssetMetadataBatchRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>> = ({
-    signal,
-  }) =>
-    getUserMediaAssetMetadataBatch(toValue(mediaAssetMetadataBatchRequest), {
-      signal,
-      ...requestOptions,
-    })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>,
     TError,
-    TData
+    GetUserMediaAssetMetadataBatchMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>,
+  TError,
+  GetUserMediaAssetMetadataBatchMutationVariables,
+  TContext
+> => {
+  const mutationKey = getGetUserMediaAssetMetadataBatchMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>,
+    GetUserMediaAssetMetadataBatchMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return getUserMediaAssetMetadataBatch(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type GetUserMediaAssetMetadataBatchQueryResult = NonNullable<
+export type GetUserMediaAssetMetadataBatchMutationResult = NonNullable<
   Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>
 >
-export type GetUserMediaAssetMetadataBatchQueryError = ErrorType<ApiResponseBase>
+export type GetUserMediaAssetMetadataBatchMutationBody = BodyType<MediaAssetMetadataBatchRequest>
+export type GetUserMediaAssetMetadataBatchMutationError = ErrorType<ApiResponseBase>
+export type GetUserMediaAssetMetadataBatchMutationVariables = {
+  data: BodyType<MediaAssetMetadataBatchRequest>
+}
 
-export function useGetUserMediaAssetMetadataBatch<
-  TData = Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>,
+export const useGetUserMediaAssetMetadataBatch = <
   TError = ErrorType<ApiResponseBase>,
+  TContext = unknown,
 >(
-  mediaAssetMetadataBatchRequest: MaybeRefOrGetter<MediaAssetMetadataBatchRequest>,
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>,
+      TError,
+      GetUserMediaAssetMetadataBatchMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getGetUserMediaAssetMetadataBatchQueryOptions(
-    mediaAssetMetadataBatchRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof getUserMediaAssetMetadataBatch>>,
+  TError,
+  GetUserMediaAssetMetadataBatchMutationVariables,
+  TContext
+> => {
+  return useMutation(getGetUserMediaAssetMetadataBatchMutationOptions(options), queryClient)
 }
-
 export const getGetUserMediaAssetDerivativeContentUrl = (
   assetId: string,
   tier: 'thumb' | 'preview' | 'large-preview' | 'processing-input',
@@ -414,68 +411,72 @@ export const uploadUserProfileAvatar = async (
   })
 }
 
-export const getUploadUserProfileAvatarQueryKey = (
-  uploadUserProfileAvatarBody?: MaybeRefOrGetter<UploadUserProfileAvatarBody>,
-) => {
-  return ['POST', 'user', 'profile', 'avatar', uploadUserProfileAvatarBody] as const
-}
+export const getUploadUserProfileAvatarMutationKey = () => ['uploadUserProfileAvatar'] as const
 
-export const getUploadUserProfileAvatarQueryOptions = <
-  TData = Awaited<ReturnType<typeof uploadUserProfileAvatar>>,
+export const getUploadUserProfileAvatarMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  uploadUserProfileAvatarBody: MaybeRefOrGetter<UploadUserProfileAvatarBody>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof uploadUserProfileAvatar>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getUploadUserProfileAvatarQueryKey(uploadUserProfileAvatarBody)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof uploadUserProfileAvatar>>> = ({
-    signal,
-  }) => uploadUserProfileAvatar(toValue(uploadUserProfileAvatarBody), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof uploadUserProfileAvatar>>,
     TError,
-    TData
+    UploadUserProfileAvatarMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof uploadUserProfileAvatar>>,
+  TError,
+  UploadUserProfileAvatarMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUploadUserProfileAvatarMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof uploadUserProfileAvatar>>,
+    UploadUserProfileAvatarMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return uploadUserProfileAvatar(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type UploadUserProfileAvatarQueryResult = NonNullable<
+export type UploadUserProfileAvatarMutationResult = NonNullable<
   Awaited<ReturnType<typeof uploadUserProfileAvatar>>
 >
-export type UploadUserProfileAvatarQueryError = ErrorType<unknown>
+export type UploadUserProfileAvatarMutationBody = BodyType<UploadUserProfileAvatarBody>
+export type UploadUserProfileAvatarMutationError = ErrorType<unknown>
+export type UploadUserProfileAvatarMutationVariables = {
+  data: BodyType<UploadUserProfileAvatarBody>
+}
 
-export function useUploadUserProfileAvatar<
-  TData = Awaited<ReturnType<typeof uploadUserProfileAvatar>>,
-  TError = ErrorType<unknown>,
->(
-  uploadUserProfileAvatarBody: MaybeRefOrGetter<UploadUserProfileAvatarBody>,
+export const useUploadUserProfileAvatar = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof uploadUserProfileAvatar>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof uploadUserProfileAvatar>>,
+      TError,
+      UploadUserProfileAvatarMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUploadUserProfileAvatarQueryOptions(uploadUserProfileAvatarBody, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof uploadUserProfileAvatar>>,
+  TError,
+  UploadUserProfileAvatarMutationVariables,
+  TContext
+> => {
+  return useMutation(getUploadUserProfileAvatarMutationOptions(options), queryClient)
 }
-
 export const getUploadUserBoardAssetUrl = (boardId: string) => {
   return `/user/boards/${encodeURIComponent(String(boardId))}/uploads`
 }
@@ -495,78 +496,73 @@ export const uploadUserBoardAsset = async (
   })
 }
 
-export const getUploadUserBoardAssetQueryKey = (
-  boardId: MaybeRefOrGetter<string>,
-  uploadUserBoardAssetBody?: MaybeRefOrGetter<UploadUserBoardAssetBody>,
-) => {
-  return ['POST', 'user', 'boards', boardId, 'uploads', uploadUserBoardAssetBody] as const
-}
+export const getUploadUserBoardAssetMutationKey = () => ['uploadUserBoardAsset'] as const
 
-export const getUploadUserBoardAssetQueryOptions = <
-  TData = Awaited<ReturnType<typeof uploadUserBoardAsset>>,
+export const getUploadUserBoardAssetMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
-  uploadUserBoardAssetBody: MaybeRefOrGetter<UploadUserBoardAssetBody>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof uploadUserBoardAsset>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadUserBoardAsset>>,
+    TError,
+    UploadUserBoardAssetMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof uploadUserBoardAsset>>,
+  TError,
+  UploadUserBoardAssetMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUploadUserBoardAssetMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getUploadUserBoardAssetQueryKey(boardId, uploadUserBoardAssetBody)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof uploadUserBoardAsset>>,
+    UploadUserBoardAssetMutationVariables
+  > = (props) => {
+    const { boardId, data } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof uploadUserBoardAsset>>> = ({ signal }) =>
-    uploadUserBoardAsset(toValue(boardId), toValue(uploadUserBoardAssetBody), {
-      signal,
-      ...requestOptions,
-    })
+    return uploadUserBoardAsset(boardId, data, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(boardId) !== null && toValue(boardId) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof uploadUserBoardAsset>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type UploadUserBoardAssetQueryResult = NonNullable<
+export type UploadUserBoardAssetMutationResult = NonNullable<
   Awaited<ReturnType<typeof uploadUserBoardAsset>>
 >
-export type UploadUserBoardAssetQueryError = ErrorType<unknown>
+export type UploadUserBoardAssetMutationBody = BodyType<UploadUserBoardAssetBody>
+export type UploadUserBoardAssetMutationError = ErrorType<unknown>
+export type UploadUserBoardAssetMutationVariables = {
+  boardId: string
+  data: BodyType<UploadUserBoardAssetBody>
+}
 
-export function useUploadUserBoardAsset<
-  TData = Awaited<ReturnType<typeof uploadUserBoardAsset>>,
-  TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
-  uploadUserBoardAssetBody: MaybeRefOrGetter<UploadUserBoardAssetBody>,
+export const useUploadUserBoardAsset = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof uploadUserBoardAsset>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof uploadUserBoardAsset>>,
+      TError,
+      UploadUserBoardAssetMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUploadUserBoardAssetQueryOptions(
-    boardId,
-    uploadUserBoardAssetBody,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof uploadUserBoardAsset>>,
+  TError,
+  UploadUserBoardAssetMutationVariables,
+  TContext
+> => {
+  return useMutation(getUploadUserBoardAssetMutationOptions(options), queryClient)
 }
-
 export const getDownloadUserImageUrl = (params: DownloadUserImageParams) => {
   const normalizedParams = new URLSearchParams()
 

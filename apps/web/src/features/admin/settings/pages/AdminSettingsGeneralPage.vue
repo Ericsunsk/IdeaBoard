@@ -1,7 +1,7 @@
 <template>
   <AdminSettingsTable
     title="网站设置"
-    subtitle="站点名称与全站品牌标识配置"
+    subtitle="站点名称、品牌标识与图片搜索供应商配置"
     table-aria-label="网站设置列表"
     scroll-aria-label="网站设置列表横向滚动区域"
     :rows="settingRows"
@@ -118,6 +118,28 @@
             </AdminButton>
           </template>
         </SettingEditorCard>
+        <template v-else-if="resolveSearchConfig(data.id)">
+          <AdminSearchProviderCard
+            :provider="resolveSearchProviderId(data.id)!"
+            :config="resolveSearchConfig(data.id)!"
+            :resource="searchResource"
+            class="mb-0"
+            @change="loadSearchProviders"
+          />
+        </template>
+        <AdminAlert v-else-if="searchLoadError" severity="error">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <span>{{ searchLoadError }}</span>
+            <AdminButton
+              :class="adminActionButtonClass"
+              variant="outline"
+              size="small"
+              @click="loadSearchProviders"
+            >
+              重试
+            </AdminButton>
+          </div>
+        </AdminAlert>
       </div>
     </template>
 
@@ -133,12 +155,14 @@
 </template>
 
 <script setup lang="ts">
-import { Globe, Xmark } from '@iconoir/vue'
-import { computed, ref, watch } from 'vue'
+import { Globe, Search, Xmark } from '@iconoir/vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminInput from '../../shared/components/AdminInput.vue'
 import AdminLogoCropDialog from '../../shared/components/AdminLogoCropDialog.vue'
+import AdminSearchProviderCard from '../AdminSearchProviderCard.vue'
 import AdminSettingsTable, {
   type AdminSettingsTableRow,
 } from '../components/AdminSettingsTable.vue'
@@ -147,7 +171,18 @@ import { brandMarkClasses } from '../../../../shared/lib/brandMark'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../../shared/constants/media'
 import { prepareImageAssetForUpload } from '../../../../shared/media/imageAssetPipeline'
 import { isSupportedUploadImageFile } from '../../../../shared/utils/imageUploadSupport'
+import { formatAdminDisplayError } from '../../shared/lib/toast'
 import SettingEditorCard from '../SettingEditorCard.vue'
+import {
+  createAdminSearchProviderResource,
+  type AdminSearchProviderResource,
+} from '../searchProviderResource'
+import {
+  SEARCH_PROVIDERS,
+  SEARCH_PROVIDER_LABELS,
+  type SearchProviderConfig,
+  type SearchProviderId,
+} from '../searchProviderTypes'
 import { useBrandingSettings } from '../useBrandingSettings'
 import {
   useAdminBrandingSettingsFeedback,
@@ -191,7 +226,87 @@ function buildBrandingRow(form: typeof brandingForm.value): AdminSettingsTableRo
   }
 }
 
-const settingRows = computed<AdminSettingsTableRow[]>(() => [buildBrandingRow(brandingForm.value)])
+const settingRows = computed<AdminSettingsTableRow[]>(() => [
+  buildBrandingRow(brandingForm.value),
+  ...buildSearchProviderRows(),
+])
+
+const searchResource: AdminSearchProviderResource = createAdminSearchProviderResource()
+const searchConfigs = ref<SearchProviderConfig[]>([])
+const searchLoadError = ref('')
+
+const searchConfigByProvider = computed<Partial<Record<SearchProviderId, SearchProviderConfig>>>(
+  () => Object.fromEntries(searchConfigs.value.map((config) => [config.provider, config])),
+)
+
+function resolveSearchProviderId(id: string): SearchProviderId | null {
+  return (SEARCH_PROVIDERS as readonly string[]).includes(id) ? (id as SearchProviderId) : null
+}
+
+function resolveSearchConfig(id: string): SearchProviderConfig | null {
+  const provider = resolveSearchProviderId(id)
+  return provider ? (searchConfigByProvider.value[provider] ?? null) : null
+}
+
+function searchProviderSummary(config: SearchProviderConfig): string {
+  if (config.test_state === 'passed') return '连接正常，可启用或停用'
+  if (config.test_state === 'failed') return '上次连接测试失败，请检查后重试'
+  return '尚未通过连接测试，启用前需先测试'
+}
+
+function buildSearchProviderRows(): AdminSettingsTableRow[] {
+  return SEARCH_PROVIDERS.map((provider) => {
+    const config = searchConfigByProvider.value[provider]
+    if (!config) {
+      return {
+        id: provider,
+        title: `${SEARCH_PROVIDER_LABELS[provider]} 图片源`,
+        description: `${SEARCH_PROVIDER_LABELS[provider]} 官方 API 接入与可用状态`,
+        icon: Search,
+        status: searchLoadError.value ? '加载失败' : '加载中',
+        statusSeverity: searchLoadError.value ? 'danger' : 'secondary',
+        summary: searchLoadError.value ? '读取供应商配置失败' : '正在读取供应商配置',
+      }
+    }
+    if (config.enabled) {
+      return {
+        id: provider,
+        title: `${SEARCH_PROVIDER_LABELS[provider]} 图片源`,
+        description: `${SEARCH_PROVIDER_LABELS[provider]} 官方 API 接入与可用状态`,
+        icon: Search,
+        status: '已启用',
+        statusSeverity: 'success',
+        summary: searchProviderSummary(config),
+      }
+    }
+    return {
+      id: provider,
+      title: `${SEARCH_PROVIDER_LABELS[provider]} 图片源`,
+      description: `${SEARCH_PROVIDER_LABELS[provider]} 官方 API 接入与可用状态`,
+      icon: Search,
+      status: config.api_key_configured ? '已停用' : '未配置',
+      statusSeverity: config.api_key_configured ? 'secondary' : 'warn',
+      summary: config.api_key_configured ? searchProviderSummary(config) : '尚未配置 API Key',
+    }
+  })
+}
+
+async function loadSearchProviders() {
+  searchLoadError.value = ''
+  try {
+    const list = await searchResource.list()
+    searchConfigs.value = [...list.providers].sort(
+      (left, right) =>
+        SEARCH_PROVIDERS.indexOf(left.provider) - SEARCH_PROVIDERS.indexOf(right.provider),
+    )
+  } catch (err) {
+    searchLoadError.value = formatAdminDisplayError(err, '加载图片搜索供应商配置失败')
+  }
+}
+
+onMounted(() => {
+  void loadSearchProviders()
+})
 
 watch(
   () => brandingForm.value.logo_url,

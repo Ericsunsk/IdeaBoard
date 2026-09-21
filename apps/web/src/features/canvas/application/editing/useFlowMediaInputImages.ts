@@ -11,15 +11,12 @@ import type {
 } from '../../../board'
 import { getCanvasNodeImageInputLimit } from '../../../board'
 import { type ImageNodeDisplayPayload } from '../../infrastructure/vue-flow-adapter/flowImageNodeSelectors.ts'
-import type { CanvasVueFlowGraphAdapter } from '../../infrastructure/vue-flow-adapter/useCanvasVueFlowGraphAdapter'
-import { createFlowGraphCommandOptions } from '../../infrastructure/vue-flow-adapter/flowGraphAdapterCommandSideEffects'
 import {
   type CanvasGraphEdgeRecord,
   type CanvasGraphNodeRecord,
   type CanvasGraphReadPort,
   type CanvasGraphStore,
 } from '../../domain/graph'
-import { boardSnapshotToFlow } from '../../infrastructure/vue-flow-adapter/flowSnapshotAdapter.ts'
 import type { MediaRef } from '../../../../shared/media/mediaRef'
 import { createPrefixedId } from '../../../../shared/utils/ids'
 
@@ -50,7 +47,6 @@ type UseFlowMediaInputImagesOptions = {
   ) => void
   readCanvasGraphStore: () => CanvasGraphReadPort
   writeCanvasGraphStore?: () => CanvasGraphStore
-  graphAdapter: CanvasVueFlowGraphAdapter
   markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
   getImageNodeDisplayPayload: (nodeId: string) => ImageNodeDisplayPayload | null
   openImageUrlPreview: (src: string, ratio?: number, assetId?: string) => Promise<void>
@@ -349,12 +345,45 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
       options.onWarning(i18n.global.t('canvas.session.removeInputImageFailed'))
       return
     }
-    const projection = boardSnapshotToFlow(writeGraphStore().exportSnapshot())
-    options.graphAdapter.replaceGraph(
-      { nodes: projection.nodes as Node[], edges: projection.edges as Edge[] },
-      createFlowGraphCommandOptions(),
-    )
+    if (
+      !isFlowProjectionInSync(
+        target.id,
+        nextInputImages.map((item) => item.id),
+        edgeIds,
+      )
+    ) {
+      console.warn('[Canvas] Graph projection did not reflect removed media input after commit', {
+        targetNodeId: target.id,
+        removedEdgeIds: edgeIds,
+      })
+    }
     options.markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
+  }
+
+  function isFlowProjectionInSync(
+    targetNodeId: string,
+    nextInputIds: readonly string[],
+    removedEdgeIds: readonly string[],
+  ): boolean {
+    const store = options.readCanvasGraphStore()
+    const flowNodeIds = new Set(options.nodes.value.map((node) => node.id))
+    if (store.getNodeIds().some((nodeId) => !flowNodeIds.has(nodeId))) return false
+    const target = options.nodes.value.find((node) => node.id === targetNodeId)
+    const snapshotNode = (
+      target?.data as { snapshotNode?: { inputImages?: Array<{ id?: unknown }> } } | undefined
+    )?.snapshotNode
+    const flowInputIds = Array.isArray(snapshotNode?.inputImages)
+      ? snapshotNode.inputImages.map((item) => item.id)
+      : null
+    if (
+      !flowInputIds ||
+      flowInputIds.length !== nextInputIds.length ||
+      flowInputIds.some((id, index) => id !== nextInputIds[index])
+    ) {
+      return false
+    }
+    const flowEdgeIds = new Set(options.edges.value.map((edge) => edge.id))
+    return removedEdgeIds.every((edgeId) => !flowEdgeIds.has(edgeId))
   }
 
   function getMediaInputImages(nodeId: string): MediaInputImage[] {

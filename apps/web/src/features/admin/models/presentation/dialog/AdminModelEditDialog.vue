@@ -11,37 +11,37 @@
       <!-- 左侧：主要配置工作区 (7 列) -->
       <div class="flex flex-col gap-4.5 lg:col-span-7">
         <CatalogIdentityPanel
-          v-model:model-id="form.id"
-          v-model:model-name="form.name"
-          v-model:model-provider="form.provider"
-          v-model:model-description="form.description"
+          v-model:model-id="form.values.id"
+          v-model:model-name="form.values.name"
+          v-model:model-provider="form.values.provider"
+          v-model:model-description="form.values.description"
           :is-editing="isEditing"
           :id-prefix-options="idPrefixOptions"
           :provider-options="providerOptions"
         />
 
         <CatalogSpecsPanel
-          v-model:context-or-resolution="form.contextOrResolution"
-          v-model:hosting="form.hosting"
+          v-model:context-or-resolution="form.values.contextOrResolution"
+          v-model:hosting="form.values.hosting"
           v-model:capabilities-draft="capabilitiesDraft"
         />
 
         <CatalogGatewayPanel
-          v-model:custom-path="form.customPath"
-          v-model:custom-params="form.customParams"
+          v-model:custom-path="form.values.customPath"
+          v-model:custom-params="form.values.customParams"
           :initially-open="showAdvanced"
         />
 
         <!-- 错误提示 -->
-        <div v-if="validationError" class="text-xs text-admin-danger" role="alert">
-          {{ validationError }}
+        <div v-if="firstValidationError" class="text-xs text-admin-danger" role="alert">
+          {{ firstValidationError }}
         </div>
       </div>
 
       <!-- 右侧：实时卡片预览与网关透视区 (5 列) -->
       <CatalogPreviewCard
         :model="previewModel"
-        :model-id="form.id"
+        :model-id="form.values.id"
         :route-preview="gatewayRoutePreview"
       />
     </div>
@@ -77,9 +77,10 @@ import { type AdminModelItem } from '../../domain/catalogData'
 import {
   blankModelForm,
   finalizeModelSubmit,
+  modelFormSchema,
   splitCapabilities,
-  validateModelForm,
 } from '../../domain/modelForm'
+import { useForm, firstFormError } from '@/components/ui/form'
 import CatalogIdentityPanel from './components/CatalogIdentityPanel.vue'
 import CatalogSpecsPanel from './components/CatalogSpecsPanel.vue'
 import CatalogGatewayPanel from './components/CatalogGatewayPanel.vue'
@@ -102,7 +103,6 @@ const catalogResource = createAdminGatewayResource().catalog
 
 const isEditing = computed(() => Boolean(props.model))
 const capabilitiesDraft = ref('')
-const validationError = ref('')
 const showAdvanced = ref(false)
 
 // 供应商 quick-pick 与 ID 前缀全部来自 Registry 接口
@@ -124,8 +124,13 @@ async function loadProviderOptions() {
   }
 }
 
-const defaultForm: AdminModelItem = blankModelForm()
-const form = ref<AdminModelItem>({ ...defaultForm })
+const form = useForm({
+  initialValues: { ...blankModelForm() },
+  schema: modelFormSchema,
+})
+const firstValidationError = computed(() =>
+  firstFormError(form.errors.value, ['id', 'name', 'provider', 'customParams']),
+)
 
 // 实时预览标签列表
 const previewCapabilities = computed(() => {
@@ -135,23 +140,23 @@ const previewCapabilities = computed(() => {
 
 // 预览用合成模型
 const previewModel = computed<AdminModelItem>(() => ({
-  id: form.value.id,
-  name: form.value.name || '模型名称',
-  provider: form.value.provider || '供应商',
-  description: form.value.description || '暂无描述。保存后将在前台模型库中完整展示。',
-  descriptionEnriched: form.value.descriptionEnriched ?? false,
-  contextOrResolution: form.value.contextOrResolution || '2048×2048',
+  id: form.values.id,
+  name: form.values.name || '模型名称',
+  provider: form.values.provider || '供应商',
+  description: form.values.description || '暂无描述。保存后将在前台模型库中完整展示。',
+  descriptionEnriched: form.values.descriptionEnriched ?? false,
+  contextOrResolution: form.values.contextOrResolution || '2048×2048',
   capabilities: previewCapabilities.value,
-  hosting: form.value.hosting,
+  hosting: form.values.hosting,
   termsUrl: '',
   docsUrl: '',
-  customPath: form.value.customPath ?? '',
-  customParams: form.value.customParams ?? '',
-  inputCostPerToken: form.value.inputCostPerToken,
-  outputCostPerToken: form.value.outputCostPerToken,
-  cacheReadCostPerToken: form.value.cacheReadCostPerToken,
-  cacheCreateCostPerToken: form.value.cacheCreateCostPerToken,
-  supportsPromptCaching: form.value.supportsPromptCaching,
+  customPath: form.values.customPath ?? '',
+  customParams: form.values.customParams ?? '',
+  inputCostPerToken: form.values.inputCostPerToken,
+  outputCostPerToken: form.values.outputCostPerToken,
+  cacheReadCostPerToken: form.values.cacheReadCostPerToken,
+  cacheCreateCostPerToken: form.values.cacheCreateCostPerToken,
+  supportsPromptCaching: form.values.supportsPromptCaching,
 }))
 
 // 路由透视
@@ -163,7 +168,7 @@ const gatewayRoutePreview = ref<GatewayRoutePreviewState>({
 })
 
 async function refreshGatewayRoutePreview() {
-  const modelId = form.value.id.trim()
+  const modelId = form.values.id.trim()
   if (!modelId) {
     gatewayRoutePreview.value = {
       providerSlug: '未指定',
@@ -176,8 +181,8 @@ async function refreshGatewayRoutePreview() {
   try {
     const preview = await catalogResource.previewRoute({
       modelId,
-      customPath: form.value.customPath?.trim() || undefined,
-      customParams: form.value.customParams?.trim() || undefined,
+      customPath: form.values.customPath?.trim() || undefined,
+      customParams: form.values.customParams?.trim() || undefined,
     })
     gatewayRoutePreview.value = {
       providerSlug: preview.provider_slug || '未指定',
@@ -191,7 +196,7 @@ async function refreshGatewayRoutePreview() {
 }
 
 watchDebounced(
-  [() => form.value.id, () => form.value.customPath, () => form.value.customParams],
+  [() => form.values.id, () => form.values.customPath, () => form.values.customParams],
   () => {
     void refreshGatewayRoutePreview()
   },
@@ -202,14 +207,14 @@ watch(
   () => props.visible,
   (val) => {
     if (val) {
-      validationError.value = ''
+      form.clearErrors()
       void loadProviderOptions()
       if (props.model) {
-        form.value = { ...props.model }
+        form.resetForm({ ...props.model })
         capabilitiesDraft.value = props.model.capabilities.join(', ')
         showAdvanced.value = Boolean(props.model.customPath || props.model.customParams)
       } else {
-        form.value = { ...defaultForm }
+        form.resetForm({ ...blankModelForm() })
         capabilitiesDraft.value = ''
         showAdvanced.value = false
       }
@@ -218,25 +223,13 @@ watch(
   { immediate: true },
 )
 
-function handleSubmit() {
-  validationError.value = ''
-  const error = validateModelForm({
-    id: form.value.id,
-    name: form.value.name,
-    provider: form.value.provider,
-    customParams: form.value.customParams,
-  })
-  if (error) {
-    validationError.value = error
-    return
-  }
-
+const handleSubmit = form.handleSubmit((values) => {
   emit(
     'submit',
     finalizeModelSubmit(
-      { ...form.value, descriptionEnriched: false },
+      { ...values, descriptionEnriched: false },
       splitCapabilities(capabilitiesDraft.value),
     ),
   )
-}
+})
 </script>

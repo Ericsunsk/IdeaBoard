@@ -1,5 +1,5 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
-import type { Node, NodeChange } from '@vue-flow/core'
+import type { NodeChange } from '@vue-flow/core'
 import type { CanvasGroup } from '../../../../board'
 import {
   CanvasGraphStaleTransactionError,
@@ -35,7 +35,6 @@ export type GroupMembershipRuntimeOptions = {
   selectedGroupId: Ref<CanvasGraphGroupId | null>
   groupFrames: ComputedRef<CanvasGroupFrame[]>
   readGroup: (groupId: CanvasGraphGroupId | null) => CanvasGroup | null
-  resolveGraphNodeIdForFlowNode: (node: Pick<Node, 'id' | 'data'>) => CanvasGraphNodeId | null
   resolveGraphNodeIdForFlowNodeId: (flowNodeId: string) => CanvasGraphNodeId | null
   selectOnlyFlowNodesByGraphIds: (nodeIds: readonly CanvasGraphNodeId[]) => boolean
   clearSelectedGroup: () => boolean
@@ -49,7 +48,7 @@ export type GroupMembershipRuntime = {
   clearPendingGroupJoin: () => boolean
   prunePendingGroupJoin: () => boolean
   capturePendingGroupJoinFromSelectedGroup: () => boolean
-  joinPendingGroupNode: (flowNode: Pick<Node, 'id' | 'data'>) => boolean
+  joinPendingGroupNode: (flowNodeId: string) => boolean
   applyDraggedNodeMembershipChanges: (
     store: CanvasGraphStore,
     transaction: CanvasGraphTransaction,
@@ -110,10 +109,10 @@ export function createGroupMembershipRuntime(
     return true
   }
 
-  function joinPendingGroupNode(flowNode: Pick<Node, 'id' | 'data'>): boolean {
+  function joinPendingGroupNode(flowNodeId: string): boolean {
     const pending = pendingGroupJoin.value
     if (!pending) return false
-    const nodeId = options.resolveGraphNodeIdForFlowNode(flowNode)
+    const nodeId = options.resolveGraphNodeIdForFlowNodeId(flowNodeId)
     clearPendingGroupJoin()
     if (!nodeId || !pending.nodeIds.includes(nodeId)) return false
 
@@ -122,14 +121,21 @@ export function createGroupMembershipRuntime(
     const transaction = store.beginTransaction('group-membership')
     let summary: ReturnType<CanvasGraphTransaction['commit']>
     try {
-      summary = transaction.moveNodeToGroup(nodeId, pending.groupId).commit()
+      // The joined node becomes the selection in the same transaction, so one
+      // user action produces one commit instead of a membership commit plus a
+      // selection commit.
+      transaction.moveNodeToGroup(nodeId, pending.groupId)
+      store
+        .getNodeIds()
+        .forEach((candidateId) => transaction.selectNode(candidateId, candidateId === nodeId))
+      store.getEdgeIds().forEach((edgeId) => transaction.selectEdge(edgeId, false))
+      summary = transaction.commit()
     } catch (_error) {
       transaction.cancel()
       options.onWarning(options.updateFailedMessage)
       return false
     }
     if (!summary.didChange) return false
-    options.selectOnlyFlowNodesByGraphIds([nodeId])
     return true
   }
 

@@ -4,12 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
@@ -32,7 +35,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -140,77 +143,78 @@ export const createUserPaymentCheckoutSession = async (
   })
 }
 
-export const getCreateUserPaymentCheckoutSessionQueryKey = (
-  createPaymentCheckoutRequest?: MaybeRefOrGetter<CreatePaymentCheckoutRequest>,
-) => {
-  return ['POST', 'user', 'payments', 'checkout-sessions', createPaymentCheckoutRequest] as const
-}
+export const getCreateUserPaymentCheckoutSessionMutationKey = () =>
+  ['createUserPaymentCheckoutSession'] as const
 
-export const getCreateUserPaymentCheckoutSessionQueryOptions = <
-  TData = Awaited<ReturnType<typeof createUserPaymentCheckoutSession>>,
+export const getCreateUserPaymentCheckoutSessionMutationOptions = <
   TError = ErrorType<ApiResponseBase | CheckoutRequestRejectedError | CheckoutStateConflictError>,
->(
-  createPaymentCheckoutRequest: MaybeRefOrGetter<CreatePaymentCheckoutRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof createUserPaymentCheckoutSession>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getCreateUserPaymentCheckoutSessionQueryKey(createPaymentCheckoutRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof createUserPaymentCheckoutSession>>> = ({
-    signal,
-  }) =>
-    createUserPaymentCheckoutSession(toValue(createPaymentCheckoutRequest), {
-      signal,
-      ...requestOptions,
-    })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof createUserPaymentCheckoutSession>>,
     TError,
-    TData
+    CreateUserPaymentCheckoutSessionMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createUserPaymentCheckoutSession>>,
+  TError,
+  CreateUserPaymentCheckoutSessionMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateUserPaymentCheckoutSessionMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createUserPaymentCheckoutSession>>,
+    CreateUserPaymentCheckoutSessionMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return createUserPaymentCheckoutSession(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type CreateUserPaymentCheckoutSessionQueryResult = NonNullable<
+export type CreateUserPaymentCheckoutSessionMutationResult = NonNullable<
   Awaited<ReturnType<typeof createUserPaymentCheckoutSession>>
 >
-export type CreateUserPaymentCheckoutSessionQueryError = ErrorType<
+export type CreateUserPaymentCheckoutSessionMutationBody = BodyType<CreatePaymentCheckoutRequest>
+export type CreateUserPaymentCheckoutSessionMutationError = ErrorType<
   ApiResponseBase | CheckoutRequestRejectedError | CheckoutStateConflictError
 >
+export type CreateUserPaymentCheckoutSessionMutationVariables = {
+  data: BodyType<CreatePaymentCheckoutRequest>
+}
 
-export function useCreateUserPaymentCheckoutSession<
-  TData = Awaited<ReturnType<typeof createUserPaymentCheckoutSession>>,
+export const useCreateUserPaymentCheckoutSession = <
   TError = ErrorType<ApiResponseBase | CheckoutRequestRejectedError | CheckoutStateConflictError>,
+  TContext = unknown,
 >(
-  createPaymentCheckoutRequest: MaybeRefOrGetter<CreatePaymentCheckoutRequest>,
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof createUserPaymentCheckoutSession>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createUserPaymentCheckoutSession>>,
+      TError,
+      CreateUserPaymentCheckoutSessionMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getCreateUserPaymentCheckoutSessionQueryOptions(
-    createPaymentCheckoutRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof createUserPaymentCheckoutSession>>,
+  TError,
+  CreateUserPaymentCheckoutSessionMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateUserPaymentCheckoutSessionMutationOptions(options), queryClient)
 }
-
 export const getGetUserPaymentOrderReturnStatusUrl = (publicToken: string) => {
   return `/user/payments/orders/${encodeURIComponent(String(publicToken))}`
 }
@@ -377,69 +381,74 @@ export const continueUserPendingPaymentOrder = async (
   )
 }
 
-export const getContinueUserPendingPaymentOrderQueryKey = (
-  publicToken: MaybeRefOrGetter<string>,
-) => {
-  return ['POST', 'user', 'payments', 'pending-orders', publicToken, 'continue'] as const
-}
+export const getContinueUserPendingPaymentOrderMutationKey = () =>
+  ['continueUserPendingPaymentOrder'] as const
 
-export const getContinueUserPendingPaymentOrderQueryOptions = <
-  TData = Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>,
+export const getContinueUserPendingPaymentOrderMutationOptions = <
   TError = ErrorType<ApiResponseBase>,
->(
-  publicToken: MaybeRefOrGetter<string>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>,
+    TError,
+    ContinueUserPendingPaymentOrderMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>,
+  TError,
+  ContinueUserPendingPaymentOrderMutationVariables,
+  TContext
+> => {
+  const mutationKey = getContinueUserPendingPaymentOrderMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getContinueUserPendingPaymentOrderQueryKey(publicToken)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>,
+    ContinueUserPendingPaymentOrderMutationVariables
+  > = (props) => {
+    const { publicToken } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>> = ({
-    signal,
-  }) => continueUserPendingPaymentOrder(toValue(publicToken), { signal, ...requestOptions })
+    return continueUserPendingPaymentOrder(publicToken, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(publicToken) !== null && toValue(publicToken) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type ContinueUserPendingPaymentOrderQueryResult = NonNullable<
+export type ContinueUserPendingPaymentOrderMutationResult = NonNullable<
   Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>
 >
-export type ContinueUserPendingPaymentOrderQueryError = ErrorType<ApiResponseBase>
 
-export function useContinueUserPendingPaymentOrder<
-  TData = Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>,
+export type ContinueUserPendingPaymentOrderMutationError = ErrorType<ApiResponseBase>
+export type ContinueUserPendingPaymentOrderMutationVariables = { publicToken: string }
+
+export const useContinueUserPendingPaymentOrder = <
   TError = ErrorType<ApiResponseBase>,
+  TContext = unknown,
 >(
-  publicToken: MaybeRefOrGetter<string>,
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>,
+      TError,
+      ContinueUserPendingPaymentOrderMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getContinueUserPendingPaymentOrderQueryOptions(publicToken, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>,
+  TError,
+  ContinueUserPendingPaymentOrderMutationVariables,
+  TContext
+> => {
+  return useMutation(getContinueUserPendingPaymentOrderMutationOptions(options), queryClient)
 }
-
 export const getAbandonUserPendingPaymentOrderUrl = (publicToken: string) => {
   return `/user/payments/pending-orders/${encodeURIComponent(String(publicToken))}/abandon`
 }
@@ -457,69 +466,74 @@ export const abandonUserPendingPaymentOrder = async (
   )
 }
 
-export const getAbandonUserPendingPaymentOrderQueryKey = (
-  publicToken: MaybeRefOrGetter<string>,
-) => {
-  return ['POST', 'user', 'payments', 'pending-orders', publicToken, 'abandon'] as const
-}
+export const getAbandonUserPendingPaymentOrderMutationKey = () =>
+  ['abandonUserPendingPaymentOrder'] as const
 
-export const getAbandonUserPendingPaymentOrderQueryOptions = <
-  TData = Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>,
+export const getAbandonUserPendingPaymentOrderMutationOptions = <
   TError = ErrorType<ApiResponseBase>,
->(
-  publicToken: MaybeRefOrGetter<string>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>,
+    TError,
+    AbandonUserPendingPaymentOrderMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>,
+  TError,
+  AbandonUserPendingPaymentOrderMutationVariables,
+  TContext
+> => {
+  const mutationKey = getAbandonUserPendingPaymentOrderMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getAbandonUserPendingPaymentOrderQueryKey(publicToken)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>,
+    AbandonUserPendingPaymentOrderMutationVariables
+  > = (props) => {
+    const { publicToken } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>> = ({
-    signal,
-  }) => abandonUserPendingPaymentOrder(toValue(publicToken), { signal, ...requestOptions })
+    return abandonUserPendingPaymentOrder(publicToken, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(publicToken) !== null && toValue(publicToken) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type AbandonUserPendingPaymentOrderQueryResult = NonNullable<
+export type AbandonUserPendingPaymentOrderMutationResult = NonNullable<
   Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>
 >
-export type AbandonUserPendingPaymentOrderQueryError = ErrorType<ApiResponseBase>
 
-export function useAbandonUserPendingPaymentOrder<
-  TData = Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>,
+export type AbandonUserPendingPaymentOrderMutationError = ErrorType<ApiResponseBase>
+export type AbandonUserPendingPaymentOrderMutationVariables = { publicToken: string }
+
+export const useAbandonUserPendingPaymentOrder = <
   TError = ErrorType<ApiResponseBase>,
+  TContext = unknown,
 >(
-  publicToken: MaybeRefOrGetter<string>,
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>,
+      TError,
+      AbandonUserPendingPaymentOrderMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getAbandonUserPendingPaymentOrderQueryOptions(publicToken, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>,
+  TError,
+  AbandonUserPendingPaymentOrderMutationVariables,
+  TContext
+> => {
+  return useMutation(getAbandonUserPendingPaymentOrderMutationOptions(options), queryClient)
 }
-
 export const getListUserPaymentRechargesUrl = (params?: ListUserPaymentRechargesParams) => {
   const normalizedParams = new URLSearchParams()
 

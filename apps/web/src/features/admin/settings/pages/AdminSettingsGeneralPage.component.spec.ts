@@ -18,6 +18,28 @@ describe('AdminSettingsGeneralPage', () => {
           data: { project_name: 'IdeaBoard Test', logo_url: '' },
         }),
       ),
+      http.get('/api/admin/search/providers', () =>
+        HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            providers: [
+              {
+                provider: 'unsplash',
+                api_key_configured: true,
+                enabled: false,
+                test_state: 'passed',
+              },
+              {
+                provider: 'pexels',
+                api_key_configured: false,
+                enabled: false,
+                test_state: 'never',
+              },
+            ],
+          },
+        }),
+      ),
     )
   })
 
@@ -33,11 +55,23 @@ describe('AdminSettingsGeneralPage', () => {
 
     expect(await screen.findByText('站点设置')).toBeVisible()
 
-    // 点击配置展开行
-    const configBtn = screen.getByRole('button', { name: '配置' })
+    // 点击配置展开行（首行为站点设置）
+    const configBtn = screen.getAllByRole('button', { name: '配置' })[0]!
     await user.click(configBtn)
 
     expect(await screen.findByLabelText('站点名称')).toBeVisible()
     expect(screen.getByLabelText('Logo 地址')).toBeVisible()
+  })
+
+  it('renders image search providers inside website settings', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    renderWithUser(AdminSettingsGeneralPage, {
+      global: {
+        plugins: [[VueQueryPlugin, { queryClient }]],
+      },
+    })
+
+    expect(await screen.findByText('Unsplash 图片源')).toBeVisible()
+    expect(screen.getByText('Pexels 图片源')).toBeVisible()
   })
 })

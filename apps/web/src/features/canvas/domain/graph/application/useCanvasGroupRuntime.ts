@@ -56,15 +56,10 @@ export type CanvasGroupRuntimeView = {
   selectionGroupAction: ComputedRef<CanvasSelectionGroupAction | null>
 }
 
-export type CanvasGroupNodeClickPayload = {
-  node: Pick<Node, 'id' | 'data'>
-  selectNode: () => void
-}
-
 export type CanvasGroupRuntimeCommands = {
   selectGroupAtPoint: (point: CanvasPoint) => boolean
-  handlePaneClick: (selectPane: () => void) => void
-  handleNodeClick: (payload: CanvasGroupNodeClickPayload) => void
+  handlePaneClick: () => void
+  handleNodeClick: (nodeId: string) => boolean
   groupSelectedNodes: () => boolean
   ungroupSelectedGroup: () => boolean
   deleteSelectedGroup: () => boolean
@@ -139,74 +134,81 @@ export function useCanvasGroupRuntime(
     return true
   }
 
+  function commitSelectionTransaction(
+    stage: (store: CanvasGraphStore, transaction: CanvasGraphTransaction) => void,
+  ): boolean {
+    let transaction: CanvasGraphTransaction | undefined
+    try {
+      const store = options.readCanvasGraphStore()
+      transaction = store.beginTransaction('node-update', {
+        recordHistory: false,
+        markDirty: false,
+      })
+      stage(store, transaction)
+      return transaction.commit().didChange
+    } catch (error) {
+      transaction?.cancel()
+      console.error('[Canvas] Failed to commit selection transaction', error)
+      options.onWarning(i18n.global.t('canvas.groupOps.updateFailed'))
+      return false
+    }
+  }
+
   function clearFlowSelection(): boolean {
-    let didChange = false
-    const nextNodes = options.nodes.value.map((node) => {
-      if ((node as SelectableFlowItem).selected !== true) return node
-      didChange = true
-      return { ...node, selected: false }
+    if (!options.isGraphSessionAttached()) return false
+    return commitSelectionTransaction((store, transaction) => {
+      store.getNodeIds().forEach((nodeId) => transaction.selectNode(nodeId, false))
+      store.getEdgeIds().forEach((edgeId) => transaction.selectEdge(edgeId, false))
     })
-    const nextEdges = options.edges.value.map((edge) => {
-      if ((edge as SelectableFlowItem).selected !== true) return edge
-      didChange = true
-      return { ...edge, selected: false }
-    })
-    if (!didChange) return false
-    options.graphAdapter.replaceGraph({
-      nodes: nextNodes,
-      edges: nextEdges,
-    })
-    return true
   }
 
   function selectOnlyFlowNodesByGraphIds(nodeIds: readonly CanvasGraphNodeId[]): boolean {
     const selectedNodeIds = new Set(nodeIds)
-    let didChange = false
-    const nextNodes = options.nodes.value.map((node) => {
-      const shouldSelect = selectedNodeIds.has(node.id as CanvasGraphNodeId)
-      if (((node as SelectableFlowItem).selected === true) === shouldSelect) return node
-      didChange = true
-      return { ...node, selected: shouldSelect }
+    if (!options.isGraphSessionAttached()) return false
+    return commitSelectionTransaction((store, transaction) => {
+      store
+        .getNodeIds()
+        .forEach((nodeId) => transaction.selectNode(nodeId, selectedNodeIds.has(nodeId)))
+      store.getEdgeIds().forEach((edgeId) => transaction.selectEdge(edgeId, false))
     })
-    const nextEdges = options.edges.value.map((edge) => {
-      if ((edge as SelectableFlowItem).selected !== true) return edge
-      didChange = true
-      return { ...edge, selected: false }
-    })
-    if (!didChange) return false
-    options.graphAdapter.replaceGraph({
-      nodes: nextNodes,
-      edges: nextEdges,
-    })
-    return true
-  }
-
-  function resolveGraphNodeIdForFlowNode(
-    node: Pick<Node, 'id' | 'data'>,
-  ): CanvasGraphNodeId | null {
-    const ref = resolveFlowNodeCanvasRef(node)
-    return ref ? toCanvasGraphNodeId(ref.nodeType, ref.id) : null
   }
 
   function resolveGraphNodeIdForFlowNodeId(flowNodeId: string): CanvasGraphNodeId | null {
     const node = options.nodes.value.find((item) => item.id === flowNodeId)
-    return resolveGraphNodeIdForFlowNode(node ?? { id: flowNodeId, data: undefined })
+    const ref = resolveFlowNodeCanvasRef(node ?? { id: flowNodeId, data: undefined })
+    return ref ? toCanvasGraphNodeId(ref.nodeType, ref.id) : null
   }
 
   function hasSelectedEdges() {
-    return options.edges.value.some((edge) => (edge as SelectableFlowItem).selected === true)
+    if (!options.isGraphSessionAttached()) {
+      return options.edges.value.some((edge) => (edge as SelectableFlowItem).selected === true)
+    }
+    const store = options.readCanvasGraphStore()
+    return store.getEdgeIds().some((edgeId) => store.getEdge(edgeId)?.selected === true)
   }
 
   function readSelectedGraphNodeIds(): CanvasGraphNodeId[] | null {
+    // Selection intent always flows through the store while a session is
+    // attached (native changes via reconcile, group intents via selection
+    // transactions), so group actions read the canonical fact instead of the
+    // Flow mirror. Detached (between board attachments) there is no store to
+    // read, so fall back to the Flow selection. A selection that includes
+    // non-canonical renderer ids still blocks the action, as before.
     const selectedFlowNodeIds = options.nodes.value
       .filter((node) => (node as SelectableFlowItem).selected === true)
       .map((node) => node.id)
-    if (selectedFlowNodeIds.length === 0) return []
-
-    const selectedGraphNodeIds = selectedFlowNodeIds
-      .map((nodeId) => resolveGraphNodeIdForFlowNodeId(nodeId))
-      .filter((nodeId): nodeId is CanvasGraphNodeId => nodeId !== null)
-    return selectedGraphNodeIds.length === selectedFlowNodeIds.length ? selectedGraphNodeIds : null
+    if (!options.isGraphSessionAttached()) {
+      if (selectedFlowNodeIds.length === 0) return []
+      const selectedGraphNodeIds = selectedFlowNodeIds
+        .map((nodeId) => resolveGraphNodeIdForFlowNodeId(nodeId))
+        .filter((nodeId): nodeId is CanvasGraphNodeId => nodeId !== null)
+      return selectedGraphNodeIds.length === selectedFlowNodeIds.length
+        ? selectedGraphNodeIds
+        : null
+    }
+    if (selectedFlowNodeIds.some((nodeId) => !isCanvasGraphNodeId(nodeId))) return null
+    const store = options.readCanvasGraphStore()
+    return store.getNodeIds().filter((nodeId) => store.getNode(nodeId)?.selected === true)
   }
 
   function isSameNodeSet(left: readonly CanvasGraphNodeId[], right: readonly CanvasGraphNodeId[]) {
@@ -281,7 +283,6 @@ export function useCanvasGroupRuntime(
     selectedGroupId,
     groupFrames,
     readGroup,
-    resolveGraphNodeIdForFlowNode,
     resolveGraphNodeIdForFlowNodeId,
     selectOnlyFlowNodesByGraphIds,
     clearSelectedGroup,
@@ -294,15 +295,13 @@ export function useCanvasGroupRuntime(
     membership.prunePendingGroupJoin()
   }
 
-  function handlePaneClick(selectPane: () => void) {
+  function handlePaneClick() {
     membership.capturePendingGroupJoinFromSelectedGroup()
-    selectPane()
     clearSelectedGroup()
   }
 
-  function handleNodeClick(payload: CanvasGroupNodeClickPayload) {
-    membership.joinPendingGroupNode(payload.node)
-    payload.selectNode()
+  function handleNodeClick(nodeId: string): boolean {
+    return membership.joinPendingGroupNode(nodeId)
   }
 
   function isSelectedGroupNodeDeselection(change: NodeChange | EdgeChange): boolean {
@@ -389,7 +388,12 @@ export function useCanvasGroupRuntime(
     const transaction = store.beginTransaction('group')
     let summary: ReturnType<CanvasGraphTransaction['commit']>
     try {
-      summary = transaction.createGroup(action.nodeIds, canvasRectToGroupGeometry(bounds)).commit()
+      // Selection rides the same transaction so one user action produces one
+      // commit: undoing the grouping also restores the selection it replaced.
+      transaction.createGroup(action.nodeIds, canvasRectToGroupGeometry(bounds))
+      action.nodeIds.forEach((nodeId) => transaction.selectNode(nodeId, false))
+      store.getEdgeIds().forEach((edgeId) => transaction.selectEdge(edgeId, false))
+      summary = transaction.commit()
     } catch (_error) {
       transaction.cancel()
       options.onWarning(i18n.global.t('canvas.groupOps.groupFailed'))
@@ -398,7 +402,6 @@ export function useCanvasGroupRuntime(
     if (!summary.didChange) return false
     const createdGroupId =
       summary.projectionPatch.groups.added[0]?.id ?? summary.changedGroupIds[0] ?? null
-    clearFlowSelection()
     if (createdGroupId) selectedGroupId.value = createdGroupId
     return true
   }

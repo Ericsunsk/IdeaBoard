@@ -4,18 +4,20 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
 
-import { computed, toValue, unref } from 'vue'
-import type { MaybeRefOrGetter } from 'vue'
+import { unref } from 'vue'
 
 import type {
   AdminBillableItemAvailabilityRequest,
@@ -27,7 +29,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -135,88 +137,73 @@ export const publishAdminBillingPrice = async (
   })
 }
 
-export const getPublishAdminBillingPriceQueryKey = (
-  sku: MaybeRefOrGetter<string>,
-  adminBillingPricePublishRequest?: MaybeRefOrGetter<AdminBillingPricePublishRequest>,
-) => {
-  return [
-    'POST',
-    'admin',
-    'billing',
-    'catalog',
-    sku,
-    'prices',
-    adminBillingPricePublishRequest,
-  ] as const
-}
+export const getPublishAdminBillingPriceMutationKey = () => ['publishAdminBillingPrice'] as const
 
-export const getPublishAdminBillingPriceQueryOptions = <
-  TData = Awaited<ReturnType<typeof publishAdminBillingPrice>>,
+export const getPublishAdminBillingPriceMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  sku: MaybeRefOrGetter<string>,
-  adminBillingPricePublishRequest: MaybeRefOrGetter<AdminBillingPricePublishRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof publishAdminBillingPrice>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof publishAdminBillingPrice>>,
+    TError,
+    PublishAdminBillingPriceMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof publishAdminBillingPrice>>,
+  TError,
+  PublishAdminBillingPriceMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPublishAdminBillingPriceMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getPublishAdminBillingPriceQueryKey(sku, adminBillingPricePublishRequest)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof publishAdminBillingPrice>>,
+    PublishAdminBillingPriceMutationVariables
+  > = (props) => {
+    const { sku, data } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof publishAdminBillingPrice>>> = ({
-    signal,
-  }) =>
-    publishAdminBillingPrice(toValue(sku), toValue(adminBillingPricePublishRequest), {
-      signal,
-      ...requestOptions,
-    })
+    return publishAdminBillingPrice(sku, data, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(sku) !== null && toValue(sku) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof publishAdminBillingPrice>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type PublishAdminBillingPriceQueryResult = NonNullable<
+export type PublishAdminBillingPriceMutationResult = NonNullable<
   Awaited<ReturnType<typeof publishAdminBillingPrice>>
 >
-export type PublishAdminBillingPriceQueryError = ErrorType<unknown>
+export type PublishAdminBillingPriceMutationBody = BodyType<AdminBillingPricePublishRequest>
+export type PublishAdminBillingPriceMutationError = ErrorType<unknown>
+export type PublishAdminBillingPriceMutationVariables = {
+  sku: string
+  data: BodyType<AdminBillingPricePublishRequest>
+}
 
-export function usePublishAdminBillingPrice<
-  TData = Awaited<ReturnType<typeof publishAdminBillingPrice>>,
-  TError = ErrorType<unknown>,
->(
-  sku: MaybeRefOrGetter<string>,
-  adminBillingPricePublishRequest: MaybeRefOrGetter<AdminBillingPricePublishRequest>,
+export const usePublishAdminBillingPrice = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof publishAdminBillingPrice>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof publishAdminBillingPrice>>,
+      TError,
+      PublishAdminBillingPriceMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getPublishAdminBillingPriceQueryOptions(
-    sku,
-    adminBillingPricePublishRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof publishAdminBillingPrice>>,
+  TError,
+  PublishAdminBillingPriceMutationVariables,
+  TContext
+> => {
+  return useMutation(getPublishAdminBillingPriceMutationOptions(options), queryClient)
 }
-
 export const getDeleteAdminArchivedBillableItemUrl = (sku: string) => {
   return `/admin/billing/catalog/${encodeURIComponent(String(sku))}`
 }
@@ -234,67 +221,71 @@ export const deleteAdminArchivedBillableItem = async (
   )
 }
 
-export const getDeleteAdminArchivedBillableItemQueryKey = (sku: MaybeRefOrGetter<string>) => {
-  return ['DELETE', 'admin', 'billing', 'catalog', sku] as const
-}
+export const getDeleteAdminArchivedBillableItemMutationKey = () =>
+  ['deleteAdminArchivedBillableItem'] as const
 
-export const getDeleteAdminArchivedBillableItemQueryOptions = <
-  TData = Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>,
+export const getDeleteAdminArchivedBillableItemMutationOptions = <
   TError = ErrorType<void>,
->(
-  sku: MaybeRefOrGetter<string>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>,
+    TError,
+    DeleteAdminArchivedBillableItemMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>,
+  TError,
+  DeleteAdminArchivedBillableItemMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeleteAdminArchivedBillableItemMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getDeleteAdminArchivedBillableItemQueryKey(sku)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>,
+    DeleteAdminArchivedBillableItemMutationVariables
+  > = (props) => {
+    const { sku } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>> = ({
-    signal,
-  }) => deleteAdminArchivedBillableItem(toValue(sku), { signal, ...requestOptions })
+    return deleteAdminArchivedBillableItem(sku, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(sku) !== null && toValue(sku) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type DeleteAdminArchivedBillableItemQueryResult = NonNullable<
+export type DeleteAdminArchivedBillableItemMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>
 >
-export type DeleteAdminArchivedBillableItemQueryError = ErrorType<void>
 
-export function useDeleteAdminArchivedBillableItem<
-  TData = Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>,
-  TError = ErrorType<void>,
->(
-  sku: MaybeRefOrGetter<string>,
+export type DeleteAdminArchivedBillableItemMutationError = ErrorType<void>
+export type DeleteAdminArchivedBillableItemMutationVariables = { sku: string }
+
+export const useDeleteAdminArchivedBillableItem = <TError = ErrorType<void>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>,
+      TError,
+      DeleteAdminArchivedBillableItemMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getDeleteAdminArchivedBillableItemQueryOptions(sku, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>,
+  TError,
+  DeleteAdminArchivedBillableItemMutationVariables,
+  TContext
+> => {
+  return useMutation(getDeleteAdminArchivedBillableItemMutationOptions(options), queryClient)
 }
-
 export const getSetAdminBillableItemAvailabilityUrl = (sku: string) => {
   return `/admin/billing/catalog/${encodeURIComponent(String(sku))}/availability`
 }
@@ -334,87 +325,75 @@ export const setAdminBillableItemAvailability = async (
   )
 }
 
-export const getSetAdminBillableItemAvailabilityQueryKey = (
-  sku: MaybeRefOrGetter<string>,
-  adminBillableItemAvailabilityRequest?: MaybeRefOrGetter<AdminBillableItemAvailabilityRequest>,
-) => {
-  return [
-    'PUT',
-    'admin',
-    'billing',
-    'catalog',
-    sku,
-    'availability',
-    adminBillableItemAvailabilityRequest,
-  ] as const
-}
+export const getSetAdminBillableItemAvailabilityMutationKey = () =>
+  ['setAdminBillableItemAvailability'] as const
 
-export const getSetAdminBillableItemAvailabilityQueryOptions = <
-  TData = Awaited<ReturnType<typeof setAdminBillableItemAvailability>>,
+export const getSetAdminBillableItemAvailabilityMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  sku: MaybeRefOrGetter<string>,
-  adminBillableItemAvailabilityRequest: MaybeRefOrGetter<AdminBillableItemAvailabilityRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof setAdminBillableItemAvailability>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setAdminBillableItemAvailability>>,
+    TError,
+    SetAdminBillableItemAvailabilityMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setAdminBillableItemAvailability>>,
+  TError,
+  SetAdminBillableItemAvailabilityMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetAdminBillableItemAvailabilityMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getSetAdminBillableItemAvailabilityQueryKey(
-    sku,
-    adminBillableItemAvailabilityRequest,
-  )
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setAdminBillableItemAvailability>>,
+    SetAdminBillableItemAvailabilityMutationVariables
+  > = (props) => {
+    const { sku, data } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof setAdminBillableItemAvailability>>> = ({
-    signal,
-  }) =>
-    setAdminBillableItemAvailability(toValue(sku), toValue(adminBillableItemAvailabilityRequest), {
-      signal,
-      ...requestOptions,
-    })
+    return setAdminBillableItemAvailability(sku, data, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(sku) !== null && toValue(sku) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof setAdminBillableItemAvailability>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type SetAdminBillableItemAvailabilityQueryResult = NonNullable<
+export type SetAdminBillableItemAvailabilityMutationResult = NonNullable<
   Awaited<ReturnType<typeof setAdminBillableItemAvailability>>
 >
-export type SetAdminBillableItemAvailabilityQueryError = ErrorType<unknown>
+export type SetAdminBillableItemAvailabilityMutationBody =
+  BodyType<AdminBillableItemAvailabilityRequest>
+export type SetAdminBillableItemAvailabilityMutationError = ErrorType<unknown>
+export type SetAdminBillableItemAvailabilityMutationVariables = {
+  sku: string
+  data: BodyType<AdminBillableItemAvailabilityRequest>
+}
 
-export function useSetAdminBillableItemAvailability<
-  TData = Awaited<ReturnType<typeof setAdminBillableItemAvailability>>,
+export const useSetAdminBillableItemAvailability = <
   TError = ErrorType<unknown>,
+  TContext = unknown,
 >(
-  sku: MaybeRefOrGetter<string>,
-  adminBillableItemAvailabilityRequest: MaybeRefOrGetter<AdminBillableItemAvailabilityRequest>,
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof setAdminBillableItemAvailability>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setAdminBillableItemAvailability>>,
+      TError,
+      SetAdminBillableItemAvailabilityMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getSetAdminBillableItemAvailabilityQueryOptions(
-    sku,
-    adminBillableItemAvailabilityRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof setAdminBillableItemAvailability>>,
+  TError,
+  SetAdminBillableItemAvailabilityMutationVariables,
+  TContext
+> => {
+  return useMutation(getSetAdminBillableItemAvailabilityMutationOptions(options), queryClient)
 }

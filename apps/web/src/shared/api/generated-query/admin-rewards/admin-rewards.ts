@@ -4,12 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
@@ -33,7 +36,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -72,67 +75,72 @@ export const createAdminRewardCode = async (
   })
 }
 
-export const getCreateAdminRewardCodeQueryKey = (
-  adminRewardCodeCreateRequest?: MaybeRefOrGetter<AdminRewardCodeCreateRequest>,
-) => {
-  return ['POST', 'admin', 'rewards', 'codes', adminRewardCodeCreateRequest] as const
-}
+export const getCreateAdminRewardCodeMutationKey = () => ['createAdminRewardCode'] as const
 
-export const getCreateAdminRewardCodeQueryOptions = <
-  TData = Awaited<ReturnType<typeof createAdminRewardCode>>,
+export const getCreateAdminRewardCodeMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  adminRewardCodeCreateRequest: MaybeRefOrGetter<AdminRewardCodeCreateRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof createAdminRewardCode>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getCreateAdminRewardCodeQueryKey(adminRewardCodeCreateRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof createAdminRewardCode>>> = ({ signal }) =>
-    createAdminRewardCode(toValue(adminRewardCodeCreateRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof createAdminRewardCode>>,
     TError,
-    TData
+    CreateAdminRewardCodeMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createAdminRewardCode>>,
+  TError,
+  CreateAdminRewardCodeMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateAdminRewardCodeMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createAdminRewardCode>>,
+    CreateAdminRewardCodeMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return createAdminRewardCode(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type CreateAdminRewardCodeQueryResult = NonNullable<
+export type CreateAdminRewardCodeMutationResult = NonNullable<
   Awaited<ReturnType<typeof createAdminRewardCode>>
 >
-export type CreateAdminRewardCodeQueryError = ErrorType<unknown>
+export type CreateAdminRewardCodeMutationBody = BodyType<AdminRewardCodeCreateRequest>
+export type CreateAdminRewardCodeMutationError = ErrorType<unknown>
+export type CreateAdminRewardCodeMutationVariables = {
+  data: BodyType<AdminRewardCodeCreateRequest>
+}
 
-export function useCreateAdminRewardCode<
-  TData = Awaited<ReturnType<typeof createAdminRewardCode>>,
-  TError = ErrorType<unknown>,
->(
-  adminRewardCodeCreateRequest: MaybeRefOrGetter<AdminRewardCodeCreateRequest>,
+export const useCreateAdminRewardCode = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof createAdminRewardCode>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createAdminRewardCode>>,
+      TError,
+      CreateAdminRewardCodeMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getCreateAdminRewardCodeQueryOptions(adminRewardCodeCreateRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof createAdminRewardCode>>,
+  TError,
+  CreateAdminRewardCodeMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateAdminRewardCodeMutationOptions(options), queryClient)
 }
-
 export const getSearchAdminRewardCodesUrl = () => {
   return `/admin/rewards/codes/search`
 }
@@ -168,67 +176,72 @@ export const searchAdminRewardCodes = async (
   })
 }
 
-export const getSearchAdminRewardCodesQueryKey = (
-  adminRewardCodeSearchRequest?: MaybeRefOrGetter<AdminRewardCodeSearchRequest>,
-) => {
-  return ['POST', 'admin', 'rewards', 'codes', 'search', adminRewardCodeSearchRequest] as const
-}
+export const getSearchAdminRewardCodesMutationKey = () => ['searchAdminRewardCodes'] as const
 
-export const getSearchAdminRewardCodesQueryOptions = <
-  TData = Awaited<ReturnType<typeof searchAdminRewardCodes>>,
+export const getSearchAdminRewardCodesMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  adminRewardCodeSearchRequest: MaybeRefOrGetter<AdminRewardCodeSearchRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof searchAdminRewardCodes>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getSearchAdminRewardCodesQueryKey(adminRewardCodeSearchRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof searchAdminRewardCodes>>> = ({ signal }) =>
-    searchAdminRewardCodes(toValue(adminRewardCodeSearchRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof searchAdminRewardCodes>>,
     TError,
-    TData
+    SearchAdminRewardCodesMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof searchAdminRewardCodes>>,
+  TError,
+  SearchAdminRewardCodesMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSearchAdminRewardCodesMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof searchAdminRewardCodes>>,
+    SearchAdminRewardCodesMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return searchAdminRewardCodes(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type SearchAdminRewardCodesQueryResult = NonNullable<
+export type SearchAdminRewardCodesMutationResult = NonNullable<
   Awaited<ReturnType<typeof searchAdminRewardCodes>>
 >
-export type SearchAdminRewardCodesQueryError = ErrorType<unknown>
+export type SearchAdminRewardCodesMutationBody = BodyType<AdminRewardCodeSearchRequest>
+export type SearchAdminRewardCodesMutationError = ErrorType<unknown>
+export type SearchAdminRewardCodesMutationVariables = {
+  data: BodyType<AdminRewardCodeSearchRequest>
+}
 
-export function useSearchAdminRewardCodes<
-  TData = Awaited<ReturnType<typeof searchAdminRewardCodes>>,
-  TError = ErrorType<unknown>,
->(
-  adminRewardCodeSearchRequest: MaybeRefOrGetter<AdminRewardCodeSearchRequest>,
+export const useSearchAdminRewardCodes = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof searchAdminRewardCodes>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof searchAdminRewardCodes>>,
+      TError,
+      SearchAdminRewardCodesMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getSearchAdminRewardCodesQueryOptions(adminRewardCodeSearchRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof searchAdminRewardCodes>>,
+  TError,
+  SearchAdminRewardCodesMutationVariables,
+  TContext
+> => {
+  return useMutation(getSearchAdminRewardCodesMutationOptions(options), queryClient)
 }
-
 export const getUpdateAdminRewardCodeUrl = (id: number) => {
   return `/admin/rewards/codes/${encodeURIComponent(String(id))}`
 }
@@ -265,78 +278,73 @@ export const updateAdminRewardCode = async (
   })
 }
 
-export const getUpdateAdminRewardCodeQueryKey = (
-  id: MaybeRefOrGetter<number>,
-  adminRewardCodeUpdateRequest?: MaybeRefOrGetter<AdminRewardCodeUpdateRequest>,
-) => {
-  return ['PATCH', 'admin', 'rewards', 'codes', id, adminRewardCodeUpdateRequest] as const
-}
+export const getUpdateAdminRewardCodeMutationKey = () => ['updateAdminRewardCode'] as const
 
-export const getUpdateAdminRewardCodeQueryOptions = <
-  TData = Awaited<ReturnType<typeof updateAdminRewardCode>>,
+export const getUpdateAdminRewardCodeMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  id: MaybeRefOrGetter<number>,
-  adminRewardCodeUpdateRequest: MaybeRefOrGetter<AdminRewardCodeUpdateRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminRewardCode>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAdminRewardCode>>,
+    TError,
+    UpdateAdminRewardCodeMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAdminRewardCode>>,
+  TError,
+  UpdateAdminRewardCodeMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateAdminRewardCodeMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getUpdateAdminRewardCodeQueryKey(id, adminRewardCodeUpdateRequest)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAdminRewardCode>>,
+    UpdateAdminRewardCodeMutationVariables
+  > = (props) => {
+    const { id, data } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminRewardCode>>> = ({ signal }) =>
-    updateAdminRewardCode(toValue(id), toValue(adminRewardCodeUpdateRequest), {
-      signal,
-      ...requestOptions,
-    })
+    return updateAdminRewardCode(id, data, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(id) !== null && toValue(id) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof updateAdminRewardCode>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type UpdateAdminRewardCodeQueryResult = NonNullable<
+export type UpdateAdminRewardCodeMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateAdminRewardCode>>
 >
-export type UpdateAdminRewardCodeQueryError = ErrorType<unknown>
+export type UpdateAdminRewardCodeMutationBody = BodyType<AdminRewardCodeUpdateRequest>
+export type UpdateAdminRewardCodeMutationError = ErrorType<unknown>
+export type UpdateAdminRewardCodeMutationVariables = {
+  id: number
+  data: BodyType<AdminRewardCodeUpdateRequest>
+}
 
-export function useUpdateAdminRewardCode<
-  TData = Awaited<ReturnType<typeof updateAdminRewardCode>>,
-  TError = ErrorType<unknown>,
->(
-  id: MaybeRefOrGetter<number>,
-  adminRewardCodeUpdateRequest: MaybeRefOrGetter<AdminRewardCodeUpdateRequest>,
+export const useUpdateAdminRewardCode = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminRewardCode>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateAdminRewardCode>>,
+      TError,
+      UpdateAdminRewardCodeMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUpdateAdminRewardCodeQueryOptions(
-    id,
-    adminRewardCodeUpdateRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateAdminRewardCode>>,
+  TError,
+  UpdateAdminRewardCodeMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateAdminRewardCodeMutationOptions(options), queryClient)
 }
-
 export const getDeleteAdminRewardCodeUrl = (id: number) => {
   return `/admin/rewards/codes/${encodeURIComponent(String(id))}`
 }
@@ -351,66 +359,70 @@ export const deleteAdminRewardCode = async (
   })
 }
 
-export const getDeleteAdminRewardCodeQueryKey = (id: MaybeRefOrGetter<number>) => {
-  return ['DELETE', 'admin', 'rewards', 'codes', id] as const
-}
+export const getDeleteAdminRewardCodeMutationKey = () => ['deleteAdminRewardCode'] as const
 
-export const getDeleteAdminRewardCodeQueryOptions = <
-  TData = Awaited<ReturnType<typeof deleteAdminRewardCode>>,
+export const getDeleteAdminRewardCodeMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  id: MaybeRefOrGetter<number>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof deleteAdminRewardCode>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAdminRewardCode>>,
+    TError,
+    DeleteAdminRewardCodeMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteAdminRewardCode>>,
+  TError,
+  DeleteAdminRewardCodeMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeleteAdminRewardCodeMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getDeleteAdminRewardCodeQueryKey(id)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteAdminRewardCode>>,
+    DeleteAdminRewardCodeMutationVariables
+  > = (props) => {
+    const { id } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteAdminRewardCode>>> = ({ signal }) =>
-    deleteAdminRewardCode(toValue(id), { signal, ...requestOptions })
+    return deleteAdminRewardCode(id, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(id) !== null && toValue(id) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof deleteAdminRewardCode>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type DeleteAdminRewardCodeQueryResult = NonNullable<
+export type DeleteAdminRewardCodeMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteAdminRewardCode>>
 >
-export type DeleteAdminRewardCodeQueryError = ErrorType<unknown>
 
-export function useDeleteAdminRewardCode<
-  TData = Awaited<ReturnType<typeof deleteAdminRewardCode>>,
-  TError = ErrorType<unknown>,
->(
-  id: MaybeRefOrGetter<number>,
+export type DeleteAdminRewardCodeMutationError = ErrorType<unknown>
+export type DeleteAdminRewardCodeMutationVariables = { id: number }
+
+export const useDeleteAdminRewardCode = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof deleteAdminRewardCode>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deleteAdminRewardCode>>,
+      TError,
+      DeleteAdminRewardCodeMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getDeleteAdminRewardCodeQueryOptions(id, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof deleteAdminRewardCode>>,
+  TError,
+  DeleteAdminRewardCodeMutationVariables,
+  TContext
+> => {
+  return useMutation(getDeleteAdminRewardCodeMutationOptions(options), queryClient)
 }
-
 export const getListAdminRewardCodeRedemptionsUrl = (
   id: number,
   params?: ListAdminRewardCodeRedemptionsParams,
@@ -637,84 +649,70 @@ export const setAdminRewardCodeEnabled = async (
   })
 }
 
-export const getSetAdminRewardCodeEnabledQueryKey = (
-  id: MaybeRefOrGetter<number>,
-  adminRewardCodeEnabledRequest?: MaybeRefOrGetter<AdminRewardCodeEnabledRequest>,
-) => {
-  return [
-    'PATCH',
-    'admin',
-    'rewards',
-    'codes',
-    id,
-    'enabled',
-    adminRewardCodeEnabledRequest,
-  ] as const
-}
+export const getSetAdminRewardCodeEnabledMutationKey = () => ['setAdminRewardCodeEnabled'] as const
 
-export const getSetAdminRewardCodeEnabledQueryOptions = <
-  TData = Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>,
+export const getSetAdminRewardCodeEnabledMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  id: MaybeRefOrGetter<number>,
-  adminRewardCodeEnabledRequest: MaybeRefOrGetter<AdminRewardCodeEnabledRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>,
+    TError,
+    SetAdminRewardCodeEnabledMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>,
+  TError,
+  SetAdminRewardCodeEnabledMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetAdminRewardCodeEnabledMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getSetAdminRewardCodeEnabledQueryKey(id, adminRewardCodeEnabledRequest)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>,
+    SetAdminRewardCodeEnabledMutationVariables
+  > = (props) => {
+    const { id, data } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>> = ({
-    signal,
-  }) =>
-    setAdminRewardCodeEnabled(toValue(id), toValue(adminRewardCodeEnabledRequest), {
-      signal,
-      ...requestOptions,
-    })
+    return setAdminRewardCodeEnabled(id, data, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(id) !== null && toValue(id) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type SetAdminRewardCodeEnabledQueryResult = NonNullable<
+export type SetAdminRewardCodeEnabledMutationResult = NonNullable<
   Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>
 >
-export type SetAdminRewardCodeEnabledQueryError = ErrorType<unknown>
+export type SetAdminRewardCodeEnabledMutationBody = BodyType<AdminRewardCodeEnabledRequest>
+export type SetAdminRewardCodeEnabledMutationError = ErrorType<unknown>
+export type SetAdminRewardCodeEnabledMutationVariables = {
+  id: number
+  data: BodyType<AdminRewardCodeEnabledRequest>
+}
 
-export function useSetAdminRewardCodeEnabled<
-  TData = Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>,
-  TError = ErrorType<unknown>,
->(
-  id: MaybeRefOrGetter<number>,
-  adminRewardCodeEnabledRequest: MaybeRefOrGetter<AdminRewardCodeEnabledRequest>,
+export const useSetAdminRewardCodeEnabled = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>,
+      TError,
+      SetAdminRewardCodeEnabledMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getSetAdminRewardCodeEnabledQueryOptions(
-    id,
-    adminRewardCodeEnabledRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>,
+  TError,
+  SetAdminRewardCodeEnabledMutationVariables,
+  TContext
+> => {
+  return useMutation(getSetAdminRewardCodeEnabledMutationOptions(options), queryClient)
 }

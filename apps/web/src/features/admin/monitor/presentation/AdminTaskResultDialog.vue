@@ -483,12 +483,20 @@ import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { getTaskPriorityLabel } from './columns'
 import { adminTaskStatuses, getTaskStatusDefinition } from '../domain/status'
-import type {
-  AdminMonitorDetailModel,
-  AdminMonitorExecutionAttempt,
-} from '../infrastructure/resource'
+import type { AdminMonitorDetailModel } from '../infrastructure/resource'
 import { useAdminTaskResultFeedback } from '../application/useAdminMonitorFeedback'
 import { useTaskResultDetail } from '../application/useTaskResultDetail'
+import {
+  formatAttemptLatency,
+  getAttemptFailureLabel,
+  getAttemptProviderLabel,
+  getAttemptStageLabel,
+  getAttemptStatusLabel,
+  getAttemptStatusSeverity,
+  getBillingSettlementLabel,
+  getDetailExecutionModelLabel,
+  getDetailExecutionProviderLabel,
+} from './taskResultLabels'
 
 const props = withDefaults(
   defineProps<{
@@ -538,90 +546,5 @@ const {
 
 function handleVisibleUpdate(visible: boolean) {
   emit('update:visible', visible)
-}
-
-function getDetailExecutionProviderLabel(task: AdminMonitorDetailModel) {
-  return task.latest_execution?.provider || '-'
-}
-
-function getDetailExecutionModelLabel(task: AdminMonitorDetailModel) {
-  const execution = task.latest_execution
-  if (!execution) return '-'
-  return execution.resolved_model || '-'
-}
-
-function getAttemptProviderLabel(attempt: AdminMonitorExecutionAttempt) {
-  return attempt.provider || `模型 ${attempt.resolved_model || '未知'}`
-}
-
-function getAttemptStatusLabel(status: string) {
-  return (
-    {
-      running: '执行中',
-      completed: '已完成',
-      failed: '失败',
-      requeued: '已重试',
-      cancelled: '已取消',
-    }[status] || status
-  )
-}
-
-function getAttemptStatusSeverity(status: string) {
-  const severityByStatus: Record<string, 'success' | 'danger' | 'warn' | 'secondary' | 'info'> = {
-    running: 'info',
-    completed: 'success',
-    failed: 'danger',
-    requeued: 'warn',
-    cancelled: 'secondary',
-  }
-  return severityByStatus[status] || 'secondary'
-}
-
-function getAttemptStageLabel(stage: string) {
-  return (
-    {
-      queued: '排队中',
-      assigned: '已分配',
-      provider: 'Provider',
-      finalizing: '结果落盘',
-      completed: '已完成',
-      failed: '失败',
-      cancelled: '已取消',
-    }[stage] || stage
-  )
-}
-
-function getAttemptFailureLabel(category: string) {
-  if (!category) return '-'
-  return (
-    {
-      input_invalid: '输入无效',
-      auth: '鉴权',
-      quota: '配额',
-      timeout: '超时',
-      provider_error: 'Provider 错误',
-      storage_error: '存储错误',
-      finalize_error: '结果处理错误',
-      cancelled: '已取消',
-      unknown: '未知',
-    }[category] || category
-  )
-}
-
-function formatAttemptLatency(milliseconds: number) {
-  if (milliseconds <= 0) return '-'
-  if (milliseconds < 1000) return `${milliseconds} ms`
-  return `${(milliseconds / 1000).toFixed(milliseconds < 10000 ? 1 : 0)} s`
-}
-
-function getBillingSettlementLabel(state: string) {
-  return (
-    {
-      held: '待结算',
-      free: '免费',
-      captured: '已扣费',
-      released: '已释放',
-    }[state] || state
-  )
 }
 </script>

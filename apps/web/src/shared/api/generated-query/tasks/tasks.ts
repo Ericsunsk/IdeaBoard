@@ -4,12 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
@@ -34,7 +37,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -73,73 +76,83 @@ export const submitUserTask = async (
   })
 }
 
-export const getSubmitUserTaskQueryKey = (
-  submitTaskRequest?: MaybeRefOrGetter<SubmitTaskRequest>,
-) => {
-  return ['POST', 'user', 'tasks', 'submit', submitTaskRequest] as const
-}
+export const getSubmitUserTaskMutationKey = () => ['submitUserTask'] as const
 
-export const getSubmitUserTaskQueryOptions = <
-  TData = Awaited<ReturnType<typeof submitUserTask>>,
+export const getSubmitUserTaskMutationOptions = <
   TError = ErrorType<
     | InsufficientCreditsError
     | WalletRestrictedError
     | PricingUnavailableError
     | SubmissionFailedError
   >,
->(
-  submitTaskRequest: MaybeRefOrGetter<SubmitTaskRequest>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof submitUserTask>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getSubmitUserTaskQueryKey(submitTaskRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof submitUserTask>>> = ({ signal }) =>
-    submitUserTask(toValue(submitTaskRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof submitUserTask>>,
     TError,
-    TData
+    SubmitUserTaskMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitUserTask>>,
+  TError,
+  SubmitUserTaskMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSubmitUserTaskMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitUserTask>>,
+    SubmitUserTaskMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return submitUserTask(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type SubmitUserTaskQueryResult = NonNullable<Awaited<ReturnType<typeof submitUserTask>>>
-export type SubmitUserTaskQueryError = ErrorType<
+export type SubmitUserTaskMutationResult = NonNullable<Awaited<ReturnType<typeof submitUserTask>>>
+export type SubmitUserTaskMutationBody = BodyType<SubmitTaskRequest>
+export type SubmitUserTaskMutationError = ErrorType<
   InsufficientCreditsError | WalletRestrictedError | PricingUnavailableError | SubmissionFailedError
 >
+export type SubmitUserTaskMutationVariables = { data: BodyType<SubmitTaskRequest> }
 
-export function useSubmitUserTask<
-  TData = Awaited<ReturnType<typeof submitUserTask>>,
+export const useSubmitUserTask = <
   TError = ErrorType<
     | InsufficientCreditsError
     | WalletRestrictedError
     | PricingUnavailableError
     | SubmissionFailedError
   >,
+  TContext = unknown,
 >(
-  submitTaskRequest: MaybeRefOrGetter<SubmitTaskRequest>,
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof submitUserTask>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof submitUserTask>>,
+      TError,
+      SubmitUserTaskMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getSubmitUserTaskQueryOptions(submitTaskRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof submitUserTask>>,
+  TError,
+  SubmitUserTaskMutationVariables,
+  TContext
+> => {
+  return useMutation(getSubmitUserTaskMutationOptions(options), queryClient)
 }
-
 export const getCheckUserTaskSubmitReadinessUrl = () => {
   return `/user/tasks/submit/readiness`
 }
@@ -175,68 +188,71 @@ export const checkUserTaskSubmitReadiness = async (
   })
 }
 
-export const getCheckUserTaskSubmitReadinessQueryKey = (
-  submitTaskRequest?: MaybeRefOrGetter<SubmitTaskRequest>,
-) => {
-  return ['POST', 'user', 'tasks', 'submit', 'readiness', submitTaskRequest] as const
-}
+export const getCheckUserTaskSubmitReadinessMutationKey = () =>
+  ['checkUserTaskSubmitReadiness'] as const
 
-export const getCheckUserTaskSubmitReadinessQueryOptions = <
-  TData = Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>,
+export const getCheckUserTaskSubmitReadinessMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  submitTaskRequest: MaybeRefOrGetter<SubmitTaskRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getCheckUserTaskSubmitReadinessQueryKey(submitTaskRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>> = ({
-    signal,
-  }) => checkUserTaskSubmitReadiness(toValue(submitTaskRequest), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>,
     TError,
-    TData
+    CheckUserTaskSubmitReadinessMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>,
+  TError,
+  CheckUserTaskSubmitReadinessMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCheckUserTaskSubmitReadinessMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>,
+    CheckUserTaskSubmitReadinessMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return checkUserTaskSubmitReadiness(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type CheckUserTaskSubmitReadinessQueryResult = NonNullable<
+export type CheckUserTaskSubmitReadinessMutationResult = NonNullable<
   Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>
 >
-export type CheckUserTaskSubmitReadinessQueryError = ErrorType<unknown>
+export type CheckUserTaskSubmitReadinessMutationBody = BodyType<SubmitTaskRequest>
+export type CheckUserTaskSubmitReadinessMutationError = ErrorType<unknown>
+export type CheckUserTaskSubmitReadinessMutationVariables = { data: BodyType<SubmitTaskRequest> }
 
-export function useCheckUserTaskSubmitReadiness<
-  TData = Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>,
-  TError = ErrorType<unknown>,
->(
-  submitTaskRequest: MaybeRefOrGetter<SubmitTaskRequest>,
+export const useCheckUserTaskSubmitReadiness = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>,
+      TError,
+      CheckUserTaskSubmitReadinessMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getCheckUserTaskSubmitReadinessQueryOptions(submitTaskRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>,
+  TError,
+  CheckUserTaskSubmitReadinessMutationVariables,
+  TContext
+> => {
+  return useMutation(getCheckUserTaskSubmitReadinessMutationOptions(options), queryClient)
 }
-
 export const getCheckUserTaskSubmitReadinessMatrixUrl = () => {
   return `/user/tasks/submit/readiness/matrix`
 }
@@ -275,83 +291,77 @@ export const checkUserTaskSubmitReadinessMatrix = async (
   )
 }
 
-export const getCheckUserTaskSubmitReadinessMatrixQueryKey = (
-  submitTaskReadinessMatrixRequest?: MaybeRefOrGetter<SubmitTaskReadinessMatrixRequest>,
-) => {
-  return [
-    'POST',
-    'user',
-    'tasks',
-    'submit',
-    'readiness',
-    'matrix',
-    submitTaskReadinessMatrixRequest,
-  ] as const
-}
+export const getCheckUserTaskSubmitReadinessMatrixMutationKey = () =>
+  ['checkUserTaskSubmitReadinessMatrix'] as const
 
-export const getCheckUserTaskSubmitReadinessMatrixQueryOptions = <
-  TData = Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>,
+export const getCheckUserTaskSubmitReadinessMatrixMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  submitTaskReadinessMatrixRequest: MaybeRefOrGetter<SubmitTaskReadinessMatrixRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getCheckUserTaskSubmitReadinessMatrixQueryKey(submitTaskReadinessMatrixRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>> = ({
-    signal,
-  }) =>
-    checkUserTaskSubmitReadinessMatrix(toValue(submitTaskReadinessMatrixRequest), {
-      signal,
-      ...requestOptions,
-    })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>,
     TError,
-    TData
+    CheckUserTaskSubmitReadinessMatrixMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>,
+  TError,
+  CheckUserTaskSubmitReadinessMatrixMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCheckUserTaskSubmitReadinessMatrixMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>,
+    CheckUserTaskSubmitReadinessMatrixMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return checkUserTaskSubmitReadinessMatrix(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type CheckUserTaskSubmitReadinessMatrixQueryResult = NonNullable<
+export type CheckUserTaskSubmitReadinessMatrixMutationResult = NonNullable<
   Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>
 >
-export type CheckUserTaskSubmitReadinessMatrixQueryError = ErrorType<unknown>
+export type CheckUserTaskSubmitReadinessMatrixMutationBody =
+  BodyType<SubmitTaskReadinessMatrixRequest>
+export type CheckUserTaskSubmitReadinessMatrixMutationError = ErrorType<unknown>
+export type CheckUserTaskSubmitReadinessMatrixMutationVariables = {
+  data: BodyType<SubmitTaskReadinessMatrixRequest>
+}
 
-export function useCheckUserTaskSubmitReadinessMatrix<
-  TData = Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>,
+export const useCheckUserTaskSubmitReadinessMatrix = <
   TError = ErrorType<unknown>,
+  TContext = unknown,
 >(
-  submitTaskReadinessMatrixRequest: MaybeRefOrGetter<SubmitTaskReadinessMatrixRequest>,
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>,
+      TError,
+      CheckUserTaskSubmitReadinessMatrixMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getCheckUserTaskSubmitReadinessMatrixQueryOptions(
-    submitTaskReadinessMatrixRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof checkUserTaskSubmitReadinessMatrix>>,
+  TError,
+  CheckUserTaskSubmitReadinessMatrixMutationVariables,
+  TContext
+> => {
+  return useMutation(getCheckUserTaskSubmitReadinessMatrixMutationOptions(options), queryClient)
 }
-
 export const getListUserTasksUrl = (params?: ListUserTasksParams) => {
   const normalizedParams = new URLSearchParams()
 
@@ -511,56 +521,65 @@ export const cancelUserTask = async (
   })
 }
 
-export const getCancelUserTaskQueryKey = (taskId: MaybeRefOrGetter<string>) => {
-  return ['POST', 'user', 'tasks', taskId, 'cancel'] as const
+export const getCancelUserTaskMutationKey = () => ['cancelUserTask'] as const
+
+export const getCancelUserTaskMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelUserTask>>,
+    TError,
+    CancelUserTaskMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cancelUserTask>>,
+  TError,
+  CancelUserTaskMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCancelUserTaskMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cancelUserTask>>,
+    CancelUserTaskMutationVariables
+  > = (props) => {
+    const { taskId } = props ?? {}
+
+    return cancelUserTask(taskId, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export const getCancelUserTaskQueryOptions = <
-  TData = Awaited<ReturnType<typeof cancelUserTask>>,
-  TError = ErrorType<unknown>,
->(
-  taskId: MaybeRefOrGetter<string>,
+export type CancelUserTaskMutationResult = NonNullable<Awaited<ReturnType<typeof cancelUserTask>>>
+
+export type CancelUserTaskMutationError = ErrorType<unknown>
+export type CancelUserTaskMutationVariables = { taskId: string }
+
+export const useCancelUserTask = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof cancelUserTask>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getCancelUserTaskQueryKey(taskId)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof cancelUserTask>>> = ({ signal }) =>
-    cancelUserTask(toValue(taskId), { signal, ...requestOptions })
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(taskId) !== null && toValue(taskId) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof cancelUserTask>>, TError, TData>
-}
-
-export type CancelUserTaskQueryResult = NonNullable<Awaited<ReturnType<typeof cancelUserTask>>>
-export type CancelUserTaskQueryError = ErrorType<unknown>
-
-export function useCancelUserTask<
-  TData = Awaited<ReturnType<typeof cancelUserTask>>,
-  TError = ErrorType<unknown>,
->(
-  taskId: MaybeRefOrGetter<string>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof cancelUserTask>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof cancelUserTask>>,
+      TError,
+      CancelUserTaskMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getCancelUserTaskQueryOptions(taskId, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof cancelUserTask>>,
+  TError,
+  CancelUserTaskMutationVariables,
+  TContext
+> => {
+  return useMutation(getCancelUserTaskMutationOptions(options), queryClient)
 }

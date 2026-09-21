@@ -4,12 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
@@ -29,7 +32,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -222,86 +225,73 @@ export const createAdminStorageProfile = async (
   )
 }
 
-export const getCreateAdminStorageProfileQueryKey = (
-  storageProfilePayload?: MaybeRefOrGetter<StorageProfilePayload>,
-  params?: MaybeRefOrGetter<CreateAdminStorageProfileParams>,
-) => {
-  return [
-    'POST',
-    'admin',
-    'storage',
-    'profiles',
-    ...(params ? [params] : []),
-    storageProfilePayload,
-  ] as const
-}
+export const getCreateAdminStorageProfileMutationKey = () => ['createAdminStorageProfile'] as const
 
-export const getCreateAdminStorageProfileQueryOptions = <
-  TData = Awaited<ReturnType<typeof createAdminStorageProfile>>,
+export const getCreateAdminStorageProfileMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  storageProfilePayload: MaybeRefOrGetter<StorageProfilePayload>,
-  params?: MaybeRefOrGetter<CreateAdminStorageProfileParams>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof createAdminStorageProfile>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getCreateAdminStorageProfileQueryKey(storageProfilePayload, params)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof createAdminStorageProfile>>> = ({
-    signal,
-  }) =>
-    createAdminStorageProfile(toValue(storageProfilePayload), toValue(params), {
-      signal,
-      ...requestOptions,
-    })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof createAdminStorageProfile>>,
     TError,
-    TData
+    CreateAdminStorageProfileMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createAdminStorageProfile>>,
+  TError,
+  CreateAdminStorageProfileMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateAdminStorageProfileMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createAdminStorageProfile>>,
+    CreateAdminStorageProfileMutationVariables
+  > = (props) => {
+    const { data, params } = props ?? {}
+
+    return createAdminStorageProfile(data, params, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type CreateAdminStorageProfileQueryResult = NonNullable<
+export type CreateAdminStorageProfileMutationResult = NonNullable<
   Awaited<ReturnType<typeof createAdminStorageProfile>>
 >
-export type CreateAdminStorageProfileQueryError = ErrorType<unknown>
+export type CreateAdminStorageProfileMutationBody = BodyType<StorageProfilePayload>
+export type CreateAdminStorageProfileMutationError = ErrorType<unknown>
+export type CreateAdminStorageProfileMutationVariables = {
+  data: BodyType<StorageProfilePayload>
+  params?: CreateAdminStorageProfileParams
+}
 
-export function useCreateAdminStorageProfile<
-  TData = Awaited<ReturnType<typeof createAdminStorageProfile>>,
-  TError = ErrorType<unknown>,
->(
-  storageProfilePayload: MaybeRefOrGetter<StorageProfilePayload>,
-  params?: MaybeRefOrGetter<CreateAdminStorageProfileParams>,
+export const useCreateAdminStorageProfile = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof createAdminStorageProfile>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createAdminStorageProfile>>,
+      TError,
+      CreateAdminStorageProfileMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getCreateAdminStorageProfileQueryOptions(
-    storageProfilePayload,
-    params,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof createAdminStorageProfile>>,
+  TError,
+  CreateAdminStorageProfileMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateAdminStorageProfileMutationOptions(options), queryClient)
 }
-
 export const getUpdateAdminStorageProfileUrl = (
   id: string,
   params?: UpdateAdminStorageProfileParams,
@@ -357,92 +347,74 @@ export const updateAdminStorageProfile = async (
   )
 }
 
-export const getUpdateAdminStorageProfileQueryKey = (
-  id: MaybeRefOrGetter<string>,
-  storageProfilePayload?: MaybeRefOrGetter<StorageProfilePayload>,
-  params?: MaybeRefOrGetter<UpdateAdminStorageProfileParams>,
-) => {
-  return [
-    'PUT',
-    'admin',
-    'storage',
-    'profiles',
-    id,
-    ...(params ? [params] : []),
-    storageProfilePayload,
-  ] as const
-}
+export const getUpdateAdminStorageProfileMutationKey = () => ['updateAdminStorageProfile'] as const
 
-export const getUpdateAdminStorageProfileQueryOptions = <
-  TData = Awaited<ReturnType<typeof updateAdminStorageProfile>>,
+export const getUpdateAdminStorageProfileMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  id: MaybeRefOrGetter<string>,
-  storageProfilePayload: MaybeRefOrGetter<StorageProfilePayload>,
-  params?: MaybeRefOrGetter<UpdateAdminStorageProfileParams>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminStorageProfile>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAdminStorageProfile>>,
+    TError,
+    UpdateAdminStorageProfileMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAdminStorageProfile>>,
+  TError,
+  UpdateAdminStorageProfileMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateAdminStorageProfileMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getUpdateAdminStorageProfileQueryKey(id, storageProfilePayload, params)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAdminStorageProfile>>,
+    UpdateAdminStorageProfileMutationVariables
+  > = (props) => {
+    const { id, data, params } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminStorageProfile>>> = ({
-    signal,
-  }) =>
-    updateAdminStorageProfile(toValue(id), toValue(storageProfilePayload), toValue(params), {
-      signal,
-      ...requestOptions,
-    })
+    return updateAdminStorageProfile(id, data, params, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(id) !== null && toValue(id) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof updateAdminStorageProfile>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type UpdateAdminStorageProfileQueryResult = NonNullable<
+export type UpdateAdminStorageProfileMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateAdminStorageProfile>>
 >
-export type UpdateAdminStorageProfileQueryError = ErrorType<unknown>
+export type UpdateAdminStorageProfileMutationBody = BodyType<StorageProfilePayload>
+export type UpdateAdminStorageProfileMutationError = ErrorType<unknown>
+export type UpdateAdminStorageProfileMutationVariables = {
+  id: string
+  data: BodyType<StorageProfilePayload>
+  params?: UpdateAdminStorageProfileParams
+}
 
-export function useUpdateAdminStorageProfile<
-  TData = Awaited<ReturnType<typeof updateAdminStorageProfile>>,
-  TError = ErrorType<unknown>,
->(
-  id: MaybeRefOrGetter<string>,
-  storageProfilePayload: MaybeRefOrGetter<StorageProfilePayload>,
-  params?: MaybeRefOrGetter<UpdateAdminStorageProfileParams>,
+export const useUpdateAdminStorageProfile = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminStorageProfile>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateAdminStorageProfile>>,
+      TError,
+      UpdateAdminStorageProfileMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUpdateAdminStorageProfileQueryOptions(
-    id,
-    storageProfilePayload,
-    params,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateAdminStorageProfile>>,
+  TError,
+  UpdateAdminStorageProfileMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateAdminStorageProfileMutationOptions(options), queryClient)
 }
-
 export const getDeleteAdminStorageProfileUrl = (id: string) => {
   return `/admin/storage/profiles/${encodeURIComponent(String(id))}`
 }
@@ -457,67 +429,70 @@ export const deleteAdminStorageProfile = async (
   })
 }
 
-export const getDeleteAdminStorageProfileQueryKey = (id: MaybeRefOrGetter<string>) => {
-  return ['DELETE', 'admin', 'storage', 'profiles', id] as const
-}
+export const getDeleteAdminStorageProfileMutationKey = () => ['deleteAdminStorageProfile'] as const
 
-export const getDeleteAdminStorageProfileQueryOptions = <
-  TData = Awaited<ReturnType<typeof deleteAdminStorageProfile>>,
+export const getDeleteAdminStorageProfileMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  id: MaybeRefOrGetter<string>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof deleteAdminStorageProfile>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAdminStorageProfile>>,
+    TError,
+    DeleteAdminStorageProfileMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteAdminStorageProfile>>,
+  TError,
+  DeleteAdminStorageProfileMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeleteAdminStorageProfileMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getDeleteAdminStorageProfileQueryKey(id)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteAdminStorageProfile>>,
+    DeleteAdminStorageProfileMutationVariables
+  > = (props) => {
+    const { id } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteAdminStorageProfile>>> = ({
-    signal,
-  }) => deleteAdminStorageProfile(toValue(id), { signal, ...requestOptions })
+    return deleteAdminStorageProfile(id, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(id) !== null && toValue(id) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof deleteAdminStorageProfile>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type DeleteAdminStorageProfileQueryResult = NonNullable<
+export type DeleteAdminStorageProfileMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteAdminStorageProfile>>
 >
-export type DeleteAdminStorageProfileQueryError = ErrorType<unknown>
 
-export function useDeleteAdminStorageProfile<
-  TData = Awaited<ReturnType<typeof deleteAdminStorageProfile>>,
-  TError = ErrorType<unknown>,
->(
-  id: MaybeRefOrGetter<string>,
+export type DeleteAdminStorageProfileMutationError = ErrorType<unknown>
+export type DeleteAdminStorageProfileMutationVariables = { id: string }
+
+export const useDeleteAdminStorageProfile = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof deleteAdminStorageProfile>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deleteAdminStorageProfile>>,
+      TError,
+      DeleteAdminStorageProfileMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getDeleteAdminStorageProfileQueryOptions(id, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof deleteAdminStorageProfile>>,
+  TError,
+  DeleteAdminStorageProfileMutationVariables,
+  TContext
+> => {
+  return useMutation(getDeleteAdminStorageProfileMutationOptions(options), queryClient)
 }
-
 export const getApplyAdminStorageProfileUrl = (id: string) => {
   return `/admin/storage/profiles/${encodeURIComponent(String(id))}/apply`
 }
@@ -532,67 +507,70 @@ export const applyAdminStorageProfile = async (
   })
 }
 
-export const getApplyAdminStorageProfileQueryKey = (id: MaybeRefOrGetter<string>) => {
-  return ['POST', 'admin', 'storage', 'profiles', id, 'apply'] as const
-}
+export const getApplyAdminStorageProfileMutationKey = () => ['applyAdminStorageProfile'] as const
 
-export const getApplyAdminStorageProfileQueryOptions = <
-  TData = Awaited<ReturnType<typeof applyAdminStorageProfile>>,
+export const getApplyAdminStorageProfileMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  id: MaybeRefOrGetter<string>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof applyAdminStorageProfile>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof applyAdminStorageProfile>>,
+    TError,
+    ApplyAdminStorageProfileMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof applyAdminStorageProfile>>,
+  TError,
+  ApplyAdminStorageProfileMutationVariables,
+  TContext
+> => {
+  const mutationKey = getApplyAdminStorageProfileMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getApplyAdminStorageProfileQueryKey(id)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof applyAdminStorageProfile>>,
+    ApplyAdminStorageProfileMutationVariables
+  > = (props) => {
+    const { id } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof applyAdminStorageProfile>>> = ({
-    signal,
-  }) => applyAdminStorageProfile(toValue(id), { signal, ...requestOptions })
+    return applyAdminStorageProfile(id, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(id) !== null && toValue(id) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof applyAdminStorageProfile>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type ApplyAdminStorageProfileQueryResult = NonNullable<
+export type ApplyAdminStorageProfileMutationResult = NonNullable<
   Awaited<ReturnType<typeof applyAdminStorageProfile>>
 >
-export type ApplyAdminStorageProfileQueryError = ErrorType<unknown>
 
-export function useApplyAdminStorageProfile<
-  TData = Awaited<ReturnType<typeof applyAdminStorageProfile>>,
-  TError = ErrorType<unknown>,
->(
-  id: MaybeRefOrGetter<string>,
+export type ApplyAdminStorageProfileMutationError = ErrorType<unknown>
+export type ApplyAdminStorageProfileMutationVariables = { id: string }
+
+export const useApplyAdminStorageProfile = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof applyAdminStorageProfile>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof applyAdminStorageProfile>>,
+      TError,
+      ApplyAdminStorageProfileMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApplyAdminStorageProfileQueryOptions(id, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof applyAdminStorageProfile>>,
+  TError,
+  ApplyAdminStorageProfileMutationVariables,
+  TContext
+> => {
+  return useMutation(getApplyAdminStorageProfileMutationOptions(options), queryClient)
 }
-
 export const getTestAdminStorageProfileUrl = (id: string) => {
   return `/admin/storage/profiles/${encodeURIComponent(String(id))}/test`
 }
@@ -607,67 +585,70 @@ export const testAdminStorageProfile = async (
   })
 }
 
-export const getTestAdminStorageProfileQueryKey = (id: MaybeRefOrGetter<string>) => {
-  return ['POST', 'admin', 'storage', 'profiles', id, 'test'] as const
-}
+export const getTestAdminStorageProfileMutationKey = () => ['testAdminStorageProfile'] as const
 
-export const getTestAdminStorageProfileQueryOptions = <
-  TData = Awaited<ReturnType<typeof testAdminStorageProfile>>,
+export const getTestAdminStorageProfileMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  id: MaybeRefOrGetter<string>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof testAdminStorageProfile>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof testAdminStorageProfile>>,
+    TError,
+    TestAdminStorageProfileMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof testAdminStorageProfile>>,
+  TError,
+  TestAdminStorageProfileMutationVariables,
+  TContext
+> => {
+  const mutationKey = getTestAdminStorageProfileMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getTestAdminStorageProfileQueryKey(id)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof testAdminStorageProfile>>,
+    TestAdminStorageProfileMutationVariables
+  > = (props) => {
+    const { id } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof testAdminStorageProfile>>> = ({
-    signal,
-  }) => testAdminStorageProfile(toValue(id), { signal, ...requestOptions })
+    return testAdminStorageProfile(id, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(id) !== null && toValue(id) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof testAdminStorageProfile>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type TestAdminStorageProfileQueryResult = NonNullable<
+export type TestAdminStorageProfileMutationResult = NonNullable<
   Awaited<ReturnType<typeof testAdminStorageProfile>>
 >
-export type TestAdminStorageProfileQueryError = ErrorType<unknown>
 
-export function useTestAdminStorageProfile<
-  TData = Awaited<ReturnType<typeof testAdminStorageProfile>>,
-  TError = ErrorType<unknown>,
->(
-  id: MaybeRefOrGetter<string>,
+export type TestAdminStorageProfileMutationError = ErrorType<unknown>
+export type TestAdminStorageProfileMutationVariables = { id: string }
+
+export const useTestAdminStorageProfile = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof testAdminStorageProfile>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof testAdminStorageProfile>>,
+      TError,
+      TestAdminStorageProfileMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getTestAdminStorageProfileQueryOptions(id, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof testAdminStorageProfile>>,
+  TError,
+  TestAdminStorageProfileMutationVariables,
+  TContext
+> => {
+  return useMutation(getTestAdminStorageProfileMutationOptions(options), queryClient)
 }
-
 export const getGetAdminStorageBucketInfoUrl = (id: string) => {
   return `/admin/storage/profiles/${encodeURIComponent(String(id))}/bucket-info`
 }

@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   leaveGuardOptions: null as LeaveGuardOptions | null,
   groupOptions: null as GroupOptions | null,
   onFlowNodeMouseDown: vi.fn(),
+  selectionOnPaneClick: vi.fn(),
+  selectionOnFlowNodeClick: vi.fn(),
   dragEvents: [] as string[],
   useCanvasWorkspaceRuntime: vi.fn(),
 }))
@@ -49,7 +51,8 @@ vi.mock('../../infrastructure/vue-flow-adapter', () => ({
     },
     commands: {
       clearSelection: vi.fn(() => true),
-      onFlowNodeClick: vi.fn(),
+      onPaneClick: mocks.selectionOnPaneClick,
+      onFlowNodeClick: mocks.selectionOnFlowNodeClick,
       onFlowNodeMouseDown: mocks.onFlowNodeMouseDown,
     },
   }),
@@ -498,6 +501,11 @@ describe('CanvasScreen', () => {
       { id: 'node-a', type: 'remove' },
     ])
     expect(harness.handlePaneClick).toHaveBeenCalledTimes(1)
+    expect(mocks.selectionOnPaneClick).toHaveBeenCalledTimes(1)
+    // Pane clicks must run group intent before pane selection.
+    expect(harness.handlePaneClick.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.selectionOnPaneClick.mock.invocationCallOrder[0]!,
+    )
     expect(harness.onFlowDeleteNode).toHaveBeenCalledWith('node-a')
     expect(mocks.onFlowNodeMouseDown).toHaveBeenCalledWith('node-a', expect.any(MouseEvent))
     expect(harness.runtime.commands.viewportControls.onMiniMapCenterRequested).toHaveBeenCalledWith(

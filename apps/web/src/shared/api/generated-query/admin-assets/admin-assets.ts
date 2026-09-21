@@ -4,23 +4,18 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation } from '@tanstack/vue-query'
 import type {
-  DataTag,
+  MutationFunction,
   QueryClient,
-  QueryFunction,
-  QueryKey,
-  UseQueryOptions,
-  UseQueryReturnType,
+  UseMutationOptions,
+  UseMutationReturnType,
 } from '@tanstack/vue-query'
-
-import { toValue, unref } from 'vue'
-import type { MaybeRefOrGetter } from 'vue'
 
 import type { ApiResponseUploadImage, UploadAdminAssetBody } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -42,57 +37,67 @@ export const uploadAdminAsset = async (
   })
 }
 
-export const getUploadAdminAssetQueryKey = (
-  uploadAdminAssetBody?: MaybeRefOrGetter<UploadAdminAssetBody>,
-) => {
-  return ['POST', 'admin', 'upload', uploadAdminAssetBody] as const
-}
+export const getUploadAdminAssetMutationKey = () => ['uploadAdminAsset'] as const
 
-export const getUploadAdminAssetQueryOptions = <
-  TData = Awaited<ReturnType<typeof uploadAdminAsset>>,
+export const getUploadAdminAssetMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  uploadAdminAssetBody: MaybeRefOrGetter<UploadAdminAssetBody>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof uploadAdminAsset>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getUploadAdminAssetQueryKey(uploadAdminAssetBody)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof uploadAdminAsset>>> = ({ signal }) =>
-    uploadAdminAsset(toValue(uploadAdminAssetBody), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof uploadAdminAsset>>,
     TError,
-    TData
+    UploadAdminAssetMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof uploadAdminAsset>>,
+  TError,
+  UploadAdminAssetMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUploadAdminAssetMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof uploadAdminAsset>>,
+    UploadAdminAssetMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return uploadAdminAsset(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type UploadAdminAssetQueryResult = NonNullable<Awaited<ReturnType<typeof uploadAdminAsset>>>
-export type UploadAdminAssetQueryError = ErrorType<unknown>
+export type UploadAdminAssetMutationResult = NonNullable<
+  Awaited<ReturnType<typeof uploadAdminAsset>>
+>
+export type UploadAdminAssetMutationBody = BodyType<UploadAdminAssetBody>
+export type UploadAdminAssetMutationError = ErrorType<unknown>
+export type UploadAdminAssetMutationVariables = { data: BodyType<UploadAdminAssetBody> }
 
-export function useUploadAdminAsset<
-  TData = Awaited<ReturnType<typeof uploadAdminAsset>>,
-  TError = ErrorType<unknown>,
->(
-  uploadAdminAssetBody: MaybeRefOrGetter<UploadAdminAssetBody>,
+export const useUploadAdminAsset = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof uploadAdminAsset>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof uploadAdminAsset>>,
+      TError,
+      UploadAdminAssetMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUploadAdminAssetQueryOptions(uploadAdminAssetBody, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof uploadAdminAsset>>,
+  TError,
+  UploadAdminAssetMutationVariables,
+  TContext
+> => {
+  return useMutation(getUploadAdminAssetMutationOptions(options), queryClient)
 }

@@ -96,8 +96,8 @@
             </h3>
           </div>
           <AdminStatusPill
-            :label="form.enabled ? '已启用' : '未启用'"
-            :variant="form.enabled ? 'success' : 'neutral'"
+            :label="form.values.enabled ? '已启用' : '未启用'"
+            :variant="form.values.enabled ? 'success' : 'neutral'"
           />
         </div>
 
@@ -105,12 +105,12 @@
           v-slot="{ describedbyId, invalid }"
           label="Client ID"
           for="admin-oauth-client-id"
-          :error="errors.clientId"
-          :required="form.enabled"
+          :error="form.errors.value.clientId"
+          :required="form.values.enabled"
         >
           <AdminInput
             id="admin-oauth-client-id"
-            v-model="form.clientId"
+            v-model="form.values.clientId"
             name="oauth_client_id"
             class="w-full"
             autocomplete="off"
@@ -119,7 +119,7 @@
             :disabled="isBusy"
             :invalid="invalid"
             :aria-describedby="describedbyId"
-            @update:model-value="errors.clientId = ''"
+            @update:model-value="form.clearErrors('clientId')"
           />
         </AdminFormField>
 
@@ -127,12 +127,12 @@
           v-slot="{ describedbyId, invalid }"
           label="Client Secret"
           for="admin-oauth-client-secret"
-          :error="errors.clientSecret"
-          :required="form.enabled && !summary.clientSecretConfigured"
+          :error="form.errors.value.clientSecret"
+          :required="form.values.enabled && !summary.clientSecretConfigured"
         >
           <AdminInput
             id="admin-oauth-client-secret"
-            v-model="form.clientSecret"
+            v-model="form.values.clientSecret"
             name="oauth_client_secret"
             type="password"
             autocomplete="new-password"
@@ -142,7 +142,7 @@
             :disabled="isBusy"
             :invalid="invalid"
             :aria-describedby="describedbyId"
-            @update:model-value="errors.clientSecret = ''"
+            @update:model-value="form.clearErrors('clientSecret')"
           />
         </AdminFormField>
 
@@ -210,6 +210,8 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
+import * as v from 'valibot'
+import { useForm } from '@/components/ui/form'
 import AdminAlert from '../shared/components/AdminAlert.vue'
 import AdminButton from '../shared/components/AdminButton.vue'
 import AdminInput from '../shared/components/AdminInput.vue'
@@ -222,6 +224,7 @@ import AdminLogoPickerPopover from '../shared/components/AdminLogoPickerPopover.
 import { formatAdminDisplayError, useAdminToast } from '../shared/lib/toast'
 import { useAppClipboard } from '../../../shared/composables/useAppClipboard'
 import { adminActionButtonClass } from '../shared/lib/uiClasses'
+import { secretField } from '../shared/lib/secretSchema'
 import googleLogoUrl from '../../../shared/assets/oauth/google.svg'
 import discordLogoUrl from '../../../shared/assets/oauth/discord.svg'
 import { getAdminBrandLogo } from '../shared/logos/brandLogos'
@@ -261,8 +264,18 @@ const isSaving = ref(false)
 const providerSwitching = ref(false)
 const loadError = ref('')
 const saveError = ref('')
-const form = reactive({ enabled: false, clientId: '', clientSecret: '' })
-const errors = reactive({ clientId: '', clientSecret: '' })
+const form = useForm({
+  initialValues: { enabled: false, clientId: '', clientSecret: '' },
+  schema: () =>
+    v.object({
+      enabled: v.boolean(),
+      clientId: secretField(form.values.enabled, '请输入 Client ID'),
+      clientSecret: secretField(
+        form.values.enabled && !summary.value?.clientSecretConfigured,
+        '请输入 Client Secret',
+      ),
+    }),
+})
 let providerLoadEpoch = 0
 const isBusy = computed(() => isSaving.value || (isLoading.value && !summary.value))
 const providerLabel = computed(() => getOAuthProviderLabel(selectedProvider.value))
@@ -338,22 +351,13 @@ async function loadSelectedProvider(provider: OAuthProviderCode) {
   }
 }
 
-function validate() {
-  errors.clientId = form.enabled && !form.clientId.trim() ? '请输入 Client ID' : ''
-  errors.clientSecret =
-    form.enabled && !summary.value?.clientSecretConfigured && !form.clientSecret.trim()
-      ? '请输入 Client Secret'
-      : ''
-  return !errors.clientId && !errors.clientSecret
-}
-
 function setProviderEnabled(provider: OAuthProviderCode, enabled: boolean) {
   providerEnabled[provider] = enabled
-  if (provider === selectedProvider.value) form.enabled = enabled
+  if (provider === selectedProvider.value) form.values.enabled = enabled
 }
 
-async function submit() {
-  if (isBusy.value || providerSwitching.value || !summary.value || !validate()) return
+const submit = form.handleSubmit(async (values) => {
+  if (isBusy.value || providerSwitching.value || !summary.value) return
   const changedProviders = oauthLoginProviders
     .map((provider) => provider.value)
     .filter(
@@ -374,9 +378,9 @@ async function submit() {
     const currentProvider = selectedProvider.value
     const saveRequests = [
       activeResource().save(currentProvider, {
-        enabled: form.enabled,
-        clientId: form.clientId,
-        clientSecret: form.clientSecret,
+        enabled: values.enabled,
+        clientId: values.clientId,
+        clientSecret: values.clientSecret,
       }),
       ...changedProviders.map((provider) =>
         activeResource().save(provider, {
@@ -404,7 +408,7 @@ async function submit() {
   } finally {
     isSaving.value = false
   }
-}
+})
 
 async function fetchProviderState() {
   const entries = await Promise.all(
@@ -429,15 +433,18 @@ function applyProviderSummaries(nextSummaries: Record<string, OAuthProviderSetti
 
 function applySummary(nextSummary: OAuthProviderSettingsSummary) {
   summary.value = nextSummary
-  form.enabled = nextSummary.enabled
-  form.clientId = nextSummary.clientId
+  form.resetForm({
+    enabled: nextSummary.enabled,
+    clientId: nextSummary.clientId,
+    clientSecret: '',
+  })
   providerEnabled[selectedProvider.value] = nextSummary.enabled
   clearSensitiveState()
 }
 
 function clearSensitiveState() {
-  form.clientSecret = ''
-  errors.clientSecret = ''
+  form.values.clientSecret = ''
+  form.clearErrors('clientSecret')
 }
 
 const { copyText } = useAppClipboard()

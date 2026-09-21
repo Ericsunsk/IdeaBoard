@@ -17,10 +17,7 @@ import {
 } from '../../domain/graph'
 import { useFlowCanvasInteractionState } from '../../presentation/screens/useFlowCanvasInteractionState.ts'
 import { useFlowNodeUiState } from '../../presentation/nodes/useFlowNodeUiState.ts'
-import type { CanvasVueFlowGraphAdapter } from '../../infrastructure/vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import type { CanvasRendererMetricsPort } from '../../infrastructure/vue-flow-adapter'
-import { createFlowGraphCommandOptions } from '../../infrastructure/vue-flow-adapter/flowGraphAdapterCommandSideEffects'
-import { createImageFlowNode } from '../../infrastructure/vue-flow-adapter/flowImageNodeFactory.ts'
 import { createCanvasNodeAt } from '../../domain/nodes/canvasNodeFactory.ts'
 import { resolveImageNodeDisplayPayload } from '../../infrastructure/vue-flow-adapter/flowImageNodeSelectors.ts'
 import type { CanvasGraphInteractionBrowserAdapter } from './interactionBrowserAdapter'
@@ -43,7 +40,6 @@ type CanvasGraphInteractionSelectionAdapter = {
 type UseCanvasGraphInteractionsOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  graphAdapter: CanvasVueFlowGraphAdapter
   readCanvasGraphStore: () => CanvasGraphReadPort
   isGraphSessionAttached: () => boolean
   writeCanvasGraphStore?: () => CanvasGraphStore
@@ -245,7 +241,12 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
       options.feedback.operationWarning(i18n.global.t('canvas.session.addImageFailed'))
       return
     }
-    options.graphAdapter.addNodes(createImageFlowNode(image), createFlowGraphCommandOptions())
+    const flowNodeId = `image-${image.id}`
+    if (!options.nodes.value.some((node) => node.id === flowNodeId)) {
+      console.warn('[Canvas] Graph projection did not reflect appended image node after commit', {
+        flowNodeId,
+      })
+    }
   }
 
   async function exportSelectedImages() {
@@ -351,7 +352,6 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
     if (!initial || !isDuplicateMode || initial.size === 0) return
     const store = options.readCanvasGraphStore()
     const reset = new Map<string, { x: number; y: number }>()
-    const appended: Node[] = []
     const appendedSnapshots: ImageNodeItem[] = []
     initial.forEach((start, flowNodeId) => {
       const record = store.getNode(start.graphNodeId)
@@ -377,10 +377,9 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
       copied.width = resolveImageNodeFrameSize(payload?.ratio ?? 1, !!payload).width
       copied.outputStatus = source.outputStatus
       reset.set(flowNodeId, { x: start.x, y: start.y })
-      appended.push(createImageFlowNode(copied))
       appendedSnapshots.push(copied)
     })
-    if (appended.length === 0) return
+    if (appendedSnapshots.length === 0) return
     const transaction = writeGraphStore().beginTransaction('node-update')
     try {
       initial.forEach((start, flowNodeId) => {
@@ -396,16 +395,27 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
       options.feedback.operationWarning(i18n.global.t('canvas.session.duplicateImagesFailed'))
       return
     }
-    options.graphAdapter.replaceNodes(
-      (nodes) => [
-        ...nodes.map((node) => {
-          const position = reset.get(node.id)
-          return position ? { ...node, position } : node
-        }),
-        ...appended,
-      ],
-      createFlowGraphCommandOptions({ recordHistory: false }),
+    const flowNodesById = new Map(options.nodes.value.map((node) => [node.id, node] as const))
+    let isProjected = appendedSnapshots.every((snapshot) =>
+      flowNodesById.has(`image-${snapshot.id}`),
     )
+    if (isProjected) {
+      for (const [flowNodeId, position] of reset) {
+        const node = flowNodesById.get(flowNodeId)
+        if (!node || node.position.x !== position.x || node.position.y !== position.y) {
+          isProjected = false
+          break
+        }
+      }
+    }
+    if (!isProjected) {
+      console.warn(
+        '[Canvas] Graph projection did not reflect duplicated image nodes after commit',
+        {
+          nodeIds: appendedSnapshots.map((snapshot) => `image-${snapshot.id}`),
+        },
+      )
+    }
   }
 
   return {

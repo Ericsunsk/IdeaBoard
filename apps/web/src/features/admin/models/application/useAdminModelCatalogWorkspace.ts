@@ -2,7 +2,7 @@ import { computed, onUnmounted, ref } from 'vue'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useAdminCollectionQuery } from '../../shared/composables/useAdminCollectionQuery'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
+import { useAdminModelCatalogFeedback } from './useAdminModelCatalogFeedback'
 import {
   createAdminGatewayResource,
   type AdminGatewayCatalog,
@@ -21,7 +21,7 @@ export function useAdminModelCatalogWorkspace(
   resource: AdminGatewayCatalog = createAdminGatewayResource().catalog,
 ) {
   const adminConfirm = useAdminConfirm()
-  const toast = useAdminToast()
+  const feedback = useAdminModelCatalogFeedback()
   const queryClient = useQueryClient()
   const queryKey = getAdminModelCatalogQueryKey()
 
@@ -163,9 +163,9 @@ export function useAdminModelCatalogWorkspace(
       }
 
       await invalidateCatalog()
-      toast.success('模型库已更新至最新')
+      feedback.catalogSynced()
     } catch (err) {
-      toast.error(formatAdminDisplayError(err, '同步模型库失败'))
+      feedback.syncFailed(err)
     } finally {
       isRefreshing.value = false
     }
@@ -188,15 +188,15 @@ export function useAdminModelCatalogWorkspace(
       const existingIds = new Set(allModels.value.map((m) => m.id))
       const toAdd = items.filter((item) => !existingIds.has(item.id))
       if (toAdd.length === 0) {
-        toast.info('所选模型已全部存在于模型库中')
+        feedback.importSkippedAsExisting()
         addDialogVisible.value = false
         return
       }
       await saveCatalogMutation.mutateAsync([...toAdd, ...allModels.value])
       addDialogVisible.value = false
-      toast.success(`已成功导入 ${toAdd.length} 个模型到模型库`)
+      feedback.imported(toAdd.length)
     } catch (err) {
-      toast.error(formatAdminDisplayError(err, '添加模型失败'))
+      feedback.addFailed(err)
     }
   }
 
@@ -216,9 +216,9 @@ export function useAdminModelCatalogWorkspace(
     const nextList = allModels.value.filter((m) => m.id !== model.id)
     try {
       await saveCatalogMutation.mutateAsync(nextList)
-      toast.success(`已删除模型「${model.name}」`)
+      feedback.deleted(model.name)
     } catch (err) {
-      toast.error(formatAdminDisplayError(err, '删除模型失败'))
+      feedback.deleteFailed(err)
     }
   }
 
@@ -229,17 +229,17 @@ export function useAdminModelCatalogWorkspace(
         nextList = allModels.value.map((m) => (m.id === item.id ? item : m))
       } else {
         if (allModels.value.some((m) => m.id === item.id)) {
-          toast.error(`模型标识 ${item.id} 已存在，不能重复添加`)
+          feedback.duplicateId(item.id)
           return
         }
         nextList = [item, ...allModels.value]
       }
       await saveCatalogMutation.mutateAsync(nextList)
       editDialogVisible.value = false
-      toast.success(editingModel.value ? '模型修改已保存' : '已成功新增模型')
+      feedback.saved(editingModel.value != null)
       editingModel.value = null
     } catch (err) {
-      toast.error(formatAdminDisplayError(err, '保存模型失败'))
+      feedback.saveFailed(err)
     }
   }
 
@@ -247,7 +247,7 @@ export function useAdminModelCatalogWorkspace(
     if (copyTimer) clearTimeout(copyTimer)
     copyTimer = null
     if (!navigator?.clipboard?.writeText) {
-      toast.error('当前环境不支持剪贴板复制')
+      feedback.clipboardUnsupported()
       return
     }
     void navigator.clipboard.writeText(id).then(
@@ -260,7 +260,7 @@ export function useAdminModelCatalogWorkspace(
         }, 2000)
       },
       () => {
-        toast.error('复制失败，请手动复制模型标识')
+        feedback.copyFailed()
       },
     )
   }

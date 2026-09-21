@@ -4,12 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationReturnType,
   UseQueryOptions,
   UseQueryReturnType,
 } from '@tanstack/vue-query'
@@ -34,7 +37,7 @@ import type {
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
-import type { ErrorType } from '../../orvalMutator'
+import type { ErrorType, BodyType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -136,68 +139,71 @@ export const upsertUserBoard = async (
   })
 }
 
-export const getUpsertUserBoardQueryKey = (
-  boardId: MaybeRefOrGetter<string>,
-  userBoardUpsertRequest?: MaybeRefOrGetter<UserBoardUpsertRequest>,
-) => {
-  return ['PUT', 'user', 'boards', boardId, userBoardUpsertRequest] as const
+export const getUpsertUserBoardMutationKey = () => ['upsertUserBoard'] as const
+
+export const getUpsertUserBoardMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof upsertUserBoard>>,
+    TError,
+    UpsertUserBoardMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof upsertUserBoard>>,
+  TError,
+  UpsertUserBoardMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpsertUserBoardMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof upsertUserBoard>>,
+    UpsertUserBoardMutationVariables
+  > = (props) => {
+    const { boardId, data } = props ?? {}
+
+    return upsertUserBoard(boardId, data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export const getUpsertUserBoardQueryOptions = <
-  TData = Awaited<ReturnType<typeof upsertUserBoard>>,
-  TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
-  userBoardUpsertRequest: MaybeRefOrGetter<UserBoardUpsertRequest>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof upsertUserBoard>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getUpsertUserBoardQueryKey(boardId, userBoardUpsertRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof upsertUserBoard>>> = ({ signal }) =>
-    upsertUserBoard(toValue(boardId), toValue(userBoardUpsertRequest), {
-      signal,
-      ...requestOptions,
-    })
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(boardId) !== null && toValue(boardId) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof upsertUserBoard>>, TError, TData>
+export type UpsertUserBoardMutationResult = NonNullable<Awaited<ReturnType<typeof upsertUserBoard>>>
+export type UpsertUserBoardMutationBody = BodyType<UserBoardUpsertRequest>
+export type UpsertUserBoardMutationError = ErrorType<unknown>
+export type UpsertUserBoardMutationVariables = {
+  boardId: string
+  data: BodyType<UserBoardUpsertRequest>
 }
 
-export type UpsertUserBoardQueryResult = NonNullable<Awaited<ReturnType<typeof upsertUserBoard>>>
-export type UpsertUserBoardQueryError = ErrorType<unknown>
-
-export function useUpsertUserBoard<
-  TData = Awaited<ReturnType<typeof upsertUserBoard>>,
-  TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
-  userBoardUpsertRequest: MaybeRefOrGetter<UserBoardUpsertRequest>,
+export const useUpsertUserBoard = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof upsertUserBoard>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof upsertUserBoard>>,
+      TError,
+      UpsertUserBoardMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUpsertUserBoardQueryOptions(boardId, userBoardUpsertRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof upsertUserBoard>>,
+  TError,
+  UpsertUserBoardMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpsertUserBoardMutationOptions(options), queryClient)
 }
-
 export const getDeleteUserBoardUrl = (boardId: string) => {
   return `/user/boards/${encodeURIComponent(String(boardId))}`
 }
@@ -212,60 +218,68 @@ export const deleteUserBoard = async (
   })
 }
 
-export const getDeleteUserBoardQueryKey = (boardId: MaybeRefOrGetter<string>) => {
-  return ['DELETE', 'user', 'boards', boardId] as const
+export const getDeleteUserBoardMutationKey = () => ['deleteUserBoard'] as const
+
+export const getDeleteUserBoardMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteUserBoard>>,
+    TError,
+    DeleteUserBoardMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteUserBoard>>,
+  TError,
+  DeleteUserBoardMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeleteUserBoardMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteUserBoard>>,
+    DeleteUserBoardMutationVariables
+  > = (props) => {
+    const { boardId } = props ?? {}
+
+    return deleteUserBoard(boardId, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export const getDeleteUserBoardQueryOptions = <
-  TData = Awaited<ReturnType<typeof deleteUserBoard>>,
-  TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
+export type DeleteUserBoardMutationResult = NonNullable<Awaited<ReturnType<typeof deleteUserBoard>>>
+
+export type DeleteUserBoardMutationError = ErrorType<unknown>
+export type DeleteUserBoardMutationVariables = { boardId: string }
+
+export const useDeleteUserBoard = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteUserBoard>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getDeleteUserBoardQueryKey(boardId)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteUserBoard>>> = ({ signal }) =>
-    deleteUserBoard(toValue(boardId), { signal, ...requestOptions })
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(boardId) !== null && toValue(boardId) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof deleteUserBoard>>, TError, TData>
-}
-
-export type DeleteUserBoardQueryResult = NonNullable<Awaited<ReturnType<typeof deleteUserBoard>>>
-export type DeleteUserBoardQueryError = ErrorType<unknown>
-
-export function useDeleteUserBoard<
-  TData = Awaited<ReturnType<typeof deleteUserBoard>>,
-  TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteUserBoard>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deleteUserBoard>>,
+      TError,
+      DeleteUserBoardMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getDeleteUserBoardQueryOptions(boardId, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof deleteUserBoard>>,
+  TError,
+  DeleteUserBoardMutationVariables,
+  TContext
+> => {
+  return useMutation(getDeleteUserBoardMutationOptions(options), queryClient)
 }
-
 export const getListBoardMembersUrl = (boardId: string) => {
   return `/user/boards/${encodeURIComponent(String(boardId))}/members`
 }
@@ -370,70 +384,73 @@ export const inviteBoardMember = async (
   })
 }
 
-export const getInviteBoardMemberQueryKey = (
-  boardId: MaybeRefOrGetter<string>,
-  inviteBoardMemberRequest?: MaybeRefOrGetter<InviteBoardMemberRequest>,
-) => {
-  return ['POST', 'user', 'boards', boardId, 'members', 'invite', inviteBoardMemberRequest] as const
-}
+export const getInviteBoardMemberMutationKey = () => ['inviteBoardMember'] as const
 
-export const getInviteBoardMemberQueryOptions = <
-  TData = Awaited<ReturnType<typeof inviteBoardMember>>,
+export const getInviteBoardMemberMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
-  inviteBoardMemberRequest: MaybeRefOrGetter<InviteBoardMemberRequest>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof inviteBoardMember>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof inviteBoardMember>>,
+    TError,
+    InviteBoardMemberMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof inviteBoardMember>>,
+  TError,
+  InviteBoardMemberMutationVariables,
+  TContext
+> => {
+  const mutationKey = getInviteBoardMemberMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getInviteBoardMemberQueryKey(boardId, inviteBoardMemberRequest)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof inviteBoardMember>>,
+    InviteBoardMemberMutationVariables
+  > = (props) => {
+    const { boardId, data } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof inviteBoardMember>>> = ({ signal }) =>
-    inviteBoardMember(toValue(boardId), toValue(inviteBoardMemberRequest), {
-      signal,
-      ...requestOptions,
-    })
+    return inviteBoardMember(boardId, data, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(boardId) !== null && toValue(boardId) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof inviteBoardMember>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type InviteBoardMemberQueryResult = NonNullable<
+export type InviteBoardMemberMutationResult = NonNullable<
   Awaited<ReturnType<typeof inviteBoardMember>>
 >
-export type InviteBoardMemberQueryError = ErrorType<unknown>
+export type InviteBoardMemberMutationBody = BodyType<InviteBoardMemberRequest>
+export type InviteBoardMemberMutationError = ErrorType<unknown>
+export type InviteBoardMemberMutationVariables = {
+  boardId: string
+  data: BodyType<InviteBoardMemberRequest>
+}
 
-export function useInviteBoardMember<
-  TData = Awaited<ReturnType<typeof inviteBoardMember>>,
-  TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
-  inviteBoardMemberRequest: MaybeRefOrGetter<InviteBoardMemberRequest>,
+export const useInviteBoardMember = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof inviteBoardMember>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof inviteBoardMember>>,
+      TError,
+      InviteBoardMemberMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getInviteBoardMemberQueryOptions(boardId, inviteBoardMemberRequest, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof inviteBoardMember>>,
+  TError,
+  InviteBoardMemberMutationVariables,
+  TContext
+> => {
+  return useMutation(getInviteBoardMemberMutationOptions(options), queryClient)
 }
-
 export const getUpdateBoardMemberRoleUrl = (boardId: string, memberPublicId: string) => {
   return `/user/boards/${encodeURIComponent(String(boardId))}/members/${encodeURIComponent(String(memberPublicId))}/role`
 }
@@ -474,103 +491,74 @@ export const updateBoardMemberRole = async (
   )
 }
 
-export const getUpdateBoardMemberRoleQueryKey = (
-  boardId: MaybeRefOrGetter<string>,
-  memberPublicId: MaybeRefOrGetter<string>,
-  updateBoardMemberRoleRequest?: MaybeRefOrGetter<UpdateBoardMemberRoleRequest>,
-) => {
-  return [
-    'PUT',
-    'user',
-    'boards',
-    boardId,
-    'members',
-    memberPublicId,
-    'role',
-    updateBoardMemberRoleRequest,
-  ] as const
-}
+export const getUpdateBoardMemberRoleMutationKey = () => ['updateBoardMemberRole'] as const
 
-export const getUpdateBoardMemberRoleQueryOptions = <
-  TData = Awaited<ReturnType<typeof updateBoardMemberRole>>,
+export const getUpdateBoardMemberRoleMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
-  memberPublicId: MaybeRefOrGetter<string>,
-  updateBoardMemberRoleRequest: MaybeRefOrGetter<UpdateBoardMemberRoleRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateBoardMemberRole>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateBoardMemberRole>>,
+    TError,
+    UpdateBoardMemberRoleMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateBoardMemberRole>>,
+  TError,
+  UpdateBoardMemberRoleMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateBoardMemberRoleMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getUpdateBoardMemberRoleQueryKey(
-    boardId,
-    memberPublicId,
-    updateBoardMemberRoleRequest,
-  )
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateBoardMemberRole>>,
+    UpdateBoardMemberRoleMutationVariables
+  > = (props) => {
+    const { boardId, memberPublicId, data } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateBoardMemberRole>>> = ({ signal }) =>
-    updateBoardMemberRole(
-      toValue(boardId),
-      toValue(memberPublicId),
-      toValue(updateBoardMemberRoleRequest),
-      { signal, ...requestOptions },
-    )
+    return updateBoardMemberRole(boardId, memberPublicId, data, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(
-      () =>
-        toValue(boardId) !== null &&
-        toValue(boardId) !== undefined &&
-        toValue(memberPublicId) !== null &&
-        toValue(memberPublicId) !== undefined,
-    ),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof updateBoardMemberRole>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type UpdateBoardMemberRoleQueryResult = NonNullable<
+export type UpdateBoardMemberRoleMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateBoardMemberRole>>
 >
-export type UpdateBoardMemberRoleQueryError = ErrorType<unknown>
+export type UpdateBoardMemberRoleMutationBody = BodyType<UpdateBoardMemberRoleRequest>
+export type UpdateBoardMemberRoleMutationError = ErrorType<unknown>
+export type UpdateBoardMemberRoleMutationVariables = {
+  boardId: string
+  memberPublicId: string
+  data: BodyType<UpdateBoardMemberRoleRequest>
+}
 
-export function useUpdateBoardMemberRole<
-  TData = Awaited<ReturnType<typeof updateBoardMemberRole>>,
-  TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
-  memberPublicId: MaybeRefOrGetter<string>,
-  updateBoardMemberRoleRequest: MaybeRefOrGetter<UpdateBoardMemberRoleRequest>,
+export const useUpdateBoardMemberRole = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateBoardMemberRole>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateBoardMemberRole>>,
+      TError,
+      UpdateBoardMemberRoleMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUpdateBoardMemberRoleQueryOptions(
-    boardId,
-    memberPublicId,
-    updateBoardMemberRoleRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateBoardMemberRole>>,
+  TError,
+  UpdateBoardMemberRoleMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateBoardMemberRoleMutationOptions(options), queryClient)
 }
-
 export const getRemoveBoardMemberUrl = (boardId: string, memberPublicId: string) => {
   return `/user/boards/${encodeURIComponent(String(boardId))}/members/${encodeURIComponent(String(memberPublicId))}`
 }
@@ -586,73 +574,70 @@ export const removeBoardMember = async (
   })
 }
 
-export const getRemoveBoardMemberQueryKey = (
-  boardId: MaybeRefOrGetter<string>,
-  memberPublicId: MaybeRefOrGetter<string>,
-) => {
-  return ['DELETE', 'user', 'boards', boardId, 'members', memberPublicId] as const
-}
+export const getRemoveBoardMemberMutationKey = () => ['removeBoardMember'] as const
 
-export const getRemoveBoardMemberQueryOptions = <
-  TData = Awaited<ReturnType<typeof removeBoardMember>>,
+export const getRemoveBoardMemberMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
-  memberPublicId: MaybeRefOrGetter<string>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof removeBoardMember>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removeBoardMember>>,
+    TError,
+    RemoveBoardMemberMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof removeBoardMember>>,
+  TError,
+  RemoveBoardMemberMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRemoveBoardMemberMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getRemoveBoardMemberQueryKey(boardId, memberPublicId)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof removeBoardMember>>,
+    RemoveBoardMemberMutationVariables
+  > = (props) => {
+    const { boardId, memberPublicId } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof removeBoardMember>>> = ({ signal }) =>
-    removeBoardMember(toValue(boardId), toValue(memberPublicId), { signal, ...requestOptions })
+    return removeBoardMember(boardId, memberPublicId, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(
-      () =>
-        toValue(boardId) !== null &&
-        toValue(boardId) !== undefined &&
-        toValue(memberPublicId) !== null &&
-        toValue(memberPublicId) !== undefined,
-    ),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof removeBoardMember>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type RemoveBoardMemberQueryResult = NonNullable<
+export type RemoveBoardMemberMutationResult = NonNullable<
   Awaited<ReturnType<typeof removeBoardMember>>
 >
-export type RemoveBoardMemberQueryError = ErrorType<unknown>
 
-export function useRemoveBoardMember<
-  TData = Awaited<ReturnType<typeof removeBoardMember>>,
-  TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
-  memberPublicId: MaybeRefOrGetter<string>,
+export type RemoveBoardMemberMutationError = ErrorType<unknown>
+export type RemoveBoardMemberMutationVariables = { boardId: string; memberPublicId: string }
+
+export const useRemoveBoardMember = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof removeBoardMember>>, TError, TData>>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof removeBoardMember>>,
+      TError,
+      RemoveBoardMemberMutationVariables,
+      TContext
+    >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getRemoveBoardMemberQueryOptions(boardId, memberPublicId, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof removeBoardMember>>,
+  TError,
+  RemoveBoardMemberMutationVariables,
+  TContext
+> => {
+  return useMutation(getRemoveBoardMemberMutationOptions(options), queryClient)
 }
-
 export const getListBoardShareTokensUrl = (boardId: string) => {
   return `/user/boards/${encodeURIComponent(String(boardId))}/share-tokens`
 }
@@ -763,78 +748,73 @@ export const createBoardShareToken = async (
   })
 }
 
-export const getCreateBoardShareTokenQueryKey = (
-  boardId: MaybeRefOrGetter<string>,
-  createBoardShareTokenRequest?: MaybeRefOrGetter<CreateBoardShareTokenRequest>,
-) => {
-  return ['POST', 'user', 'boards', boardId, 'share-tokens', createBoardShareTokenRequest] as const
-}
+export const getCreateBoardShareTokenMutationKey = () => ['createBoardShareToken'] as const
 
-export const getCreateBoardShareTokenQueryOptions = <
-  TData = Awaited<ReturnType<typeof createBoardShareToken>>,
+export const getCreateBoardShareTokenMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
-  createBoardShareTokenRequest: MaybeRefOrGetter<CreateBoardShareTokenRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof createBoardShareToken>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBoardShareToken>>,
+    TError,
+    CreateBoardShareTokenMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createBoardShareToken>>,
+  TError,
+  CreateBoardShareTokenMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateBoardShareTokenMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getCreateBoardShareTokenQueryKey(boardId, createBoardShareTokenRequest)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createBoardShareToken>>,
+    CreateBoardShareTokenMutationVariables
+  > = (props) => {
+    const { boardId, data } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof createBoardShareToken>>> = ({ signal }) =>
-    createBoardShareToken(toValue(boardId), toValue(createBoardShareTokenRequest), {
-      signal,
-      ...requestOptions,
-    })
+    return createBoardShareToken(boardId, data, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(boardId) !== null && toValue(boardId) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof createBoardShareToken>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type CreateBoardShareTokenQueryResult = NonNullable<
+export type CreateBoardShareTokenMutationResult = NonNullable<
   Awaited<ReturnType<typeof createBoardShareToken>>
 >
-export type CreateBoardShareTokenQueryError = ErrorType<unknown>
+export type CreateBoardShareTokenMutationBody = BodyType<CreateBoardShareTokenRequest>
+export type CreateBoardShareTokenMutationError = ErrorType<unknown>
+export type CreateBoardShareTokenMutationVariables = {
+  boardId: string
+  data: BodyType<CreateBoardShareTokenRequest>
+}
 
-export function useCreateBoardShareToken<
-  TData = Awaited<ReturnType<typeof createBoardShareToken>>,
-  TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
-  createBoardShareTokenRequest: MaybeRefOrGetter<CreateBoardShareTokenRequest>,
+export const useCreateBoardShareToken = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof createBoardShareToken>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createBoardShareToken>>,
+      TError,
+      CreateBoardShareTokenMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getCreateBoardShareTokenQueryOptions(
-    boardId,
-    createBoardShareTokenRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof createBoardShareToken>>,
+  TError,
+  CreateBoardShareTokenMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateBoardShareTokenMutationOptions(options), queryClient)
 }
-
 export const getRevokeBoardShareTokenUrl = (boardId: string, tokenId: number) => {
   return `/user/boards/${encodeURIComponent(String(boardId))}/share-tokens/${encodeURIComponent(String(tokenId))}/revoke`
 }
@@ -850,77 +830,70 @@ export const revokeBoardShareToken = async (
   })
 }
 
-export const getRevokeBoardShareTokenQueryKey = (
-  boardId: MaybeRefOrGetter<string>,
-  tokenId: MaybeRefOrGetter<number>,
-) => {
-  return ['POST', 'user', 'boards', boardId, 'share-tokens', tokenId, 'revoke'] as const
-}
+export const getRevokeBoardShareTokenMutationKey = () => ['revokeBoardShareToken'] as const
 
-export const getRevokeBoardShareTokenQueryOptions = <
-  TData = Awaited<ReturnType<typeof revokeBoardShareToken>>,
+export const getRevokeBoardShareTokenMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
-  tokenId: MaybeRefOrGetter<number>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof revokeBoardShareToken>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof revokeBoardShareToken>>,
+    TError,
+    RevokeBoardShareTokenMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof revokeBoardShareToken>>,
+  TError,
+  RevokeBoardShareTokenMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRevokeBoardShareTokenMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-  const queryKey = getRevokeBoardShareTokenQueryKey(boardId, tokenId)
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof revokeBoardShareToken>>,
+    RevokeBoardShareTokenMutationVariables
+  > = (props) => {
+    const { boardId, tokenId } = props ?? {}
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof revokeBoardShareToken>>> = ({ signal }) =>
-    revokeBoardShareToken(toValue(boardId), toValue(tokenId), { signal, ...requestOptions })
+    return revokeBoardShareToken(boardId, tokenId, requestOptions)
+  }
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(
-      () =>
-        toValue(boardId) !== null &&
-        toValue(boardId) !== undefined &&
-        toValue(tokenId) !== null &&
-        toValue(tokenId) !== undefined,
-    ),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof revokeBoardShareToken>>, TError, TData>
+  return { mutationFn, ...mutationOptions }
 }
 
-export type RevokeBoardShareTokenQueryResult = NonNullable<
+export type RevokeBoardShareTokenMutationResult = NonNullable<
   Awaited<ReturnType<typeof revokeBoardShareToken>>
 >
-export type RevokeBoardShareTokenQueryError = ErrorType<unknown>
 
-export function useRevokeBoardShareToken<
-  TData = Awaited<ReturnType<typeof revokeBoardShareToken>>,
-  TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
-  tokenId: MaybeRefOrGetter<number>,
+export type RevokeBoardShareTokenMutationError = ErrorType<unknown>
+export type RevokeBoardShareTokenMutationVariables = { boardId: string; tokenId: number }
+
+export const useRevokeBoardShareToken = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof revokeBoardShareToken>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof revokeBoardShareToken>>,
+      TError,
+      RevokeBoardShareTokenMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getRevokeBoardShareTokenQueryOptions(boardId, tokenId, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof revokeBoardShareToken>>,
+  TError,
+  RevokeBoardShareTokenMutationVariables,
+  TContext
+> => {
+  return useMutation(getRevokeBoardShareTokenMutationOptions(options), queryClient)
 }
-
 export const getJoinBoardByShareTokenUrl = () => {
   return `/user/boards/share-tokens/join`
 }
@@ -956,63 +929,67 @@ export const joinBoardByShareToken = async (
   })
 }
 
-export const getJoinBoardByShareTokenQueryKey = (
-  joinBoardByShareTokenBody?: MaybeRefOrGetter<JoinBoardByShareTokenBody>,
-) => {
-  return ['POST', 'user', 'boards', 'share-tokens', 'join', joinBoardByShareTokenBody] as const
-}
+export const getJoinBoardByShareTokenMutationKey = () => ['joinBoardByShareToken'] as const
 
-export const getJoinBoardByShareTokenQueryOptions = <
-  TData = Awaited<ReturnType<typeof joinBoardByShareToken>>,
+export const getJoinBoardByShareTokenMutationOptions = <
   TError = ErrorType<unknown>,
->(
-  joinBoardByShareTokenBody: MaybeRefOrGetter<JoinBoardByShareTokenBody>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof joinBoardByShareToken>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getJoinBoardByShareTokenQueryKey(joinBoardByShareTokenBody)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof joinBoardByShareToken>>> = ({ signal }) =>
-    joinBoardByShareToken(toValue(joinBoardByShareTokenBody), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof joinBoardByShareToken>>,
     TError,
-    TData
+    JoinBoardByShareTokenMutationVariables,
+    TContext
   >
+  request?: SecondParameter<typeof orvalMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof joinBoardByShareToken>>,
+  TError,
+  JoinBoardByShareTokenMutationVariables,
+  TContext
+> => {
+  const mutationKey = getJoinBoardByShareTokenMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof joinBoardByShareToken>>,
+    JoinBoardByShareTokenMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return joinBoardByShareToken(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
 }
 
-export type JoinBoardByShareTokenQueryResult = NonNullable<
+export type JoinBoardByShareTokenMutationResult = NonNullable<
   Awaited<ReturnType<typeof joinBoardByShareToken>>
 >
-export type JoinBoardByShareTokenQueryError = ErrorType<unknown>
+export type JoinBoardByShareTokenMutationBody = BodyType<JoinBoardByShareTokenBody>
+export type JoinBoardByShareTokenMutationError = ErrorType<unknown>
+export type JoinBoardByShareTokenMutationVariables = { data: BodyType<JoinBoardByShareTokenBody> }
 
-export function useJoinBoardByShareToken<
-  TData = Awaited<ReturnType<typeof joinBoardByShareToken>>,
-  TError = ErrorType<unknown>,
->(
-  joinBoardByShareTokenBody: MaybeRefOrGetter<JoinBoardByShareTokenBody>,
+export const useJoinBoardByShareToken = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof joinBoardByShareToken>>, TError, TData>
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof joinBoardByShareToken>>,
+      TError,
+      JoinBoardByShareTokenMutationVariables,
+      TContext
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getJoinBoardByShareTokenQueryOptions(joinBoardByShareTokenBody, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof joinBoardByShareToken>>,
+  TError,
+  JoinBoardByShareTokenMutationVariables,
+  TContext
+> => {
+  return useMutation(getJoinBoardByShareTokenMutationOptions(options), queryClient)
 }

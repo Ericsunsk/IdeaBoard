@@ -175,5 +175,6 @@ Only add these after benchmark evidence shows they address the measured bottlene
 - edge projection budget / related-edge mode
 - media preview lazy/degraded mode
 - handle/tool chrome on-demand mounting
-- result materialization through Graph Runtime
+- result materialization verification through Graph Runtime contract tests
+  (`result-materialize` transaction with `recordHistory: false, markDirty: true`)
 - permanent telemetry counters beyond benchmark-only instrumentation

@@ -5,7 +5,6 @@ import { createEmptyBoardSnapshot, type BoardSnapshot, type ImageNodeItem } from
 import { i18n } from '../../../../shared/i18n'
 import { loadLocaleMessages } from '../../../../shared/i18n/userLocale'
 import { CanvasGraphSession } from '../../domain/graph'
-import { useCanvasVueFlowGraphAdapter } from '../../infrastructure/vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import type { FlowNodeData } from '../../domain/nodes/flowTypes.ts'
 import { useCanvasGraphInteractions } from './useCanvasGraphInteractions'
 
@@ -65,11 +64,9 @@ function createHarness() {
     operationLoading: vi.fn(() => loading),
   }
   let attached = true
-  const graphAdapter = useCanvasVueFlowGraphAdapter({ nodes, edges })
   const interactions = useCanvasGraphInteractions({
     nodes,
     edges,
-    graphAdapter,
     readCanvasGraphStore: () => graphSession.store,
     isGraphSessionAttached: () => attached,
     selection: { selectedElements, clear },
@@ -88,6 +85,7 @@ function createHarness() {
     feedback,
     loading,
     image,
+    graphSession,
     setAttached: (value: boolean) => {
       attached = value
     },
@@ -148,7 +146,8 @@ describe('useCanvasGraphInteractions', () => {
     harness.interactions.commands.appendImageToCanvas('image-1')
 
     expect(harness.openNodeImage).toHaveBeenCalledWith(harness.image, 'latest-output')
-    expect(harness.nodes.value[1]?.data?.snapshotNode).toMatchObject({
+    const appended = harness.graphSession.store.exportSnapshot().imageNodes.at(-1)
+    expect(appended).toMatchObject({
       sourceImageUrl: 'https://example.test/output.png',
       sourceMediaAssetId: 101,
       sourceMediaRef: { assetId: 'asset_201', derivativeTier: 'preview' },
@@ -164,13 +163,17 @@ describe('useCanvasGraphInteractions', () => {
     harness.nodes.value[0] = { ...draggedNode, position: { x: 50, y: 65 } }
     harness.interactions.commands.finishNodeDragDuplicateTracking(true)
 
-    const copied = harness.nodes.value[1]?.data?.snapshotNode as ImageNodeItem
+    const copied = harness.graphSession.store.exportSnapshot().imageNodes.at(-1) as ImageNodeItem
     expect(copied.sourceImageUrl).toBe('https://example.test/source.png')
     expect(copied.sourceMediaAssetId).toBe(101)
     expect(copied.outputImages).toEqual([
       { url: 'https://example.test/output.png', ratio: 0.75, mediaAssetId: 201 },
     ])
-    expect(harness.nodes.value[0]?.position).toEqual({ x: 20, y: 30 })
+    const original = harness.graphSession.store
+      .exportSnapshot()
+      .imageNodes.find((node) => node.id === 1)
+    expect(original?.x).toBe(20)
+    expect(original?.y).toBe(30)
   })
 
   it('owns selection clearing and Canvas interaction state', () => {

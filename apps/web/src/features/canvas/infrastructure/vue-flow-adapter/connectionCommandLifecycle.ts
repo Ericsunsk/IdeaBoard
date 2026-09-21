@@ -38,28 +38,49 @@ export type CanvasConnectionCommandLifecycleOptions = {
   markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
 }
 
+type CanvasConnectionValidationFailure =
+  { kind: 'semantics' } | { kind: 'endpoints' } | { kind: 'mutation'; message: string }
+
+type CanvasConnectionValidationResult =
+  { connection: Connection } | { failure: CanvasConnectionValidationFailure }
+
 export function createCanvasConnectionCommandLifecycle(
   options: CanvasConnectionCommandLifecycleOptions,
 ) {
-  function resolveValidatedConnection(
+  // Preview and commit share this single normalization + validation run
+  // (including the target input-limit policy), so the highlight shown during
+  // drag always agrees with the drop outcome.
+  function validateConnection(
     connection: Connection,
     existingEdges: readonly Edge[],
-  ): Connection | null {
+  ): CanvasConnectionValidationResult {
     const resolvedConnection = options.normalizeConnection
       ? options.normalizeConnection(connection, existingEdges)
       : connection
     if (!resolvedConnection || !options.isValidConnection(resolvedConnection)) {
-      options.onWarning(i18n.global.t('canvas.edges.connectionSemanticsWarning'))
-      return null
+      return { failure: { kind: 'semantics' } }
     }
-    if (!resolvedConnection.source || !resolvedConnection.target) return null
+    if (!resolvedConnection.source || !resolvedConnection.target) {
+      return { failure: { kind: 'endpoints' } }
+    }
     const validationMessage =
       options.validateConnectionMutation?.(resolvedConnection, existingEdges) ?? null
-    if (validationMessage) {
-      options.onWarning(validationMessage)
-      return null
+    if (validationMessage) return { failure: { kind: 'mutation', message: validationMessage } }
+    return { connection: resolvedConnection }
+  }
+
+  function resolveValidatedConnection(
+    connection: Connection,
+    existingEdges: readonly Edge[],
+  ): Connection | null {
+    const result = validateConnection(connection, existingEdges)
+    if ('connection' in result) return result.connection
+    if (result.failure.kind === 'semantics') {
+      options.onWarning(i18n.global.t('canvas.edges.connectionSemanticsWarning'))
+    } else if (result.failure.kind === 'mutation') {
+      options.onWarning(result.failure.message)
     }
-    return resolvedConnection
+    return null
   }
 
   function createNextCanvasConnection(resolvedConnection: Connection, existingEdges: Edge[]) {
@@ -149,8 +170,12 @@ export function createCanvasConnectionCommandLifecycle(
     return commitConnection(resolvedConnection)
   }
 
+  function canConnectPreview(connection: Connection): boolean {
+    return 'connection' in validateConnection(connection, options.readEdges())
+  }
+
   return createCanvasVueFlowConnectionAdapter({
-    canConnect: options.isValidConnection,
+    canConnect: canConnectPreview,
     connect,
   })
 }

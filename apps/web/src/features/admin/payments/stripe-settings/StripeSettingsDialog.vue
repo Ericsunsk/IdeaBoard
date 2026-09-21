@@ -48,12 +48,12 @@
         v-slot="{ describedbyId, invalid }"
         label="Payment Method Configuration ID"
         for="admin-stripe-payment-method-configuration-id"
-        :error="errors.paymentMethodConfigurationId"
+        :error="form.errors.value.paymentMethodConfigurationId"
         required
       >
         <AdminInput
           id="admin-stripe-payment-method-configuration-id"
-          v-model="form.paymentMethodConfigurationId"
+          v-model="form.values.paymentMethodConfigurationId"
           class="w-full"
           placeholder="pmc_..."
           maxlength="255"
@@ -69,13 +69,13 @@
         v-slot="{ describedbyId, invalid }"
         label="Stripe API Key"
         for="admin-stripe-api-key"
-        :error="errors.apiKey"
+        :error="form.errors.value.apiKey"
         hint="支持 sk_ 或 rk_ 格式。"
         :required="!summary?.apiKeyConfigured"
       >
         <AdminInput
           id="admin-stripe-api-key"
-          v-model="form.apiKey"
+          v-model="form.values.apiKey"
           class="w-full"
           type="password"
           autocomplete="off"
@@ -92,12 +92,12 @@
         v-slot="{ describedbyId, invalid }"
         label="Product Tax Code"
         for="admin-stripe-product-tax-code"
-        :error="errors.productTaxCode"
+        :error="form.errors.value.productTaxCode"
         required
       >
         <AdminInput
           id="admin-stripe-product-tax-code"
-          v-model="form.productTaxCode"
+          v-model="form.values.productTaxCode"
           class="w-full"
           placeholder="例如：txcd_10105001"
           aria-label="Product Tax Code"
@@ -113,11 +113,11 @@
           class="flex min-h-10 items-center justify-between rounded-xl border border-admin-border bg-admin-surface-muted px-3"
         >
           <span class="text-admin-body text-admin-text-2">
-            {{ form.purchasesEnabled ? '已开放' : '已关闭' }}
+            {{ form.values.purchasesEnabled ? '已开放' : '已关闭' }}
           </span>
           <AdminSwitch
             id="admin-stripe-purchases-enabled"
-            v-model="form.purchasesEnabled"
+            v-model="form.values.purchasesEnabled"
             aria-label="充值开放"
             :disabled="isBusy"
           />
@@ -149,15 +149,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, ref } from 'vue'
+import * as v from 'valibot'
+import { useForm } from '@/components/ui/form'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminInput from '../../shared/components/AdminInput.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
 import AdminSettingsDialogFrame from '../../shared/components/AdminSettingsDialogFrame.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
-import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
+import { formatAdminDisplayError } from '../../shared/lib/toast'
+import { useStripeSettingsFeedback } from '../useStripeSettingsFeedback'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
+import { secretField } from '../../shared/lib/secretSchema'
 import { createAdminStripeSettingsResource } from './resource'
 import type { AdminStripeSettingsResource, StripeConfigurationSummary } from './types'
 
@@ -173,19 +177,34 @@ const emit = defineEmits<{
 }>()
 
 const defaultResource = createAdminStripeSettingsResource()
-const toast = useAdminToast()
+const feedback = useStripeSettingsFeedback()
 const summary = ref<StripeConfigurationSummary | null>(null)
 const isLoading = ref(false)
 const isSaving = ref(false)
 const loadError = ref('')
 const saveError = ref('')
-const form = reactive({
-  apiKey: '',
-  paymentMethodConfigurationId: '',
-  productTaxCode: '',
-  purchasesEnabled: false,
+const form = useForm({
+  initialValues: {
+    apiKey: '',
+    paymentMethodConfigurationId: '',
+    productTaxCode: '',
+    purchasesEnabled: false,
+  },
+  schema: () =>
+    v.object({
+      apiKey: secretField(!summary.value?.apiKeyConfigured, '请输入 Stripe API Key'),
+      paymentMethodConfigurationId: v.pipe(
+        v.string(),
+        v.trim(),
+        v.check((value) => value.length > 0, '请输入 Payment Method Configuration ID'),
+        v.check(
+          (value) => value.length === 0 || paymentMethodConfigurationIdPattern.test(value),
+          '请输入有效的 pmc_... ID',
+        ),
+      ),
+      productTaxCode: v.pipe(v.string(), v.trim(), v.minLength(1, '请输入 Product Tax Code')),
+    }),
 })
-const errors = reactive({ apiKey: '', paymentMethodConfigurationId: '', productTaxCode: '' })
 const isBusy = computed(() => isLoading.value || isSaving.value)
 const apiKeyPlaceholder = computed(() =>
   summary.value?.apiKeyConfigured ? '已配置，留空则保持不变' : '输入 Stripe API Key',
@@ -213,9 +232,12 @@ async function load() {
   try {
     const nextSummary = await activeResource().get()
     summary.value = nextSummary
-    form.paymentMethodConfigurationId = nextSummary.paymentMethodConfigurationId
-    form.productTaxCode = nextSummary.productTaxCode
-    form.purchasesEnabled = nextSummary.purchasesEnabled
+    form.resetForm({
+      apiKey: '',
+      paymentMethodConfigurationId: nextSummary.paymentMethodConfigurationId,
+      productTaxCode: nextSummary.productTaxCode,
+      purchasesEnabled: nextSummary.purchasesEnabled,
+    })
   } catch (error) {
     loadError.value = formatAdminDisplayError(error, '加载 Stripe 设置失败，请重试')
   } finally {
@@ -223,40 +245,30 @@ async function load() {
   }
 }
 
-function validate() {
-  errors.apiKey =
-    !summary.value?.apiKeyConfigured && !form.apiKey.trim() ? '请输入 Stripe API Key' : ''
-  const paymentMethodConfigurationId = form.paymentMethodConfigurationId.trim()
-  errors.paymentMethodConfigurationId = !paymentMethodConfigurationId
-    ? '请输入 Payment Method Configuration ID'
-    : paymentMethodConfigurationIdPattern.test(paymentMethodConfigurationId)
-      ? ''
-      : '请输入有效的 pmc_... ID'
-  errors.productTaxCode = form.productTaxCode.trim() ? '' : '请输入 Product Tax Code'
-  return !errors.apiKey && !errors.paymentMethodConfigurationId && !errors.productTaxCode
-}
-
 function clearError(field: 'apiKey' | 'paymentMethodConfigurationId' | 'productTaxCode') {
-  errors[field] = ''
+  form.clearErrors(field)
 }
 
-async function submit() {
-  if (isBusy.value || !validate()) return
+const submit = form.handleSubmit(async (values) => {
+  if (isBusy.value) return
   isSaving.value = true
   saveError.value = ''
   try {
     const nextSummary = await activeResource().save({
-      ...(form.apiKey.trim() ? { apiKey: form.apiKey.trim() } : {}),
-      paymentMethodConfigurationId: form.paymentMethodConfigurationId.trim(),
-      productTaxCode: form.productTaxCode.trim(),
-      purchasesEnabled: form.purchasesEnabled,
+      ...(values.apiKey.trim() ? { apiKey: values.apiKey.trim() } : {}),
+      paymentMethodConfigurationId: values.paymentMethodConfigurationId.trim(),
+      productTaxCode: values.productTaxCode.trim(),
+      purchasesEnabled: values.purchasesEnabled,
     })
     summary.value = nextSummary
-    form.paymentMethodConfigurationId = nextSummary.paymentMethodConfigurationId
-    form.productTaxCode = nextSummary.productTaxCode
-    form.purchasesEnabled = nextSummary.purchasesEnabled
+    form.resetForm({
+      apiKey: '',
+      paymentMethodConfigurationId: nextSummary.paymentMethodConfigurationId,
+      productTaxCode: nextSummary.productTaxCode,
+      purchasesEnabled: nextSummary.purchasesEnabled,
+    })
     clearSensitiveState()
-    toast.success('Stripe 设置已保存')
+    feedback.saved()
     emit('update:visible', false)
   } catch (error) {
     clearSensitiveState()
@@ -264,12 +276,10 @@ async function submit() {
   } finally {
     isSaving.value = false
   }
-}
+})
 
 function clearSensitiveState() {
-  form.apiKey = ''
-  errors.apiKey = ''
-  errors.paymentMethodConfigurationId = ''
-  errors.productTaxCode = ''
+  form.values.apiKey = ''
+  form.clearErrors()
 }
 </script>

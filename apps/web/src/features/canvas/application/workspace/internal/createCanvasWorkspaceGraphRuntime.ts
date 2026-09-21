@@ -55,7 +55,6 @@ export function createCanvasWorkspaceGraphRuntime(
   const interactions = useCanvasGraphInteractions({
     nodes: board.flowPane.nodes,
     edges: board.flowPane.edges,
-    graphAdapter: board.graphEditing.adapter,
     readCanvasGraphStore: board.graphEditing.readCanvasGraphStore,
     isGraphSessionAttached: board.graphEditing.isGraphSessionAttached,
     writeCanvasGraphStore: board.graphEditing.readCanvasGraphStore,
