@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"hash"
 	"io"
@@ -22,7 +23,7 @@ import (
 	"ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/platform/safehttp"
+	"ideaboard/api/internal/platform/outboundhttp"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -34,6 +35,51 @@ var defaultR2PermissionRetryDelays = []time.Duration{
 }
 
 const maxRemoteFileSize = 50 * 1024 * 1024
+
+// s3DeliveryOutbound is the shared standard outbound client for storage
+// delivery reads (public/signed URL fetch): timeout cap, bounded retries
+// and Retry-After respect match the gateway migration (#766).
+var s3DeliveryOutbound = outboundhttp.NewClient(outboundhttp.Config{})
+
+// s3DeliveryTarget names storage delivery egress in outbound logs/metrics.
+const s3DeliveryTarget = "s3-storage"
+
+// s3DeliveryTimeout bounds one delivery object fetch.
+const s3DeliveryTimeout = 30 * time.Second
+
+// s3GetWithPolicy fetches one delivery URL through the standard outbound
+// client under the runtime outbound policy. An exhausted retryable status
+// returns its status and body preview with a nil error, exactly like the
+// single-shot response it replaces, so the public-then-signed fallback and
+// the 404 mapping below keep working. Only transport/timeout failures
+// surface as errors.
+func s3GetWithPolicy(ctx context.Context, rawURL string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := s3DeliveryOutbound.Do(ctx, req, outboundhttp.RequestOptions{
+		Timeout:    s3DeliveryTimeout,
+		AllowHosts: outbound.AllowHosts(ctx),
+		Target:     s3DeliveryTarget,
+	})
+	if err != nil {
+		var statusErr *outboundhttp.HTTPStatusError
+		if errors.As(err, &statusErr) {
+			preview := statusErr.Body
+			return &http.Response{
+				Status:        fmt.Sprintf("%d %s", statusErr.StatusCode, http.StatusText(statusErr.StatusCode)),
+				StatusCode:    statusErr.StatusCode,
+				Header:        make(http.Header),
+				Body:          io.NopCloser(strings.NewReader(preview)),
+				ContentLength: int64(len(preview)),
+				Request:       req,
+			}, nil
+		}
+		return nil, err
+	}
+	return resp, nil
+}
 
 type S3CompatibleService struct {
 	clientCache             sync.Map
@@ -190,6 +236,7 @@ func (s *S3CompatibleService) PutBytesAtKeyWithConfig(ctx context.Context, objec
 	}
 	body := bytes.NewReader(data)
 	if err := s.putObjectWithRetry(ctx, cfg, body, func(attemptCtx context.Context) error {
+		startedAt := time.Now()
 		_, putErr := client.PutObject(
 			attemptCtx,
 			strings.TrimSpace(cfg.BucketName),
@@ -198,6 +245,7 @@ func (s *S3CompatibleService) PutBytesAtKeyWithConfig(ctx context.Context, objec
 			int64(len(data)),
 			minio.PutObjectOptions{ContentType: contentType, UserMetadata: map[string]string{"object-generation": strconv.FormatInt(generation, 10)}},
 		)
+		observeS3Data(putErr, time.Since(startedAt))
 		return putErr
 	}); err != nil {
 		return fmt.Errorf("上传派生图片失败: %w", err)
@@ -260,6 +308,7 @@ func (s *S3CompatibleService) putReaderWithConfigRef(ctx context.Context, client
 	}
 
 	err = s.putObjectWithRetry(ctx, cfg, body, func(attemptCtx context.Context) error {
+		startedAt := time.Now()
 		_, putErr := client.PutObject(
 			attemptCtx,
 			strings.TrimSpace(cfg.BucketName),
@@ -268,6 +317,7 @@ func (s *S3CompatibleService) putReaderWithConfigRef(ctx context.Context, client
 			size,
 			minio.PutObjectOptions{ContentType: contentType, UserMetadata: map[string]string{"object-generation": strconv.FormatInt(generation, 10)}},
 		)
+		observeS3Data(putErr, time.Since(startedAt))
 		return putErr
 	})
 	if err != nil {
@@ -387,7 +437,10 @@ func (s *S3CompatibleService) DeleteWithConfig(ctx context.Context, objectKey st
 		return err
 	}
 	err = s.retryR2PermissionDenied(ctx, cfg, "object delete", func(int) error {
-		return client.RemoveObject(ctx, strings.TrimSpace(cfg.BucketName), key, minio.RemoveObjectOptions{})
+		startedAt := time.Now()
+		removeErr := client.RemoveObject(ctx, strings.TrimSpace(cfg.BucketName), key, minio.RemoveObjectOptions{})
+		observeS3Data(removeErr, time.Since(startedAt))
+		return removeErr
 	})
 	if err != nil {
 		return fmt.Errorf("删除失败: %w", err)
@@ -417,7 +470,7 @@ func (s *S3CompatibleService) readDeliveryObject(ctx context.Context, key string
 	if err != nil {
 		return nil, err
 	}
-	response, err := safehttp.GetWithAllowHosts(ctx, publicURL, 30*time.Second, outbound.AllowHosts(ctx)...)
+	response, err := s3GetWithPolicy(ctx, publicURL)
 	if err != nil || response == nil || response.StatusCode != http.StatusOK {
 		if response != nil {
 			_ = response.Body.Close()
@@ -429,7 +482,7 @@ func (s *S3CompatibleService) readDeliveryObject(ctx context.Context, key string
 			}
 			return nil, fmt.Errorf("读取文件失败: %w", signedErr)
 		}
-		response, err = safehttp.GetWithAllowHosts(ctx, signedURL, 30*time.Second, outbound.AllowHosts(ctx)...)
+		response, err = s3GetWithPolicy(ctx, signedURL)
 		if err != nil {
 			return nil, fmt.Errorf("读取 signed 文件失败: %w", err)
 		}
@@ -491,8 +544,11 @@ func (s *S3CompatibleService) DeletePrefixWithConfig(ctx context.Context, object
 			if object.Err != nil {
 				return object.Err
 			}
-			if err := client.RemoveObject(ctx, bucketName, object.Key, minio.RemoveObjectOptions{}); err != nil {
-				return err
+			removeStartedAt := time.Now()
+			removeErr := client.RemoveObject(ctx, bucketName, object.Key, minio.RemoveObjectOptions{})
+			observeS3Data(removeErr, time.Since(removeStartedAt))
+			if removeErr != nil {
+				return removeErr
 			}
 		}
 		return nil
