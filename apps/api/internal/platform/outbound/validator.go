@@ -42,7 +42,7 @@ func AllowHosts(ctx context.Context) []string {
 	}
 	setting, err := provider.GetOutboundPolicy(ctx)
 	if err != nil {
-		slog.WarnContext(ctx, "outbound policy read failed; private egress remains blocked", "error", err)
+		slog.WarnContext(ctx, "outbound policy read failed; private egress remains blocked", "err", err)
 		return nil
 	}
 	return append([]string(nil), setting.AllowHosts...)
