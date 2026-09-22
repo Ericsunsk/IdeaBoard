@@ -185,3 +185,43 @@ func TestStoreDoCoordinatesConcurrentCallers(t *testing.T) {
 		t.Fatalf("waiter result = %+v", gotSecond)
 	}
 }
+
+func TestStoreDoDoesNotCacheLeaderErrors(t *testing.T) {
+	store := NewStore(DefaultStoreOptions())
+	wantErr := errors.New("temporary failure")
+	calls := 0
+	for range 2 {
+		_, replayed, err := store.Do(context.Background(), "scope", 1, "error-key", HashRequest("a"), func() (any, error) {
+			calls++
+			return nil, wantErr
+		})
+		if !errors.Is(err, wantErr) || replayed {
+			t.Fatalf("Do error = replayed:%v err:%v", replayed, err)
+		}
+	}
+	if calls != 2 {
+		t.Fatalf("leader calls=%d, want 2 after uncached errors", calls)
+	}
+}
+
+func TestStoreDoWaiterContextCanCancel(t *testing.T) {
+	store := NewStore(DefaultStoreOptions())
+	started := make(chan struct{})
+	release := make(chan struct{})
+	go func() {
+		_, _, _ = store.Do(context.Background(), "scope", 1, "wait-key", HashRequest("a"), func() (any, error) {
+			close(started)
+			<-release
+			return "done", nil
+		})
+	}()
+	<-started
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, replayed, err := store.Do(ctx, "scope", 1, "wait-key", HashRequest("a"), func() (any, error) {
+		return "must not execute", nil
+	}); !errors.Is(err, context.Canceled) || replayed {
+		t.Fatalf("cancelled waiter = replayed:%v err:%v", replayed, err)
+	}
+	close(release)
+}
