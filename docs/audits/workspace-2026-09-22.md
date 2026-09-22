@@ -417,6 +417,17 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - schema reviewer 要求 migrations → schema snapshot → queries → generated sqlc 原子闭包，并提示包含 DROP/purge 的 migration 需要 Fresh DB、backup 与 rollback/cutover 计划。
 - 本子批不提交 backend 代码，避免产生 HEAD 不可编译、SQL/generated 不一致或保留已知并发数据丢失窗口的 commit；待完整 PGX/sqlc/schema/consumer closure 后一次性提交。
 
+## 第四批补充：Workflow provider API type contract（4Y）
+
+全量 Go test 暴露 `internal/workflow/features_test.go` 引用的 provider API type contract 在 dirty workspace 中被删除：`feature_rules.go` 缺失 `ProviderOpenAICompatible`、`ProviderGoogleAI`、`ProviderGoogleCloud` 与 `ValidateProviderAPIType` 等定义。该文件本来已存在于 HEAD，恢复后与 HEAD 字节一致，因此本次是恢复误删而非新增代码，不产生代码 commit；保留工作区恢复状态以维持测试契约。
+
+### Verification and boundary
+
+- `cd apps/api && go test ./internal/workflow -count=1 -race` 通过。
+- `go vet ./internal/workflow` 通过。
+- clean `HEAD + feature_rules.go` snapshot 同样通过 workflow test/race/vet。
+- 未扩展到 provider runtime 或 database migration；本项仅恢复被删除的 workflow contract。
+
 ## 第四批补充：AI Gateway admin response/probe security hardening（4W，待 backend closure）
 
 MCP Codegraph 与 security review 识别并修复两项明确问题：Admin brand-logo response 的 cache policy 从 `public` 改为 `private`，避免共享 proxy/CDN 缓存绕过后续权限检查；`ProbeGatewayConnection` 拒绝 URL userinfo、query 与 fragment，避免敏感信息进入 URL/日志并保持 probe target 由受控 path 构造。补充 handler header 与 URL validation regression tests，并清理同一位置的重复注释。Logo cache 无界增长与 observed SQL 高基数属于低风险残余项，按“不过度 defense / design”暂不扩展。
