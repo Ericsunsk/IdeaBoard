@@ -23,6 +23,14 @@ const (
 	FeatureSlugOutpaint   = "outpaint"
 )
 
+// ReservedVisionSlug is permanently reserved for vision search
+// (SKU ai-search:vision, admin mapping bare key "vision").
+// It must never be registered as a workflow feature slug: the gateway mapping
+// storage isolates vision at ai_gateway_vision_model precisely because the API
+// reuses the bare string, and a workflow "vision" would reintroduce the
+// ai-image:vision / ai-search:vision overwrite. Locked by test.
+const ReservedVisionSlug = "vision"
+
 var supportedWorkflowFeatureSlugs = registeredImageFeatureSlugs()
 var supportedTaskFeatureSlugs = supportedFeatureSlugSet(supportedWorkflowFeatureSlugs)
 var aiImageWorkflowFeatures = supportedFeatureSlugSet(supportedWorkflowFeatureSlugs)

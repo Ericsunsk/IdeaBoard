@@ -102,6 +102,29 @@ func TestAIImageFeatureSlugsAreTheCanonicalWorkflowContract(t *testing.T) {
 	}
 }
 
+// TestVisionSlugIsReservedForSearch locks the root fix for the
+// ai-image:vision / ai-search:vision bare-key overwrite: "vision" belongs to
+// search only and must never validate as a workflow feature.
+func TestVisionSlugIsReservedForSearch(t *testing.T) {
+	if ReservedVisionSlug != "vision" {
+		t.Fatalf("reserved vision slug = %q, want %q", ReservedVisionSlug, "vision")
+	}
+	if _, ok := ParseWorkflowFeatureSlug(ReservedVisionSlug); ok {
+		t.Fatalf("reserved slug %q validates as workflow, want rejection", ReservedVisionSlug)
+	}
+	if _, err := ValidateWorkflowFeatureSlug(ReservedVisionSlug); err == nil {
+		t.Fatalf("reserved slug %q validates, want error", ReservedVisionSlug)
+	}
+	if IsAIImageFeature(ReservedVisionSlug) {
+		t.Fatalf("reserved slug %q classified as AI image, want false", ReservedVisionSlug)
+	}
+	for _, slug := range AIImageFeatureSlugs() {
+		if slug == ReservedVisionSlug {
+			t.Fatalf("workflow registry contains reserved slug %q", slug)
+		}
+	}
+}
+
 func TestSupportedFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T) {
 	repoRoot := findWorkflowRepoRoot(t)
 	frontendPath := filepath.Join(repoRoot, "apps", "web", "src", "shared", "domain", "workflowFeatures.ts")
