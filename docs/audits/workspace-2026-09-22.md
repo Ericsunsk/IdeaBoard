@@ -215,3 +215,15 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - Clean archive（替换 `admin.go`）中同 package tests 通过。
 - 提交：`de31ff78 fix(identity): map admin errors to stable codes`。
 - 本批未覆盖 Identity repository、auth service client 和 user lifecycle 的其他 dirty changes。
+
+## 第四批补充：Runtime RED metrics primitive（4G）
+
+本子批提交 Runtime RED metrics primitive 与 Gin middleware：HTTP request 按 method/route template/status 记录 counter + latency，Gateway 按 bounded feature/outcome 记录 request/retry，River queue 通过 timeout-bounded refresher 发布 depth/head lag。nil-safe observer、collector reuse、negative input normalization 和 refresh failure 保留 last gauge，避免 metrics path 反向阻塞请求或 scrape；raw URL、user/task ID、error text 不进入 labels。
+
+### Verification and boundary
+
+- clean archive（仅加入 metrics primitive/middleware 文件）中：
+  `go test ./internal/runtime/infrastructure/metrics ./internal/runtime/interfaces/http -run 'Test(Observe|Nil|Gateway|Refresh|Refresher|Multi|NewSet|REDMetrics)' -count=1 -race` 通过。
+- 同范围 `go vet` 通过。
+- 提交：`ba9c8ceb feat(runtime): add bounded RED metrics primitives`。
+- 本批未提交 `routes.go`/composition wiring；这些文件同时包含 Search/AIGateway/Billing module migration，必须在后续完整闭包中审计，当前 middleware 仍未接入 production route tree。
