@@ -30,17 +30,17 @@ func NewInternalHandler(updater LoginMetadataUpdater, key string) *InternalHandl
 
 func (h *InternalHandler) UpdateLoginMetadata(c *gin.Context) {
 	if h == nil || h.updater == nil || !constantTimeHeaderEquals(c.GetHeader("X-Internal-Key"), h.key) {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.MachineError(c, http.StatusUnauthorized, "identity_unauthorized", "unauthorized")
 		return
 	}
 	var req ports.LoginMetadataRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		response.MachineError(c, http.StatusBadRequest, codeIdentityRequestInvalid, "参数错误")
 		return
 	}
 	req.AuthUserID, req.IP, req.Country = strings.TrimSpace(req.AuthUserID), strings.TrimSpace(req.IP), strings.ToUpper(strings.TrimSpace(req.Country))
 	if req.AuthUserID == "" || len(req.AuthUserID) > maxAuthUserIDLength || (req.IP != "" && net.ParseIP(req.IP) == nil) || !validLoginCountry(req.Country) {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		response.MachineError(c, http.StatusBadRequest, codeIdentityRequestInvalid, "参数错误")
 		return
 	}
 	if err := h.updater.UpdateLastLoginMetadata(c.Request.Context(), req.AuthUserID, req.IP, req.Country); err != nil {
