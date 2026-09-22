@@ -128,3 +128,22 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 ### 验证
 
 - 以当前 HEAD 加仅 3A 文件构造的独立快照中，`go test ./internal/workflow -count=1` 通过。
+
+## 第四批前置：Idempotency primitive（4A）
+
+本次先提交共享 `platform/idempotency` primitive，不提交尚未闭合的 boards/task/rewards consumers。MCP `search_graph`/`codegraph_explore` 追踪了 `HashRequest`、`Store`、`replayBoardWrite` 及 task/reward HTTP 调用链；Standards / Spec 双轴复核确认 consumer 仍有独立的 contract 缺陷，留待 4B。
+
+### Findings and scope boundary
+
+- P1（4B 待处理）：Rewards `Redeem` 只解析 header、随后丢弃 key，不能把 key 绑定到 Code/request，也不能在同 key 不同 Code 时返回 conflict。
+- P1（4B 待处理）：Boards 的 `Lookup` → service side effect → `StoreResult` 非原子；相同 key 并发请求可能同时执行副作用。
+- P2（4B 待处理）：Task cancel 只校验 header 存在，没有按 `task_id` 做 request binding 或 replay。
+- P2（4B 待处理）：Rewards HTTP 删除既有 redemption metrics 文件，属于与本 primitive 无关的 observability 回归，未纳入本提交。
+- 4A 修复 `HashRequest` 在包含 NUL 的 caller-controlled parts 上使用 length-prefix framing，同时保持普通输入的历史 digest 稳定，避免影响已有 durable request hashes。
+- 4A 让导出的零值 `Store` lazy-init，并新增 `Store.Do` 的 same-key in-flight coordination：同 hash waiter 获得 leader 的结果/错误，不同 hash 在副作用前 conflict。现有 consumers 尚未迁移到 `Do`，因此 4A 不宣称端到端并发幂等已完成。
+
+### Verification
+
+- `cd apps/api && go test ./internal/platform/idempotency -count=1 -race` 通过。
+- `cd apps/api && go vet ./internal/platform/idempotency` 通过。
+- 提交：`a7f3e32c fix(idempotency): harden fingerprints and concurrent replay`。
