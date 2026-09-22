@@ -57,45 +57,17 @@ type prometheusRedemptionMetricsRecorder struct {
 	databaseConflicts prometheus.Counter
 }
 
-func newPrometheusRedemptionMetricsRecorder(
-	registerer prometheus.Registerer,
-) (*prometheusRedemptionMetricsRecorder, error) {
+func newPrometheusRedemptionMetricsRecorder(registerer prometheus.Registerer) (*prometheusRedemptionMetricsRecorder, error) {
 	if registerer == nil {
 		return nil, fmt.Errorf("register reward redemption metrics: registerer is required")
 	}
 	recorder := &prometheusRedemptionMetricsRecorder{
-		redemptions: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: "ideaboard",
-			Subsystem: "rewards",
-			Name:      "redemptions_total",
-			Help:      "Reward redemption requests by outcome.",
-		}, []string{"outcome"}),
-		creditedCredits: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: "ideaboard",
-			Subsystem: "rewards",
-			Name:      "credited_credits_total",
-			Help:      "Credits granted by successful reward redemptions.",
-		}),
-		latency: prometheus.NewHistogram(prometheus.HistogramOpts{
-			Namespace: "ideaboard",
-			Subsystem: "rewards",
-			Name:      "redemption_latency_seconds",
-			Help:      "Reward redemption request latency in seconds.",
-		}),
-		databaseConflicts: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: "ideaboard",
-			Subsystem: "rewards",
-			Name:      "database_conflicts_total",
-			Help:      "PostgreSQL conflicts encountered by reward redemptions.",
-		}),
+		redemptions:       prometheus.NewCounterVec(prometheus.CounterOpts{Namespace: "ideaboard", Subsystem: "rewards", Name: "redemptions_total", Help: "Reward redemption requests by outcome."}, []string{"outcome"}),
+		creditedCredits:   prometheus.NewCounter(prometheus.CounterOpts{Namespace: "ideaboard", Subsystem: "rewards", Name: "credited_credits_total", Help: "Credits granted by successful reward redemptions."}),
+		latency:           prometheus.NewHistogram(prometheus.HistogramOpts{Namespace: "ideaboard", Subsystem: "rewards", Name: "redemption_latency_seconds", Help: "Reward redemption request latency in seconds."}),
+		databaseConflicts: prometheus.NewCounter(prometheus.CounterOpts{Namespace: "ideaboard", Subsystem: "rewards", Name: "database_conflicts_total", Help: "PostgreSQL conflicts encountered by reward redemptions."}),
 	}
-	collectors := []prometheus.Collector{
-		recorder.redemptions,
-		recorder.creditedCredits,
-		recorder.latency,
-		recorder.databaseConflicts,
-	}
-	for _, collector := range collectors {
+	for _, collector := range []prometheus.Collector{recorder.redemptions, recorder.creditedCredits, recorder.latency, recorder.databaseConflicts} {
 		if err := registerer.Register(collector); err != nil {
 			return nil, fmt.Errorf("register reward redemption metrics: %w", err)
 		}
@@ -103,9 +75,7 @@ func newPrometheusRedemptionMetricsRecorder(
 	return recorder, nil
 }
 
-func mustNewPrometheusRedemptionMetricsRecorder(
-	registerer prometheus.Registerer,
-) *prometheusRedemptionMetricsRecorder {
+func mustNewPrometheusRedemptionMetricsRecorder(registerer prometheus.Registerer) *prometheusRedemptionMetricsRecorder {
 	recorder, err := newPrometheusRedemptionMetricsRecorder(registerer)
 	if err != nil {
 		panic(err)
@@ -147,10 +117,7 @@ type redemptionMetrics struct {
 	recorder redemptionMetricsRecorder
 }
 
-func newRedemptionMetrics(
-	now func() time.Time,
-	recorder redemptionMetricsRecorder,
-) redemptionMetrics {
+func newRedemptionMetrics(now func() time.Time, recorder redemptionMetricsRecorder) redemptionMetrics {
 	if now == nil {
 		now = time.Now
 	}
@@ -177,22 +144,13 @@ func (m redemptionMetrics) Start() func(redemptionOutcome, int64, error) {
 		if creditedCredits < 0 || outcome != redemptionOutcomeSuccess {
 			creditedCredits = 0
 		}
-		m.recorder.RecordRedemption(redemptionMetricObservation{
-			Outcome:          outcome,
-			CreditedCredits:  creditedCredits,
-			Latency:          latency,
-			DatabaseConflict: isRedemptionDatabaseConflict(err),
-		})
+		m.recorder.RecordRedemption(redemptionMetricObservation{Outcome: outcome, CreditedCredits: creditedCredits, Latency: latency, DatabaseConflict: isRedemptionDatabaseConflict(err)})
 	}
 }
 
 func normalizeRedemptionOutcome(outcome redemptionOutcome) redemptionOutcome {
 	switch outcome {
-	case redemptionOutcomeSuccess,
-		redemptionOutcomeReplayed,
-		redemptionOutcomeInvalid,
-		redemptionOutcomeRateLimited,
-		redemptionOutcomeInternalError:
+	case redemptionOutcomeSuccess, redemptionOutcomeReplayed, redemptionOutcomeInvalid, redemptionOutcomeRateLimited, redemptionOutcomeInternalError:
 		return outcome
 	default:
 		return redemptionOutcomeInternalError

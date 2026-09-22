@@ -13,6 +13,7 @@ import (
 	"ideaboard/api/internal/platform/idempotency"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
+	rewardsdomain "ideaboard/api/internal/rewards/domain"
 	"ideaboard/api/internal/rewards/ports"
 
 	"github.com/gin-gonic/gin"
@@ -24,6 +25,7 @@ type UserHandler struct {
 	service ports.UserService
 	limiter *redemptionAttemptLimiter
 	replay  *idempotency.Store
+	metrics redemptionMetrics
 }
 
 type AdminCommandHandler struct {
@@ -36,7 +38,8 @@ type AdminReadHandler struct {
 }
 
 type RedemptionHandlerOptions struct {
-	Now func() time.Time
+	Now             func() time.Time
+	MetricsRecorder redemptionMetricsRecorder
 }
 
 func NewUserHandler(service ports.UserService) *UserHandler {
@@ -44,10 +47,14 @@ func NewUserHandler(service ports.UserService) *UserHandler {
 }
 
 func NewUserHandlerWithOptions(service ports.UserService, options RedemptionHandlerOptions) *UserHandler {
+	if options.MetricsRecorder == nil {
+		options.MetricsRecorder = defaultRedemptionMetricsRecorder
+	}
 	return &UserHandler{
 		service: service,
 		limiter: newRedemptionAttemptLimiter(options.Now),
 		replay:  idempotency.NewStore(idempotency.DefaultStoreOptions()),
+		metrics: newRedemptionMetrics(options.Now, options.MetricsRecorder),
 	}
 }
 
@@ -341,14 +348,17 @@ func (h *UserHandler) Redeem(c *gin.Context) {
 	if !ok {
 		return
 	}
+	finishMetrics := h.metrics.Start()
 	key, err := idempotency.Parse(c.GetHeader(idempotency.Header))
 	if err != nil {
+		finishMetrics(redemptionOutcomeInvalid, 0, err)
 		idempotency.DefaultMetrics.ObserveError(err)
 		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
 		return
 	}
 	var request redeemRequest
 	if err := decodeRewardJSON(c, &request); err != nil {
+		finishMetrics(redemptionOutcomeInvalid, 0, err)
 		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
 		return
 	}
@@ -363,24 +373,31 @@ func (h *UserHandler) Redeem(c *gin.Context) {
 	})
 	if err != nil {
 		if errors.Is(err, errRewardRedeemRateLimited) {
+			finishMetrics(redemptionOutcomeRateLimited, 0, nil)
 			writeRewardRateLimitedError(c)
 			return
 		}
 		if idempotency.IsConflict(err) {
+			finishMetrics(redemptionOutcomeInvalid, 0, err)
 			idempotency.DefaultMetrics.Observe(idempotency.OutcomeConflict)
 			response.MachineError(c, http.StatusConflict, codeRewardCodeIdempotencyConflict, "幂等请求与原请求不一致")
 			return
 		}
+		finishMetrics(redemptionOutcomeForError(err), 0, err)
 		writeRewardRedeemError(c, err)
 		return
 	}
-	if replayed {
-		idempotency.DefaultMetrics.Observe(idempotency.OutcomeReplay)
-	}
 	result, ok := data.(ports.RedeemResult)
 	if !ok {
+		finishMetrics(redemptionOutcomeInternalError, 0, fmt.Errorf("unexpected reward redemption result type"))
 		writeRewardUnavailableError(c, true)
 		return
+	}
+	if replayed {
+		finishMetrics(redemptionOutcomeReplayed, 0, nil)
+		idempotency.DefaultMetrics.Observe(idempotency.OutcomeReplay)
+	} else {
+		finishMetrics(redemptionOutcomeSuccess, result.CreditedAmount, nil)
 	}
 	if replayed {
 		result.Replayed = true
@@ -388,6 +405,15 @@ func (h *UserHandler) Redeem(c *gin.Context) {
 	result.Redemption.UserPublicID = identityPrincipal.PublicID()
 	result.Redemption.DisplayName = identityPrincipal.DisplayName()
 	response.SuccessDTO(c, result)
+}
+
+func redemptionOutcomeForError(err error) redemptionOutcome {
+	switch {
+	case errors.Is(err, rewardsdomain.ErrInvalidCode), errors.Is(err, rewardsdomain.ErrCodeUnavailable), errors.Is(err, rewardsdomain.ErrWalletFrozen):
+		return redemptionOutcomeInvalid
+	default:
+		return redemptionOutcomeInternalError
+	}
 }
 
 func (h *UserHandler) ListRedemptions(c *gin.Context) {
