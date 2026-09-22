@@ -428,6 +428,20 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - clean `HEAD + feature_rules.go` snapshot 同样通过 workflow test/race/vet。
 - 未扩展到 provider runtime 或 database migration；本项仅恢复被删除的 workflow contract。
 
+## 第四批补充：Searchcatalog backend closure（4Z，暂不提交代码）
+
+本子批审计 Searchcatalog 的 domain/ports/application/infrastructure/interfaces，并用 MCP Codegraph 追踪 Search、Vision billing、provider adapter 与 Admin settings 边界。发现并修复三处 HTTP nil dependency panic：Search handler、Admin provider Update/Test 在未组合依赖时现在 fail-closed 返回 `503`，并新增 regression test。
+
+另外修复 `VisionBillingService.ReconcilePending` 的连接池占用窗口：先完整读取并检查 `rows.Err()`，立即关闭查询 rows，再逐项开启 settlement transaction。这样满批（100 条）时不会让扫描连接与 reconcile transactions 同时占用 pool。
+
+### Verification and boundary
+
+- `cd apps/api && go test ./internal/searchcatalog/... -count=1 -race` 通过。
+- `go vet ./internal/searchcatalog/...` 通过。
+- clean snapshot 表明 Searchcatalog application/interface 依赖同一轮 Billing DDD reorg；Billing 又依赖 PGX/sqlc caller migration，无法从 HEAD 单独构建。因此本子批代码不单独 commit，避免产生不可编译中间态。
+- reviewer 未发现新的 P1/P2；outbound allowlist/redirect、Vision input size/MIME、billing reserve/capture/release transaction 与 goroutine cleanup 均通过静态审计。
+- residual：尚未执行真实 PostgreSQL/HTTP integration；完整提交需与 Billing + PGX/sqlc closure 一起验证。
+
 ## 第四批补充：AI Gateway admin response/probe security hardening（4W，待 backend closure）
 
 MCP Codegraph 与 security review 识别并修复两项明确问题：Admin brand-logo response 的 cache policy 从 `public` 改为 `private`，避免共享 proxy/CDN 缓存绕过后续权限检查；`ProbeGatewayConnection` 拒绝 URL userinfo、query 与 fragment，避免敏感信息进入 URL/日志并保持 probe target 由受控 path 构造。补充 handler header 与 URL validation regression tests，并清理同一位置的重复注释。Logo cache 无界增长与 observed SQL 高基数属于低风险残余项，按“不过度 defense / design”暂不扩展。
