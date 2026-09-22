@@ -335,3 +335,14 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - 同 package `go vet` 通过。
 - 提交：`f45f27ab feat(providers): add cache and image reference primitives`。
 - Executor、dialects、gateway client 与 probe wiring 属于尚未闭合的 provider migration，本批未纳入。
+
+## 第四批补充：Search/Vision domain contract（4R）
+
+本子批建立 Searchcatalog domain contract：web search provider vocabulary 只允许 Unsplash/Pexels，Vision search 使用独立 failure taxonomy 与 bounded image/byte/timeout limits，不把 Vision provider 混入 web-search credentials。`VisionProviderError` 保留 machine-readable failure kind，同时通过 `Unwrap` 保留 cause 供内部分类。
+
+### Verification and boundary
+
+- clean archive（仅加入 Searchcatalog domain files/tests）中 `go test ./internal/searchcatalog/domain -count=1 -race` 通过。
+- 同 package `go vet` 通过。
+- 提交：`b130054d feat(search): establish closed vision domain contract`。
+- Vision input materializer、HTTP mapping、provider adapters 与 persistence migration 仍属于后续闭包。
