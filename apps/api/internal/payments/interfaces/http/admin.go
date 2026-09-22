@@ -2,14 +2,16 @@ package http
 
 import (
 	"errors"
-	"ideaboard/api/internal/credits/domain"
+	"log/slog"
 	"net/http"
-	"strconv"
+
+	"ideaboard/api/internal/credits/domain"
 
 	"ideaboard/api/internal/identity/principal"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	"ideaboard/api/internal/platform/jsonlimit"
+	"ideaboard/api/internal/platform/pagination"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -51,16 +53,12 @@ func (h *AdminHandler) ListAdminPaymentOrders(c *gin.Context) {
 	}
 	input, err := adminPaymentOrderListInputFromQuery(c)
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, "支付订单筛选条件无效")
+		writeAdminPaymentOrderListError(c, err)
 		return
 	}
 	page, err := h.service.ListAdminPaymentOrders(c.Request.Context(), input)
-	if errors.Is(err, paymentcontracts.ErrAdminPaymentOrderFilter) || errors.Is(err, paymentcontracts.ErrAdminPaymentOrderCursor) {
-		response.Error(c, http.StatusBadRequest, err.Error())
-		return
-	}
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "读取支付订单失败")
+		writeAdminPaymentOrderListError(c, err)
 		return
 	}
 	response.SuccessDTO(c, page)
@@ -112,10 +110,24 @@ func (h *AdminHandler) CreateAdminPaymentRefund(c *gin.Context) {
 	})
 	if err != nil {
 		switch {
-		case errors.Is(err, paymentcontracts.ErrRefundAmountInvalid), errors.Is(err, paymentcontracts.ErrRefundIdempotency), errors.Is(err, paymentcontracts.ErrAdminPaymentOrderFilter):
-			response.Error(c, http.StatusBadRequest, err.Error())
-		case errors.Is(err, paymentcontracts.ErrRefundExpired), errors.Is(err, paymentcontracts.ErrRefundOrderNotEligible), errors.Is(err, paymentcontracts.ErrRefundAmountExceeds):
-			response.Error(c, http.StatusConflict, err.Error())
+		case errors.Is(err, paymentcontracts.ErrRefundAmountInvalid):
+			slog.Warn("admin payment refund rejected", "outcome", "invalid_amount", "err", err)
+			response.Error(c, http.StatusBadRequest, "退款 Idea 数量无效")
+		case errors.Is(err, paymentcontracts.ErrRefundIdempotency):
+			slog.Warn("admin payment refund rejected", "outcome", "invalid_idempotency", "err", err)
+			response.Error(c, http.StatusBadRequest, "退款幂等键无效")
+		case errors.Is(err, paymentcontracts.ErrAdminPaymentOrderFilter):
+			slog.Warn("admin payment refund rejected", "outcome", "invalid_filter", "err", err)
+			response.Error(c, http.StatusBadRequest, "支付订单筛选条件无效")
+		case errors.Is(err, paymentcontracts.ErrRefundExpired):
+			slog.Warn("admin payment refund rejected", "outcome", "refund_expired", "err", err)
+			response.Error(c, http.StatusConflict, "支付订单已超过 14 天退款期限")
+		case errors.Is(err, paymentcontracts.ErrRefundOrderNotEligible):
+			slog.Warn("admin payment refund rejected", "outcome", "order_not_eligible", "err", err)
+			response.Error(c, http.StatusConflict, "支付订单当前不满足退款条件")
+		case errors.Is(err, paymentcontracts.ErrRefundAmountExceeds):
+			slog.Warn("admin payment refund rejected", "outcome", "amount_exceeds", "err", err)
+			response.Error(c, http.StatusConflict, "退款 Idea 数量超过可退余额")
 		case errors.Is(err, domain.ErrInsufficientCredits):
 			response.Error(c, http.StatusConflict, "Wallet 可用 Idea 不足")
 		case errors.Is(err, paymentcontracts.ErrStripeProviderUnavailable):
@@ -152,14 +164,38 @@ func adminPaymentOrderListInputFromQuery(c *gin.Context) (paymentcontracts.Admin
 		input.AnomalyOnly = raw[0] == "true"
 	}
 	if raw, ok := query["limit"]; ok {
-		limit, err := strconv.Atoi(raw[0])
-		if err != nil || limit < 1 || limit > maxAdminPaymentOrderLimit {
+		limit, err := pagination.ParseLimit(raw[0])
+		if err != nil {
 			return paymentcontracts.AdminPaymentOrderListInput{}, paymentcontracts.ErrAdminPaymentOrderFilter
 		}
 		input.Limit = limit
 	}
 	return input, nil
 }
+
+// adminPaymentOrderListErrorTable binds admin order list outcomes to stable
+// machine codes so callers branch on codes instead of copy. Limit and filter
+// failures share the filter code; cursor failures keep their own code, both
+// tracking the shared pagination standard.
+var adminPaymentOrderListErrorTable = []paymentErrorMapping{
+	{
+		targets: []error{paymentcontracts.ErrAdminPaymentOrderFilter},
+		status:  http.StatusBadRequest,
+		code:    "admin_payment_order_filter_invalid",
+		message: "支付订单筛选条件无效",
+	},
+	{
+		targets: []error{paymentcontracts.ErrAdminPaymentOrderCursor},
+		status:  http.StatusBadRequest,
+		code:    "admin_payment_order_cursor_invalid",
+		message: "支付订单游标无效",
+	},
+}
+
+func writeAdminPaymentOrderListError(c *gin.Context, err error) {
+	renderMappedPaymentError(c, err, adminPaymentOrderListErrorTable, http.StatusInternalServerError, "读取支付订单失败")
+}
+
 func (h *AdminHandler) GetStripeConfiguration(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if _, ok := principal.RequireAdmin(c); !ok {

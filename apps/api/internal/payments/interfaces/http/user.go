@@ -4,13 +4,13 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"ideaboard/api/internal/identity/principal"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	"ideaboard/api/internal/platform/jsonlimit"
+	"ideaboard/api/internal/platform/pagination"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -226,22 +226,14 @@ func (h *UserCheckoutHandler) ListRecharges(c *gin.Context) {
 		response.Error(c, http.StatusServiceUnavailable, "充值服务暂不可用")
 		return
 	}
-	limit := 0
-	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
-		value, err := strconv.Atoi(raw)
-		if err != nil {
-			response.Error(c, http.StatusBadRequest, "limit 无效")
-			return
-		}
-		limit = value
-	}
-	page, err := h.service.ListRecharges(c.Request.Context(), identityPrincipal.UserID(), c.Query("cursor"), limit)
-	if errors.Is(err, paymentcontracts.ErrRechargeHistoryCursor) || errors.Is(err, paymentcontracts.ErrRechargeHistoryLimit) {
-		response.Error(c, http.StatusBadRequest, err.Error())
+	limit, err := pagination.ParseLimit(c.Query("limit"))
+	if err != nil {
+		writeRechargeHistoryError(c, paymentcontracts.ErrRechargeHistoryLimit)
 		return
 	}
+	page, err := h.service.ListRecharges(c.Request.Context(), identityPrincipal.UserID(), c.Query("cursor"), limit)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "读取充值记录失败")
+		writeRechargeHistoryError(c, err)
 		return
 	}
 	response.SuccessDTO(c, page)

@@ -9,6 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
+	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
@@ -158,7 +161,7 @@ func (s *Service) ListRecharges(ctx context.Context, userID int64, cursor string
 	}
 	page := paymentcontracts.RechargeHistoryPage{Items: make([]paymentcontracts.RechargeHistoryItem, 0, min(limit, len(rows)))}
 	if len(rows) > limit {
-		page.NextCursor, err = EncodeRechargeHistoryCursor(rows[limit-1].OccurredAt, rows[limit-1].ID)
+		page.NextCursor, err = EncodeRechargeHistoryCursor(dbutil.TimeValue(rows[limit-1].OccurredAt), uuid.UUID(rows[limit-1].ID.Bytes))
 		if err != nil {
 			return paymentcontracts.RechargeHistoryPage{}, fmt.Errorf("encode recharge history cursor: %w", err)
 		}
@@ -192,5 +195,5 @@ func rechargeHistoryItem(row dbsqlc.ListPaymentRechargeHistoryRow) (paymentcontr
 	default:
 		return paymentcontracts.RechargeHistoryItem{}, fmt.Errorf("invalid payment order history status %q", row.Status)
 	}
-	return paymentcontracts.RechargeHistoryItem{OccurredAt: row.OccurredAt, IdeaQuantity: row.IdeaQuantity, PaidAmountMinor: paidAmountMinor, PaidCurrency: paidCurrency, Status: status, RefundedIdeaQuantity: row.RefundedIdeaQuantity, RefundedAmountMinor: row.RefundedAmountMinor, ReceiptURL: row.ReceiptUrl}, nil
+	return paymentcontracts.RechargeHistoryItem{OccurredAt: dbutil.TimeValue(row.OccurredAt), IdeaQuantity: row.IdeaQuantity, PaidAmountMinor: paidAmountMinor, PaidCurrency: paidCurrency, Status: status, RefundedIdeaQuantity: row.RefundedIdeaQuantity, RefundedAmountMinor: row.RefundedAmountMinor, ReceiptURL: row.ReceiptUrl}, nil
 }

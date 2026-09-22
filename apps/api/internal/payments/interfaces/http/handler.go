@@ -12,10 +12,6 @@ const (
 	maxPaymentRefundRequestBytes       int64 = 16 << 10
 )
 
-const (
-	maxAdminPaymentOrderLimit = 100
-)
-
 type UserCheckoutHandler struct {
 	service       paymentcontracts.UserCheckoutService
 	publicOrigins config.PublicOriginsConfig
