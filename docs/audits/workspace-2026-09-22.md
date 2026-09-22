@@ -314,3 +314,13 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - clean archive（替换 workflow feature files）中 `go test ./internal/workflow -run 'TestVisionSlugIsReservedForSearch|TestValidateProviderAPIType' -count=1 -race` 通过。
 - 提交：`28656b46 fix(workflow): reserve vision search slug`。
 - `feature_rules.go` 的删除及 provider registry migration 仍未纳入，本批只处理 slug namespace invariant。
+
+## 第四批补充：River retry/timeout policy matrix（4P）
+
+本子批新增 Task queue 的 code-owned retry/timeout matrix，覆盖 drawing、final-failure、credit/payment reconciliation、checkout shutdown、retention、vision billing 和 media reclamation workers。Matrix 以 worker/queue roster、正数预算、跨 worker 一致性和关键安全上限测试约束，防止新 worker 静默继承全局 `JobTimeout` 或重复散落 retry literals。
+
+### Verification and boundary
+
+- clean archive（仅加入 queue matrix 文件）中 `go test ./internal/tasking/infrastructure/queue -run 'TestRiver(Timeout|Retry)Matrix' -count=1` 通过。
+- 提交：`4fb2ffce fix(tasking): centralize River retry and timeout policy`。
+- 本批只提交 policy/matrix contract；各 worker `Timeout()`/`MaxAttempts` wiring 与 queue routing SQL migration 仍需后续闭包审计。
