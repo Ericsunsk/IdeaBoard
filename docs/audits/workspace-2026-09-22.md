@@ -382,3 +382,26 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - `git diff --check` 通过。
 - 提交：`8ccf0310 fix(ui): use border focus state for inputs`。
 - 本批只处理 shared Input primitive；未修改各 feature 表单布局或 Admin model catalog 的其他 dirty UI。
+
+## 第四批补充：Admin model catalog + generated API sync（4V）
+
+本子批审计并提交 Admin model catalog 前端闭包：catalog/reference/observed UI、brand logo registry 与 generated API client 同步 `apps/api/openapi.yaml`。修复 catalog reference 与 route preview 的 stale async response 覆盖，修正 SKU 区域标题以匹配实际展示的 on-sale/off-sale 状态，并保留 provider-qualified model identity 语义，不引入额外过滤或跨 provider 归一化设计。MCP Codegraph 复核了 Admin handler、generated API 与 model UI 的调用边界。
+
+### Verification and boundary
+
+- 当前 workspace：`npm run api:check-generated` 通过；Admin models/logos focused tests 为 `11 files / 89 tests`；`npm run build` 通过。
+- clean `HEAD + 本批 frontend/API 闭包` snapshot：generated drift 通过，`11 files / 89 tests` 通过；`vue-tsc` 与 Vite 编译通过。
+- clean snapshot 的 bundle-size gate 仍因既有 `heic2any` chunk `1320.5 KB` 超过 `634.8 KB` budget 而失败；未为此引入与本批无关的拆包设计。
+- `git diff --check` 通过。
+- 提交：`966cb75e feat(admin): sync gateway model catalog API`。
+- backend `internal/aigateway` 尚未在本批提交：其事务保存调用依赖尚未闭合的 `settings`/sqlc/DB migration closure，后续单独审计后再提交，避免产生 HEAD 不可编译的中间 commit。
+
+## 第四批补充：AI Gateway admin response/probe security hardening（4W，待 backend closure）
+
+MCP Codegraph 与 security review 识别并修复两项明确问题：Admin brand-logo response 的 cache policy 从 `public` 改为 `private`，避免共享 proxy/CDN 缓存绕过后续权限检查；`ProbeGatewayConnection` 拒绝 URL userinfo、query 与 fragment，避免敏感信息进入 URL/日志并保持 probe target 由受控 path 构造。补充 handler header 与 URL validation regression tests，并清理同一位置的重复注释。Logo cache 无界增长与 observed SQL 高基数属于低风险残余项，按“不过度 defense / design”暂不扩展。
+
+### Verification and boundary
+
+- `cd apps/api && go test ./internal/aigateway -count=1 -race` 通过。
+- `cd apps/api && go vet ./internal/aigateway` 通过。
+- clean `HEAD + internal/aigateway` snapshot 暴露其依赖 `settings.SetAndDeleteManyWithAdminAudit` 尚未进入 HEAD；因此安全修复将随完整 backend transaction/sqlc closure 一起提交，当前不单独制造不可编译 commit。
