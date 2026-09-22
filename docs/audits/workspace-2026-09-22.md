@@ -293,3 +293,14 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - 同 package `go vet` 通过。
 - 提交：`2a242ba6 fix(payments): align readmodel pagination contract`。
 - `readmodel/service.go` 的 pgx/sqlc time/UUID conversion、HTTP handler machine mapping 和 integration pagination tests 仍未纳入，待下一批闭包验证。
+
+## 第四批补充：Payments pagination HTTP closure（4N）
+
+本子批完成 pagination 的 application/HTTP 闭包：readmodel service 适配 pgx/sqlc 的 nullable time 与 UUID cursor 字段；Admin payment order 的 filter/cursor、user recharge history 的 limit/cursor 都通过 stable machine codes 返回，避免 raw error text；HTTP 输入统一使用 shared pagination parser。新增 Admin handler safe-message tests。
+
+### Verification and boundary
+
+- clean archive（替换 readmodel service/facts 与 Payments HTTP handler 文件）中 `go test ./internal/payments/interfaces/http -count=1 -race` 通过。
+- 同 package `go vet` 通过。
+- 提交：`b77e7a73 fix(payments): harden pagination HTTP boundaries`。
+- DB integration pagination fixture `payments/tests/recharge_pagination_test.go` 仍未提交，需等 testdb/sqlc migration dirty closure 一起验证。
