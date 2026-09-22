@@ -179,3 +179,15 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - Clean archive（仅替换 `presign.go`）中 `go test ./internal/media/storage/application/runtime -count=1` 与 `go vet ./internal/media/storage/application/runtime` 通过。
 - 提交：`6669d6ee fix(media): reject local presign before integrity lookup`。
 - 本批未触碰当前 dirty 的 media pgx migration/test fixtures；跨 profile persistence、driver capability 和 presign URL security 仍需后续批次单独审计。
+
+## 第四批补充：Rewards redemption observability（4D）
+
+工作区原有 staged deletion 删除了 `rewards/interfaces/http/metrics.go` 及其测试。该删除与幂等 consumer 改造无关，并违反 Rewards `CONTEXT.md` 中“固定 outcome、credited Ideas、latency，且禁止用户/Code/digest labels”的 observability contract。本子批恢复 bounded Prometheus recorder，并接回当前 `UserHandler.Redeem`：invalid input、rate limit、idempotency conflict、service failure、replay 和 success 都会记录固定 outcome；replay 不重复 credited credits，数据库冲突通过 PostgreSQL SQLSTATE 分类。
+
+### Verification and boundary
+
+- `cd apps/api && go test ./internal/rewards/interfaces/http ./internal/rewards/tests -count=1 -race` 通过。
+- `cd apps/api && go vet ./internal/rewards/interfaces/http ./internal/rewards/tests` 通过。
+- Clean archive（当前 HEAD 的 API）中 Rewards HTTP package/tests `go test -count=1` 与 `go vet` 通过。
+- 提交：`d2d4c0ad fix(rewards): restore redemption observability`。
+- 本批只恢复 HTTP redemption metrics；跨实例 metrics aggregation、durable idempotency fact 及 Rewards database transaction 仍不在此批范围内。
