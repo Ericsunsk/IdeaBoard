@@ -442,6 +442,17 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - reviewer 未发现新的 P1/P2；outbound allowlist/redirect、Vision input size/MIME、billing reserve/capture/release transaction 与 goroutine cleanup 均通过静态审计。
 - residual：尚未执行真实 PostgreSQL/HTTP integration；完整提交需与 Billing + PGX/sqlc closure 一起验证。
 
+## 第四批补充：Library shared pagination audit（5A，暂不提交代码）
+
+本子批快速审计 Library pagination migration：旧 `cursor.go` 已删除，cursor transport 统一到 `platform/pagination`；`DefaultPageSize`/`MaxPageSize` 仍分别绑定 shared `DefaultLimit=50`/`MaxLimit=200`，`parseLimit` 的空值、边界和错误映射均保持原 contract。MCP Codegraph 确认 `EncodeCursor`/`DecodeCursor` 的调用边界只经 Library handler 与 shared pagination。
+
+### Verification and boundary
+
+- `cd apps/api && go test ./internal/library ./internal/platform/pagination -count=1 -race` 通过。
+- `go vet ./internal/library ./internal/platform/pagination` 通过。
+- Library repository/service 同样依赖 PGX/sqlc caller migration，无法从 HEAD 单独 clean-build；不与 Searchcatalog/Billing 混成伪小 commit。
+- residual：Library handler 的 nil service 组合错误仍会在请求路径触发 panic；这是既有 handler-wide dependency guard 缺口，不在本次 pagination contract 中扩大修复范围，后续可与统一 HTTP fail-closed 批次合并。
+
 ## 第四批补充：AI Gateway admin response/probe security hardening（4W，待 backend closure）
 
 MCP Codegraph 与 security review 识别并修复两项明确问题：Admin brand-logo response 的 cache policy 从 `public` 改为 `private`，避免共享 proxy/CDN 缓存绕过后续权限检查；`ProbeGatewayConnection` 拒绝 URL userinfo、query 与 fragment，避免敏感信息进入 URL/日志并保持 probe target 由受控 path 构造。补充 handler header 与 URL validation regression tests，并清理同一位置的重复注释。Logo cache 无界增长与 observed SQL 高基数属于低风险残余项，按“不过度 defense / design”暂不扩展。
