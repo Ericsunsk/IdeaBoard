@@ -227,3 +227,14 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - 同范围 `go vet` 通过。
 - 提交：`ba9c8ceb feat(runtime): add bounded RED metrics primitives`。
 - 本批未提交 `routes.go`/composition wiring；这些文件同时包含 Search/AIGateway/Billing module migration，必须在后续完整闭包中审计，当前 middleware 仍未接入 production route tree。
+
+## 第四批补充：S3 outbound delivery and data-plane metrics（4H）
+
+本子批将 S3-compatible delivery 的 public/signed GET 迁移到标准 `outboundhttp.Client`，统一 timeout、allowlist、retry/status handling；Put/Delete data-plane 调用通过共享 `s3-storage` target 记录 success/canceled/timeout/http 4xx/http 5xx/transport outcomes。404 miss 仍作为 delivery fallback/control flow，不误报为 transport failure；response body cleanup 和原有 signed fallback 语义保持不变。
+
+### Verification and boundary
+
+- clean archive（替换 S3 `service.go` 与 RED helper/test）中 `go test ./internal/media/storage/infrastructure/s3 -count=1` 通过。
+- 同 package `go vet` 通过。
+- 提交：`63569322 fix(media): standardize S3 outbound delivery`。
+- 本批未覆盖 media Postgres repository、profile HTTP handler 或 remote downloader；这些改动仍需与 storage migration 闭包一起审计。
