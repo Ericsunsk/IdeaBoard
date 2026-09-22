@@ -203,3 +203,15 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - Clean archive（仅替换本子批 3 个文件）中同 package test/vet 通过。
 - 提交：`cfebb45a fix(identity): stabilize internal HTTP error envelopes`。
 - 当前 dirty 的 Identity Admin handler 尚未纳入本提交；它引用了同一 error seam，但与其他 user/admin lifecycle 改动耦合，后续需在完整闭包中验证。
+
+## 第四批补充：Identity Admin HTTP mapping（4F）
+
+在 4E error seam 之上，本子批把 Admin settings/user/impersonation 分支迁移到稳定 machine codes，并将 upstream/Auth/operation details 留在 server logs；原有鉴权、target checks 和 status classification 保持不变。这样 validation、not-found、forbidden、upstream rejected/unavailable 不再依赖可变的 copy 或泄露 wrapped error。
+
+### Verification and boundary
+
+- `cd apps/api && go test ./internal/identity/users/interfaces/http -count=1 -race` 通过。
+- `cd apps/api && go vet ./internal/identity/users/interfaces/http` 通过。
+- Clean archive（替换 `admin.go`）中同 package tests 通过。
+- 提交：`de31ff78 fix(identity): map admin errors to stable codes`。
+- 本批未覆盖 Identity repository、auth service client 和 user lifecycle 的其他 dirty changes。
