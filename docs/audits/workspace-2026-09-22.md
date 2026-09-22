@@ -324,3 +324,14 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - clean archive（仅加入 queue matrix 文件）中 `go test ./internal/tasking/infrastructure/queue -run 'TestRiver(Timeout|Retry)Matrix' -count=1` 通过。
 - 提交：`4fb2ffce fix(tasking): centralize River retry and timeout policy`。
 - 本批只提交 policy/matrix contract；各 worker `Timeout()`/`MaxAttempts` wiring 与 queue routing SQL migration 仍需后续闭包审计。
+
+## 第四批补充：Provider cache/image reference primitives（4Q）
+
+本子批提交两个 network-free provider domain primitives：versioned SHA-256 text cache key 按 feature/model/canonical request bytes 隔离；provider image reference 仅接受 public HTTPS URL，relative `/uploads/` 必须通过 configured API origin 解析。测试覆盖 deterministic key、scope collision、empty input、HTTP/scheme-relative rejection 与 upload resolution。
+
+### Verification and boundary
+
+- clean archive（仅加入 provider domain primitive/test）中 `go test ./internal/runtime/interfaces/worker/providers/domain -count=1 -race` 通过。
+- 同 package `go vet` 通过。
+- 提交：`f45f27ab feat(providers): add cache and image reference primitives`。
+- Executor、dialects、gateway client 与 probe wiring 属于尚未闭合的 provider migration，本批未纳入。
