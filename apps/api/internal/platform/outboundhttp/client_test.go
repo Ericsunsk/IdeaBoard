@@ -166,7 +166,7 @@ func TestSnapshotRequestBodyClosesReaderAfterReadError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRequest() error = %v", err)
 	}
-	_, err = snapshotRequestBody(req)
+	_, err = snapshotRequestBody(context.Background(), req)
 	if err == nil {
 		t.Fatal("snapshotRequestBody succeeded with failing reader")
 	}

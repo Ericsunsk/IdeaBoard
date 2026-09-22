@@ -169,6 +169,9 @@ func DoRequestWithAllowHosts(
 	ctx = nonNilContext(ctx)
 	policy, err := resolvePolicy(ctx, req.URL.String(), allowHosts...)
 	if err != nil {
+		if req.Body != nil {
+			_ = req.Body.Close()
+		}
 		return nil, err
 	}
 	req = req.WithContext(ctx)

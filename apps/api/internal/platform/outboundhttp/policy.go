@@ -16,8 +16,14 @@ func parseRetryAfter(raw string) time.Duration {
 	if raw == "" {
 		return 0
 	}
-	if seconds, err := strconv.ParseFloat(raw, 64); err == nil && seconds >= 0 {
-		return time.Duration(seconds * float64(time.Second))
+	if !strings.ContainsAny(raw, ".eE+-") {
+		if seconds, err := strconv.ParseUint(raw, 10, 63); err == nil {
+			const maxDuration = uint64(1<<63 - 1)
+			if seconds > maxDuration/uint64(time.Second) {
+				return time.Duration(maxDuration)
+			}
+			return time.Duration(seconds * uint64(time.Second))
+		}
 	}
 	if when, err := http.ParseTime(raw); err == nil {
 		if delay := time.Until(when); delay > 0 {

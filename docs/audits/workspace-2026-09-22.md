@@ -110,9 +110,11 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - 修复 nil context 触发 `context.WithTimeout` panic，以及读取不可重放 body 出错时未关闭 reader 的 Resource Cleanup 问题。
 - `outbound_retries_total` 仅在确实安排下一次 attempt 时递增；最后一次失败和 `MaxAttempts=1` 不再误计 retry。
 - `safehttp.ErrPolicyViolation` 将 URL/SSRF 的确定性拒绝与 transient transport error 区分；policy rejection 立即 fail closed，不重试。
+- 提交后复核又修复 request-body reader 的关闭、SSRF prevalidation 失败时 fresh body 的关闭、不可重放 body 受 call timeout 约束，以及 Retry-After/backoff duration overflow。
 
 ### 验证与边界
 
 - `cd apps/api && go test ./internal/platform/outboundhttp ./internal/platform/safehttp -count=1 -race` 通过。
 - `cd apps/api && go vet ./internal/platform/outboundhttp ./internal/platform/safehttp` 通过。
 - 本批只验证共享客户端与安全边界；provider-specific status mapping、Cloudflare gateway billing 及业务 retry budget 仍在后续批次审计。
+- 以上补丁作为同一 outbound 子批的 follow-up commit 提交；若 reader 无法响应 Close，后台读取 goroutine 仍可能延迟结束，这是 Go `io.Reader` 无强制取消能力的边界。

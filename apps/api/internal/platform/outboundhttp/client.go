@@ -215,11 +215,15 @@ func (c *Client) Do(ctx context.Context, req *http.Request, opts RequestOptions)
 		timeout = c.maxTimeout
 	}
 
-	body, err := snapshotRequestBody(req)
-	if err != nil {
-		return nil, err
-	}
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
+	body, err := snapshotRequestBody(callCtx, req)
+	if err != nil {
+		cancel()
+		return nil, c.finishWithLatency(target, err, time.Since(startedAt))
+	}
+	if req.Body != nil {
+		defer req.Body.Close()
+	}
 	// No defer cancel here: the call budget must stay alive until the
 	// caller finishes reading a returned response body. Error paths cancel
 	// explicitly; success paths transfer cancel ownership to the wrapped
@@ -425,7 +429,7 @@ func (c *Client) sendOnce(ctx context.Context, req *http.Request, body []byte, a
 
 // snapshotRequestBody buffers a non-replayable request body once so retries
 // resend identical bytes. Requests with GetBody set need no buffering.
-func snapshotRequestBody(req *http.Request) ([]byte, error) {
+func snapshotRequestBody(ctx context.Context, req *http.Request) ([]byte, error) {
 	if req.Body == nil || req.Body == http.NoBody {
 		return nil, nil
 	}
@@ -433,11 +437,27 @@ func snapshotRequestBody(req *http.Request) ([]byte, error) {
 		return nil, nil
 	}
 	originalBody := req.Body
-	defer func() { _ = originalBody.Close() }()
-	payload, err := io.ReadAll(io.LimitReader(originalBody, maxBufferedBodyBytes+1))
-	if err != nil {
-		return nil, fmt.Errorf("outbound request body read failed: %w", err)
+	type readResult struct {
+		payload []byte
+		err     error
 	}
+	resultCh := make(chan readResult, 1)
+	go func() {
+		payload, err := io.ReadAll(io.LimitReader(originalBody, maxBufferedBodyBytes+1))
+		_ = originalBody.Close()
+		resultCh <- readResult{payload, err}
+	}()
+	var result readResult
+	select {
+	case <-ctx.Done():
+		_ = originalBody.Close()
+		return nil, ctx.Err()
+	case result = <-resultCh:
+	}
+	if result.err != nil {
+		return nil, fmt.Errorf("outbound request body read failed: %w", result.err)
+	}
+	payload := result.payload
 	if int64(len(payload)) > maxBufferedBodyBytes {
 		return nil, fmt.Errorf("outbound request body exceeds %d bytes", maxBufferedBodyBytes)
 	}
@@ -464,6 +484,9 @@ func (c *Client) waitForRetry(failedAttempt int, retryAfter time.Duration) (time
 func (c *Client) backoffForAttempt(failedAttempt int) time.Duration {
 	wait := c.initialBackoff
 	for i := 1; i < failedAttempt; i++ {
+		if wait >= c.maxBackoff || wait > time.Duration(1<<63-1)/2 {
+			return c.maxBackoff
+		}
 		wait *= 2
 		if wait >= c.maxBackoff {
 			return c.maxBackoff
