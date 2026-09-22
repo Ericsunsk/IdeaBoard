@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	paymentports "ideaboard/api/internal/payments/ports"
+	"ideaboard/api/internal/platform/outboundhttp"
 
 	"github.com/stripe/stripe-go/v86"
 )
@@ -21,10 +23,32 @@ const (
 
 type Adapter struct {
 	newClient func(string) *stripe.Client
+	recorder  *Recorder
 }
 
 func New() *Adapter {
-	return &Adapter{newClient: func(key string) *stripe.Client { return stripe.NewClient(key) }}
+	return &Adapter{
+		newClient: func(key string) *stripe.Client { return stripe.NewClient(key) },
+		recorder:  NewRecorder(),
+	}
+}
+
+// NewWithRecorder builds an Adapter writing Stripe RED to m (nil-safe).
+// Tests inject an isolated registry here; production uses New().
+func NewWithRecorder(m *outboundhttp.Metrics) *Adapter {
+	a := New()
+	a.recorder = NewRecorderWithMetrics(m)
+	return a
+}
+
+// observe records one finished SDK call in outbound RED. It stays nil-safe
+// for Adapters built without New (test stubs).
+func (a *Adapter) observe(err error, startedAt time.Time) {
+	if a == nil || a.recorder == nil {
+		NewRecorder().Observe(err, time.Since(startedAt))
+		return
+	}
+	a.recorder.Observe(err, time.Since(startedAt))
 }
 
 func (a *Adapter) PrepareConfiguration(ctx context.Context, input paymentports.PrepareStripeConfiguration) (paymentports.PreparedStripeConfiguration, error) {
@@ -32,7 +56,9 @@ func (a *Adapter) PrepareConfiguration(ctx context.Context, input paymentports.P
 		return paymentports.PreparedStripeConfiguration{}, paymentports.NewGatewayError(paymentports.GatewayErrorProviderUnavailable, "Stripe client unavailable", nil)
 	}
 	client := a.newClient(input.APIKey)
+	startedAt := time.Now()
 	account, err := client.V1Accounts.Retrieve(ctx, nil)
+	a.observe(err, startedAt)
 	if err != nil {
 		return paymentports.PreparedStripeConfiguration{}, mapStripeError("验证 Stripe 账户", err)
 	}
@@ -42,7 +68,9 @@ func (a *Adapter) PrepareConfiguration(ctx context.Context, input paymentports.P
 	if !account.ChargesEnabled {
 		return paymentports.PreparedStripeConfiguration{}, paymentports.NewGatewayError(paymentports.GatewayErrorCapabilityMissing, "Stripe 账户尚未启用收款", nil)
 	}
+	startedAt = time.Now()
 	paymentMethodConfiguration, err := client.V1PaymentMethodConfigurations.Retrieve(ctx, input.PaymentMethodConfigurationID, nil)
+	a.observe(err, startedAt)
 	if err != nil {
 		return paymentports.PreparedStripeConfiguration{}, mapStripeError("读取 Stripe Payment Method Configuration", err)
 	}
@@ -50,11 +78,11 @@ func (a *Adapter) PrepareConfiguration(ctx context.Context, input paymentports.P
 		paymentMethodConfiguration.Livemode != (input.Mode == paymentports.StripeModeLive) || !paymentMethodConfiguration.Active {
 		return paymentports.PreparedStripeConfiguration{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, "Stripe Payment Method Configuration 无效或未启用", nil)
 	}
-	product, err := ensureProduct(ctx, client, input, account.ID)
+	product, err := a.ensureProduct(ctx, client, input, account.ID)
 	if err != nil {
 		return paymentports.PreparedStripeConfiguration{}, err
 	}
-	endpoint, secret, err := ensureWebhookEndpoint(ctx, client, input, account.ID)
+	endpoint, secret, err := a.ensureWebhookEndpoint(ctx, client, input, account.ID)
 	if err != nil {
 		return paymentports.PreparedStripeConfiguration{}, err
 	}
@@ -65,28 +93,34 @@ func (a *Adapter) PrepareConfiguration(ctx context.Context, input paymentports.P
 	}, nil
 }
 
-func ensureProduct(ctx context.Context, client *stripe.Client, input paymentports.PrepareStripeConfiguration, accountID string) (*stripe.Product, error) {
+func (a *Adapter) ensureProduct(ctx context.Context, client *stripe.Client, input paymentports.PrepareStripeConfiguration, accountID string) (*stripe.Product, error) {
 	if input.ExistingAccountID == accountID && strings.TrimSpace(input.ExistingProductID) != "" {
+		startedAt := time.Now()
 		product, err := client.V1Products.Retrieve(ctx, input.ExistingProductID, nil)
+		a.observe(err, startedAt)
 		if err == nil && productMatchesMode(product, input.Mode) {
-			return updateProduct(ctx, client, product.ID, input.ProductTaxCode)
+			return a.updateProduct(ctx, client, product.ID, input.ProductTaxCode)
 		}
 		if err != nil && !isStripeNotFound(err) {
 			return nil, mapStripeError("读取 Stripe Product", err)
 		}
 	}
 
+	listStartedAt := time.Now()
 	list := client.V1Products.List(ctx, &stripe.ProductListParams{
 		ListParams: stripe.ListParams{Limit: stripe.Int64(100), Single: true}, Active: stripe.Bool(true),
 	})
 	for _, product := range list.Data() {
 		if product != nil && product.Metadata[productResourceKey] == productResourceValue && productMatchesMode(product, input.Mode) {
-			return updateProduct(ctx, client, product.ID, input.ProductTaxCode)
+			a.observe(list.Err(), listStartedAt)
+			return a.updateProduct(ctx, client, product.ID, input.ProductTaxCode)
 		}
 	}
 	if err := list.Err(); err != nil {
+		a.observe(err, listStartedAt)
 		return nil, mapStripeError("查找 Stripe Product", err)
 	}
+	a.observe(nil, listStartedAt)
 
 	params := &stripe.ProductCreateParams{
 		Name: stripe.String("Idea"), Description: stripe.String("IdeaBoard Idea purchase"),
@@ -94,7 +128,9 @@ func ensureProduct(ctx context.Context, client *stripe.Client, input paymentport
 		Metadata: map[string]string{productResourceKey: productResourceValue},
 	}
 	params.SetIdempotencyKey("ideaboard-product-" + accountID)
+	createStartedAt := time.Now()
 	product, err := client.V1Products.Create(ctx, params)
+	a.observe(err, createStartedAt)
 	if err != nil {
 		return nil, mapStripeError("创建 Stripe Product", err)
 	}
@@ -104,12 +140,14 @@ func ensureProduct(ctx context.Context, client *stripe.Client, input paymentport
 	return product, nil
 }
 
-func updateProduct(ctx context.Context, client *stripe.Client, productID, taxCode string) (*stripe.Product, error) {
+func (a *Adapter) updateProduct(ctx context.Context, client *stripe.Client, productID, taxCode string) (*stripe.Product, error) {
+	startedAt := time.Now()
 	product, err := client.V1Products.Update(ctx, productID, &stripe.ProductUpdateParams{
 		Name: stripe.String("Idea"), Description: stripe.String("IdeaBoard Idea purchase"),
 		TaxCode: stripe.String(taxCode), Active: stripe.Bool(true), UnitLabel: stripe.String("Idea"),
 		Metadata: map[string]string{productResourceKey: productResourceValue},
 	})
+	a.observe(err, startedAt)
 	if err != nil {
 		return nil, mapStripeError("更新 Stripe Product", err)
 	}
@@ -119,11 +157,13 @@ func updateProduct(ctx context.Context, client *stripe.Client, productID, taxCod
 	return product, nil
 }
 
-func ensureWebhookEndpoint(ctx context.Context, client *stripe.Client, input paymentports.PrepareStripeConfiguration, accountID string) (*stripe.WebhookEndpoint, string, error) {
+func (a *Adapter) ensureWebhookEndpoint(ctx context.Context, client *stripe.Client, input paymentports.PrepareStripeConfiguration, accountID string) (*stripe.WebhookEndpoint, string, error) {
 	if input.ExistingAccountID == accountID && strings.TrimSpace(input.ExistingWebhookEndpointID) != "" && strings.TrimSpace(input.ExistingWebhookSecret) != "" {
+		startedAt := time.Now()
 		endpoint, err := client.V1WebhookEndpoints.Retrieve(ctx, input.ExistingWebhookEndpointID, nil)
+		a.observe(err, startedAt)
 		if err == nil && endpoint != nil && endpoint.APIVersion == stripe.APIVersion && endpointMatchesMode(endpoint, input.Mode) {
-			updated, updateErr := updateWebhookEndpoint(ctx, client, endpoint.ID, input.WebhookURL)
+			updated, updateErr := a.updateWebhookEndpoint(ctx, client, endpoint.ID, input.WebhookURL)
 			if updateErr != nil {
 				return nil, "", updateErr
 			}
@@ -140,7 +180,9 @@ func ensureWebhookEndpoint(ctx context.Context, client *stripe.Client, input pay
 		Metadata: map[string]string{productResourceKey: "payment_webhook"},
 	}
 	params.SetIdempotencyKey(webhookIdempotencyKey(accountID, input.WebhookURL))
+	createStartedAt := time.Now()
 	endpoint, err := client.V1WebhookEndpoints.Create(ctx, params)
+	a.observe(err, createStartedAt)
 	if err != nil {
 		return nil, "", mapStripeError("创建 Stripe Webhook Endpoint", err)
 	}
@@ -150,12 +192,14 @@ func ensureWebhookEndpoint(ctx context.Context, client *stripe.Client, input pay
 	return endpoint, endpoint.Secret, nil
 }
 
-func updateWebhookEndpoint(ctx context.Context, client *stripe.Client, endpointID, webhookURL string) (*stripe.WebhookEndpoint, error) {
+func (a *Adapter) updateWebhookEndpoint(ctx context.Context, client *stripe.Client, endpointID, webhookURL string) (*stripe.WebhookEndpoint, error) {
+	startedAt := time.Now()
 	endpoint, err := client.V1WebhookEndpoints.Update(ctx, endpointID, &stripe.WebhookEndpointUpdateParams{
 		URL: stripe.String(webhookURL), Description: stripe.String("IdeaBoard payment events"),
 		Disabled: stripe.Bool(false), EnabledEvents: stringPointers(paymentports.SupportedStripeWebhookEventTypes()),
 		Metadata: map[string]string{productResourceKey: "payment_webhook"},
 	})
+	a.observe(err, startedAt)
 	if err != nil {
 		return nil, mapStripeError("更新 Stripe Webhook Endpoint", err)
 	}

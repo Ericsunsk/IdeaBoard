@@ -35,7 +35,9 @@ func (a *Adapter) CreateCustomer(ctx context.Context, input paymentports.CreateC
 		Metadata:    map[string]string{"ideaboard_user_id": strconv.FormatInt(input.UserID, 10)},
 	}
 	params.SetIdempotencyKey(input.IdempotencyKey)
+	startedAt := time.Now()
 	customer, err := client.V1Customers.Create(ctx, params)
+	a.observe(err, startedAt)
 	if err != nil {
 		return paymentports.CheckoutCustomer{}, mapStripeCreateError("创建 Stripe Customer", err)
 	}
@@ -79,7 +81,9 @@ func (a *Adapter) CreateCheckoutSession(ctx context.Context, input paymentports.
 		}},
 	}
 	params.SetIdempotencyKey(input.IdempotencyKey)
+	startedAt := time.Now()
 	session, err := client.V1CheckoutSessions.Create(ctx, params)
+	a.observe(err, startedAt)
 	if err != nil {
 		return paymentports.CheckoutSession{}, mapStripeCreateError("创建 Stripe Checkout Session", err)
 	}
@@ -91,7 +95,7 @@ func (a *Adapter) RetrieveCheckoutSession(ctx context.Context, input paymentport
 	if err != nil {
 		return paymentports.CheckoutSession{}, err
 	}
-	session, err := retrieveCheckoutSession(ctx, client, input.SessionID)
+	session, err := a.retrieveCheckoutSession(ctx, client, input.SessionID)
 	if err != nil {
 		return paymentports.CheckoutSession{}, mapStripeError("读取 Stripe Checkout Session", err)
 	}
@@ -103,15 +107,17 @@ func (a *Adapter) ExpireCheckoutSession(ctx context.Context, input paymentports.
 	if err != nil {
 		return paymentports.ExpireCheckoutSessionResult{}, err
 	}
+	expireStartedAt := time.Now()
 	session, err := client.V1CheckoutSessions.Expire(ctx, input.SessionID, &stripe.CheckoutSessionExpireParams{
 		Expand: []*string{stripe.String("payment_intent.latest_charge")},
 	})
+	a.observe(err, expireStartedAt)
 	if err != nil {
 		expireErr := mapStripeError("关闭 Stripe Checkout Session", err)
 		// A payment can complete between the local decision and Stripe's Expire
 		// call. Resolve that provider race from a fresh canonical Session without
 		// allowing a secondary read failure to hide the original operation error.
-		session, err = retrieveCheckoutSession(ctx, client, input.SessionID)
+		session, err = a.retrieveCheckoutSession(ctx, client, input.SessionID)
 		if err != nil {
 			return paymentports.ExpireCheckoutSessionResult{}, expireErr
 		}
@@ -119,10 +125,13 @@ func (a *Adapter) ExpireCheckoutSession(ctx context.Context, input paymentports.
 	return expireCheckoutSessionResult(session)
 }
 
-func retrieveCheckoutSession(ctx context.Context, client *stripe.Client, sessionID string) (*stripe.CheckoutSession, error) {
-	return client.V1CheckoutSessions.Retrieve(ctx, sessionID, &stripe.CheckoutSessionRetrieveParams{
+func (a *Adapter) retrieveCheckoutSession(ctx context.Context, client *stripe.Client, sessionID string) (*stripe.CheckoutSession, error) {
+	startedAt := time.Now()
+	session, err := client.V1CheckoutSessions.Retrieve(ctx, sessionID, &stripe.CheckoutSessionRetrieveParams{
 		Expand: []*string{stripe.String("payment_intent.latest_charge")},
 	})
+	a.observe(err, startedAt)
+	return session, err
 }
 
 func expireCheckoutSessionResult(session *stripe.CheckoutSession) (paymentports.ExpireCheckoutSessionResult, error) {

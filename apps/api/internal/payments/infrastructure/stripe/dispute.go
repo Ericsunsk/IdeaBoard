@@ -21,7 +21,9 @@ func (a *Adapter) RetrieveDispute(ctx context.Context, apiKey, disputeID string)
 	if err != nil {
 		return paymentports.StripeDispute{}, err
 	}
+	startedAt := time.Now()
 	dispute, err := client.V1Disputes.Retrieve(ctx, disputeID, nil)
+	a.observe(err, startedAt)
 	if err != nil {
 		return paymentports.StripeDispute{}, mapStripeError("读取 Stripe Dispute", err)
 	}

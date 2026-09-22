@@ -3,6 +3,7 @@ package stripe
 import (
 	"context"
 	"strings"
+	"time"
 
 	paymentports "ideaboard/api/internal/payments/ports"
 
@@ -21,7 +22,9 @@ func (a *Adapter) CreateRefund(ctx context.Context, input paymentports.CreateStr
 	}
 	params := &stripe.RefundCreateParams{Charge: stripe.String(input.ChargeID), Amount: stripe.Int64(input.AmountMinor), Currency: stripe.String(input.Currency)}
 	params.SetIdempotencyKey(input.IdempotencyKey)
+	startedAt := time.Now()
 	refund, err := client.V1Refunds.Create(ctx, params)
+	a.observe(err, startedAt)
 	if err != nil {
 		return paymentports.StripeRefund{}, mapStripeError("创建 Stripe Refund", err)
 	}
@@ -36,7 +39,9 @@ func (a *Adapter) RetrieveRefund(ctx context.Context, apiKey, refundID string) (
 	if err != nil {
 		return paymentports.StripeRefund{}, err
 	}
+	startedAt := time.Now()
 	refund, err := client.V1Refunds.Retrieve(ctx, refundID, nil)
+	a.observe(err, startedAt)
 	if err != nil {
 		return paymentports.StripeRefund{}, mapStripeError("读取 Stripe Refund", err)
 	}
