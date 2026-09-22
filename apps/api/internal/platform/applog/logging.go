@@ -16,10 +16,15 @@ func Configure(appEnv string) {
 }
 
 func newHandler(w io.Writer, appEnv string, opts *slog.HandlerOptions) slog.Handler {
+	var inner slog.Handler
 	if isProductionEnv(appEnv) {
-		return slog.NewJSONHandler(w, opts)
+		inner = slog.NewJSONHandler(w, opts)
+	} else {
+		inner = slog.NewTextHandler(w, opts)
 	}
-	return slog.NewTextHandler(w, opts)
+	// PII redaction covers every environment: development logs are the most
+	// likely to be pasted into issues and chat.
+	return NewRedactingHandler(inner)
 }
 
 func isProductionEnv(env string) bool {

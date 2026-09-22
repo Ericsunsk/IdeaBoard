@@ -72,6 +72,18 @@ func SuccessDTO[T any](c *gin.Context, data T) {
 	})
 }
 
+// AcceptedDTO renders the shared envelope with 202 for async-accepted work
+// (e.g. pending settlement). Handlers must use it instead of raw c.JSON so
+// the trust boundary (safe Msg, request correlation, MessageSafe) holds.
+func AcceptedDTO[T any](c *gin.Context, data T) {
+	c.JSON(http.StatusAccepted, Response{
+		Code:      0,
+		Msg:       "accepted",
+		RequestID: requestIDOf(c),
+		Data:      data,
+	})
+}
+
 func InternalError(c *gin.Context, httpStatus int, publicMsg string, err error) {
 	attrs := []any{"message", publicMsg, "status", httpStatus, "request_id", requestIDOf(c)}
 	if c != nil && c.Request != nil {

@@ -61,3 +61,18 @@ func TestMachineErrorEchoesRequestID(t *testing.T) {
 		t.Fatalf("envelope = %v, want machine code with request_id", payload)
 	}
 }
+
+func TestAcceptedDTOEchoesRequestIDAndPreservesSuccessEnvelope(t *testing.T) {
+	c, recorder := newRequestIDTestContext("req-accepted")
+	AcceptedDTO(c, struct {
+		Status string `json:"status"`
+	}{Status: "pending"})
+	payload := decodeEnvelope(t, recorder.Body.Bytes())
+	if recorder.Code != http.StatusAccepted || payload["request_id"] != "req-accepted" || payload["code"] != float64(0) || payload["msg"] != "accepted" {
+		t.Fatalf("accepted response = %d %v", recorder.Code, payload)
+	}
+	data, ok := payload["data"].(map[string]any)
+	if !ok || data["status"] != "pending" {
+		t.Fatalf("accepted response lost payload: %v", payload)
+	}
+}
