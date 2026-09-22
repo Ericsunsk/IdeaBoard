@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -67,7 +68,7 @@ func (h *AdminHandler) UpdateRegistrationSetting(c *gin.Context) {
 	}
 	var req settings.RegistrationSetting
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
+		writeIdentityRequestInvalid(c, "参数错误")
 		return
 	}
 
@@ -100,7 +101,7 @@ func (h *AdminHandler) UpdateRateLimitSettings(c *gin.Context) {
 	}
 	var req settings.RateLimitSetting
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
+		writeIdentityRequestInvalid(c, "参数错误")
 		return
 	}
 
@@ -133,7 +134,7 @@ func (h *AdminHandler) UpdateMediaUploadSettings(c *gin.Context) {
 	}
 	var req settings.MediaUploadSetting
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
+		writeIdentityRequestInvalid(c, "参数错误")
 		return
 	}
 
@@ -165,7 +166,7 @@ func (h *AdminHandler) UpdateBrandingSettings(c *gin.Context) {
 	}
 	var req settings.BrandingSetting
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
+		writeIdentityRequestInvalid(c, "参数错误")
 		return
 	}
 
@@ -199,11 +200,11 @@ func (h *AdminHandler) UpdateOutboundPolicy(c *gin.Context) {
 	}
 	var req updateOutboundPolicyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误，allow_hosts 为必填")
+		writeIdentityRequestInvalid(c, "参数错误，allow_hosts 为必填")
 		return
 	}
 	if req.AllowHosts == nil {
-		response.Error(c, 400, "allow_hosts 不能为空")
+		writeIdentityRequestInvalid(c, "allow_hosts 不能为空")
 		return
 	}
 	updated, err := runtimeSettings.UpdateOutboundPolicy(c.Request.Context(), settings.OutboundPolicySetting{
@@ -218,14 +219,14 @@ func (h *AdminHandler) UpdateOutboundPolicy(c *gin.Context) {
 func (h *AdminHandler) ListUsers(c *gin.Context) {
 	var req ports.UserListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		response.Error(c, 400, "参数错误")
+		writeIdentityRequestInvalid(c, "参数错误")
 		return
 	}
 
 	result, err := h.userService.ListUsers(c.Request.Context(), &req)
 	if err != nil {
 		if validation.Is(err) {
-			response.Error(c, 400, err.Error())
+			writeIdentityRequestInvalid(c, identityValidationMessage(err, "参数错误"))
 			return
 		}
 		response.InternalError(c, 500, "获取用户列表失败", err)
@@ -253,7 +254,7 @@ func (h *AdminHandler) UpdateUserRole(c *gin.Context) {
 		Role string `json:"role" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
+		writeIdentityRequestInvalid(c, "参数错误")
 		return
 	}
 
@@ -281,11 +282,11 @@ func (h *AdminHandler) BanUser(c *gin.Context) {
 
 	var req ports.AdminBanUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
+		writeIdentityRequestInvalid(c, "参数错误")
 		return
 	}
 	if req.ExpiresInDays < 0 {
-		response.Error(c, 400, "expires_in_days 不能小于 0")
+		writeIdentityRequestInvalid(c, "expires_in_days 不能小于 0")
 		return
 	}
 
@@ -376,34 +377,35 @@ func (h *AdminHandler) ImpersonateUser(c *gin.Context) {
 		return
 	}
 	if h == nil || h.userService == nil || h.impersonator == nil {
-		response.InternalError(c, http.StatusInternalServerError, "伪装登录服务未配置", errors.New("admin user impersonation dependencies not configured"))
+		slog.Error("admin impersonation dependencies not configured")
+		response.MachineError(c, http.StatusInternalServerError, codeIdentityOperationFailed, "伪装登录服务未配置")
 		return
 	}
 
 	target, err := h.userService.GetByPublicID(c.Request.Context(), publicID)
 	if err != nil {
 		if database.IsNotFound(err) {
-			response.Error(c, 404, "用户不存在")
+			response.MachineError(c, http.StatusNotFound, codeIdentityUserNotFound, "用户不存在")
 			return
 		}
 		response.InternalError(c, 500, "读取用户失败", err)
 		return
 	}
 	if target == nil || target.ID <= 0 {
-		response.Error(c, 404, "用户不存在")
+		response.MachineError(c, http.StatusNotFound, codeIdentityUserNotFound, "用户不存在")
 		return
 	}
 	if actor.UserID() == target.ID {
-		response.Error(c, 400, "不能模拟当前登录管理员自己")
+		writeIdentityRequestInvalid(c, "不能模拟当前登录管理员自己")
 		return
 	}
 	if strings.ToLower(strings.TrimSpace(target.Role)) == domain.RoleAdmin {
-		response.Error(c, 400, "不能模拟管理员账号")
+		writeIdentityRequestInvalid(c, "不能模拟管理员账号")
 		return
 	}
 	authUserID := strings.TrimSpace(derefString(target.AuthUserID))
 	if authUserID == "" {
-		response.Error(c, 400, "目标用户缺少 auth_user_id，无法模拟登录")
+		writeIdentityRequestInvalid(c, "目标用户缺少 auth_user_id，无法模拟登录")
 		return
 	}
 
@@ -423,7 +425,7 @@ func (h *AdminHandler) ImpersonateUser(c *gin.Context) {
 func getTargetUserPublicIDParam(c *gin.Context) (string, bool) {
 	publicID, err := uuid.Parse(strings.TrimSpace(c.Param("public_id")))
 	if err != nil {
-		response.Error(c, 400, "无效的用户 public_id")
+		response.MachineError(c, http.StatusBadRequest, codeIdentityUserPublicIDInvalid, "无效的用户 public_id")
 		return "", false
 	}
 	return publicID.String(), true
@@ -436,46 +438,30 @@ type impersonationStatusError interface {
 
 func respondAdminUserImpersonationError(c *gin.Context, err error) {
 	var statusErr impersonationStatusError
-	if !errors.As(err, &statusErr) {
-		response.InternalError(c, http.StatusBadGateway, "认证服务伪装登录失败", err)
+	if err == nil || !errors.As(err, &statusErr) {
+		slog.Error("admin impersonation upstream failure", "err", err)
+		response.MachineError(c, http.StatusBadGateway, codeIdentityUpstreamUnavailable, "认证服务伪装登录失败")
 		return
 	}
 
 	switch statusErr.StatusCode() {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		response.Error(c, statusErr.StatusCode(), "认证服务拒绝伪装登录")
+		response.MachineError(c, statusErr.StatusCode(), codeIdentityUpstreamRejected, "认证服务拒绝伪装登录")
 	case http.StatusBadRequest, http.StatusNotFound:
-		response.Error(c, http.StatusBadRequest, "目标用户无法进行伪装登录")
+		response.MachineError(c, http.StatusBadRequest, codeIdentityRequestInvalid, "目标用户无法进行伪装登录")
 	default:
-		response.InternalError(c, http.StatusBadGateway, "认证服务伪装登录失败", err)
+		slog.Error("admin impersonation upstream failure", "status", statusErr.StatusCode(), "err", err)
+		response.MachineError(c, http.StatusBadGateway, codeIdentityUpstreamUnavailable, "认证服务伪装登录失败")
 	}
 }
 
 func RespondIdentityAdminCommandError(c *gin.Context, err error) {
-	var commandErr *ports.IdentityAdminCommandError
-	if !errors.As(err, &commandErr) {
-		response.InternalError(c, 500, "管理员操作失败", err)
-		return
-	}
-	switch commandErr.Kind {
-	case ports.IdentityAdminInvalid, ports.IdentityAdminTargetNotFound, ports.IdentityAdminAuthIdentityNotFound:
-		response.Error(c, 400, commandErr.Message)
-	case ports.IdentityAdminConflict:
-		response.Error(c, 409, commandErr.Message)
-	case ports.IdentityAdminForbidden:
-		response.Error(c, 403, commandErr.Message)
-	case ports.IdentityAdminAuthFailure:
-		response.InternalError(c, 502, commandErr.Message, commandErr)
-	case ports.IdentityAdminBusinessFailure, ports.IdentityAdminReconciliationRequired, ports.IdentityAdminUnavailable:
-		response.InternalError(c, 500, commandErr.Message, commandErr)
-	default:
-		response.InternalError(c, 500, "管理员操作失败", commandErr)
-	}
+	respondIdentityAdminCommandError(c, err)
 }
 
 func (h *AdminHandler) requireRuntimeSettings(c *gin.Context) (*settings.RuntimeSettingsService, bool) {
 	if h == nil || h.runtimeSettings == nil {
-		response.Error(c, 503, "系统设置服务未配置")
+		response.MachineError(c, http.StatusServiceUnavailable, codeIdentityServiceUnavailable, "系统设置服务未配置")
 		return nil, false
 	}
 	return h.runtimeSettings, true
@@ -483,7 +469,8 @@ func (h *AdminHandler) requireRuntimeSettings(c *gin.Context) (*settings.Runtime
 
 func (h *AdminHandler) requireIdentityAdminCommands(c *gin.Context) (ports.IdentityAdminCommands, bool) {
 	if h == nil || h.identityCommands == nil {
-		response.InternalError(c, http.StatusInternalServerError, "身份管理命令未配置", errors.New("identity admin commands not configured"))
+		slog.Error("identity admin commands not configured")
+		response.MachineError(c, http.StatusInternalServerError, codeIdentityOperationFailed, "身份管理命令未配置")
 		return nil, false
 	}
 	return h.identityCommands, true
@@ -502,7 +489,7 @@ func (h *AdminHandler) respondRuntimeSettingsWriteError(c *gin.Context, err erro
 		return false
 	}
 	if validation.Is(err) {
-		response.Error(c, 400, err.Error())
+		writeIdentityRequestInvalid(c, identityValidationMessage(err, "参数错误"))
 		return true
 	}
 	response.InternalError(c, 500, "保存设置失败", err)
