@@ -369,3 +369,16 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - 提交：`75bbc00b fix(search): remove obsolete image failure reporting`。
 - `apps/web/src/features/search/CONTEXT.md` 原有大范围重写中仍残留 “failure reporting” 描述；已修正工作区文案，但未将整份用户 dirty 文档并入本代码 commit，待 Search docs 批次单独审计。
 - `apps/api/openapi.yaml`、backend metrics handler 删除和 generated client 变更混在大型 Searchcatalog/API migration 中，本批未强行拆入；后续需验证其完整 schema/codegen 闭包。
+
+## 第四批补充：Input focus-state primitive（4U）
+
+本子批审计并提交 shared `Input` primitive 的 focus visual contract：移除默认 shadow，keyboard focus 从额外 ring 收敛为 semantic border color；invalid 状态使用 destructive focus border。MCP blast-radius 扫描确认该 variant 只经 `Input.vue` 暴露，消费者无需迁移。测试新增 invalid focus class 断言，并确认 `tailwind-merge` 会用 destructive focus 覆盖 base ring color。
+
+### Verification and boundary
+
+- 当前 workspace：`npm run test:run -- src/components/ui/primitives.unit.spec.ts`，`6 tests` 通过。
+- clean `HEAD + 本批 2 个文件` snapshot：同一 focused test，`6 tests` 通过。
+- `npm run build` 通过（`vue-tsc`、Vite、bundle size check）。
+- `git diff --check` 通过。
+- 提交：`8ccf0310 fix(ui): use border focus state for inputs`。
+- 本批只处理 shared Input primitive；未修改各 feature 表单布局或 Admin model catalog 的其他 dirty UI。
