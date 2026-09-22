@@ -17,6 +17,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type idempotencyMachineErrorResponse struct {
+	Code string `json:"code"`
+}
+
 // performRewardWriteWithKey mirrors performRewardRequestWithRecorder and
 // attaches an Idempotency-Key header for POST write contract coverage.
 func performRewardWriteWithKey[T any](
@@ -50,7 +54,7 @@ func performRewardWriteWithKey[T any](
 		t.Fatalf("%s %s status = %d, want %d; body=%s", method, path, recorder.Code, wantStatus, recorder.Body.String())
 	}
 	if wantStatus < 200 || wantStatus >= 300 {
-		var machine rewardMachineErrorResponse
+		var machine idempotencyMachineErrorResponse
 		if err := json.Unmarshal(recorder.Body.Bytes(), &machine); err != nil {
 			t.Fatalf("decode %s %s machine error: %v; body=%s", method, path, err, recorder.Body.String())
 		}
@@ -72,7 +76,7 @@ func assertRewardMachineCode(t *testing.T, recorder *httptest.ResponseRecorder, 
 	if recorder.Code != wantStatus {
 		t.Fatalf("status = %d, want %d; body=%s", recorder.Code, wantStatus, recorder.Body.String())
 	}
-	var machine rewardMachineErrorResponse
+	var machine idempotencyMachineErrorResponse
 	if err := json.Unmarshal(recorder.Body.Bytes(), &machine); err != nil {
 		t.Fatalf("decode machine error: %v; body=%s", err, recorder.Body.String())
 	}
