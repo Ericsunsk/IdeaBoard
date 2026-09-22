@@ -191,3 +191,15 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - Clean archive（当前 HEAD 的 API）中 Rewards HTTP package/tests `go test -count=1` 与 `go vet` 通过。
 - 提交：`d2d4c0ad fix(rewards): restore redemption observability`。
 - 本批只恢复 HTTP redemption metrics；跨实例 metrics aggregation、durable idempotency fact 及 Rewards database transaction 仍不在此批范围内。
+
+## 第四批补充：Identity internal HTTP error seam（4E）
+
+本子批把 Identity internal login-metadata endpoint 及可复用的 Admin command error mapping 接到 shared `errorrender`：wire response 使用稳定 machine code，内部错误保留 server-side logging，避免 provider/Auth/database detail 进入响应。`constantTimeHeaderEquals` 的鉴权行为保持不变；新增测试覆盖 missing/wrong key、valid update 和 invalid body。
+
+### Verification and boundary
+
+- `cd apps/api && go test ./internal/identity/users/interfaces/http -count=1 -race` 通过。
+- `cd apps/api && go vet ./internal/identity/users/interfaces/http` 通过。
+- Clean archive（仅替换本子批 3 个文件）中同 package test/vet 通过。
+- 提交：`cfebb45a fix(identity): stabilize internal HTTP error envelopes`。
+- 当前 dirty 的 Identity Admin handler 尚未纳入本提交；它引用了同一 error seam，但与其他 user/admin lifecycle 改动耦合，后续需在完整闭包中验证。
