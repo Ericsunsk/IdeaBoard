@@ -356,3 +356,16 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - clean archive（仅加入 Searchcatalog ports）中 `go test ./internal/searchcatalog/ports -count=1` 与 `go vet` 通过。
 - 提交：`ec7a544b feat(search): define gateway and provider ports`。
 - Application/infrastructure/composition wiring 尚未提交，需在后续完整闭包验证。
+
+## 第四批补充：Search frontend image-failure reporting removal（4T）
+
+本子批审计并提交 Search frontend 对旧 image-failure telemetry 的移除：`createSearchFeed` 不再暴露或调用 `reportImageFailure`，`resource.ts` 不再依赖旧 generated mutation；image failure/retry 状态继续由 feed 本地维护。该删除与 Phase 3 Vision Search spec 一致：该阶段只要求有效 Vision 提交的 `vision_search_requests_total`，image-failure reporting 属于 deferred observability。MCP `codegraph_explore` 与全仓符号扫描确认旧 endpoint、handler、metric 和 generated caller 无残余运行时引用。
+
+### Verification and boundary
+
+- 当前 workspace Search tests：`npm run test:run -- src/features/search`，`12 files / 56 tests` 通过。
+- clean `HEAD + 本批 3 个代码文件` snapshot：`feed.unit.spec.ts`，`9 tests` 通过。
+- `git diff --check` 通过；Standards reviewer 未发现 documented-standard 违反或 Fowler smell，Spec reviewer 未发现缺失要求、scope creep 或实现错误。
+- 提交：`75bbc00b fix(search): remove obsolete image failure reporting`。
+- `apps/web/src/features/search/CONTEXT.md` 原有大范围重写中仍残留 “failure reporting” 描述；已修正工作区文案，但未将整份用户 dirty 文档并入本代码 commit，待 Search docs 批次单独审计。
+- `apps/api/openapi.yaml`、backend metrics handler 删除和 generated client 变更混在大型 Searchcatalog/API migration 中，本批未强行拆入；后续需验证其完整 schema/codegen 闭包。
