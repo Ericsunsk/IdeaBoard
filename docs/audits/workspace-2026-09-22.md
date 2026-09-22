@@ -165,3 +165,17 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - 提交：`c2daf1c8`、`295d57de`、`9413b36e`。
 - Replay 仍是单进程 cache；跨实例/重启的 Reward key→request durable fact 尚未建立，后续必须与 Rewards schema/service transaction 一起审计，不能把本批视作分布式幂等完成。
 - 工作区原有 `rewards/interfaces/http/metrics.go` 删除仍未纳入本批；这是独立的 observability 回归，需单独决定恢复或替代实现。
+
+## 第四批补充：Media Storage presign provider boundary（4C）
+
+本子批修复 `StorageService.Presign` 的 provider boundary：Local profile 不支持 provider hand-off，应在 integrity re-read 前立即拒绝。此前实现会先执行一次无意义的 object I/O；当 Local object 不存在或 integrity facts 不匹配时，调用方可能收到误导性的 storage/integrity error，而不是稳定的 unsupported-provider contract。
+
+同时补充 storage profile ID 的 resolve error context，便于定位多 profile 配置问题。现有 `TestPresignRejectsLocalProfileForProviderHandOff` 已覆盖该顺序契约，无需扩大测试 fixture。
+
+### Verification and boundary
+
+- `cd apps/api && go test ./internal/media/storage/tests -run TestPresign -count=1` 通过。
+- `cd apps/api && go vet ./internal/media/storage/application/runtime` 通过。
+- Clean archive（仅替换 `presign.go`）中 `go test ./internal/media/storage/application/runtime -count=1` 与 `go vet ./internal/media/storage/application/runtime` 通过。
+- 提交：`6669d6ee fix(media): reject local presign before integrity lookup`。
+- 本批未触碰当前 dirty 的 media pgx migration/test fixtures；跨 profile persistence、driver capability 和 presign URL security 仍需后续批次单独审计。
