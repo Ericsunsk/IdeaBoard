@@ -453,6 +453,17 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - Library repository/service 同样依赖 PGX/sqlc caller migration，无法从 HEAD 单独 clean-build；不与 Searchcatalog/Billing 混成伪小 commit。
 - residual：Library handler 的 nil service 组合错误仍会在请求路径触发 panic；这是既有 handler-wide dependency guard 缺口，不在本次 pagination contract 中扩大修复范围，后续可与统一 HTTP fail-closed 批次合并。
 
+## 第四批补充：Board idempotency audit（5B，暂不提交代码）
+
+本子批审计 Board invite/member 与 share-token POST idempotency。MCP graph 追踪确认：成员邀请使用 `(scope, user, key, request hash)` bounded replay store；share-token 创建使用 PostgreSQL advisory lock、`(created_by, idempotency_key)` partial unique index、request hash conflict 检查，并对 bearer token 做 encrypted-at-rest replay secret。生成 share token 的随机碰撞检查发生在持久化前，但不改变 idempotency correctness。
+
+### Verification and boundary
+
+- `cd apps/api && go test ./internal/boards -run 'Idempot|ShareToken|BoardError' -count=1 -race` 通过。
+- `go vet ./internal/boards` 通过。
+- 未发现新的 P1/P2；错误 code machine envelope 与 idempotency conflict/required contract 一致。
+- Board repository 依赖同一 PGX/sqlc/schema migration closure，clean HEAD 无法独立构建；本子批不单独提交代码。
+
 ## 第四批补充：AI Gateway admin response/probe security hardening（4W，待 backend closure）
 
 MCP Codegraph 与 security review 识别并修复两项明确问题：Admin brand-logo response 的 cache policy 从 `public` 改为 `private`，避免共享 proxy/CDN 缓存绕过后续权限检查；`ProbeGatewayConnection` 拒绝 URL userinfo、query 与 fragment，避免敏感信息进入 URL/日志并保持 probe target 由受控 path 构造。补充 handler header 与 URL validation regression tests，并清理同一位置的重复注释。Logo cache 无界增长与 observed SQL 高基数属于低风险残余项，按“不过度 defense / design”暂不扩展。
