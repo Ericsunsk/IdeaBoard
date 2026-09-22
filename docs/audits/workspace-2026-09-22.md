@@ -260,3 +260,14 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - 同 package `go vet` 通过。
 - 提交：`cf5282b3 fix(media): stabilize storage HTTP errors`。
 - 本批未覆盖 storage repository、profile migration 和 upload/download handlers 的其他 dirty changes。
+
+## 第四批补充：Payments wrapped-error response boundary（4K）
+
+本子批修复 Payments HTTP `paymentErrorMapping` 的 response leak：缺少显式 safe message 的 mapping 不再回显 `err.Error()`，统一使用固定 fallback，并通过 shared `errorrender` 记录 server-side detail。测试覆盖 errors.Join/wrapped provider payload、Stripe/checkout/webhook mappings，以及 empty-message fallback，确保 secrets 不进入 wire envelope。
+
+### Verification and boundary
+
+- clean archive（仅替换 Payments `errors.go`/`errors_test.go`）中 `go test ./internal/payments/interfaces/http -count=1 -race` 通过。
+- 同 package `go vet` 通过。
+- 提交：`82b3d0e8 fix(payments): prevent wrapped error detail leaks`。
+- Admin order pagination mapping、recharge history pagination 和 handler migration 仍未纳入；它们依赖当前 dirty application/readmodel closure，后续单独审计。
