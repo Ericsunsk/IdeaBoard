@@ -39,7 +39,6 @@ function dependencies(overrides: Partial<SearchFeedDependencies> = {}): SearchFe
     lookupSavedKeys: vi.fn(async () => new Set<string>()),
     persistence: persistence(),
     restoreScroll: vi.fn(),
-    reportImageFailure: vi.fn(),
     ...overrides,
   }
 }
@@ -273,5 +272,19 @@ describe('createSearchFeed interface', () => {
     await feed.load(true)
 
     expect(lookupSavedKeys).not.toHaveBeenCalled()
+  })
+
+  it('keeps image failure and retry state local to the feed', () => {
+    const feed = createFeed(dependencies())
+
+    feed.markImageError('image-1')
+    feed.markImageError('image-1')
+
+    expect(feed.failedImages.value).toEqual(new Set(['image-1']))
+
+    feed.retryImage('image-1')
+
+    expect(feed.failedImages.value).toEqual(new Set())
+    expect(feed.imageRetryCount('image-1')).toBe(1)
   })
 })

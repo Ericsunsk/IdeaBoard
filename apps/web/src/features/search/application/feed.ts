@@ -4,7 +4,6 @@ import { libraryAssetKey, lookupSavedAssetKeys } from '../../library'
 import { type SearchResult } from '../domain/models'
 import {
   generateRandomInspirationCursor,
-  reportSearchImageFailure,
   searchInspiration,
 } from '../infrastructure/resource'
 import { createBrowserSearchFeedPersistence } from '../infrastructure/feedPersistence'
@@ -16,7 +15,6 @@ export type SearchFeedDependencies = {
   lookupSavedKeys: typeof lookupSavedAssetKeys
   persistence: SearchFeedPersistence
   restoreScroll: (scrollY: number) => void
-  reportImageFailure: typeof reportSearchImageFailure
 }
 
 const defaults: SearchFeedDependencies = {
@@ -27,7 +25,6 @@ const defaults: SearchFeedDependencies = {
   restoreScroll(scrollY) {
     window.scrollTo({ top: scrollY, behavior: 'instant' })
   },
-  reportImageFailure: reportSearchImageFailure,
 }
 
 type SearchFeedOptions = {
@@ -285,8 +282,6 @@ export function createSearchFeed(
   function markImageError(id: string): void {
     if (failedImages.value.has(id)) return
     failedImages.value = new Set(failedImages.value).add(id)
-    const result = results.value.find((item) => item.id === id)
-    if (result && isAuthenticated()) void dependencies.reportImageFailure(result.provider)
   }
 
   function retryImage(id: string): void {

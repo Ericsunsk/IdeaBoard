@@ -1,15 +1,11 @@
 import type {
-  SearchCatalogProvider,
   SearchPage,
   VisionReference,
   VisionExtraction,
 } from '../domain/models'
 import { searchInspiration as searchPublicInspiration } from '../../../shared/api/generated-query/search/search'
-import {
-  extractUserVisionSearch,
-  recordSearchImageFailure,
-} from '../../../shared/api/generated-query/user/user'
-import { resolveApiData, resolveApiOk } from '../../../shared/api/apiResponse'
+import { extractUserVisionSearch } from '../../../shared/api/generated-query/user/user'
+import { resolveApiData } from '../../../shared/api/apiResponse'
 import { stripUndefined } from '../../../shared/api/stripUndefined'
 import { i18n } from '../../../shared/i18n'
 
@@ -21,7 +17,6 @@ export function generateRandomInspirationCursor(): string {
   }
   return ''
 }
-
 const inFlightRequests = new Map<
   string,
   { promise: Promise<SearchPage>; signal?: AbortSignal | undefined }
@@ -90,15 +85,4 @@ export async function extractVisionSearch(input: {
     ),
     i18n.global.t('search.visionSearchFailed'),
   )
-}
-
-export async function reportSearchImageFailure(provider: SearchCatalogProvider): Promise<void> {
-  try {
-    await resolveApiOk(
-      recordSearchImageFailure({ provider }),
-      i18n.global.t('search.reportImageFailureFailed'),
-    )
-  } catch (error) {
-    if (import.meta.env.DEV) console.debug('search image failure metric unavailable', error)
-  }
 }
