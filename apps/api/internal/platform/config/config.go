@@ -50,6 +50,110 @@ type DatabaseConfig struct {
 	MigrationPassword string
 	Database          string
 	SSLMode           string
+	Pool              PoolConfig
+}
+
+// PoolConfig bounds the runtime pgxpool and the River pgxpool. Values are
+// deploy-level tuning (see docs/runbooks/deployment.md): the combined
+// runtime MaxOpenConns + River MaxConns of one API instance must stay
+// under PostgreSQL max_connections with headroom for migrations and CLIs.
+// Out-of-range values fall back to defaults and are recorded in
+// Config.InvalidEnv so production startup fails fast instead of silently
+// running with defaults.
+type PoolConfig struct {
+	MaxOpenConns   int
+	MaxIdleConns   int
+	MaxLifetimeMin int
+	MaxIdleTimeMin int
+	RiverMaxConns  int
+	RiverMinConns  int
+}
+
+const (
+	DefaultPoolMaxOpenConns   = 25
+	DefaultPoolMaxIdleConns   = 10
+	DefaultPoolMaxLifetimeMin = 30
+	DefaultPoolMaxIdleTimeMin = 5
+	DefaultRiverPoolMaxConns  = 10
+	DefaultRiverPoolMinConns  = 1
+)
+
+const (
+	minPoolMaxOpenConns  = 1
+	maxPoolMaxOpenConns  = 64
+	minPoolMaxIdleConns  = 0
+	maxPoolMaxIdleConns  = 64
+	minPoolLifetimeMin   = 1
+	maxPoolLifetimeMin   = 1440
+	minPoolIdleTimeMin   = 1
+	maxPoolIdleTimeMin   = 1440
+	minRiverPoolMaxConns = 1
+	maxRiverPoolMaxConns = 32
+	minRiverPoolMinConns = 1
+	maxRiverPoolMinConns = 16
+	// Leave room on the default PostgreSQL max_connections=100 for migrations,
+	// CLIs and health tooling; runtime and River pools may consume at most 80.
+	maxRuntimePoolBudget = 80
+)
+
+// EffectiveMaxOpenConns clamps the configured ceiling into the supported
+// range, falling back to the default for unset or invalid values.
+func (c PoolConfig) EffectiveMaxOpenConns() int {
+	if c.MaxOpenConns < minPoolMaxOpenConns || c.MaxOpenConns > maxPoolMaxOpenConns {
+		return DefaultPoolMaxOpenConns
+	}
+	return c.MaxOpenConns
+}
+
+// EffectiveMaxIdleConns clamps idle connections and never exceeds the
+// effective open ceiling, so a misconfigured idle count cannot reserve more
+// than the pool allows.
+func (c PoolConfig) EffectiveMaxIdleConns() int {
+	maxOpen := c.EffectiveMaxOpenConns()
+	if c.MaxIdleConns < minPoolMaxIdleConns || c.MaxIdleConns > maxPoolMaxIdleConns {
+		return min(DefaultPoolMaxIdleConns, maxOpen)
+	}
+	if c.MaxIdleConns > maxOpen {
+		return maxOpen
+	}
+	return c.MaxIdleConns
+}
+
+// EffectiveMaxLifetimeMin bounds connection recycling age in minutes.
+func (c PoolConfig) EffectiveMaxLifetimeMin() int {
+	if c.MaxLifetimeMin < minPoolLifetimeMin || c.MaxLifetimeMin > maxPoolLifetimeMin {
+		return DefaultPoolMaxLifetimeMin
+	}
+	return c.MaxLifetimeMin
+}
+
+// EffectiveMaxIdleTimeMin bounds idle recycling age in minutes.
+func (c PoolConfig) EffectiveMaxIdleTimeMin() int {
+	if c.MaxIdleTimeMin < minPoolIdleTimeMin || c.MaxIdleTimeMin > maxPoolIdleTimeMin {
+		return DefaultPoolMaxIdleTimeMin
+	}
+	return c.MaxIdleTimeMin
+}
+
+// EffectiveRiverMaxConns clamps the River pgxpool ceiling.
+func (c PoolConfig) EffectiveRiverMaxConns() int {
+	if c.RiverMaxConns < minRiverPoolMaxConns || c.RiverMaxConns > maxRiverPoolMaxConns {
+		return DefaultRiverPoolMaxConns
+	}
+	return c.RiverMaxConns
+}
+
+// EffectiveRiverMinConns clamps the River pgxpool floor and never exceeds
+// the effective ceiling.
+func (c PoolConfig) EffectiveRiverMinConns() int {
+	maxConns := c.EffectiveRiverMaxConns()
+	if c.RiverMinConns < minRiverPoolMinConns || c.RiverMinConns > maxRiverPoolMinConns {
+		return DefaultRiverPoolMinConns
+	}
+	if c.RiverMinConns > maxConns {
+		return maxConns
+	}
+	return c.RiverMinConns
 }
 
 type AppConfig struct {
@@ -121,6 +225,9 @@ func (c PublicOriginsConfig) APIParsedURL() *url.URL {
 
 type WorkerConfig struct {
 	Concurrency int
+	// TaskRetentionDays bounds raw task row lifetime; statistics aggregates
+	// and financial facts are retained independently of this window.
+	TaskRetentionDays int
 }
 
 const (
@@ -129,11 +236,24 @@ const (
 	maxRiverWorkerConcurrency     = 64
 )
 
+const (
+	DefaultTaskRetentionDays = 7
+	minTaskRetentionDays     = 1
+	maxTaskRetentionDays     = 90
+)
+
 func (c WorkerConfig) EffectiveConcurrency() int {
 	if c.Concurrency < minRiverWorkerConcurrency || c.Concurrency > maxRiverWorkerConcurrency {
 		return DefaultRiverWorkerConcurrency
 	}
 	return c.Concurrency
+}
+
+func (c WorkerConfig) EffectiveTaskRetentionDays() int {
+	if c.TaskRetentionDays < minTaskRetentionDays || c.TaskRetentionDays > maxTaskRetentionDays {
+		return DefaultTaskRetentionDays
+	}
+	return c.TaskRetentionDays
 }
 
 type EventBusConfig struct {
@@ -177,11 +297,18 @@ type envConfig struct {
 	DBMigrationPassword string `env:"DB_MIGRATION_PASSWORD"`
 	DBName              string `env:"DB_NAME"`
 	DBSSLMode           string `env:"DB_SSLMODE"`
+	DBPoolMaxOpen       string `env:"DB_POOL_MAX_OPEN"`
+	DBPoolMaxIdle       string `env:"DB_POOL_MAX_IDLE"`
+	DBPoolMaxLifetime   string `env:"DB_POOL_MAX_LIFETIME_MINUTES"`
+	DBPoolMaxIdleTime   string `env:"DB_POOL_MAX_IDLE_MINUTES"`
+	RiverPoolMaxConns   string `env:"RIVER_POOL_MAX_CONNS"`
+	RiverPoolMinConns   string `env:"RIVER_POOL_MIN_CONNS"`
 	NATSEventBusEnabled string `env:"NATS_EVENT_BUS_ENABLED"`
 	NATSPassword        string `env:"NATS_PASSWORD"`
 	NATSHost            string `env:"NATS_HOST"`
 	NATSPort            string `env:"NATS_PORT"`
 	RiverConcurrency    string `env:"RIVER_WORKER_CONCURRENCY"`
+	TaskRetentionDays   string `env:"TASK_RETENTION_DAYS"`
 
 	AppPort               string `env:"APP_PORT"`
 	AppHost               string `env:"APP_HOST"`
@@ -208,7 +335,7 @@ func Load() *Config {
 
 	raw, err := env.ParseAs[envConfig]()
 	if err != nil {
-		slog.Warn("failed to parse environment config; using defaults where possible", "error", err)
+		slog.Warn("failed to parse environment config; using defaults where possible", "err", err)
 	}
 
 	raw.DBPassword = strings.TrimSpace(raw.DBPassword)
@@ -251,6 +378,41 @@ func Load() *Config {
 		invalidEnv = append(invalidEnv, "RIVER_WORKER_CONCURRENCY")
 		slog.Warn("invalid integer env; fallback to default", "key", "RIVER_WORKER_CONCURRENCY", "value", strings.TrimSpace(raw.RiverConcurrency), "default", DefaultRiverWorkerConcurrency)
 	}
+	retentionDays, retentionValid := boundedIntEnv(raw.TaskRetentionDays, DefaultTaskRetentionDays, minTaskRetentionDays, maxTaskRetentionDays)
+	if !retentionValid {
+		invalidEnv = append(invalidEnv, "TASK_RETENTION_DAYS")
+		slog.Warn("invalid integer env; fallback to default", "key", "TASK_RETENTION_DAYS", "value", strings.TrimSpace(raw.TaskRetentionDays), "default", DefaultTaskRetentionDays)
+	}
+	poolMaxOpen, poolMaxOpenValid := boundedIntEnv(raw.DBPoolMaxOpen, DefaultPoolMaxOpenConns, minPoolMaxOpenConns, maxPoolMaxOpenConns)
+	if !poolMaxOpenValid {
+		invalidEnv = append(invalidEnv, "DB_POOL_MAX_OPEN")
+		slog.Warn("invalid integer env; fallback to default", "key", "DB_POOL_MAX_OPEN", "value", strings.TrimSpace(raw.DBPoolMaxOpen), "default", DefaultPoolMaxOpenConns)
+	}
+	poolMaxIdle, poolMaxIdleValid := boundedIntEnv(raw.DBPoolMaxIdle, DefaultPoolMaxIdleConns, minPoolMaxIdleConns, maxPoolMaxIdleConns)
+	if !poolMaxIdleValid {
+		invalidEnv = append(invalidEnv, "DB_POOL_MAX_IDLE")
+		slog.Warn("invalid integer env; fallback to default", "key", "DB_POOL_MAX_IDLE", "value", strings.TrimSpace(raw.DBPoolMaxIdle), "default", DefaultPoolMaxIdleConns)
+	}
+	poolLifetime, poolLifetimeValid := boundedIntEnv(raw.DBPoolMaxLifetime, DefaultPoolMaxLifetimeMin, minPoolLifetimeMin, maxPoolLifetimeMin)
+	if !poolLifetimeValid {
+		invalidEnv = append(invalidEnv, "DB_POOL_MAX_LIFETIME_MINUTES")
+		slog.Warn("invalid integer env; fallback to default", "key", "DB_POOL_MAX_LIFETIME_MINUTES", "value", strings.TrimSpace(raw.DBPoolMaxLifetime), "default", DefaultPoolMaxLifetimeMin)
+	}
+	poolIdleTime, poolIdleTimeValid := boundedIntEnv(raw.DBPoolMaxIdleTime, DefaultPoolMaxIdleTimeMin, minPoolIdleTimeMin, maxPoolIdleTimeMin)
+	if !poolIdleTimeValid {
+		invalidEnv = append(invalidEnv, "DB_POOL_MAX_IDLE_MINUTES")
+		slog.Warn("invalid integer env; fallback to default", "key", "DB_POOL_MAX_IDLE_MINUTES", "value", strings.TrimSpace(raw.DBPoolMaxIdleTime), "default", DefaultPoolMaxIdleTimeMin)
+	}
+	riverMaxConns, riverMaxValid := boundedIntEnv(raw.RiverPoolMaxConns, DefaultRiverPoolMaxConns, minRiverPoolMaxConns, maxRiverPoolMaxConns)
+	if !riverMaxValid {
+		invalidEnv = append(invalidEnv, "RIVER_POOL_MAX_CONNS")
+		slog.Warn("invalid integer env; fallback to default", "key", "RIVER_POOL_MAX_CONNS", "value", strings.TrimSpace(raw.RiverPoolMaxConns), "default", DefaultRiverPoolMaxConns)
+	}
+	riverMinConns, riverMinValid := boundedIntEnv(raw.RiverPoolMinConns, DefaultRiverPoolMinConns, minRiverPoolMinConns, maxRiverPoolMinConns)
+	if !riverMinValid {
+		invalidEnv = append(invalidEnv, "RIVER_POOL_MIN_CONNS")
+		slog.Warn("invalid integer env; fallback to default", "key", "RIVER_POOL_MIN_CONNS", "value", strings.TrimSpace(raw.RiverPoolMinConns), "default", DefaultRiverPoolMinConns)
+	}
 
 	return &Config{
 		Database: DatabaseConfig{
@@ -262,6 +424,14 @@ func Load() *Config {
 			MigrationPassword: raw.DBMigrationPassword,
 			Database:          stringEnvDefault(raw.DBName, "ideaboard"),
 			SSLMode:           stringEnvDefault(raw.DBSSLMode, "disable"),
+			Pool: PoolConfig{
+				MaxOpenConns:   poolMaxOpen,
+				MaxIdleConns:   poolMaxIdle,
+				MaxLifetimeMin: poolLifetime,
+				MaxIdleTimeMin: poolIdleTime,
+				RiverMaxConns:  riverMaxConns,
+				RiverMinConns:  riverMinConns,
+			},
 		},
 		Events: EventBusConfig{
 			Enabled: eventBusEnabled,
@@ -284,7 +454,7 @@ func Load() *Config {
 			InternalAPIKey: strings.TrimSpace(raw.AuthServiceInternalAPIKey),
 			TimeoutSeconds: 5,
 		},
-		Worker:  WorkerConfig{Concurrency: workerConcurrency},
+		Worker:  WorkerConfig{Concurrency: workerConcurrency, TaskRetentionDays: retentionDays},
 		Credits: CreditsConfig{WelcomeIdentityKey: strings.TrimSpace(raw.CreditsWelcomeIdentityKey)},
 		Rewards: RewardsConfig{CodeHMACKeys: strings.TrimSpace(raw.RewardsCodeHMACKeys)},
 		Storage: StorageConfig{LocalRoot: strings.TrimSpace(raw.StorageLocalRoot)},
@@ -303,15 +473,37 @@ func Load() *Config {
 // non-placeholder DB_PASSWORD and an allowlisted SSL mode. Production also
 // rejects env keys that failed parsing (see Config.InvalidEnv) so a typo like
 // RIVER_WORKER_CONCURRENCY="lots" cannot silently run with defaults.
+// Public origins are validated here as well so a missing PUBLIC_ORIGIN fails
+// fast at boot instead of surfacing from the first URL-building call site.
 func LoadAndValidate() (*Config, error) {
 	cfg := Load()
-	if err := cfg.ValidateDatabase(); err != nil {
-		return nil, err
-	}
-	if err := cfg.ValidateEnvStrict(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+// Validate runs every startup fail-fast check in one place: database
+// settings, malformed env fallbacks (production only), and public origins.
+// Callers booting the process must fail on the returned error before opening
+// any connection or listener.
+func (c *Config) Validate() error {
+	if c == nil {
+		return fmt.Errorf("config is required")
+	}
+	if err := c.ValidateDatabase(); err != nil {
+		return err
+	}
+	if err := c.ValidateEnvStrict(); err != nil {
+		return err
+	}
+	if max := c.Database.Pool.EffectiveMaxOpenConns() + c.Database.Pool.EffectiveRiverMaxConns(); max > maxRuntimePoolBudget {
+		return fmt.Errorf("database pool budget %d exceeds maximum %d", max, maxRuntimePoolBudget)
+	}
+	if err := c.PublicOrigins.Validate(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // ValidateEnvStrict rejects fallback defaults from malformed env values in

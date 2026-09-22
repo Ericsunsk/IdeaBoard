@@ -13,7 +13,7 @@
 | 批次 | 范围 | 核心验证 | 进度 |
 | --- | --- | --- | --- |
 | 1 | Platform 日志脱敏、HTTP 错误、分页和 Accepted response | 边界、泄露、请求关联、独立 package 测试 | 已审计和修复，验证结果见下 |
-| 2 | PostgreSQL / pgx / sqlc、Schema、migrations、runtime privileges | 类型映射、事务、权限、migration replay、生成一致性 | 2A 已提交；2B 仍在审计 |
+| 2 | PostgreSQL / pgx / sqlc、Schema、migrations、runtime privileges | 类型映射、事务、权限、migration replay、生成一致性 | 2A 已提交；2B 配置契约子批已提交，runtime/migration 仍在审计 |
 | 3 | AI Gateway、Workflow、accountpool 退役 | 出口限制、请求方言、模型映射、配置 | 待审计 |
 | 4 | Task submission、River、execution、retention、statistics | 幂等、超时/重试/取消、终态与扣费原子性 | 待审计 |
 | 5 | Billing、Credits、Payments、Rewards、Identity | 金额、账务状态机、身份生命周期、错误契约 | 待审计 |
@@ -83,3 +83,19 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - 2B 会单独验证 `cd apps/api/internal/testdb && go test ./...`、pgx transaction/pool 资源语义、完整 generated sqlc 一致性及 migration purge。
 - rollback/fallback：本批代码提交可用 `git revert <batch-2a-commit>` 回滚。2B migration 中的 DROP 和 secret purge 仍是 ADR 已批准的不可逆操作，不能通过 runtime image rollback 恢复，发布前需保留备份并走 Fresh Database/cutover 流程。
 - 未执行线上数据库写入；临时数据库位于 `/tmp/ideaboard-audit-b2.*`，完成后可停止/删除该临时实例。
+
+## 第二批补充：数据库配置契约（2B-0）
+
+本子批仅提交 `platform/config` 的连接池/Task retention 配置、环境样例与对应测试。它不提交 `platform/database/postgres.go` 的 pgx runtime 接入，也不提交 sqlc、testdb 或 destructive migration；这些文件仍有跨层依赖，必须在后续闭包中一起验证。
+
+### Standards / Spec
+
+- 修复 invalid `DB_POOL_MAX_IDLE` fallback 未按有效 open 上限 clamp 的边界错误。
+- 修复 `TASK_RETENTION_DAYS` 未加入测试环境清理列表导致的顺序污染。
+- 增加 runtime + River 连接池总预算上限（80），为默认 PostgreSQL `max_connections=100` 保留 migrations/CLI/health tooling headroom；生产 `InvalidEnv` 仍 fail-fast，开发环境保留 warning/default 行为。
+- `docs/runbooks/deployment.md` 已定义变量范围与 idle clamp 契约；配置实现与该文档一致。
+
+### 验证与边界
+
+- `cd apps/api && go test ./internal/platform/config -count=1` 通过。
+- 本子批未证明 pgx pool 实际 runtime idle 回收；当前 `postgres.go` 仍属于未提交迁移闭包，不能把 `DB_POOL_MAX_IDLE` 视为已在运行时生效。
