@@ -1,18 +1,23 @@
 package readmodel
 
 import (
-	"encoding/base64"
-	"encoding/json"
-	"io"
 	"strings"
 	"time"
 
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
+	"ideaboard/api/internal/platform/pagination"
 
 	"github.com/google/uuid"
 )
 
-const MaxAdminPaymentOrderCursorLen = 512
+const (
+	// DefaultAdminPaymentOrderLimit tracks the shared pagination standard.
+	DefaultAdminPaymentOrderLimit = pagination.DefaultLimit
+	// MaxAdminPaymentOrderLimit tracks the shared pagination standard.
+	MaxAdminPaymentOrderLimit = pagination.MaxLimit
+	// MaxAdminPaymentOrderCursorLen tracks the shared pagination standard.
+	MaxAdminPaymentOrderCursorLen = pagination.MaxCursorLen
+)
 
 // AdminPaymentOrderCursor is the immutable keyset position for admin order reads.
 type AdminPaymentOrderCursor struct {
@@ -21,25 +26,16 @@ type AdminPaymentOrderCursor struct {
 }
 
 func DecodeAdminPaymentOrderCursor(value string) (*AdminPaymentOrderCursor, error) {
-	if len(value) > MaxAdminPaymentOrderCursorLen {
+	// Transport integrity lives in the shared pagination helper; this
+	// wrapper only enforces the admin keyset position fields.
+	cursor, err := pagination.DecodeCursor[AdminPaymentOrderCursor](value)
+	if err != nil {
 		return nil, paymentcontracts.ErrAdminPaymentOrderCursor
 	}
-	value = strings.TrimSpace(value)
-	if value == "" {
+	if cursor == nil {
 		return nil, nil
 	}
-	raw, err := base64.RawURLEncoding.DecodeString(value)
-	if err != nil || base64.RawURLEncoding.EncodeToString(raw) != value {
-		return nil, paymentcontracts.ErrAdminPaymentOrderCursor
-	}
-	var cursor AdminPaymentOrderCursor
-	decoder := json.NewDecoder(strings.NewReader(string(raw)))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&cursor); err != nil || cursor.CreatedAt == "" || cursor.OrderID == "" {
-		return nil, paymentcontracts.ErrAdminPaymentOrderCursor
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); err != io.EOF {
+	if cursor.CreatedAt == "" || cursor.OrderID == "" {
 		return nil, paymentcontracts.ErrAdminPaymentOrderCursor
 	}
 	createdAt, err := time.Parse(time.RFC3339Nano, cursor.CreatedAt)
@@ -50,24 +46,22 @@ func DecodeAdminPaymentOrderCursor(value string) (*AdminPaymentOrderCursor, erro
 	if err != nil || parsedID.String() != strings.ToLower(cursor.OrderID) {
 		return nil, paymentcontracts.ErrAdminPaymentOrderCursor
 	}
-	return &cursor, nil
+	return cursor, nil
 }
 
 func EncodeAdminPaymentOrderCursor(createdAt time.Time, orderID uuid.UUID) (string, error) {
-	raw, err := json.Marshal(AdminPaymentOrderCursor{CreatedAt: createdAt.UTC().Format(time.RFC3339Nano), OrderID: orderID.String()})
-	if err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(raw), nil
+	return pagination.EncodeCursor(AdminPaymentOrderCursor{CreatedAt: createdAt.UTC().Format(time.RFC3339Nano), OrderID: orderID.String()})
 }
 
 const (
 	// DefaultRechargeHistoryLimit is the default page size for a user's recharge history.
-	DefaultRechargeHistoryLimit = 20
+	// It tracks the shared pagination standard.
+	DefaultRechargeHistoryLimit = pagination.DefaultLimit
 	// MaxRechargeHistoryLimit bounds the number of rows returned by one page.
-	MaxRechargeHistoryLimit = 20
+	// It tracks the shared pagination standard.
+	MaxRechargeHistoryLimit = pagination.MaxLimit
 	// MaxRechargeHistoryCursorLen bounds opaque cursor input before decoding.
-	MaxRechargeHistoryCursorLen = 512
+	MaxRechargeHistoryCursorLen = pagination.MaxCursorLen
 )
 
 // RechargeHistoryCursor is the immutable keyset position for recharge history.
@@ -78,19 +72,17 @@ type RechargeHistoryCursor struct {
 }
 
 func DecodeRechargeHistoryCursor(value string) (*RechargeHistoryCursor, error) {
-	if len(value) > MaxRechargeHistoryCursorLen {
-		return nil, paymentcontracts.ErrRechargeHistoryCursor
-	}
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return nil, nil
-	}
-	raw, err := base64.RawURLEncoding.DecodeString(value)
+	// The legacy codec stays as the expand-phase seam: callers keep using
+	// this function while the transport integrity checks live in the shared
+	// pagination helper.
+	cursor, err := pagination.DecodeCursor[RechargeHistoryCursor](value)
 	if err != nil {
 		return nil, paymentcontracts.ErrRechargeHistoryCursor
 	}
-	var cursor RechargeHistoryCursor
-	if err := json.Unmarshal(raw, &cursor); err != nil || cursor.OccurredAt == "" || cursor.OrderID == "" {
+	if cursor == nil {
+		return nil, nil
+	}
+	if cursor.OccurredAt == "" || cursor.OrderID == "" {
 		return nil, paymentcontracts.ErrRechargeHistoryCursor
 	}
 	if _, err := time.Parse(time.RFC3339Nano, cursor.OccurredAt); err != nil {
@@ -99,13 +91,9 @@ func DecodeRechargeHistoryCursor(value string) (*RechargeHistoryCursor, error) {
 	if _, err := uuid.Parse(cursor.OrderID); err != nil {
 		return nil, paymentcontracts.ErrRechargeHistoryCursor
 	}
-	return &cursor, nil
+	return cursor, nil
 }
 
 func EncodeRechargeHistoryCursor(occurredAt time.Time, orderID uuid.UUID) (string, error) {
-	raw, err := json.Marshal(RechargeHistoryCursor{OccurredAt: occurredAt.UTC().Format(time.RFC3339Nano), OrderID: orderID.String()})
-	if err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(raw), nil
+	return pagination.EncodeCursor(RechargeHistoryCursor{OccurredAt: occurredAt.UTC().Format(time.RFC3339Nano), OrderID: orderID.String()})
 }

@@ -7,14 +7,13 @@ import (
 
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
+	"ideaboard/api/internal/platform/pagination"
 
 	"github.com/google/uuid"
 )
 
 const (
-	defaultAdminPaymentOrderLimit = 20
-	maxAdminPaymentOrderLimit     = 100
-	maxAdminPaymentOrderUserLen   = 50
+	maxAdminPaymentOrderUserLen = 50
 )
 
 var adminPaymentOrderNumber = regexp.MustCompile(`^IBP-[0-9]{8}-[A-Z0-9]{12}$`)
@@ -29,12 +28,11 @@ func NormalizeAdminPaymentOrderFilters(input paymentcontracts.AdminPaymentOrderL
 	if filters.Status != "" && !validAdminPaymentOrderStatus(paymentsdomain.PaymentOrderStatus(filters.Status)) {
 		return AdminPaymentOrderFilters{}, paymentcontracts.ErrAdminPaymentOrderFilter
 	}
-	if filters.Limit == 0 {
-		filters.Limit = defaultAdminPaymentOrderLimit
-	}
-	if filters.Limit < 1 || filters.Limit > maxAdminPaymentOrderLimit {
+	limit, err := pagination.NormalizeLimit(filters.Limit)
+	if err != nil {
 		return AdminPaymentOrderFilters{}, paymentcontracts.ErrAdminPaymentOrderFilter
 	}
+	filters.Limit = limit
 	user := strings.TrimSpace(input.User)
 	if utf8.RuneCountInString(user) > maxAdminPaymentOrderUserLen {
 		return AdminPaymentOrderFilters{}, paymentcontracts.ErrAdminPaymentOrderFilter
