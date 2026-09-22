@@ -31,7 +31,7 @@ func NewHandler(service StorageProfilesService) *Handler {
 
 func (h *Handler) ListProviders(c *gin.Context) {
 	if h.service == nil {
-		response.Error(c, 500, "存储服务未初始化")
+		writeStorageUnavailable(c)
 		return
 	}
 	response.SuccessDTO(c, storageProvidersResponse{Providers: h.service.ListProviderMeta()})
@@ -39,21 +39,25 @@ func (h *Handler) ListProviders(c *gin.Context) {
 
 func (h *Handler) ListProfiles(c *gin.Context) {
 	if h.service == nil {
-		response.Error(c, 500, "存储服务未初始化")
+		writeStorageUnavailable(c)
 		return
 	}
 	profiles, err := h.service.ListProfiles(c.Request.Context())
 	if err != nil {
-		response.Error(c, 500, "获取存储列表失败")
+		writeStorageListError(c, err)
 		return
 	}
 	response.SuccessDTO(c, storageProfilesResponse{Profiles: profiles})
 }
 
 func (h *Handler) CreateProfile(c *gin.Context) {
+	if h.service == nil {
+		writeStorageUnavailable(c)
+		return
+	}
 	var req domain.StorageProfile
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
+		writeStorageInputError(c)
 		return
 	}
 
@@ -69,9 +73,13 @@ func (h *Handler) CreateProfile(c *gin.Context) {
 }
 
 func (h *Handler) UpdateProfile(c *gin.Context) {
+	if h.service == nil {
+		writeStorageUnavailable(c)
+		return
+	}
 	var req domain.StorageProfile
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
+		writeStorageInputError(c)
 		return
 	}
 	req.ID = c.Param("id")
@@ -89,11 +97,11 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 
 func (h *Handler) DeleteProfile(c *gin.Context) {
 	if h.service == nil {
-		response.Error(c, 500, "存储服务未初始化")
+		writeStorageUnavailable(c)
 		return
 	}
 	if err := h.service.DeleteProfile(c.Request.Context(), c.Param("id")); err != nil {
-		response.InternalError(c, 400, "删除失败，请检查配置或稍后重试", err)
+		writeStorageCommandError(c, "删除失败，请检查配置或稍后重试", err)
 		return
 	}
 	response.SuccessDTO(c, storageMessageResponse{Message: "删除成功"})
@@ -101,7 +109,7 @@ func (h *Handler) DeleteProfile(c *gin.Context) {
 
 func (h *Handler) ApplyProfile(c *gin.Context) {
 	if h.service == nil {
-		response.Error(c, 500, "存储服务未初始化")
+		writeStorageUnavailable(c)
 		return
 	}
 	profile, err := h.service.ApplyProfile(c.Request.Context(), c.Param("id"))
@@ -117,7 +125,7 @@ func (h *Handler) ApplyProfile(c *gin.Context) {
 
 func (h *Handler) TestProfile(c *gin.Context) {
 	if h.service == nil {
-		response.Error(c, 500, "存储服务未初始化")
+		writeStorageUnavailable(c)
 		return
 	}
 	if err := h.service.TestProfile(c.Request.Context(), c.Param("id")); err != nil {
@@ -129,7 +137,7 @@ func (h *Handler) TestProfile(c *gin.Context) {
 
 func (h *Handler) GetBucketInfo(c *gin.Context) {
 	if h.service == nil {
-		response.Error(c, 500, "存储服务未初始化")
+		writeStorageUnavailable(c)
 		return
 	}
 	info, err := h.service.GetBucketInfo(c.Request.Context(), c.Param("id"))
@@ -163,15 +171,6 @@ type storageBucketInfoResponse struct {
 
 type userMessageError interface {
 	UserMessage() string
-}
-
-func writeStorageCommandError(c *gin.Context, fallback string, err error) {
-	var userMsgErr userMessageError
-	if errors.As(err, &userMsgErr) {
-		response.Error(c, 400, userMsgErr.UserMessage())
-		return
-	}
-	response.InternalError(c, 400, fallback, err)
 }
 
 func (h *Handler) saveProfile(c *gin.Context, req *domain.StorageProfile) (*domain.StorageProfile, error) {
