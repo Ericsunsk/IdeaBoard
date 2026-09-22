@@ -282,3 +282,14 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - 同 package `go vet` 通过。
 - 提交：`186736a0 feat(payments): record Stripe outbound outcomes`。
 - 本批未修改 Payments transaction/reconciliation/webhook application semantics；仅增加 outbound observability。
+
+## 第四批补充：Payments readmodel pagination contract（4M）
+
+本子批将 Admin payment orders 与 user recharge history 的 readmodel cursor/limit 规则收敛到 shared `platform/pagination`：default 50、max 200、opaque cursor max 512 bytes，领域层仍负责 timestamp/UUID payload validation。该值与 `apps/api/openapi.yaml` 及 Payments `CONTEXT.md` 的 pagination contract 一致，避免 HTTP/application 两套边界漂移。
+
+### Verification and boundary
+
+- clean archive（替换 readmodel filter/cursor 文件并加入纯测试）中 `go test ./internal/payments/application/readmodel -count=1 -race` 通过。
+- 同 package `go vet` 通过。
+- 提交：`2a242ba6 fix(payments): align readmodel pagination contract`。
+- `readmodel/service.go` 的 pgx/sqlc time/UUID conversion、HTTP handler machine mapping 和 integration pagination tests 仍未纳入，待下一批闭包验证。
