@@ -118,3 +118,13 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - `cd apps/api && go vet ./internal/platform/outboundhttp ./internal/platform/safehttp` 通过。
 - 本批只验证共享客户端与安全边界；provider-specific status mapping、Cloudflare gateway billing 及业务 retry budget 仍在后续批次审计。
 - 以上补丁作为同一 outbound 子批的 follow-up commit 提交；若 reader 无法响应 Close，后台读取 goroutine 仍可能延迟结束，这是 Go `io.Reader` 无强制取消能力的边界。
+
+## 第三批补充：Workflow Gateway route registry（3A）
+
+本子批只提交 `workflow/gateway_path.go`、`workflow/provider_registry.go` 及纯函数测试。它把 provider namespace、route source、chat/image 判定和 Gateway reachability classification 收敛到无 I/O seam，供 preview 与 worker 后续共同使用。
+
+`internal/aigateway` 的 config/detect/model/handler 仍未提交：其 catalog/mapping audit 写入依赖尚未闭合的 pgx `settings/sqlc` migration；当前已修复但必须随数据库调用方闭包一起验证。
+
+### 验证
+
+- 以当前 HEAD 加仅 3A 文件构造的独立快照中，`go test ./internal/workflow -count=1` 通过。
