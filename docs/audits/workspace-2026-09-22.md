@@ -304,3 +304,13 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - 同 package `go vet` 通过。
 - 提交：`b77e7a73 fix(payments): harden pagination HTTP boundaries`。
 - DB integration pagination fixture `payments/tests/recharge_pagination_test.go` 仍未提交，需等 testdb/sqlc migration dirty closure 一起验证。
+
+## 第四批补充：Workflow vision namespace guard（4O）
+
+本子批固定 `vision` 为 search-only reserved slug，阻止它进入 image workflow registry。这样不会再次把 `ai-image:vision` 与 `ai-search:vision` 映射到同一个 bare key，避免 Gateway route/catalog 配置被覆盖。补充 regression test 验证 parser、validator 与 image classification 全部拒绝该 slug，并保留原 provider API type tests。
+
+### Verification and boundary
+
+- clean archive（替换 workflow feature files）中 `go test ./internal/workflow -run 'TestVisionSlugIsReservedForSearch|TestValidateProviderAPIType' -count=1 -race` 通过。
+- 提交：`28656b46 fix(workflow): reserve vision search slug`。
+- `feature_rules.go` 的删除及 provider registry migration 仍未纳入，本批只处理 slug namespace invariant。
