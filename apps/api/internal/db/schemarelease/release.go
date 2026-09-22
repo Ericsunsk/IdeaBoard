@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -16,12 +15,13 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"ideaboard/api/internal/db/schemaassembly"
 	"ideaboard/api/internal/db/schemacontract"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Options struct {
@@ -50,7 +50,9 @@ func (execRunner) Run(ctx context.Context, directory, name string, args ...strin
 	command.Dir = directory
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return output, fmt.Errorf("%s %s: %w", name, strings.Join(args, " "), err)
+		// Do not include argv in the error: the migration URL contains the
+		// database password. Keep the underlying exit error for diagnostics.
+		return output, fmt.Errorf("%s failed: %w", name, err)
 	}
 	return output, nil
 }
@@ -394,18 +396,25 @@ func readTree(root string) (map[string][]byte, error) {
 }
 
 func verifyCatalogSemantics(ctx context.Context, apiRoot, dsn string, snapshot []byte) (err error) {
-	db, err := sql.Open("pgx", dsn)
+	poolConfig, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return fmt.Errorf("parse PostgreSQL DSN: %w", err)
+	}
+	if poolConfig.MaxConns < 2 {
+		return errors.New("schema contract verification requires at least two connections")
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		return fmt.Errorf("open PostgreSQL: %w", err)
 	}
-	defer func() { err = errors.Join(err, db.Close()) }()
+	defer pool.Close()
 
-	snapshotConn, snapshotCleanup, err := openIsolatedSchema(ctx, db, "schema_release_snapshot")
+	snapshotConn, snapshotCleanup, err := openIsolatedSchema(ctx, pool, "schema_release_snapshot")
 	if err != nil {
 		return err
 	}
 	defer func() { err = errors.Join(err, snapshotCleanup()) }()
-	migrationConn, migrationCleanup, err := openIsolatedSchema(ctx, db, "schema_release_migration")
+	migrationConn, migrationCleanup, err := openIsolatedSchema(ctx, pool, "schema_release_migration")
 	if err != nil {
 		return err
 	}
@@ -416,18 +425,18 @@ func verifyCatalogSemantics(ctx context.Context, apiRoot, dsn string, snapshot [
 		snapshotConn,
 		migrationConn,
 		snapshot,
-		func(ctx context.Context, conn *sql.Conn) error {
+		func(ctx context.Context, conn *pgxpool.Conn) error {
 			return applyAtlasMigration(ctx, apiRoot, dsn, conn)
 		},
 	)
 }
 
-func applyAtlasMigration(ctx context.Context, apiRoot, dsn string, conn *sql.Conn) error {
+func applyAtlasMigration(ctx context.Context, apiRoot, dsn string, conn *pgxpool.Conn) error {
 	if conn == nil {
 		return errors.New("migration connection is nil")
 	}
 	var schemaName string
-	if err := conn.QueryRowContext(ctx, `SELECT current_schema()`).Scan(&schemaName); err != nil {
+	if err := conn.QueryRow(ctx, `SELECT current_schema()`).Scan(&schemaName); err != nil {
 		return fmt.Errorf("resolve migration schema: %w", err)
 	}
 	parsed, err := url.Parse(dsn)
@@ -448,36 +457,34 @@ func applyAtlasMigration(ctx context.Context, apiRoot, dsn string, conn *sql.Con
 	return nil
 }
 
-func openIsolatedSchema(ctx context.Context, db *sql.DB, prefix string) (*sql.Conn, func() error, error) {
+func openIsolatedSchema(ctx context.Context, pool *pgxpool.Pool, prefix string) (*pgxpool.Conn, func() error, error) {
 	random := make([]byte, 8)
 	if _, err := rand.Read(random); err != nil {
 		return nil, nil, fmt.Errorf("generate isolated schema name: %w", err)
 	}
 	schemaName := fmt.Sprintf("%s_%x", prefix, random)
 	quoted := quoteIdentifier(schemaName)
-	// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- quoted is pg identifier sanitized above
-	if _, err := db.ExecContext(ctx, "CREATE SCHEMA "+quoted); err != nil {
-		return nil, nil, fmt.Errorf("create isolated schema: %w", err)
-	}
-	conn, err := db.Conn(ctx)
+	conn, err := pool.Acquire(ctx)
 	if err != nil {
-		// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- quoted is pg identifier sanitized above
-		_, _ = db.ExecContext(context.Background(), "DROP SCHEMA IF EXISTS "+quoted+" CASCADE")
 		return nil, nil, fmt.Errorf("open isolated schema connection: %w", err)
 	}
-	if _, err := conn.ExecContext(ctx, "SET search_path TO "+quoted+", public"); err != nil {
-		_ = conn.Close()
-		// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- quoted is pg identifier sanitized above
-		_, _ = db.ExecContext(context.Background(), "DROP SCHEMA IF EXISTS "+quoted+" CASCADE")
-		return nil, nil, fmt.Errorf("set isolated schema search_path: %w", err)
-	}
-	cleanup := func() error {
+	cleanup := sync.OnceValue(func() error {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		closeErr := conn.Close()
+		// This connection carries a schema-specific search_path and prepared
+		// statements. Closing it prevents session state leaking back to the pool.
+		closeErr := conn.Conn().Close(cleanupCtx)
+		conn.Release()
 		// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- quoted is pg identifier sanitized above
-		_, dropErr := db.ExecContext(cleanupCtx, "DROP SCHEMA IF EXISTS "+quoted+" CASCADE")
+		_, dropErr := pool.Exec(cleanupCtx, "DROP SCHEMA IF EXISTS "+quoted+" CASCADE")
 		return errors.Join(closeErr, dropErr)
+	})
+	// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- quoted is pg identifier sanitized above
+	if _, err := conn.Exec(ctx, "CREATE SCHEMA "+quoted); err != nil {
+		return nil, nil, errors.Join(fmt.Errorf("create isolated schema: %w", err), cleanup())
+	}
+	if _, err := conn.Exec(ctx, "SET search_path TO "+quoted+", public"); err != nil {
+		return nil, nil, errors.Join(fmt.Errorf("set isolated schema search_path: %w", err), cleanup())
 	}
 	return conn, cleanup, nil
 }

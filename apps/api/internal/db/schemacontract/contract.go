@@ -2,11 +2,12 @@ package schemacontract
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type catalogProperty struct {
@@ -19,15 +20,15 @@ type schemaContract struct {
 	properties map[catalogProperty]string
 }
 
-type MigrationApplier func(context.Context, *sql.Conn) error
+type MigrationApplier func(context.Context, *pgxpool.Conn) error
 
 // VerifySchemaSnapshotContract applies both schema release paths and compares
 // their PostgreSQL catalog semantics. The caller owns two empty, isolated
 // schemas and their connection lifecycle.
 func VerifySchemaSnapshotContract(
 	ctx context.Context,
-	snapshotConn *sql.Conn,
-	migrationConn *sql.Conn,
+	snapshotConn *pgxpool.Conn,
+	migrationConn *pgxpool.Conn,
 	snapshotSQL []byte,
 	applyMigration MigrationApplier,
 ) error {
@@ -37,7 +38,7 @@ func VerifySchemaSnapshotContract(
 	if len(snapshotSQL) == 0 {
 		return fmt.Errorf("schema snapshot is empty")
 	}
-	if _, err := snapshotConn.ExecContext(ctx, string(snapshotSQL)); err != nil {
+	if _, err := snapshotConn.Exec(ctx, string(snapshotSQL)); err != nil {
 		return fmt.Errorf("apply schema snapshot: %w", err)
 	}
 	if err := applyMigration(ctx, migrationConn); err != nil {
@@ -55,16 +56,16 @@ func VerifySchemaSnapshotContract(
 	return compareSchemaContracts(snapshotContract, migrationContract)
 }
 
-func inspectSchemaContract(ctx context.Context, conn *sql.Conn) (schemaContract, error) {
+func inspectSchemaContract(ctx context.Context, conn *pgxpool.Conn) (schemaContract, error) {
 	if conn == nil {
 		return schemaContract{}, fmt.Errorf("database connection is nil")
 	}
 	var schemaName string
-	if err := conn.QueryRowContext(ctx, `SELECT current_schema()`).Scan(&schemaName); err != nil {
+	if err := conn.QueryRow(ctx, `SELECT current_schema()`).Scan(&schemaName); err != nil {
 		return schemaContract{}, fmt.Errorf("resolve current schema: %w", err)
 	}
 
-	rows, err := conn.QueryContext(ctx, schemaCatalogQuery)
+	rows, err := conn.Query(ctx, schemaCatalogQuery)
 	if err != nil {
 		return schemaContract{}, fmt.Errorf("query schema catalog: %w", err)
 	}
@@ -93,9 +94,7 @@ func inspectSchemaContract(ctx context.Context, conn *sql.Conn) (schemaContract,
 	if err := rows.Err(); err != nil {
 		return schemaContract{}, fmt.Errorf("read schema catalog: %w", err)
 	}
-	if err := rows.Close(); err != nil {
-		return schemaContract{}, fmt.Errorf("close schema catalog rows: %w", err)
-	}
+	rows.Close()
 	if err := inspectBuiltinSeed(ctx, conn, contract); err != nil {
 		return schemaContract{}, err
 	}
@@ -129,11 +128,11 @@ FROM (
 	},
 }
 
-func inspectBuiltinSeed(ctx context.Context, conn *sql.Conn, contract schemaContract) error {
+func inspectBuiltinSeed(ctx context.Context, conn *pgxpool.Conn, contract schemaContract) error {
 	for _, seed := range builtinSeedQueries {
 		property := catalogProperty{kind: "builtin_seed", object: seed.object, property: "rows"}
 		var tableExists bool
-		if err := conn.QueryRowContext(
+		if err := conn.QueryRow(
 			ctx,
 			`SELECT pg_catalog.to_regclass(pg_catalog.format('%I.%I', current_schema(), $1::text)) IS NOT NULL`,
 			seed.table,
@@ -145,7 +144,7 @@ func inspectBuiltinSeed(ctx context.Context, conn *sql.Conn, contract schemaCont
 			continue
 		}
 		var value string
-		if err := conn.QueryRowContext(ctx, seed.query).Scan(&value); err != nil {
+		if err := conn.QueryRow(ctx, seed.query).Scan(&value); err != nil {
 			return fmt.Errorf("inspect builtin seed %s: %w", seed.object, err)
 		}
 		contract.properties[property] = value

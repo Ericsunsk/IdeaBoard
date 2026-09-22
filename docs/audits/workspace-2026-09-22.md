@@ -13,7 +13,7 @@
 | 批次 | 范围 | 核心验证 | 进度 |
 | --- | --- | --- | --- |
 | 1 | Platform 日志脱敏、HTTP 错误、分页和 Accepted response | 边界、泄露、请求关联、独立 package 测试 | 已审计和修复，验证结果见下 |
-| 2 | PostgreSQL / pgx / sqlc、Schema、migrations、runtime privileges | 类型映射、事务、权限、migration replay、生成一致性 | 待审计 |
+| 2 | PostgreSQL / pgx / sqlc、Schema、migrations、runtime privileges | 类型映射、事务、权限、migration replay、生成一致性 | 2A 已提交；2B 仍在审计 |
 | 3 | AI Gateway、Workflow、accountpool 退役 | 出口限制、请求方言、模型映射、配置 | 待审计 |
 | 4 | Task submission、River、execution、retention、statistics | 幂等、超时/重试/取消、终态与扣费原子性 | 待审计 |
 | 5 | Billing、Credits、Payments、Rewards、Identity | 金额、账务状态机、身份生命周期、错误契约 | 待审计 |
@@ -57,3 +57,29 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - 本批无数据库变更。后续需要撤销时，在干净工作区使用该批 commit 的 `git revert` 生成反向提交；不通过 reset 丢弃其他工作。
 
 查找本批提交：`git log --oneline -- docs/audits/workspace-2026-09-22.md`。
+
+## 第二批：PostgreSQL / pgx / Schema Release（2A）
+
+本次提交只包括 Schema Release 工具。事务、runtime pool、AccountPool retirement migration、testdb nested module 和全部 generated sqlc 差异继续留在 2B，待连接池 idle 语义和跨层调用方闭包完成后再提交。
+
+### Standards
+
+发现并修复 1 项：
+
+1. **P2：Schema Release 错误包含 DSN。** command runner 原错误拼接全部 argv，Atlas URL 可能包含数据库密码。错误只保留 executable 和 exit error；stdout/stderr 由上层按需返回，未把 URL 放入错误文本。
+
+### Spec
+
+发现 0 项；2B 有一项待提交修复：
+
+1. **2B 待提交，P1：AccountPool retirement 漏清理 retired 密文。** `api_account_secrets` 的历史轮换会保留 `secret_payload`、`fingerprint` 和 `key_version`，但原 migration 只匹配 `status <> 'retired'`，正常 retired 行因此永久保留凭据材料。工作区已改为清理全部仍有材料的行，保留历史行/FK，并在隔离 Fresh database 中插入 active 与 retired 两类 fixture 验证结果为零。
+
+另验证：Board share `token_secret` 通过 repository 的 Encrypt/Decrypt seam；新增 execution-attempt constraints、Schema fragments、snapshot 和 migrations 的静态对象/FK 对齐；`atlas.sum` 由 Atlas 根据实际 migration 内容更新，其中旧 migration 的既有 checksum drift 被一并校正。
+
+### 验证与边界
+
+- `go test ./internal/db/schemarelease ./internal/db/schemacontract -count=1` 通过；Schema Release integration cleanup test 以隔离 PostgreSQL 17 通过。
+- 独立 PostgreSQL 17 临时实例：Atlas 9 migrations Fresh replay、Schema Release 默认检查（snapshot/catalog 对比、sqlc generation drift check）通过；active/retired secret purge fixture 已验证但属于待提交 2B。
+- 2B 会单独验证 `cd apps/api/internal/testdb && go test ./...`、pgx transaction/pool 资源语义、完整 generated sqlc 一致性及 migration purge。
+- rollback/fallback：本批代码提交可用 `git revert <batch-2a-commit>` 回滚。2B migration 中的 DROP 和 secret purge 仍是 ADR 已批准的不可逆操作，不能通过 runtime image rollback 恢复，发布前需保留备份并走 Fresh Database/cutover 流程。
+- 未执行线上数据库写入；临时数据库位于 `/tmp/ideaboard-audit-b2.*`，完成后可停止/删除该临时实例。

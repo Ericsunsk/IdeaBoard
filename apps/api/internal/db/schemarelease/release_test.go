@@ -1,10 +1,16 @@
 package schemarelease
 
 import (
+	"context"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestValidateMigrationChangesAllowsAppendOnlyHistory(t *testing.T) {
@@ -117,5 +123,78 @@ func writeTestFile(t *testing.T, path, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestExecRunnerFailureDoesNotExposeArguments(t *testing.T) {
+	_, err := (execRunner{}).Run(t.Context(), t.TempDir(), "sh", "-c", "exit 7", "--url", "postgres://audit:fixture-secret@localhost/test")
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) || exitErr.ExitCode() != 7 {
+		t.Fatalf("expected wrapped exit status 7: %v", err)
+	}
+	if strings.Contains(err.Error(), "fixture-secret") || strings.Contains(err.Error(), "postgres://") {
+		t.Fatal("command failure exposes database connection arguments")
+	}
+}
+
+func TestVerifyCatalogSemanticsRejectsSingleConnectionPool(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	err := verifyCatalogSemantics(ctx, t.TempDir(), "postgres://audit@127.0.0.1:1/test?pool_max_conns=1", []byte("SELECT 1;"))
+	if err == nil || !strings.Contains(err.Error(), "at least two connections") {
+		t.Fatalf("expected pool capacity validation before database I/O: %v", err)
+	}
+}
+
+func TestIsolatedSchemaCleanupAfterCancellation(t *testing.T) {
+	dsn := os.Getenv("API_TEST_DATABASE_DSN")
+	if dsn == "" {
+		t.Skip("set API_TEST_DATABASE_DSN to run PostgreSQL integration tests")
+	}
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config.MaxConns = 1
+	config.MinConns = 0
+	pool, err := pgxpool.NewWithConfig(t.Context(), config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	var originalPath string
+	if err := pool.QueryRow(t.Context(), "SHOW search_path").Scan(&originalPath); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	t.Cleanup(cancel)
+	conn, cleanup, err := openIsolatedSchema(ctx, pool, "audit_cleanup")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Register before assertions so failures cannot leave a checked-out connection.
+	t.Cleanup(func() {
+		if err := cleanup(); err != nil {
+			t.Errorf("cleanup isolated schema: %v", err)
+		}
+	})
+	var schema string
+	if err := conn.QueryRow(ctx, "SELECT current_schema()").Scan(&schema); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	if err := cleanup(); err != nil {
+		t.Fatal(err)
+	}
+	var exists bool
+	if err := pool.QueryRow(t.Context(), "SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = $1)", schema).Scan(&exists); err != nil || exists {
+		t.Fatalf("isolated schema remained: exists=%v err=%v", exists, err)
+	}
+	var afterPath string
+	if err := pool.QueryRow(t.Context(), "SHOW search_path").Scan(&afterPath); err != nil {
+		t.Fatal(err)
+	}
+	if afterPath != originalPath {
+		t.Fatalf("isolated session state leaked into pool: search_path=%q, want %q", afterPath, originalPath)
 	}
 }
