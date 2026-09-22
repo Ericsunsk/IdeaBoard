@@ -147,3 +147,21 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - `cd apps/api && go test ./internal/platform/idempotency -count=1 -race` 通过。
 - `cd apps/api && go vet ./internal/platform/idempotency` 通过。
 - 提交：`a7f3e32c fix(idempotency): harden fingerprints and concurrent replay`。
+
+## 第四批补充：Reward Redeem consumer（4B-1）
+
+`#771` 的原始 issue/评论明确要求 Reward Redeem 强制幂等键，并允许通过 durable `user+code` 事实 replay；本轮复核发现仅依赖该 natural fact 不足以绑定 caller key。MCP `search_graph` 追踪了 `UserHandler.Redeem`、rewards composition/service、前端 resource 和相关 HTTP tests。
+
+### 修复
+
+- `UserHandler.Redeem` 现在把 `(user, key, normalized code)` 绑定到 process-local `Store.Do`。同 key 同 code 直接 replay 首次结果并标记 `replayed=true`；同 key 不同 code 在副作用前返回 `409 reward_code_idempotency_conflict`。
+- `Idempotency-Key` 解析和 replay 判定先于 redemption rate limiter，合法 replay 不会再次消耗 quota 或被错误渲染成 `429`；只有真正的新副作用尝试进入 limiter。
+- Rewards HTTP 失败统一通过 machine-error mapping；补充错误码、key conflict、replay-before-limit 和独立 response fixture 测试。
+
+### Verification and boundary
+
+- 当前工作区：`go test -race` 覆盖 `platform/idempotency`、`boards`、`tasking/interfaces/http/task`、`rewards/interfaces/http`、`rewards/tests`，并对相关 package 执行 `go vet`，全部通过。
+- Clean archive（只含已提交代码）中 Rewards HTTP package/tests 的 `go test -count=1` 和 `go vet` 通过。
+- 提交：`c2daf1c8`、`295d57de`、`9413b36e`。
+- Replay 仍是单进程 cache；跨实例/重启的 Reward key→request durable fact 尚未建立，后续必须与 Rewards schema/service transaction 一起审计，不能把本批视作分布式幂等完成。
+- 工作区原有 `rewards/interfaces/http/metrics.go` 删除仍未纳入本批；这是独立的 observability 回归，需单独决定恢复或替代实现。
