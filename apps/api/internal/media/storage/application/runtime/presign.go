@@ -31,7 +31,10 @@ func (s *Service) Presign(ctx context.Context, req ports.PresignRequest) (ports.
 	}
 	profile, err := s.profiles.ResolveProfileByID(ctx, req.StorageProfileID)
 	if err != nil {
-		return ports.PresignedURL{}, fmt.Errorf("presign: %w", err)
+		return ports.PresignedURL{}, fmt.Errorf("presign: resolve storage profile %q: %w", req.StorageProfileID, err)
+	}
+	if profile.Provider == domain.StorageProviderLocal {
+		return ports.PresignedURL{}, domain.ErrPresignUnsupportedProvider
 	}
 	if req.ExpectedSizeBytes <= 0 || strings.TrimSpace(req.ExpectedMIMEType) == "" || strings.TrimSpace(req.ExpectedChecksumSHA256) == "" || req.ExpectedObjectGeneration <= 0 {
 		return ports.PresignedURL{}, fmt.Errorf("presign: integrity facts are required")
@@ -39,9 +42,6 @@ func (s *Service) Presign(ctx context.Context, req ports.PresignRequest) (ports.
 	verifier := integrity.NewIntegrityVerifier(s, integrity.IntegrityConfig{})
 	if err := verifier.Verify(ctx, req.StorageProfileID, req.ObjectKey, req.ExpectedChecksumSHA256, req.ExpectedMIMEType, req.ExpectedSizeBytes); err != nil {
 		return ports.PresignedURL{}, fmt.Errorf("presign: verify object: %w", err)
-	}
-	if profile.Provider == domain.StorageProviderLocal {
-		return ports.PresignedURL{}, domain.ErrPresignUnsupportedProvider
 	}
 	driver, err := s.drivers.GetDriver(profile.Provider)
 	if err != nil {
