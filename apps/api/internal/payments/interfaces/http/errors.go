@@ -1,21 +1,23 @@
 package http
 
 import (
-	"errors"
+	"log/slog"
 	"net/http"
 
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentports "ideaboard/api/internal/payments/ports"
-	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/platform/errorrender"
 
 	"github.com/gin-gonic/gin"
 )
 
 // paymentErrorMapping binds one stable outcome to its wire rendering. Codes
 // are machine-stable from here on; do not rename one without coordinating
-// the frontend. An empty message renders err.Error(); every table row must
-// provide a machine code.
+// the frontend. Every table row must provide a machine code and a fixed safe
+// message: the wire envelope never renders raw error text so wrapped provider,
+// storage, or database details cannot leak. The original error stays
+// attributable in server logs via slog.
 //
 // The tables below are the single source of truth for payments HTTP error
 // rendering. Domain, ports, and contracts sentinels stay dependency-free by
@@ -28,31 +30,25 @@ type paymentErrorMapping struct {
 	message string
 }
 
-func (m paymentErrorMapping) matches(err error) bool {
-	for _, target := range m.targets {
-		if errors.Is(err, target) {
-			return true
-		}
-	}
-	return false
+func (m paymentErrorMapping) Matches(err error) bool {
+	return errorrender.TargetsMatch(m.targets, err)
 }
 
 func (m paymentErrorMapping) render(c *gin.Context, err error) {
 	msg := m.message
 	if msg == "" {
-		msg = err.Error()
+		slog.Warn("payment error mapping missing safe message", "code", m.code, "status", m.status, "err", err)
+		msg = "请求处理失败，请稍后重试"
 	}
-	response.MachineError(c, m.status, m.code, msg)
+	errorrender.Render(c, m.status, m.code, msg)
 }
 
 func renderMappedPaymentError(c *gin.Context, err error, table []paymentErrorMapping, defaultStatus int, defaultMessage string) {
-	for _, m := range table {
-		if m.matches(err) {
-			m.render(c, err)
-			return
-		}
+	if row, ok := errorrender.FirstMatch(table, err); ok {
+		row.render(c, err)
+		return
 	}
-	response.Error(c, defaultStatus, defaultMessage)
+	errorrender.RenderNumeric(c, defaultStatus, defaultMessage)
 }
 
 var stripeConfigurationErrorTable = []paymentErrorMapping{
@@ -62,8 +58,9 @@ var stripeConfigurationErrorTable = []paymentErrorMapping{
 			paymentcontracts.ErrInvalidPaymentMethodConfiguration, paymentcontracts.ErrInvalidProductTaxCode,
 			paymentcontracts.ErrInvalidWebhookURL,
 		},
-		status: http.StatusBadRequest,
-		code:   "stripe_configuration_invalid_input",
+		status:  http.StatusBadRequest,
+		code:    "stripe_configuration_invalid_input",
+		message: "Stripe 配置参数错误",
 	},
 	{
 		targets: []error{paymentcontracts.ErrStripePermissionDenied},
@@ -76,8 +73,9 @@ var stripeConfigurationErrorTable = []paymentErrorMapping{
 			paymentcontracts.ErrStripeAccountUnavailable, paymentcontracts.ErrStripeCapabilityUnavailable,
 			paymentcontracts.ErrStripeConfigurationInvalid,
 		},
-		status: http.StatusUnprocessableEntity,
-		code:   "stripe_configuration_unprocessable",
+		status:  http.StatusUnprocessableEntity,
+		code:    "stripe_configuration_unprocessable",
+		message: "当前 Stripe 配置不可用",
 	},
 	{
 		targets: []error{paymentcontracts.ErrStripeProviderUnavailable},
@@ -99,31 +97,36 @@ var checkoutErrorTable = []paymentErrorMapping{
 			paymentsdomain.ErrInvalidIdeaQuantity, paymentsdomain.ErrTermsAcceptanceRequired,
 			paymentsdomain.ErrCheckoutIdempotencyKey,
 		},
-		status: http.StatusBadRequest,
-		code:   "checkout_invalid_input",
+		status:  http.StatusBadRequest,
+		code:    "checkout_invalid_input",
+		message: "充值参数错误",
 	},
 	{
 		targets: []error{
 			paymentsdomain.ErrCheckoutIdempotencyConflict, paymentcontracts.ErrPendingCheckoutLimit,
 			paymentcontracts.ErrPaymentAlreadyInProgress,
 		},
-		status: http.StatusConflict,
-		code:   "checkout_conflict",
+		status:  http.StatusConflict,
+		code:    "checkout_conflict",
+		message: "充值请求冲突，请稍后重试",
 	},
 	{
 		targets: []error{paymentcontracts.ErrPaymentAlreadyCompleted},
 		status:  http.StatusUnprocessableEntity,
 		code:    "payment_already_completed",
+		message: "该充值已完成，请勿重复支付",
 	},
 	{
 		targets: []error{paymentcontracts.ErrCheckoutSessionExpired},
 		status:  http.StatusUnprocessableEntity,
 		code:    "checkout_session_expired",
+		message: "支付页面已过期，请重新发起充值",
 	},
 	{
 		targets: []error{paymentsdomain.ErrWalletNotRechargeable},
-		status:  http.StatusLocked,
+		status:  http.StatusConflict,
 		code:    "wallet_not_rechargeable",
+		message: "当前账户暂不可充值",
 	},
 	{
 		targets: []error{paymentsdomain.ErrCheckoutRequestRejected},
@@ -147,14 +150,30 @@ var checkoutErrorTable = []paymentErrorMapping{
 	},
 }
 
+var rechargeHistoryErrorTable = []paymentErrorMapping{
+	{
+		targets: []error{paymentcontracts.ErrRechargeHistoryLimit},
+		status:  http.StatusBadRequest,
+		code:    "recharge_history_limit_invalid",
+		message: "充值记录 limit 无效",
+	},
+	{
+		targets: []error{paymentcontracts.ErrRechargeHistoryCursor},
+		status:  http.StatusBadRequest,
+		code:    "recharge_history_cursor_invalid",
+		message: "充值记录游标无效",
+	},
+}
+
 var stripeWebhookErrorTable = []paymentErrorMapping{
 	{
 		targets: []error{
 			paymentports.ErrInvalidWebhookSignature, paymentports.ErrWebhookSignatureExpired,
 			paymentports.ErrMalformedWebhookPayload,
 		},
-		status: http.StatusBadRequest,
-		code:   "webhook_signature_invalid",
+		status:  http.StatusBadRequest,
+		code:    "webhook_signature_invalid",
+		message: "Stripe Webhook 签名无效",
 	},
 	{
 		targets: []error{paymentcontracts.ErrStripeConfigurationNotFound, paymentcontracts.ErrStripeConfigurationInvalid},
@@ -174,4 +193,12 @@ func writeCheckoutError(c *gin.Context, err error) {
 
 func writeStripeWebhookError(c *gin.Context, err error) {
 	renderMappedPaymentError(c, err, stripeWebhookErrorTable, http.StatusInternalServerError, "Stripe Webhook 处理失败")
+}
+
+// writeRechargeHistoryError renders recharge-history failures through the
+// machine envelope so callers branch on stable codes instead of copy.
+// Pagination outcomes (limit/cursor) are part of the shared pagination
+// standard; unmapped failures keep the established safe message.
+func writeRechargeHistoryError(c *gin.Context, err error) {
+	renderMappedPaymentError(c, err, rechargeHistoryErrorTable, http.StatusInternalServerError, "读取充值记录失败")
 }
