@@ -4,16 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/idempotency"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
-	rewardsdomain "ideaboard/api/internal/rewards/domain"
 	"ideaboard/api/internal/rewards/ports"
 
 	"github.com/gin-gonic/gin"
@@ -24,7 +23,7 @@ const maxRewardRequestBytes int64 = 64 << 10
 type UserHandler struct {
 	service ports.UserService
 	limiter *redemptionAttemptLimiter
-	metrics redemptionMetrics
+	replay  *idempotency.Store
 }
 
 type AdminCommandHandler struct {
@@ -37,8 +36,7 @@ type AdminReadHandler struct {
 }
 
 type RedemptionHandlerOptions struct {
-	Now             func() time.Time
-	MetricsRecorder redemptionMetricsRecorder
+	Now func() time.Time
 }
 
 func NewUserHandler(service ports.UserService) *UserHandler {
@@ -46,15 +44,14 @@ func NewUserHandler(service ports.UserService) *UserHandler {
 }
 
 func NewUserHandlerWithOptions(service ports.UserService, options RedemptionHandlerOptions) *UserHandler {
-	if options.MetricsRecorder == nil {
-		options.MetricsRecorder = defaultRedemptionMetricsRecorder
-	}
 	return &UserHandler{
 		service: service,
 		limiter: newRedemptionAttemptLimiter(options.Now),
-		metrics: newRedemptionMetrics(options.Now, options.MetricsRecorder),
+		replay:  idempotency.NewStore(idempotency.DefaultStoreOptions()),
 	}
 }
+
+var errRewardRedeemRateLimited = errors.New("reward redemption rate limited")
 
 func NewAdminCommandHandler(service ports.AdminCommandService) *AdminCommandHandler {
 	return &AdminCommandHandler{service: service}
@@ -99,7 +96,7 @@ type redeemRequest struct {
 func (h *AdminCommandHandler) CreateRewardCode(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
+		writeRewardUnavailableError(c, false)
 		return
 	}
 	actorID, ok := requireAdmin(c)
@@ -108,7 +105,20 @@ func (h *AdminCommandHandler) CreateRewardCode(c *gin.Context) {
 	}
 	var request createRewardCodeRequest
 	if err := decodeRewardJSON(c, &request); err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
+		return
+	}
+	// Idempotency-Key header is canonical; the body idempotency_key stays
+	// accepted as fallback. A mismatch conflicts instead of forking codes.
+	key, err := idempotency.Resolve(c.GetHeader(idempotency.Header), request.IdempotencyKey)
+	if err != nil {
+		if idempotency.IsConflict(err) {
+			idempotency.DefaultMetrics.Observe(idempotency.OutcomeConflict)
+			response.MachineError(c, http.StatusConflict, codeRewardCodeIdempotencyConflict, "幂等请求与原创建参数不一致")
+			return
+		}
+		idempotency.DefaultMetrics.Observe(idempotency.OutcomeMissing)
+		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
 		return
 	}
 	created, err := h.service.CreateRewardCode(c.Request.Context(), ports.CreateRewardCodeCommand{
@@ -117,7 +127,7 @@ func (h *AdminCommandHandler) CreateRewardCode(c *gin.Context) {
 		CreditAmount:   request.CreditAmount,
 		MaxRedemptions: request.MaxRedemptions,
 		ExpiresAt:      request.ExpiresAt,
-		IdempotencyKey: request.IdempotencyKey,
+		IdempotencyKey: key,
 		ActorUserID:    actorID,
 	})
 	if err != nil {
@@ -130,7 +140,7 @@ func (h *AdminCommandHandler) CreateRewardCode(c *gin.Context) {
 func (h *AdminCommandHandler) UpdateRewardCode(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
+		writeRewardUnavailableError(c, false)
 		return
 	}
 	rewardCodeID, actorID, ok := requireAdminRewardCode(c)
@@ -139,7 +149,7 @@ func (h *AdminCommandHandler) UpdateRewardCode(c *gin.Context) {
 	}
 	var request updateRewardCodeRequest
 	if err := decodeRewardJSON(c, &request); err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
 		return
 	}
 	updated, err := h.service.UpdateRewardCode(c.Request.Context(), ports.UpdateRewardCodeCommand{
@@ -161,7 +171,7 @@ func (h *AdminCommandHandler) UpdateRewardCode(c *gin.Context) {
 func (h *AdminCommandHandler) SetRewardCodeEnabled(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
+		writeRewardUnavailableError(c, false)
 		return
 	}
 	rewardCodeID, actorID, ok := requireAdminRewardCode(c)
@@ -170,7 +180,7 @@ func (h *AdminCommandHandler) SetRewardCodeEnabled(c *gin.Context) {
 	}
 	var request setRewardCodeEnabledRequest
 	if err := decodeRewardJSON(c, &request); err != nil || request.Enabled == nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
 		return
 	}
 	updated, err := h.service.SetRewardCodeEnabled(c.Request.Context(), ports.SetRewardCodeEnabledCommand{
@@ -188,7 +198,7 @@ func (h *AdminCommandHandler) SetRewardCodeEnabled(c *gin.Context) {
 func (h *AdminCommandHandler) DeleteRewardCode(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
+		writeRewardUnavailableError(c, false)
 		return
 	}
 	rewardCodeID, actorID, ok := requireAdminRewardCode(c)
@@ -209,32 +219,32 @@ func (h *AdminCommandHandler) DeleteRewardCode(c *gin.Context) {
 func (h *AdminReadHandler) SearchRewardCodes(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
+		writeRewardUnavailableError(c, false)
 		return
 	}
 	if _, ok := requireAdmin(c); !ok {
 		return
 	}
 	if c.Request.URL.RawQuery != "" {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
 		return
 	}
 	var request searchRewardCodesRequest
 	if err := decodeRewardJSON(c, &request); err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
 		return
 	}
 	input := ports.SearchRewardCodesInput{Query: request.Query, Status: request.Status, Limit: 20}
 	if request.BeforeID != nil {
 		if *request.BeforeID <= 0 {
-			response.Error(c, http.StatusBadRequest, "参数错误")
+			writeRewardInputError(c, codeRewardPaginationInvalid, "参数错误")
 			return
 		}
 		input.BeforeID = *request.BeforeID
 	}
 	if request.Limit != nil {
 		if *request.Limit < 1 || *request.Limit > 100 {
-			response.Error(c, http.StatusBadRequest, "参数错误")
+			writeRewardInputError(c, codeRewardPaginationInvalid, "参数错误")
 			return
 		}
 		input.Limit = *request.Limit
@@ -250,7 +260,7 @@ func (h *AdminReadHandler) SearchRewardCodes(c *gin.Context) {
 func (h *AdminReadHandler) ListAdminRedemptions(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
+		writeRewardUnavailableError(c, false)
 		return
 	}
 	rewardCodeID, _, ok := requireAdminRewardCode(c)
@@ -265,7 +275,7 @@ func (h *AdminReadHandler) ListAdminRedemptions(c *gin.Context) {
 		raw = strings.TrimSpace(raw)
 		value, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || value <= 0 {
-			response.Error(c, http.StatusBadRequest, "before_id 无效")
+			writeRewardInputError(c, codeRewardPaginationInvalid, "before_id 无效")
 			return
 		}
 		input.BeforeID = value
@@ -274,7 +284,7 @@ func (h *AdminReadHandler) ListAdminRedemptions(c *gin.Context) {
 		raw = strings.TrimSpace(raw)
 		value, err := strconv.Atoi(raw)
 		if err != nil || value < 1 || value > 100 {
-			response.Error(c, http.StatusBadRequest, "limit 无效")
+			writeRewardInputError(c, codeRewardPaginationInvalid, "limit 无效")
 			return
 		}
 		input.Limit = value
@@ -294,7 +304,7 @@ func (h *AdminReadHandler) ListAdminRedemptions(c *gin.Context) {
 func (h *AdminReadHandler) GetAdminRedemption(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
+		writeRewardUnavailableError(c, false)
 		return
 	}
 	rewardCodeID, _, ok := requireAdminRewardCode(c)
@@ -303,7 +313,7 @@ func (h *AdminReadHandler) GetAdminRedemption(c *gin.Context) {
 	}
 	redemptionID, err := strconv.ParseInt(strings.TrimSpace(c.Param("redemption_id")), 10, 64)
 	if err != nil || redemptionID <= 0 {
-		response.Error(c, http.StatusBadRequest, "兑换记录 ID 无效")
+		writeRewardInputError(c, codeRewardRedemptionIDInvalid, "兑换记录 ID 无效")
 		return
 	}
 	detail, err := h.service.GetAdminRedemption(c.Request.Context(), ports.GetAdminRedemptionInput{
@@ -324,68 +334,66 @@ func (h *AdminReadHandler) GetAdminRedemption(c *gin.Context) {
 func (h *UserHandler) Redeem(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if h == nil || h.service == nil {
-		response.Error(c, http.StatusServiceUnavailable, "网络错误，请重试")
+		writeRewardUnavailableError(c, true)
 		return
 	}
 	identityPrincipal, ok := principal.Require(c)
 	if !ok {
 		return
 	}
-	finishMetrics := h.metrics.Start()
-	if !h.limiter.Allow(identityPrincipal.UserID()) {
-		finishMetrics(redemptionOutcomeRateLimited, 0, nil)
-		response.Error(c, http.StatusTooManyRequests, "操作频繁，请稍后重试")
+	key, err := idempotency.Parse(c.GetHeader(idempotency.Header))
+	if err != nil {
+		idempotency.DefaultMetrics.ObserveError(err)
+		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
 		return
 	}
 	var request redeemRequest
 	if err := decodeRewardJSON(c, &request); err != nil {
-		finishMetrics(redemptionOutcomeInvalid, 0, nil)
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
 		return
 	}
-	result, err := h.service.Redeem(c.Request.Context(), ports.RedeemCommand{
-		UserID: identityPrincipal.UserID(), Code: request.Code,
+	requestHash := idempotency.HashRequest(strings.TrimSpace(request.Code))
+	data, replayed, err := h.replay.Do(c.Request.Context(), "reward:redeem", identityPrincipal.UserID(), key, requestHash, func() (any, error) {
+		if !h.limiter.Allow(identityPrincipal.UserID()) {
+			return nil, errRewardRedeemRateLimited
+		}
+		return h.service.Redeem(c.Request.Context(), ports.RedeemCommand{
+			UserID: identityPrincipal.UserID(), Code: request.Code,
+		})
 	})
 	if err != nil {
-		finishMetrics(redemptionOutcomeForError(err), 0, err)
+		if errors.Is(err, errRewardRedeemRateLimited) {
+			writeRewardRateLimitedError(c)
+			return
+		}
+		if idempotency.IsConflict(err) {
+			idempotency.DefaultMetrics.Observe(idempotency.OutcomeConflict)
+			response.MachineError(c, http.StatusConflict, codeRewardCodeIdempotencyConflict, "幂等请求与原请求不一致")
+			return
+		}
 		writeRewardRedeemError(c, err)
 		return
 	}
+	if replayed {
+		idempotency.DefaultMetrics.Observe(idempotency.OutcomeReplay)
+	}
+	result, ok := data.(ports.RedeemResult)
+	if !ok {
+		writeRewardUnavailableError(c, true)
+		return
+	}
+	if replayed {
+		result.Replayed = true
+	}
 	result.Redemption.UserPublicID = identityPrincipal.PublicID()
 	result.Redemption.DisplayName = identityPrincipal.DisplayName()
-	if result.Replayed {
-		finishMetrics(redemptionOutcomeReplayed, 0, nil)
-	} else {
-		finishMetrics(redemptionOutcomeSuccess, result.CreditedAmount, nil)
-	}
 	response.SuccessDTO(c, result)
-}
-
-func redemptionOutcomeForError(err error) redemptionOutcome {
-	switch {
-	case errors.Is(err, rewardsdomain.ErrInvalidCode), errors.Is(err, rewardsdomain.ErrCodeUnavailable), errors.Is(err, rewardsdomain.ErrWalletFrozen):
-		return redemptionOutcomeInvalid
-	default:
-		return redemptionOutcomeInternalError
-	}
-}
-
-func writeRewardRedeemError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, rewardsdomain.ErrInvalidCode), errors.Is(err, rewardsdomain.ErrCodeUnavailable):
-		response.Error(c, http.StatusUnprocessableEntity, "兑换码无效或已失效")
-	case errors.Is(err, rewardsdomain.ErrWalletFrozen):
-		response.Error(c, http.StatusLocked, "当前账户无法兑换奖励")
-	default:
-		slog.Warn("reward redemption failed", "outcome", "internal_error", "error_type", fmt.Sprintf("%T", err))
-		response.Error(c, http.StatusInternalServerError, "网络错误，请重试")
-	}
 }
 
 func (h *UserHandler) ListRedemptions(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
+		writeRewardUnavailableError(c, false)
 		return
 	}
 	identityPrincipal, ok := principal.Require(c)
@@ -397,7 +405,7 @@ func (h *UserHandler) ListRedemptions(c *gin.Context) {
 		raw = strings.TrimSpace(raw)
 		value, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || value <= 0 {
-			response.Error(c, http.StatusBadRequest, "before_id 无效")
+			writeRewardInputError(c, codeRewardPaginationInvalid, "before_id 无效")
 			return
 		}
 		input.BeforeID = value
@@ -406,7 +414,7 @@ func (h *UserHandler) ListRedemptions(c *gin.Context) {
 		raw = strings.TrimSpace(raw)
 		value, err := strconv.Atoi(raw)
 		if err != nil || value < 1 || value > 100 {
-			response.Error(c, http.StatusBadRequest, "limit 无效")
+			writeRewardInputError(c, codeRewardPaginationInvalid, "limit 无效")
 			return
 		}
 		input.Limit = value
@@ -476,7 +484,7 @@ func requireAdminRewardCode(c *gin.Context) (int64, int64, bool) {
 	}
 	rewardCodeID, err := strconv.ParseInt(strings.TrimSpace(c.Param("id")), 10, 64)
 	if err != nil || rewardCodeID <= 0 {
-		response.Error(c, http.StatusBadRequest, "兑换码 ID 无效")
+		writeRewardInputError(c, codeRewardCodeIDInvalid, "兑换码 ID 无效")
 		return 0, 0, false
 	}
 	return rewardCodeID, actorID, true
@@ -484,30 +492,4 @@ func requireAdminRewardCode(c *gin.Context) (int64, int64, bool) {
 
 func decodeRewardJSON(c *gin.Context, destination any) error {
 	return jsonlimit.DecodeStrictRequest(c.Writer, c.Request, maxRewardRequestBytes, destination)
-}
-
-func writeRewardError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, rewardsdomain.ErrInvalidCode):
-		response.Error(c, http.StatusBadRequest, "参数错误")
-	case errors.Is(err, rewardsdomain.ErrRewardCodeConflict):
-		response.Error(c, http.StatusConflict, "幂等请求与原创建参数不一致")
-	case errors.Is(err, rewardsdomain.ErrCodeCollision):
-		response.Error(c, http.StatusConflict, "兑换码已存在")
-	case errors.Is(err, rewardsdomain.ErrRewardCodeNotFound):
-		response.Error(c, http.StatusNotFound, "兑换码不存在")
-	case errors.Is(err, rewardsdomain.ErrCapBelowRedemptions):
-		response.Error(c, http.StatusConflict, "兑换上限不能低于已兑换次数")
-	case errors.Is(err, rewardsdomain.ErrRewardCodeRedeemed):
-		response.Error(c, http.StatusConflict, "已有兑换记录，只能停用该兑换码")
-	case errors.Is(err, rewardsdomain.ErrRedemptionNotFound):
-		response.Error(c, http.StatusNotFound, "兑换记录不存在")
-	case errors.Is(err, rewardsdomain.ErrCodeUnavailable):
-		response.Error(c, http.StatusUnprocessableEntity, "兑换码无效或已失效")
-	case errors.Is(err, rewardsdomain.ErrWalletFrozen):
-		response.Error(c, http.StatusLocked, "当前账户无法兑换奖励")
-	default:
-		slog.Warn("reward admin operation failed", "error_type", fmt.Sprintf("%T", err))
-		response.Error(c, http.StatusInternalServerError, "奖励操作失败")
-	}
 }

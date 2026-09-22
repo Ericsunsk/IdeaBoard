@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -227,17 +226,6 @@ func TestAdminRedemptionListFailsClosedForMissingIdentityMapping(t *testing.T) {
 	}
 }
 
-type captureRedemptionMetrics struct {
-	mu           sync.Mutex
-	observations []redemptionMetricObservation
-}
-
-func (c *captureRedemptionMetrics) RecordRedemption(observation redemptionMetricObservation) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.observations = append(c.observations, observation)
-}
-
 func TestRewardRedeemRequiresAuthenticationAndDisablesCaching(t *testing.T) {
 	handler := NewUserHandler(rewardHandlerServiceStub{redeem: func(context.Context, RedeemCommand) (RedeemResult, error) {
 		t.Fatal("unauthenticated request reached Rewards service")
@@ -274,25 +262,23 @@ func TestRewardRedeemCannotTargetAnotherUserFromRequestBody(t *testing.T) {
 
 func TestRewardRedeemLimitsEachAuthenticatedUser(t *testing.T) {
 	now := time.Date(2026, time.July, 16, 12, 0, 0, 0, time.UTC)
-	metricsRecorder := &captureRedemptionMetrics{}
 	serviceCalls := 0
 	service := rewardHandlerServiceStub{redeem: func(context.Context, RedeemCommand) (RedeemResult, error) {
 		serviceCalls++
 		return RedeemResult{CreditedAmount: 1}, nil
 	}}
 	handler := newUserHandlerWithOptions(service, redemptionHandlerOptions{
-		Now:             func() time.Time { return now },
-		MetricsRecorder: metricsRecorder,
+		Now: func() time.Time { return now },
 	})
 
 	user41 := rewardRedeemRouter(t, handler, 41)
 	for attempt := 1; attempt <= defaultRedemptionAttemptLimit; attempt++ {
-		recorder := performRawRewardRedeem(t, user41, `{"code":"SECURE01"}`)
+		recorder := performRawRewardRedeemWithKey(t, user41, `{"code":"SECURE01"}`, fmt.Sprintf("secure-key-%d", attempt))
 		if recorder.Code != http.StatusOK {
 			t.Fatalf("attempt %d status = %d; body=%s", attempt, recorder.Code, recorder.Body.String())
 		}
 	}
-	limited := performRawRewardRedeem(t, user41, `{"code":"SECURE01"}`)
+	limited := performRawRewardRedeemWithKey(t, user41, `{"code":"SECURE01"}`, "secure-key-limited")
 	assertRewardErrorResponse(t, limited, http.StatusTooManyRequests, "操作频繁，请稍后重试")
 	if got := limited.Header().Get("Cache-Control"); got != "no-store" {
 		t.Fatalf("rate-limited Cache-Control = %q, want no-store", got)
@@ -300,65 +286,10 @@ func TestRewardRedeemLimitsEachAuthenticatedUser(t *testing.T) {
 	if serviceCalls != defaultRedemptionAttemptLimit {
 		t.Fatalf("service calls = %d, want %d", serviceCalls, defaultRedemptionAttemptLimit)
 	}
-	if got := metricsRecorder.observations[defaultRedemptionAttemptLimit].Outcome; got != redemptionOutcomeRateLimited {
-		t.Fatalf("limited request outcome = %q, want %q", got, redemptionOutcomeRateLimited)
-	}
 
 	user42 := rewardRedeemRouter(t, handler, 42)
 	if recorder := performRawRewardRedeem(t, user42, `{"code":"SECURE01"}`); recorder.Code != http.StatusOK {
 		t.Fatalf("other user status = %d; body=%s", recorder.Code, recorder.Body.String())
-	}
-}
-
-func TestRewardRedeemRecordsLowCardinalityOutcomes(t *testing.T) {
-	now := time.Date(2026, time.July, 16, 12, 0, 0, 0, time.UTC)
-	recorder := &captureRedemptionMetrics{}
-	service := rewardHandlerServiceStub{redeem: func(_ context.Context, command RedeemCommand) (RedeemResult, error) {
-		now = now.Add(25 * time.Millisecond)
-		switch command.Code {
-		case "SUCCESS1":
-			return RedeemResult{CreditedAmount: 25}, nil
-		case "REPLAY01":
-			return RedeemResult{CreditedAmount: 25, Replayed: true}, nil
-		case "INVALID1":
-			return RedeemResult{}, ErrCodeUnavailable
-		case "BADINPUT":
-			return RedeemResult{}, ErrInvalidCommand
-		default:
-			return RedeemResult{}, errors.New("database unavailable")
-		}
-	}}
-	handler := newUserHandlerWithOptions(service, redemptionHandlerOptions{
-		Now:             func() time.Time { return now },
-		MetricsRecorder: recorder,
-	})
-	router := rewardRedeemRouter(t, handler, 41)
-
-	for _, code := range []string{"SUCCESS1", "REPLAY01", "INVALID1", "BADINPUT", "INTERNAL"} {
-		performRawRewardRedeem(t, router, `{"code":"`+code+`"}`)
-	}
-
-	wantOutcomes := []redemptionOutcome{
-		redemptionOutcomeSuccess,
-		redemptionOutcomeReplayed,
-		redemptionOutcomeInvalid,
-		redemptionOutcomeInvalid,
-		redemptionOutcomeInternalError,
-	}
-	if len(recorder.observations) != len(wantOutcomes) {
-		t.Fatalf("observations = %+v, want %d", recorder.observations, len(wantOutcomes))
-	}
-	for index, want := range wantOutcomes {
-		observation := recorder.observations[index]
-		if observation.Outcome != want || observation.Latency != 25*time.Millisecond {
-			t.Fatalf("observation %d = %+v, want outcome=%q latency=25ms", index, observation, want)
-		}
-	}
-	if recorder.observations[0].CreditedCredits != 25 {
-		t.Fatalf("success credited Credits = %d, want 25", recorder.observations[0].CreditedCredits)
-	}
-	if recorder.observations[1].CreditedCredits != 0 {
-		t.Fatalf("replay credited Credits = %d, want 0", recorder.observations[1].CreditedCredits)
 	}
 }
 
@@ -499,9 +430,14 @@ func rewardRedeemRouter(t *testing.T, handler *UserHandler, userID int64) http.H
 }
 
 func performRawRewardRedeem(t *testing.T, router http.Handler, body string) *httptest.ResponseRecorder {
+	return performRawRewardRedeemWithKey(t, router, body, "security-test-key")
+}
+
+func performRawRewardRedeemWithKey(t *testing.T, router http.Handler, body, key string) *httptest.ResponseRecorder {
 	t.Helper()
 	request := httptest.NewRequest(http.MethodPost, "/user/rewards/redeem", strings.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Idempotency-Key", key)
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, request)
 	return recorder
