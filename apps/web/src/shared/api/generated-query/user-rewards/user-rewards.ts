@@ -25,7 +25,12 @@ import type {
   ApiResponseRewardRedeemResult,
   ApiResponseRewardRedemptionHistoryPage,
   ListUserRewardRedemptionsParams,
+  RewardCodeUnavailableError,
+  RewardInvalidInputError,
+  RewardRateLimitedError,
+  RewardRedeemFailedError,
   RewardRedeemRequest,
+  RewardWalletLockedError,
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
@@ -71,7 +76,14 @@ export const redeemUserReward = async (
 export const getRedeemUserRewardMutationKey = () => ['redeemUserReward'] as const
 
 export const getRedeemUserRewardMutationOptions = <
-  TError = ErrorType<ApiResponseBase>,
+  TError = ErrorType<
+    | RewardInvalidInputError
+    | ApiResponseBase
+    | RewardWalletLockedError
+    | RewardCodeUnavailableError
+    | RewardRateLimitedError
+    | RewardRedeemFailedError
+  >,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -110,10 +122,27 @@ export type RedeemUserRewardMutationResult = NonNullable<
   Awaited<ReturnType<typeof redeemUserReward>>
 >
 export type RedeemUserRewardMutationBody = BodyType<RewardRedeemRequest>
-export type RedeemUserRewardMutationError = ErrorType<ApiResponseBase>
+export type RedeemUserRewardMutationError = ErrorType<
+  | RewardInvalidInputError
+  | ApiResponseBase
+  | RewardWalletLockedError
+  | RewardCodeUnavailableError
+  | RewardRateLimitedError
+  | RewardRedeemFailedError
+>
 export type RedeemUserRewardMutationVariables = { data: BodyType<RewardRedeemRequest> }
 
-export const useRedeemUserReward = <TError = ErrorType<ApiResponseBase>, TContext = unknown>(
+export const useRedeemUserReward = <
+  TError = ErrorType<
+    | RewardInvalidInputError
+    | ApiResponseBase
+    | RewardWalletLockedError
+    | RewardCodeUnavailableError
+    | RewardRateLimitedError
+    | RewardRedeemFailedError
+  >,
+  TContext = unknown,
+>(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof redeemUserReward>>,

@@ -4,6 +4,7 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { DetectedGatewayModelModalities } from './detectedGatewayModelModalities'
 
 export interface DetectedGatewayModel {
   id: string
@@ -11,12 +12,11 @@ export interface DetectedGatewayModel {
   provider: string
   mode?: string
   description?: string
+  description_enriched?: boolean
   context_or_resolution?: string
-  /** Reference USD per token, never billing input. */
-  input_cost_per_token?: number
-  /** Reference USD per token, never billing input. */
-  output_cost_per_token?: number
-  cache_read_input_token_cost?: number
-  cache_creation_input_token_cost?: number
+  /** Raw models.dev limit.context in tokens, display metadata only, never billing input. */
+  context_limit?: number
+  capabilities?: string[]
+  modalities?: DetectedGatewayModelModalities
   supports_prompt_caching?: boolean
 }

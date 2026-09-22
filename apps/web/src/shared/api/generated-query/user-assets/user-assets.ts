@@ -477,6 +477,75 @@ export const useUploadUserProfileAvatar = <TError = ErrorType<unknown>, TContext
 > => {
   return useMutation(getUploadUserProfileAvatarMutationOptions(options), queryClient)
 }
+export const getGetUserProfileAvatarContentUrl = () => {
+  return `/user/profile/avatar/content`
+}
+
+export const getUserProfileAvatarContent = async (
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<Blob> => {
+  return orvalMutator<Blob>(getGetUserProfileAvatarContentUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetUserProfileAvatarContentQueryKey = () => {
+  return ['user', 'profile', 'avatar', 'content'] as const
+}
+
+export const getGetUserProfileAvatarContentQueryOptions = <
+  TData = Awaited<ReturnType<typeof getUserProfileAvatarContent>>,
+  TError = ErrorType<ApiResponseBase>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getUserProfileAvatarContent>>, TError, TData>
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetUserProfileAvatarContentQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserProfileAvatarContent>>> = ({
+    signal,
+  }) => getUserProfileAvatarContent({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getUserProfileAvatarContent>>,
+    TError,
+    TData
+  >
+}
+
+export type GetUserProfileAvatarContentQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getUserProfileAvatarContent>>
+>
+export type GetUserProfileAvatarContentQueryError = ErrorType<ApiResponseBase>
+
+export function useGetUserProfileAvatarContent<
+  TData = Awaited<ReturnType<typeof getUserProfileAvatarContent>>,
+  TError = ErrorType<ApiResponseBase>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getUserProfileAvatarContent>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetUserProfileAvatarContentQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
 export const getUploadUserBoardAssetUrl = (boardId: string) => {
   return `/user/boards/${encodeURIComponent(String(boardId))}/uploads`
 }

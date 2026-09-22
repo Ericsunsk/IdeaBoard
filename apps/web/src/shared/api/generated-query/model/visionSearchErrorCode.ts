@@ -20,8 +20,9 @@ export const VisionSearchErrorCode = {
   vision_search_network: 'vision_search_network',
   vision_search_provider_error: 'vision_search_provider_error',
   vision_search_schema_error: 'vision_search_schema_error',
-  vision_search_idempotency_key_required: 'vision_search_idempotency_key_required',
-  vision_search_idempotency_conflict: 'vision_search_idempotency_conflict',
-  vision_search_pricing_unavailable: 'vision_search_pricing_unavailable',
+  idempotency_key_required: 'idempotency_key_required',
+  idempotency_conflict: 'idempotency_conflict',
+  pricing_unavailable: 'pricing_unavailable',
   insufficient_credits: 'insufficient_credits',
+  wallet_restricted: 'wallet_restricted',
 } as const

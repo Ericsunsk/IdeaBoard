@@ -21,18 +21,22 @@ import { computed, toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
+  ApiResponseBase,
   ApiResponseMessage,
   ApiResponseTask,
   ApiResponseTaskId,
   ApiResponseTaskList,
   ApiResponseTaskSubmitReadiness,
   ApiResponseTaskSubmitReadinessMatrix,
+  IdempotencyConflictError,
+  IdempotencyKeyRequiredError,
   InsufficientCreditsError,
   ListUserTasksParams,
   PricingUnavailableError,
   SubmissionFailedError,
   SubmitTaskReadinessMatrixRequest,
   SubmitTaskRequest,
+  TaskSubmissionConflictError,
   WalletRestrictedError,
 } from '../model'
 
@@ -80,8 +84,12 @@ export const getSubmitUserTaskMutationKey = () => ['submitUserTask'] as const
 
 export const getSubmitUserTaskMutationOptions = <
   TError = ErrorType<
+    | ApiResponseBase
+    | IdempotencyKeyRequiredError
     | InsufficientCreditsError
     | WalletRestrictedError
+    | IdempotencyConflictError
+    | TaskSubmissionConflictError
     | PricingUnavailableError
     | SubmissionFailedError
   >,
@@ -122,14 +130,25 @@ export const getSubmitUserTaskMutationOptions = <
 export type SubmitUserTaskMutationResult = NonNullable<Awaited<ReturnType<typeof submitUserTask>>>
 export type SubmitUserTaskMutationBody = BodyType<SubmitTaskRequest>
 export type SubmitUserTaskMutationError = ErrorType<
-  InsufficientCreditsError | WalletRestrictedError | PricingUnavailableError | SubmissionFailedError
+  | ApiResponseBase
+  | IdempotencyKeyRequiredError
+  | InsufficientCreditsError
+  | WalletRestrictedError
+  | IdempotencyConflictError
+  | TaskSubmissionConflictError
+  | PricingUnavailableError
+  | SubmissionFailedError
 >
 export type SubmitUserTaskMutationVariables = { data: BodyType<SubmitTaskRequest> }
 
 export const useSubmitUserTask = <
   TError = ErrorType<
+    | ApiResponseBase
+    | IdempotencyKeyRequiredError
     | InsufficientCreditsError
     | WalletRestrictedError
+    | IdempotencyConflictError
+    | TaskSubmissionConflictError
     | PricingUnavailableError
     | SubmissionFailedError
   >,
@@ -524,7 +543,7 @@ export const cancelUserTask = async (
 export const getCancelUserTaskMutationKey = () => ['cancelUserTask'] as const
 
 export const getCancelUserTaskMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<IdempotencyKeyRequiredError | IdempotencyConflictError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -561,10 +580,15 @@ export const getCancelUserTaskMutationOptions = <
 
 export type CancelUserTaskMutationResult = NonNullable<Awaited<ReturnType<typeof cancelUserTask>>>
 
-export type CancelUserTaskMutationError = ErrorType<unknown>
+export type CancelUserTaskMutationError = ErrorType<
+  IdempotencyKeyRequiredError | IdempotencyConflictError
+>
 export type CancelUserTaskMutationVariables = { taskId: string }
 
-export const useCancelUserTask = <TError = ErrorType<unknown>, TContext = unknown>(
+export const useCancelUserTask = <
+  TError = ErrorType<IdempotencyKeyRequiredError | IdempotencyConflictError>,
+  TContext = unknown,
+>(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof cancelUserTask>>,

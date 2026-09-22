@@ -10,7 +10,7 @@ import type { WorkflowFeatureSlug } from './workflowFeatureSlug'
 export interface SubmitTaskRequest {
   prompt: string
   /**
-   * Client-generated idempotency key for a single task submission action. It is required for every canonical AI image workflow because billed submissions must converge after network timeouts. Reuse the same value when retrying the same action; generate a new value for an intentional rerun.
+   * Client-generated idempotency key for a single task submission action. It is required for every canonical AI image workflow because billed submissions must converge after network timeouts. Reuse the same value when retrying the same action; generate a new value for an intentional rerun. Prefer the Idempotency-Key header; this body field stays accepted as fallback and a header/body mismatch is a 409 conflict.
    * @maxLength 128
    * @pattern ^[A-Za-z0-9_.:-]+$
    */

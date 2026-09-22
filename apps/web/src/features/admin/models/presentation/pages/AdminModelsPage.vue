@@ -106,8 +106,13 @@
         :key="model.id"
         class="group flex flex-col h-full overflow-hidden rounded-xl border border-admin-border-soft bg-white transition-colors hover:border-admin-accent/50"
       >
-        <!-- 卡片主体区域 (Upper Section) -->
-        <AdminModelCardBody :model="model" hoverable />
+        <!-- 卡片主体区域 (Upper Section，含近 7 天观测区) -->
+        <AdminModelCardBody
+          :model="model"
+          hoverable
+          :observed="observedByModel.get(model.id)"
+          :observed-loading="isObservedLoading"
+        />
         <!-- 卡片底栏 (1:1 复刻 Cloudflare ModelCard Secondary Footer: 条款/文档链接 + 复制 ID / 编辑 / 删除 按钮) -->
         <div
           class="flex items-center justify-between border-t border-admin-border-soft bg-admin-bg/50 px-4 py-2 text-xs"
@@ -260,6 +265,8 @@ const {
   isListError,
   isListStale,
   refetchCatalog,
+  observedByModel,
+  isObservedLoading,
   isSaving,
   isRefreshing,
   addDialogVisible,

@@ -26,8 +26,10 @@ export function blankModelForm(): AdminModelItem {
 }
 
 // 探测模型入库：description 为空即空（不再写占位文案），靠富化位 +
-// 为空即补收敛；capabilities 置空（未知不伪造），hosting 按供应商推导，
-// 社区参考价原样透传。descriptionEnriched 置 true：导入文本都视为可被更新探测覆盖。
+// 为空即补收敛；capabilities 置空（未知不伪造），hosting 按供应商推导。
+// 目录/探测不带价（后端票 773 已删 4 单价字段）：结算唯一依据 billing SKU UnitCredits，
+// 参照价走 models-reference 接口按需查询，不随目录保存。descriptionEnriched 置 true：
+// 导入文本都视为可被更新探测覆盖。
 export function buildModelItemFromDetected(model: DetectedGatewayModel): AdminModelItem {
   return {
     id: model.id,
@@ -43,10 +45,6 @@ export function buildModelItemFromDetected(model: DetectedGatewayModel): AdminMo
       : MODEL_HOSTING_THIRD_PARTY,
     termsUrl: '',
     docsUrl: '',
-    inputCostPerToken: model.input_cost_per_token,
-    outputCostPerToken: model.output_cost_per_token,
-    cacheReadCostPerToken: model.cache_read_input_token_cost,
-    cacheCreateCostPerToken: model.cache_creation_input_token_cost,
     supportsPromptCaching: model.supports_prompt_caching,
   }
 }

@@ -88,6 +88,46 @@ describe('AdminModelsPage', () => {
           ],
         }),
       ),
+      http.get('/api/admin/settings/ai-gateway/models-observed', () =>
+        HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: [
+            {
+              model: 'openai/gpt-image-1',
+              provider: 'OpenAI',
+              window_days: 7,
+              window_since: '2026-09-15T00:00:00Z',
+              attempts_total: 100,
+              completed: 92,
+              failed: 8,
+              cache_hits: 30,
+              success_rate: 0.92,
+              cache_hit_rate: 0.3,
+              top_failure_stage: 'render',
+              top_failure_category: 'timeout',
+              top_failure_count: 5,
+              has_observations: true,
+              has_sku_margin: true,
+              sku_margins: [
+                {
+                  sku: 'ai-image:gpt-image-1',
+                  display_name: 'GPT Image 1',
+                  feature: 'generation',
+                  on_sale: true,
+                  unit_credits_by_variant: { default: 100 },
+                  actual_cost_credits: null,
+                  has_actual_cost: false,
+                  cost_source: 'unavailable',
+                  cost_note: '网关实际成本暂无来源',
+                  margin_credits: null,
+                  margin_status: 'unknown_no_cost',
+                },
+              ],
+            },
+          ],
+        }),
+      ),
     )
   })
 
@@ -256,6 +296,20 @@ describe('AdminModelsPage', () => {
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalled()
     })
+  })
+
+  it('renders observed stats on cards and graceful fallback for unobserved models', async () => {
+    renderModelsPage()
+    await screen.findByText('我们找到了 2 个模型')
+
+    // 有观测的卡片：成功率/失败分类/cache 命中率/在售标记。
+    expect(await screen.findByText('92%')).toBeInTheDocument()
+    expect(screen.getByText('render / timeout · 5 次')).toBeInTheDocument()
+    expect(screen.getByText('GPT Image 1 · 在售')).toBeInTheDocument()
+    // margin/cost 恒 null：暂无数据，不编造。
+    expect(screen.getByText('成本 / 毛利')).toBeInTheDocument()
+    // 无观测的卡片（seedream-v2 缺席接口）：优雅缺省。
+    expect(screen.getByText(/暂无 7 天观测数据/)).toBeInTheDocument()
   })
 
   it('opens add gateway dialog when clicking 新增网关 button', async () => {

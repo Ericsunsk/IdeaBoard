@@ -19,11 +19,5 @@ export interface GatewayModelCatalogItem {
   custom_path?: string
   custom_params?: string
   description_enriched?: boolean
-  /** Reference USD per token, never billing input. */
-  input_cost_per_token?: number
-  /** Reference USD per token, never billing input. */
-  output_cost_per_token?: number
-  cache_read_input_token_cost?: number
-  cache_creation_input_token_cost?: number
   supports_prompt_caching?: boolean
 }

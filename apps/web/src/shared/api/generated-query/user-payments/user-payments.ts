@@ -28,10 +28,13 @@ import type {
   ApiResponsePendingPaymentOrder,
   ApiResponsePendingPaymentOrderList,
   ApiResponseRechargeHistoryPage,
+  CheckoutConflictError,
+  CheckoutInvalidInputError,
   CheckoutRequestRejectedError,
   CheckoutStateConflictError,
   CreatePaymentCheckoutRequest,
   ListUserPaymentRechargesParams,
+  WalletNotRechargeableError,
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
@@ -147,7 +150,13 @@ export const getCreateUserPaymentCheckoutSessionMutationKey = () =>
   ['createUserPaymentCheckoutSession'] as const
 
 export const getCreateUserPaymentCheckoutSessionMutationOptions = <
-  TError = ErrorType<ApiResponseBase | CheckoutRequestRejectedError | CheckoutStateConflictError>,
+  TError = ErrorType<
+    | CheckoutInvalidInputError
+    | CheckoutConflictError
+    | WalletNotRechargeableError
+    | CheckoutRequestRejectedError
+    | CheckoutStateConflictError
+  >,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -187,14 +196,24 @@ export type CreateUserPaymentCheckoutSessionMutationResult = NonNullable<
 >
 export type CreateUserPaymentCheckoutSessionMutationBody = BodyType<CreatePaymentCheckoutRequest>
 export type CreateUserPaymentCheckoutSessionMutationError = ErrorType<
-  ApiResponseBase | CheckoutRequestRejectedError | CheckoutStateConflictError
+  | CheckoutInvalidInputError
+  | CheckoutConflictError
+  | WalletNotRechargeableError
+  | CheckoutRequestRejectedError
+  | CheckoutStateConflictError
 >
 export type CreateUserPaymentCheckoutSessionMutationVariables = {
   data: BodyType<CreatePaymentCheckoutRequest>
 }
 
 export const useCreateUserPaymentCheckoutSession = <
-  TError = ErrorType<ApiResponseBase | CheckoutRequestRejectedError | CheckoutStateConflictError>,
+  TError = ErrorType<
+    | CheckoutInvalidInputError
+    | CheckoutConflictError
+    | WalletNotRechargeableError
+    | CheckoutRequestRejectedError
+    | CheckoutStateConflictError
+  >,
   TContext = unknown,
 >(
   options?: {

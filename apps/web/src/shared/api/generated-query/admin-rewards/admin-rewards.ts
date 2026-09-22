@@ -33,6 +33,8 @@ import type {
   ApiResponseRewardCodePage,
   ApiResponseUpdatedRewardCode,
   ListAdminRewardCodeRedemptionsParams,
+  RewardCodeIdempotencyConflictError,
+  RewardInvalidInputError,
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
@@ -78,7 +80,7 @@ export const createAdminRewardCode = async (
 export const getCreateAdminRewardCodeMutationKey = () => ['createAdminRewardCode'] as const
 
 export const getCreateAdminRewardCodeMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<RewardInvalidInputError | RewardCodeIdempotencyConflictError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -117,12 +119,17 @@ export type CreateAdminRewardCodeMutationResult = NonNullable<
   Awaited<ReturnType<typeof createAdminRewardCode>>
 >
 export type CreateAdminRewardCodeMutationBody = BodyType<AdminRewardCodeCreateRequest>
-export type CreateAdminRewardCodeMutationError = ErrorType<unknown>
+export type CreateAdminRewardCodeMutationError = ErrorType<
+  RewardInvalidInputError | RewardCodeIdempotencyConflictError
+>
 export type CreateAdminRewardCodeMutationVariables = {
   data: BodyType<AdminRewardCodeCreateRequest>
 }
 
-export const useCreateAdminRewardCode = <TError = ErrorType<unknown>, TContext = unknown>(
+export const useCreateAdminRewardCode = <
+  TError = ErrorType<RewardInvalidInputError | RewardCodeIdempotencyConflictError>,
+  TContext = unknown,
+>(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof createAdminRewardCode>>,

@@ -13,7 +13,7 @@ export type ListLibraryAssetsParams = {
   cursor?: string
   /**
    * @minimum 1
-   * @maximum 48
+   * @maximum 200
    */
   limit?: number
 }

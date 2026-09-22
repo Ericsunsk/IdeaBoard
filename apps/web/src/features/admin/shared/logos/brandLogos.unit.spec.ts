@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest'
 import {
   ADMIN_BRAND_CATEGORIES,
   ALL_ADMIN_BRAND_LOGOS,
+  adminBrandLogoProxyUrl,
   detectAdminBrandLogoKey,
   getAdminBrandLogo,
   getAdminBrandLogoOverride,
   replaceAdminBrandLogoOverrides,
   resolveModelBrandLogo,
 } from './brandLogos'
+
+const LOGO_ENDPOINT = '/api/admin/settings/ai-gateway/brand-logo'
 
 describe('adminBrandLogos', () => {
   it('defines all major brand categories', () => {
@@ -27,6 +30,31 @@ describe('adminBrandLogos', () => {
     expect(ALL_ADMIN_BRAND_LOGOS.some((l) => l.category === 'china-ai')).toBe(true)
     expect(ALL_ADMIN_BRAND_LOGOS.some((l) => l.category === 'global-ai')).toBe(true)
     expect(ALL_ADMIN_BRAND_LOGOS.some((l) => l.category === 'storage')).toBe(true)
+  })
+
+  it('routes provider logos through the backend models.dev passthrough', () => {
+    expect(adminBrandLogoProxyUrl('openai')).toBe(`${LOGO_ENDPOINT}?provider=openai`)
+    expect(adminBrandLogoProxyUrl('fal')).toBe(`${LOGO_ENDPOINT}?provider=fal`)
+
+    const openai = ALL_ADMIN_BRAND_LOGOS.find((l) => l.key === 'openai')
+    expect(openai?.logoSrc).toBe(`${LOGO_ENDPOINT}?provider=openai`)
+    const fal = ALL_ADMIN_BRAND_LOGOS.find((l) => l.key === 'fal')
+    expect(fal?.logoSrc).toBe(`${LOGO_ENDPOINT}?provider=fal`)
+
+    // 存储与身份类目仍用站内现成资产，不走透传。
+    const minio = ALL_ADMIN_BRAND_LOGOS.find((l) => l.key === 'minio')
+    expect(minio?.logoSrc).not.toContain(LOGO_ENDPOINT)
+    const github = ALL_ADMIN_BRAND_LOGOS.find((l) => l.key === 'github')
+    expect(github?.logoSrc).not.toContain(LOGO_ENDPOINT)
+  })
+
+  it('maps keys with divergent models.dev provider IDs to verified upstream IDs', () => {
+    expect(adminBrandLogoProxyUrl('zhipu')).toBe(`${LOGO_ENDPOINT}?provider=zhipuai`)
+    expect(adminBrandLogoProxyUrl('moonshot')).toBe(`${LOGO_ENDPOINT}?provider=moonshotai`)
+    expect(adminBrandLogoProxyUrl('aliyun')).toBe(`${LOGO_ENDPOINT}?provider=alibaba`)
+    expect(adminBrandLogoProxyUrl('doubao')).toBe(`${LOGO_ENDPOINT}?provider=volcengine`)
+    expect(adminBrandLogoProxyUrl('gemini')).toBe(`${LOGO_ENDPOINT}?provider=google`)
+    expect(adminBrandLogoProxyUrl('bedrock')).toBe(`${LOGO_ENDPOINT}?provider=amazon-bedrock`)
   })
 
   it('detects brand logos by keyword, domain, and endpoint patterns', () => {
@@ -81,7 +109,7 @@ describe('adminBrandLogos', () => {
     expect(getAdminBrandLogoOverride('storage-profile', 'storage-101')).toBeUndefined()
   })
 
-  it('resolves model brand logo dynamically based on model name, id, and provider', () => {
+  it('resolves model brand logo URLs based on model name, id, and provider', () => {
     const getLogo = (key: string) => ALL_ADMIN_BRAND_LOGOS.find((l) => l.key === key)?.logoSrc
 
     // 1. 用户真实截图场景：模型名为 Google/Gemini，但提供商为 OpenRouter
@@ -108,13 +136,13 @@ describe('adminBrandLogos', () => {
     })
     expect(claudeLogo).toBe(getLogo('anthropic'))
 
-    // 4. 模型名称为通用名，但提供商为 Fal AI -> 兜底为 Fal 图标
+    // 4. 模型名称为通用名，但提供商为 Fal AI -> 兜底为 Fal 透传地址（上游回默认图，不断图）
     const falLogo = resolveModelBrandLogo({
       id: 'fal-ai/birefnet',
       name: 'BiRefNet 高清智能抠图',
       provider: 'Fal AI',
     })
-    expect(falLogo).toBe(getLogo('fal'))
+    expect(falLogo).toBe(`${LOGO_ENDPOINT}?provider=fal`)
 
     // 5. 完全未知的自建模型 -> 返回 undefined (回退到 Cube 图标)
     const unknownLogo = resolveModelBrandLogo({

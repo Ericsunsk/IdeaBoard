@@ -35,6 +35,20 @@ describe('AdminModelEditDialog', () => {
           ],
         })
       }),
+      // 右侧参照价面板经后端透传查询：默认 miss 降级，不阻塞表单主流程。
+      http.get('/api/admin/settings/ai-gateway/models-reference', () => {
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            model_id: '',
+            source: 'models.dev',
+            note: '参照价，非结算依据',
+            found: false,
+            error_code: 'not_found',
+          },
+        })
+      }),
     )
   })
 

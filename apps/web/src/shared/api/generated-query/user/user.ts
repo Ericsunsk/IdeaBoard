@@ -20,11 +20,9 @@ import type {
 import { unref } from 'vue'
 
 import type {
-  ApiResponseEmpty,
   ApiResponseUserInfo,
   ApiResponseVisionExtraction,
   ExtractUserVisionSearchBody,
-  RecordSearchImageFailureRequest,
   VisionSearchError,
 } from '../model'
 
@@ -95,107 +93,6 @@ export function useGetUserInfo<
   return query
 }
 
-export const getRecordSearchImageFailureUrl = () => {
-  return `/user/search/metrics`
-}
-
-export const recordSearchImageFailure = async (
-  recordSearchImageFailureRequest: RecordSearchImageFailureRequest,
-  options?: Parameters<typeof orvalMutator>[1],
-): Promise<ApiResponseEmpty> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit['headers']>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
-  return orvalMutator<ApiResponseEmpty>(getRecordSearchImageFailureUrl(), {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(recordSearchImageFailureRequest),
-  })
-}
-
-export const getRecordSearchImageFailureMutationKey = () => ['recordSearchImageFailure'] as const
-
-export const getRecordSearchImageFailureMutationOptions = <
-  TError = ErrorType<unknown>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof recordSearchImageFailure>>,
-    TError,
-    RecordSearchImageFailureMutationVariables,
-    TContext
-  >
-  request?: SecondParameter<typeof orvalMutator>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof recordSearchImageFailure>>,
-  TError,
-  RecordSearchImageFailureMutationVariables,
-  TContext
-> => {
-  const mutationKey = getRecordSearchImageFailureMutationKey()
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof recordSearchImageFailure>>,
-    RecordSearchImageFailureMutationVariables
-  > = (props) => {
-    const { data } = props ?? {}
-
-    return recordSearchImageFailure(data, requestOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type RecordSearchImageFailureMutationResult = NonNullable<
-  Awaited<ReturnType<typeof recordSearchImageFailure>>
->
-export type RecordSearchImageFailureMutationBody = BodyType<RecordSearchImageFailureRequest>
-export type RecordSearchImageFailureMutationError = ErrorType<unknown>
-export type RecordSearchImageFailureMutationVariables = {
-  data: BodyType<RecordSearchImageFailureRequest>
-}
-
-export const useRecordSearchImageFailure = <TError = ErrorType<unknown>, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof recordSearchImageFailure>>,
-      TError,
-      RecordSearchImageFailureMutationVariables,
-      TContext
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof recordSearchImageFailure>>,
-  TError,
-  RecordSearchImageFailureMutationVariables,
-  TContext
-> => {
-  return useMutation(getRecordSearchImageFailureMutationOptions(options), queryClient)
-}
 export const getExtractUserVisionSearchUrl = () => {
   return `/user/search/vision-extract`
 }

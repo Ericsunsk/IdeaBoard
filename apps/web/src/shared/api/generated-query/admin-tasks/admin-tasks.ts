@@ -25,6 +25,8 @@ import type {
   ApiResponseAdminTaskList,
   ApiResponseMessage,
   ApiResponseTaskId,
+  IdempotencyConflictError,
+  IdempotencyKeyRequiredError,
   ListAdminTasksParams,
   SubmitTaskRequest,
 } from '../model'
@@ -225,7 +227,7 @@ export const cancelAdminTask = async (
 export const getCancelAdminTaskMutationKey = () => ['cancelAdminTask'] as const
 
 export const getCancelAdminTaskMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<IdempotencyKeyRequiredError | IdempotencyConflictError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -262,10 +264,15 @@ export const getCancelAdminTaskMutationOptions = <
 
 export type CancelAdminTaskMutationResult = NonNullable<Awaited<ReturnType<typeof cancelAdminTask>>>
 
-export type CancelAdminTaskMutationError = ErrorType<unknown>
+export type CancelAdminTaskMutationError = ErrorType<
+  IdempotencyKeyRequiredError | IdempotencyConflictError
+>
 export type CancelAdminTaskMutationVariables = { taskId: string }
 
-export const useCancelAdminTask = <TError = ErrorType<unknown>, TContext = unknown>(
+export const useCancelAdminTask = <
+  TError = ErrorType<IdempotencyKeyRequiredError | IdempotencyConflictError>,
+  TContext = unknown,
+>(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof cancelAdminTask>>,

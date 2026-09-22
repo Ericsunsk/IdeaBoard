@@ -10,4 +10,6 @@ export type SubmissionFailedErrorCode =
 
 export const SubmissionFailedErrorCode = {
   submission_failed: 'submission_failed',
+  provider_unavailable: 'provider_unavailable',
+  prompt_unavailable: 'prompt_unavailable',
 } as const

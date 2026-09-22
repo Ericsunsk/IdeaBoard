@@ -30,6 +30,8 @@ import type {
   ApiResponseUserBoard,
   ApiResponseUserBoardList,
   CreateBoardShareTokenRequest,
+  IdempotencyConflictError,
+  IdempotencyKeyRequiredError,
   InviteBoardMemberRequest,
   JoinBoardByShareTokenBody,
   UpdateBoardMemberRoleRequest,
@@ -387,7 +389,7 @@ export const inviteBoardMember = async (
 export const getInviteBoardMemberMutationKey = () => ['inviteBoardMember'] as const
 
 export const getInviteBoardMemberMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<IdempotencyKeyRequiredError | IdempotencyConflictError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -426,13 +428,18 @@ export type InviteBoardMemberMutationResult = NonNullable<
   Awaited<ReturnType<typeof inviteBoardMember>>
 >
 export type InviteBoardMemberMutationBody = BodyType<InviteBoardMemberRequest>
-export type InviteBoardMemberMutationError = ErrorType<unknown>
+export type InviteBoardMemberMutationError = ErrorType<
+  IdempotencyKeyRequiredError | IdempotencyConflictError
+>
 export type InviteBoardMemberMutationVariables = {
   boardId: string
   data: BodyType<InviteBoardMemberRequest>
 }
 
-export const useInviteBoardMember = <TError = ErrorType<unknown>, TContext = unknown>(
+export const useInviteBoardMember = <
+  TError = ErrorType<IdempotencyKeyRequiredError | IdempotencyConflictError>,
+  TContext = unknown,
+>(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof inviteBoardMember>>,
@@ -751,7 +758,7 @@ export const createBoardShareToken = async (
 export const getCreateBoardShareTokenMutationKey = () => ['createBoardShareToken'] as const
 
 export const getCreateBoardShareTokenMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<IdempotencyKeyRequiredError | IdempotencyConflictError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -790,13 +797,18 @@ export type CreateBoardShareTokenMutationResult = NonNullable<
   Awaited<ReturnType<typeof createBoardShareToken>>
 >
 export type CreateBoardShareTokenMutationBody = BodyType<CreateBoardShareTokenRequest>
-export type CreateBoardShareTokenMutationError = ErrorType<unknown>
+export type CreateBoardShareTokenMutationError = ErrorType<
+  IdempotencyKeyRequiredError | IdempotencyConflictError
+>
 export type CreateBoardShareTokenMutationVariables = {
   boardId: string
   data: BodyType<CreateBoardShareTokenRequest>
 }
 
-export const useCreateBoardShareToken = <TError = ErrorType<unknown>, TContext = unknown>(
+export const useCreateBoardShareToken = <
+  TError = ErrorType<IdempotencyKeyRequiredError | IdempotencyConflictError>,
+  TContext = unknown,
+>(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof createBoardShareToken>>,
@@ -833,7 +845,7 @@ export const revokeBoardShareToken = async (
 export const getRevokeBoardShareTokenMutationKey = () => ['revokeBoardShareToken'] as const
 
 export const getRevokeBoardShareTokenMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<IdempotencyKeyRequiredError | IdempotencyConflictError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -872,10 +884,15 @@ export type RevokeBoardShareTokenMutationResult = NonNullable<
   Awaited<ReturnType<typeof revokeBoardShareToken>>
 >
 
-export type RevokeBoardShareTokenMutationError = ErrorType<unknown>
+export type RevokeBoardShareTokenMutationError = ErrorType<
+  IdempotencyKeyRequiredError | IdempotencyConflictError
+>
 export type RevokeBoardShareTokenMutationVariables = { boardId: string; tokenId: number }
 
-export const useRevokeBoardShareToken = <TError = ErrorType<unknown>, TContext = unknown>(
+export const useRevokeBoardShareToken = <
+  TError = ErrorType<IdempotencyKeyRequiredError | IdempotencyConflictError>,
+  TContext = unknown,
+>(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof revokeBoardShareToken>>,
@@ -932,7 +949,7 @@ export const joinBoardByShareToken = async (
 export const getJoinBoardByShareTokenMutationKey = () => ['joinBoardByShareToken'] as const
 
 export const getJoinBoardByShareTokenMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<IdempotencyKeyRequiredError | IdempotencyConflictError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -971,10 +988,15 @@ export type JoinBoardByShareTokenMutationResult = NonNullable<
   Awaited<ReturnType<typeof joinBoardByShareToken>>
 >
 export type JoinBoardByShareTokenMutationBody = BodyType<JoinBoardByShareTokenBody>
-export type JoinBoardByShareTokenMutationError = ErrorType<unknown>
+export type JoinBoardByShareTokenMutationError = ErrorType<
+  IdempotencyKeyRequiredError | IdempotencyConflictError
+>
 export type JoinBoardByShareTokenMutationVariables = { data: BodyType<JoinBoardByShareTokenBody> }
 
-export const useJoinBoardByShareToken = <TError = ErrorType<unknown>, TContext = unknown>(
+export const useJoinBoardByShareToken = <
+  TError = ErrorType<IdempotencyKeyRequiredError | IdempotencyConflictError>,
+  TContext = unknown,
+>(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof joinBoardByShareToken>>,

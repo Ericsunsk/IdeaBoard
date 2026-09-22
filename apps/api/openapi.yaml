@@ -22,11 +22,9 @@ tags:
   - name: AdminBilling
   - name: AdminRewards
   - name: AdminPayments
-  - name: AdminAccounts
   - name: AdminTasks
   - name: AdminMonitor
   - name: AdminStatistics
-  - name: AdminProviderEndpoints
   - name: AdminBrandLogos
   - name: AdminSearchProviders
   - name: AdminStorage
@@ -79,25 +77,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseSearchResults'
-  /user/search/metrics:
-    post:
-      tags: [User]
-      operationId: recordSearchImageFailure
-      security:
-        - cookieAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RecordSearchImageFailureRequest'
-      responses:
-        '200':
-          description: Recorded
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseEmpty'
   /user/search/vision-extract:
     post:
       tags: [User]
@@ -112,7 +91,7 @@ paths:
           schema:
             type: string
             minLength: 1
-            maxLength: 160
+            maxLength: 128
       requestBody:
         required: true
         content:
@@ -230,7 +209,7 @@ paths:
       parameters:
         - { name: folder_id, in: query, schema: { oneOf: [{ type: integer, format: int64, minimum: 1 }, { type: string, enum: [all, quick-saves] }] } }
         - { name: cursor, in: query, schema: { type: string, maxLength: 512 } }
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 48, default: 24 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
       responses:
         '200':
           description: Cursor-paginated personal library assets
@@ -375,6 +354,8 @@ paths:
       operationId: redeemUserReward
       security:
         - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -391,17 +372,12 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseRewardRedeemResult' }
         '400':
-          description: Malformed request; user copy is 参数错误
+          description: Malformed request or missing idempotency key; user copy is 参数错误
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+              schema: { $ref: '#/components/schemas/RewardInvalidInputError' }
         '401':
           description: Authentication required
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ApiResponseBase' }
-        '409':
-          description: RewardCode already redeemed by the authenticated user
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseBase' }
@@ -409,22 +385,22 @@ paths:
           description: Code is invalid or unavailable without exposing its state
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ApiResponseBase' }
-        '423':
+              schema: { $ref: '#/components/schemas/RewardCodeUnavailableError' }
+        '409':
           description: Current Wallet cannot receive Rewards
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+              schema: { $ref: '#/components/schemas/RewardWalletLockedError' }
         '429':
           description: Per-user redemption attempt limit exceeded
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+              schema: { $ref: '#/components/schemas/RewardRateLimitedError' }
         '500':
           description: Internal or transport failure with stable generic user copy
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+              schema: { $ref: '#/components/schemas/RewardRedeemFailedError' }
   /user/rewards/redemptions:
     get:
       tags: [UserRewards]
@@ -487,17 +463,15 @@ paths:
           description: Invalid checkout payload or legal acceptance
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+              schema: { $ref: '#/components/schemas/CheckoutInvalidInputError' }
         '409':
-          description: Idempotency conflict, three active pending orders, or the same quantity is already processing
+          description: Idempotency conflict, order state conflict, or wallet cannot start a recharge
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ApiResponseBase' }
-        '423':
-          description: Current Wallet cannot start a recharge
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+              schema:
+                oneOf:
+                  - { $ref: '#/components/schemas/CheckoutConflictError' }
+                  - { $ref: '#/components/schemas/WalletNotRechargeableError' }
         '422':
           description: Stripe definitively rejected Checkout creation, or a recovered Session is already completed or expired; the client may retry with a new idempotency key
           content:
@@ -571,7 +545,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseBase' }
-        '423':
+        '409':
           description: Current Wallet cannot continue a Checkout
           content:
             application/json:
@@ -613,7 +587,7 @@ paths:
           schema: { type: string, maxLength: 512 }
         - name: limit
           in: query
-          schema: { type: integer, minimum: 1, maximum: 20, default: 20 }
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
       responses:
         '200':
           description: Current authenticated user's last twelve months of final recharge facts
@@ -761,6 +735,30 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseUploadAvatar'
+  /user/profile/avatar/content:
+    get:
+      tags: [UserAssets]
+      operationId: getUserProfileAvatarContent
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Current authenticated user's uploaded profile avatar bytes
+          headers:
+            Cache-Control:
+              description: Private short-lived avatar cache
+              schema: { type: string }
+            Content-Disposition:
+              description: Inline avatar rendering
+              schema: { type: string }
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        '404':
+          description: Profile avatar not found for the current user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
   /user/boards:
     get:
       tags: [Boards]
@@ -848,6 +846,7 @@ paths:
       operationId: inviteBoardMember
       parameters:
         - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -861,6 +860,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseBoardMember'
+        '400':
+          description: The idempotency key is missing or malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdempotencyKeyRequiredError'
+        '409':
+          description: Idempotency key was reused with different input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdempotencyConflictError'
   /user/boards/{board_id}/members/{member_public_id}/role:
     put:
       tags: [Boards]
@@ -913,6 +924,7 @@ paths:
       operationId: createBoardShareToken
       parameters:
         - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -926,6 +938,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseBoardShareToken'
+        '400':
+          description: The idempotency key is missing or malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdempotencyKeyRequiredError'
+        '409':
+          description: Idempotency key was reused with different input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdempotencyConflictError'
   /user/boards/{board_id}/share-tokens/{token_id}/revoke:
     post:
       tags: [Boards]
@@ -933,6 +957,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/BoardId'
         - $ref: '#/components/parameters/ShareTokenID'
+        - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
           description: OK
@@ -940,10 +965,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseRevoked'
+        '400':
+          description: The idempotency key is missing or malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdempotencyKeyRequiredError'
+        '409':
+          description: Idempotency key was reused with different input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdempotencyConflictError'
   /user/boards/share-tokens/join:
     post:
       tags: [Boards]
       operationId: joinBoardByShareToken
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -957,10 +996,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseUserBoard'
+        '400':
+          description: The idempotency key is missing or malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdempotencyKeyRequiredError'
+        '409':
+          description: Idempotency key was reused with different input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdempotencyConflictError'
   /user/tasks/submit:
     post:
       tags: [Tasks]
       operationId: submitUserTask
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -974,6 +1027,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseTaskId'
+        '400':
+          description: Invalid request payload, or the idempotency key is missing or malformed
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ApiResponseBase'
+                  - $ref: '#/components/schemas/IdempotencyKeyRequiredError'
         '402':
           description: The server quote cannot be covered by the user's available Idea balance
           content:
@@ -981,11 +1042,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/InsufficientCreditsError'
         '409':
-          description: The user's Wallet is restricted from new consumption
+          description: The user's Wallet is restricted, the idempotency key was reused with different input, or media preparation failed or is not ready
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WalletRestrictedError'
+                oneOf:
+                  - $ref: '#/components/schemas/WalletRestrictedError'
+                  - $ref: '#/components/schemas/IdempotencyConflictError'
+                  - $ref: '#/components/schemas/TaskSubmissionConflictError'
         '503':
           description: The authoritative Task price or transactional submission service is unavailable
           content:
@@ -1061,6 +1125,7 @@ paths:
       operationId: cancelUserTask
       parameters:
         - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
           description: OK
@@ -1068,6 +1133,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseMessage'
+        '400':
+          description: The idempotency key is missing or malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdempotencyKeyRequiredError'
+        '409':
+          description: Idempotency key was reused with different input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdempotencyConflictError'
   /user/download:
     get:
       tags: [UserAssets]
@@ -1227,6 +1304,226 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseOutboundPolicySetting'
 
+  /admin/settings/ai-gateway:
+    get:
+      tags: [AdminSettings]
+      operationId: getAdminAIGatewayConfig
+      responses:
+        '200':
+          description: Masked AI gateway configuration; secret material is never returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseGatewayConfigSummary'
+    put:
+      tags: [AdminSettings]
+      operationId: updateAdminAIGatewayConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGatewayConfigRequest'
+      responses:
+        '200':
+          description: Gateway token and identity persisted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseBase'
+
+  /admin/settings/ai-gateway/models:
+    get:
+      tags: [AdminSettings]
+      operationId: listAdminGatewayModelMappings
+      responses:
+        '200':
+          description: Per-feature model mappings for the AI gateway
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseGatewayModelMappings'
+
+  /admin/settings/ai-gateway/models/{feature}:
+    put:
+      tags: [AdminSettings]
+      operationId: saveAdminGatewayModelMapping
+      parameters:
+        - name: feature
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveGatewayModelMappingRequest'
+      responses:
+        '200':
+          description: Model mapping persisted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseBase'
+
+  /admin/settings/ai-gateway/catalog:
+    get:
+      tags: [AdminSettings]
+      operationId: listAdminGatewayModelCatalog
+      responses:
+        '200':
+          description: Curated model catalog for the AI gateway
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseGatewayModelCatalog'
+    put:
+      tags: [AdminSettings]
+      operationId: saveAdminGatewayModelCatalog
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveGatewayModelCatalogRequest'
+      responses:
+        '200':
+          description: Model catalog persisted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseBase'
+
+  /admin/settings/ai-gateway/route-preview:
+    post:
+      tags: [AdminSettings]
+      operationId: previewAdminGatewayRoute
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreviewGatewayRouteRequest'
+      responses:
+        '200':
+          description: Routing facts for a model identifier without touching configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseGatewayRoutePreview'
+
+  /admin/settings/ai-gateway/test-connection:
+    post:
+      tags: [AdminSettings]
+      operationId: testAdminGatewayConnection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestGatewayConnectionRequest'
+      responses:
+        '200':
+          description: Server-side reachability diagnosis without touching configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseGatewayConnectionTest'
+
+  /admin/settings/ai-gateway/detect-models:
+    get:
+      tags: [AdminSettings]
+      operationId: detectAdminGatewayModels
+      parameters:
+        - name: provider
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: Models resolved from the community catalog for configured providers without touching configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseDetectedGatewayModels'
+
+  /admin/settings/ai-gateway/providers:
+    get:
+      tags: [AdminSettings]
+      operationId: listAdminGatewayProviders
+      responses:
+        '200':
+          description: Provider registry for quick-pick UIs without touching configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseGatewayProviderOptions'
+
+  /admin/settings/ai-gateway/models-reference:
+    get:
+      tags: [AdminSettings]
+      operationId: getAdminGatewayModelReference
+      parameters:
+        - name: model_id
+          in: query
+          required: false
+          schema: { type: string }
+        - name: provider
+          in: query
+          required: false
+          schema: { type: string }
+        - name: model
+          in: query
+          required: false
+          schema: { type: string }
+        - name: refresh
+          in: query
+          required: false
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Read-only models.dev reference price and context for one model; reference data only, never billing input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseGatewayModelReference'
+
+  /admin/settings/ai-gateway/brand-logo:
+    get:
+      tags: [AdminSettings]
+      operationId: getAdminGatewayBrandLogo
+      parameters:
+        - name: provider
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$'
+            maxLength: 64
+      responses:
+        '200':
+          description: Provider logo SVG proxied from models.dev; unknown or unavailable providers degrade to the default mark with an X-Brand-Logo-Fallback marker
+          headers:
+            X-Brand-Logo-Fallback:
+              description: Present only on degraded responses carrying the embedded default mark
+              schema: { type: string }
+          content:
+            image/svg+xml:
+              schema: { type: string, format: binary }
+
+  /admin/settings/ai-gateway/models-observed:
+    get:
+      tags: [AdminSettings]
+      operationId: listAdminGatewayModelsObserved
+      responses:
+        '200':
+          description: Per-model trailing 7-day first-party observations with SKU margin rows; gateway actual cost has no receipt/log source so margin cost stays an explicit unavailable marker
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseGatewayModelsObserved'
+
   /admin/payments/stripe-config:
     get:
       tags: [AdminPayments]
@@ -1332,7 +1629,7 @@ paths:
           schema: { type: string, maxLength: 512 }
         - name: limit
           in: query
-          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
       responses:
         '200':
           description: Filtered Admin Payment Order page with opaque keyset pagination
@@ -1797,6 +2094,8 @@ paths:
       operationId: createAdminRewardCode
       security:
         - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -1811,6 +2110,16 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseCreatedRewardCode' }
+        '400':
+          description: Malformed request or missing idempotency key; user copy is 参数错误
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RewardInvalidInputError' }
+        '409':
+          description: Idempotency key was reused with different creation input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RewardCodeIdempotencyConflictError' }
 
   /admin/rewards/codes/search:
     post:
@@ -2210,171 +2519,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseBillableItemAvailability'
 
-  /admin/accounts:
-    get:
-      tags: [AdminAccounts]
-      operationId: listAdminAccounts
-      parameters:
-        - name: keyword
-          in: query
-          schema: { type: string }
-        - name: api_type
-          in: query
-          schema: { type: string }
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PageSize'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseAccountList'
-    post:
-      tags: [AdminAccounts]
-      operationId: createAdminAccount
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AdminAccountCreateRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseAdminAccount'
-  /admin/accounts/limits:
-    get:
-      tags: [AdminAccounts]
-      operationId: getAdminAccountLimits
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseAccountLimits'
-  /admin/accounts/{id}:
-    get:
-      tags: [AdminAccounts]
-      operationId: getAdminAccount
-      parameters:
-        - $ref: '#/components/parameters/IdPath'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseAdminAccount'
-    put:
-      tags: [AdminAccounts]
-      operationId: updateAdminAccount
-      parameters:
-        - $ref: '#/components/parameters/IdPath'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AdminAccountUpdateRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseEmpty'
-    delete:
-      tags: [AdminAccounts]
-      operationId: deleteAdminAccount
-      parameters:
-        - $ref: '#/components/parameters/IdPath'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseEmpty'
-  /admin/accounts/{id}/models:
-    patch:
-      tags: [AdminAccounts]
-      operationId: patchAdminAccountModel
-      parameters:
-        - $ref: '#/components/parameters/IdPath'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AdminAccountModelPatchRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseAdminAccount'
-    delete:
-      tags: [AdminAccounts]
-      operationId: deleteAdminAccountModel
-      parameters:
-        - $ref: '#/components/parameters/IdPath'
-        - name: model_name
-          in: query
-          required: true
-          schema: { type: string }
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseAdminAccount'
-  /admin/accounts/{id}/queue:
-    get:
-      tags: [AdminAccounts]
-      operationId: getAdminAccountQueue
-      parameters:
-        - $ref: '#/components/parameters/IdPath'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseMonitorAccountLoad'
-  /admin/accounts/{id}/start:
-    post:
-      tags: [AdminAccounts]
-      operationId: startAdminAccount
-      parameters:
-        - $ref: '#/components/parameters/IdPath'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseEmpty'
-  /admin/accounts/{id}/stop:
-    post:
-      tags: [AdminAccounts]
-      operationId: stopAdminAccount
-      parameters:
-        - $ref: '#/components/parameters/IdPath'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseEmpty'
-
   /admin/tasks:
     get:
       tags: [AdminTasks]
@@ -2430,6 +2574,7 @@ paths:
       operationId: cancelAdminTask
       parameters:
         - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
           description: OK
@@ -2437,6 +2582,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseMessage'
+        '400':
+          description: The idempotency key is missing or malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdempotencyKeyRequiredError'
+        '409':
+          description: Idempotency key was reused with different input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdempotencyConflictError'
   /admin/tasks/{task_id}:
     get:
       tags: [AdminTasks]
@@ -2536,33 +2693,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseUploadImage'
 
-  /admin/provider-endpoints:
-    get:
-      tags: [AdminProviderEndpoints]
-      operationId: listAdminProviderEndpoints
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseProviderEndpointList'
-    post:
-      tags: [AdminProviderEndpoints]
-      operationId: createAdminProviderEndpoint
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProviderEndpointFormData'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseProviderEndpoint'
   /admin/search/providers:
     get:
       tags: [AdminSearchProviders]
@@ -2606,85 +2736,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseSearchProviderTest'
-  /admin/provider-endpoints/registry:
-    get:
-      tags: [AdminProviderEndpoints]
-      operationId: getAdminProviderEndpointRegistry
-      responses:
-        '200':
-          description: Supported endpoint protocols and capabilities
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseProviderEndpointRegistry'
-  /admin/provider-endpoints/detect-models:
-    post:
-      tags: [AdminProviderEndpoints]
-      operationId: detectAdminProviderEndpointModels
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DetectModelsRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseDetectModels'
-  /admin/provider-endpoints/{id}:
-    put:
-      tags: [AdminProviderEndpoints]
-      operationId: updateAdminProviderEndpoint
-      parameters:
-        - $ref: '#/components/parameters/IdPath'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProviderEndpointFormData'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseProviderEndpoint'
-    delete:
-      tags: [AdminProviderEndpoints]
-      operationId: deleteAdminProviderEndpoint
-      parameters:
-        - $ref: '#/components/parameters/IdPath'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseEmpty'
-  /admin/provider-endpoints/{id}/status:
-    patch:
-      tags: [AdminProviderEndpoints]
-      operationId: setAdminProviderEndpointStatus
-      parameters:
-        - $ref: '#/components/parameters/IdPath'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProviderEndpointStatusUpdate'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseProviderEndpoint'
-
   /admin/storage/providers:
     get:
       tags: [AdminStorage]
@@ -2927,6 +2978,12 @@ components:
       name: page_size
       in: query
       schema: { type: integer }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Caller-chosen idempotency key, at most 128 characters. Reuse it when retrying the same action; generate a new value for an intentional rerun. Operations that still accept a legacy body key treat the header as canonical and report a 409 conflict on mismatch.
+      schema: { type: string, minLength: 1, maxLength: 128 }
 
   schemas:
     ApiResponseBase:
@@ -2989,9 +3046,165 @@ components:
       properties:
         code:
           type: string
-          enum: [submission_failed]
+          enum: [submission_failed, provider_unavailable, prompt_unavailable]
         msg:
           type: string
+
+    TaskSubmissionConflictError:
+      type: object
+      required: [code, msg, message_safe]
+      properties:
+        code:
+          type: string
+          enum: [media_preparation_failed, media_processing_input_not_ready]
+        msg:
+          type: string
+        message_safe:
+          type: boolean
+          enum: [true]
+
+    IdempotencyKeyRequiredError:
+      type: object
+      required: [code, msg, message_safe]
+      properties:
+        code:
+          type: string
+          enum: [idempotency_key_required]
+        msg:
+          type: string
+        message_safe:
+          type: boolean
+          enum: [true]
+
+    IdempotencyConflictError:
+      type: object
+      required: [code, msg, message_safe]
+      properties:
+        code:
+          type: string
+          enum: [idempotency_conflict]
+        msg:
+          type: string
+        message_safe:
+          type: boolean
+          enum: [true]
+
+    RewardInvalidInputError:
+      type: object
+      required: [code, msg, message_safe]
+      properties:
+        code:
+          type: string
+          enum: [reward_invalid_input]
+        msg:
+          type: string
+        message_safe:
+          type: boolean
+          enum: [true]
+
+    RewardCodeUnavailableError:
+      type: object
+      required: [code, msg, message_safe]
+      properties:
+        code:
+          type: string
+          enum: [reward_code_unavailable]
+        msg:
+          type: string
+        message_safe:
+          type: boolean
+          enum: [true]
+
+    RewardWalletLockedError:
+      type: object
+      required: [code, msg, message_safe]
+      properties:
+        code:
+          type: string
+          enum: [reward_wallet_locked]
+        msg:
+          type: string
+        message_safe:
+          type: boolean
+          enum: [true]
+
+    RewardRateLimitedError:
+      type: object
+      required: [code, msg, message_safe]
+      properties:
+        code:
+          type: string
+          enum: [reward_rate_limited]
+        msg:
+          type: string
+        message_safe:
+          type: boolean
+          enum: [true]
+
+    RewardRedeemFailedError:
+      type: object
+      required: [code, msg, message_safe]
+      properties:
+        code:
+          type: string
+          enum: [reward_redeem_failed]
+        msg:
+          type: string
+        message_safe:
+          type: boolean
+          enum: [true]
+
+    RewardCodeIdempotencyConflictError:
+      type: object
+      required: [code, msg, message_safe]
+      properties:
+        code:
+          type: string
+          enum: [reward_code_idempotency_conflict]
+        msg:
+          type: string
+        message_safe:
+          type: boolean
+          enum: [true]
+
+    CheckoutInvalidInputError:
+      type: object
+      required: [code, msg, message_safe]
+      properties:
+        code:
+          type: string
+          enum: [checkout_invalid_input]
+        msg:
+          type: string
+        message_safe:
+          type: boolean
+          enum: [true]
+
+    CheckoutConflictError:
+      type: object
+      required: [code, msg, message_safe]
+      properties:
+        code:
+          type: string
+          enum: [checkout_conflict]
+        msg:
+          type: string
+        message_safe:
+          type: boolean
+          enum: [true]
+
+    WalletNotRechargeableError:
+      type: object
+      required: [code, msg, message_safe]
+      properties:
+        code:
+          type: string
+          enum: [wallet_not_rechargeable]
+        msg:
+          type: string
+        message_safe:
+          type: boolean
+          enum: [true]
 
     WalletRestrictedError:
       type: object
@@ -3997,7 +4210,7 @@ components:
 
     AdminTaskBillingSnapshot:
       type: object
-      required: [sku, output_resolution, display_name, price_version_id, price_version, unit_credits, quantity, total_credits, quoted_at, settlement_state, settled_at, feature_exists]
+      required: [sku, output_resolution, display_name, price_version_id, price_version, unit_credits, quantity, total_credits, captured_credits, quoted_at, settlement_state, settled_at, feature_exists]
       properties:
         sku: { $ref: '#/components/schemas/BillingSKUCode' }
         output_resolution: { type: string, enum: [default, 1k, 2k, 4k] }
@@ -4007,6 +4220,7 @@ components:
         unit_credits: { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
         quantity: { type: integer, format: int64, minimum: 1 }
         total_credits: { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
+        captured_credits: { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
         quoted_at: { type: string, format: date-time }
         settlement_state:
           type: string
@@ -4023,26 +4237,20 @@ components:
       type: object
       required:
         - attempt_no
-        - account_id
         - status
         - stage
         - failure_category
-        - provider_endpoint_id
-        - provider_endpoint_name
         - resolved_model
-        - api_type
+        - provider
+        - gateway_step
         - provider_started_at
         - provider_finished_at
-        - finalize_started_at
-        - finalize_finished_at
         - completed_at
         - cancelled_at
         - provider_latency_ms
-        - finalize_latency_ms
         - total_latency_ms
       properties:
         attempt_no: { type: integer, minimum: 1 }
-        account_id: { type: integer, format: int64, minimum: 1 }
         status:
           type: string
           enum: [running, completed, failed, requeued, cancelled]
@@ -4052,43 +4260,37 @@ components:
         failure_category:
           type: string
           enum: ['', input_invalid, auth, quota, timeout, provider_error, storage_error, finalize_error, cancelled, unknown]
-        provider_endpoint_id: { type: integer, format: int64, minimum: 1 }
-        provider_endpoint_name: { type: string }
+        provider: { type: string }
+        gateway_step: { type: string }
         resolved_model: { type: string }
-        api_type: { type: string }
         provider_started_at: { type: string, format: date-time, nullable: true }
         provider_finished_at: { type: string, format: date-time, nullable: true }
-        finalize_started_at: { type: string, format: date-time, nullable: true }
-        finalize_finished_at: { type: string, format: date-time, nullable: true }
         completed_at: { type: string, format: date-time, nullable: true }
         cancelled_at: { type: string, format: date-time, nullable: true }
         provider_latency_ms: { type: integer, format: int64, minimum: 0 }
-        finalize_latency_ms: { type: integer, format: int64, minimum: 0 }
         total_latency_ms: { type: integer, format: int64, minimum: 0 }
 
-    AdminTaskMonitorExecutionSnapshot:
+    AdminMonitorExecutionSnapshot:
       type: object
       required:
-        - account_id
-        - provider_endpoint_id
-        - provider_endpoint_name
         - resolved_model
-        - api_type
+        - provider
+        - gateway_step
       properties:
-        account_id: { type: integer, format: int64, minimum: 1 }
-        provider_endpoint_id: { type: integer, format: int64, minimum: 1 }
-        provider_endpoint_name: { type: string }
         resolved_model: { type: string }
-        api_type: { type: string }
+        provider: { type: string }
+        gateway_step: { type: string }
 
-    AdminTaskMonitorListItem:
+    AdminMonitorListItem:
       type: object
-      required: [task_id, user_public_id, user_display_name, prompt, priority, status, error_msg, result, created_at, completed_at]
+      required: [task_id, user_public_id, user_display_name, prompt, feature_slug, credits, priority, status, error_msg, result, created_at, completed_at]
       properties:
         task_id: { type: string }
         user_public_id: { type: string, format: uuid }
         user_display_name: { type: string }
         prompt: { type: string }
+        feature_slug: { type: string }
+        credits: { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
         priority: { type: integer, minimum: 1, maximum: 4 }
         status: { type: string }
         error_msg: { type: string }
@@ -4096,9 +4298,9 @@ components:
         created_at: { type: string, format: date-time }
         completed_at: { type: string, format: date-time, nullable: true }
         latest_execution:
-          $ref: '#/components/schemas/AdminTaskMonitorExecutionSnapshot'
+          $ref: '#/components/schemas/AdminMonitorExecutionSnapshot'
 
-    AdminTaskMonitorDetail:
+    AdminMonitorDetail:
       type: object
       required:
         - task_id
@@ -4147,7 +4349,7 @@ components:
         billing:
           $ref: '#/components/schemas/AdminTaskBillingSnapshot'
         latest_execution:
-          $ref: '#/components/schemas/AdminTaskMonitorExecutionSnapshot'
+          $ref: '#/components/schemas/AdminMonitorExecutionSnapshot'
         execution_attempts:
           type: array
           items: { $ref: '#/components/schemas/AdminTaskExecutionAttempt' }
@@ -4255,6 +4457,8 @@ components:
             It is required for every canonical AI image workflow because billed submissions must
             converge after network timeouts. Reuse the same value when retrying the
             same action; generate a new value for an intentional rerun.
+            Prefer the Idempotency-Key header; this body field stays accepted as
+            fallback and a header/body mismatch is a 409 conflict.
         priority:
           type: integer
           minimum: 1
@@ -4366,31 +4570,6 @@ components:
           $ref: '#/components/schemas/UpscaleParams'
         fusion:
           $ref: '#/components/schemas/FusionParams'
-
-    WorkflowTaskParams:
-      type: object
-      additionalProperties: false
-      properties:
-        schema_version:
-          type: integer
-          minimum: 1
-        feature:
-          $ref: '#/components/schemas/WorkflowFeatureSlug'
-        media:
-          $ref: '#/components/schemas/WorkflowMediaInputs'
-        controls:
-          $ref: '#/components/schemas/GenerationControls'
-        variation:
-          $ref: '#/components/schemas/VariationsParams'
-        outpaint:
-          $ref: '#/components/schemas/OutpaintParams'
-        upscale:
-          $ref: '#/components/schemas/UpscaleParams'
-        fusion:
-          $ref: '#/components/schemas/FusionParams'
-        extra:
-          type: object
-          additionalProperties: true
 
     WorkflowMediaInputs:
       type: object
@@ -4907,130 +5086,6 @@ components:
         duplicate: { type: boolean }
         ignored: { type: boolean }
 
-    AdminAccount:
-      type: object
-      required: [id, name, provider_endpoint_id, provider_endpoint_api_type, provider_endpoint_protocol, provider_endpoint_capabilities, provider_endpoint_base_url, models, secret_configured, max_concurrent, fail_count, weight, timeout, extra_config, status, created_at, updated_at]
-      properties:
-        id: { type: integer }
-        name: { type: string }
-        provider_endpoint_id: { type: integer }
-        provider_endpoint_api_type: { type: string }
-        provider_endpoint_protocol: { type: string }
-        provider_endpoint_capabilities:
-          type: array
-          items: { type: string }
-        provider_endpoint_base_url: { type: string }
-        models:
-          type: array
-          items:
-            $ref: '#/components/schemas/AdminAccountModel'
-        secret_configured: { type: boolean }
-        max_concurrent: { type: integer }
-        current_concurrent: { type: integer }
-        wait_queue_count: { type: integer }
-        running_status: { type: string }
-        fail_count: { type: integer }
-        weight: { type: integer }
-        timeout: { type: integer }
-        extra_config: { type: string }
-        status: { type: integer }
-        created_at: { type: string }
-        updated_at: { type: string }
-
-    AdminAccountModel:
-      type: object
-      required: [name, enabled, weight, sort_order, supports_2k, supports_4k]
-      properties:
-        id: { type: integer }
-        name: { type: string }
-        enabled: { type: boolean }
-        weight: { type: integer }
-        max_concurrent: { type: integer }
-        sort_order: { type: integer }
-        supports_2k: { type: boolean }
-        supports_4k: { type: boolean }
-
-    AdminAccountModelInput:
-      type: object
-      required: [name]
-      properties:
-        name: { type: string }
-        enabled: { type: boolean }
-        weight: { type: integer }
-        max_concurrent: { type: integer }
-        supports_2k: { type: boolean }
-        supports_4k: { type: boolean }
-
-    AdminAccountModelPatchRequest:
-      type: object
-      required: [name]
-      properties:
-        name: { type: string }
-        enabled: { type: boolean }
-        weight: { type: integer }
-        max_concurrent:
-          type: integer
-          nullable: true
-        sort_order: { type: integer }
-        supports_2k: { type: boolean }
-        supports_4k: { type: boolean }
-
-    AdminAccountCreateRequest:
-      type: object
-      required: [name, provider_endpoint_id, secret, models]
-      properties:
-        name: { type: string }
-        provider_endpoint_id: { type: integer }
-        secret: { type: string }
-        models:
-          type: array
-          items:
-            $ref: '#/components/schemas/AdminAccountModelInput'
-        max_concurrent: { type: integer }
-        timeout: { type: integer }
-        weight: { type: integer }
-        extra_config: { type: string }
-
-    AdminAccountUpdateRequest:
-      type: object
-      properties:
-        name: { type: string }
-        secret: { type: string }
-        models:
-          type: array
-          items:
-            $ref: '#/components/schemas/AdminAccountModelInput'
-        max_concurrent: { type: integer }
-        timeout: { type: integer }
-        weight: { type: integer }
-        extra_config: { type: string }
-
-    AccountLimitRange:
-      type: object
-      required: [min, max, default]
-      properties:
-        min: { type: integer }
-        max: { type: integer }
-        default: { type: integer }
-
-    AccountLimits:
-      type: object
-      required: [max_concurrent, timeout_seconds]
-      properties:
-        max_concurrent:
-          $ref: '#/components/schemas/AccountLimitRange'
-        timeout_seconds:
-          $ref: '#/components/schemas/AccountLimitRange'
-
-    MonitorAccountLoad:
-      type: object
-      required: [current_concurrent, max_concurrent]
-      properties:
-        current_concurrent:
-          type: integer
-          description: Running task attempts currently assigned to this account.
-        max_concurrent: { type: integer }
-
     MonitorExecutionPressureKey:
       type: string
       enum:
@@ -5117,7 +5172,7 @@ components:
 
     MonitorData:
       type: object
-      required: [global_queue_len, wait_queue_len, running_attempts, account_loads, execution_pressure, golden_signals]
+      required: [global_queue_len, wait_queue_len, running_attempts, execution_pressure, golden_signals]
       properties:
         global_queue_len:
           type: integer
@@ -5128,10 +5183,6 @@ components:
         running_attempts:
           type: integer
           description: Running task attempts currently recorded in PostgreSQL.
-        account_loads:
-          type: object
-          additionalProperties:
-            $ref: '#/components/schemas/MonitorAccountLoad'
         execution_pressure:
           type: array
           items:
@@ -5191,6 +5242,7 @@ components:
               date: { type: string }
               label: { type: string }
               total: { type: integer }
+              captured_credits: { type: integer }
               segments:
                 type: array
                 items:
@@ -5287,79 +5339,6 @@ components:
         scanned_days: { type: integer }
         backfilled_days: { type: integer }
 
-    ProviderEndpoint:
-      type: object
-      required: [id, api_type, protocol, capabilities, name, base_url, api_key_configured, status, created_at, updated_at]
-      properties:
-        id: { type: integer }
-        api_type:
-          $ref: '#/components/schemas/ProviderAPIType'
-        protocol: { type: string }
-        capabilities:
-          type: array
-          minItems: 1
-          items:
-            $ref: '#/components/schemas/ProviderCapability'
-        name: { type: string }
-        base_url: { type: string }
-        api_key_configured: { type: boolean }
-        status: { type: integer }
-        created_at: { type: string }
-        updated_at: { type: string }
-
-    ProviderEndpointFormData:
-      type: object
-      required: [api_type, protocol, name, base_url, status]
-      properties:
-        api_type:
-          $ref: '#/components/schemas/ProviderAPIType'
-        protocol: { type: string }
-        capability:
-          $ref: '#/components/schemas/ProviderProcessingCapability'
-        api_key: { type: string, writeOnly: true }
-        name: { type: string }
-        base_url: { type: string }
-        status: { type: integer }
-
-    ProviderEndpointStatusUpdate:
-      type: object
-      required: [status]
-      properties:
-        status:
-          type: integer
-          enum: [0, 1]
-
-    ProviderAPIType:
-      type: string
-      enum: [openai-compatible, self-hosted, google-ai, google-cloud]
-
-    ProviderCapability:
-      type: string
-      enum: [generation, cutout, upscale, fill]
-
-    ProviderProcessingCapability:
-      type: string
-      enum: [cutout, upscale, fill]
-
-    ProviderEndpointProtocol:
-      type: object
-      required: [id, capabilities]
-      properties:
-        id: { type: string }
-        capabilities:
-          type: array
-          items:
-            $ref: '#/components/schemas/ProviderCapability'
-
-    ProviderEndpointRegistry:
-      type: object
-      required: [protocols]
-      properties:
-        protocols:
-          type: array
-          items:
-            $ref: '#/components/schemas/ProviderEndpointProtocol'
-
     SearchProvider:
       type: object
       required: [provider, api_key_configured, enabled, test_state]
@@ -5428,20 +5407,13 @@ components:
         next_cursor: { type: string }
         has_more: { type: boolean }
 
-    RecordSearchImageFailureRequest:
-      type: object
-      required: [provider]
-      properties:
-        provider:
-          $ref: '#/components/schemas/SearchCatalogProvider'
-
     SearchCatalogProvider:
       type: string
       enum: [unsplash, pexels]
 
     SearchProviderProvider:
       type: string
-      enum: [unsplash, pexels, vision]
+      enum: [unsplash, pexels]
 
     VisionExtraction:
       type: object
@@ -5472,10 +5444,11 @@ components:
             - vision_search_network
             - vision_search_provider_error
             - vision_search_schema_error
-            - vision_search_idempotency_key_required
-            - vision_search_idempotency_conflict
-            - vision_search_pricing_unavailable
+            - idempotency_key_required
+            - idempotency_conflict
+            - pricing_unavailable
             - insufficient_credits
+            - wallet_restricted
         msg: { type: string }
         message_safe: { type: boolean, enum: [true] }
 
@@ -5490,26 +5463,6 @@ components:
     SearchProviderTestResultTestState:
       type: string
       enum: [passed, failed]
-
-    DetectModelsRequest:
-      type: object
-      required: [base_url, api_key]
-      properties:
-        base_url: { type: string }
-        api_key: { type: string }
-        api_type:
-          $ref: '#/components/schemas/ProviderAPIType'
-        protocol: { type: string }
-
-    DetectModelsResponse:
-      type: object
-      required: [models, api_type]
-      properties:
-        models:
-          type: array
-          items: { type: string }
-        api_type:
-          $ref: '#/components/schemas/ProviderAPIType'
 
     StorageProviderField:
       type: object
@@ -5823,7 +5776,7 @@ components:
                 list:
                   type: array
                   items:
-                    $ref: '#/components/schemas/AdminTaskMonitorListItem'
+                    $ref: '#/components/schemas/AdminMonitorListItem'
                 total: { type: integer }
                 pending_count: { type: integer }
                 running_count: { type: integer }
@@ -5842,7 +5795,7 @@ components:
               required: [task]
               properties:
                 task:
-                  $ref: '#/components/schemas/AdminTaskMonitorDetail'
+                  $ref: '#/components/schemas/AdminMonitorDetail'
 
     ApiResponseMessage:
       allOf:
@@ -5897,6 +5850,328 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/OutboundPolicySetting'
+
+    GatewayModelMapping:
+      type: object
+      required: [feature, model]
+      properties:
+        feature: { type: string }
+        model: { type: string }
+
+    GatewayConfigSummary:
+      type: object
+      required: [token_configured]
+      properties:
+        base_url: { type: string }
+        account_id: { type: string }
+        gateway_id: { type: string }
+        token_configured: { type: boolean }
+        is_first_party: { type: boolean }
+        updated_at: { type: string, format: date-time, nullable: true }
+
+    UpdateGatewayConfigRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        base_url: { type: string }
+        token: { type: string }
+        account_id: { type: string }
+        gateway_id: { type: string }
+
+    ApiResponseGatewayConfigSummary:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/GatewayConfigSummary'
+
+    SaveGatewayModelMappingRequest:
+      type: object
+      required: [model]
+      properties:
+        model: { type: string }
+
+    ApiResponseGatewayModelMappings:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/GatewayModelMapping'
+
+    GatewayModelCatalogItem:
+      type: object
+      required: [id, name, provider, description, context_or_resolution, capabilities, hosting, terms_url, docs_url]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        provider: { type: string }
+        mode: { type: string }
+        description: { type: string }
+        context_or_resolution: { type: string }
+        capabilities:
+          type: array
+          items: { type: string }
+        hosting: { type: string }
+        terms_url: { type: string }
+        docs_url: { type: string }
+        custom_path: { type: string }
+        custom_params: { type: string }
+        description_enriched: { type: boolean }
+        supports_prompt_caching: { type: boolean }
+
+    SaveGatewayModelCatalogRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GatewayModelCatalogItem'
+
+    ApiResponseGatewayModelCatalog:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/GatewayModelCatalogItem'
+
+    PreviewGatewayRouteRequest:
+      type: object
+      required: [model_id]
+      properties:
+        model_id: { type: string }
+        custom_path: { type: string }
+        custom_params: { type: string }
+
+    GatewayRoutePreview:
+      type: object
+      required: [provider_slug, is_first_party, target_path, path_source, path_source_label]
+      properties:
+        provider_slug: { type: string }
+        is_first_party: { type: boolean }
+        target_path: { type: string }
+        path_source:
+          type: string
+          enum: [override, openrouter, anthropic, fal, chat, generations]
+        path_source_label: { type: string }
+
+    ApiResponseGatewayRoutePreview:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/GatewayRoutePreview'
+
+    TestGatewayConnectionRequest:
+      type: object
+      required: [base_url]
+      properties:
+        base_url: { type: string }
+        token: { type: string }
+        provider: { type: string }
+        model: { type: string }
+        path: { type: string }
+
+    GatewayConnectionTest:
+      type: object
+      required: [reachable, status_code, latency_ms, message]
+      properties:
+        reachable: { type: boolean }
+        status_code: { type: integer }
+        latency_ms: { type: integer, format: int64, minimum: 0 }
+        message: { type: string }
+
+    ApiResponseGatewayConnectionTest:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/GatewayConnectionTest'
+
+    DetectedGatewayModel:
+      type: object
+      required: [id, name, provider]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        provider: { type: string }
+        mode: { type: string }
+        description: { type: string }
+        description_enriched: { type: boolean }
+        context_or_resolution: { type: string }
+        context_limit: { type: integer, description: "Raw models.dev limit.context in tokens, display metadata only, never billing input." }
+        capabilities:
+          type: array
+          items: { type: string }
+        modalities:
+          type: object
+          properties:
+            input: { type: array, items: { type: string } }
+            output: { type: array, items: { type: string } }
+        supports_prompt_caching: { type: boolean }
+
+    GatewayModelDetection:
+      type: object
+      required: [models, configured_providers]
+      properties:
+        models:
+          type: array
+          items:
+            $ref: '#/components/schemas/DetectedGatewayModel'
+        configured_providers:
+          type: integer
+          description: Number of control-plane configured providers intersected with the community catalog.
+
+    ApiResponseDetectedGatewayModels:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/GatewayModelDetection'
+
+    GatewayModelReference:
+      type: object
+      required: [model_id, source, note, found]
+      properties:
+        model_id: { type: string }
+        provider: { type: string }
+        name: { type: string }
+        input_usd_per_mtok: { type: number, description: "Reference USD per million input tokens, never billing input." }
+        output_usd_per_mtok: { type: number, description: "Reference USD per million output tokens, never billing input." }
+        context_limit: { type: integer }
+        last_updated: { type: string }
+        reasoning: { type: boolean, description: "Upstream capability flag, verbatim from models.dev. Absent means unknown." }
+        tool_call: { type: boolean, description: "Upstream capability flag, verbatim from models.dev. Absent means unknown." }
+        temperature: { type: boolean, description: "Upstream capability flag, verbatim from models.dev. Absent means unknown." }
+        attachment: { type: boolean, description: "Upstream capability flag, verbatim from models.dev. Absent means unknown." }
+        structured_output: { type: boolean, description: "Upstream capability flag, verbatim from models.dev. Absent means unknown." }
+        open_weights: { type: boolean, description: "Upstream capability flag, verbatim from models.dev. Absent means unknown." }
+        modalities:
+          type: object
+          properties:
+            input: { type: array, items: { type: string } }
+            output: { type: array, items: { type: string } }
+        knowledge: { type: string }
+        release_date: { type: string }
+        family: { type: string }
+        status: { type: string, description: "Upstream lifecycle flag (e.g. deprecated, beta). Absent means no warning." }
+        source: { type: string, enum: [models.dev] }
+        note: { type: string }
+        found: { type: boolean }
+        error_code:
+          type: string
+          enum: [allowlist_missing, upstream_error, not_found]
+        message: { type: string }
+
+    ApiResponseGatewayModelReference:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/GatewayModelReference'
+
+    GatewayProviderOption:
+      type: object
+      required: [slug, display_name, id_prefix]
+      properties:
+        slug: { type: string }
+        display_name: { type: string }
+        id_prefix: { type: string }
+
+    ApiResponseGatewayProviderOptions:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/GatewayProviderOption'
+
+    GatewayModelSKUMargin:
+      type: object
+      required: [sku, display_name, feature, on_sale, unit_credits_by_variant, has_actual_cost, cost_source, cost_note, margin_status]
+      properties:
+        sku: { type: string }
+        display_name: { type: string }
+        feature: { type: string, description: "Gateway mapping feature linked to this SKU (vision maps to ai-search:vision)." }
+        on_sale: { type: boolean, description: "True only when the SKU card is active (enabled with configured pricing)." }
+        unit_credits_by_variant:
+          type: object
+          additionalProperties: { type: integer, format: int64, minimum: 0 }
+        actual_cost_credits:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+          description: "Gateway actual cost in Credits; always null until a receipt/log cost source exists, never fabricated."
+        has_actual_cost: { type: boolean }
+        cost_source: { type: string, enum: [unavailable] }
+        cost_note: { type: string }
+        margin_credits:
+          type: integer
+          format: int64
+          nullable: true
+          description: "Charged UnitCredits minus gateway actual cost; null while the cost is unavailable."
+        margin_status:
+          type: string
+          enum: [unknown_no_cost]
+          description: "unknown_no_cost until a cost source exists; a negative (loss) state arrives with it for red highlighting."
+
+    GatewayModelObserved:
+      type: object
+      required: [model, provider, window_days, window_since, attempts_total, completed, failed, cache_hits, has_observations, has_sku_margin, sku_margins]
+      properties:
+        model: { type: string }
+        provider: { type: string }
+        window_days: { type: integer, description: "Fixed trailing observation window in days." }
+        window_since: { type: string, format: date-time }
+        attempts_total: { type: integer, format: int64, minimum: 0, description: "Terminal (completed/failed) attempts created in the window." }
+        completed: { type: integer, format: int64, minimum: 0 }
+        failed: { type: integer, format: int64, minimum: 0 }
+        cache_hits: { type: integer, format: int64, minimum: 0 }
+        success_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+          nullable: true
+          description: "completed / (completed + failed); null without terminal attempts."
+        cache_hit_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+          nullable: true
+          description: "cache-hit terminal attempts / (completed + failed); null without terminal attempts."
+        top_failure_stage: { type: string, description: "Most frequent failure_stage among failed attempts; empty without failures." }
+        top_failure_category: { type: string, description: "failure_category paired with the top stage; empty without failures." }
+        top_failure_count: { type: integer, format: int64, minimum: 0 }
+        has_observations: { type: boolean }
+        has_sku_margin: { type: boolean }
+        sku_margins:
+          type: array
+          items:
+            $ref: '#/components/schemas/GatewayModelSKUMargin'
+
+    ApiResponseGatewayModelsObserved:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/GatewayModelObserved'
 
     ApiResponseStripeConfigurationSummary:
       allOf:
@@ -6345,55 +6620,6 @@ components:
       allOf:
         - $ref: '#/components/schemas/ApiResponseBase'
 
-    ApiResponseAccountList:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              type: object
-              required: [list, total]
-              properties:
-                list:
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/AdminAccount'
-                total: { type: integer }
-
-    ApiResponseAdminAccount:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              type: object
-              required: [account]
-              properties:
-                account:
-                  $ref: '#/components/schemas/AdminAccount'
-                current_concurrent: { type: integer }
-                max_concurrent: { type: integer }
-
-    ApiResponseAccountLimits:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              type: object
-              required: [limits]
-              properties:
-                limits:
-                  $ref: '#/components/schemas/AccountLimits'
-
-    ApiResponseMonitorAccountLoad:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              $ref: '#/components/schemas/MonitorAccountLoad'
-
     ApiResponseMonitor:
       allOf:
         - $ref: '#/components/schemas/ApiResponseBase'
@@ -6417,40 +6643,6 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/AdminStatisticsBackfillResult'
-
-    ApiResponseProviderEndpointList:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              type: object
-              required: [list]
-              properties:
-                list:
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/ProviderEndpoint'
-
-    ApiResponseProviderEndpoint:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              type: object
-              required: [provider_endpoint]
-              properties:
-                provider_endpoint:
-                  $ref: '#/components/schemas/ProviderEndpoint'
-
-    ApiResponseProviderEndpointRegistry:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              $ref: '#/components/schemas/ProviderEndpointRegistry'
 
     ApiResponseSearchProviderList:
       allOf:
@@ -6489,14 +6681,6 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/VisionExtraction'
-
-    ApiResponseDetectModels:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              $ref: '#/components/schemas/DetectModelsResponse'
 
     ApiResponseStorageProviderList:
       allOf:

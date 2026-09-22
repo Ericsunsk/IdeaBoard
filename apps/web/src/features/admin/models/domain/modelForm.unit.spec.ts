@@ -36,21 +36,18 @@ describe('modelForm', () => {
     expect(item.descriptionEnriched).toBe(true)
   })
 
-  it('passes community pricing through on import', () => {
+  it('keeps only the prompt-caching capability bit on import (no pricing)', () => {
     const item = buildModelItemFromDetected({
       id: 'gpt-4o',
       name: 'GPT-4o',
       provider: 'OpenAI',
-      input_cost_per_token: 0.0000025,
-      output_cost_per_token: 0.00001,
-      cache_read_input_token_cost: 0.00000125,
       supports_prompt_caching: true,
     })
-    expect(item.inputCostPerToken).toBe(0.0000025)
-    expect(item.outputCostPerToken).toBe(0.00001)
-    expect(item.cacheReadCostPerToken).toBe(0.00000125)
-    expect(item.cacheCreateCostPerToken).toBeUndefined()
     expect(item.supportsPromptCaching).toBe(true)
+    expect(item).not.toHaveProperty('inputCostPerToken')
+    expect(item).not.toHaveProperty('outputCostPerToken')
+    expect(item).not.toHaveProperty('cacheReadCostPerToken')
+    expect(item).not.toHaveProperty('cacheCreateCostPerToken')
   })
 
   it('validates required fields and custom JSON', () => {

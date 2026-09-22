@@ -74,6 +74,10 @@ describe('useAdminModelCatalogWorkspace refresh enrichment', () => {
         throw new Error('not needed')
       },
       listProviders: async () => [],
+      getReference: async () => {
+        throw new Error('not needed')
+      },
+      listObserved: async () => [],
       detect: async () => ({
         models: detected.map((d) => ({
           id: d.id,

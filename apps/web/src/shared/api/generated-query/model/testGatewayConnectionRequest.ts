@@ -8,4 +8,7 @@
 export interface TestGatewayConnectionRequest {
   base_url: string
   token?: string
+  provider?: string
+  model?: string
+  path?: string
 }

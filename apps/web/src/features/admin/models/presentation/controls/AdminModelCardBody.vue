@@ -62,20 +62,11 @@
         {{ cap }}
       </span>
 
-      <!-- 社区参考价胶囊 (USD/1M tokens，有价才展示，不进计费) -->
-      <span
-        v-if="pricingText"
-        class="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
-        :title="pricingTitle"
-      >
-        {{ pricingText }}
-      </span>
-
-      <!-- prompt cache 徽标 (支持才展示) -->
+      <!-- prompt cache 徽标 (支持才展示；目录仅保留能力位，价格走参照接口) -->
       <span
         v-if="model.supportsPromptCaching"
         class="inline-flex items-center rounded-md bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700"
-        :title="cacheTitle || '支持 prompt caching'"
+        title="支持 prompt caching"
       >
         cache √
       </span>
@@ -92,6 +83,9 @@
         {{ model.hosting }}
       </span>
     </div>
+
+    <!-- 观测区：近 7 天成功率/失败分类/cache 命中率/在售 SKU；无观测优雅缺省 -->
+    <ObservedStatsPanel :observed="observed" :loading="observedLoading" />
   </div>
 </template>
 
@@ -99,31 +93,24 @@
 import { computed } from 'vue'
 import { Cube } from '@iconoir/vue'
 import { resolveModelBrandLogo } from '../../../shared/logos/brandLogos'
-import {
-  formatCachePricing,
-  formatModelPricing,
-  MODEL_HOSTING_CLOUDFLARE,
-} from '../../domain/catalogData'
-import type { AdminModelItem } from '../../domain/catalogData'
+import { MODEL_HOSTING_CLOUDFLARE } from '../../domain/catalogData'
+import type { AdminModelItem, ModelObservedSnapshot } from '../../domain/catalogData'
+import ObservedStatsPanel from './ObservedStatsPanel.vue'
 
 const props = withDefaults(
   defineProps<{
     model: AdminModelItem
     hoverable?: boolean | undefined
+    observed?: ModelObservedSnapshot | null | undefined
+    observedLoading?: boolean | undefined
   }>(),
   {
     hoverable: false,
+    observed: null,
+    observedLoading: false,
   },
 )
 
 // 模板多处使用：一次解析，多处复用。
 const brandLogo = computed(() => resolveModelBrandLogo(props.model))
-const pricingText = computed(() => formatModelPricing(props.model))
-const cacheText = computed(() => formatCachePricing(props.model))
-// hover 展示完整分解（含缓存读写价），胶囊只放 in/out 主价。
-const pricingTitle = computed(() => {
-  const base = `社区参考价（USD/1M tokens，不计费）：${pricingText.value}`
-  return cacheText.value ? `${base}；${cacheText.value}` : base
-})
-const cacheTitle = computed(() => (cacheText.value ? `${cacheText.value} /1M` : ''))
 </script>

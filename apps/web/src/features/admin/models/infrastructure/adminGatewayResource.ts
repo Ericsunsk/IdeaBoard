@@ -1,8 +1,10 @@
 import {
   detectAdminGatewayModels,
   getAdminAIGatewayConfig,
+  getAdminGatewayModelReference,
   listAdminGatewayModelCatalog,
   listAdminGatewayModelMappings,
+  listAdminGatewayModelsObserved,
   listAdminGatewayProviders,
   previewAdminGatewayRoute,
   saveAdminGatewayModelCatalog,
@@ -15,12 +17,18 @@ import type {
   GatewayConnectionTest,
   GatewayModelCatalogItem,
   GatewayModelDetection,
+  GatewayModelObserved,
+  GatewayModelReference,
   GatewayProviderOption,
   GatewayRoutePreview,
 } from '../../../../shared/api/generated-query/model'
 import type { UpdateGatewayConfigRequest } from '../../../../shared/api/generated-query/model/updateGatewayConfigRequest'
 import { resolveApiData, resolveApiOk } from '../../../../shared/api/apiResponse'
-import type { AdminModelItem } from '../domain/catalogData'
+import type {
+  AdminModelItem,
+  ModelObservedSnapshot,
+  ModelReferenceSnapshot,
+} from '../domain/catalogData'
 import { MODEL_HOSTING_CLOUDFLARE, MODEL_HOSTING_THIRD_PARTY } from '../domain/catalogData'
 
 export type {
@@ -45,6 +53,20 @@ export interface AdminGatewayCatalog {
   }) => Promise<GatewayRoutePreview>
   detect: (provider?: string) => Promise<GatewayModelDetection>
   listProviders: () => Promise<GatewayProviderOption[]>
+  // models.dev 参照价（只读透传）：USD/MTok 单价、context limit、last_updated，
+  // 外加能力 booleans、modalities、knowledge、release_date、family、status
+  // enrichment（均为可选，缺失即未知）。description 永不透传。
+  // source 恒为 models.dev。found=false 为上游降级/miss，HTTP 仍 200，调用方按快照展示。
+  getReference: (input: {
+    modelId?: string | undefined
+    provider?: string | undefined
+    model?: string | undefined
+    refresh?: boolean | undefined
+  }) => Promise<ModelReferenceSnapshot>
+  // 7 天观测（只读透传）：成功率/头号失败/cache 命中率（无终结 attempts 时 null），
+  // 外加 SKU 在售标记与 margin 行（实际成本恒 null，未编造）。
+  // 缺席接口的 model 调用方按暂无数据渲染。
+  listObserved: () => Promise<ModelObservedSnapshot[]>
 }
 
 export interface AdminGatewayConnection {
@@ -77,6 +99,8 @@ export function createAdminGatewayResource(): AdminGatewayResource {
       previewRoute: previewModelRoute,
       detect: detectGatewayModels,
       listProviders: listGatewayProviders,
+      getReference: getModelReference,
+      listObserved: listModelsObserved,
     },
     connection: {
       get: getGatewayConnection,
@@ -108,10 +132,6 @@ function toAdminModelItem(item: GatewayModelCatalogItem): AdminModelItem {
     customPath: item.custom_path || '',
     customParams: item.custom_params || '',
     descriptionEnriched: item.description_enriched,
-    inputCostPerToken: item.input_cost_per_token,
-    outputCostPerToken: item.output_cost_per_token,
-    cacheReadCostPerToken: item.cache_read_input_token_cost,
-    cacheCreateCostPerToken: item.cache_creation_input_token_cost,
     supportsPromptCaching: item.supports_prompt_caching,
   }
 }
@@ -131,14 +151,6 @@ function toGatewayCatalogItem(item: AdminModelItem): GatewayModelCatalogItem {
     ...(item.customPath ? { custom_path: item.customPath } : {}),
     ...(item.customParams ? { custom_params: item.customParams } : {}),
     ...(item.descriptionEnriched != null ? { description_enriched: item.descriptionEnriched } : {}),
-    ...(item.inputCostPerToken != null ? { input_cost_per_token: item.inputCostPerToken } : {}),
-    ...(item.outputCostPerToken != null ? { output_cost_per_token: item.outputCostPerToken } : {}),
-    ...(item.cacheReadCostPerToken != null
-      ? { cache_read_input_token_cost: item.cacheReadCostPerToken }
-      : {}),
-    ...(item.cacheCreateCostPerToken != null
-      ? { cache_creation_input_token_cost: item.cacheCreateCostPerToken }
-      : {}),
     ...(item.supportsPromptCaching != null
       ? { supports_prompt_caching: item.supportsPromptCaching }
       : {}),
@@ -188,6 +200,96 @@ async function listGatewayProviders(): Promise<GatewayProviderOption[]> {
   const data = await resolveApiData(listAdminGatewayProviders(), '加载供应商列表失败')
   if (!Array.isArray(data)) throw new Error('加载供应商列表失败')
   return data
+}
+
+function toAdminModelReference(item: GatewayModelReference): ModelReferenceSnapshot {
+  return {
+    modelId: item.model_id,
+    provider: item.provider,
+    name: item.name,
+    inputUsdPerMtok: item.input_usd_per_mtok,
+    outputUsdPerMtok: item.output_usd_per_mtok,
+    contextLimit: item.context_limit,
+    lastUpdated: item.last_updated,
+    reasoning: item.reasoning,
+    toolCall: item.tool_call,
+    temperature: item.temperature,
+    attachment: item.attachment,
+    structuredOutput: item.structured_output,
+    openWeights: item.open_weights,
+    modalities:
+      item.modalities == null
+        ? undefined
+        : { input: item.modalities.input, output: item.modalities.output },
+    knowledge: item.knowledge,
+    releaseDate: item.release_date,
+    family: item.family,
+    status: item.status,
+    source: item.source,
+    note: item.note,
+    found: item.found,
+    errorCode: item.error_code,
+    message: item.message,
+  }
+}
+
+async function getModelReference(input: {
+  modelId?: string | undefined
+  provider?: string | undefined
+  model?: string | undefined
+  refresh?: boolean | undefined
+}): Promise<ModelReferenceSnapshot> {
+  const data = await resolveApiData(
+    getAdminGatewayModelReference({
+      ...(input.modelId?.trim() ? { model_id: input.modelId.trim() } : {}),
+      ...(input.provider?.trim() ? { provider: input.provider.trim() } : {}),
+      ...(input.model?.trim() ? { model: input.model.trim() } : {}),
+      ...(input.refresh ? { refresh: true } : {}),
+    }),
+    '加载参照价失败',
+  )
+  if (!data) throw new Error('加载参照价失败')
+  return toAdminModelReference(data)
+}
+
+function toAdminModelObserved(item: GatewayModelObserved): ModelObservedSnapshot {
+  return {
+    model: item.model,
+    provider: item.provider,
+    windowDays: item.window_days,
+    windowSince: item.window_since,
+    attemptsTotal: item.attempts_total,
+    completed: item.completed,
+    failed: item.failed,
+    cacheHits: item.cache_hits,
+    // exactOptionalPropertyTypes：nullable 可选值直接透传（null 即未知，调用方暂无数据）。
+    successRate: item.success_rate,
+    cacheHitRate: item.cache_hit_rate,
+    topFailureStage: item.top_failure_stage,
+    topFailureCategory: item.top_failure_category,
+    topFailureCount: item.top_failure_count,
+    hasObservations: item.has_observations,
+    hasSkuMargin: item.has_sku_margin,
+    skuMargins: (item.sku_margins ?? []).map((margin) => ({
+      sku: margin.sku,
+      displayName: margin.display_name,
+      feature: margin.feature,
+      onSale: margin.on_sale,
+      unitCreditsByVariant: { ...margin.unit_credits_by_variant },
+      actualCostCredits: margin.actual_cost_credits,
+      hasActualCost: margin.has_actual_cost,
+      costSource: margin.cost_source,
+      costNote: margin.cost_note,
+      marginCredits: margin.margin_credits,
+      marginStatus: margin.margin_status,
+    })),
+  }
+}
+
+async function listModelsObserved(): Promise<ModelObservedSnapshot[]> {
+  const data = await resolveApiData(listAdminGatewayModelsObserved(), '加载观测数据失败')
+  if (!Array.isArray(data)) throw new Error('加载观测数据失败')
+  return data.map(toAdminModelObserved)
 }
 
 async function getGatewayConnection(): Promise<GatewayConnectionSummary> {

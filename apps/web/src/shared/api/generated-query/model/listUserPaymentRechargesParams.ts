@@ -12,7 +12,7 @@ export type ListUserPaymentRechargesParams = {
   cursor?: string
   /**
    * @minimum 1
-   * @maximum 20
+   * @maximum 200
    */
   limit?: number
 }

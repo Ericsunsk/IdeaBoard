@@ -39,11 +39,19 @@
       </div>
 
       <!-- 右侧：实时卡片预览与网关透视区 (5 列) -->
-      <CatalogPreviewCard
-        :model="previewModel"
-        :model-id="form.values.id"
-        :route-preview="gatewayRoutePreview"
-      />
+      <div class="flex flex-col gap-4 lg:col-span-5">
+        <CatalogPreviewCard
+          :model="previewModel"
+          :model-id="form.values.id"
+          :route-preview="gatewayRoutePreview"
+        />
+        <!-- models.dev 参照价：只读透传，不进目录保存 payload -->
+        <CatalogReferencePanel
+          :model-id="form.values.id"
+          :provider="form.values.provider"
+          :model-name="form.values.name"
+        />
+      </div>
     </div>
 
     <!-- 弹窗底栏 -->
@@ -84,6 +92,7 @@ import { useForm, firstFormError } from '@/components/ui/form'
 import CatalogIdentityPanel from './components/CatalogIdentityPanel.vue'
 import CatalogSpecsPanel from './components/CatalogSpecsPanel.vue'
 import CatalogGatewayPanel from './components/CatalogGatewayPanel.vue'
+import CatalogReferencePanel from './components/CatalogReferencePanel.vue'
 import CatalogPreviewCard, {
   type GatewayRoutePreviewState,
 } from './components/CatalogPreviewCard.vue'
@@ -152,10 +161,6 @@ const previewModel = computed<AdminModelItem>(() => ({
   docsUrl: '',
   customPath: form.values.customPath ?? '',
   customParams: form.values.customParams ?? '',
-  inputCostPerToken: form.values.inputCostPerToken,
-  outputCostPerToken: form.values.outputCostPerToken,
-  cacheReadCostPerToken: form.values.cacheReadCostPerToken,
-  cacheCreateCostPerToken: form.values.cacheCreateCostPerToken,
   supportsPromptCaching: form.values.supportsPromptCaching,
 }))
 
@@ -166,8 +171,10 @@ const gatewayRoutePreview = ref<GatewayRoutePreviewState>({
   targetPath: '-',
   protocol: '-',
 })
+let routePreviewVersion = 0
 
 async function refreshGatewayRoutePreview() {
+  const version = ++routePreviewVersion
   const modelId = form.values.id.trim()
   if (!modelId) {
     gatewayRoutePreview.value = {
@@ -184,6 +191,7 @@ async function refreshGatewayRoutePreview() {
       customPath: form.values.customPath?.trim() || undefined,
       customParams: form.values.customParams?.trim() || undefined,
     })
+    if (version !== routePreviewVersion) return
     gatewayRoutePreview.value = {
       providerSlug: preview.provider_slug || '未指定',
       isFirstParty: preview.is_first_party,
@@ -191,7 +199,13 @@ async function refreshGatewayRoutePreview() {
       protocol: preview.path_source_label || preview.path_source,
     }
   } catch {
-    // 预览失败保留上次结果，不干扰表单
+    if (version !== routePreviewVersion) return
+    gatewayRoutePreview.value = {
+      providerSlug: '未指定',
+      isFirstParty: false,
+      targetPath: '-',
+      protocol: '预览不可用',
+    }
   }
 }
 
