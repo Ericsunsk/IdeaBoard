@@ -346,3 +346,13 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - 同 package `go vet` 通过。
 - 提交：`b130054d feat(search): establish closed vision domain contract`。
 - Vision input materializer、HTTP mapping、provider adapters 与 persistence migration 仍属于后续闭包。
+
+## 第四批补充：Searchcatalog ports（4S）
+
+本子批定义 Searchcatalog 的 dependency inversion seams：web provider search/test adapters 只依赖 closed domain vocabulary；Vision config 只携带 model，AI Gateway endpoint/token 留在 central gateway；gateway port 只交换 bounded request/response facts，不导入 Runtime transport implementation。
+
+### Verification and boundary
+
+- clean archive（仅加入 Searchcatalog ports）中 `go test ./internal/searchcatalog/ports -count=1` 与 `go vet` 通过。
+- 提交：`ec7a544b feat(search): define gateway and provider ports`。
+- Application/infrastructure/composition wiring 尚未提交，需在后续完整闭包验证。
