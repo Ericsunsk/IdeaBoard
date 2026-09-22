@@ -213,8 +213,8 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 	})
 	userRouter.POST("/user/rewards/redeem", userHandler.Redeem)
 	userRouter.GET("/user/rewards/redemptions", userHandler.ListRedemptions)
-	redeemed, redeemRecorder := performRewardRequestWithRecorder[RedeemResult](
-		t, userRouter, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": "HTTP-ROTATED-2026"}, http.StatusOK,
+	redeemed, redeemRecorder := performRewardWriteWithKey[RedeemResult](
+		t, userRouter, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": "HTTP-ROTATED-2026"}, "http-reward-redeem", http.StatusOK,
 	)
 	if redeemRecorder.Header().Get("Cache-Control") != "no-store" || redeemed.CreditedAmount != 25 {
 		t.Fatalf("redeem = %+v Cache-Control=%q", redeemed, redeemRecorder.Header().Get("Cache-Control"))
@@ -244,8 +244,8 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 		t.Fatalf("redeemed delete Cache-Control=%q", redeemedDeleteRecorder.Header().Get("Cache-Control"))
 	}
 	invalidRaw := "INVALID-SECRET-9999"
-	_, invalidRecorder := performRewardRequestWithRecorder[struct{}](
-		t, userRouter, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": invalidRaw}, http.StatusUnprocessableEntity,
+	_, invalidRecorder := performRewardWriteWithKey[struct{}](
+		t, userRouter, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": invalidRaw}, "http-reward-redeem-invalid", http.StatusUnprocessableEntity,
 	)
 	if invalidRecorder.Header().Get("Cache-Control") != "no-store" || strings.Contains(invalidRecorder.Body.String(), invalidRaw) {
 		t.Fatalf("invalid response leaked raw Code: %s", invalidRecorder.Body.String())
@@ -262,6 +262,13 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 type rewardHTTPResponse[T any] struct {
 	Code int `json:"code"`
 	Data T   `json:"data"`
+}
+
+// rewardMachineErrorResponse mirrors response.MachineErrorResponse: rewards
+// failures always render here so callers branch on code, never on copy.
+type rewardMachineErrorResponse struct {
+	Code string `json:"code"`
+	Msg  string `json:"msg"`
 }
 
 func performRewardRequestWithRecorder[T any](
@@ -289,6 +296,17 @@ func performRewardRequestWithRecorder[T any](
 	router.ServeHTTP(recorder, request)
 	if recorder.Code != wantStatus {
 		t.Fatalf("%s %s status = %d, want %d; body=%s", method, path, recorder.Code, wantStatus, recorder.Body.String())
+	}
+	if wantStatus < 200 || wantStatus >= 300 {
+		var machine rewardMachineErrorResponse
+		if err := json.Unmarshal(recorder.Body.Bytes(), &machine); err != nil {
+			t.Fatalf("decode %s %s machine error: %v; body=%s", method, path, err, recorder.Body.String())
+		}
+		if machine.Code == "" {
+			t.Fatalf("%s %s machine error missing code; body=%s", method, path, recorder.Body.String())
+		}
+		var zero T
+		return zero, recorder
 	}
 	var response rewardHTTPResponse[T]
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
