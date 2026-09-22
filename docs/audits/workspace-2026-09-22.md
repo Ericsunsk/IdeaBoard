@@ -249,3 +249,14 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - 同 package `go vet` 通过。
 - 提交：`2ea061d8 fix(media): standardize remote image egress`。
 - 本批未修改 remote allowlist provider 或 media HTTP handler；其 policy/config ownership 仍需后续审计。
+
+## 第四批补充：Media Storage HTTP error contract（4J）
+
+本子批将 Storage profile HTTP handler 的 nil-service、JSON validation、list/command/provider errors 统一到 machine-readable `storage_*` codes。Curated `UserMessage()` 仍只用于明确安全的 profile validation；其他 wrapped provider/database errors 只进入 server logs，响应保持固定 safe message。并补充了 handler error envelope tests。
+
+### Verification and boundary
+
+- clean archive（替换 Storage HTTP handler/error seam/test）中 `go test ./internal/media/storage/interfaces/http -count=1 -race` 通过。
+- 同 package `go vet` 通过。
+- 提交：`cf5282b3 fix(media): stabilize storage HTTP errors`。
+- 本批未覆盖 storage repository、profile migration 和 upload/download handlers 的其他 dirty changes。
