@@ -99,3 +99,20 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 
 - `cd apps/api && go test ./internal/platform/config -count=1` 通过。
 - 本子批未证明 pgx pool 实际 runtime idle 回收；当前 `postgres.go` 仍属于未提交迁移闭包，不能把 `DB_POOL_MAX_IDLE` 视为已在运行时生效。
+
+## 第三批补充：Outbound HTTP 可靠性与 SSRF 边界
+
+本子批提交 `platform/outboundhttp` 标准客户端及 `safehttp` policy error seam。它覆盖所有已迁移调用方共用的 retry、timeout、Retry-After、request-body replay、metrics 和 allowlist 约束；不包含各业务 context 的 provider 行为审计。
+
+### Standards / Spec
+
+- 双轴复核发现并修复带 `http.Request.GetBody` 的 POST 在 503/429 retry 后发送空 body 的问题。
+- 修复 nil context 触发 `context.WithTimeout` panic，以及读取不可重放 body 出错时未关闭 reader 的 Resource Cleanup 问题。
+- `outbound_retries_total` 仅在确实安排下一次 attempt 时递增；最后一次失败和 `MaxAttempts=1` 不再误计 retry。
+- `safehttp.ErrPolicyViolation` 将 URL/SSRF 的确定性拒绝与 transient transport error 区分；policy rejection 立即 fail closed，不重试。
+
+### 验证与边界
+
+- `cd apps/api && go test ./internal/platform/outboundhttp ./internal/platform/safehttp -count=1 -race` 通过。
+- `cd apps/api && go vet ./internal/platform/outboundhttp ./internal/platform/safehttp` 通过。
+- 本批只验证共享客户端与安全边界；provider-specific status mapping、Cloudflare gateway billing 及业务 retry budget 仍在后续批次审计。

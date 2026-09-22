@@ -2,6 +2,7 @@ package safehttp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -13,6 +14,11 @@ import (
 	"sync/atomic"
 	"time"
 )
+
+// ErrPolicyViolation marks deterministic URL and SSRF policy rejections.
+// Retry clients must fail these closed instead of treating them as transient
+// transport failures.
+var ErrPolicyViolation = errors.New("safehttp policy violation")
 
 const defaultTimeout = 15 * time.Second
 const safeTransportPoolMaxSize = 256
@@ -56,16 +62,16 @@ func resolvePolicyWithTimeout(ctx context.Context, rawURL string, resolveTimeout
 
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return nil, fmt.Errorf("URL 格式错误")
+		return nil, fmt.Errorf("%w: URL 格式错误", ErrPolicyViolation)
 	}
 
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return nil, fmt.Errorf("仅支持 http/https URL")
+		return nil, fmt.Errorf("%w: 仅支持 http/https URL", ErrPolicyViolation)
 	}
 
 	host := parsed.Hostname()
 	if host == "" {
-		return nil, fmt.Errorf("URL 缺少主机名")
+		return nil, fmt.Errorf("%w: URL 缺少主机名", ErrPolicyViolation)
 	}
 
 	if resolveTimeout <= 0 {
@@ -532,7 +538,7 @@ func filterAllowedIPs(host string, port string, addrs []net.IPAddr, allowedHosts
 	allowLoopback := allowedHosts["localhost"] || allowedHostPorts[hostPortKey("localhost", port)]
 
 	if strings.EqualFold(host, "localhost") && !hostAllowed {
-		return nil, fmt.Errorf("不允许访问本地地址")
+		return nil, fmt.Errorf("%w: 不允许访问本地地址", ErrPolicyViolation)
 	}
 
 	allowed := make([]net.IPAddr, 0, len(addrs))
@@ -549,7 +555,7 @@ func filterAllowedIPs(host string, port string, addrs []net.IPAddr, allowedHosts
 	}
 
 	if len(allowed) == 0 {
-		return nil, fmt.Errorf("不允许访问内网或本地地址")
+		return nil, fmt.Errorf("%w: 不允许访问内网或本地地址", ErrPolicyViolation)
 	}
 
 	return allowed, nil
