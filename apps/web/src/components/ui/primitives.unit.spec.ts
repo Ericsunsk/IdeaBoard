@@ -36,6 +36,7 @@ describe('Standard shadcn-vue primitives', () => {
     expect(input.element.value).toBe('hello')
     expect(input.classes()).toContain('h-8')
     expect(input.classes()).toContain('border-destructive')
+    expect(input.classes()).toContain('focus-visible:border-destructive')
     expect(input.attributes('aria-invalid')).toBe('true')
   })
 
