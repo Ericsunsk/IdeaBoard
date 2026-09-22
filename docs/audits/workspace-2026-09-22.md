@@ -271,3 +271,14 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - 同 package `go vet` 通过。
 - 提交：`82b3d0e8 fix(payments): prevent wrapped error detail leaks`。
 - Admin order pagination mapping、recharge history pagination 和 handler migration 仍未纳入；它们依赖当前 dirty application/readmodel closure，后续单独审计。
+
+## 第四批补充：Stripe outbound observability（4L）
+
+本子批为 Stripe SDK account/product/webhook/checkout/refund/dispute 调用接入固定 `stripe` target 的 outbound RED recorder，统一记录 success、HTTP 4xx/5xx、timeout/canceled/transport outcome 和 latency。Recorder 可注入 isolated metrics registry，production fallback 到 shared default metrics；labels 不含 account、customer、order、URL 或 provider payload。
+
+### Verification and boundary
+
+- clean archive（替换 Stripe adapter/checkout/dispute/refund 并加入 recorder/test）中 `go test ./internal/payments/infrastructure/stripe -count=1 -race` 通过。
+- 同 package `go vet` 通过。
+- 提交：`186736a0 feat(payments): record Stripe outbound outcomes`。
+- 本批未修改 Payments transaction/reconciliation/webhook application semantics；仅增加 outbound observability。
