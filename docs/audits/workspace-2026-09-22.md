@@ -396,6 +396,27 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - 提交：`966cb75e feat(admin): sync gateway model catalog API`。
 - backend `internal/aigateway` 尚未在本批提交：其事务保存调用依赖尚未闭合的 `settings`/sqlc/DB migration closure，后续单独审计后再提交，避免产生 HEAD 不可编译的中间 commit。
 
+## 第四批补充：AI Gateway/backend transaction audit（4X，暂不提交代码）
+
+本子批继续审计 backend `internal/aigateway`、`platform/settings` 与 PGX/sqlc 迁移边界。MCP impact/Codegraph 确认 AI Gateway package 依赖 `settings.SetAndDeleteManyWithAdminAudit`，而 settings 又依赖整套 PGX `sqlc` generated interface 与大量 caller migration，不能做只包含单 package 的中间提交。
+
+审计期间修复但暂留工作区的两项 handler/config 问题：
+
+- `TestConnection` 在 Admin 请求需要从 mapping 推导 route 时，若 handler 未注入 store 会 nil dereference；现统一返回 `503 Service Unavailable` 并有 regression test。
+- `ConfigRepository.Update` 在空 `base_url` 时吞掉 `GetSummary` 的非空 I/O error；现以 `load existing AI gateway config` 上下文返回。
+
+仍需在完整 transaction closure 中修复的高风险项：`SaveCatalog` 在取得 advisory lock 前读取旧 catalog/mappings，存在并发 mapping 写入被随后 cascade 删除的数据丢失窗口。必须将 stale-key 计算与 lock/write 放入同一 pgx transaction seam，不能通过额外 retry 或 defensive copy 掩盖。
+
+### Verification and boundary
+
+- 当前 workspace：`cd apps/api && go test ./internal/aigateway ./internal/platform/settings -count=1 -race` 与 `go vet ./internal/aigateway ./internal/platform/settings` 通过。
+- 当前 API 全量测试除工作区已有 workflow dirty 缺失符号（`ProviderOpenAICompatible`、`ProviderGoogleAI`、`ValidateProviderAPIType`）外均通过；失败属于未纳入本批的 workflow closure。
+- PGX targeted checks 通过：`internal/db/dbutil`、`internal/platform/database/...`、`internal/runtime/infrastructure/database`；nested `internal/testdb` tests 通过。
+- clean HEAD snapshot 证明：PGX/dbutil 不能脱离 generated sqlc 与 settings callers 编译；替换全套 sqlc + settings + PGX database/testdb 文件后 targeted packages 通过。
+- transaction reviewer 未发现 rollback 修复 P1，但指出 `Commit(ctx)` cancellation 的结果-unknown 仍缺真实 PostgreSQL 回归测试。
+- schema reviewer 要求 migrations → schema snapshot → queries → generated sqlc 原子闭包，并提示包含 DROP/purge 的 migration 需要 Fresh DB、backup 与 rollback/cutover 计划。
+- 本子批不提交 backend 代码，避免产生 HEAD 不可编译、SQL/generated 不一致或保留已知并发数据丢失窗口的 commit；待完整 PGX/sqlc/schema/consumer closure 后一次性提交。
+
 ## 第四批补充：AI Gateway admin response/probe security hardening（4W，待 backend closure）
 
 MCP Codegraph 与 security review 识别并修复两项明确问题：Admin brand-logo response 的 cache policy 从 `public` 改为 `private`，避免共享 proxy/CDN 缓存绕过后续权限检查；`ProbeGatewayConnection` 拒绝 URL userinfo、query 与 fragment，避免敏感信息进入 URL/日志并保持 probe target 由受控 path 构造。补充 handler header 与 URL validation regression tests，并清理同一位置的重复注释。Logo cache 无界增长与 observed SQL 高基数属于低风险残余项，按“不过度 defense / design”暂不扩展。
