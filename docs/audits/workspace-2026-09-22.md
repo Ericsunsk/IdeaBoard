@@ -238,3 +238,14 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - 同 package `go vet` 通过。
 - 提交：`63569322 fix(media): standardize S3 outbound delivery`。
 - 本批未覆盖 media Postgres repository、profile HTTP handler 或 remote downloader；这些改动仍需与 storage migration 闭包一起审计。
+
+## 第四批补充：Remote image outbound boundary（4I）
+
+本子批将 remote image fetch 迁移到标准 outbound client，统一 30s timeout、allow-host SSRF policy、bounded retries 和 Retry-After。`HTTPStatusError` 转换为兼容旧逻辑的 response/status，只有 transport/timeout 作为 Go error 返回；body 仍由既有 size-limited image decoder 负责读取与 cleanup。
+
+### Verification and boundary
+
+- clean archive（替换 remote downloader）中 `go test ./internal/media/storage/infrastructure/remote -count=1` 通过。
+- 同 package `go vet` 通过。
+- 提交：`2ea061d8 fix(media): standardize remote image egress`。
+- 本批未修改 remote allowlist provider 或 media HTTP handler；其 policy/config ownership 仍需后续审计。
