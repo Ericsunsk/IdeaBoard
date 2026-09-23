@@ -1,6 +1,7 @@
 /**
  * Single owner for module-direction rules: no-circular,
  * shared-not-to-features, route-pages-no-direct-generated-query,
+ * features-admin-no-public-client, non-admin-no-control-client,
  * no-cross-feature-deep-imports.
  *
  * File-local Overlay adapter conventions live in eslint.config.js
@@ -43,6 +44,31 @@ module.exports = {
       },
       to: {
         path: '^src/shared/api/generated-query',
+      },
+    },
+    {
+      name: 'features-admin-no-public-client',
+      severity: 'error',
+      comment:
+        'Admin surface must use the control client (or legacy generated-query) instead of the public client. (Issue #800)',
+      from: {
+        path: '^src/features/admin',
+      },
+      to: {
+        path: '^src/shared/api/generated-query/public',
+      },
+    },
+    {
+      name: 'non-admin-no-control-client',
+      severity: 'error',
+      comment:
+        'Non-admin features must use the public client (or legacy generated-query) instead of the admin-only control client. (Issue #800)',
+      from: {
+        path: '^src/features',
+        pathNot: '^src/features/admin',
+      },
+      to: {
+        path: '^src/shared/api/generated-query/control',
       },
     },
     {

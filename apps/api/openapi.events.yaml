@@ -1,0 +1,113 @@
+openapi: 3.0.3
+info:
+  title: IdeaBoard Workspace Events
+  version: 0.1.0
+  description: |
+    Event contract skeleton (issue #800). JSON Schema only: this document
+    defines no paths. Workspace events share one envelope; SSE and webhooks
+    differ only in transport. Events are an event layer, not a task queue:
+    River + PostgreSQL remain the source of truth for task state.
+
+    SSE replay: clients reconnect with the `Last-Event-ID` request header and
+    the server resumes after that event ID. The initial `:connected` frame is
+    not a domain event and carries no `evt_` ID.
+
+    Webhook delivery: POSTs share the envelope below and add `X-Webhook-Signature`
+    (HMAC-SHA256 over the raw body with the subscription secret),
+    `X-Webhook-Delivery-Id` and `X-Webhook-Attempt` headers, per-subscription
+    event-type filtering, exponential-backoff retry, delivery status and
+    dead-letter behavior (filled in by #807).
+  x-event-transports: [sse, webhook]
+  x-event-types: [task.completed, task.failed, board.member_invited]
+servers:
+  - url: /api/v1
+paths: {}
+components:
+  schemas:
+    EventEnvelope:
+      type: object
+      required: [id, type, version, occurred_at, actor, resource, workspace_id, data]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          pattern: '^evt_[A-Za-z0-9]+$'
+          description: Opaque event identifier, also used for SSE Last-Event-ID replay.
+        type:
+          type: string
+          enum: [task.completed, task.failed, board.member_invited]
+          description: Stable event type; initial set filled in by #802-#807.
+        version:
+          type: integer
+          minimum: 1
+          default: 1
+          description: Schema version of the event data payload.
+        occurred_at:
+          type: string
+          format: date-time
+          description: RFC3339 UTC timestamp of occurrence.
+        actor:
+          $ref: '#/components/schemas/EventActor'
+        resource:
+          $ref: '#/components/schemas/EventResource'
+        workspace_id:
+          type: string
+          pattern: '^ws_[A-Za-z0-9]+$'
+        data:
+          type: object
+          description: Versioned payload discriminated by type + version.
+    EventActor:
+      type: object
+      required: [type, id]
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [user, service_account, system]
+        id:
+          type: string
+          description: Opaque actor identifier (usr_*, service account ID, or "system").
+    EventResource:
+      type: object
+      required: [type, id]
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [task, board, media_asset]
+        id:
+          type: string
+          description: Opaque resource identifier (task_*, board_*, asset_*).
+    TaskCompletedData:
+      type: object
+      required: [task_id]
+      additionalProperties: false
+      properties:
+        task_id:
+          type: string
+          pattern: '^task_[A-Za-z0-9]+$'
+        outputs_uri:
+          type: string
+          nullable: true
+          description: API URI for task outputs, never a raw storage URL.
+    TaskFailedData:
+      type: object
+      required: [task_id, error_code]
+      additionalProperties: false
+      properties:
+        task_id:
+          type: string
+          pattern: '^task_[A-Za-z0-9]+$'
+        error_code:
+          type: string
+          description: Stable machine-readable failure code.
+    BoardMemberInvitedData:
+      type: object
+      required: [board_id, member_id]
+      additionalProperties: false
+      properties:
+        board_id:
+          type: string
+          pattern: '^board_[A-Za-z0-9]+$'
+        member_id:
+          type: string

@@ -1,0 +1,316 @@
+openapi: 3.0.3
+info:
+  title: IdeaBoard Control API
+  version: 0.1.0
+  description: |
+    Control Plane contract skeleton (issue #800).
+    Canonical prefix is /api/control/v1. This surface has its own OpenAPI
+    contract, authorization middleware, capability checks, rate limits and
+    mandatory audit records, independent from the Public Data Plane. It must
+    never be exposed as ordinary public resources such as /api/v1/platform/*.
+    Stub families carry `x-stub: true` and are filled in by #808. The legacy
+    single-file contract in apps/api/openapi.yaml is untouched.
+  x-rate-limit:
+    window_seconds: 60
+    max_requests: 120
+    description: Control Plane limits are separate from Public limits.
+  x-audit:
+    required: true
+    fields: [operator, target, capability, request_id, idempotency_key, reason, outcome, occurred_at]
+    description: Every high-risk mutation records operator, target, reason and outcome.
+servers:
+  - url: /api/control/v1
+security:
+  - controlSession: []
+  - controlOperatorKey: []
+tags:
+  - name: ControlUsers
+    description: User administration, sessions and impersonation.
+  - name: ControlWorkspaces
+    description: Workspace administration and membership intervention.
+  - name: ControlBilling
+    description: Billing accounts, catalog and financial operations.
+paths:
+  /users:
+    get:
+      tags: [ControlUsers]
+      operationId: listControlUsers
+      summary: List users for platform administration (stub)
+      x-stub: true
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated control user list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedControlUsers'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /workspaces:
+    get:
+      tags: [ControlWorkspaces]
+      operationId: listControlWorkspaces
+      summary: List workspaces for platform administration (stub)
+      x-stub: true
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated control workspace list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedControlWorkspaces'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /billing/accounts:
+    get:
+      tags: [ControlBilling]
+      operationId: listControlBillingAccounts
+      summary: List billing accounts for financial operations (stub)
+      x-stub: true
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated billing account list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedControlBillingAccounts'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+components:
+  securitySchemes:
+    controlSession:
+      type: apiKey
+      in: cookie
+      name: better-auth.session_token
+      description: >-
+        Operator session. Same transport cookie as Public, but authorized
+        through separate Control capability checks and Control rate limits.
+    controlOperatorKey:
+      type: apiKey
+      in: header
+      name: X-Control-Key
+      description: Operator service key for automation; never valid on Public routes.
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor token bound to operator, filters and sort order.
+      schema:
+        type: string
+        maxLength: 512
+    PageSize:
+      name: page_size
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Required on every high-risk Control mutation; recorded in the audit record.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+  headers:
+    RequestId:
+      description: Server-assigned request correlation ID, present on every response.
+      schema:
+        type: string
+    RetryAfter:
+      description: Seconds to wait before retrying (429 and 503 with known window).
+      schema:
+        type: integer
+  responses:
+    Unauthorized:
+      description: Missing operator authentication.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ControlErrorEnvelope'
+    Forbidden:
+      description: Authenticated operator lacks the Control capability for this family.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ControlErrorEnvelope'
+  schemas:
+    ControlErrorEnvelope:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          additionalProperties: false
+          properties:
+            code:
+              type: string
+              description: Stable machine-readable code.
+            message:
+              type: string
+            details:
+              type: object
+            request_id:
+              type: string
+    ControlPaginationMeta:
+      type: object
+      required: [next_cursor, has_more]
+      additionalProperties: false
+      properties:
+        next_cursor:
+          type: string
+          nullable: true
+        has_more:
+          type: boolean
+    AuditRecord:
+      type: object
+      required: [operator, capability, request_id, outcome, occurred_at]
+      additionalProperties: false
+      properties:
+        operator:
+          type: object
+          required: [type, id]
+          additionalProperties: false
+          properties:
+            type:
+              type: string
+              enum: [user, service_account]
+            id:
+              type: string
+        target:
+          type: object
+          nullable: true
+          required: [type, id]
+          additionalProperties: false
+          properties:
+            type:
+              type: string
+            id:
+              type: string
+        capability:
+          type: string
+          description: Control capability used, e.g. users.impersonate.
+        request_id:
+          type: string
+        idempotency_key:
+          type: string
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+          description: Operator note justifying the high-risk mutation.
+        outcome:
+          type: string
+          enum: [read, success, denied, failed]
+        occurred_at:
+          type: string
+          format: date-time
+    ControlUser:
+      type: object
+      required: [id]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          pattern: '^usr_[A-Za-z0-9]+$'
+    ControlWorkspace:
+      type: object
+      required: [id]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          pattern: '^ws_[A-Za-z0-9]+$'
+    ControlBillingAccount:
+      type: object
+      required: [id]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Opaque billing account identifier owned by a workspace or organization.
+    PaginatedControlUsers:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlUser'
+        meta:
+          $ref: '#/components/schemas/ControlPaginationMeta'
+    PaginatedControlWorkspaces:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlWorkspace'
+        meta:
+          $ref: '#/components/schemas/ControlPaginationMeta'
+    PaginatedControlBillingAccounts:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlBillingAccount'
+        meta:
+          $ref: '#/components/schemas/ControlPaginationMeta'

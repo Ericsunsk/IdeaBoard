@@ -9,6 +9,11 @@ export type ApiClientError = Error & {
   msg?: string | undefined
   status?: number | undefined
   data?: unknown
+  // Contract envelope passthrough (issue #803): v1 error bodies carry
+  // `{ error: { code, message, details, request_id } }`. Additive only;
+  // legacy `{ code, msg, data }` handling below is untouched.
+  requestId?: string | undefined
+  details?: unknown
 }
 
 export type ApiRequestConfig = Omit<FetchOptions<'json'>, 'baseURL' | 'params' | 'signal'> & {
@@ -30,18 +35,60 @@ function getPayloadMessage(payload: unknown, data: Record<string, unknown> | nul
   return ''
 }
 
+type ContractErrorFields = {
+  code?: string | undefined
+  message?: string | undefined
+  details?: unknown
+  requestId?: string | undefined
+}
+
+// getContractErrorFields reads the v1 `{ error: { code, message, details,
+// request_id } }` envelope (issue #803). It returns undefined when the
+// payload carries no contract error. Contract messages are user-facing by
+// kernel design, hence safe to display.
+function getContractErrorFields(data: Record<string, unknown> | null): ContractErrorFields | undefined {
+  const nested = toObject(data?.error)
+  if (typeof nested?.code !== 'string' || !nested.code) return undefined
+  const fields: ContractErrorFields = { code: nested.code }
+  if (typeof nested.message === 'string' && nested.message) fields.message = nested.message
+  fields.details = nested.details
+  if (typeof nested.request_id === 'string' && nested.request_id) {
+    fields.requestId = nested.request_id
+  }
+  return fields
+}
+
 export function createApiError(payload?: unknown, status?: number): ApiClientError {
   const data = toObject(payload)
   const safeMessage = getPayloadMessage(payload, data)
-  const message = safeMessage || i18n.global.t('common.errors.requestIncomplete')
+  // The contract branch only applies when the legacy top-level `code`
+  // is absent, so existing `{ code, msg, data }` payloads keep their
+  // exact behavior.
+  const legacyCode =
+    typeof data?.code === 'number' || typeof data?.code === 'string' ? data.code : undefined
+  const contractError = legacyCode == null ? getContractErrorFields(data) : undefined
+  return buildApiError(data, status, safeMessage, legacyCode, contractError)
+}
+
+function buildApiError(
+  data: Record<string, unknown> | null,
+  status: number | undefined,
+  safeMessage: string,
+  legacyCode: number | string | undefined,
+  contractError: ContractErrorFields | undefined,
+): ApiClientError {
+  const displayMessage = safeMessage || contractError?.message || ''
+  const message = displayMessage || i18n.global.t('common.errors.requestIncomplete')
   const error = new Error(message) as ApiClientError
-  error.code =
-    (typeof data?.code === 'number' || typeof data?.code === 'string' ? data.code : undefined) ??
-    status
-  error.hasSafeDisplayMessage = Boolean(safeMessage)
-  error.msg = safeMessage
+  error.code = legacyCode ?? contractError?.code ?? status
+  error.hasSafeDisplayMessage = Boolean(displayMessage)
+  error.msg = displayMessage
   error.status = status
   error.data = data?.data
+  if (contractError != null) {
+    error.details = contractError.details
+    error.requestId = contractError.requestId
+  }
   return error
 }
 

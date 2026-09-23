@@ -18,6 +18,7 @@ import (
 	"ideaboard/api/internal/media/librarymaterialization"
 	storageauth "ideaboard/api/internal/media/storage/application/authorization"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
+	"ideaboard/api/internal/media/workspaceuploads"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/config"
@@ -36,6 +37,7 @@ import (
 	searchports "ideaboard/api/internal/searchcatalog/ports"
 	statisticshttp "ideaboard/api/internal/tasking/interfaces/http/statistics"
 	taskhttp "ideaboard/api/internal/tasking/interfaces/http/task"
+	tenancypg "ideaboard/api/internal/tenancy/postgres"
 	"ideaboard/api/internal/usage"
 
 	"github.com/gin-gonic/gin"
@@ -109,7 +111,35 @@ func newAppRouter(
 	// Panic recovery, access logging and request IDs are registered in
 	// registerGlobalMiddleware so every route shares the error envelope.
 	registerHTTPRoutes(router, httpapi.Dependencies{
-		Auth:                authDeps,
+		Auth: authDeps,
+		ContractV1: httpapi.ContractV1Deps{
+			Store: tenancypg.NewStore(repos.db),
+			Users: httpapi.NewUsersRepositoryDirectory(repos.userRepo),
+			// Upload sessions are process-local ephemeral coordination
+			// (never durable); workspace assets reuse media_assets via
+			// the postgres sibling; bytes read through the storage
+			// service gateway seam.
+			UploadSessions:  workspaceuploads.NewInMemorySessionStore(),
+			WorkspaceAssets: workspaceuploads.NewPostgresAssetStore(repos.db),
+			MediaObjects:    services.storageService,
+		},
+		// Workspace billing surface (issue #804). Reads compose the
+		// Credits ledger, billing records, and usage through their owning
+		// services (no handler ledger writes); checkout reuses the
+		// Payments seam with a workspace-namespaced idempotency key, and
+		// webhook settlement stays inside Payments -> credits.Commands.
+		// Task submission settlement is #805 (hook left unimplemented).
+		ContractV1Billing: httpapi.ContractV1BillingDeps{
+			Tenancy:         tenancypg.NewStore(repos.db),
+			Users:           httpapi.NewUsersRepositoryDirectory(repos.userRepo),
+			BillingAccounts: tenancypg.NewBillingAccountStore(repos.db),
+			Wallets:         services.creditService,
+			Records:         services.billingRecords,
+			Usage:           services.usageService,
+			Quoter:          services.billingCatalog,
+			Checkout: httpapi.NewPaymentsCheckoutAdapter(services.paymentService,
+				cfg.PublicOrigins.WebURL("/user/boards")),
+		},
 		PublicSearchHandler: searchhttp.NewSearchHandler(searchapplication.NewSearchService(searchProviderConfig, []searchports.SearchProviderAdapter{searchinfra.NewUnsplashAdapter(), searchinfra.NewPexelsAdapter()})),
 		UserRoutes: httpapi.UserRouteDeps{
 			AuthHandler:            auth.NewAuthHandler(services.userService),

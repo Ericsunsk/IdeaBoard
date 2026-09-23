@@ -10,12 +10,18 @@ import {
 import { resolveApiUrl, resolveAssetUrl } from '../config/runtimeUrls'
 import { requireApiData } from './apiResponse'
 import { api } from './client'
+import {
+  workspaceMediaAssetContentSuffix,
+  workspaceMediaAssetDerivativeSuffix,
+  type WorkspaceMediaDerivativeVariant,
+} from './upload'
 import { subscribeUserEvent } from './userEventStream'
 import { createPollDelay } from '../utils/polling'
 import { i18n } from '../i18n'
 import {
   getGetUserMediaAssetMetadataUrl,
   getGetUserMediaAssetMetadataBatchUrl,
+  getGetUserMediaAssetDerivativeContentUrl,
   getGetUserMediaAssetOriginalContentUrl,
 } from './generated-query/user-assets/user-assets'
 import type {
@@ -237,16 +243,16 @@ export function resolveMediaAssetOriginalURL(assetId: MediaAssetId): string {
 
 /**
  * Format-agnostic derivative delivery URL. The backend negotiates the ready
- * physical encoding server-side; callers never specify a format.
+ * physical encoding server-side; callers never specify a format. The path
+ * comes from the generated client (never hand-concatenated) so legacy
+ * delivery URLs cannot drift from the OpenAPI contract.
  */
 export function resolveMediaAssetDerivativeURL(
   assetId: MediaAssetId,
   tier: 'thumb' | 'preview' | 'large-preview' | 'processing-input' = 'large-preview',
 ): string {
   const normalized = assetId.trim()
-  return resolveApiUrl(
-    `/user/media-assets/${encodeURIComponent(normalized)}/derivatives/${encodeURIComponent(tier)}/content`,
-  )
+  return resolveApiUrl(getGetUserMediaAssetDerivativeContentUrl(normalized, tier))
 }
 
 /**
@@ -260,6 +266,31 @@ export async function resolveMediaAssetProcessingURL(assetId: MediaAssetId): Pro
   const status = variant?.status ?? metadata.status
   if (status === 'ready' && variant?.url) return resolveAssetUrl(variant.url)
   throw new MediaAssetDerivativeNotReadyError('processing-input', status)
+}
+
+// ---------------------------------------------------------------------------
+// Workspace media delivery URLs (issue #803, Public Data Plane).
+//
+// Canonical browser URLs for workspace-bound assets live under
+// `/api/v1/workspaces/{workspace_id}/media-assets/...` and carry
+// `asset_...` only (storage keys never leave the server). Path suffixes
+// are owned by `./upload` (single source of truth, validated opaque
+// ids); this module only mounts them onto the runtime base URL.
+// Board/Task/Library adoption of these URLs is #805/#806.
+
+export function resolveWorkspaceMediaAssetOriginalURL(
+  workspaceId: string,
+  assetId: MediaAssetId,
+): string {
+  return resolveApiUrl(workspaceMediaAssetContentSuffix(workspaceId, assetId))
+}
+
+export function resolveWorkspaceMediaAssetDerivativeURL(
+  workspaceId: string,
+  assetId: MediaAssetId,
+  tier: WorkspaceMediaDerivativeVariant = 'large-preview',
+): string {
+  return resolveApiUrl(workspaceMediaAssetDerivativeSuffix(workspaceId, assetId, tier))
 }
 
 function normalizeTier(value: unknown): MediaAssetDeliveryTier {

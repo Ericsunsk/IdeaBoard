@@ -11,6 +11,9 @@ import (
 )
 
 type Querier interface {
+	ArchiveOrganization(ctx context.Context, publicID string) (int64, error)
+	ArchiveWorkspace(ctx context.Context, publicID string) (int64, error)
+	ArchiveWorkspaceMediaAsset(ctx context.Context, arg ArchiveWorkspaceMediaAssetParams) (MediaAsset, error)
 	BackfillDailyStatsByCreatedRange(ctx context.Context, arg BackfillDailyStatsByCreatedRangeParams) (BackfillDailyStatsByCreatedRangeRow, error)
 	BeginLibraryMaterializedMediaAsset(ctx context.Context, arg BeginLibraryMaterializedMediaAssetParams) (int64, error)
 	BeginTaskResultMediaAsset(ctx context.Context, arg BeginTaskResultMediaAssetParams) (int64, error)
@@ -37,16 +40,37 @@ type Querier interface {
 	CountBoardShareTokenByHash(ctx context.Context, tokenHash string) (int64, error)
 	CountBoardsByBoardID(ctx context.Context, boardID string) (int64, error)
 	CountMediaRefsByAssetID(ctx context.Context, mediaAssetID int64) (int64, error)
+	CountOrganizationOwners(ctx context.Context, organizationID int64) (int64, error)
 	CountTasksByStatus(ctx context.Context, status string) (int64, error)
 	CountTasksByUserID(ctx context.Context, userID int64) (int64, error)
+	CountWorkspaceOwners(ctx context.Context, workspaceID int64) (int64, error)
+	// Billing Account owner stub (#801). Full lifecycle belongs to #804.
+	CreateBillingAccountStub(ctx context.Context, arg CreateBillingAccountStubParams) (BillingAccount, error)
 	CreateBoardShareToken(ctx context.Context, arg CreateBoardShareTokenParams) (int64, error)
 	CreateBoardUploadMediaAsset(ctx context.Context, arg CreateBoardUploadMediaAssetParams) (int64, error)
 	CreateLibraryFolder(ctx context.Context, arg CreateLibraryFolderParams) (LibraryFolder, error)
+	// Organization tenancy queries (#801). Public references use public_id;
+	// internal_id stays database-internal.
+	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	CreatePreparedMediaAsset(ctx context.Context, arg CreatePreparedMediaAssetParams) (int64, error)
 	CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error)
 	CreateTaskIdempotent(ctx context.Context, arg CreateTaskIdempotentParams) (CreateTaskIdempotentRow, error)
 	CreateTaskOutput(ctx context.Context, arg CreateTaskOutputParams) (int64, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
+	// Workspace tenancy queries (#801). Public references use public_id;
+	// internal_id stays database-internal.
+	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error)
+	// Workspace-scoped media assets (issue #803). The workspace binding reuses
+	// media_assets.metadata (workspace_id) with NO schema change; the archive
+	// lifecycle marker travels in metadata.archived_at. Storage keys never
+	// leave the server: content URLs carry asset_... only.
+	//
+	// Retention: CreateWorkspaceMediaAsset stamps reclaim_after at
+	// complete + 7d (WorkspaceAssetAbandonedTTL) for never-verified assets;
+	// the existing media reclamation scanner reclaims them once due unless
+	// Board/Task/Library refs protect them (#805/#806 own those refs).
+	// ArchiveWorkspaceMediaAsset restamps reclaim_after at archive + 30d.
+	CreateWorkspaceMediaAsset(ctx context.Context, arg CreateWorkspaceMediaAssetParams) (MediaAsset, error)
 	DeleteAdminBrandLogoOverride(ctx context.Context, arg DeleteAdminBrandLogoOverrideParams) (int64, error)
 	DeleteBoardByOwnerAndBoardID(ctx context.Context, arg DeleteBoardByOwnerAndBoardIDParams) (int64, error)
 	DeleteBoardMediaRefsByOwnerAndBoardID(ctx context.Context, arg DeleteBoardMediaRefsByOwnerAndBoardIDParams) error
@@ -59,12 +83,14 @@ type Querier interface {
 	DeleteLibraryAsset(ctx context.Context, arg DeleteLibraryAssetParams) (int64, error)
 	DeleteLibraryFolder(ctx context.Context, arg DeleteLibraryFolderParams) (int64, error)
 	DeleteMediaDerivativesByAsset(ctx context.Context, arg DeleteMediaDerivativesByAssetParams) error
+	DeleteOrganizationMembership(ctx context.Context, arg DeleteOrganizationMembershipParams) (int64, error)
 	DeleteOutputsByTaskID(ctx context.Context, taskID string) error
 	DeleteSystemConfigsByKeys(ctx context.Context, configKeys []string) error
 	DeleteTaskOutputMediaRefsByTaskID(ctx context.Context, taskID string) error
 	DeleteUnclaimedPreparedMediaAsset(ctx context.Context, arg DeleteUnclaimedPreparedMediaAssetParams) (int64, error)
 	DeleteUserBoardsByUserID(ctx context.Context, userID int64) error
 	DeleteUserByID(ctx context.Context, id int64) (int64, error)
+	DeleteWorkspaceMembership(ctx context.Context, arg DeleteWorkspaceMembershipParams) (int64, error)
 	EnsureLibraryFolderByName(ctx context.Context, arg EnsureLibraryFolderByNameParams) error
 	EnsureQuickSavesFolder(ctx context.Context, ownerUserID int64) error
 	// Exhausted failure: same terminal write plus retry accounting.
@@ -80,6 +106,7 @@ type Querier interface {
 	GetActiveExecutionAttemptByTaskID(ctx context.Context, taskID string) (GetActiveExecutionAttemptByTaskIDRow, error)
 	GetActiveStorageProfileSecretVersion(ctx context.Context, arg GetActiveStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error)
 	GetAdminPaymentOrder(ctx context.Context, orderNumber string) (GetAdminPaymentOrderRow, error)
+	GetBillingAccountByWorkspaceID(ctx context.Context, workspaceID pgtype.Int8) (BillingAccount, error)
 	GetBoardByBoardID(ctx context.Context, boardID string) (Board, error)
 	GetBoardByOwnerAndBoardID(ctx context.Context, arg GetBoardByOwnerAndBoardIDParams) (Board, error)
 	GetBoardMemberByUserID(ctx context.Context, arg GetBoardMemberByUserIDParams) (BoardMember, error)
@@ -96,6 +123,9 @@ type Querier interface {
 	GetMediaAssetByIDForOwner(ctx context.Context, arg GetMediaAssetByIDForOwnerParams) (MediaAsset, error)
 	GetMediaAssetByStorageLocator(ctx context.Context, arg GetMediaAssetByStorageLocatorParams) (MediaAsset, error)
 	GetMediaDerivativeByAssetTier(ctx context.Context, arg GetMediaDerivativeByAssetTierParams) (MediaDerivative, error)
+	GetOrganizationByInternalID(ctx context.Context, internalID int64) (Organization, error)
+	GetOrganizationByPublicID(ctx context.Context, publicID string) (Organization, error)
+	GetOrganizationMembership(ctx context.Context, arg GetOrganizationMembershipParams) (OrganizationMembership, error)
 	GetPaymentCheckoutShutdown(ctx context.Context, id pgtype.UUID) (PaymentCheckoutShutdown, error)
 	GetPaymentCustomer(ctx context.Context, arg GetPaymentCustomerParams) (PaymentCustomer, error)
 	GetPaymentOrderByCheckoutSession(ctx context.Context, arg GetPaymentOrderByCheckoutSessionParams) (PaymentOrder, error)
@@ -108,6 +138,7 @@ type Querier interface {
 	GetPaymentStripeCredential(ctx context.Context, id pgtype.UUID) (PaymentStripeCredential, error)
 	GetPaymentStripeCredentialForOrder(ctx context.Context, id pgtype.UUID) (PaymentStripeCredential, error)
 	GetPaymentStripeCredentialForOrderNumber(ctx context.Context, publicOrderNumber string) (PaymentStripeCredential, error)
+	GetPersonalWorkspaceByOwner(ctx context.Context, ownerUserID pgtype.Int8) (Workspace, error)
 	GetProcessingInputManifestObject(ctx context.Context, arg GetProcessingInputManifestObjectParams) (GetProcessingInputManifestObjectRow, error)
 	GetQuickSavesFolder(ctx context.Context, ownerUserID int64) (LibraryFolder, error)
 	GetReadyLibraryMaterializedMediaAsset(ctx context.Context, arg GetReadyLibraryMaterializedMediaAssetParams) (MediaAsset, error)
@@ -124,15 +155,24 @@ type Querier interface {
 	GetUserByStorageUID(ctx context.Context, storageUid string) (User, error)
 	GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUserIDByStorageUIDForUpdateParams) (int64, error)
 	GetUsersByIDs(ctx context.Context, ids []int64) ([]User, error)
+	GetWorkspaceByInternalID(ctx context.Context, internalID int64) (Workspace, error)
+	GetWorkspaceByPublicID(ctx context.Context, publicID string) (Workspace, error)
+	GetWorkspaceMediaAsset(ctx context.Context, arg GetWorkspaceMediaAssetParams) (MediaAsset, error)
+	GetWorkspaceMembership(ctx context.Context, arg GetWorkspaceMembershipParams) (WorkspaceMembership, error)
 	HasActiveStorageProfileSecretVersion(ctx context.Context, arg HasActiveStorageProfileSecretVersionParams) (bool, error)
 	InsertPaymentAdminAction(ctx context.Context, arg InsertPaymentAdminActionParams) error
 	InsertPaymentCheckoutShutdown(ctx context.Context, arg InsertPaymentCheckoutShutdownParams) (PaymentCheckoutShutdown, error)
 	InsertPaymentOrderIntent(ctx context.Context, arg InsertPaymentOrderIntentParams) (PaymentOrder, error)
 	InsertPaymentStripeCredential(ctx context.Context, arg InsertPaymentStripeCredentialParams) (PaymentStripeCredential, error)
 	InsertPaymentWebhookEvent(ctx context.Context, arg InsertPaymentWebhookEventParams) (int64, error)
+	// Personal workspace provisioning is idempotent on the partial unique index
+	// ux_workspaces_personal_owner: concurrent inserts for the same owner collapse
+	// to a single row, and the follow-up select always reads the winner.
+	InsertPersonalWorkspaceIgnore(ctx context.Context, arg InsertPersonalWorkspaceIgnoreParams) (int64, error)
 	InsertStorageProfileSecretVersion(ctx context.Context, arg InsertStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error)
 	InsertTaskStatEventIgnore(ctx context.Context, arg InsertTaskStatEventIgnoreParams) (int64, error)
 	InsertUsedUIDIgnore(ctx context.Context, storageUid string) (int64, error)
+	InsertWorkspaceMembershipIgnore(ctx context.Context, arg InsertWorkspaceMembershipIgnoreParams) (int64, error)
 	ListAccessibleBoardsByUserID(ctx context.Context, arg ListAccessibleBoardsByUserIDParams) ([]ListAccessibleBoardsByUserIDRow, error)
 	ListActivePaymentCheckoutShutdowns(ctx context.Context) ([]PaymentCheckoutShutdown, error)
 	ListActivePaymentOrders(ctx context.Context, userID int64) ([]PaymentOrder, error)
@@ -161,6 +201,8 @@ type Querier interface {
 	ListMediaDerivativesByAsset(ctx context.Context, arg ListMediaDerivativesByAssetParams) ([]MediaDerivative, error)
 	ListMediaRefsByBoardID(ctx context.Context, arg ListMediaRefsByBoardIDParams) ([]MediaRef, error)
 	ListMonitorExecutionPressureByRange(ctx context.Context, arg ListMonitorExecutionPressureByRangeParams) ([]ListMonitorExecutionPressureByRangeRow, error)
+	ListOrganizationMembers(ctx context.Context, arg ListOrganizationMembersParams) ([]OrganizationMembership, error)
+	ListOrganizationsByUserID(ctx context.Context, arg ListOrganizationsByUserIDParams) ([]Organization, error)
 	ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([]ListOutputsByTaskIDsRow, error)
 	ListPaymentOrdersForCheckoutShutdown(ctx context.Context, arg ListPaymentOrdersForCheckoutShutdownParams) ([]PaymentOrder, error)
 	ListPaymentRechargeHistory(ctx context.Context, arg ListPaymentRechargeHistoryParams) ([]ListPaymentRechargeHistoryRow, error)
@@ -185,6 +227,10 @@ type Querier interface {
 	ListUserPendingPaymentOrders(ctx context.Context, userID int64) ([]PaymentOrder, error)
 	ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUIDsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	ListWorkspaceMediaAssets(ctx context.Context, arg ListWorkspaceMediaAssetsParams) ([]MediaAsset, error)
+	ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMembersParams) ([]WorkspaceMembership, error)
+	ListWorkspacesByOrganizationID(ctx context.Context, arg ListWorkspacesByOrganizationIDParams) ([]Workspace, error)
+	ListWorkspacesByUserID(ctx context.Context, arg ListWorkspacesByUserIDParams) ([]Workspace, error)
 	LockAIGatewayModelMappingWrite(ctx context.Context) error
 	LockBoardShareTokenIdempotency(ctx context.Context, lockKey string) error
 	LockStorageProfileSecretVersionRotation(ctx context.Context, arg LockStorageProfileSecretVersionRotationParams) (bool, error)
@@ -228,12 +274,16 @@ type Querier interface {
 	SoftDeleteMediaAssetByID(ctx context.Context, arg SoftDeleteMediaAssetByIDParams) (int64, error)
 	SummarizeTasks(ctx context.Context, arg SummarizeTasksParams) (SummarizeTasksRow, error)
 	SummarizeUsers(ctx context.Context, arg SummarizeUsersParams) (SummarizeUsersRow, error)
+	UpdateOrganizationMemberRole(ctx context.Context, arg UpdateOrganizationMemberRoleParams) (int64, error)
+	UpdateOrganizationName(ctx context.Context, arg UpdateOrganizationNameParams) (int64, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (int64, error)
 	UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) (int64, error)
 	UpdateUserLastLoginMetadata(ctx context.Context, arg UpdateUserLastLoginMetadataParams) (int64, error)
 	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (int64, error)
 	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) (int64, error)
 	UpdateUserStorageUID(ctx context.Context, arg UpdateUserStorageUIDParams) (int64, error)
+	UpdateWorkspaceMemberRole(ctx context.Context, arg UpdateWorkspaceMemberRoleParams) (int64, error)
+	UpdateWorkspaceName(ctx context.Context, arg UpdateWorkspaceNameParams) (int64, error)
 	UpsertAdminBrandLogoOverride(ctx context.Context, arg UpsertAdminBrandLogoOverrideParams) (AdminBrandLogoOverride, error)
 	UpsertBoard(ctx context.Context, arg UpsertBoardParams) (int64, error)
 	UpsertBoardMember(ctx context.Context, arg UpsertBoardMemberParams) error
@@ -244,11 +294,13 @@ type Querier interface {
 	UpsertMediaAssetSource(ctx context.Context, arg UpsertMediaAssetSourceParams) (int64, error)
 	UpsertMediaDerivative(ctx context.Context, arg UpsertMediaDerivativeParams) (MediaDerivative, error)
 	UpsertMediaRef(ctx context.Context, arg UpsertMediaRefParams) (int64, error)
+	UpsertOrganizationMembership(ctx context.Context, arg UpsertOrganizationMembershipParams) error
 	UpsertPaymentCustomer(ctx context.Context, arg UpsertPaymentCustomerParams) (PaymentCustomer, error)
 	UpsertStorageProfile(ctx context.Context, arg UpsertStorageProfileParams) (int64, error)
 	UpsertSystemConfig(ctx context.Context, arg UpsertSystemConfigParams) error
 	UpsertTaskDailyStatDelta(ctx context.Context, arg UpsertTaskDailyStatDeltaParams) error
 	UpsertTaskStatEventCorrection(ctx context.Context, arg UpsertTaskStatEventCorrectionParams) (int64, error)
+	UpsertWorkspaceMembership(ctx context.Context, arg UpsertWorkspaceMembershipParams) error
 }
 
 var _ Querier = (*Queries)(nil)

@@ -1,4 +1,35 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'orval'
+
+const configDir = path.dirname(fileURLToPath(import.meta.url))
+
+// Issue #800: the Public/Control OpenAPI split lands in parallel. A project is
+// only registered when its spec stub exists and carries paths, so
+// `npm run api:generate` and existing builds keep passing before the split.
+// Candidates prefer `../api/` (apps/web -> apps/api, mirroring apiQuery);
+// `../../api/` is kept as a literal fallback per the issue text.
+function resolveUsableSpec(candidates: readonly string[]): string | null {
+  for (const candidate of candidates) {
+    try {
+      const content = readFileSync(path.resolve(configDir, candidate), 'utf8')
+      if (content.includes('paths')) return candidate
+    } catch {
+      // Missing or unreadable stub: try the next candidate.
+    }
+  }
+  return null
+}
+
+const publicSpecTarget = resolveUsableSpec([
+  '../api/openapi.public.yaml',
+  '../../api/openapi.public.yaml',
+])
+const controlSpecTarget = resolveUsableSpec([
+  '../api/openapi.control.yaml',
+  '../../api/openapi.control.yaml',
+])
 
 export default defineConfig({
   apiQuery: {
@@ -36,4 +67,73 @@ export default defineConfig({
       },
     },
   },
+  // Issue #800: Public/Control dual-client skeleton. Registered only when the
+  // matching split spec stub exists (see resolveUsableSpec above); no feature
+  // migrates to the new envelope yet (migration is #801-#808).
+  ...(publicSpecTarget
+    ? {
+        publicQuery: {
+          input: {
+            target: publicSpecTarget,
+          },
+          output: {
+            target: 'src/shared/api/generated-query/public/',
+            schemas: 'src/shared/api/generated-query/public/model',
+            mode: 'tags-split',
+            client: 'vue-query',
+            httpClient: 'fetch',
+            clean: true,
+            formatter: 'prettier',
+            urlEncodeParameters: true,
+            override: {
+              mutator: {
+                path: './src/shared/api/orvalMutator.ts',
+                name: 'orvalMutator',
+              },
+              fetch: {
+                includeHttpResponseReturnType: false,
+              },
+              query: {
+                // Same rationale as apiQuery: Orval defaults already map
+                // GET -> useQuery and non-GET -> useMutation.
+                shouldExportKeys: true,
+              },
+            },
+          },
+        },
+      }
+    : {}),
+  ...(controlSpecTarget
+    ? {
+        controlQuery: {
+          input: {
+            target: controlSpecTarget,
+          },
+          output: {
+            target: 'src/shared/api/generated-query/control/',
+            schemas: 'src/shared/api/generated-query/control/model',
+            mode: 'tags-split',
+            client: 'vue-query',
+            httpClient: 'fetch',
+            clean: true,
+            formatter: 'prettier',
+            urlEncodeParameters: true,
+            override: {
+              mutator: {
+                path: './src/shared/api/orvalMutator.ts',
+                name: 'orvalMutator',
+              },
+              fetch: {
+                includeHttpResponseReturnType: false,
+              },
+              query: {
+                // Same rationale as apiQuery: Orval defaults already map
+                // GET -> useQuery and non-GET -> useMutation.
+                shouldExportKeys: true,
+              },
+            },
+          },
+        },
+      }
+    : {}),
 })

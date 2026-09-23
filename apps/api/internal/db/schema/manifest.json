@@ -3,6 +3,8 @@
   "output": "schema.sql",
   "fragments": [
     {"name": "identity", "path": "fragments/identity.sql"},
+    {"name": "organization", "path": "fragments/organization.sql", "depends_on": ["identity"]},
+    {"name": "workspace", "path": "fragments/workspace.sql", "depends_on": ["identity", "organization"]},
     {"name": "credits", "path": "fragments/credits.sql", "depends_on": ["identity"]},
     {"name": "account_pool", "path": "fragments/account_pool.sql", "depends_on": ["identity"]},
     {"name": "platform", "path": "fragments/platform.sql", "depends_on": ["identity"]},

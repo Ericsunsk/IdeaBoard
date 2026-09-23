@@ -72,6 +72,21 @@ function scanBoardDeepImports(includeFixtures = false): Set<string> {
 
 const fixtureCases: BoundaryFixtureCase[] = [
   {
+    name: 'prohibits admin features from importing the public generated client',
+    expectedRule: 'features-admin-no-public-client',
+    fixtureFilePath: path.join(webRoot, 'src/features/admin/.boundary-admin-public.fixture.ts'),
+    content: `import { getMe } from '../../shared/api/generated-query/public/me/me'; console.log(getMe);`,
+  },
+  {
+    name: 'prohibits non-admin features from importing the control generated client',
+    expectedRule: 'non-admin-no-control-client',
+    fixtureFilePath: path.join(
+      webRoot,
+      'src/features/board/.boundary-non-admin-control.fixture.ts',
+    ),
+    content: `import { listControlUsers } from '../../shared/api/generated-query/control/control-users/control-users'; console.log(listControlUsers);`,
+  },
+  {
     name: 'detects circular dependencies',
     expectedRule: 'no-circular',
     fixtureFilePath: path.join(webRoot, 'src/shared/.circular-a.fixture.ts'),

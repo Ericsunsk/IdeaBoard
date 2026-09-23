@@ -54,8 +54,18 @@ async function prepareGenerationWorkspace(tempRoot: string): Promise<string> {
     mkdir(tempApiSourceRoot, { recursive: true }),
   ])
 
+  // Issue #800: copy the Public/Control split specs when present. Missing or
+  // empty stubs are skipped (matching the orval.config.ts guard), so the
+  // check compares the new dirs only once the parallel split lands.
+  const optionalSpecs = ['openapi.public.yaml', 'openapi.control.yaml'].filter((spec) =>
+    existsSync(path.join(repoRoot, 'apps/api', spec)),
+  )
+
   await Promise.all([
     copyFile(path.join(repoRoot, 'apps/api/openapi.yaml'), path.join(tempApiRoot, 'openapi.yaml')),
+    ...optionalSpecs.map((spec) =>
+      copyFile(path.join(repoRoot, 'apps/api', spec), path.join(tempApiRoot, spec)),
+    ),
     copyFile(path.join(webRoot, 'package.json'), path.join(tempWebRoot, 'package.json')),
     copyFile(path.join(webRoot, 'orval.config.ts'), path.join(tempWebRoot, 'orval.config.ts')),
     copyFile(

@@ -1,0 +1,3021 @@
+openapi: 3.0.3
+info:
+  title: IdeaBoard Public API
+  version: 0.1.0
+  description: |
+    Public Data Plane contract (issue #800 kernel, #801 workspace/
+    organization/member lifecycle, #802 board collaboration, #803 upload
+    sessions + media assets, #804 workspace billing). Canonical prefix
+    is /api/v1. Envelopes, cursor pagination, idempotency and correlation
+    headers, and opaque public identifiers follow the contract kernel.
+    The legacy single-file contract in apps/api/openapi.yaml is
+    untouched; deletion is #809.
+servers:
+  - url: /api/v1
+security:
+  - publicSession: []
+  - publicApiKey: []
+tags:
+  - name: Me
+    description: Identity-owned profile and preferences of the current principal.
+  - name: Workspaces
+    description: Workspace lifecycle and membership.
+  - name: Organizations
+    description: Organization lifecycle and organization-scoped workspaces.
+  - name: WorkspaceMembers
+    description: Workspace membership and role transitions.
+  - name: Boards
+    description: Workspace-rooted board collaboration, documents, and share tokens.
+  - name: Uploads
+    description: Ephemeral workspace upload sessions (transfer coordination only).
+  - name: MediaAssets
+    description: Workspace-bound media asset metadata and byte delivery.
+  - name: WorkspaceBilling
+    description: Implicit per-workspace billing account, credits, and checkout.
+paths:
+  /me:
+    get:
+      tags: [Me]
+      operationId: getMe
+      summary: Get the current principal profile
+      description: >-
+        Returns the session principal with the external usr_ identifier.
+        Provisions the personal workspace idempotently on first call.
+      responses:
+        '200':
+          description: Current principal profile.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /workspaces:
+    get:
+      tags: [Workspaces]
+      operationId: listWorkspaces
+      summary: List visible workspaces with cursor pagination
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated workspace list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedWorkspaces'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Workspaces]
+      operationId: createWorkspace
+      summary: Create a workspace
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkspaceRequest'
+      responses:
+        '201':
+          description: Workspace created.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /workspaces/{workspace_id}:
+    get:
+      tags: [Workspaces]
+      operationId: getWorkspace
+      summary: Get a workspace by explicit workspace context
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Workspace detail.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Workspaces]
+      operationId: updateWorkspace
+      summary: Rename a workspace (owner/admin only)
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWorkspaceRequest'
+      responses:
+        '200':
+          description: Workspace updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /workspaces/{workspace_id}/archive:
+    post:
+      tags: [Workspaces]
+      operationId: archiveWorkspace
+      summary: Archive a workspace (owner/admin only)
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Workspace archived.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /workspaces/{workspace_id}/members:
+    get:
+      tags: [WorkspaceMembers]
+      operationId: listWorkspaceMembers
+      summary: List workspace members (members only)
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Workspace member list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceMemberList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [WorkspaceMembers]
+      operationId: addWorkspaceMember
+      summary: Add a workspace member (owner/admin only; owner-only promotion)
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddWorkspaceMemberRequest'
+      responses:
+        '201':
+          description: Member added.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceMemberEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /workspaces/{workspace_id}/members/{member_id}:
+    patch:
+      tags: [WorkspaceMembers]
+      operationId: updateWorkspaceMember
+      summary: Change a member role (last owner cannot be demoted)
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/MemberId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWorkspaceMemberRequest'
+      responses:
+        '200':
+          description: Member role updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceMemberEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags: [WorkspaceMembers]
+      operationId: removeWorkspaceMember
+      summary: Remove a workspace member (last owner cannot be removed)
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/MemberId'
+      responses:
+        '200':
+          description: Member removed.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /organizations:
+    get:
+      tags: [Organizations]
+      operationId: listOrganizations
+      summary: List visible organizations with cursor pagination
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated organization list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOrganizations'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Organizations]
+      operationId: createOrganization
+      summary: Create an organization
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationRequest'
+      responses:
+        '201':
+          description: Organization created.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /organizations/{organization_id}:
+    get:
+      tags: [Organizations]
+      operationId: getOrganization
+      summary: Get an organization by explicit organization context
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+      responses:
+        '200':
+          description: Organization detail.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Organizations]
+      operationId: updateOrganization
+      summary: Rename an organization (owner/admin only)
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrganizationRequest'
+      responses:
+        '200':
+          description: Organization updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /organizations/{organization_id}/workspaces:
+    get:
+      tags: [Organizations]
+      operationId: listOrganizationWorkspaces
+      summary: List workspaces of an organization (org members only)
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+      responses:
+        '200':
+          description: Organization workspace list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Organizations]
+      operationId: createOrganizationWorkspace
+      summary: Create an organization workspace (org owner/admin only)
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationWorkspaceRequest'
+      responses:
+        '201':
+          description: Organization workspace created.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /workspaces/{workspace_id}/boards:
+    get:
+      tags: [Boards]
+      operationId: listBoards
+      summary: List accessible boards of a workspace with cursor pagination
+      description: >-
+        Lists non-archived boards the caller holds an explicit board role
+        on (owner, editor, or viewer). Workspace membership alone never
+        grants board access: boards without a grant stay invisible and are
+        excluded, never 403. Hidden workspaces converge to 404
+        workspace_not_found.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated board list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBoards'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Boards]
+      operationId: createBoard
+      summary: Create a board (workspace members only)
+      description: >-
+        Creates a board at revision 1 with the empty document snapshot;
+        the creator is the implicit owner. Requires the Idempotency-Key
+        header (scope board:create): missing keys render 400
+        idempotency_key_required, key reuse with a different request
+        renders 409 board_idempotency_conflict, same key+hash replays the
+        first result. Unknown body fields are rejected with 400; blank or
+        overlong names render 422 validation_failed.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBoardRequest'
+      responses:
+        '201':
+          description: Board created.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /workspaces/{workspace_id}/boards/join:
+    post:
+      tags: [Boards]
+      operationId: joinBoardByToken
+      summary: Join a board with a share bearer
+      description: >-
+        The bearer is the capability: the caller needs no prior workspace
+        membership or board grant, and a successful join grants workspace
+        membership (member) alongside the board grant. Requires the
+        Idempotency-Key header. Every join failure (unknown, revoked, or
+        foreign-workspace bearer) converges to 404
+        board_share_token_not_found so existence is never leaked; only
+        malformed input renders 400.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JoinBoardRequest'
+      responses:
+        '200':
+          description: Joined board.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /workspaces/{workspace_id}/boards/{board_id}:
+    get:
+      tags: [Boards]
+      operationId: getBoard
+      summary: Get a board (any board role)
+      description: >-
+        Malformed ids, unknown boards, and callers holding no board role
+        converge to 404 board_not_found. The revision counter is returned
+        as the ETag response header.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+      responses:
+        '200':
+          description: Board detail.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Boards]
+      operationId: updateBoard
+      summary: Rename a board (owner/editor only)
+      description: >-
+        Viewers render 403 board_forbidden. Writes against an archived
+        board also render 403 board_forbidden. Blank or overlong names
+        render 422 validation_failed. No Idempotency-Key is required.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBoardRequest'
+      responses:
+        '200':
+          description: Board renamed.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /workspaces/{workspace_id}/boards/{board_id}/archive:
+    post:
+      tags: [Boards]
+      operationId: archiveBoard
+      summary: Archive a board (owner/editor only)
+      description: >-
+        Requires the Idempotency-Key header. Already-archived boards read
+        as 404 board_not_found so archive stays idempotent-safe.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Board archived.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /workspaces/{workspace_id}/boards/{board_id}/restore:
+    post:
+      tags: [Boards]
+      operationId: restoreBoard
+      summary: Restore an archived board (owner/editor only)
+      description: >-
+        Requires the Idempotency-Key header. Live boards read as 404
+        board_not_found.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Board restored.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /workspaces/{workspace_id}/boards/{board_id}/document:
+    get:
+      tags: [Boards]
+      operationId: getBoardDocument
+      summary: Get the board document snapshot (any board role)
+      description: >-
+        Returns the canonical snapshot envelope with the revision counter
+        as the ETag response header.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+      responses:
+        '200':
+          description: Board document snapshot.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardDocumentEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Boards]
+      operationId: replaceBoardDocument
+      summary: Replace the board document (owner/editor only, optimistic concurrency)
+      description: >-
+        Requires both the Idempotency-Key header and the If-Match
+        precondition carrying the expected revision (the ETag value from
+        the last read). Missing, wildcard, or unparsable preconditions
+        render 400; stale revisions render 409 board_revision_conflict.
+        The snapshot is a versioned discriminated union
+        {schema_version, payload}: unknown fields are rejected with 400.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceBoardDocumentRequest'
+      responses:
+        '200':
+          description: Document replaced; revision advanced.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardDocumentEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /workspaces/{workspace_id}/boards/{board_id}/revisions:
+    get:
+      tags: [Boards]
+      operationId: listBoardRevisions
+      summary: List immutable document revisions (any board role)
+      description: >-
+        Revisions are INSERT-only and returned oldest-first with cursor
+        pagination.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated revision list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBoardRevisions'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /workspaces/{workspace_id}/boards/{board_id}/revisions/{revision_id}:
+    get:
+      tags: [Boards]
+      operationId: getBoardRevision
+      summary: Get one immutable revision with its snapshot (any board role)
+      description: >-
+        Entries resolve by revision number first, then by entry id.
+        Unknown values converge to 404 board_not_found.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/RevisionId'
+      responses:
+        '200':
+          description: Revision detail with snapshot.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardRevisionDetailEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /workspaces/{workspace_id}/boards/{board_id}/members:
+    get:
+      tags: [Boards]
+      operationId: listBoardMembers
+      summary: List board members (any board role)
+      description: >-
+        The implicit owner row comes first, followed by explicit grants
+        ordered by user. Bearer secrets never appear here.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+      responses:
+        '200':
+          description: Board member list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardMemberList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Boards]
+      operationId: addBoardMember
+      summary: Grant a board role (owner only)
+      description: >-
+        Requires the Idempotency-Key header. Re-adding an existing member
+        keeps the current role. Inviting the implicit owner renders 400
+        bad_request; unknown users render 404 board_member_not_found;
+        illegal roles render 422 validation_failed.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddBoardMemberRequest'
+      responses:
+        '201':
+          description: Member added.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardMemberEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /workspaces/{workspace_id}/boards/{board_id}/members/{member_id}:
+    patch:
+      tags: [Boards]
+      operationId: updateBoardMember
+      summary: Change a board member role (owner only)
+      description: >-
+        Demoting the last owner renders 403
+        membership_transition_forbidden. Unknown or malformed member ids
+        converge to 404 board_member_not_found. No Idempotency-Key is
+        required.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/MemberId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBoardMemberRequest'
+      responses:
+        '200':
+          description: Member role updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardMemberEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags: [Boards]
+      operationId: removeBoardMember
+      summary: Remove a board member (owner manages the roster; anyone may leave)
+      description: >-
+        Owners may remove anyone; any member may remove themselves
+        (self-leave). Removing the last owner renders 403
+        membership_transition_forbidden; removing the implicit owner row
+        renders 400. Requires the Idempotency-Key header.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/MemberId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Member removed.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /workspaces/{workspace_id}/boards/{board_id}/shares:
+    get:
+      tags: [Boards]
+      operationId: listShareTokens
+      summary: List share tokens without bearers (owner only)
+      description: >-
+        List entries carry the list-safe token_prefix only; the bearer
+        plaintext is shown once at creation (and on idempotent replay)
+        and never here.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+      responses:
+        '200':
+          description: Share token list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardShareTokenList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Boards]
+      operationId: createShareToken
+      summary: Create a share bearer (owner only)
+      description: >-
+        Requires the Idempotency-Key header; same key+hash replays the
+        same bearer, a different request renders 409
+        board_idempotency_conflict. Share roles are editor or viewer
+        only (anything else renders 422 validation_failed). The bearer
+        `token` is returned once and must be stored by the caller.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateShareTokenRequest'
+      responses:
+        '201':
+          description: Share token created (bearer shown once).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardShareTokenEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /workspaces/{workspace_id}/boards/{board_id}/shares/{token_id}:
+    delete:
+      tags: [Boards]
+      operationId: revokeShareToken
+      summary: Revoke a share token (owner only)
+      description: >-
+        Requires the Idempotency-Key header. Revocation is idempotent:
+        revoking twice succeeds. Unknown token ids converge to 404
+        board_share_token_not_found. Joins against the bearer converge to
+        the same 404 afterwards.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/TokenId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Share token revoked.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /workspaces/{workspace_id}/uploads:
+    post:
+      tags: [Uploads]
+      operationId: createUploadSession
+      summary: Declare an upload session (workspace members only)
+      description: >-
+        Declares filename, MIME, size, checksum, and media kind; the
+        session coordinates transfer only and creates no durable asset.
+        Only image declarations are accepted in this slice. Requires the
+        Idempotency-Key header (scope upload:create): key reuse with a
+        different declaration renders 409 upload_idempotency_conflict.
+        Declaration failures render 422 upload_validation_failed with
+        details.fields. Byte transfer rides the opaque same-origin slot
+        named in upload_target (no bucket, secret, or storage key ever
+        leaves the server).
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUploadRequest'
+      responses:
+        '201':
+          description: Upload session declared.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadSessionEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /workspaces/{workspace_id}/uploads/{upload_id}:
+    get:
+      tags: [Uploads]
+      operationId: getUploadSession
+      summary: Get an upload session (workspace members only)
+      description: >-
+        The first read moves a pending session to transferring. Expired
+        sessions render 410 upload_expired; cross-workspace ids are
+        invisible and render 404 upload_not_found.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/UploadId'
+      responses:
+        '200':
+          description: Upload session detail.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadSessionEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          description: Upload session expired (upload_expired); declare a new session.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/uploads/{upload_id}/complete:
+    post:
+      tags: [Uploads]
+      operationId: completeUploadSession
+      summary: Complete an upload session and materialize the media asset
+      description: >-
+        The completion echo (checksum, size, and MIME/kind when present)
+        must equal the session declarations byte-for-byte, otherwise the
+        session fails terminally and completion renders 422
+        upload_validation_failed. Completing a terminal session renders
+        409 upload_state_conflict. Only a successful complete creates the
+        durable media asset row, returned alongside the session.
+        Requires the Idempotency-Key header (scope upload:complete).
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/UploadId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteUploadRequest'
+      responses:
+        '200':
+          description: Upload completed with its media asset.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompleteUploadEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '410':
+          description: Upload session expired (upload_expired); declare a new session.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /workspaces/{workspace_id}/media-assets:
+    get:
+      tags: [MediaAssets]
+      operationId: listMediaAssets
+      summary: List workspace media assets with cursor pagination (members only)
+      description: >-
+        Any workspace member reads any workspace asset; archived assets
+        are hidden from the list (they stay metadata-readable by id).
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated media asset list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMediaAssets'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /workspaces/{workspace_id}/media-assets/{asset_id}:
+    get:
+      tags: [MediaAssets]
+      operationId: getMediaAsset
+      summary: Get media asset metadata (members only)
+      description: >-
+        Metadata speaks the JSON envelope only and never carries storage
+        keys. Archived assets stay metadata-readable (archived_at set).
+        Cross-workspace ids are invisible and render 404 media_not_found.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/AssetId'
+      responses:
+        '200':
+          description: Media asset metadata.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaAssetEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /workspaces/{workspace_id}/media-assets/{asset_id}/content:
+    get:
+      tags: [MediaAssets]
+      operationId: getMediaAssetContent
+      summary: Download asset bytes (members only)
+      description: >-
+        Binary endpoint: serves raw bytes with the asset MIME type and
+        never the JSON envelope, never storage keys. Every failure
+        (including auth) is a plain non-JSON status with the same
+        semantics: 404 invisible asset or workspace, 409 asset not ready,
+        410 asset archived.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/AssetId'
+      responses:
+        '200':
+          description: Raw asset bytes.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Missing authentication (plain-text body, never the JSON envelope).
+        '404':
+          description: Invisible asset or workspace (plain-text body, never the JSON envelope).
+        '409':
+          description: Asset bytes not ready (plain-text body, never the JSON envelope).
+        '410':
+          description: Asset archived (media_archived; plain-text body, never the JSON envelope).
+  /workspaces/{workspace_id}/media-assets/{asset_id}/derivatives/{variant}:
+    get:
+      tags: [MediaAssets]
+      operationId: getMediaAssetDerivative
+      summary: Download a stored derivative rendition (members only)
+      description: >-
+        Binary endpoint with the same plain-status protocol as content:
+        unknown tiers render a plain 400, tiers without a stored row
+        render a plain 409, archived assets a plain 410. There is no
+        pull-through rendering on this path.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/AssetId'
+        - name: variant
+          in: path
+          required: true
+          description: Derivative tier.
+          schema:
+            type: string
+            enum: [thumb, preview, large-preview]
+      responses:
+        '200':
+          description: Raw derivative bytes.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Unknown derivative tier (plain-text body, never the JSON envelope).
+        '401':
+          description: Missing authentication (plain-text body, never the JSON envelope).
+        '404':
+          description: Invisible asset or workspace (plain-text body, never the JSON envelope).
+        '409':
+          description: Tier not materialized or asset not ready (plain-text body, never the JSON envelope).
+        '410':
+          description: Asset archived (media_archived; plain-text body, never the JSON envelope).
+  /workspaces/{workspace_id}/media-assets/{asset_id}/archive:
+    post:
+      tags: [MediaAssets]
+      operationId: archiveMediaAsset
+      summary: Archive a media asset (owner/admin only)
+      description: >-
+        Documented deviation: the archive action is a POST /archive
+        sub-resource (not an `:archive` action suffix) to keep Gin
+        routing collision-free. Requires the Idempotency-Key header.
+        Non-admin members render 403 workspace_forbidden. Archived assets
+        stay metadata-readable but binary reads go 410.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/AssetId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Media asset archived.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaAssetEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /workspaces/{workspace_id}/billing-account:
+    get:
+      tags: [WorkspaceBilling]
+      operationId: getWorkspaceBillingAccount
+      summary: Get the implicit per-workspace billing account (members only)
+      description: >-
+        The account is implicit per workspace (no billing-account id in
+        URLs) and provisioned idempotently on first read. Hidden
+        workspaces converge to 404 workspace_not_found.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Workspace billing account.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceBillingAccountEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: Billing service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/credits/balance:
+    get:
+      tags: [WorkspaceBilling]
+      operationId: getWorkspaceCreditsBalance
+      summary: Get workspace credits balance (members only)
+      description: >-
+        Transitional projection: the credits ledger stays user-scoped, so
+        workspace reads project the workspace owner's wallet. All money
+        is integer minor units. Frozen or restricted wallets render 403
+        billing_wallet_restricted; missing wallets render 404 with the
+        same code (no provisioning state leak).
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Credits balance in integer minor units.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceCreditsBalanceEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Wallet frozen or restricted (billing_wallet_restricted).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: Balance service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/credits/ledger:
+    get:
+      tags: [WorkspaceBilling]
+      operationId: listWorkspaceCreditsLedger
+      summary: List immutable credits ledger entries (members only)
+      description: >-
+        Ledger entries are immutable INSERT-only facts served newest-first
+        over an opaque before-sequence cursor. Restricted wallets render
+        403 billing_wallet_restricted.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated ledger entries.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCreditsLedger'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Wallet frozen or restricted (billing_wallet_restricted).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: Ledger service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/billing-records:
+    get:
+      tags: [WorkspaceBilling]
+      operationId: listWorkspaceBillingRecords
+      summary: List caller-owned billing records (members only)
+      description: >-
+        Read model over settled ledger facts plus immutable task billing
+        snapshots; no ledger writes happen here. Cursor pagination over
+        the opaque before-sequence cursor.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated billing records.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBillingRecords'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: Billing service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/usage:
+    get:
+      tags: [WorkspaceBilling]
+      operationId: getWorkspaceUsage
+      summary: Get current workspace usage snapshot (members only)
+      description: >-
+        Read-only composition of settled captures plus task snapshots.
+        Unknown range values render 422 validation_failed.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: range
+          in: query
+          required: false
+          description: Usage window. Defaults to 30d.
+          schema:
+            type: string
+            enum: [7d, 30d, 1y]
+            default: 30d
+      responses:
+        '200':
+          description: Usage snapshot (timezone Asia/Shanghai).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceUsageEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          description: Usage service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/checkout-sessions:
+    post:
+      tags: [WorkspaceBilling]
+      operationId: createWorkspaceCheckoutSession
+      summary: Create a recharge checkout session (members only)
+      description: >-
+        Pricing is server-side only: the request carries the Idea quantity
+        plus terms acceptance, never prices or amounts (unknown fields
+        such as client-supplied prices are strictly rejected with 400).
+        Quantity bounds are 500..500000 Ideas; terms must be accepted at
+        the current versions. Requires the Idempotency-Key header: same
+        key+hash replays the first session, a different request renders
+        409 billing_checkout_conflict. Restricted wallets render 403
+        billing_wallet_restricted. Webhook settlement (POST
+        /api/webhooks/stripe) is unchanged and settles only through the
+        Payments to credits transaction.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkspaceCheckoutRequest'
+      responses:
+        '201':
+          description: Checkout session created.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceCheckoutSessionEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Wallet restricted and not rechargeable (billing_wallet_restricted).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Idempotency-Key reused with a different checkout request (billing_checkout_conflict).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          description: Price snapshot or checkout service unavailable (billing_quote_unavailable, service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/checkout-sessions/{session_id}:
+    get:
+      tags: [WorkspaceBilling]
+      operationId: getWorkspaceCheckoutSession
+      summary: Get a checkout session status (members only)
+      description: >-
+        Unknown sessions within a visible workspace render 404
+        billing_session_not_found; hidden workspaces converge to 404
+        workspace_not_found first.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: session_id
+          in: path
+          required: true
+          description: Opaque checkout session identifier returned at creation.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+      responses:
+        '200':
+          description: Checkout session status.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceCheckoutSessionEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown checkout session (billing_session_not_found) or hidden workspace (workspace_not_found).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Checkout service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+components:
+  securitySchemes:
+    publicSession:
+      type: apiKey
+      in: cookie
+      name: better-auth.session_token
+      description: Human session via the Better Auth transport (/api/auth/*).
+    publicApiKey:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: Personal API key or OAuth token principal.
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor token bound to principal, filters and sort order.
+      schema:
+        type: string
+        maxLength: 512
+    PageSize:
+      name: page_size
+      in: query
+      required: false
+      description: Requested page size. Default 20, maximum 100.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    WorkspaceId:
+      name: workspace_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/WorkspaceId'
+    OrganizationId:
+      name: organization_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/OrganizationId'
+    MemberId:
+      name: member_id
+      in: path
+      required: true
+      description: External usr_ member identifier (database ids never appear in URLs).
+      schema:
+        $ref: '#/components/schemas/UserId'
+    BoardId:
+      name: board_id
+      in: path
+      required: true
+      description: Opaque board_ identifier (malformed shapes converge to 404 board_not_found, never 400).
+      schema:
+        $ref: '#/components/schemas/BoardId'
+    RevisionId:
+      name: revision_id
+      in: path
+      required: true
+      description: Board revision number or entry id (unknown values converge to 404 board_not_found).
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    TokenId:
+      name: token_id
+      in: path
+      required: true
+      description: Opaque sht_ share token identifier (legacy integer shapes simply miss and read as 404).
+      schema:
+        $ref: '#/components/schemas/ShareTokenId'
+    UploadId:
+      name: upload_id
+      in: path
+      required: true
+      description: Opaque upload_ session identifier (malformed shapes converge to 404 upload_not_found).
+      schema:
+        $ref: '#/components/schemas/UploadId'
+    AssetId:
+      name: asset_id
+      in: path
+      required: true
+      description: Opaque asset_ media identifier (malformed shapes converge to 404 media_not_found).
+      schema:
+        $ref: '#/components/schemas/MediaAssetId'
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: >-
+        Expected board revision (the ETag value from the last read).
+        Missing, wildcard, or unparsable values render 400; stale values
+        render 409 board_revision_conflict at write time.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 32
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: >-
+        Caller-chosen idempotency key, at most 128 characters. Scoped by
+        principal, operation and key value. Reuse it when retrying the same
+        action; reuse with a different request returns 409 with
+        workspace_idempotency_conflict-style codes. No body-level key is accepted.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    RequestId:
+      name: Request-Id
+      in: header
+      required: false
+      description: Caller-supplied correlation ID echoed back on the response.
+      schema:
+        type: string
+        maxLength: 128
+  headers:
+    RequestId:
+      description: Server-assigned request correlation ID, present on every response.
+      schema:
+        type: string
+    ETag:
+      description: Resource version (board revision counter) for optimistic updates; send back as If-Match.
+      schema:
+        type: string
+    RateLimitLimit:
+      description: Rate limit ceiling for the current window.
+      schema:
+        type: integer
+    RateLimitRemaining:
+      description: Remaining requests in the current window.
+      schema:
+        type: integer
+    RateLimitReset:
+      description: Seconds until the current window resets.
+      schema:
+        type: integer
+    RetryAfter:
+      description: Seconds to wait before retrying (429 and 503 with known window).
+      schema:
+        type: integer
+  responses:
+    BadRequest:
+      description: Malformed request, including missing idempotency keys.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Unauthorized:
+      description: Missing authentication.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Forbidden:
+      description: Visible-but-forbidden; hidden resources converge to 404 instead.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    NotFound:
+      description: Missing or invisible resource (anti-enumeration).
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Conflict:
+      description: Idempotency-key reuse with a different request.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    UnprocessableEntity:
+      description: Validation failure with details.fields.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+  schemas:
+    SuccessEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          description: Resource payload.
+        meta:
+          type: object
+          description: Optional single-resource metadata.
+    DeletedEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [deleted]
+          additionalProperties: false
+          properties:
+            deleted:
+              type: boolean
+    MeEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/Me'
+    WorkspaceEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/Workspace'
+    WorkspaceList:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Workspace'
+    OrganizationEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/Organization'
+    WorkspaceMemberEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/WorkspaceMember'
+    WorkspaceMemberList:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceMember'
+    PaginationMeta:
+      type: object
+      required: [next_cursor, has_more]
+      additionalProperties: false
+      properties:
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page; null when exhausted.
+        has_more:
+          type: boolean
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          additionalProperties: false
+          properties:
+            code:
+              type: string
+              description: Stable machine-readable code, e.g. workspace_idempotency_conflict.
+              example: workspace_idempotency_conflict
+            message:
+              type: string
+              description: User-facing text; may change. Branch on code, not message.
+            details:
+              type: object
+              description: Field-level validation failures under details.fields.
+            request_id:
+              type: string
+              description: Correlation ID matching the Request-Id response header.
+    UserId:
+      type: string
+      pattern: '^usr_[A-Za-z0-9]+$'
+      description: Opaque public user identifier.
+    OrganizationId:
+      type: string
+      pattern: '^org_[A-Za-z0-9]+$'
+      description: Opaque public organization identifier.
+    WorkspaceId:
+      type: string
+      pattern: '^ws_[A-Za-z0-9]+$'
+      description: Opaque public workspace identifier.
+    BoardId:
+      type: string
+      pattern: '^board_[A-Za-z0-9]+$'
+      description: Opaque public board identifier.
+    TaskId:
+      type: string
+      pattern: '^task_[A-Za-z0-9]+$'
+      description: Opaque public task identifier.
+    MediaAssetId:
+      type: string
+      pattern: '^asset_[A-Za-z0-9]+$'
+      description: Opaque public media asset identifier.
+    UploadId:
+      type: string
+      pattern: '^upload_[A-Za-z0-9]+$'
+      description: Opaque public upload session identifier.
+    EventId:
+      type: string
+      pattern: '^evt_[A-Za-z0-9]+$'
+      description: Opaque public event identifier.
+    MembershipRole:
+      type: string
+      enum: [owner, admin, member]
+      description: Workspace/organization membership role.
+    Me:
+      type: object
+      required: [id]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/UserId'
+        display_name:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+        personal_workspace_id:
+          $ref: '#/components/schemas/WorkspaceId'
+    Workspace:
+      type: object
+      required: [id, name, created_at]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/WorkspaceId'
+        organization_id:
+          anyOf:
+            - $ref: '#/components/schemas/OrganizationId'
+            - nullable: true
+          description: Null for personal workspaces without an organization.
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        created_at:
+          type: string
+          format: date-time
+          description: RFC3339 UTC timestamp.
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: RFC3339 UTC timestamp; null unless archived.
+    Organization:
+      type: object
+      required: [id, name, created_at]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/OrganizationId'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        created_at:
+          type: string
+          format: date-time
+          description: RFC3339 UTC timestamp.
+    WorkspaceMember:
+      type: object
+      required: [user_id, role]
+      additionalProperties: false
+      properties:
+        user_id:
+          $ref: '#/components/schemas/UserId'
+        role:
+          $ref: '#/components/schemas/MembershipRole'
+        created_at:
+          type: string
+          format: date-time
+    CreateWorkspaceRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [name]
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 120
+            organization_id:
+              anyOf:
+                - $ref: '#/components/schemas/OrganizationId'
+                - nullable: true
+    UpdateWorkspaceRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [name]
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 120
+    AddWorkspaceMemberRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [user_id, role]
+          additionalProperties: false
+          properties:
+            user_id:
+              $ref: '#/components/schemas/UserId'
+            role:
+              $ref: '#/components/schemas/MembershipRole'
+    UpdateWorkspaceMemberRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [role]
+          additionalProperties: false
+          properties:
+            role:
+              $ref: '#/components/schemas/MembershipRole'
+    CreateOrganizationRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [name]
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 120
+    UpdateOrganizationRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [name]
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 120
+    CreateOrganizationWorkspaceRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [name]
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 120
+    PaginatedWorkspaces:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Workspace'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    PaginatedOrganizations:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Organization'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    ShareTokenId:
+      type: string
+      pattern: '^sht_[A-Za-z0-9_-]+$'
+      description: Opaque share bearer identifier (the bearer itself is shown once at creation only).
+    BoardRole:
+      type: string
+      enum: [owner, editor, viewer]
+      description: Explicit board grant role (creator row counts as owner).
+    ShareRole:
+      type: string
+      enum: [editor, viewer]
+      description: Share bearer role (owner cannot be granted via shares).
+    Board:
+      type: object
+      required: [id, workspace_id, name, revision, schema_version, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/BoardId'
+        workspace_id:
+          $ref: '#/components/schemas/WorkspaceId'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        revision:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Revision counter, also served as the ETag header.
+        schema_version:
+          type: integer
+          format: int32
+          minimum: 1
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: RFC3339 UTC timestamp; null unless archived.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    BoardEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/Board'
+    PaginatedBoards:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Board'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    CreateBoardRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [name]
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 120
+    UpdateBoardRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [name]
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 120
+    JoinBoardRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [token]
+          additionalProperties: false
+          properties:
+            token:
+              type: string
+              minLength: 1
+              maxLength: 256
+              description: Share bearer plaintext.
+    BoardDocument:
+      type: object
+      required: [board_id, revision, schema_version, document, updated_at]
+      additionalProperties: false
+      properties:
+        board_id:
+          $ref: '#/components/schemas/BoardId'
+        revision:
+          type: integer
+          format: int64
+          minimum: 1
+        schema_version:
+          type: integer
+          format: int32
+          minimum: 1
+        document:
+          type: object
+          description: Canonical snapshot payload object.
+        updated_at:
+          type: string
+          format: date-time
+    BoardDocumentEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/BoardDocument'
+    ReplaceBoardDocumentRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [schema_version, payload]
+          additionalProperties: false
+          properties:
+            schema_version:
+              type: integer
+              format: int32
+              minimum: 1
+            payload:
+              type: object
+              description: Snapshot payload object (unknown fields rejected).
+    BoardRevision:
+      type: object
+      required: [id, revision, schema_version, source_revision, created_at]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Immutable entry id (addressable like the revision number).
+        revision:
+          type: integer
+          format: int64
+          minimum: 1
+        schema_version:
+          type: integer
+          format: int32
+          minimum: 1
+        source_revision:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Expected revision the write was based on (0 for revision 1).
+        created_by:
+          $ref: '#/components/schemas/UserId'
+        created_at:
+          type: string
+          format: date-time
+    BoardRevisionDetail:
+      type: object
+      required: [id, revision, schema_version, source_revision, created_at, snapshot]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        revision:
+          type: integer
+          format: int64
+          minimum: 1
+        schema_version:
+          type: integer
+          format: int32
+          minimum: 1
+        source_revision:
+          type: integer
+          format: int64
+          minimum: 0
+        created_by:
+          $ref: '#/components/schemas/UserId'
+        created_at:
+          type: string
+          format: date-time
+        snapshot:
+          type: object
+          description: Immutable snapshot bytes as a JSON object.
+    BoardRevisionDetailEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/BoardRevisionDetail'
+    PaginatedBoardRevisions:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/BoardRevision'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    BoardMember:
+      type: object
+      required: [user_id, role]
+      additionalProperties: false
+      properties:
+        user_id:
+          $ref: '#/components/schemas/UserId'
+        role:
+          $ref: '#/components/schemas/BoardRole'
+        created_at:
+          type: string
+          format: date-time
+    BoardMemberEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/BoardMember'
+    BoardMemberList:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/BoardMember'
+    AddBoardMemberRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [user_id, role]
+          additionalProperties: false
+          properties:
+            user_id:
+              $ref: '#/components/schemas/UserId'
+            role:
+              $ref: '#/components/schemas/BoardRole'
+    UpdateBoardMemberRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [role]
+          additionalProperties: false
+          properties:
+            role:
+              $ref: '#/components/schemas/BoardRole'
+    BoardShareToken:
+      type: object
+      required: [token_id, token_prefix, role, revoked, usage_count, created_at]
+      additionalProperties: false
+      properties:
+        token_id:
+          $ref: '#/components/schemas/ShareTokenId'
+        token:
+          type: string
+          description: Bearer plaintext, returned once at creation (and on idempotent replay), never on list.
+        token_prefix:
+          type: string
+          description: List-safe bearer prefix (first 8 characters).
+        role:
+          $ref: '#/components/schemas/ShareRole'
+        revoked:
+          type: boolean
+        usage_count:
+          type: integer
+          format: int64
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: RFC3339 UTC timestamp; null unless revoked.
+    BoardShareTokenEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/BoardShareToken'
+    BoardShareTokenList:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/BoardShareToken'
+    CreateShareTokenRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [role]
+          additionalProperties: false
+          properties:
+            role:
+              $ref: '#/components/schemas/ShareRole'
+    UploadTarget:
+      type: object
+      required: [kind, slot, expires_at]
+      additionalProperties: false
+      properties:
+        kind:
+          type: string
+          enum: [same-origin-slot]
+          description: Opaque same-origin transfer slot (no bucket, secret, or storage key).
+        slot:
+          $ref: '#/components/schemas/UploadId'
+        expires_at:
+          type: string
+          format: date-time
+    UploadSession:
+      type: object
+      required: [id, workspace_id, status, filename, mime_type, size_bytes, checksum_sha256, media_kind, upload_target, created_at, updated_at, expires_at]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/UploadId'
+        workspace_id:
+          $ref: '#/components/schemas/WorkspaceId'
+        status:
+          type: string
+          enum: [pending, transferring, completed, failed, expired]
+        filename:
+          type: string
+          minLength: 1
+          maxLength: 255
+        mime_type:
+          type: string
+          description: Canonical image MIME from the supported allowlist.
+        size_bytes:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 31457280
+        checksum_sha256:
+          type: string
+          pattern: '^[0-9a-fA-F]{64}$'
+          description: 64-character hex sha256 digest (normalized to lowercase).
+        media_kind:
+          type: string
+          enum: [image]
+        upload_target:
+          $ref: '#/components/schemas/UploadTarget'
+        asset_id:
+          $ref: '#/components/schemas/MediaAssetId'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+    UploadSessionEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/UploadSession'
+    CreateUploadRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [filename, mime_type, size_bytes, checksum_sha256]
+          additionalProperties: false
+          properties:
+            filename:
+              type: string
+              minLength: 1
+              maxLength: 255
+            mime_type:
+              type: string
+              description: Image MIME from the supported allowlist.
+            size_bytes:
+              type: integer
+              format: int64
+              minimum: 1
+              maximum: 31457280
+            checksum_sha256:
+              type: string
+              pattern: '^[0-9a-fA-F]{64}$'
+            media_kind:
+              type: string
+              enum: [image]
+              default: image
+              description: Defaults to image when omitted.
+    CompleteUploadRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [checksum_sha256, size_bytes]
+          additionalProperties: false
+          properties:
+            checksum_sha256:
+              type: string
+              pattern: '^[0-9a-fA-F]{64}$'
+              description: Must equal the session declaration or the session fails terminally.
+            size_bytes:
+              type: integer
+              format: int64
+              minimum: 1
+              maximum: 31457280
+              description: Must equal the session declaration.
+            mime_type:
+              type: string
+              description: Must match the session declaration when present.
+            media_kind:
+              type: string
+              enum: [image]
+              description: Must match the session declaration when present.
+            width:
+              type: integer
+              format: int32
+              minimum: 0
+              maximum: 32768
+              description: Client-declared frame width (byte inspection lands with #805).
+            height:
+              type: integer
+              format: int32
+              minimum: 0
+              maximum: 32768
+              description: Client-declared frame height (byte inspection lands with #805).
+    CompleteUploadResult:
+      type: object
+      required: [upload, asset]
+      additionalProperties: false
+      properties:
+        upload:
+          $ref: '#/components/schemas/UploadSession'
+        asset:
+          $ref: '#/components/schemas/MediaAsset'
+    CompleteUploadEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/CompleteUploadResult'
+    MediaDerivative:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [pending, ready]
+        url:
+          type: string
+          format: uri
+          description: Same-origin derivative URL, present when ready.
+    MediaAsset:
+      type: object
+      required: [id, workspace_id, status, media_kind, mime_type, width, height, size_bytes, checksum_sha256, content_url, derivatives, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/MediaAssetId'
+        workspace_id:
+          $ref: '#/components/schemas/WorkspaceId'
+        status:
+          type: string
+          enum: [pending, ready]
+          description: pending until byte verification lands (#805); binary reads stay 409 meanwhile.
+        media_kind:
+          type: string
+          enum: [image]
+        mime_type:
+          type: string
+        width:
+          type: integer
+          format: int32
+          minimum: 0
+        height:
+          type: integer
+          format: int32
+          minimum: 0
+        size_bytes:
+          type: integer
+          format: int64
+          minimum: 1
+        checksum_sha256:
+          type: string
+          pattern: '^[0-9a-fA-F]{64}$'
+        content_url:
+          type: string
+          format: uri
+          description: Canonical same-origin content URL.
+        derivatives:
+          type: object
+          description: Display tiers keyed by variant (thumb, preview, large-preview); tiers without stored rows stay pending.
+          additionalProperties:
+            $ref: '#/components/schemas/MediaDerivative'
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: RFC3339 UTC timestamp; null unless archived.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    MediaAssetEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/MediaAsset'
+    PaginatedMediaAssets:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaAsset'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    WorkspaceBillingAccount:
+      type: object
+      required: [workspace_id, owner_type]
+      additionalProperties: false
+      properties:
+        workspace_id:
+          $ref: '#/components/schemas/WorkspaceId'
+        owner_type:
+          type: string
+          enum: [workspace]
+        created_at:
+          type: string
+          format: date-time
+          description: Omitted when empty.
+        updated_at:
+          type: string
+          format: date-time
+          description: Omitted when empty.
+    WorkspaceBillingAccountEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/WorkspaceBillingAccount'
+    WorkspaceCreditsBalance:
+      type: object
+      required: [workspace_id, available_credits, reserved_credits, status]
+      additionalProperties: false
+      properties:
+        workspace_id:
+          $ref: '#/components/schemas/WorkspaceId'
+        available_credits:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Integer minor units.
+        reserved_credits:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Integer minor units.
+        status:
+          type: string
+          enum: [active, frozen]
+        active_restrictions:
+          type: array
+          items:
+            type: string
+          description: Restriction type names; omitted when empty.
+    WorkspaceCreditsBalanceEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/WorkspaceCreditsBalance'
+    CreditsLedgerEntry:
+      type: object
+      required: [transaction_id, command_type, amount_credits, available_credits_after, reserved_credits_after, created_at]
+      additionalProperties: false
+      properties:
+        transaction_id:
+          type: string
+        command_type:
+          type: string
+          enum: [grant, hold, capture, release, refund, deduction, correction, purchase_credit, purchase_refund, payment_dispute_debit, payment_dispute_restore]
+        amount_credits:
+          type: integer
+          format: int64
+          description: Integer minor units (signed).
+        available_credits_after:
+          type: integer
+          format: int64
+        reserved_credits_after:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+    PaginatedCreditsLedger:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreditsLedgerEntry'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    BillingRecord:
+      type: object
+      required: [record_id, occurred_at, kind, title, credit_delta, available_credits_after]
+      additionalProperties: false
+      properties:
+        record_id:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        kind:
+          type: string
+          enum: [ai_usage, usage, reward, system_grant, system_adjustment, top_up]
+        title:
+          type: string
+        credit_delta:
+          type: integer
+          format: int64
+          description: Integer minor units (signed).
+        available_credits_after:
+          type: integer
+          format: int64
+    PaginatedBillingRecords:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/BillingRecord'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    WorkspaceUsage:
+      type: object
+      required: [timezone, lifetime, trend]
+      additionalProperties: false
+      properties:
+        timezone:
+          type: string
+          enum: [Asia/Shanghai]
+        lifetime:
+          type: object
+          required: [total_credits, peak_daily_credits, average_daily_credits, task_count, active_days]
+          additionalProperties: false
+          properties:
+            total_credits:
+              type: integer
+              format: int64
+              minimum: 0
+            peak_daily_credits:
+              type: integer
+              format: int64
+              minimum: 0
+            average_daily_credits:
+              type: number
+              minimum: 0
+            task_count:
+              type: integer
+              format: int64
+              minimum: 0
+            active_days:
+              type: integer
+              format: int64
+              minimum: 0
+        trend:
+          type: array
+          items:
+            type: object
+            required: [date, credits]
+            additionalProperties: false
+            properties:
+              date:
+                type: string
+                description: Calendar date (YYYY-MM-DD) in the snapshot timezone.
+              credits:
+                type: integer
+                format: int64
+                minimum: 0
+    WorkspaceUsageEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/WorkspaceUsage'
+    CreateWorkspaceCheckoutRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [idea_quantity, terms_accepted]
+          additionalProperties: false
+          properties:
+            idea_quantity:
+              type: integer
+              format: int64
+              minimum: 500
+              maximum: 500000
+              description: Idea quantity to recharge (no price fields; pricing is server-side only).
+            terms_accepted:
+              type: boolean
+              description: Must be true at the current terms versions.
+            terms_version:
+              type: string
+              description: Defaults to the current terms version when omitted.
+            refund_policy_version:
+              type: string
+              description: Defaults to the current refund policy version when omitted.
+    WorkspaceCheckoutSession:
+      type: object
+      required: [session_id]
+      additionalProperties: false
+      properties:
+        session_id:
+          type: string
+          description: Opaque checkout session identifier.
+        status:
+          type: string
+          description: Session status (present on read).
+        idea_quantity:
+          type: integer
+          format: int64
+          minimum: 0
+        checkout_url:
+          type: string
+          format: uri
+          description: Omitted when empty.
+        expires_at:
+          type: string
+          format: date-time
+          description: Omitted when empty.
+        reused:
+          type: boolean
+          description: True when an idempotent replay returned the first session.
+    WorkspaceCheckoutSessionEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/WorkspaceCheckoutSession'

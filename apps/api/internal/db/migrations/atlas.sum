@@ -1,4 +1,4 @@
-h1:Ad8j507pd78YNNpoJdfXW2KLCEuHx2WNWZpEEYuWfsg=
+h1:O+SgZmtTgJoXi1ZstLDo4LsTbczXetDCPSerMaGEjHc=
 20260902051519_baseline.sql h1:pVd8aETL2zA3Asz+eT4TlROh3jZPsWSYgKARwnLwp5c=
 20260902090000_media_derivative_source_generation.sql h1:5nVvZ4Nw9N02fsdwLQU9DUBv1GmE+qW5+CMAkgDHbio=
 20260914160000_drop_media_derivative_outbox.sql h1:mSS8jygmOB6Usw3pwwEHaWyoHXLnZHtjZ036Bz4YHP4=
@@ -9,3 +9,4 @@ h1:Ad8j507pd78YNNpoJdfXW2KLCEuHx2WNWZpEEYuWfsg=
 20260916000004_drop_task_assignment_status_gate.sql h1:Ujx9GmuVFAF57kT7tnYTEiE3yO7yh/SOpRHc+WpCGlA=
 20260922000000_board_share_token_idempotency.sql h1:M4V4nVZJQuxdV9GvTbcG5HaP4v6KLHdp/jfKgl0Ih4w=
 20260923000000_repair_accountpool_secret_purge.sql h1:24ttC4t672kp6+bgqcAKMnfDQFQXKBeB4DecR3eNifk=
+20260923000001_workspace_organization_lifecycle.sql h1:t7kjnt2fO/HPe9vUEwCVqTZUmGlE6kbrW7zM6+1Y8z4=

@@ -9,3 +9,38 @@
 export { useWorkspaceAccountControls } from './shell/useWorkspaceAccountControls'
 export type { WorkspaceNavigationAdapter } from './shell/useWorkspaceAccountControls'
 export { default as WorkspaceNavigation } from './shell/components/WorkspaceNavigation.vue'
+export {
+  classifyWorkspaceAccessError,
+  fetchAllWorkspaces,
+  fetchPrincipal,
+  fetchWorkspacePage,
+  normalizeWorkspaceListParams,
+  parsePrincipal,
+  parseWorkspaceItem,
+  parseWorkspacePage,
+  provisionWorkspace,
+  workspaceApiUrls,
+  workspaceQueryKeys,
+} from './infrastructure/workspaceResource'
+export type {
+  PrincipalSummary,
+  WorkspaceAccessKind,
+  WorkspaceListPage,
+  WorkspaceSummary,
+} from './infrastructure/workspaceResource'
+export {
+  createWorkspaceSelectionStore,
+  getWorkspaceSelectionStore,
+  localStorageWorkspacePersist,
+  memoryWorkspacePersist,
+  resetWorkspaceSelectionStore,
+  resolveWorkspaceSelection,
+  toWorkspaceSelectionStatus,
+  useWorkspaceSelection,
+} from './infrastructure/workspaceContext'
+export type {
+  ProvisionWorkspaceInput,
+  WorkspaceSelectionSource,
+  WorkspaceSelectionStatus,
+  WorkspaceSelectionStore,
+} from './infrastructure/workspaceContext'

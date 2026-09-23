@@ -75,6 +75,269 @@ ALTER TABLE ONLY user_deletion_requests
 
 --
 --
+-- Organization tenancy foundation (#801).
+--
+-- A personal Workspace exists without an Organization. An Organization owns
+-- memberships and Workspaces. Public references must use public_id; the
+-- internal_id bigint stays database-internal per the contract kernel.
+
+CREATE TABLE organizations (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  archived_at TIMESTAMPTZ NULL,
+  CONSTRAINT uq_organizations_public_id UNIQUE (public_id),
+  CONSTRAINT chk_organizations_public_id CHECK (public_id LIKE 'org\_%')
+);
+
+CREATE TABLE organization_memberships (
+  organization_id BIGINT NOT NULL REFERENCES organizations(internal_id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('owner','admin','member')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (organization_id, user_id)
+);
+
+CREATE INDEX idx_organization_memberships_user ON organization_memberships (user_id, organization_id);
+-- Workspace tenancy foundation (#801).
+--
+-- A Workspace is owned by a User (personal Workspace, no Organization) or by
+-- an Organization. Workspace membership and Board membership are separate
+-- permission layers. Public references must use public_id; the internal_id
+-- bigint stays database-internal per the contract kernel.
+
+CREATE TABLE workspaces (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  organization_id BIGINT NULL REFERENCES organizations(internal_id),
+  owner_user_id BIGINT NULL REFERENCES users(id),
+  name TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  archived_at TIMESTAMPTZ NULL,
+  CONSTRAINT uq_workspaces_public_id UNIQUE (public_id),
+  CONSTRAINT chk_workspaces_public_id CHECK (public_id LIKE 'ws\_%'),
+  CONSTRAINT chk_workspaces_owner_xor CHECK (
+    (organization_id IS NOT NULL AND owner_user_id IS NULL)
+    OR (organization_id IS NULL AND owner_user_id IS NOT NULL)
+  )
+);
+
+-- Personal workspace idempotency: at most one live personal Workspace per user.
+-- Archived personal Workspaces stay out of the way so reprovisioning works.
+CREATE UNIQUE INDEX ux_workspaces_personal_owner ON workspaces(owner_user_id) WHERE organization_id IS NULL AND archived_at IS NULL;
+
+CREATE TABLE workspace_memberships (
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('owner','admin','member')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (workspace_id, user_id)
+);
+
+CREATE INDEX idx_workspace_memberships_user ON workspace_memberships (user_id, workspace_id);
+
+-- Boards and collaboration (#802). Boards are workspace-scoped with separate
+-- ACL from workspace membership. Document snapshots use optimistic concurrency
+-- (ETag/If-Match). Revisions are immutable. Share tokens enable public join.
+-- Temporary _v2 suffix to coexist with legacy user-scoped boards until #809.
+CREATE TABLE boards_v2 (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  archived_at TIMESTAMPTZ NULL,
+  CONSTRAINT uq_boards_v2_public_id UNIQUE (public_id),
+  CONSTRAINT chk_boards_v2_public_id CHECK (public_id LIKE 'board\_%'),
+  CONSTRAINT chk_boards_v2_title CHECK (length(btrim(title)) BETWEEN 1 AND 200)
+);
+
+CREATE INDEX idx_boards_v2_workspace ON boards_v2 (workspace_id, created_at DESC) WHERE archived_at IS NULL;
+CREATE INDEX idx_boards_v2_archived ON boards_v2 (workspace_id, archived_at DESC) WHERE archived_at IS NOT NULL;
+
+-- Board document snapshots with optimistic concurrency. The etag is a hash
+-- of (document_version || snapshot_data) for conflict detection. Document
+-- schema evolution uses a versioned discriminated union (not modeled here).
+CREATE TABLE board_documents_v2 (
+  board_id BIGINT PRIMARY KEY REFERENCES boards_v2(internal_id) ON DELETE CASCADE,
+  document_version INT NOT NULL DEFAULT 1,
+  snapshot_data JSONB NOT NULL,
+  etag TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT chk_board_documents_v2_version_positive CHECK (document_version > 0),
+  CONSTRAINT chk_board_documents_v2_etag CHECK (length(etag) BETWEEN 8 AND 128)
+);
+
+-- Immutable revision history. Each write creates a new revision referencing
+-- the prior one. Revision data may be delta or full snapshot (not prescribed).
+CREATE TABLE board_revisions_v2 (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  board_id BIGINT NOT NULL REFERENCES boards_v2(internal_id) ON DELETE CASCADE,
+  revision_number INT NOT NULL,
+  author_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  parent_revision_id BIGINT NULL REFERENCES board_revisions_v2(internal_id) ON DELETE RESTRICT,
+  revision_data JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_board_revisions_v2_public_id UNIQUE (public_id),
+  CONSTRAINT uq_board_revisions_v2_board_number UNIQUE (board_id, revision_number),
+  CONSTRAINT chk_board_revisions_v2_public_id CHECK (public_id LIKE 'rev\_%'),
+  CONSTRAINT chk_board_revisions_v2_number_positive CHECK (revision_number > 0)
+);
+
+CREATE INDEX idx_board_revisions_v2_board_created ON board_revisions_v2 (board_id, created_at DESC);
+CREATE INDEX idx_board_revisions_v2_author ON board_revisions_v2 (author_user_id, created_at DESC);
+
+-- Board membership ACL, separate from workspace membership. Role enforcement
+-- at application layer: owner > editor > viewer.
+CREATE TABLE board_memberships_v2 (
+  board_id BIGINT NOT NULL REFERENCES boards_v2(internal_id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('owner','editor','viewer')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (board_id, user_id)
+);
+
+CREATE INDEX idx_board_memberships_v2_user ON board_memberships_v2 (user_id, board_id);
+
+-- Share tokens enable public join with configurable role. Token creation,
+-- join, and revocation are idempotent commands (Idempotency-Key required).
+CREATE TABLE board_share_tokens_v2 (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  board_id BIGINT NOT NULL REFERENCES boards_v2(internal_id) ON DELETE CASCADE,
+  token_secret TEXT NOT NULL,
+  granted_role TEXT NOT NULL CHECK (granted_role IN ('editor','viewer')),
+  created_by_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  revoked_at TIMESTAMPTZ NULL,
+  revoked_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  CONSTRAINT uq_board_share_tokens_v2_public_id UNIQUE (public_id),
+  CONSTRAINT uq_board_share_tokens_v2_secret UNIQUE (token_secret),
+  CONSTRAINT chk_board_share_tokens_v2_public_id CHECK (public_id LIKE 'bst\_%'),
+  CONSTRAINT chk_board_share_tokens_v2_secret CHECK (length(token_secret) >= 32),
+  CONSTRAINT chk_board_share_tokens_v2_revocation CHECK (
+    (revoked_at IS NULL AND revoked_by_user_id IS NULL)
+    OR (revoked_at IS NOT NULL AND revoked_by_user_id IS NOT NULL)
+  )
+);
+
+CREATE INDEX idx_board_share_tokens_v2_board ON board_share_tokens_v2 (board_id) WHERE revoked_at IS NULL;
+CREATE INDEX idx_board_share_tokens_v2_secret ON board_share_tokens_v2 (token_secret) WHERE revoked_at IS NULL;
+
+-- Upload sessions and Media Assets (#803). Upload sessions have explicit
+-- lifecycle (pending → completed/expired/failed). Only successful completion
+-- creates a durable Media Asset. Storage keys are never exposed in the API.
+-- Temporary _v2 suffix to coexist with legacy user-scoped media until #809.
+CREATE TABLE upload_sessions_v2 (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  uploader_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  declared_mime_type TEXT NOT NULL,
+  declared_size_bytes BIGINT NOT NULL,
+  declared_checksum TEXT NULL,
+  storage_key TEXT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  completed_at TIMESTAMPTZ NULL,
+  expired_at TIMESTAMPTZ NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_upload_sessions_v2_public_id UNIQUE (public_id),
+  CONSTRAINT chk_upload_sessions_v2_public_id CHECK (public_id LIKE 'upload\_%'),
+  CONSTRAINT chk_upload_sessions_v2_size_positive CHECK (declared_size_bytes > 0),
+  CONSTRAINT chk_upload_sessions_v2_status CHECK (status IN ('pending','transferring','completed','expired','failed')),
+  CONSTRAINT chk_upload_sessions_v2_completion CHECK (
+    (status = 'completed' AND completed_at IS NOT NULL AND storage_key IS NOT NULL)
+    OR (status = 'expired' AND expired_at IS NOT NULL)
+    OR (status IN ('pending','transferring','failed'))
+  )
+);
+
+CREATE INDEX idx_upload_sessions_v2_workspace ON upload_sessions_v2 (workspace_id, created_at DESC);
+CREATE INDEX idx_upload_sessions_v2_uploader ON upload_sessions_v2 (uploader_user_id, created_at DESC);
+CREATE INDEX idx_upload_sessions_v2_pending ON upload_sessions_v2 (created_at) WHERE status IN ('pending','transferring');
+
+-- Media Assets are immutable references to stored content with typed metadata.
+-- Assets are created only from successful upload completion. Content delivery
+-- supports original and derivative variants without exposing storage_key.
+CREATE TABLE media_assets_v2 (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  upload_session_id BIGINT NOT NULL REFERENCES upload_sessions_v2(internal_id) ON DELETE RESTRICT,
+  owner_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  storage_key TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  checksum TEXT NOT NULL,
+  media_kind TEXT NOT NULL,
+  width INT NULL,
+  height INT NULL,
+  duration_ms INT NULL,
+  metadata JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  archived_at TIMESTAMPTZ NULL,
+  CONSTRAINT uq_media_assets_v2_public_id UNIQUE (public_id),
+  CONSTRAINT uq_media_assets_v2_storage_key UNIQUE (storage_key),
+  CONSTRAINT chk_media_assets_v2_public_id CHECK (public_id LIKE 'asset\_%'),
+  CONSTRAINT chk_media_assets_v2_size_positive CHECK (size_bytes > 0),
+  CONSTRAINT chk_media_assets_v2_media_kind CHECK (media_kind IN ('image','video','audio','document','other')),
+  CONSTRAINT chk_media_assets_v2_dimensions CHECK (
+    (media_kind = 'image' AND width > 0 AND height > 0)
+    OR (media_kind != 'image')
+  ),
+  CONSTRAINT chk_media_assets_v2_metadata CHECK (jsonb_typeof(metadata) = 'object')
+);
+
+CREATE INDEX idx_media_assets_v2_workspace ON media_assets_v2 (workspace_id, created_at DESC) WHERE archived_at IS NULL;
+CREATE INDEX idx_media_assets_v2_owner ON media_assets_v2 (owner_user_id, created_at DESC);
+CREATE INDEX idx_media_assets_v2_upload ON media_assets_v2 (upload_session_id);
+
+-- Media Asset derivatives (thumbnails, transcodes). Storage and delivery
+-- follow the same storage_key hiding rule as originals.
+CREATE TABLE media_asset_derivatives_v2 (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  asset_id BIGINT NOT NULL REFERENCES media_assets_v2(internal_id) ON DELETE CASCADE,
+  variant_name TEXT NOT NULL,
+  storage_key TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  width INT NULL,
+  height INT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_media_asset_derivatives_v2_asset_variant UNIQUE (asset_id, variant_name),
+  CONSTRAINT uq_media_asset_derivatives_v2_storage_key UNIQUE (storage_key),
+  CONSTRAINT chk_media_asset_derivatives_v2_size_positive CHECK (size_bytes > 0),
+  CONSTRAINT chk_media_asset_derivatives_v2_variant CHECK (length(btrim(variant_name)) BETWEEN 1 AND 64)
+);
+
+CREATE INDEX idx_media_asset_derivatives_v2_asset ON media_asset_derivatives_v2 (asset_id);
+
+-- Billing Account foundation (#804). A Billing Account is owned by exactly
+-- one Workspace (initial owner) or exactly one Organization. The public_id
+-- is the API-facing identifier per contract kernel (#800).
+CREATE TABLE billing_accounts (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  workspace_id BIGINT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  organization_id BIGINT NULL REFERENCES organizations(internal_id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_billing_accounts_public_id UNIQUE (public_id),
+  CONSTRAINT chk_billing_accounts_public_id CHECK (public_id LIKE 'ba\_%'),
+  CONSTRAINT chk_billing_accounts_owner_xor CHECK (
+    (workspace_id IS NOT NULL AND organization_id IS NULL)
+    OR (workspace_id IS NULL AND organization_id IS NOT NULL)
+  )
+);
+
+-- 1:1 relationship: each workspace has exactly one billing account
+CREATE UNIQUE INDEX ux_billing_accounts_workspace ON billing_accounts (workspace_id) WHERE workspace_id IS NOT NULL;
+CREATE UNIQUE INDEX ux_billing_accounts_organization ON billing_accounts (organization_id) WHERE organization_id IS NOT NULL;
 CREATE TABLE credit_wallets (
   user_id BIGINT PRIMARY KEY,
   status VARCHAR(20) NOT NULL DEFAULT 'active',
@@ -2199,6 +2462,9 @@ CREATE TABLE task_execution_attempts (
 CREATE INDEX idx_task_execution_attempts_task_id ON task_execution_attempts (task_id);
 CREATE INDEX idx_task_execution_attempts_status_created_at ON task_execution_attempts (status, created_at DESC);
 CREATE INDEX idx_task_execution_attempts_running_created_at ON task_execution_attempts (created_at) WHERE status = 'running';
+
+-- Legacy user-scoped media tables (deprecated, remove in #809)
+
 CREATE TABLE media_assets (
   id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
   asset_id VARCHAR(64) NOT NULL,
@@ -2393,6 +2659,81 @@ CREATE INDEX idx_media_refs_owner_ref ON media_refs (owner_user_id, ref_type, re
 CREATE INDEX idx_media_refs_owner_board_created ON media_refs (owner_user_id, board_id, created_at, id);
 CREATE INDEX idx_media_refs_task ON media_refs (task_id, ref_type);
 
+
+-- Legacy user-scoped board tables (deprecated, remove in #809)
+
+CREATE TABLE boards (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  board_id VARCHAR(100) NOT NULL,
+  owner_user_id BIGINT NOT NULL,
+  created_by BIGINT NOT NULL,
+  name VARCHAR(60) NOT NULL,
+  state JSONB NOT NULL,
+  revision BIGINT NOT NULL DEFAULT 1,
+  state_schema_version INTEGER NOT NULL DEFAULT 1,
+  last_saved_by BIGINT,
+  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  CONSTRAINT uq_boards_board_id UNIQUE (board_id),
+  CONSTRAINT ck_boards_revision CHECK (revision > 0),
+  CONSTRAINT ck_boards_state_schema_version CHECK (state_schema_version > 0),
+  CONSTRAINT fk_boards_owner_user_id FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_boards_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_boards_last_saved_by FOREIGN KEY (last_saved_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE UNIQUE INDEX uq_boards_owner_name ON boards (owner_user_id, lower(name));
+CREATE INDEX idx_boards_owner_updated ON boards (owner_user_id, updated_at);
+
+CREATE TABLE board_members (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  board_id VARCHAR(100) NOT NULL,
+  user_id BIGINT NOT NULL,
+  role VARCHAR(20) NOT NULL,
+  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  CONSTRAINT uq_board_member UNIQUE (board_id, user_id),
+  CONSTRAINT ck_board_members_role CHECK (role IN ('editor', 'viewer')),
+  CONSTRAINT fk_board_members_board FOREIGN KEY (board_id) REFERENCES boards(board_id) ON DELETE CASCADE,
+  CONSTRAINT fk_board_members_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_board_member_user ON board_members (user_id, board_id);
+
+CREATE TABLE board_share_tokens (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  board_id VARCHAR(100) NOT NULL,
+  token_hash VARCHAR(128) NOT NULL,
+  token_prefix VARCHAR(16) NOT NULL,
+  role VARCHAR(20) NOT NULL,
+  created_by BIGINT NOT NULL,
+  revoked BOOLEAN NOT NULL DEFAULT FALSE,
+  usage_count BIGINT NOT NULL DEFAULT 0,
+  max_uses INTEGER,
+  last_used_at TIMESTAMPTZ(3),
+  revoked_at TIMESTAMPTZ(3),
+  revoked_by BIGINT,
+  expires_at TIMESTAMPTZ(3),
+  idempotency_key VARCHAR(128) NOT NULL DEFAULT '',
+  request_hash VARCHAR(64) NOT NULL DEFAULT '',
+  token_secret TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  CONSTRAINT uq_board_share_tokens_token_hash UNIQUE (token_hash),
+  CONSTRAINT ck_board_share_tokens_role CHECK (role IN ('editor', 'viewer')),
+  CONSTRAINT ck_board_share_tokens_usage CHECK (usage_count >= 0 AND (max_uses IS NULL OR max_uses > 0)),
+  CONSTRAINT ck_board_share_tokens_token_hash_not_blank CHECK (btrim(token_hash) <> ''),
+  CONSTRAINT ck_board_share_tokens_token_prefix_not_blank CHECK (btrim(token_prefix) <> ''),
+  CONSTRAINT ck_board_share_tokens_idempotency CHECK ((idempotency_key = '' AND request_hash = '') OR (idempotency_key <> '' AND request_hash <> '')),
+  CONSTRAINT ck_board_share_tokens_revoked_at CHECK (NOT revoked OR revoked_at IS NOT NULL),
+  CONSTRAINT fk_board_share_tokens_board FOREIGN KEY (board_id) REFERENCES boards(board_id) ON DELETE CASCADE,
+  CONSTRAINT fk_board_share_tokens_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_board_share_tokens_revoked_by FOREIGN KEY (revoked_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_board_share_token_board ON board_share_tokens (board_id, created_at DESC);
+CREATE INDEX idx_board_share_token_active ON board_share_tokens (token_hash) WHERE NOT revoked;
+CREATE UNIQUE INDEX uq_board_share_tokens_creator_idempotency ON board_share_tokens (created_by, idempotency_key) WHERE idempotency_key <> '';
 CREATE TABLE task_outputs (
   id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
   task_id VARCHAR(64) NOT NULL,
@@ -2636,78 +2977,6 @@ CREATE TABLE feature_prompts (
   CONSTRAINT ck_feature_prompts_feature_slug CHECK (feature_slug IN ('generation', 'inpaint', 'render', 'variations', 'cutout', 'fusion', 'upscale', 'outpaint')),
   CONSTRAINT fk_feature_prompts_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 );
-CREATE TABLE boards (
-  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-  board_id VARCHAR(100) NOT NULL,
-  owner_user_id BIGINT NOT NULL,
-  created_by BIGINT NOT NULL,
-  name VARCHAR(60) NOT NULL,
-  state JSONB NOT NULL,
-  revision BIGINT NOT NULL DEFAULT 1,
-  state_schema_version INTEGER NOT NULL DEFAULT 1,
-  last_saved_by BIGINT,
-  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT uq_boards_board_id UNIQUE (board_id),
-  CONSTRAINT ck_boards_revision CHECK (revision > 0),
-  CONSTRAINT ck_boards_state_schema_version CHECK (state_schema_version > 0),
-  CONSTRAINT fk_boards_owner_user_id FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_boards_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
-  CONSTRAINT fk_boards_last_saved_by FOREIGN KEY (last_saved_by) REFERENCES users(id) ON DELETE SET NULL
-);
-
-CREATE UNIQUE INDEX uq_boards_owner_name ON boards (owner_user_id, lower(name));
-CREATE INDEX idx_boards_owner_updated ON boards (owner_user_id, updated_at);
-
-CREATE TABLE board_members (
-  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-  board_id VARCHAR(100) NOT NULL,
-  user_id BIGINT NOT NULL,
-  role VARCHAR(20) NOT NULL,
-  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT uq_board_member UNIQUE (board_id, user_id),
-  CONSTRAINT ck_board_members_role CHECK (role IN ('editor', 'viewer')),
-  CONSTRAINT fk_board_members_board FOREIGN KEY (board_id) REFERENCES boards(board_id) ON DELETE CASCADE,
-  CONSTRAINT fk_board_members_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_board_member_user ON board_members (user_id, board_id);
-
-CREATE TABLE board_share_tokens (
-  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-  board_id VARCHAR(100) NOT NULL,
-  token_hash VARCHAR(128) NOT NULL,
-  token_prefix VARCHAR(16) NOT NULL,
-  role VARCHAR(20) NOT NULL,
-  created_by BIGINT NOT NULL,
-  revoked BOOLEAN NOT NULL DEFAULT FALSE,
-  usage_count BIGINT NOT NULL DEFAULT 0,
-  max_uses INTEGER,
-  last_used_at TIMESTAMPTZ(3),
-  revoked_at TIMESTAMPTZ(3),
-  revoked_by BIGINT,
-  expires_at TIMESTAMPTZ(3),
-  idempotency_key VARCHAR(128) NOT NULL DEFAULT '',
-  request_hash VARCHAR(64) NOT NULL DEFAULT '',
-  token_secret TEXT NOT NULL DEFAULT '',
-  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT uq_board_share_tokens_token_hash UNIQUE (token_hash),
-  CONSTRAINT ck_board_share_tokens_role CHECK (role IN ('editor', 'viewer')),
-  CONSTRAINT ck_board_share_tokens_usage CHECK (usage_count >= 0 AND (max_uses IS NULL OR max_uses > 0)),
-  CONSTRAINT ck_board_share_tokens_token_hash_not_blank CHECK (btrim(token_hash) <> ''),
-  CONSTRAINT ck_board_share_tokens_token_prefix_not_blank CHECK (btrim(token_prefix) <> ''),
-  CONSTRAINT ck_board_share_tokens_idempotency CHECK ((idempotency_key = '' AND request_hash = '') OR (idempotency_key <> '' AND request_hash <> '')),
-  CONSTRAINT ck_board_share_tokens_revoked_at CHECK (NOT revoked OR revoked_at IS NOT NULL),
-  CONSTRAINT fk_board_share_tokens_board FOREIGN KEY (board_id) REFERENCES boards(board_id) ON DELETE CASCADE,
-  CONSTRAINT fk_board_share_tokens_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
-  CONSTRAINT fk_board_share_tokens_revoked_by FOREIGN KEY (revoked_by) REFERENCES users(id) ON DELETE SET NULL
-);
-
-CREATE INDEX idx_board_share_token_board ON board_share_tokens (board_id, created_at DESC);
-CREATE INDEX idx_board_share_token_active ON board_share_tokens (token_hash) WHERE NOT revoked;
-CREATE UNIQUE INDEX uq_board_share_tokens_creator_idempotency ON board_share_tokens (created_by, idempotency_key) WHERE idempotency_key <> '';
 CREATE TABLE reward_codes (
   id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
   display_name VARCHAR(120) NOT NULL,

@@ -64,6 +64,15 @@ type ApiAccountSecret struct {
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 }
 
+type BillingAccount struct {
+	InternalID     int64              `json:"internal_id"`
+	PublicID       string             `json:"public_id"`
+	WorkspaceID    pgtype.Int8        `json:"workspace_id"`
+	OrganizationID pgtype.Int8        `json:"organization_id"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type BillingAdminAction struct {
 	ID             int64              `json:"id"`
 	ActionType     string             `json:"action_type"`
@@ -118,6 +127,14 @@ type Board struct {
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 }
 
+type BoardDocumentsV2 struct {
+	BoardID         int64              `json:"board_id"`
+	DocumentVersion int32              `json:"document_version"`
+	SnapshotData    []byte             `json:"snapshot_data"`
+	Etag            string             `json:"etag"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
 type BoardMember struct {
 	ID        int64              `json:"id"`
 	BoardID   string             `json:"board_id"`
@@ -125,6 +142,24 @@ type BoardMember struct {
 	Role      string             `json:"role"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type BoardMembershipsV2 struct {
+	BoardID   int64              `json:"board_id"`
+	UserID    int64              `json:"user_id"`
+	Role      string             `json:"role"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type BoardRevisionsV2 struct {
+	InternalID       int64              `json:"internal_id"`
+	PublicID         string             `json:"public_id"`
+	BoardID          int64              `json:"board_id"`
+	RevisionNumber   int32              `json:"revision_number"`
+	AuthorUserID     int64              `json:"author_user_id"`
+	ParentRevisionID pgtype.Int8        `json:"parent_revision_id"`
+	RevisionData     []byte             `json:"revision_data"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 }
 
 type BoardShareToken struct {
@@ -146,6 +181,28 @@ type BoardShareToken struct {
 	TokenSecret    string             `json:"token_secret"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type BoardShareTokensV2 struct {
+	InternalID      int64              `json:"internal_id"`
+	PublicID        string             `json:"public_id"`
+	BoardID         int64              `json:"board_id"`
+	TokenSecret     string             `json:"token_secret"`
+	GrantedRole     string             `json:"granted_role"`
+	CreatedByUserID int64              `json:"created_by_user_id"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	RevokedAt       pgtype.Timestamptz `json:"revoked_at"`
+	RevokedByUserID pgtype.Int8        `json:"revoked_by_user_id"`
+}
+
+type BoardsV2 struct {
+	InternalID  int64              `json:"internal_id"`
+	PublicID    string             `json:"public_id"`
+	WorkspaceID int64              `json:"workspace_id"`
+	Title       string             `json:"title"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	ArchivedAt  pgtype.Timestamptz `json:"archived_at"`
 }
 
 type CreditAccount struct {
@@ -369,6 +426,18 @@ type MediaAsset struct {
 	ReclaimGeneration int64              `json:"reclaim_generation"`
 }
 
+type MediaAssetDerivativesV2 struct {
+	InternalID  int64              `json:"internal_id"`
+	AssetID     int64              `json:"asset_id"`
+	VariantName string             `json:"variant_name"`
+	StorageKey  string             `json:"storage_key"`
+	MimeType    string             `json:"mime_type"`
+	SizeBytes   int64              `json:"size_bytes"`
+	Width       pgtype.Int4        `json:"width"`
+	Height      pgtype.Int4        `json:"height"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
 type MediaAssetSource struct {
 	ID            int64              `json:"id"`
 	MediaAssetID  int64              `json:"media_asset_id"`
@@ -378,6 +447,25 @@ type MediaAssetSource struct {
 	SourceIndex   int32              `json:"source_index"`
 	Metadata      []byte             `json:"metadata"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+}
+
+type MediaAssetsV2 struct {
+	InternalID      int64              `json:"internal_id"`
+	PublicID        string             `json:"public_id"`
+	WorkspaceID     int64              `json:"workspace_id"`
+	UploadSessionID int64              `json:"upload_session_id"`
+	OwnerUserID     int64              `json:"owner_user_id"`
+	StorageKey      string             `json:"storage_key"`
+	MimeType        string             `json:"mime_type"`
+	SizeBytes       int64              `json:"size_bytes"`
+	Checksum        string             `json:"checksum"`
+	MediaKind       string             `json:"media_kind"`
+	Width           pgtype.Int4        `json:"width"`
+	Height          pgtype.Int4        `json:"height"`
+	DurationMs      pgtype.Int4        `json:"duration_ms"`
+	Metadata        []byte             `json:"metadata"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	ArchivedAt      pgtype.Timestamptz `json:"archived_at"`
 }
 
 type MediaDerivative struct {
@@ -420,6 +508,22 @@ type MediaRef struct {
 	Metadata     []byte             `json:"metadata"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
+type Organization struct {
+	InternalID int64              `json:"internal_id"`
+	PublicID   string             `json:"public_id"`
+	Name       string             `json:"name"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	ArchivedAt pgtype.Timestamptz `json:"archived_at"`
+}
+
+type OrganizationMembership struct {
+	OrganizationID int64              `json:"organization_id"`
+	UserID         int64              `json:"user_id"`
+	Role           string             `json:"role"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
 type PaymentAdminAction struct {
@@ -893,6 +997,21 @@ type TaskSubmissionClaim struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
+type UploadSessionsV2 struct {
+	InternalID        int64              `json:"internal_id"`
+	PublicID          string             `json:"public_id"`
+	WorkspaceID       int64              `json:"workspace_id"`
+	UploaderUserID    int64              `json:"uploader_user_id"`
+	DeclaredMimeType  string             `json:"declared_mime_type"`
+	DeclaredSizeBytes int64              `json:"declared_size_bytes"`
+	DeclaredChecksum  pgtype.Text        `json:"declared_checksum"`
+	StorageKey        pgtype.Text        `json:"storage_key"`
+	Status            string             `json:"status"`
+	CompletedAt       pgtype.Timestamptz `json:"completed_at"`
+	ExpiredAt         pgtype.Timestamptz `json:"expired_at"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+}
+
 type User struct {
 	ID               int64              `json:"id"`
 	PublicID         pgtype.UUID        `json:"public_id"`
@@ -922,4 +1041,22 @@ type UsersUsedUid struct {
 	ID         int64              `json:"id"`
 	StorageUid string             `json:"storage_uid"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+type Workspace struct {
+	InternalID     int64              `json:"internal_id"`
+	PublicID       string             `json:"public_id"`
+	OrganizationID pgtype.Int8        `json:"organization_id"`
+	OwnerUserID    pgtype.Int8        `json:"owner_user_id"`
+	Name           string             `json:"name"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	ArchivedAt     pgtype.Timestamptz `json:"archived_at"`
+}
+
+type WorkspaceMembership struct {
+	WorkspaceID int64              `json:"workspace_id"`
+	UserID      int64              `json:"user_id"`
+	Role        string             `json:"role"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }

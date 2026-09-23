@@ -1,0 +1,294 @@
+// Workspace selection state (issue #801, frontend slice).
+//
+// State Ownership Contract mapping for workspace scope:
+// - TanStack Query cache (`workspaceQueryKeys.list`) is the single source of
+//   truth for server data; it is never copied into another global store.
+// - The URL param (`?workspace=ws_...`) owns shareable/back-navigable nav state.
+// - A narrow persisted store below owns only the selected opaque ID
+//   (pure client state) and reload persistence. Board ACL (#802+) layers its
+//   own scope on top of the selected workspace ID exposed here.
+
+import { computed, shallowRef, toValue, watch, type MaybeRefOrGetter } from 'vue'
+import { useQuery } from '@tanstack/vue-query'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  classifyWorkspaceAccessError,
+  fetchWorkspacePage,
+  provisionWorkspace,
+  workspaceQueryKeys,
+  type WorkspaceAccessKind,
+  type WorkspaceSummary,
+} from './workspaceResource'
+import {
+  readLocalStorageItem,
+  removeLocalStorageItem,
+  writeLocalStorageItem,
+} from '../../../shared/utils/storage'
+import { isOpaqueId, opaqueIdPrefix } from '../../../shared/api/contractKernel'
+
+export const WORKSPACE_URL_PARAM = 'workspace'
+export const WORKSPACE_SELECTION_STORAGE_KEY = 'ideaboard.workspace.selected.v1'
+
+export type WorkspaceSelectionSource = 'url' | 'stored' | 'auto-personal' | 'auto-first' | 'none'
+
+export type WorkspaceSelectionStatus =
+  | 'loading'
+  | 'empty'
+  | 'ready'
+  | 'error'
+  | 'hidden'
+  | 'forbidden'
+  | 'disabled'
+
+export function asWorkspaceId(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!isOpaqueId(trimmed) || opaqueIdPrefix(trimmed) !== 'ws') return null
+  return trimmed
+}
+
+// Resolution order: explicit URL share > persisted choice > personal
+// workspace (`organizationId == null`) > first visible item > none.
+export function resolveWorkspaceSelection(
+  items: readonly WorkspaceSummary[],
+  hints?: { urlId?: unknown; storedId?: unknown },
+): { selectedId: string | null; source: WorkspaceSelectionSource } {
+  const visible = new Set(items.map((item) => item.publicId))
+  const urlId = asWorkspaceId(hints?.urlId)
+  if (urlId && visible.has(urlId)) return { selectedId: urlId, source: 'url' }
+  const storedId = asWorkspaceId(hints?.storedId)
+  if (storedId && visible.has(storedId)) return { selectedId: storedId, source: 'stored' }
+  const personal = items.find((item) => item.organizationId == null)
+  if (personal) return { selectedId: personal.publicId, source: 'auto-personal' }
+  const first = items[0]
+  if (first) return { selectedId: first.publicId, source: 'auto-first' }
+  return { selectedId: null, source: 'none' }
+}
+
+export function toWorkspaceSelectionStatus(input: {
+  enabled: boolean
+  isPending: boolean
+  isError: boolean
+  error?: unknown
+  itemCount: number
+}): WorkspaceSelectionStatus {
+  if (!input.enabled) return 'disabled'
+  if (input.isPending) return 'loading'
+  if (input.isError) {
+    const access: WorkspaceAccessKind | null = classifyWorkspaceAccessError(input.error)
+    if (access === 'hidden') return 'hidden'
+    if (access === 'forbidden') return 'forbidden'
+    return 'error'
+  }
+  if (input.itemCount === 0) return 'empty'
+  return 'ready'
+}
+
+export type WorkspaceSelectionPersist = {
+  readSelectedId: () => string | null
+  writeSelectedId: (id: string | null) => void
+}
+
+export function localStorageWorkspacePersist(
+  key: string = WORKSPACE_SELECTION_STORAGE_KEY,
+): WorkspaceSelectionPersist {
+  return {
+    readSelectedId: () => asWorkspaceId(readLocalStorageItem(key)),
+    writeSelectedId: (id) => {
+      if (id == null) {
+        removeLocalStorageItem(key)
+        return
+      }
+      if (!writeLocalStorageItem(key, id)) {
+        console.warn('[workspace] persist selection failed')
+      }
+    },
+  }
+}
+
+export function memoryWorkspacePersist(initial: string | null = null): WorkspaceSelectionPersist {
+  let current = asWorkspaceId(initial)
+  return {
+    readSelectedId: () => current,
+    writeSelectedId: (id) => {
+      current = asWorkspaceId(id)
+    },
+  }
+}
+
+export type ProvisionWorkspaceInput = {
+  name: string
+  organizationId?: string | undefined
+}
+
+export type WorkspaceProvisionFn = (
+  input: ProvisionWorkspaceInput,
+  request?: { idempotencyKey?: string | undefined; requestId?: string | undefined },
+) => Promise<WorkspaceSummary>
+
+// Narrow client-only store: holds the selected ID plus in-flight provision
+// dedupe. Server data always comes from the TanStack Query cache.
+export function createWorkspaceSelectionStore(deps?: {
+  persist?: WorkspaceSelectionPersist | undefined
+  provision?: WorkspaceProvisionFn | undefined
+}) {
+  const persist = deps?.persist ?? localStorageWorkspacePersist()
+  const provision = deps?.provision ?? provisionWorkspace
+  const selectedId = shallowRef<string | null>(null)
+  let primed = false
+  const inflight = new Map<string, Promise<WorkspaceSummary>>()
+
+  function storedId(): string | null {
+    if (!primed) {
+      primed = true
+      selectedId.value = persist.readSelectedId()
+    }
+    return selectedId.value
+  }
+
+  function provisionDedupeKey(input: ProvisionWorkspaceInput): string {
+    const scope = asWorkspaceId(input.organizationId) ?? '-'
+    return `${scope}:${input.name.trim().toLowerCase()}`
+  }
+
+  return {
+    selectedId,
+    getSelectedId: storedId,
+    select(id: string): void {
+      const valid = asWorkspaceId(id)
+      if (!valid) throw new Error('Invalid workspace selection')
+      selectedId.value = valid
+      primed = true
+      persist.writeSelectedId(valid)
+    },
+    clear(): void {
+      selectedId.value = null
+      primed = true
+      persist.writeSelectedId(null)
+    },
+    // Concurrent provisions for the same (name, organization) share one
+    // promise and one idempotency key, so double-clicks cannot fork.
+    provision(input: ProvisionWorkspaceInput): Promise<WorkspaceSummary> {
+      const key = provisionDedupeKey(input)
+      const running = inflight.get(key)
+      if (running) return running
+      const task = provision(input)
+        .then((workspace) => {
+          selectedId.value = workspace.publicId
+          primed = true
+          persist.writeSelectedId(workspace.publicId)
+          return workspace
+        })
+        .finally(() => {
+          if (inflight.get(key) === task) inflight.delete(key)
+        })
+      inflight.set(key, task)
+      return task
+    },
+  }
+}
+
+export type WorkspaceSelectionStore = ReturnType<typeof createWorkspaceSelectionStore>
+
+let sharedStore: WorkspaceSelectionStore | null = null
+
+export function getWorkspaceSelectionStore(): WorkspaceSelectionStore {
+  if (!sharedStore) sharedStore = createWorkspaceSelectionStore()
+  return sharedStore
+}
+
+export function resetWorkspaceSelectionStore(): void {
+  sharedStore = null
+}
+
+export type UseWorkspaceSelectionOptions = {
+  enabled?: MaybeRefOrGetter<boolean> | undefined
+  routeWorkspaceId?: MaybeRefOrGetter<string | null | undefined> | undefined
+  store?: WorkspaceSelectionStore | undefined
+}
+
+// Shell-level selection: query owns server data, URL owns nav state, the
+// narrow store owns the persisted ID. Covers loading/empty/error/disabled
+// plus the hidden(404)-vs-forbidden(403) split per DESIGN.md.
+export function useWorkspaceSelection(options?: UseWorkspaceSelectionOptions) {
+  const store = options?.store ?? getWorkspaceSelectionStore()
+  const route = useRoute()
+  const router = useRouter()
+
+  const query = useQuery({
+    queryKey: workspaceQueryKeys.list,
+    queryFn: ({ signal }) => fetchWorkspacePage(undefined, { signal }),
+    enabled: () => toValue(options?.enabled ?? true),
+    staleTime: 15_000,
+  })
+
+  const urlId = computed(() =>
+    options?.routeWorkspaceId !== undefined
+      ? asWorkspaceId(toValue(options.routeWorkspaceId))
+      : asWorkspaceId(route.query[WORKSPACE_URL_PARAM]),
+  )
+
+  // Keep an explicit shared choice sticky across refetches without ever
+  // copying server items into the store. Auto derivations stay pure so the
+  // personal-first rule re-evaluates deterministically on every load.
+  watch(
+    () => query.data.value,
+    (page) => {
+      if (!page) return
+      const resolved = resolveWorkspaceSelection(page.items, {
+        urlId: urlId.value,
+        storedId: store.getSelectedId(),
+      })
+      if (resolved.selectedId && resolved.source === 'url') {
+        store.select(resolved.selectedId)
+      }
+    },
+    { immediate: true },
+  )
+
+  const items = computed(() => query.data.value?.items ?? [])
+  const selection = computed(() =>
+    resolveWorkspaceSelection(items.value, {
+      urlId: urlId.value,
+      storedId: store.getSelectedId(),
+    }),
+  )
+  const selectedId = computed(() => selection.value.selectedId)
+  const selected = computed(
+    () => items.value.find((item) => item.publicId === selection.value.selectedId) ?? null,
+  )
+  const status = computed<WorkspaceSelectionStatus>(() =>
+    toWorkspaceSelectionStatus({
+      enabled: toValue(options?.enabled ?? true),
+      isPending: query.isPending.value,
+      isError: query.isError.value,
+      error: query.error.value,
+      itemCount: items.value.length,
+    }),
+  )
+
+  function selectWorkspace(id: string): void {
+    store.select(id)
+    const next = store.getSelectedId()
+    void router.replace({
+      query: {
+        ...route.query,
+        ...(next == null ? {} : { [WORKSPACE_URL_PARAM]: next }),
+      },
+    })
+  }
+
+  return {
+    items,
+    selectedId,
+    selected,
+    selectionSource: computed(() => selection.value.source),
+    status,
+    isPending: computed(() => query.isPending.value),
+    error: computed(() => query.error.value),
+    refetch: () => query.refetch(),
+    selectWorkspace,
+    provisionWorkspace: (input: ProvisionWorkspaceInput) => store.provision(input),
+    queryKey: workspaceQueryKeys.list,
+  }
+}

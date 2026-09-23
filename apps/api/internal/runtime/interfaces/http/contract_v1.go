@@ -1,0 +1,564 @@
+package httpapi
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"strings"
+	"time"
+
+	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/identity/auth"
+	"ideaboard/api/internal/identity/principal"
+	identityports "ideaboard/api/internal/identity/users/ports"
+	"ideaboard/api/internal/media/workspaceuploads"
+	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/tenancy"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+)
+
+// ContractV1Deps wires the Public Data Plane v1 handlers (issue #801).
+//
+// Store is the tenancy.Store interface: the DB sibling implements it
+// against sqlc once organizations/workspaces tables land; until then it
+// stays nil in production wiring (handlers fail closed with 501) and
+// tests pass tenancy.NewInMemoryStoreForTests(). The in-memory fallback
+// must never be wired in production.
+type ContractV1Deps struct {
+	Store       tenancy.Store
+	Users       V1UserDirectory
+	Idempotency *contract.IdempotencyStore
+	// Boards is the workspace-rooted board collaboration store (issue
+	// #802). Nil keeps the boards surface fail-closed with 501 until the
+	// postgres workspace-board mapping lands (#809); tests inject the
+	// in-memory implementation.
+	Boards boards.WorkspaceBoardStore
+	// UploadSessions coordinates ephemeral upload transfer state (issue
+	// #803). Sessions never touch PostgreSQL (completion-only
+	// durability); the process-local store is the production backend
+	// and tests inject a fresh instance per engine.
+	UploadSessions workspaceuploads.SessionStore
+	// WorkspaceAssets persists workspace-bound media assets (issue
+	// #803). Production wires the postgres sibling (existing
+	// media_assets table, metadata workspace binding, no new columns);
+	// tests inject the in-memory sibling. Nil keeps the upload/media
+	// surface fail-closed with 501.
+	WorkspaceAssets workspaceuploads.AssetStore
+	// MediaObjects reads stored bytes for the v1 content/derivative
+	// endpoints (issue #803). Production wires *storage.Service;
+	// tests inject fakes. Nil fails binary reads closed with 503
+	// while metadata endpoints keep working.
+	MediaObjects V1MediaObjectReader
+}
+
+// V1UserDirectory translates between internal numeric user ids and the
+// external usr_<hex> identifiers without leaking database ids to the API.
+// Production adapts the identity UserRepository; tests use a static map.
+type V1UserDirectory interface {
+	ResolveUserID(ctx context.Context, publicID uuid.UUID) (int64, error)
+	GetUserPublicID(ctx context.Context, userID int64) (uuid.UUID, error)
+}
+
+// usersRepositoryDirectory adapts identityports.UserRepository to
+// V1UserDirectory (production wiring).
+type usersRepositoryDirectory struct {
+	repo identityports.UserRepository
+}
+
+// NewUsersRepositoryDirectory exposes the production V1UserDirectory
+// adapter for composition wiring outside this package.
+func NewUsersRepositoryDirectory(repo identityports.UserRepository) V1UserDirectory {
+	return usersRepositoryDirectory{repo: repo}
+}
+
+func (d usersRepositoryDirectory) ResolveUserID(ctx context.Context, publicID uuid.UUID) (int64, error) {
+	if d.repo == nil || publicID == uuid.Nil {
+		return 0, tenancy.ErrNotFound
+	}
+	user, err := d.repo.GetByPublicID(ctx, publicID.String())
+	if err != nil || user == nil {
+		return 0, tenancy.ErrNotFound
+	}
+	return user.ID, nil
+}
+
+func (d usersRepositoryDirectory) GetUserPublicID(ctx context.Context, userID int64) (uuid.UUID, error) {
+	if d.repo == nil || userID <= 0 {
+		return uuid.Nil, tenancy.ErrNotFound
+	}
+	user, err := d.repo.GetByID(ctx, userID)
+	if err != nil || user == nil {
+		return uuid.Nil, tenancy.ErrNotFound
+	}
+	return user.PublicID, nil
+}
+
+func (d *ContractV1Deps) normalize() {
+	if d.Idempotency == nil {
+		d.Idempotency = contract.NewIdempotencyStore(contract.DefaultIdempotencyStoreOptions())
+	}
+}
+
+// v1AuthMiddleware keeps the cookie-session path working in production by
+// delegating to the Better Auth session middleware when it is configured;
+// in tests (no auth service) it accepts an injected principal instead.
+// Either way ResolvePrincipal() runs next to resolve the TenantScope.
+func v1AuthMiddleware(authDeps AuthDeps) gin.HandlerFunc {
+	if authDeps.AuthServiceClient != nil && authDeps.UserRepo != nil {
+		return auth.AuthMiddleware(authDeps.AuthServiceClient, authDeps.UserRepo, authDeps.UserLifecycle)
+	}
+	return func(c *gin.Context) {
+		if _, ok := principal.From(c); !ok {
+			contract.RenderError(c, http.StatusUnauthorized, contract.CodeUnauthorized, "未登录")
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// RegisterContractV1Routes mounts the real v1 handlers on group (exported
+// for tests; production calls it from RegisterRoutes with the full auth
+// deps). Unknown v1 paths still fail closed with 501.
+func RegisterContractV1Routes(group *gin.RouterGroup, authDeps AuthDeps, deps ContractV1Deps) {
+	deps.normalize()
+	handler := &contractV1Handler{deps: deps}
+	group.Use(v1AuthMiddleware(authDeps), ResolvePrincipal())
+	group.GET("/me", handler.getMe)
+	group.GET("/workspaces", handler.listWorkspaces)
+	group.POST("/workspaces", handler.createWorkspace)
+	group.GET("/workspaces/:workspace_id", handler.getWorkspace)
+	group.PATCH("/workspaces/:workspace_id", handler.updateWorkspace)
+	group.POST("/workspaces/:workspace_id/archive", handler.archiveWorkspace)
+	group.GET("/workspaces/:workspace_id/members", handler.listWorkspaceMembers)
+	group.POST("/workspaces/:workspace_id/members", handler.addWorkspaceMember)
+	group.PATCH("/workspaces/:workspace_id/members/:member_id", handler.updateWorkspaceMember)
+	group.DELETE("/workspaces/:workspace_id/members/:member_id", handler.removeWorkspaceMember)
+	group.GET("/organizations", handler.listOrganizations)
+	group.POST("/organizations", handler.createOrganization)
+	group.GET("/organizations/:organization_id", handler.getOrganization)
+	group.PATCH("/organizations/:organization_id", handler.updateOrganization)
+	group.GET("/organizations/:organization_id/workspaces", handler.listOrganizationWorkspaces)
+	group.POST("/organizations/:organization_id/workspaces", handler.createOrganizationWorkspace)
+	// Workspace upload sessions + media assets (issue #803). The
+	// :archive sub-resource form keeps Gin routing collision-free
+	// (documented deviation from the `:archive` action suffix).
+	group.POST("/workspaces/:workspace_id/uploads", handler.createUploadSession)
+	group.GET("/workspaces/:workspace_id/uploads/:upload_id", handler.getUploadSession)
+	group.POST("/workspaces/:workspace_id/uploads/:upload_id/complete", handler.completeUploadSession)
+	group.GET("/workspaces/:workspace_id/media-assets", handler.listMediaAssets)
+	group.GET("/workspaces/:workspace_id/media-assets/:asset_id", handler.getMediaAsset)
+	group.GET("/workspaces/:workspace_id/media-assets/:asset_id/content", handler.contentMediaAsset)
+	group.GET("/workspaces/:workspace_id/media-assets/:asset_id/derivatives/:variant", handler.derivativeMediaAsset)
+	group.POST("/workspaces/:workspace_id/media-assets/:asset_id/archive", handler.archiveMediaAsset)
+	handler.registerBoardRoutes(group)
+}
+
+type contractV1Handler struct {
+	deps ContractV1Deps
+}
+
+// v1ListCursor is the opaque keyset position for v1 list endpoints. It is
+// bound to principal + operation at encode sites (Baseline 5.5); decode
+// failures render pagination_cursor_invalid.
+type v1ListCursor struct {
+	Offset int `json:"offset"`
+}
+
+func (h *contractV1Handler) requireStore(c *gin.Context) bool {
+	if h.deps.Store == nil {
+		contract.RenderError(c, http.StatusNotImplemented,
+			contract.CodeContractNotImplemented, "The v1 contract surface is not implemented yet")
+		c.Abort()
+		return false
+	}
+	return true
+}
+
+func v1RequestPrincipal(c *gin.Context) (principal.Principal, bool) {
+	identityPrincipal, ok := principal.From(c)
+	if !ok {
+		contract.RenderError(c, http.StatusUnauthorized, contract.CodeUnauthorized, "未登录")
+		c.Abort()
+		return principal.Principal{}, false
+	}
+	return identityPrincipal, true
+}
+
+// v1WorkspaceContext resolves the explicit workspace context: malformed
+// ids and unknown workspaces are invisible (ok=false, 404 already
+// rendered); visible workspaces return the caller's role (member=false
+// when the caller holds no membership).
+func (h *contractV1Handler) v1WorkspaceContext(c *gin.Context, identityPrincipal principal.Principal) (*tenancy.Workspace, string, bool) {
+	raw := strings.TrimSpace(c.Param("workspace_id"))
+	if !contract.IsWorkspaceID(raw) {
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+		c.Abort()
+		return nil, "", false
+	}
+	workspace, err := h.deps.Store.GetWorkspace(c.Request.Context(), raw)
+	if err != nil {
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+		c.Abort()
+		return nil, "", false
+	}
+	role, member, err := h.deps.Store.GetWorkspaceRole(c.Request.Context(), raw, identityPrincipal.UserID())
+	if err != nil {
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+		c.Abort()
+		return nil, "", false
+	}
+	if !member {
+		return workspace, "", false
+	}
+	return workspace, role, true
+}
+
+// v1OrganizationContext is the organization-scoped counterpart: hidden
+// orgs converge to 404 organization_not_found.
+func (h *contractV1Handler) v1OrganizationContext(c *gin.Context, identityPrincipal principal.Principal) (*tenancy.Organization, string, bool) {
+	raw := strings.TrimSpace(c.Param("organization_id"))
+	if !contract.IsOrganizationID(raw) {
+		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, "组织不存在")
+		c.Abort()
+		return nil, "", false
+	}
+	organization, err := h.deps.Store.GetOrganization(c.Request.Context(), raw)
+	if err != nil {
+		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, "组织不存在")
+		c.Abort()
+		return nil, "", false
+	}
+	role, member, err := h.deps.Store.GetOrganizationRole(c.Request.Context(), raw, identityPrincipal.UserID())
+	if err != nil {
+		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, "组织不存在")
+		c.Abort()
+		return nil, "", false
+	}
+	if !member {
+		return organization, "", false
+	}
+	return organization, role, true
+}
+
+func v1FormatTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
+}
+
+type v1MeDTO struct {
+	ID                  string  `json:"id"`
+	DisplayName         string  `json:"display_name"`
+	Role                string  `json:"role"`
+	PersonalWorkspaceID *string `json:"personal_workspace_id,omitempty"`
+}
+
+func (h *contractV1Handler) getMe(c *gin.Context) {
+	identityPrincipal, ok := v1RequestPrincipal(c)
+	if !ok {
+		return
+	}
+	dto := v1MeDTO{
+		ID:          tenancy.FormatUserPublicID(identityPrincipal.PublicID()),
+		DisplayName: identityPrincipal.DisplayName(),
+		Role:        identityPrincipal.Role().String(),
+	}
+	// Personal workspace auto-provision hook: idempotent and
+	// concurrent-safe; a provision failure never fails /me itself.
+	if h.deps.Store != nil {
+		if personal, err := h.deps.Store.EnsurePersonalWorkspace(c.Request.Context(), identityPrincipal.UserID()); err == nil && personal != nil {
+			id := personal.PublicID
+			dto.PersonalWorkspaceID = &id
+		}
+	}
+	contract.RenderSuccess(c, dto)
+}
+
+type v1WorkspaceDTO struct {
+	ID             string  `json:"id"`
+	OrganizationID *string `json:"organization_id"`
+	Name           string  `json:"name"`
+	CreatedAt      string  `json:"created_at"`
+	ArchivedAt     *string `json:"archived_at,omitempty"`
+}
+
+func toWorkspaceDTO(w *tenancy.Workspace) v1WorkspaceDTO {
+	dto := v1WorkspaceDTO{
+		ID:        w.PublicID,
+		Name:      w.Name,
+		CreatedAt: v1FormatTime(w.CreatedAt),
+	}
+	if w.OrganizationID != nil {
+		org := *w.OrganizationID
+		dto.OrganizationID = &org
+	}
+	if w.ArchivedAt != nil {
+		archived := v1FormatTime(*w.ArchivedAt)
+		dto.ArchivedAt = &archived
+	}
+	return dto
+}
+
+func (h *contractV1Handler) listWorkspaces(c *gin.Context) {
+	identityPrincipal, ok := v1RequestPrincipal(c)
+	if !ok || !h.requireStore(c) {
+		return
+	}
+	pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
+	if err != nil {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
+		c.Abort()
+		return
+	}
+	offset := 0
+	if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
+		cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
+		if decodeErr != nil || cursor == nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+			c.Abort()
+			return
+		}
+		if cursor.Offset < 0 {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+			c.Abort()
+			return
+		}
+		offset = cursor.Offset
+	}
+	ctx := c.Request.Context()
+	workspaces, err := h.deps.Store.ListWorkspacesForUser(ctx, identityPrincipal.UserID())
+	if err != nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "工作区服务暂不可用")
+		c.Abort()
+		return
+	}
+	// First-list auto-provision hook when the user has no workspace yet.
+	if len(workspaces) == 0 {
+		if personal, provisionErr := h.deps.Store.EnsurePersonalWorkspace(ctx, identityPrincipal.UserID()); provisionErr == nil && personal != nil {
+			workspaces, err = h.deps.Store.ListWorkspacesForUser(ctx, identityPrincipal.UserID())
+			if err != nil {
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "工作区服务暂不可用")
+				c.Abort()
+				return
+			}
+		}
+	}
+	if offset > len(workspaces) {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+		c.Abort()
+		return
+	}
+	end := offset + pageSize
+	if end > len(workspaces) {
+		end = len(workspaces)
+	}
+	page := make([]v1WorkspaceDTO, 0, end-offset)
+	for _, w := range workspaces[offset:end] {
+		page = append(page, toWorkspaceDTO(w))
+	}
+	meta := contract.NewPageMeta("", false)
+	if end < len(workspaces) {
+		next, encodeErr := contract.EncodeCursor(v1ListCursor{Offset: end})
+		if encodeErr != nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "工作区服务暂不可用")
+			c.Abort()
+			return
+		}
+		meta = contract.NewPageMeta(next, true)
+	}
+	contract.RenderPaginated(c, page, meta)
+}
+
+type v1CreateWorkspaceBody struct {
+	Data struct {
+		Name           string  `json:"name"`
+		OrganizationID *string `json:"organization_id"`
+	} `json:"data"`
+}
+
+func (h *contractV1Handler) createWorkspace(c *gin.Context) {
+	identityPrincipal, ok := v1RequestPrincipal(c)
+	if !ok || !h.requireStore(c) {
+		return
+	}
+	key, err := contract.IdempotencyKeyFromHeader(c)
+	if err != nil {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+		c.Abort()
+		return
+	}
+	var body v1CreateWorkspaceBody
+	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
+			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
+		c.Abort()
+		return
+	}
+	name := strings.TrimSpace(body.Data.Name)
+	if validateErr := tenancy.ValidateName(name); validateErr != nil {
+		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+			"工作区名称非法", contract.FieldErrors{Fields: map[string]string{"name": "required"}})
+		c.Abort()
+		return
+	}
+	var orgID *string
+	if body.Data.OrganizationID != nil {
+		candidate := strings.TrimSpace(*body.Data.OrganizationID)
+		if !contract.IsOrganizationID(candidate) {
+			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+				"组织标识非法", contract.FieldErrors{Fields: map[string]string{"organization_id": "invalid"}})
+			c.Abort()
+			return
+		}
+		orgID = &candidate
+	}
+	ctx := c.Request.Context()
+	// Organization-scoped creation requires org visibility: hidden orgs
+	// (unknown id or caller holds no membership) converge to 404
+	// organization_not_found; org members without owner/admin get 403.
+	if orgID != nil {
+		_, role, orgErr := h.orgRoleForCreate(ctx, *orgID, identityPrincipal.UserID())
+		if orgErr != nil {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, "组织不存在")
+			c.Abort()
+			return
+		}
+		if role != tenancy.RoleOwner && role != tenancy.RoleAdmin {
+			if !RequireOrganizationCapability(c, true, false) {
+				return
+			}
+		}
+	}
+	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+	orgPart := ""
+	if orgID != nil {
+		orgPart = *orgID
+	}
+	scope := contract.IdempotencyScope(externalUser, "workspace:create")
+	hash := contract.HashIdempotencyRequest("workspace:create", name, orgPart)
+	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
+		params := tenancy.CreateWorkspaceParams{Name: name, OrganizationID: orgID, OwnerUserID: identityPrincipal.UserID()}
+		if orgID != nil {
+			return h.deps.Store.CreateOrganizationWorkspace(ctx, *orgID, identityPrincipal.UserID(), name)
+		}
+		return h.deps.Store.CreateWorkspace(ctx, params)
+	})
+	if doErr != nil {
+		if contract.IsIdempotencyConflict(doErr) {
+			contract.RenderError(c, http.StatusConflict, contract.CodeWorkspaceIdempotencyConflict, "幂等请求与原请求不一致")
+			c.Abort()
+			return
+		}
+		if errors.Is(doErr, tenancy.ErrNotFound) {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, "组织不存在")
+			c.Abort()
+			return
+		}
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "工作区服务暂不可用")
+		c.Abort()
+		return
+	}
+	created, ok := result.(*tenancy.Workspace)
+	if !ok || created == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "工作区服务暂不可用")
+		c.Abort()
+		return
+	}
+	contract.RenderCreated(c, toWorkspaceDTO(created))
+}
+
+func (h *contractV1Handler) orgRoleForCreate(ctx context.Context, orgID string, userID int64) (*tenancy.Organization, string, error) {
+	organization, err := h.deps.Store.GetOrganization(ctx, orgID)
+	if err != nil {
+		return nil, "", err
+	}
+	role, member, err := h.deps.Store.GetOrganizationRole(ctx, orgID, userID)
+	if err != nil {
+		return nil, "", err
+	}
+	if !member {
+		return organization, "", tenancy.ErrForbidden
+	}
+	return organization, role, nil
+}
+
+func (h *contractV1Handler) getWorkspace(c *gin.Context) {
+	identityPrincipal, ok := v1RequestPrincipal(c)
+	if !ok || !h.requireStore(c) {
+		return
+	}
+	workspace, _, visible := h.v1WorkspaceContext(c, identityPrincipal)
+	if workspace == nil {
+		return
+	}
+	if !RequireWorkspaceCapability(c, visible, visible) {
+		return
+	}
+	contract.RenderSuccess(c, toWorkspaceDTO(workspace))
+}
+
+type v1UpdateWorkspaceBody struct {
+	Data struct {
+		Name string `json:"name"`
+	} `json:"data"`
+}
+
+func (h *contractV1Handler) updateWorkspace(c *gin.Context) {
+	identityPrincipal, ok := v1RequestPrincipal(c)
+	if !ok || !h.requireStore(c) {
+		return
+	}
+	workspace, role, visible := h.v1WorkspaceContext(c, identityPrincipal)
+	if workspace == nil {
+		return
+	}
+	if !RequireWorkspaceCapability(c, visible, role == tenancy.RoleOwner || role == tenancy.RoleAdmin) {
+		return
+	}
+	var body v1UpdateWorkspaceBody
+	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
+			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
+		c.Abort()
+		return
+	}
+	name := strings.TrimSpace(body.Data.Name)
+	if validateErr := tenancy.ValidateName(name); validateErr != nil {
+		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+			"工作区名称非法", contract.FieldErrors{Fields: map[string]string{"name": "required"}})
+		c.Abort()
+		return
+	}
+	updated, err := h.deps.Store.UpdateWorkspace(c.Request.Context(), workspace.PublicID, name)
+	if err != nil {
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+		c.Abort()
+		return
+	}
+	contract.RenderSuccess(c, toWorkspaceDTO(updated))
+}
+
+func (h *contractV1Handler) archiveWorkspace(c *gin.Context) {
+	identityPrincipal, ok := v1RequestPrincipal(c)
+	if !ok || !h.requireStore(c) {
+		return
+	}
+	workspace, role, visible := h.v1WorkspaceContext(c, identityPrincipal)
+	if workspace == nil {
+		return
+	}
+	if !RequireWorkspaceCapability(c, visible, role == tenancy.RoleOwner || role == tenancy.RoleAdmin) {
+		return
+	}
+	archived, err := h.deps.Store.ArchiveWorkspace(c.Request.Context(), workspace.PublicID)
+	if err != nil {
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+		c.Abort()
+		return
+	}
+	contract.RenderSuccess(c, toWorkspaceDTO(archived))
+}
