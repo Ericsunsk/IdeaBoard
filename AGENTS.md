@@ -1,6 +1,6 @@
 # IdeaBoard Agent Protocol
 
-This file is the only agent-facing entry point. Keep it short, executable, and in English. Human-facing docs stay in Simplified Chinese with English Technical Terms.
+This file is the only agent-facing entry point. Keep it short, executable, and in English. Human-facing docs stay in Simplified Chinese with English Technical Terms. Exception: `CONTEXT.md` files are agent-facing and stay in English (see Response Rules).
 
 ## Response Rules
 
@@ -8,6 +8,7 @@ This file is the only agent-facing entry point. Keep it short, executable, and i
 - Keep Technical Terms in English.
 - Prefer direct execution over long explanations.
 - Report verification and unresolved risks clearly.
+- Read `CONTEXT.md` files as English agent docs; keep them English when editing.
 
 ## Read Order
 
@@ -23,7 +24,7 @@ Do not create a new doc if an existing canonical doc can answer the same questio
 
 ## Stack Snapshot
 
-- Frontend: Vue 3, Vite, TypeScript, Tailwind CSS v4, PrimeVue v4 unstyled.
+- Frontend: Vue 3, Vite, TypeScript, Tailwind CSS v4, Reka UI (shadcn-style).
 - Backend: Go, Gin, sqlc, River, NATS JetStream, PostgreSQL 17.
 - Auth: Better Auth, Fastify, TypeScript.
 

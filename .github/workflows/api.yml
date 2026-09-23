@@ -27,6 +27,20 @@ jobs:
     name: API Quality
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: ideaboard_test
+          POSTGRES_USER: ideaboard
+          POSTGRES_PASSWORD: ideaboard_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U ideaboard -d ideaboard_test -h 127.0.0.1"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      API_TEST_DATABASE_DSN: postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable
+      API_TEST_DATABASE_REQUIRED: "1"
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
@@ -57,6 +71,24 @@ jobs:
         env:
           CGO_ENABLED: "0"
         run: go build ./...
+
+  openapi-breaking:
+    name: OpenAPI Breaking Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-go
+        with:
+          cache-dependency-path: apps/api/go.sum
+      - name: Check for breaking OpenAPI changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          OPENAPI_BREAKING_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: ./scripts/openapi-breaking-check.sh "${BASE_SHA}"
 
   schema:
     name: API Schema Release

@@ -473,3 +473,37 @@ MCP Codegraph 与 security review 识别并修复两项明确问题：Admin bran
 - `cd apps/api && go test ./internal/aigateway -count=1 -race` 通过。
 - `cd apps/api && go vet ./internal/aigateway` 通过。
 - clean `HEAD + internal/aigateway` snapshot 暴露其依赖 `settings.SetAndDeleteManyWithAdminAudit` 尚未进入 HEAD；因此安全修复将随完整 backend transaction/sqlc closure 一起提交，当前不单独制造不可编译 commit。
+
+## 第五批补充：Tasking / Gateway retry convergence（5C）
+
+复核 Provider transient failure 的调用链时发现一个 P1：`requeueFailedAttempt` 原来调用 `ResetTaskExecutionToken`。该 SQL 会释放 execution token，却不会递增 `tasks.retry_count`，导致 `maxProviderFailureRequeues = 2` 永远无法达到；River 的默认 `MaxAttempts=25` 可能让一次 transient Provider 错误重复触发 25 次整任务执行和付费请求。
+
+本批增加 `RequeueRunningTask`，使用已有的 `TaskConvergenceRequeued` / `RequeueTaskRunningWithExecutionToken` 原子递增 retry count；中断恢复继续使用 reset 语义。新增 PostgreSQL integration test 验证 task 状态、retry count、execution token 和 attempt status 同时收敛。Gateway client 的本地 outbound retry 也收敛为单次发送，把 Provider retry budget 留给 Cloudflare Gateway 与 River whole-task policy。
+
+### Verification
+
+- `cd apps/api && go test ./internal/tasking/application/execution ./internal/runtime/interfaces/worker/execution -count=1` 通过。
+- `cd apps/api && go test ./...` 通过。
+- `cd apps/api && go vet ./...` 通过。
+
+## 第五批补充：Task cancellation HTTP contract（5D）
+
+OpenAPI 已将 `Idempotency-Key` 声明为 Task cancel 的 required header；User/Admin 两个前端 caller 原来没有传递该 header，会在 API contract 收紧后稳定收到 `400`。新增 task-specific key primitive，并在 shared Task API 与 Admin monitor resource 注入同一稳定 key；补充 6 个 focused tests。
+
+### Verification
+
+- `cd apps/web && npm run test:run -- src/shared/api/task.unit.spec.ts src/features/admin/monitor/infrastructure/resource.contract.spec.ts`：2 files / 6 tests 通过。
+- `cd apps/web && npm run api:check-generated && npm run build` 通过。
+
+## 第五批补充：OpenAPI breaking gate edge cases（5E）
+
+修复 `scripts/openapi-breaking-check.sh` 在 `OPENAPI_BREAKING_LABELS` 为空且启用 `set -u` 时的数组展开错误；CI 未设置 label 时现在会正常继续到 base-ref 检查。approval label 仍按逗号分隔、trim 后的 exact match 判断；oasdiff 的 breaking 与 tool error 状态保持区分。
+
+### Verification
+
+- 空 label、带空格的 exact approval label、相似但不相等的 label 三条路径通过。
+- `bash -n scripts/openapi-breaking-check.sh` 与 `git diff --check` 通过。
+
+## 第五批补充：完整 workspace checks（5F）
+
+`go tool sqlc generate` 已执行且成功；未在真实数据库执行 migration。当前完整 API 与 Web build/test 通过，但包含 schema DROP/secret purge 的 migration 仍需发布前 backup、Fresh Database replay 和 cutover/rollback 计划。

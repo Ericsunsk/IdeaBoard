@@ -21,7 +21,7 @@
 
 ## 系统形态
 
-IdeaBoard 是面向图像设计与电商展示场景的 AI 画布工作流平台。系统围绕 Canvas Board、workflow feature、Task、Prompt、AccountPool 和 Media Storage 协作。
+IdeaBoard 是面向图像设计与电商展示场景的 AI 画布工作流平台。系统围绕 Canvas Board、workflow feature、Task、Prompt、AI Gateway 出口和 Media Storage 协作。AccountPool 已退役，见 [ADR-0009](./docs/adr/0009-accountpool-retirement.md)。
 
 ```mermaid
 flowchart TB
@@ -36,7 +36,7 @@ flowchart TB
     API --> Worker["Runtime Worker"]
 
     Worker --> Postgres
-    Worker --> AI["Upstream AI Providers"]
+    Worker --> AI["Cloudflare AI Gateway<br>sole egress"]
     Worker --> Storage["Local / S3-compatible Storage"]
     Worker --> NATS
     Uploads --> Storage
@@ -102,13 +102,15 @@ NATS JetStream 只负责持久领域事件、audit 和 realtime fanout。当前�
 
 ### 4. Worker 是 runtime adapter
 
-`internal/runtime/worker` 消费 Tasking、AccountPool、Workflow、Prompts 和 Media 的接口，并拥有 provider calls、River worker execution、process-level retry 和运行时错误收敛。
+`internal/runtime/worker` 消费 Tasking、Workflow、Prompts 和 Media 的接口，经 Cloudflare AI Gateway 做 provider calls，并拥有 River worker execution 与运行时错误收敛。网关内部重试（上限 5 次）耗尽后，transient 失败（429/5xx/超时/网络错误）允许最多 2 次 worker 层整任务重投（reset + River backoff，新 execution token，以 `tasks.retry_count` 为界），确定性失败直接终态，见 [ADR-0008](./docs/adr/0008-cloudflare-ai-gateway-sole-egress.md) 与 [ADR-0010](./docs/adr/0010-gateway-cache-billing-timeout.md)。
 
 不要把 worker implementation 挪进 Tasking。Tasking 拥有任务模型、提交、队列、统计和运行状态语义；worker 拥有执行适配。
 
+模型图片请求的 vendor 方言收敛在 `internal/runtime/interfaces/worker/providers/dialects`：按 `(provider, model, customParams)` 一次分发（chat 判定优先、Fal 专表、其余 generic），shaping 与解析纯函数无网络。路径推断仍归 `workflow.ResolveRoute`（execution 与 preview 共用单 seam），membership 与别名归 `workflow.ResolveProvider`，custom 参数由 worker 在 Encode 后合并一次，重试/缓存/超时归网关（ADR-0008/0010）。claim 与 attempt 行在同一 SQL 语句原子提交，不存在有 token 无 attempt 行的中间态。
+
 ### 5. Feature Prompt 只保存当前模板
 
-`feature_prompts` 按 `feature_slug` 保存唯一当前 Prompt，原地更新，不创建 version、revision 或 history。模板变量和 merge policy 由代码维护，不属于运营配置。Billing 价格是 Workflow 是否可提交的唯一业务开关；Readiness 与 Submit 共用同一套 Prompt、typed params 和 Billing request 规划。任务提交不固化 model 或候选账号，worker 在每次执行时从当前已启用的 Provider Account 与 Model 池中按容量动态分配，并将实际 `resolved_model` 写入 lease。媒体输入、mask、多参考图、multipart 上传、本地重绘窗口和 provider 参数仍由运行时处理。
+`feature_prompts` 按 `feature_slug` 保存唯一当前 Prompt，原地更新，不创建 version、revision 或 history。模板变量和 merge policy 由代码维护，不属于运营配置。Billing 价格是 Workflow 是否可提交的唯一业务开关；Readiness 与 Submit 共用同一套 Prompt、typed params 和 Billing request 规划。任务提交不固化 model，worker 在每次执行时读取当前功能模型映射，并将网关回执的实际 `resolved_model` 写入 execution-attempt 事实；价格不受模型影响，见 [ADR-0010](./docs/adr/0010-gateway-cache-billing-timeout.md)。媒体输入、mask、多参考图、multipart 上传、本地重绘窗口和 provider 参数仍由运行时处理。
 
 稳定变量和运营模板见 [docs/runbooks/system-prompts.md](./docs/runbooks/system-prompts.md)。
 
@@ -139,12 +141,12 @@ Admin route pages 不直接依赖 generated API。每个 Admin vertical context 
 | Frontend context                 | Backend context                                                                 | Ownership                                                                                                |
 | -------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | `features/admin/users`           | `internal/identity/users`                                                       | 用户列表、角色/status、会话、伪装登录、受控注销                                                          |
-| `features/admin/provider-config` | `internal/accountpool`                                                          | channel/account/provider payload、模型检测、调度可见性                                                   |
-| `features/admin/prompt-config`   | `internal/prompts`, `internal/workflow`                                         | 当前 Workflow Feature 的 prompt template；变量和 merge policy 由代码维护                                 |
+| `features/admin/provider-config`（已退役，见 ADR-0009，随 PR-2 删除） | `internal/accountpool`（已退役） | ~~channel/account/provider payload、模型检测、调度可见性~~ |
+| `features/admin/prompts`   | `internal/prompts`, `internal/workflow`                                         | 当前 Workflow Feature 的 prompt template；变量和 merge policy 由代码维护                                 |
 | `features/admin/storage`         | `internal/media/storage`                                                        | storage provider/profile、secret masking、bucket test/apply                                              |
-| `features/admin/task-monitor`    | `internal/tasking`                                                              | task list/detail、runtime monitor、stream/poll fallback                                                  |
+| `features/admin/monitor`    | `internal/tasking`                                                              | task list/detail、runtime monitor、stream/poll fallback                                                  |
 | `features/admin/statistics`      | `internal/tasking/taskstats`                                                    | statistics aggregation、backfill status、range contract                                                  |
-| `features/admin/credits-billing` | `internal/billing`, `internal/credits`, `internal/rewards`, `internal/payments` | Registry-backed 功能定价 Catalog、Wallet/Ledger operations、Credit Health、RewardCode 运营与 Stripe 配置 |
+| `features/admin/credits` | `internal/billing`, `internal/credits`, `internal/rewards`, `internal/payments` | Registry-backed 功能定价 Catalog、Wallet/Ledger operations、Credit Health、RewardCode 运营与 Stripe 配置 |
 
 ### 9. Generated code 是边界，不是业务模型
 
@@ -173,7 +175,7 @@ Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.
 | Platform                                            | `internal/platform`, `internal/db`, `internal/events` | config、database、response helpers、safe HTTP、event bus、sqlc                                                                             |
 | Tasking                                             | `internal/tasking`                                    | task model、submission、queueing、runtime state、statistics                                                                                |
 | Identity                                            | `internal/identity`                                   | auth middleware/client、user persistence、user/admin management                                                                            |
-| AccountPool                                         | `internal/accountpool`                                | accounts、channels、load、scheduling visibility                                                                                            |
+| AccountPool（已退役，见 ADR-0009）                   | —                                                     | Account/endpoint rows remain for historical references; credential material is purged. AI egress belongs to Cloudflare AI Gateway          |
 | Boards                                              | `internal/boards`                                     | board ownership、access checks、board management API                                                                                       |
 | Media                                               | `internal/media`                                      | storage、assets、media refs、image format validation                                                                                       |
 | Library                                             | `internal/library`                                    | 外部灵感素材收藏、Folder、幂等保存与 cursor 分页；只保存 provider URL 和 source metadata                                                   |

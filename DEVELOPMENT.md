@@ -200,10 +200,10 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 
 | 入口                                                                                                              | 用途                                |
 | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| [CanvasPage.vue](./apps/web/src/features/canvas/pages/CanvasPage.vue)                                             | Canvas route page                   |
-| [executionContract.ts](./apps/web/src/features/canvas/execution/contracts/executionContract.ts)                   | 前端 workflow feature contract      |
-| [generationIntent.ts](./apps/web/src/features/canvas/image-workflow/generationIntent.ts)                          | Prompt/node execution orchestration |
-| [useFlowImageActionOrchestrator.ts](./apps/web/src/features/canvas/composables/useFlowImageActionOrchestrator.ts) | Image node direct actions           |
+| [CanvasPage.vue](./apps/web/src/features/canvas/presentation/pages/CanvasPage.vue)                                             | Canvas route page                   |
+| [executionContract.ts](./apps/web/src/features/canvas/domain/execution-contracts/executionContract.ts)                   | 前端 workflow feature contract      |
+| [generationIntent.ts](./apps/web/src/features/canvas/application/image-workflow/generationIntent.ts)                          | Prompt/node execution orchestration |
+| [useCanvasImageWorkflow.ts](./apps/web/src/features/canvas/application/image-workflow/useCanvasImageWorkflow.ts) | Image node direct actions           |
 | [taskEvents.ts](./apps/web/src/shared/api/taskEvents.ts)                                                          | Task SSE events                     |
 | [features.go](./apps/api/internal/workflow/features.go)                                                           | 后端 canonical feature contract     |
 
@@ -211,18 +211,18 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 
 | 入口                                                                          | 用途                          |
 | ----------------------------------------------------------------------------- | ----------------------------- |
-| [service.go](./apps/api/internal/tasking/taskservice/service.go)              | Task service                  |
-| [store.go](./apps/api/internal/tasking/tasksubmission/store.go)               | Transactional task submission |
-| [river_queue.go](./apps/api/internal/tasking/taskqueue/river_queue.go)        | River enqueue adapter         |
-| [river_worker.go](./apps/api/internal/runtime/worker/river_worker.go)         | River worker adapter          |
-| [task_processor.go](./apps/api/internal/runtime/worker/task_processor.go)     | Worker task processing        |
-| [provider_request.go](./apps/api/internal/runtime/worker/provider_request.go) | Provider request shaping      |
+| [service.go](./apps/api/internal/tasking/application/task/service.go)              | Task service                  |
+| [store.go](./apps/api/internal/tasking/application/submission/store.go)               | Transactional task submission |
+| [river_queue.go](./apps/api/internal/tasking/infrastructure/queue/river_queue.go)        | River enqueue adapter         |
+| [worker.go](./apps/api/internal/runtime/interfaces/worker/river/worker.go)         | River worker adapter          |
+| [processor.go](./apps/api/internal/runtime/interfaces/worker/execution/processor.go)     | Worker task processing        |
+| [request.go](./apps/api/internal/runtime/interfaces/worker/providers/request.go) | Provider request shaping      |
 
 ### Prompt config
 
 | 入口                                                                                                     | 用途               |
 | -------------------------------------------------------------------------------------------------------- | ------------------ |
-| [AdminPromptConfigPage.vue](./apps/web/src/features/admin/prompt-config/pages/AdminPromptConfigPage.vue) | Admin prompt UI    |
+| [AdminPromptConfigPage.vue](./apps/web/src/features/admin/prompts/pages/AdminPromptConfigPage.vue) | Admin prompt UI    |
 | [engine.go](./apps/api/internal/prompts/engine.go)                                                       | Prompt rendering   |
 | [docs/runbooks/system-prompts.md](./docs/runbooks/system-prompts.md)                                     | 运营模板和变量规则 |
 
@@ -234,15 +234,15 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | [service_client.go](./apps/api/internal/identity/auth/service_client.go) | Go -> Auth internal client |
 | [index.ts](./apps/auth/src/index.ts)                                     | Auth service routes        |
 | [client.ts](./apps/web/src/shared/auth/client.ts)                        | Web auth client            |
-| [authSession.ts](./apps/web/src/features/auth/session/authSession.ts)    | User session store         |
+| [userSession.ts](./apps/web/src/features/auth/session/userSession.ts)    | User session store         |
 | [docs/runbooks/auth-operations.md](./docs/runbooks/auth-operations.md)   | Auth operation rules       |
 
 ### Credits
 
 | 入口                                                               | 用途                                                                                       |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| [service.go](./apps/api/internal/credits/service.go)               | Grant/Hold/Capture/Release/Refund Command seam 与 caller-owned transaction adapter         |
-| [reconciliation.go](./apps/api/internal/credits/reconciliation.go) | 自动账本检查、Run history 与全局 Finding queue；Stale Hold 固定 24 小时且不接受 Admin 配置 |
+| [composition.go](./apps/api/internal/credits/composition.go)               | Grant/Hold/Capture/Release/Refund Command seam 与 caller-owned transaction adapter         |
+| [service.go](./apps/api/internal/credits/application/reconciliation/service.go) | 自动账本检查、Run history 与全局 Finding queue；Stale Hold 固定 24 小时且不接受 Admin 配置 |
 | [CONTEXT.md](./apps/api/internal/credits/CONTEXT.md)               | Credits domain language 与 invariants                                                      |
 | [credits-million.md](./docs/benchmarks/credits-million.md)         | 显式百万流水 harness 与参考结果                                                            |
 | [web-performance.md](./docs/benchmarks/web-performance.md)         | Web bundle size guard 与 Canvas interaction benchmark                                      |
@@ -251,16 +251,16 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 
 | 入口                                                 | 用途                                                                    |
 | ---------------------------------------------------- | ----------------------------------------------------------------------- |
-| [service.go](./apps/api/internal/rewards/service.go) | RewardCode、Redemption create/list/redeem/history 与 Credits Grant 编排 |
+| [service.go](./apps/api/internal/rewards/application/redemptions/service.go) | RewardCode、Redemption create/list/redeem/history 与 Credits Grant 编排 |
 | [CONTEXT.md](./apps/api/internal/rewards/CONTEXT.md) | Rewards Domain Language 与 invariants                                   |
 
 ### Billing
 
 | 入口                                                             | 用途                                                                                             |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| [service.go](./apps/api/internal/billing/service.go)             | 全局 SKU Catalog、versioned pricing 与 Quote seam                                                |
+| [store.go](./apps/api/internal/billing/infrastructure/postgres/store.go)             | 全局 SKU Catalog、versioned pricing 与 Quote seam                                                |
 | [CONTEXT.md](./apps/api/internal/billing/CONTEXT.md)             | Billing domain language、SKU namespace 与 snapshot invariants                                    |
-| [service.go](./apps/api/internal/tasking/taskbilling/service.go) | AI Image Workflow SKU resolver、Readiness、Submit Hold 与 terminal Capture/Release orchestration |
+| [service.go](./apps/api/internal/tasking/application/billing/service.go) | AI Image Workflow SKU resolver、Readiness、Submit Hold 与 terminal Capture/Release orchestration |
 
 ## Workflow Feature Contract
 
@@ -383,7 +383,6 @@ apps/api/
 ├── cmd/                      # service entrypoints
 ├── internal/platform/        # config, database, response, safehttp
 ├── internal/runtime/         # bootstrap, HTTP routes, worker, webdist
-├── internal/accountpool/     # accounts/channels/load
 ├── internal/identity/        # auth/users/admin user management
 ├── internal/media/           # storage/assets/media refs/image format
 ├── internal/boards/          # board ownership and management

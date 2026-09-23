@@ -145,7 +145,7 @@ sequenceDiagram
 
 | 服务层级 | 技术选型与用途 |
 | :--- | :--- |
-| **Web Frontend** | Vue 3 (Composition API), Vite, TypeScript, Tailwind CSS v4, PrimeVue v4, Vue Flow |
+| **Web Frontend** | Vue 3 (Composition API), Vite, TypeScript, Tailwind CSS v4, Reka UI (shadcn-style), Vue Flow |
 | **Go API Backend** | Go 1.26+, Gin Framework, sqlc (Typed Query Engine), River Queue (PG 17 Native Queue) |
 | **Auth Service** | Better Auth, Fastify, TypeScript, OTP & Google OAuth 2.0 |
 | **Database & Cache** | PostgreSQL 17 (Triggers, JSONB, Composite Indexes), Usage Per-process LRU Cache |

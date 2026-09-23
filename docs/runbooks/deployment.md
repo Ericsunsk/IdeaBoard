@@ -52,7 +52,7 @@ graph LR
 - Docker Compose 管理 API、Auth、PostgreSQL、NATS JetStream 与 `api-uploads` volume。
 - River 任务队列写入 PostgreSQL；JetStream 只承载状态事件、audit 与实时 fanout。
 
-任务 retry 分两层：`taskexecution` 的 `defaultTaskRetryLimit=3` 是 DB/provider failover 的业务 retry 上限；River `MaxAttempts=25` 是 worker panic、process error、临时基础设施故障的队列层 retry。Worker timeout、无容量 backoff 与 `MaxAttempts` 是代码持有的 typed policy；worker concurrency 通过 `RIVER_WORKER_CONCURRENCY` 配置，默认 5、范围 1–64，重启 API/Worker 后生效。NATS retention 固定为 7 天。Admin 只管理 Egress allowlist，按请求读取并在保存后即时生效。
+任务 retry 分三层：网关内部重试（单请求最多 5 次，Cloudflare 侧 fallback 链）；网关耗尽后 transient 失败（429/5xx/超时/网络）允许最多 2 次 worker 层重投（reset + River backoff 整任务重投，新 token，以 `tasks.retry_count` 为界，见 ADR-0010）；River `MaxAttempts=25` 是 worker panic、process error、临时基础设施故障的队列层 retry（整任务重投）。Worker timeout（网关 300s/worker 360s/River 17m 嵌套）与 `MaxAttempts` 是代码持有的 typed policy；worker concurrency 通过 `RIVER_WORKER_CONCURRENCY` 配置，默认 5、范围 1–64，重启 API/Worker 后生效。NATS retention 固定为 7 天。Admin 只管理 Egress allowlist（AI 出口唯一是 Cloudflare AI Gateway，图片下载经 safehttp 做 SSRF 防护），按请求读取并在保存后即时生效。
 
 Pages 项目建议配置：
 
@@ -446,6 +446,40 @@ ideaboard delete --yes
 
 `delete` 默认保留 Docker volumes；同时删除数据加 `--volumes`。
 
+### Runtime 硬化（连接池 / 启动校验 / 重试矩阵）
+
+数据库连接池按部署调优（`apps/api/.env.example` 同步注释）：
+
+| 变量 | 默认 | 范围 | 说明 |
+|------|------|------|------|
+| `DB_POOL_MAX_OPEN` | 25 | 1–64 | `database/sql` 池上限 |
+| `DB_POOL_MAX_IDLE` | 10 | 0–64 | idle 上限，超过 open 上限自动 clamp |
+| `DB_POOL_MAX_LIFETIME_MINUTES` | 30 | 1–1440 | 连接复用最大年龄（NAT/pgbouncer 后防 stale socket） |
+| `DB_POOL_MAX_IDLE_MINUTES` | 5 | 1–1440 | idle 连接回收 |
+| `RIVER_POOL_MAX_CONNS` | 10 | 1–32 | River pgxpool 上限 |
+| `RIVER_POOL_MIN_CONNS` | 1 | 1–16 | River pgxpool 下限，不超过上限 |
+
+单实例连接预算 = `DB_POOL_MAX_OPEN + RIVER_POOL_MAX_CONNS`（默认 35），必须留出 migrations / CLI / fixtures 余量，远低于 PostgreSQL `max_connections`（默认 100）。改动重启 API 后生效；非法值回退默认并在生产启动期直接失败（`Config.InvalidEnv`），开发环境仅 warning。
+
+启动期 fail-fast 链（按顺序，任一失败进程直接退出）：`Config.Validate`（DB 口令/SSL、非法 env、PUBLIC_ORIGIN）→ `AUTH_INTERNAL_KEY`（生产 32+ 字符非占位）→ imgproxy 配置 → `APP_SECRETS_ENCRYPTION_KEY` → runtime 权限校验。`PUBLIC_ORIGIN` 缺失不再等到首次拼 URL 才暴露。
+
+River 重试矩阵是代码持有的 typed policy（事实源 `internal/tasking/infrastructure/queue.RiverRetryMatrix`，insert 点引用同包常量，改预算只改一处）：
+
+| Queue | MaxAttempts | 说明 |
+|-------|-------------|------|
+| `drawing_default`（`drawing_generate` + settlement-only `drawing_final_failure`） | 25 | panic/process error/基础设施故障的队列层重试；provider transient 在预算内最多 2 次整任务重投（`tasks.retry_count` 为界） |
+| `credit_reconciliation` | 5 | 对账卡住直接告警，不 churn |
+| `payment_reconciliation` / `payment_checkout_shutdown` | 8 | Stripe/DB transient 重试 |
+| `task_retention` | 3 | 串行 purge，失败立即暴露 |
+| `vision_billing` | 5 | 快照对账 |
+| `media_reclamation` | 10 | 存储抖动偏 transient，预算高于其他维护队列 |
+
+attempt 间隔为 River 默认指数 backoff + jitter。全部 7 个队列的 depth/lag 都有独立 gauge（`ideaboard_river_queue_depth{queue}` / `ideaboard_river_queue_lag_seconds{queue}`，15s 刷新），排障见 [backend-metrics.md](./backend-metrics.md) C 节（按 queue 逐个看，不要只看 `drawing_default`）。
+
+日志默认脱敏：`internal/platform/applog` 对 credential/token/secret 类 key 直接 `[REDACTED]`，并擦除 value 中 `password=`/`token=` 对与 `scheme://user:password@host` 形态。排障贴日志时仍不要粘贴整段 DSN 或整块 env。
+
+OpenAPI breaking-change 门禁：CI `API / OpenAPI Breaking Changes` job 用 oasdiff 对比 base→head，error 级 breaking（删 path/operation、新增必填、删响应字段、收紧 enum）直接失败； additive 变更通过。确属 intentional 的契约 breaking（如退役整域）由 reviewer 加 `openapi-breaking-approved` label 豁免。本地复现：`./scripts/openapi-breaking-check.sh <base-sha>`。
+
 ### Payments 事故处理
 
 需要立即停止充值时，在 Admin Payments 设置将 `purchases_enabled` 设为 `false`。新的 Checkout 会被拒绝；River 会异步 Expire 仍有效的待支付 Stripe Checkout Session，重复执行安全幂等。不要删除 Payment Order、Refund、Dispute、Ledger 或 Webhook Inbox 来“取消”支付。
@@ -537,3 +571,14 @@ docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stack
 6. 演练结束后清理解密后的 dump、tar、临时目录和本地下载副本。
 
 数据保存在 Docker volumes：`postgres-data`、`nats-data`、`api-uploads`。不要使用 `docker compose down -v`，除非你明确要删除生产数据。
+
+## AI Gateway 模型映射（单 AI 出口）
+
+所有 AI 调用唯一出口是 Cloudflare AI Gateway；应用代码不装任何 vendor SDK，不存任何 provider key。provider 只挂在 CF 侧，代码里的 provider slug 是不透明路由 token。
+
+- 定价页模型映射值格式：`provider/model[@gateway-path]`，worker 每次执行读取当前值。
+- 网关 path 前缀：`openrouter` / `fal` 按 CF 原生 slug 直写，其它进 `custom-<slug>`。OpenAI 永不直连（挂在 OpenRouter 或网关自有槽位做非图像调用），因此没有 direct-images 形状。
+- 响应形状按路由固定二选一：`openrouter` 走 chat-completions（含 `modalities: [text, image]` 的文生图），`fal` 走 media API（`{image:{url}}` / `{images:[{url}]}`，materializer 按 egress policy 下载落库）。
+- `@path` 永远优先：fal 各模型路径、cutout/upscale/inpaint 类 custom 路由必须在映射里显式写 `@path`。
+- 禁止事项：不上 Google 原生 `:generateContent`/`:predict` 路由（已删除对应方言代码）；upscale 只许 `fal-ai/esrgan`，禁止 `clarity-upscaler`（毛利为负）；vision 搜索走中央网关连接（openrouter 路由），模型与其它 feature 一样在模型映射里配（`vision` key，定价页"其它模型映射"区），搜索供应商设置里不再有 vision 配置面。
+- Egress allowlist 需放行网关域名；fal 结果图床 host 由该 allowlist 覆盖（materializer 下载用）。

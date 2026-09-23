@@ -1,5 +1,6 @@
 # OpenRouter 免费模型全景深度调研报告 (2026 最新版)
 
+> **Status (2026-09-22)**: superseded as a model source. The gateway cutover (see ADR-0008/ADR-0010) made the LiteLLM community catalog the model metadata source and control-plane provider lists the configured set; per-model free-tier details below are point-in-time evidence only, do not treat them as current.
 > **调研基准时间**：2026年09月04日 (Asia/Shanghai)
 > **第一手信息源 (Primary Sources)**：
 > 1. OpenRouter 官方公开模型列表 API: `https://openrouter.ai/api/v1/models`
