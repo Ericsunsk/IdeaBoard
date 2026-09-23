@@ -1,0 +1,180 @@
+package httpapi
+
+// Control billing family (issue #808): billing accounts and the
+// Registry-backed pricing catalog behind control:billing.
+//
+// The billing account is implicit per workspace (no public account id in
+// URLs); the catalog delegates to the billing BillableCatalogService
+// seam. Legacy /api/admin/billing/* routes are untouched.
+
+import (
+	"errors"
+	"net/http"
+	"strings"
+	"time"
+
+	"ideaboard/api/internal/billing"
+	"ideaboard/api/internal/platform/contract"
+
+	"github.com/gin-gonic/gin"
+)
+
+type controlBillingAccount struct {
+	WorkspaceID string    `json:"workspace_id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+func (d *ContractControlDeps) listControlBillingAccounts(c *gin.Context, _ controlContext) {
+	if d == nil || d.Tenancy == nil || d.BillingAccounts == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "计费服务暂不可用")
+		return
+	}
+	workspaceID := strings.TrimSpace(c.Query("workspace_id"))
+	if !contract.IsWorkspaceID(workspaceID) {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "workspace_id 为必填")
+		return
+	}
+	workspace, err := d.Tenancy.GetWorkspace(c.Request.Context(), workspaceID)
+	if err != nil {
+		writeControlTenancyError(c, err, "工作区不存在")
+		return
+	}
+	account, err := d.BillingAccounts.EnsureBillingAccountForWorkspace(c.Request.Context(), workspace.InternalID, workspace.PublicID)
+	if err != nil {
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "读取计费账户失败")
+		return
+	}
+	items := []controlBillingAccount{{
+		WorkspaceID: account.WorkspacePublicID,
+		CreatedAt:   account.CreatedAt,
+		UpdatedAt:   account.UpdatedAt,
+	}}
+	contract.RenderPaginated(c, items, contract.NewPageMeta("", false))
+}
+
+func writeControlBillingError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, billing.ErrInvalidSKU),
+		errors.Is(err, billing.ErrInvalidQuantity),
+		errors.Is(err, billing.ErrInvalidCatalogEntry),
+		errors.Is(err, billing.ErrInvalidOutputResolution):
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+	case errors.Is(err, billing.ErrSKUNotFound):
+		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "计费功能不存在")
+	case errors.Is(err, billing.ErrPricingUnavailable),
+		errors.Is(err, billing.ErrQuoteTotalExceeded):
+		contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeValidationFailed, "计费功能当前不可操作")
+	case errors.Is(err, billing.ErrItemNotArchived),
+		errors.Is(err, billing.ErrArchivedItemInUse):
+		contract.RenderError(c, http.StatusConflict, contract.CodeConflict, "计费功能状态冲突")
+	case errors.Is(err, billing.ErrServiceUnavailable):
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "计费服务暂不可用")
+	default:
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "计费操作失败")
+	}
+}
+
+func (d *ContractControlDeps) listControlBillingCatalog(c *gin.Context, _ controlContext) {
+	if d == nil || d.Catalog == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "计费服务暂不可用")
+		return
+	}
+	items, err := d.Catalog.List(c.Request.Context())
+	if err != nil {
+		writeControlBillingError(c, err)
+		return
+	}
+	var payload any = items
+	if items == nil {
+		payload = []any{}
+	}
+	contract.RenderSuccess(c, struct {
+		Items any `json:"items"`
+	}{Items: payload})
+}
+
+type controlPublishPricesRequest struct {
+	Prices map[string]int64 `json:"prices"`
+}
+
+func (d *ContractControlDeps) publishControlCatalogPrices(c *gin.Context, ctx controlContext) {
+	if d == nil || d.Catalog == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "计费服务暂不可用")
+		return
+	}
+	sku := strings.TrimSpace(c.Param("sku"))
+	if sku == "" {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "sku 无效")
+		return
+	}
+	var req controlPublishPricesRequest
+	if err := contract.BindStrictJSON(c, &req); err != nil {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+		return
+	}
+	prices := make(map[billing.OutputResolution]int64, len(req.Prices))
+	for rawResolution, unitCredits := range req.Prices {
+		resolution, err := billing.NormalizeOutputResolution(rawResolution)
+		if err != nil {
+			writeControlBillingError(c, err)
+			return
+		}
+		prices[resolution] = unitCredits
+	}
+	if len(prices) == 0 {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+		return
+	}
+	published, err := d.Catalog.PublishPrices(c.Request.Context(), sku, prices, ctx.Operator.UserID())
+	if err != nil {
+		writeControlBillingError(c, err)
+		return
+	}
+	contract.RenderSuccess(c, struct {
+		Prices any `json:"prices"`
+	}{Prices: published})
+}
+
+func (d *ContractControlDeps) setControlCatalogAvailability(c *gin.Context, ctx controlContext) {
+	if d == nil || d.Catalog == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "计费服务暂不可用")
+		return
+	}
+	sku := strings.TrimSpace(c.Param("sku"))
+	if sku == "" {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "sku 无效")
+		return
+	}
+	var req struct {
+		Enabled *bool `json:"enabled"`
+	}
+	if err := contract.BindStrictJSON(c, &req); err != nil || req.Enabled == nil {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+		return
+	}
+	availability, err := d.Catalog.SetAvailability(c.Request.Context(), sku, *req.Enabled, ctx.Operator.UserID())
+	if err != nil {
+		writeControlBillingError(c, err)
+		return
+	}
+	contract.RenderSuccess(c, availability)
+}
+
+func (d *ContractControlDeps) deleteControlCatalogItem(c *gin.Context, ctx controlContext) {
+	if d == nil || d.Catalog == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "计费服务暂不可用")
+		return
+	}
+	sku := strings.TrimSpace(c.Param("sku"))
+	if sku == "" {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "sku 无效")
+		return
+	}
+	result, err := d.Catalog.DeleteArchived(c.Request.Context(), sku, ctx.Operator.UserID())
+	if err != nil {
+		writeControlBillingError(c, err)
+		return
+	}
+	contract.RenderSuccess(c, result)
+}

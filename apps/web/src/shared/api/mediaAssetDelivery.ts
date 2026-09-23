@@ -16,6 +16,7 @@ import {
   type WorkspaceMediaDerivativeVariant,
 } from './upload'
 import { subscribeUserEvent } from './userEventStream'
+import { subscribeWorkspaceMediaInvalidation } from './workspaceEventStream'
 import { createPollDelay } from '../utils/polling'
 import { i18n } from '../i18n'
 import {
@@ -101,6 +102,43 @@ function ensureMediaEventSubscription() {
       return
     }
   })
+}
+
+// Workspace media invalidation (issue #807). Workspace-scoped callers
+// subscribe per workspace id; the versioned stream (`media.asset_ready` /
+// `media.asset_archived`) invalidates the same metadata cache the legacy
+// user-scope subscription feeds. Legacy behavior above is untouched.
+// Entries are refcounted so overlapping composables share one transport.
+type WorkspaceMediaSubscription = {
+  stop: () => void
+  count: number
+}
+
+const workspaceMediaSubscriptions = new Map<string, WorkspaceMediaSubscription>()
+
+export function ensureWorkspaceMediaInvalidation(workspaceId: string): () => void {
+  const key = workspaceId.trim()
+  if (key.length === 0) throw new Error('Invalid workspace id: expected ws_...')
+  const existing = workspaceMediaSubscriptions.get(key)
+  if (existing) {
+    existing.count += 1
+    return () => releaseWorkspaceMediaInvalidation(key)
+  }
+  const stop = subscribeWorkspaceMediaInvalidation(key, (assetId) => {
+    notifyAssetInvalidated(assetId)
+  })
+  workspaceMediaSubscriptions.set(key, { stop, count: 1 })
+  return () => releaseWorkspaceMediaInvalidation(key)
+}
+
+function releaseWorkspaceMediaInvalidation(workspaceId: string): void {
+  const entry = workspaceMediaSubscriptions.get(workspaceId)
+  if (!entry) return
+  entry.count -= 1
+  if (entry.count <= 0) {
+    workspaceMediaSubscriptions.delete(workspaceId)
+    entry.stop()
+  }
 }
 
 function subscribeAssetInvalidation(assetId: MediaAssetId, listener: () => void): () => void {

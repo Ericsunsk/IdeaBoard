@@ -29,8 +29,19 @@ export function useAdminCreditsBillingOperationsFeedback() {
 function formatCreditsBillingError(error: unknown, fallback: string) {
   if (error && typeof error === 'object') {
     const candidate = error as { status?: unknown; code?: unknown }
-    if (candidate.status === 409 || candidate.code === 409) {
+    // Control error-code branches (issue 808): match on code, never copy.
+    if (
+      candidate.code === 'idempotency_conflict' ||
+      candidate.code === 409 ||
+      candidate.status === 409
+    ) {
       return '操作发生幂等冲突，未重复记账。请刷新 Wallet 与流水后重试。'
+    }
+    if (candidate.code === 'billing_wallet_restricted') {
+      return '账户当前受限，暂时无法操作。请先处理账户限制。'
+    }
+    if (candidate.code === 'control_reason_required') {
+      return '需要填写操作原因后重试。'
     }
   }
   return formatAdminApiError(error, fallback)

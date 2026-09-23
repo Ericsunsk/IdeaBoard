@@ -16,17 +16,18 @@ import (
 )
 
 const (
-	defaultNATSStreamName      = "IDEABOARD_EVENTS"
-	defaultNATSSubjectPrefix   = "ideaboard"
-	defaultNATSRetention       = 7 * 24 * time.Hour
-	defaultNATSConnectTimeout  = 5 * time.Second
-	defaultNATSRequestTimeout  = 5 * time.Second
-	defaultNATSDrainTimeout    = 2 * time.Second
-	defaultNATSConsumerPrefix  = "ideaboard-api-events"
-	taskStatusSubjectSuffix    = "task.status"
-	userEventSubjectSuffix     = "user.event"
-	natsDuplicateWindow        = 2 * time.Minute
-	natsConsumerInactivePeriod = 24 * time.Hour
+	defaultNATSStreamName       = "IDEABOARD_EVENTS"
+	defaultNATSSubjectPrefix    = "ideaboard"
+	defaultNATSRetention        = 7 * 24 * time.Hour
+	defaultNATSConnectTimeout   = 5 * time.Second
+	defaultNATSRequestTimeout   = 5 * time.Second
+	defaultNATSDrainTimeout     = 2 * time.Second
+	defaultNATSConsumerPrefix   = "ideaboard-api-events"
+	taskStatusSubjectSuffix     = "task.status"
+	userEventSubjectSuffix      = "user.event"
+	workspaceEventSubjectSuffix = "workspace.event"
+	natsDuplicateWindow         = 2 * time.Minute
+	natsConsumerInactivePeriod  = 24 * time.Hour
 )
 
 type NATSJetStreamConfig struct {
@@ -45,6 +46,7 @@ type NATSJetStreamEventBus struct {
 	streamName        string
 	taskStatusSubject string
 	userEventSubject  string
+	workspaceSubject  string
 	instanceID        string
 
 	mu       sync.Mutex
@@ -96,6 +98,7 @@ func NewNATSJetStreamEventBus(ctx context.Context, cfg NATSJetStreamConfig) (*NA
 		streamName:        cfg.StreamName,
 		taskStatusSubject: taskStatusSubject(cfg.SubjectPrefix),
 		userEventSubject:  userEventSubject(cfg.SubjectPrefix),
+		workspaceSubject:  workspaceEventSubject(cfg.SubjectPrefix),
 		instanceID:        cfg.ConsumerName,
 	}, nil
 }
@@ -306,6 +309,109 @@ func (b *NATSJetStreamEventBus) SubscribeTaskStatus(ctx context.Context, handler
 	return nil
 }
 
+// Workspace v1 envelopes ride the same JetStream stream (7-day MaxAge)
+// under <prefix>.workspace.event. The transport is the event layer, NOT
+// a task queue: River + PostgreSQL stay the task state fact source.
+// MsgID is the envelope evt_ id so redeliveries collapse in the
+// duplicate window; consumers additionally dedup on id.
+type workspaceV1Envelope struct {
+	OriginInstance string     `json:"origin_instance"`
+	Envelope       V1Envelope `json:"envelope"`
+}
+
+// WorkspaceEventHandler handles a remote-origin v1 envelope.
+type WorkspaceEventHandler func(ctx context.Context, envelope V1Envelope) error
+
+// PublishWorkspaceEvent publishes a validated v1 envelope best-effort.
+// Nil buses and unconfigured clients are no-ops (single-process tests).
+func (b *NATSJetStreamEventBus) PublishWorkspaceEvent(ctx context.Context, envelope V1Envelope) error {
+	if b == nil || b.js == nil {
+		return nil
+	}
+	if err := ValidateV1Envelope(envelope); err != nil {
+		return err
+	}
+	payload, err := json.Marshal(workspaceV1Envelope{
+		OriginInstance: b.instanceID,
+		Envelope:       envelope,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal workspace event: %w", err)
+	}
+	if _, err := b.js.Publish(ctx, b.workspaceSubject, payload, jetstream.WithMsgID(envelope.ID)); err != nil {
+		return fmt.Errorf("publish workspace event: %w", err)
+	}
+	return nil
+}
+
+func decodeWorkspaceEventForInstance(payload []byte, instanceID string) (V1Envelope, bool, error) {
+	var wrapped workspaceV1Envelope
+	if err := json.Unmarshal(payload, &wrapped); err != nil {
+		return V1Envelope{}, false, fmt.Errorf("decode workspace event envelope: %w", err)
+	}
+	wrapped.OriginInstance = strings.TrimSpace(wrapped.OriginInstance)
+	if wrapped.OriginInstance == "" {
+		return V1Envelope{}, false, fmt.Errorf("decode workspace event envelope: origin_instance is required")
+	}
+	if wrapped.OriginInstance == strings.TrimSpace(instanceID) {
+		return V1Envelope{}, false, nil
+	}
+	if err := ValidateV1Envelope(wrapped.Envelope); err != nil {
+		return V1Envelope{}, false, err
+	}
+	return wrapped.Envelope, true, nil
+}
+
+// SubscribeWorkspaceEvents bridges remote-origin v1 envelopes to the
+// handler (local-origin messages ack without delivery).
+func (b *NATSJetStreamEventBus) SubscribeWorkspaceEvents(ctx context.Context, handler WorkspaceEventHandler) error {
+	if b == nil || b.js == nil {
+		return nil
+	}
+	if handler == nil {
+		return fmt.Errorf("subscribe workspace events: handler is nil")
+	}
+	consumerName := b.instanceID + "-workspace-events"
+	consumer, err := b.js.CreateOrUpdateConsumer(ctx, b.streamName, jetstream.ConsumerConfig{
+		Name: consumerName, Durable: consumerName, Description: "IdeaBoard API workspace event bridge",
+		DeliverPolicy: jetstream.DeliverNewPolicy, AckPolicy: jetstream.AckExplicitPolicy,
+		AckWait: 30 * time.Second, MaxDeliver: 5, MaxAckPending: 1024,
+		FilterSubject: b.workspaceSubject, InactiveThreshold: natsConsumerInactivePeriod,
+	})
+	if err != nil {
+		return fmt.Errorf("ensure nats workspace event consumer %s: %w", consumerName, err)
+	}
+	consume, err := consumer.Consume(func(msg jetstream.Msg) {
+		envelope, shouldDeliver, err := decodeWorkspaceEventForInstance(msg.Data(), b.instanceID)
+		if err != nil {
+			slog.Warn("discard malformed workspace event", "subject", msg.Subject(), "err", err)
+			_ = msg.Term()
+			return
+		}
+		if !shouldDeliver {
+			_ = msg.Ack()
+			return
+		}
+		handlerCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		err = handler(handlerCtx, envelope)
+		cancel()
+		if err != nil {
+			_ = msg.NakWithDelay(time.Second)
+			return
+		}
+		_ = msg.Ack()
+	}, jetstream.ConsumeErrHandler(func(_ jetstream.ConsumeContext, err error) {
+		slog.Warn("workspace event consumer error", "err", err)
+	}))
+	if err != nil {
+		return fmt.Errorf("start nats workspace event consumer %s: %w", consumerName, err)
+	}
+	b.mu.Lock()
+	b.consumes = append(b.consumes, consume)
+	b.mu.Unlock()
+	return nil
+}
+
 func (b *NATSJetStreamEventBus) Close() error {
 	if b == nil {
 		return nil
@@ -364,6 +470,10 @@ func taskStatusSubject(prefix string) string {
 
 func userEventSubject(prefix string) string {
 	return normalizeSubjectPrefix(prefix) + "." + userEventSubjectSuffix
+}
+
+func workspaceEventSubject(prefix string) string {
+	return normalizeSubjectPrefix(prefix) + "." + workspaceEventSubjectSuffix
 }
 
 func normalizeSubjectPrefix(raw string) string {

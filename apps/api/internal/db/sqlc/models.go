@@ -205,6 +205,23 @@ type BoardsV2 struct {
 	ArchivedAt  pgtype.Timestamptz `json:"archived_at"`
 }
 
+type ControlAuditRecord struct {
+	InternalID           int64              `json:"internal_id"`
+	PublicID             string             `json:"public_id"`
+	OperatorUserID       int64              `json:"operator_user_id"`
+	OperationType        string             `json:"operation_type"`
+	Capability           string             `json:"capability"`
+	TargetType           string             `json:"target_type"`
+	TargetID             string             `json:"target_id"`
+	Reason               string             `json:"reason"`
+	Outcome              string             `json:"outcome"`
+	ErrorMessage         string             `json:"error_message"`
+	RequestCorrelationID string             `json:"request_correlation_id"`
+	IdempotencyKey       string             `json:"idempotency_key"`
+	Metadata             []byte             `json:"metadata"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+}
+
 type CreditAccount struct {
 	ID           int64              `json:"id"`
 	WalletUserID pgtype.Int8        `json:"wallet_user_id"`
@@ -357,6 +374,32 @@ type CreditWelcomeIdentityKeyGuard struct {
 	BoundAt        pgtype.Timestamptz `json:"bound_at"`
 }
 
+type EventDelivery struct {
+	InternalID      int64              `json:"internal_id"`
+	EventID         int64              `json:"event_id"`
+	SubscriptionID  int64              `json:"subscription_id"`
+	AttemptCount    int32              `json:"attempt_count"`
+	Status          string             `json:"status"`
+	NextRetryAt     pgtype.Timestamptz `json:"next_retry_at"`
+	LastAttemptedAt pgtype.Timestamptz `json:"last_attempted_at"`
+	CompletedAt     pgtype.Timestamptz `json:"completed_at"`
+	ResponseStatus  pgtype.Int4        `json:"response_status"`
+	ResponseBody    string             `json:"response_body"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
+type EventSubscription struct {
+	InternalID    int64              `json:"internal_id"`
+	PublicID      string             `json:"public_id"`
+	WorkspaceID   int64              `json:"workspace_id"`
+	EndpointUrl   string             `json:"endpoint_url"`
+	SigningSecret string             `json:"signing_secret"`
+	EventTypes    []string           `json:"event_types"`
+	Status        string             `json:"status"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
 type FeaturePrompt struct {
 	FeatureSlug string             `json:"feature_slug"`
 	Prompt      string             `json:"prompt"`
@@ -390,6 +433,22 @@ type LibraryAssetMediaAsset struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type LibraryAssetsV2 struct {
+	InternalID  int64              `json:"internal_id"`
+	PublicID    string             `json:"public_id"`
+	WorkspaceID int64              `json:"workspace_id"`
+	FolderID    int64              `json:"folder_id"`
+	Provider    string             `json:"provider"`
+	SourceID    string             `json:"source_id"`
+	SourceUrl   string             `json:"source_url"`
+	PreviewUrl  string             `json:"preview_url"`
+	OriginalUrl string             `json:"original_url"`
+	Width       int32              `json:"width"`
+	Height      int32              `json:"height"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
 type LibraryFolder struct {
 	ID          int64              `json:"id"`
 	OwnerUserID int64              `json:"owner_user_id"`
@@ -398,6 +457,29 @@ type LibraryFolder struct {
 	IsDefault   bool               `json:"is_default"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type LibraryFoldersV2 struct {
+	InternalID  int64              `json:"internal_id"`
+	PublicID    string             `json:"public_id"`
+	WorkspaceID int64              `json:"workspace_id"`
+	Name        string             `json:"name"`
+	IsSystem    bool               `json:"is_system"`
+	IsDefault   bool               `json:"is_default"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type LibraryMaterializationsV2 struct {
+	InternalID     int64              `json:"internal_id"`
+	PublicID       string             `json:"public_id"`
+	WorkspaceID    int64              `json:"workspace_id"`
+	LibraryAssetID int64              `json:"library_asset_id"`
+	Status         string             `json:"status"`
+	MediaAssetID   pgtype.Int8        `json:"media_asset_id"`
+	ErrorMessage   string             `json:"error_message"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
 }
 
 type MediaAsset struct {
@@ -968,6 +1050,17 @@ type TaskOutput struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
+type TaskOutputsV2 struct {
+	InternalID   int64              `json:"internal_id"`
+	TaskID       int64              `json:"task_id"`
+	OutputIndex  int32              `json:"output_index"`
+	OutputKind   string             `json:"output_kind"`
+	MediaAssetID pgtype.Int8        `json:"media_asset_id"`
+	RemoteUrl    pgtype.Text        `json:"remote_url"`
+	Metadata     []byte             `json:"metadata"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
 type TaskStatEvent struct {
 	ID                 int64              `json:"id"`
 	TaskID             string             `json:"task_id"`
@@ -995,6 +1088,27 @@ type TaskSubmissionClaim struct {
 	TaskID         string             `json:"task_id"`
 	RequestHash    string             `json:"request_hash"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+type TasksV2 struct {
+	InternalID        int64              `json:"internal_id"`
+	PublicID          string             `json:"public_id"`
+	WorkspaceID       int64              `json:"workspace_id"`
+	SubmitterUserID   int64              `json:"submitter_user_id"`
+	BillingAccountID  int64              `json:"billing_account_id"`
+	WorkflowType      string             `json:"workflow_type"`
+	WorkflowInput     []byte             `json:"workflow_input"`
+	Status            string             `json:"status"`
+	Priority          int32              `json:"priority"`
+	RetryCount        int32              `json:"retry_count"`
+	LeaseToken        string             `json:"lease_token"`
+	ErrorMessage      string             `json:"error_message"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	StartedAt         pgtype.Timestamptz `json:"started_at"`
+	CompletedAt       pgtype.Timestamptz `json:"completed_at"`
+	CancelledAt       pgtype.Timestamptz `json:"cancelled_at"`
+	CancelledByUserID pgtype.Int8        `json:"cancelled_by_user_id"`
 }
 
 type UploadSessionsV2 struct {
@@ -1052,6 +1166,19 @@ type Workspace struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	ArchivedAt     pgtype.Timestamptz `json:"archived_at"`
+}
+
+type WorkspaceEvent struct {
+	InternalID   int64              `json:"internal_id"`
+	PublicID     string             `json:"public_id"`
+	WorkspaceID  int64              `json:"workspace_id"`
+	EventType    string             `json:"event_type"`
+	EventVersion int32              `json:"event_version"`
+	ActorUserID  pgtype.Int8        `json:"actor_user_id"`
+	ResourceType string             `json:"resource_type"`
+	ResourceID   string             `json:"resource_id"`
+	EventData    []byte             `json:"event_data"`
+	OccurredAt   pgtype.Timestamptz `json:"occurred_at"`
 }
 
 type WorkspaceMembership struct {

@@ -1,4 +1,4 @@
-import type { AdminUserListItem } from '../../../shared/api/generated-query/model'
+import type { AdminUserListItem } from './resource'
 import { formatDateOnly } from '../../../shared/utils/dateTime'
 import { formatIdeaAmount } from '../../../shared/i18n/userIdeaCurrency'
 

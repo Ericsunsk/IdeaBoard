@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AdminUserListItem } from '../../../shared/api/generated-query/model'
+import type { AdminUserListItem } from './resource'
 import {
   createAdminUserRowView,
   getUserActionItems,
@@ -93,7 +93,7 @@ describe('admin user view model', () => {
 
 function makeUser(overrides: Partial<AdminUserListItem> = {}): AdminUserListItem {
   return {
-    public_id: '00000000-0000-0000-0000-000000000001',
+    public_id: 'usr_000000000000000000000001',
     email: 'user@example.com',
     providers: ['email'],
     display_name: 'user',
@@ -103,6 +103,8 @@ function makeUser(overrides: Partial<AdminUserListItem> = {}): AdminUserListItem
     avatar: '',
     created_at: '',
     updated_at: '',
+    last_login_ip: '',
+    last_login_country: '',
     ...overrides,
   }
 }

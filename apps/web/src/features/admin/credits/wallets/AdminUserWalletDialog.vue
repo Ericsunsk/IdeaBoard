@@ -104,7 +104,7 @@
         :transactions="transactions"
         :ledger-loading="ledgerLoading"
         :command-pending="commandPending"
-        :has-next-page="nextBeforeSequence != null"
+        :has-next-page="nextCursor != null"
         @open-refund="openRefund"
         @load-more="loadMore"
       />
@@ -145,9 +145,9 @@ const emit = defineEmits<{ 'update:visible': [visible: boolean]; 'refresh-users'
 const { t } = useI18n()
 const confirm = useAdminConfirm()
 const feedback = useAdminCreditsBillingOperationsFeedback()
-const beforeSequence = ref<number | undefined>()
+const ledgerCursor = ref<string | undefined>()
 const transactions = ref<AdminCreditLedgerTransaction[]>([])
-const nextBeforeSequence = ref<number | undefined>()
+const nextCursor = ref<string | undefined>()
 const loadedCursors = new Set<string>()
 const activeCommand = ref<AdminCreditCommandKind | null>(null)
 const refundSource = ref<AdminCreditLedgerTransaction | null>(null)
@@ -156,7 +156,7 @@ const reason = ref('')
 const showErrors = ref(false)
 const resource = useAdminCreditWalletResource(
   () => (props.visible ? props.user.publicId : null),
-  beforeSequence,
+  ledgerCursor,
 )
 const wallet = resource.wallet
 const walletLoading = computed(
@@ -239,17 +239,17 @@ watch(
       !criteria ||
       !page ||
       criteria.userPublicId !== props.user.publicId ||
-      criteria.beforeSequence !== beforeSequence.value
+      (criteria.cursor ?? undefined) !== ledgerCursor.value
     )
       return
-    const cursorKey = String(criteria.beforeSequence ?? 'first')
+    const cursorKey = criteria.cursor ?? 'first'
     if (loadedCursors.has(cursorKey)) return
     loadedCursors.add(cursorKey)
     const known = new Set(transactions.value.map((transaction) => transaction.transaction_id))
     transactions.value.push(
       ...page.transactions.filter((transaction) => !known.has(transaction.transaction_id)),
     )
-    nextBeforeSequence.value = page.next_before_sequence
+    nextCursor.value = page.nextCursor
   },
   { immediate: true },
 )
@@ -261,15 +261,15 @@ watch(ledgerError, (error) => {
 })
 
 function resetLedger() {
-  beforeSequence.value = undefined
+  ledgerCursor.value = undefined
   transactions.value = []
-  nextBeforeSequence.value = undefined
+  nextCursor.value = undefined
   loadedCursors.clear()
   void Promise.all([resource.walletQuery.refetch(), resource.ledgerQuery.refetch()])
 }
 function loadMore() {
-  if (nextBeforeSequence.value == null || ledgerLoading.value) return
-  beforeSequence.value = nextBeforeSequence.value
+  if (nextCursor.value == null || ledgerLoading.value) return
+  ledgerCursor.value = nextCursor.value
 }
 function refreshWallet() {
   resetLedger()

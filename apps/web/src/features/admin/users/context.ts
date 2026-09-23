@@ -1,10 +1,9 @@
 import { computed, ref, watch } from 'vue'
 import type { AdminUsersFeedback } from './useUsersFeedback'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
-import { usePagePagination } from '../shared/composables/usePagePagination'
 import { useAdminUserCommands } from './commands'
 import type { AdminUserSessionCommands } from './sessionCommands'
-import { useAdminUsersResource, type AdminUsersQueryParams } from './resource'
+import { useAdminUsersResource, type AdminUsersQueryFilters } from './resource'
 import {
   createAdminUserRowView,
   type AdminUserRowView,
@@ -21,7 +20,6 @@ type AdminUsersContextDependencies = {
 }
 
 function createAdminUsersQueryState() {
-  const pageState = ref(1)
   const pageSize = ref(10)
   const searchKeyword = ref('')
   const appliedSearchKeyword = ref('')
@@ -36,24 +34,22 @@ function createAdminUsersQueryState() {
   const hasAppliedUserQuery = computed(
     () => Boolean(appliedSearchKeyword.value) || hasUserFilter.value,
   )
-  const selectedUserRole = computed<AdminUsersQueryParams['role']>(() =>
+  const selectedUserRole = computed<AdminUsersQueryFilters['role']>(() =>
     userRoleFilter.value === USER_ROLE_FILTER_ALL
       ? undefined
-      : (userRoleFilter.value as AdminUsersQueryParams['role']),
+      : (userRoleFilter.value as AdminUsersQueryFilters['role']),
   )
-  const selectedUserStatus = computed<AdminUsersQueryParams['status']>(() => {
+  const selectedUserStatus = computed(() => {
     if (userStatusFilter.value === USER_STATUS_FILTER_ALL) return undefined
-    return userStatusFilter.value as AdminUsersQueryParams['status']
+    return userStatusFilter.value as AdminUsersQueryFilters['status']
   })
-  const userQueryParams = computed<AdminUsersQueryParams>(() => ({
-    page: pageState.value,
-    page_size: pageSize.value,
+  const userQueryFilters = computed<AdminUsersQueryFilters>(() => ({
     keyword: appliedSearchKeyword.value || undefined,
     role: selectedUserRole.value,
     status: selectedUserStatus.value,
+    pageSize: pageSize.value,
   }))
   return {
-    pageState,
     pageSize,
     searchKeyword,
     appliedSearchKeyword,
@@ -61,7 +57,7 @@ function createAdminUsersQueryState() {
     userStatusFilter,
     hasUserFilter,
     hasAppliedUserQuery,
-    userQueryParams,
+    userQueryFilters,
   }
 }
 
@@ -73,7 +69,6 @@ export function useAdminUsersContext(
   dependencies: AdminUsersContextDependencies = {},
 ) {
   const {
-    pageState,
     pageSize,
     searchKeyword,
     appliedSearchKeyword,
@@ -81,41 +76,41 @@ export function useAdminUsersContext(
     userStatusFilter,
     hasUserFilter,
     hasAppliedUserQuery,
-    userQueryParams,
+    userQueryFilters,
   } = createAdminUsersQueryState()
-  const usersQuery = useAdminUsersResource(userQueryParams)
-  const usersData = computed(() => usersQuery.data.value)
+  const collection = useAdminUsersResource(userQueryFilters)
   const users = computed<AdminUserRowView[]>(() =>
-    (usersData.value?.list ?? []).map(createAdminUserRowView),
+    (collection.data.value?.items ?? []).map(createAdminUserRowView),
   )
-  const loading = computed(() => usersQuery.isLoading.value || usersQuery.isFetching.value)
-  const paginationTotalRecords = computed(() => usersData.value?.total)
-  const totalRecordCount = computed(() => paginationTotalRecords.value ?? 0)
-  const totalUsersLabel = computed(() =>
-    hasAppliedUserQuery.value
-      ? `${totalRecordCount.value} 匹配用户`
-      : `${totalRecordCount.value} 用户`,
-  )
-  const pagination = usePagePagination({
-    currentPage: pageState,
-    totalRecords: paginationTotalRecords,
-    pageSize,
-    pending: loading,
-  })
+  const loading = computed(() => collection.loading.value)
+  // Cursor collections carry no total: the footer names the scope instead
+  // of a count, and the pager navigates known pages only.
+  const totalUsersLabel = computed(() => (hasAppliedUserQuery.value ? '匹配用户' : '全部用户'))
+  const pagination = {
+    currentPage: collection.pagination.currentPage,
+    totalPages: collection.pagination.knownPageCount,
+    canPrevious: collection.pagination.canRetreat,
+    canNext: collection.pagination.canAdvance,
+    previous: () => {
+      collection.previousPage()
+    },
+    next: () => {
+      collection.nextPage()
+    },
+    reset: () => {
+      collection.pagination.reset()
+    },
+  }
   const emptyUserMessage = computed(() => (hasAppliedUserQuery.value ? '暂无匹配用户' : '暂无用户'))
 
-  watch(
-    [userRoleFilter, userStatusFilter],
-    () => {
-      pagination.reset()
-    },
-    { flush: 'sync' },
-  )
+  watch([userRoleFilter, userStatusFilter, pageSize], () => {
+    pagination.reset()
+  })
 
   watch(
-    () => usersQuery.error.value,
-    (error) => {
-      if (error) options.feedback.loadFailed(error)
+    [() => collection.initialError.value, () => collection.backgroundError.value],
+    ([initialError, backgroundError]) => {
+      if (initialError || backgroundError) options.feedback.loadFailed(collection.query.error.value)
     },
   )
 
@@ -139,7 +134,7 @@ export function useAdminUsersContext(
       appliedSearchKeyword.value = nextKeyword
       return
     }
-    void usersQuery.refetch()
+    void collection.refresh()
   }
 
   const list = {

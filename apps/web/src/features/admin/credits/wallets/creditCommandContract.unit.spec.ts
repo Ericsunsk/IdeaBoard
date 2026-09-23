@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildAdminCreditCommandRequest, validateAdminCreditCommand } from './creditCommandContract'
 
 describe('Admin Credit command contract', () => {
-  const publicId = '11111111-1111-4111-8111-111111111111'
+  const publicId = 'usr_11111111111111111111111111111111'
   it('builds auditable Grant and Deduction requests with independent idempotency identities', () => {
     const grant = buildAdminCreditCommandRequest(
       { kind: 'grant', userPublicId: publicId, amountCredits: 20, reason: ' 活动补偿 ' },
@@ -14,13 +14,18 @@ describe('Admin Credit command contract', () => {
     )
 
     expect(grant).toEqual({
-      user_public_id: publicId,
-      amount_credits: 20,
-      reason: '活动补偿',
-      idempotency_key: 'admin-ui:grant:grant-operation',
-      business_reference_id: 'admin-ui:grant:grant-operation',
+      body: {
+        user_id: publicId,
+        amount_credits: 20,
+        business_reference_id: 'control-ui:grant:grant-operation',
+        reason: '活动补偿',
+      },
+      idempotencyKey: 'control-ui:grant:grant-operation',
+      operatorReason: '活动补偿',
     })
-    expect(deduction.idempotency_key).toBe('admin-ui:deduction:deduct-operation')
+    expect(deduction.idempotencyKey).toBe('control-ui:deduction:deduct-operation')
+    expect(deduction.operatorReason).toBe('误发回收')
+    expect(deduction.body).not.toHaveProperty('idempotency_key')
   })
 
   it('allows Refund only from a Charge and rejects amounts above remaining refundable Credits', () => {
@@ -58,8 +63,11 @@ describe('Admin Credit command contract', () => {
         () => 'refund-operation',
       ),
     ).toMatchObject({
-      charge_transaction_id: 'charge-1',
-      idempotency_key: 'admin-ui:refund:refund-operation',
+      body: {
+        user_id: publicId,
+        charge_transaction_id: 'charge-1',
+      },
+      idempotencyKey: 'control-ui:refund:refund-operation',
     })
   })
 

@@ -9,3 +9,4 @@ export type {
 } from './domain/models'
 export type { SearchAuthAction, LibrarySearchReference } from './domain/authAction'
 export { clearPendingSearchAuthAction } from './infrastructure/authContinuation'
+export * from './infrastructure/workspace'

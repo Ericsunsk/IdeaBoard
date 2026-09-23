@@ -1,42 +1,156 @@
-import type { MaybeRef } from 'vue'
+// Users collection resource (issue 808): feature-owned boundary over the
+// Control generated client for user administration reads. Route pages and
+// components must consume this module, never `generated-query` directly.
+//
+// Transport hits /api/control/v1 (controlMutator prefix) with the contract
+// envelope {data, meta}. Cursor pagination follows the converged admin
+// collection pattern (useAdminCursorCollection, prev/next without totals).
+// Control identifiers are usr_ public ids; the adapter maps ControlUser
+// onto the legacy row shape so views keep working, defaulting fields the
+// control projection does not carry.
+import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import {
-  getListAdminUsersQueryKey,
-  useListAdminUsers,
-} from '../../../shared/api/generated-query/admin-users/admin-users'
+  getListControlUsersQueryKey,
+  listControlUsers,
+} from '../../../shared/api/generated-query/control/control-users/control-users'
 import type {
-  AdminUserListItem as GeneratedAdminUserListItem,
-  ApiResponseUserListData,
-  ListAdminUsersParams,
-} from '../../../shared/api/generated-query/model'
-import { createApiDataSelector } from '../../../shared/api/apiResponse'
+  ControlUser,
+  ListControlUsersParams,
+} from '../../../shared/api/generated-query/control/model'
+import { stripUndefined } from '../../../shared/api/stripUndefined'
+import { useAdminCursorCollection } from '../shared/composables/useAdminCursorCollection'
 
-export type AdminUserListItem = GeneratedAdminUserListItem
 export type AdminUsersRoleFilterValue = 'admin' | 'user'
 export type AdminUsersStatusFilterValue = 0 | 1
 
-const selectAdminUsers = createApiDataSelector<ApiResponseUserListData>('加载用户列表失败')
+// Feature-owned row item: legacy AdminUserListItem shape, control-sourced.
+// public_id carries the usr_ public id used by every control mutation.
+export type AdminUserListItem = {
+  public_id: string
+  email: string
+  providers: string[]
+  display_name: string
+  avatar: string
+  role: AdminUsersRoleFilterValue
+  status: number
+  created_at: string
+  updated_at: string
+  available_credits: number
+  last_login_ip: string
+  last_login_country: string
+}
 
-export type AdminUsersQueryParams = {
-  page: number
-  page_size: number
+export type AdminUsersQueryFilters = {
   keyword?: string | undefined
   role?: AdminUsersRoleFilterValue | undefined
   status?: AdminUsersStatusFilterValue | undefined
+  pageSize?: number | undefined
 }
 
-export function useAdminUsersResource(params: MaybeRef<AdminUsersQueryParams>) {
-  return useListAdminUsers<ApiResponseUserListData>(toGeneratedListParams(params), {
-    query: {
-      placeholderData: (previous) => previous,
-      select: selectAdminUsers,
-    },
+export type AdminUsersPage = {
+  items: AdminUserListItem[]
+  nextCursor: string | undefined
+  hasMore: boolean
+}
+
+export const ADMIN_USERS_PAGE_SIZE_DEFAULT = 10
+export const ADMIN_USERS_PAGE_SIZE_MAX = 100
+
+function normalizeRole(value: ControlUser['role']): AdminUsersRoleFilterValue {
+  return value === 'admin' ? 'admin' : 'user'
+}
+
+export function mapControlUserToListItem(user: ControlUser): AdminUserListItem {
+  return {
+    public_id: user.id,
+    email: user.email ?? '',
+    providers: user.providers ?? [],
+    display_name: user.display_name ?? '',
+    avatar: user.avatar ?? '',
+    role: normalizeRole(user.role),
+    status: typeof user.status === 'number' ? user.status : 0,
+    created_at: user.created_at ?? '',
+    updated_at: user.updated_at ?? '',
+    available_credits: typeof user.available_credits === 'number' ? user.available_credits : 0,
+    last_login_ip: user.last_login_ip ?? '',
+    last_login_country: user.last_login_country ?? '',
+  }
+}
+
+function normalizePageSize(pageSize: number | undefined): number {
+  if (pageSize === undefined) return ADMIN_USERS_PAGE_SIZE_DEFAULT
+  if (!Number.isFinite(pageSize)) return ADMIN_USERS_PAGE_SIZE_DEFAULT
+  return Math.min(Math.max(1, Math.floor(pageSize)), ADMIN_USERS_PAGE_SIZE_MAX)
+}
+
+function normalizeStatusFilter(
+  status: AdminUsersStatusFilterValue | undefined,
+): string | undefined {
+  if (status === undefined) return undefined
+  return String(status)
+}
+
+export function buildListControlUsersParams(
+  filters: AdminUsersQueryFilters,
+  cursor: string | undefined,
+): ListControlUsersParams {
+  return stripUndefined({
+    ...(cursor === undefined ? {} : { cursor }),
+    page_size: normalizePageSize(filters.pageSize),
+    keyword: filters.keyword?.trim() ? filters.keyword.trim() : undefined,
+    role: filters.role,
+    status: normalizeStatusFilter(filters.status),
   })
 }
 
 export function getAdminUsersListQueryKey() {
-  return getListAdminUsersQueryKey()
+  return getListControlUsersQueryKey()
 }
 
-function toGeneratedListParams(params: MaybeRef<AdminUsersQueryParams>) {
-  return params as MaybeRef<ListAdminUsersParams>
+export function useAdminUsersResource(filters: MaybeRefOrGetter<AdminUsersQueryFilters>) {
+  const normalizedFilters = computed<AdminUsersQueryFilters>(() => {
+    const raw = toValue(filters)
+    return {
+      keyword: raw.keyword?.trim() ? raw.keyword.trim() : undefined,
+      role: raw.role,
+      status: raw.status,
+      pageSize: normalizePageSize(raw.pageSize),
+    }
+  })
+
+  const collection = useAdminCursorCollection<AdminUsersPage, string>({
+    buildKey: (cursor) => [
+      ...getAdminUsersListQueryKey(),
+      stripUndefined({
+        keyword: normalizedFilters.value.keyword,
+        role: normalizedFilters.value.role,
+        status: normalizedFilters.value.status,
+        page_size: normalizedFilters.value.pageSize,
+      }),
+      cursor ?? null,
+    ],
+    queryFn: async ({ queryKey, signal }) => {
+      const cursor = queryKey.at(-1)
+      const response = await listControlUsers(
+        buildListControlUsersParams(
+          normalizedFilters.value,
+          typeof cursor === 'string' ? cursor : undefined,
+        ),
+        { signal },
+      )
+      const items = Array.isArray(response.data) ? response.data : []
+      const meta = response.meta
+      return {
+        items: items.map(mapControlUserToListItem),
+        nextCursor:
+          meta?.has_more && typeof meta.next_cursor === 'string' && meta.next_cursor
+            ? meta.next_cursor
+            : undefined,
+        hasMore: meta?.has_more === true,
+      }
+    },
+    getNextCursor: (page) => page.nextCursor,
+  })
+
+  return collection
 }

@@ -140,6 +140,34 @@ func newAppRouter(
 			Checkout: httpapi.NewPaymentsCheckoutAdapter(services.paymentService,
 				cfg.PublicOrigins.WebURL("/user/boards")),
 		},
+		// Control Plane administration (issue #808). Every seam below is
+		// shared with the legacy admin handlers (no second ledger, queue,
+		// or settings store); the control guard adds capability auth,
+		// the separate rate-limit bucket, header-only idempotency, the
+		// operator reason, and the mandatory audit record. Legacy
+		// /api/admin routes above are untouched; removal is #809.
+		ContractControl: httpapi.ContractControlDeps{
+			Users:             services.userService,
+			Identity:          administration.NewIdentityAdminCommands(services.userService, services.authServiceClient),
+			Impersonator:      services.authServiceClient,
+			Credits:           services.creditService,
+			CreditUsers:       creditUserResolver,
+			CreditReads:       services.creditService,
+			Reconciliation:    services.creditService,
+			Tasks:             taskServices.taskService,
+			Tenancy:           tenancypg.NewStore(repos.db),
+			UserDirectory:     httpapi.NewUsersRepositoryDirectory(repos.userRepo),
+			BillingAccounts:   tenancypg.NewBillingAccountStore(repos.db),
+			Catalog:           services.billingCatalog,
+			Payments:          services.paymentService,
+			Settings:          services.runtimeSettings,
+			PaymentWebhookURL: cfg.PublicOrigins.APIURL("/api/webhooks/stripe"),
+			AIGateway:         aiGatewayHandler,
+			Storage:           storagehttp.NewHandler(services.storageService),
+			SearchProviders:   searchhttp.NewHandler(searchProviderConfig, searchinfra.NewProviderTestAdapters()...),
+			FeaturePrompts:    prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
+			Monitor:           taskStatsHandler,
+		},
 		PublicSearchHandler: searchhttp.NewSearchHandler(searchapplication.NewSearchService(searchProviderConfig, []searchports.SearchProviderAdapter{searchinfra.NewUnsplashAdapter(), searchinfra.NewPexelsAdapter()})),
 		UserRoutes: httpapi.UserRouteDeps{
 			AuthHandler:            auth.NewAuthHandler(services.userService),

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/principal"
 	identityports "ideaboard/api/internal/identity/users/ports"
@@ -51,6 +52,35 @@ type ContractV1Deps struct {
 	// tests inject fakes. Nil fails binary reads closed with 503
 	// while metadata endpoints keep working.
 	MediaObjects V1MediaObjectReader
+	// Library is the workspace-scoped library + materialization surface
+	// (issue #806). Zero value keeps the surface fail-closed (501/503);
+	// tests inject the in-memory store plus fakes.
+	Library ContractV1LibraryDeps
+	// Search is the workspace-scoped search + vision-query surface
+	// (issue #806). Zero value keeps the surface fail-closed (501/503);
+	// tests inject fakes.
+	Search ContractV1SearchDeps
+	// Tasks is the workspace-scoped async job surface (issue #805).
+	// Nil keeps the tasks surface fail-closed with 501 until the
+	// postgres workspace-task mapping lands (#809); tests inject the
+	// in-memory implementation plus quoter/holder/queue/asset fakes.
+	Tasks      WorkspaceTaskStore
+	TaskQuoter WorkspaceTaskQuoter
+	TaskHolder WorkspaceTaskHolder
+	TaskQueue  WorkspaceTaskEnqueuer
+	TaskAssets WorkspaceTaskAssetReader
+	// Events is the workspace event hot log + SSE replay window (issue
+	// #807). Nil normalizes to a process-local log; tests inject a
+	// fresh instance per engine for isolation.
+	Events *events.WorkspaceEventLog
+	// Webhooks owns signed webhook subscriptions + dispatch (issue
+	// #807). Nil normalizes to a process-local store with the
+	// production HTTPS sender; tests inject fakes.
+	Webhooks *events.WebhookStore
+	// EventBus publishes v1 envelopes to NATS JetStream (event layer,
+	// not a queue). Nil disables cross-instance fanout (single-process
+	// tests); production wires the shared bus.
+	EventBus *events.NATSJetStreamEventBus
 }
 
 // V1UserDirectory translates between internal numeric user ids and the
@@ -98,6 +128,12 @@ func (d usersRepositoryDirectory) GetUserPublicID(ctx context.Context, userID in
 func (d *ContractV1Deps) normalize() {
 	if d.Idempotency == nil {
 		d.Idempotency = contract.NewIdempotencyStore(contract.DefaultIdempotencyStoreOptions())
+	}
+	if d.Events == nil {
+		d.Events = events.NewWorkspaceEventLog()
+	}
+	if d.Webhooks == nil {
+		d.Webhooks = events.NewWebhookStore(events.NewHTTPSender(), nil)
 	}
 }
 
@@ -154,6 +190,10 @@ func RegisterContractV1Routes(group *gin.RouterGroup, authDeps AuthDeps, deps Co
 	group.GET("/workspaces/:workspace_id/media-assets/:asset_id/derivatives/:variant", handler.derivativeMediaAsset)
 	group.POST("/workspaces/:workspace_id/media-assets/:asset_id/archive", handler.archiveMediaAsset)
 	handler.registerBoardRoutes(group)
+	handler.registerLibraryRoutes(group)
+	handler.registerSearchRoutes(group)
+	handler.registerTaskRoutes(group)
+	handler.registerEventRoutes(group)
 }
 
 type contractV1Handler struct {

@@ -1,20 +1,24 @@
-import { ref, type ComputedRef } from 'vue'
+import { nextTick, ref, toValue, type MaybeRefOrGetter } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ApiResponseUserListData } from '../../../shared/api/generated-query/model'
 import type { AdminUsersFeedback } from './useUsersFeedback'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import { useAdminUsersContext } from './context'
-import type { AdminUsersQueryParams } from './resource'
+import type { AdminUsersPage, AdminUsersQueryFilters } from './resource'
 
 const mockState = vi.hoisted(() => ({
-  params: undefined as ComputedRef<AdminUsersQueryParams> | undefined,
-  query: undefined as unknown,
+  filtersRef: undefined as MaybeRefOrGetter<AdminUsersQueryFilters> | undefined,
+  collection: undefined as unknown,
 }))
 
+function currentFilters(): AdminUsersQueryFilters | undefined {
+  if (mockState.filtersRef === undefined) return undefined
+  return toValue(mockState.filtersRef)
+}
+
 vi.mock('./resource', () => ({
-  useAdminUsersResource: vi.fn((params: ComputedRef<AdminUsersQueryParams>) => {
-    mockState.params = params
-    return mockState.query
+  useAdminUsersResource: vi.fn((filters: MaybeRefOrGetter<AdminUsersQueryFilters>) => {
+    mockState.filtersRef = filters
+    return mockState.collection
   }),
 }))
 
@@ -22,93 +26,105 @@ vi.mock('./commands', () => ({
   useAdminUserCommands: vi.fn(() => ({})),
 }))
 
-beforeEach(() => {
-  mockState.params = undefined
-  mockState.query = {
-    data: ref(makeUserList(25)),
-    error: ref(null),
-    isLoading: ref(false),
-    isFetching: ref(false),
-    refetch: vi.fn(),
+type CollectionStub = {
+  data: ReturnType<typeof ref<AdminUsersPage | undefined>>
+  loading: ReturnType<typeof ref<boolean>>
+  initialError: ReturnType<typeof ref<boolean>>
+  backgroundError: ReturnType<typeof ref<boolean>>
+  refresh: ReturnType<typeof vi.fn>
+  query: { error: ReturnType<typeof ref<Error | null>> }
+  pagination: {
+    currentPage: ReturnType<typeof ref<number>>
+    knownPageCount: ReturnType<typeof ref<number>>
+    canRetreat: ReturnType<typeof ref<boolean>>
+    canAdvance: ReturnType<typeof ref<boolean>>
+    reset: ReturnType<typeof vi.fn>
   }
-})
-
-describe('admin users pagination contract', () => {
-  it('uses the shared page boundary for navigation and pending requests', () => {
-    const context = createContext()
-    const pagination = context.list.pagination
-
-    expect(pagination.totalPages.value).toBe(3)
-    expect(mockState.params?.value.page).toBe(1)
-    expect(pagination.next()).toBe(true)
-    expect(mockState.params?.value.page).toBe(2)
-
-    const query = mockState.query as { isFetching: ReturnType<typeof ref<boolean>> }
-    query.isFetching.value = true
-
-    expect(pagination.canPrevious.value).toBe(false)
-    expect(pagination.canNext.value).toBe(false)
-    expect(pagination.previous()).toBe(false)
-    expect(pagination.next()).toBe(false)
-    expect(mockState.params?.value.page).toBe(2)
-  })
-
-  it('clamps a stale last page and resets page state before the query changes', () => {
-    const context = createContext()
-    const pagination = context.list.pagination
-    const query = mockState.query as { data: ReturnType<typeof ref<ApiResponseUserListData>> }
-
-    pagination.next()
-    pagination.next()
-    expect(pagination.currentPage.value).toBe(3)
-
-    query.data.value = makeUserList(11)
-    expect(pagination.currentPage.value).toBe(2)
-    expect(mockState.params?.value.page).toBe(2)
-
-    context.list.userRoleFilter.value = 'admin'
-    expect(pagination.currentPage.value).toBe(1)
-
-    pagination.next()
-    context.list.searchKeyword.value = '  alice  '
-    context.list.loadUsers()
-    expect(pagination.currentPage.value).toBe(1)
-    expect(mockState.params?.value.keyword).toBe('alice')
-  })
-
-  it('does not reset the page when the current request fails without replacement data', () => {
-    const context = createContext()
-    const pagination = context.list.pagination
-    const query = mockState.query as {
-      data: ReturnType<typeof ref<ApiResponseUserListData | undefined>>
-      error: ReturnType<typeof ref<Error | null>>
-    }
-
-    pagination.next()
-    expect(pagination.currentPage.value).toBe(2)
-
-    query.data.value = undefined
-    query.error.value = new Error('加载失败')
-
-    expect(pagination.currentPage.value).toBe(2)
-    expect(mockState.params?.value.page).toBe(2)
-    expect(pagination.totalPages.value).toBe(3)
-  })
-})
-
-function createContext() {
-  return useAdminUsersContext({
-    feedback: { loadFailed: vi.fn() } as unknown as AdminUsersFeedback,
-    confirm: { confirm: vi.fn().mockResolvedValue(true) } as AdminConfirmPort,
-  })
+  previousPage: ReturnType<typeof vi.fn>
+  nextPage: ReturnType<typeof vi.fn>
 }
 
-function makeUserList(total: number): ApiResponseUserListData {
+function makeCollection(): CollectionStub {
   return {
-    total,
-    active_count: total,
-    banned_count: 0,
-    admin_count: 0,
-    list: [],
+    data: ref<AdminUsersPage | undefined>({
+      items: [],
+      nextCursor: 'cursor-2',
+      hasMore: true,
+    }),
+    loading: ref(false),
+    initialError: ref(false),
+    backgroundError: ref(false),
+    refresh: vi.fn(),
+    query: { error: ref<Error | null>(null) },
+    pagination: {
+      currentPage: ref(1),
+      knownPageCount: ref(2),
+      canRetreat: ref(false),
+      canAdvance: ref(true),
+      reset: vi.fn(),
+    },
+    previousPage: vi.fn(),
+    nextPage: vi.fn(),
   }
+}
+
+beforeEach(() => {
+  mockState.filtersRef = undefined
+  mockState.collection = makeCollection()
+})
+
+describe('admin users cursor pagination contract', () => {
+  it('navigates through known cursor pages without totals', () => {
+    const context = createContext()
+    const pagination = context.list.pagination
+
+    expect(pagination.currentPage.value).toBe(1)
+    expect(pagination.totalPages.value).toBe(2)
+    pagination.next()
+    expect((mockState.collection as CollectionStub).nextPage).toHaveBeenCalled()
+    pagination.previous()
+    expect((mockState.collection as CollectionStub).previousPage).toHaveBeenCalled()
+  })
+
+  it('resets cursor state when filters change and applies keyword on load', async () => {
+    const context = createContext()
+    const collection = mockState.collection as CollectionStub
+
+    context.list.userRoleFilter.value = 'admin'
+    await nextTick()
+    expect(collection.pagination.reset).toHaveBeenCalled()
+
+    context.list.searchKeyword.value = '  alice  '
+    context.list.loadUsers()
+    await nextTick()
+    expect(collection.pagination.reset).toHaveBeenCalled()
+    expect(currentFilters()?.keyword).toBe('alice')
+  })
+
+  it('refetches without touching filters when the keyword is unchanged', () => {
+    const context = createContext()
+    const collection = mockState.collection as CollectionStub
+
+    context.list.loadUsers()
+    expect(collection.refresh).toHaveBeenCalled()
+  })
+
+  it('reports collection errors through feedback', async () => {
+    const feedback = { loadFailed: vi.fn() }
+    createContext(feedback)
+    const collection = mockState.collection as CollectionStub
+
+    collection.initialError.value = true
+    await nextTick()
+    expect(feedback.loadFailed).toHaveBeenCalled()
+  })
+})
+
+function createContext(
+  feedback: { loadFailed: ReturnType<typeof vi.fn> } = { loadFailed: vi.fn() },
+) {
+  return useAdminUsersContext({
+    feedback: feedback as unknown as AdminUsersFeedback,
+    confirm: { confirm: vi.fn().mockResolvedValue(true) } as AdminConfirmPort,
+  })
 }

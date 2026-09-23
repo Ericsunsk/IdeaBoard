@@ -2358,6 +2358,72 @@ CREATE INDEX idx_tasks_feature_created_at ON tasks (feature_slug, created_at DES
 CREATE INDEX idx_tasks_terminal_created_at ON tasks (created_at) WHERE status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results');
 CREATE INDEX idx_tasks_pending_updated_at ON tasks (updated_at) WHERE status = 'pending';
 
+-- Workspace-scoped task lifecycle (#805). Tasks are async jobs for AI workflows
+-- with explicit lifecycle, billing settlement, retry, and cancellation.
+-- Temporary _v2 suffix to coexist with legacy user-scoped tasks until #809.
+CREATE TABLE tasks_v2 (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  submitter_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  billing_account_id BIGINT NOT NULL REFERENCES billing_accounts(internal_id) ON DELETE RESTRICT,
+  workflow_type TEXT NOT NULL,
+  workflow_input JSONB NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  priority INT NOT NULL DEFAULT 2,
+  retry_count INT NOT NULL DEFAULT 0,
+  lease_token TEXT NOT NULL DEFAULT '',
+  error_message TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  started_at TIMESTAMPTZ NULL,
+  completed_at TIMESTAMPTZ NULL,
+  cancelled_at TIMESTAMPTZ NULL,
+  cancelled_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT uq_tasks_v2_public_id UNIQUE (public_id),
+  CONSTRAINT chk_tasks_v2_public_id CHECK (public_id LIKE 'task\_%'),
+  CONSTRAINT chk_tasks_v2_status CHECK (status IN ('pending','running','completed','failed','cancelled')),
+  CONSTRAINT chk_tasks_v2_priority CHECK (priority BETWEEN 1 AND 4),
+  CONSTRAINT chk_tasks_v2_retry_count CHECK (retry_count >= 0),
+  CONSTRAINT chk_tasks_v2_workflow_type CHECK (length(btrim(workflow_type)) BETWEEN 1 AND 64),
+  CONSTRAINT chk_tasks_v2_lease_status CHECK (status = 'running' OR lease_token = ''),
+  CONSTRAINT chk_tasks_v2_terminal_consistency CHECK (
+    (status IN ('pending','running') AND completed_at IS NULL AND cancelled_at IS NULL)
+    OR (status = 'completed' AND completed_at IS NOT NULL AND cancelled_at IS NULL)
+    OR (status = 'failed' AND completed_at IS NOT NULL AND cancelled_at IS NULL)
+    OR (status = 'cancelled' AND cancelled_at IS NOT NULL)
+  ),
+  CONSTRAINT chk_tasks_v2_workflow_input CHECK (jsonb_typeof(workflow_input) = 'object')
+);
+
+CREATE INDEX idx_tasks_v2_workspace ON tasks_v2 (workspace_id, created_at DESC);
+CREATE INDEX idx_tasks_v2_status ON tasks_v2 (status, created_at) WHERE status IN ('pending','running');
+CREATE INDEX idx_tasks_v2_submitter ON tasks_v2 (submitter_user_id, created_at DESC);
+CREATE INDEX idx_tasks_v2_billing ON tasks_v2 (billing_account_id, created_at DESC);
+
+-- Task outputs reference Media Assets or remote URLs without exposing storage keys.
+CREATE TABLE task_outputs_v2 (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  task_id BIGINT NOT NULL REFERENCES tasks_v2(internal_id) ON DELETE CASCADE,
+  output_index INT NOT NULL,
+  output_kind TEXT NOT NULL,
+  media_asset_id BIGINT NULL REFERENCES media_assets_v2(internal_id) ON DELETE RESTRICT,
+  remote_url TEXT NULL,
+  metadata JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_task_outputs_v2_task_index UNIQUE (task_id, output_index),
+  CONSTRAINT chk_task_outputs_v2_index CHECK (output_index >= 0),
+  CONSTRAINT chk_task_outputs_v2_kind CHECK (output_kind IN ('media_asset','remote_url')),
+  CONSTRAINT chk_task_outputs_v2_kind_shape CHECK (
+    (output_kind = 'media_asset' AND media_asset_id IS NOT NULL AND remote_url IS NULL)
+    OR (output_kind = 'remote_url' AND media_asset_id IS NULL AND remote_url IS NOT NULL)
+  ),
+  CONSTRAINT chk_task_outputs_v2_metadata CHECK (jsonb_typeof(metadata) = 'object')
+);
+
+CREATE INDEX idx_task_outputs_v2_task ON task_outputs_v2 (task_id, output_index);
+CREATE INDEX idx_task_outputs_v2_media ON task_outputs_v2 (media_asset_id) WHERE media_asset_id IS NOT NULL;
+
 CREATE TABLE task_execution_metrics (
   task_id VARCHAR(64) PRIMARY KEY,
   current_stage VARCHAR(32) NOT NULL DEFAULT 'queued',
@@ -2860,6 +2926,181 @@ CREATE TABLE library_asset_media_assets (
 );
 
 CREATE INDEX idx_library_asset_media_assets_owner ON library_asset_media_assets (owner_user_id, media_asset_id);
+
+-- Workspace-scoped library and search (#806). Library assets are saved external
+-- references, not managed Media Assets. Folders and visibility are workspace-scoped.
+-- Temporary _v2 suffix to coexist with legacy user-scoped library until #809.
+CREATE TABLE library_folders_v2 (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  is_system BOOLEAN NOT NULL DEFAULT FALSE,
+  is_default BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_library_folders_v2_public_id UNIQUE (public_id),
+  CONSTRAINT uq_library_folders_v2_workspace_name UNIQUE (workspace_id, name),
+  CONSTRAINT chk_library_folders_v2_public_id CHECK (public_id LIKE 'lfolder\_%'),
+  CONSTRAINT chk_library_folders_v2_name CHECK (length(btrim(name)) BETWEEN 1 AND 100),
+  CONSTRAINT chk_library_folders_v2_system_shape CHECK (NOT is_system OR is_default)
+);
+
+CREATE INDEX idx_library_folders_v2_workspace ON library_folders_v2 (workspace_id, created_at);
+
+CREATE TABLE library_assets_v2 (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  folder_id BIGINT NOT NULL REFERENCES library_folders_v2(internal_id) ON DELETE RESTRICT,
+  provider TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  source_url TEXT NOT NULL,
+  preview_url TEXT NOT NULL,
+  original_url TEXT NOT NULL,
+  width INT NOT NULL DEFAULT 0,
+  height INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_library_assets_v2_public_id UNIQUE (public_id),
+  CONSTRAINT uq_library_assets_v2_workspace_source UNIQUE (workspace_id, provider, source_id),
+  CONSTRAINT chk_library_assets_v2_public_id CHECK (public_id LIKE 'lasset\_%'),
+  CONSTRAINT chk_library_assets_v2_provider CHECK (provider IN ('unsplash','pexels')),
+  CONSTRAINT chk_library_assets_v2_source_id CHECK (length(btrim(source_id)) > 0),
+  CONSTRAINT chk_library_assets_v2_dimensions CHECK (width >= 0 AND height >= 0)
+);
+
+CREATE INDEX idx_library_assets_v2_workspace ON library_assets_v2 (workspace_id, created_at DESC);
+CREATE INDEX idx_library_assets_v2_folder ON library_assets_v2 (folder_id, created_at DESC);
+
+-- Materialization creates a durable job that eventually produces a Media Asset.
+CREATE TABLE library_materializations_v2 (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  library_asset_id BIGINT NOT NULL REFERENCES library_assets_v2(internal_id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending',
+  media_asset_id BIGINT NULL REFERENCES media_assets_v2(internal_id) ON DELETE RESTRICT,
+  error_message TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at TIMESTAMPTZ NULL,
+  CONSTRAINT uq_library_materializations_v2_public_id UNIQUE (public_id),
+  CONSTRAINT chk_library_materializations_v2_public_id CHECK (public_id LIKE 'lmat\_%'),
+  CONSTRAINT chk_library_materializations_v2_status CHECK (status IN ('pending','processing','completed','failed')),
+  CONSTRAINT chk_library_materializations_v2_completion CHECK (
+    (status = 'completed' AND media_asset_id IS NOT NULL AND completed_at IS NOT NULL)
+    OR (status = 'failed' AND completed_at IS NOT NULL)
+    OR (status IN ('pending','processing'))
+  )
+);
+
+CREATE INDEX idx_library_materializations_v2_workspace ON library_materializations_v2 (workspace_id, created_at DESC);
+CREATE INDEX idx_library_materializations_v2_library_asset ON library_materializations_v2 (library_asset_id);
+CREATE INDEX idx_library_materializations_v2_status ON library_materializations_v2 (status, created_at);
+
+-- Workspace event streams and webhook delivery (#807). Events share one envelope
+-- for SSE and signed webhooks. NATS JetStream is the transport, PostgreSQL tracks
+-- delivery state for webhooks (retry, dead-letter, status).
+CREATE TABLE workspace_events (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  event_version INT NOT NULL DEFAULT 1,
+  actor_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+  resource_type TEXT NOT NULL,
+  resource_id TEXT NOT NULL,
+  event_data JSONB NOT NULL,
+  occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_workspace_events_public_id UNIQUE (public_id),
+  CONSTRAINT chk_workspace_events_public_id CHECK (public_id LIKE 'evt\_%'),
+  CONSTRAINT chk_workspace_events_type CHECK (length(btrim(event_type)) > 0),
+  CONSTRAINT chk_workspace_events_version CHECK (event_version > 0),
+  CONSTRAINT chk_workspace_events_resource CHECK (length(btrim(resource_type)) > 0 AND length(btrim(resource_id)) > 0),
+  CONSTRAINT chk_workspace_events_data CHECK (jsonb_typeof(event_data) = 'object')
+);
+
+CREATE INDEX idx_workspace_events_workspace ON workspace_events (workspace_id, occurred_at DESC);
+CREATE INDEX idx_workspace_events_type ON workspace_events (event_type, occurred_at DESC);
+CREATE INDEX idx_workspace_events_resource ON workspace_events (resource_type, resource_id, occurred_at DESC);
+
+-- Webhook subscriptions with filtered event types and endpoint signing secrets.
+CREATE TABLE event_subscriptions (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  endpoint_url TEXT NOT NULL,
+  signing_secret TEXT NOT NULL,
+  event_types TEXT[] NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_event_subscriptions_public_id UNIQUE (public_id),
+  CONSTRAINT chk_event_subscriptions_public_id CHECK (public_id LIKE 'sub\_%'),
+  CONSTRAINT chk_event_subscriptions_status CHECK (status IN ('active','paused','disabled')),
+  CONSTRAINT chk_event_subscriptions_event_types CHECK (array_length(event_types, 1) > 0)
+);
+
+CREATE INDEX idx_event_subscriptions_workspace ON event_subscriptions (workspace_id, created_at DESC);
+CREATE INDEX idx_event_subscriptions_status ON event_subscriptions (status) WHERE status = 'active';
+
+-- Webhook delivery state with retry tracking and dead-letter parking.
+CREATE TABLE event_deliveries (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  event_id BIGINT NOT NULL REFERENCES workspace_events(internal_id) ON DELETE CASCADE,
+  subscription_id BIGINT NOT NULL REFERENCES event_subscriptions(internal_id) ON DELETE CASCADE,
+  attempt_count INT NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pending',
+  next_retry_at TIMESTAMPTZ NULL,
+  last_attempted_at TIMESTAMPTZ NULL,
+  completed_at TIMESTAMPTZ NULL,
+  response_status INT NULL,
+  response_body TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT chk_event_deliveries_attempt_count CHECK (attempt_count >= 0),
+  CONSTRAINT chk_event_deliveries_status CHECK (status IN ('pending','retrying','delivered','failed','dead_letter')),
+  CONSTRAINT chk_event_deliveries_completion CHECK (
+    (status IN ('pending','retrying') AND completed_at IS NULL)
+    OR (status IN ('delivered','failed','dead_letter') AND completed_at IS NOT NULL)
+  )
+);
+
+CREATE INDEX idx_event_deliveries_subscription ON event_deliveries (subscription_id, created_at DESC);
+CREATE INDEX idx_event_deliveries_retry ON event_deliveries (next_retry_at) WHERE status = 'retrying' AND next_retry_at IS NOT NULL;
+CREATE INDEX idx_event_deliveries_status ON event_deliveries (status, created_at);
+
+-- Control Plane audit records (#808). Every high-risk operation records operator,
+-- target, capability, reason, outcome, and timestamp. Capability enforcement
+-- happens at middleware; this table is the immutable audit trail.
+CREATE TABLE control_audit_records (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  operator_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  operation_type TEXT NOT NULL,
+  capability TEXT NOT NULL,
+  target_type TEXT NOT NULL,
+  target_id TEXT NOT NULL,
+  reason TEXT NOT NULL DEFAULT '',
+  outcome TEXT NOT NULL,
+  error_message TEXT NOT NULL DEFAULT '',
+  request_correlation_id TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL DEFAULT '',
+  metadata JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_control_audit_records_public_id UNIQUE (public_id),
+  CONSTRAINT chk_control_audit_records_public_id CHECK (public_id LIKE 'audit\_%'),
+  CONSTRAINT chk_control_audit_records_operation CHECK (length(btrim(operation_type)) > 0),
+  CONSTRAINT chk_control_audit_records_capability CHECK (capability LIKE 'control:%'),
+  CONSTRAINT chk_control_audit_records_target CHECK (length(btrim(target_type)) > 0 AND length(btrim(target_id)) > 0),
+  CONSTRAINT chk_control_audit_records_outcome CHECK (outcome IN ('success','failure','denied')),
+  CONSTRAINT chk_control_audit_records_metadata CHECK (jsonb_typeof(metadata) = 'object')
+);
+
+CREATE INDEX idx_control_audit_records_operator ON control_audit_records (operator_user_id, created_at DESC);
+CREATE INDEX idx_control_audit_records_target ON control_audit_records (target_type, target_id, created_at DESC);
+CREATE INDEX idx_control_audit_records_capability ON control_audit_records (capability, created_at DESC);
+CREATE INDEX idx_control_audit_records_correlation ON control_audit_records (request_correlation_id);
+
 CREATE TABLE ai_search_operations (
   operation_id UUID PRIMARY KEY,
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

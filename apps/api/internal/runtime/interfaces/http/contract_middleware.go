@@ -148,12 +148,15 @@ func PublicContractChain() []gin.HandlerFunc {
 }
 
 // ControlContractChain is the separate Control Plane middleware chain
-// placeholder. #808 adds operator auth, capability checks, separate rate
-// limits, and mandatory audit records here.
-func ControlContractChain() []gin.HandlerFunc {
+// (issue #808): Request-Id bridging plus the dedicated control
+// rate-limit bucket. Capability auth (operator grant), tenant scope,
+// per-route audit, and header-only idempotency are wired by
+// RegisterContractControlRoutes so tests can inject principals and
+// sinks per engine.
+func ControlContractChain(limiter *ControlRateLimiter) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
 		ContractRequestIDMiddleware(),
-		ContractRateLimitHeadersMiddleware(),
+		ControlRateLimitMiddleware(limiter),
 		ContractETagMiddleware(),
 	}
 }
@@ -162,21 +165,13 @@ func ControlContractChain() []gin.HandlerFunc {
 // handlers for the workspace/organization/member lifecycle (issue #801),
 // boards + collaboration (#802), uploads + media (#803) with the shared
 // PublicContractChain. Workspace billing (#804) mounts on its own group
-// via RegisterContractV1BillingRoutesOnEngine. Legacy routes are
+// via RegisterContractV1BillingRoutesOnEngine, and the Control Plane
+// (#808) via RegisterContractControlRoutesOnEngine. Legacy routes are
 // untouched.
 func registerContractV1RoutesOnEngine(r *gin.Engine, authDeps AuthDeps, deps ContractV1Deps) {
 	v1 := r.Group(ContractV1GroupPath)
 	v1.Use(PublicContractChain()...)
 	RegisterContractV1Routes(v1, authDeps, deps)
-}
-
-// registerContractControlStubRoutes mounts the additive Control Plane stub
-// group. Every path under it fails closed with 501 until real handlers
-// land; legacy routes are untouched.
-func registerContractControlStubRoutes(r *gin.Engine) {
-	control := r.Group(ContractControlGroupPath)
-	control.Use(ControlContractChain()...)
-	control.Any("/*contractPath", contractNotImplemented)
 }
 
 func contractNotImplemented(c *gin.Context) {

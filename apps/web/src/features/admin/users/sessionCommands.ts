@@ -6,7 +6,10 @@ export type AdminUserRedirect = {
 }
 
 export type AdminUserSessionCommands = {
-  startImpersonation: (publicId: string) => Promise<void>
+  startImpersonation: (
+    publicId: string,
+    options?: { operatorReason?: string | undefined },
+  ) => Promise<void>
 }
 
 function createBrowserRedirect(): AdminUserRedirect {
@@ -25,8 +28,10 @@ export function createAdminUserSessionCommands(
   const userStore = useUserStore()
 
   return {
-    async startImpersonation(publicId: string) {
-      await impersonateAdminUser(publicId)
+    async startImpersonation(publicId: string, options?: { operatorReason?: string | undefined }) {
+      const operatorReason = options?.operatorReason?.trim() ?? ''
+      if (!operatorReason) throw new Error('需要填写操作原因')
+      await impersonateAdminUser(publicId, { operatorReason })
 
       userStore.clearAuth()
       redirect.schedule('/', 1000)

@@ -4,7 +4,8 @@
  * IdeaBoard Public API
  * Public Data Plane contract (issue #800 kernel, #801 workspace/
  * organization/member lifecycle, #802 board collaboration, #803 upload
- * sessions + media assets, #804 workspace billing). Canonical prefix
+ * sessions + media assets, #804 workspace billing, #805 workspace tasks,
+ * #806 workspace library + search). Canonical prefix
  * is /api/v1. Envelopes, cursor pagination, idempotency and correlation
  * headers, and opaque public identifiers follow the contract kernel.
  * The legacy single-file contract in apps/api/openapi.yaml is

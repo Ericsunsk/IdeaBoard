@@ -1,29 +1,297 @@
 openapi: 3.0.3
 info:
   title: IdeaBoard Workspace Events
-  version: 0.1.0
+  version: 0.2.0
   description: |
-    Event contract skeleton (issue #800). JSON Schema only: this document
-    defines no paths. Workspace events share one envelope; SSE and webhooks
-    differ only in transport. Events are an event layer, not a task queue:
-    River + PostgreSQL remain the source of truth for task state.
+    Workspace event contract (issue #807). One versioned envelope is shared
+    by SSE and signed webhooks; transports differ only in delivery. Events
+    are an event layer, not a task queue: River + PostgreSQL remain the
+    source of truth for task state, NATS JetStream carries the transport.
 
-    SSE replay: clients reconnect with the `Last-Event-ID` request header and
-    the server resumes after that event ID. The initial `:connected` frame is
-    not a domain event and carries no `evt_` ID.
+    Envelope versioning is independent from HTTP API versions: `version`
+    versions the event data payload for (`type`) only. The frozen registry
+    (all version 1) is: task.created/running/completed/failed/cancelled,
+    media.asset_ready/archived, board.document_replaced/member_changed/
+    share_revoked, billing.settled, library.materialization_completed/failed.
+    Registry changes are additive only; existing (type, version) pairs never
+    change shape. Internal DB rows, numeric ids, storage URLs, bearers, and
+    amounts are never exposed (public ids + API URIs + refs only). Control
+    audit records are never exposed on this surface (see #808).
 
-    Webhook delivery: POSTs share the envelope below and add `X-Webhook-Signature`
-    (HMAC-SHA256 over the raw body with the subscription secret),
-    `X-Webhook-Delivery-Id` and `X-Webhook-Attempt` headers, per-subscription
-    event-type filtering, exponential-backoff retry, delivery status and
-    dead-letter behavior (filled in by #807).
+    Producer maturity: HTTP-path producers (task.created/cancelled,
+    media.asset_ready/archived, board.document_replaced/member_changed/
+    share_revoked, billing.settled refs, library.materialization_completed/
+    failed) emit after their store commit. task.running/completed/failed
+    validate here but have no live HTTP producer yet: worker-side terminal
+    settle flushes through the same staged seam with the #809 worker.
+
+    SSE replay: clients reconnect with the `Last-Event-ID` request header
+    (or `?last_event_id=` for native EventSource) and the server resumes
+    after that event id. Cursors are bound to the workspace + principal
+    membership + types filter: cross-workspace cursors cannot resume.
+    Unknown or evicted cursors resume from the oldest retained envelope
+    with an `event: gap` notice frame (`{truncated: true}`) so clients
+    refetch state. The initial `:connected` frame is not a domain event
+    and carries no `evt_` ID.
+
+    Webhook delivery: POSTs share the envelope and add
+    `X-Webhook-Signature` (hex HMAC-SHA256 over "<timestamp>.<raw-body>"),
+    `X-Webhook-Timestamp` (unix seconds, ±5 minute tolerance),
+    `X-Webhook-Delivery-Id` (evt_ id) and `X-Webhook-Attempt` headers,
+    per-subscription event-type filtering, exponential-backoff retry
+    (30s base, doubling, 1h cap, 8 attempts), delivery status and
+    dead-letter parking. Subscription secrets are returned exactly once
+    at creation (only when server-minted) and never appear in reads.
+    All mutating subscription calls require a header-only Idempotency-Key.
+    Provider inbound webhooks (Stripe) stay distinct integrations that
+    emit internal events; they never flow through this dispatcher.
+
+    Retention: NATS JetStream MaxAge (7 days per DESIGN) is authoritative;
+    the process-local hot log (1000 envelopes/workspace) is the live
+    replay window. Durable outbox persistence lands with #809.
   x-event-transports: [sse, webhook]
-  x-event-types: [task.completed, task.failed, board.member_invited]
+  x-event-types: [task.created, task.running, task.completed, task.failed, task.cancelled, media.asset_ready, media.asset_archived, board.document_replaced, board.member_changed, board.share_revoked, billing.settled, library.materialization_completed, library.materialization_failed]
 servers:
   - url: /api/v1
-paths: {}
+paths:
+  /workspaces/{workspace_id}/events:
+    get:
+      operationId: streamWorkspaceEvents
+      tags: [WorkspaceEvents]
+      summary: Subscribe to the versioned workspace event stream (SSE).
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/LastEventId'
+        - $ref: '#/components/parameters/EventTypesFilter'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: text/event-stream with `id:`-carried envelopes.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/PaginationCursorInvalid'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/EventNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+  /workspaces/{workspace_id}/event-subscriptions:
+    get:
+      operationId: listEventSubscriptions
+      tags: [WorkspaceEvents]
+      summary: List masked webhook subscriptions (owner|admin).
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Masked subscriptions (no secret material).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventSubscriptionList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EventForbidden'
+        '404':
+          $ref: '#/components/responses/EventNotFound'
+    post:
+      operationId: createEventSubscription
+      tags: [WorkspaceEvents]
+      summary: Create a webhook subscription (owner|admin, idempotent).
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEventSubscriptionRequest'
+      responses:
+        '201':
+          description: Subscription created; minted secret returned once.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateEventSubscriptionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EventForbidden'
+        '404':
+          $ref: '#/components/responses/EventNotFound'
+        '409':
+          $ref: '#/components/responses/EventSubscriptionConflict'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+  /workspaces/{workspace_id}/event-subscriptions/{subscription_id}:
+    delete:
+      operationId: deleteEventSubscription
+      tags: [WorkspaceEvents]
+      summary: Delete a webhook subscription (owner|admin, idempotent key required).
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/EventSubscriptionId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Deleted marker.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedMarker'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EventForbidden'
+        '404':
+          $ref: '#/components/responses/EventSubscriptionNotFound'
 components:
+  parameters:
+    WorkspaceId:
+      name: workspace_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^ws_[A-Za-z0-9]+$'
+    EventSubscriptionId:
+      name: subscription_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^sub_[A-Za-z0-9]+$'
+    LastEventId:
+      name: last_event_id
+      in: query
+      required: false
+      description: Resume cursor (evt_ id). The Last-Event-ID request header takes precedence.
+      schema:
+        type: string
+        pattern: '^evt_[A-Za-z0-9]+$'
+    EventTypesFilter:
+      name: types
+      in: query
+      required: false
+      description: Comma-separated subset of frozen event types; empty means all.
+      schema:
+        type: string
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+    RequestId:
+      name: Request-Id
+      in: header
+      required: false
+      schema:
+        type: string
+  headers:
+    RequestId:
+      description: Echoed request correlation ID.
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Unauthorized:
+      description: Missing session.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    EventNotFound:
+      description: Hidden workspace (anti-enumeration).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    EventForbidden:
+      description: Visible member without owner|admin on subscription management.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    EventSubscriptionNotFound:
+      description: Unknown subscription id.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    EventSubscriptionConflict:
+      description: Idempotency-Key reused with a different request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    PaginationCursorInvalid:
+      description: Malformed Last-Event-ID cursor.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    ValidationFailed:
+      description: Unknown event-type filter or invalid subscription fields.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
   schemas:
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          properties:
+            code:
+              type: string
+              enum: [bad_request, unauthorized, event_not_found, event_forbidden, event_subscription_not_found, event_subscription_conflict, pagination_cursor_invalid, validation_failed, idempotency_key_required]
+            message:
+              type: string
+            request_id:
+              type: string
+    DeletedMarker:
+      type: object
+      required: [deleted]
+      properties:
+        deleted:
+          type: boolean
+        id:
+          type: string
+          pattern: '^sub_[A-Za-z0-9]+$'
     EventEnvelope:
       type: object
       required: [id, type, version, occurred_at, actor, resource, workspace_id, data]
@@ -35,8 +303,8 @@ components:
           description: Opaque event identifier, also used for SSE Last-Event-ID replay.
         type:
           type: string
-          enum: [task.completed, task.failed, board.member_invited]
-          description: Stable event type; initial set filled in by #802-#807.
+          enum: [task.created, task.running, task.completed, task.failed, task.cancelled, media.asset_ready, media.asset_archived, board.document_replaced, board.member_changed, board.share_revoked, billing.settled, library.materialization_completed, library.materialization_failed]
+          description: Stable event type with independent schema versioning.
         version:
           type: integer
           minimum: 1
@@ -63,10 +331,10 @@ components:
       properties:
         type:
           type: string
-          enum: [user, service_account, system]
+          enum: [user, service, system]
         id:
           type: string
-          description: Opaque actor identifier (usr_*, service account ID, or "system").
+          description: Opaque actor identifier (usr_* for users, "system" for system).
     EventResource:
       type: object
       required: [type, id]
@@ -74,11 +342,22 @@ components:
       properties:
         type:
           type: string
-          enum: [task, board, media_asset]
+          enum: [task, board, media_asset, library_materialization, checkout_session]
+          description: checkout_session is reserved for the #809 Stripe-convergence mapping and is never emitted today.
         id:
           type: string
-          description: Opaque resource identifier (task_*, board_*, asset_*).
-    TaskCompletedData:
+          description: Opaque resource identifier (task_*, board_*, asset_*, libm_*).
+    TaskCreatedData:
+      type: object
+      required: [task_id, workflow_kind]
+      additionalProperties: false
+      properties:
+        task_id:
+          type: string
+          pattern: '^task_[A-Za-z0-9]+$'
+        workflow_kind:
+          type: string
+    TaskRunningData:
       type: object
       required: [task_id]
       additionalProperties: false
@@ -86,9 +365,16 @@ components:
         task_id:
           type: string
           pattern: '^task_[A-Za-z0-9]+$'
+    TaskCompletedData:
+      type: object
+      required: [task_id, outputs_uri]
+      additionalProperties: false
+      properties:
+        task_id:
+          type: string
+          pattern: '^task_[A-Za-z0-9]+$'
         outputs_uri:
           type: string
-          nullable: true
           description: API URI for task outputs, never a raw storage URL.
     TaskFailedData:
       type: object
@@ -101,7 +387,44 @@ components:
         error_code:
           type: string
           description: Stable machine-readable failure code.
-    BoardMemberInvitedData:
+    TaskCancelledData:
+      type: object
+      required: [task_id]
+      additionalProperties: false
+      properties:
+        task_id:
+          type: string
+          pattern: '^task_[A-Za-z0-9]+$'
+        cancel_reason:
+          type: string
+    MediaAssetReadyData:
+      type: object
+      required: [asset_id]
+      additionalProperties: false
+      properties:
+        asset_id:
+          type: string
+          pattern: '^asset_[A-Za-z0-9]+$'
+    MediaAssetArchivedData:
+      type: object
+      required: [asset_id]
+      additionalProperties: false
+      properties:
+        asset_id:
+          type: string
+          pattern: '^asset_[A-Za-z0-9]+$'
+    BoardDocumentReplacedData:
+      type: object
+      required: [board_id, revision]
+      additionalProperties: false
+      properties:
+        board_id:
+          type: string
+          pattern: '^board_[A-Za-z0-9]+$'
+        revision:
+          type: integer
+          minimum: 1
+    BoardMemberChangedData:
       type: object
       required: [board_id, member_id]
       additionalProperties: false
@@ -111,3 +434,179 @@ components:
           pattern: '^board_[A-Za-z0-9]+$'
         member_id:
           type: string
+          pattern: '^usr_[A-Za-z0-9]+$'
+    BoardShareRevokedData:
+      type: object
+      required: [board_id, share_token_id]
+      additionalProperties: false
+      properties:
+        board_id:
+          type: string
+          pattern: '^board_[A-Za-z0-9]+$'
+        share_token_id:
+          type: string
+          description: Token id only; the bearer never leaves the server.
+    BillingSettledData:
+      type: object
+      required: [reference_type, reference_id, settlement_state]
+      additionalProperties: false
+      properties:
+        reference_type:
+          type: string
+          enum: [task, library_materialization, checkout_session]
+        reference_id:
+          type: string
+        settlement_state:
+          type: string
+          enum: [quoted, free, held, captured, released]
+        hold_transaction_id:
+          type: string
+          description: Ledger hold reference only; amounts never appear in events.
+    LibraryMaterializationCompletedData:
+      type: object
+      required: [materialization_id, library_asset_id, media_asset_id]
+      additionalProperties: false
+      properties:
+        materialization_id:
+          type: string
+          pattern: '^libm_[A-Za-z0-9]+$'
+        library_asset_id:
+          type: string
+          pattern: '^liba_[A-Za-z0-9]+$'
+        media_asset_id:
+          type: string
+          pattern: '^asset_[A-Za-z0-9]+$'
+    LibraryMaterializationFailedData:
+      type: object
+      required: [materialization_id, library_asset_id, error_code]
+      additionalProperties: false
+      properties:
+        materialization_id:
+          type: string
+          pattern: '^libm_[A-Za-z0-9]+$'
+        library_asset_id:
+          type: string
+          pattern: '^liba_[A-Za-z0-9]+$'
+        error_code:
+          type: string
+    EventSubscription:
+      type: object
+      required: [id, workspace_id, url, event_types, has_secret, status, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          pattern: '^sub_[A-Za-z0-9]+$'
+        workspace_id:
+          type: string
+          pattern: '^ws_[A-Za-z0-9]+$'
+        url:
+          type: string
+          format: uri
+          description: https required (http allowed only for loopback/.test).
+        event_types:
+          type: array
+          items:
+            type: string
+          description: Empty means all frozen types.
+        has_secret:
+          type: boolean
+          description: Secret material never appears in reads.
+        status:
+          type: string
+          enum: [active, degraded, dead_letter]
+        failure_count:
+          type: integer
+        dead_letter_size:
+          type: integer
+        recent_attempts:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookAttempt'
+        dead_letter:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookDeadLetter'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    WebhookAttempt:
+      type: object
+      required: [delivery_id, attempt, status_code, outcome, at]
+      properties:
+        delivery_id:
+          type: string
+        attempt:
+          type: integer
+        status_code:
+          type: integer
+        outcome:
+          type: string
+          enum: [delivered, failed]
+        error:
+          type: string
+        at:
+          type: string
+          format: date-time
+    WebhookDeadLetter:
+      type: object
+      required: [delivery_id, event_type, attempts, at]
+      properties:
+        delivery_id:
+          type: string
+        event_type:
+          type: string
+        attempts:
+          type: integer
+        last_error:
+          type: string
+        at:
+          type: string
+          format: date-time
+    EventSubscriptionList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [subscriptions]
+          properties:
+            subscriptions:
+              type: array
+              items:
+                $ref: '#/components/schemas/EventSubscription'
+    CreateEventSubscriptionRequest:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [url]
+          additionalProperties: false
+          properties:
+            url:
+              type: string
+              format: uri
+            secret:
+              type: string
+              description: Optional (min 16 chars); when omitted the server mints one.
+            event_types:
+              type: array
+              items:
+                type: string
+    CreateEventSubscriptionResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [subscription]
+          properties:
+            subscription:
+              $ref: '#/components/schemas/EventSubscription'
+            secret:
+              type: string
+              description: Hex-encoded minted secret, returned exactly once (absent otherwise).

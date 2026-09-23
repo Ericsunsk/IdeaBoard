@@ -103,6 +103,9 @@ export default defineConfig({
         },
       }
     : {}),
+  // Issue #808: the Control client carries its own transport mutator so
+  // generated relative paths resolve under /api/control/v1 (the shared
+  // mutator only mounts /api). Generated code stays untouched.
   ...(controlSpecTarget
     ? {
         controlQuery: {
@@ -120,8 +123,8 @@ export default defineConfig({
             urlEncodeParameters: true,
             override: {
               mutator: {
-                path: './src/shared/api/orvalMutator.ts',
-                name: 'orvalMutator',
+                path: './src/shared/api/controlMutator.ts',
+                name: 'controlMutator',
               },
               fetch: {
                 includeHttpResponseReturnType: false,

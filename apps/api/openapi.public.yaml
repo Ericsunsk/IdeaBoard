@@ -5,7 +5,8 @@ info:
   description: |
     Public Data Plane contract (issue #800 kernel, #801 workspace/
     organization/member lifecycle, #802 board collaboration, #803 upload
-    sessions + media assets, #804 workspace billing). Canonical prefix
+    sessions + media assets, #804 workspace billing, #805 workspace tasks,
+    #806 workspace library + search). Canonical prefix
     is /api/v1. Envelopes, cursor pagination, idempotency and correlation
     headers, and opaque public identifiers follow the contract kernel.
     The legacy single-file contract in apps/api/openapi.yaml is
@@ -32,6 +33,12 @@ tags:
     description: Workspace-bound media asset metadata and byte delivery.
   - name: WorkspaceBilling
     description: Implicit per-workspace billing account, credits, and checkout.
+  - name: WorkspaceTasks
+    description: Workspace-scoped async task lifecycle (submit, read, cancel, outputs, quotes).
+  - name: WorkspaceLibrary
+    description: Workspace-scoped library folders, saved provider references, and materializations.
+  - name: WorkspaceSearch
+    description: Workspace-scoped provider search and vision queries.
 paths:
   /me:
     get:
@@ -1686,6 +1693,793 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/tasks:
+    get:
+      tags: [WorkspaceTasks]
+      operationId: listWorkspaceTasks
+      summary: List workspace tasks with cursor pagination (members only)
+      description: >-
+        Lists workspace tasks oldest-first with cursor pagination. Hidden
+        workspaces converge to 404 task_not_found (never
+        workspace_not_found) so the task surface never leaks workspace
+        existence.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated task list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedWorkspaceTasks'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [WorkspaceTasks]
+      operationId: createWorkspaceTask
+      summary: Submit a workspace task (members only, 202 + Location)
+      description: >-
+        Submits an async task under the discriminated input union
+        {workflow_kind, inputs:{media_asset_ids}, params}: workflow_kind
+        names a registered AI image feature (generation, inpaint, render,
+        variations, cutout, fusion, upscale, outpaint); media_asset_ids
+        carry asset_... references only (no raw storage URLs); unknown
+        params keys and storage URLs render 422 validation_failed with
+        details.fields. Settlement runs Quote -> Hold -> Insert -> Enqueue
+        with compensating rollback. Requires the Idempotency-Key header
+        (scope task:create): same key+hash replays the first task, key
+        reuse with a different request renders 409
+        task_idempotency_conflict. Insufficient Ideas render 402
+        task_insufficient_credits.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkspaceTaskRequest'
+      responses:
+        '202':
+          description: Task accepted for async execution.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Location:
+              description: Canonical task URL (/api/v1/workspaces/{workspace_id}/tasks/{task_id}).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          description: Insufficient Ideas (task_insufficient_credits).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Visible-but-forbidden (task_forbidden) or restricted wallet (billing_wallet_restricted).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          description: Quote or task service unavailable (billing_quote_unavailable, service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/tasks/{task_id}:
+    get:
+      tags: [WorkspaceTasks]
+      operationId: getWorkspaceTask
+      summary: Get a workspace task (members only)
+      description: >-
+        Malformed task_ shapes, unknown tasks, and cross-workspace ids
+        converge to 404 task_not_found. The response carries no params
+        object (params are write-only); outputs ride output_refs.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Task detail.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /workspaces/{workspace_id}/tasks/{task_id}/cancel:
+    post:
+      tags: [WorkspaceTasks]
+      operationId: cancelWorkspaceTask
+      summary: Cancel a workspace task (members only)
+      description: >-
+        Documented deviation: the cancel action is a POST /cancel
+        sub-resource (not a `:cancel` action suffix) to keep Gin
+        routing collision-free. The optional body carries only
+        {data:{reason}} and defaults to "user cancel". Requires the
+        Idempotency-Key header (scope task:cancel). Cancelling a
+        terminal task renders 409 task_state_conflict.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelWorkspaceTaskRequest'
+      responses:
+        '200':
+          description: Task cancelled.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /workspaces/{workspace_id}/tasks/{task_id}/outputs:
+    get:
+      tags: [WorkspaceTasks]
+      operationId: listWorkspaceTaskOutputs
+      summary: List task output references (members only)
+      description: >-
+        Outputs inherit task visibility: hidden tasks converge to 404
+        task_not_found. Asset outputs reference byte-verified ready
+        asset_... media assets; remote outputs carry URL + checksum with
+        no storage internals.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Task output references.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceTaskOutputsEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /workspaces/{workspace_id}/task-quotes:
+    post:
+      tags: [WorkspaceTasks]
+      operationId: quoteWorkspaceTask
+      summary: Preflight price quote for a task (members only, no persistence)
+      description: >-
+        Returns an immutable price snapshot with no persistence (separate
+        from the authoritative create). No Idempotency-Key is required.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuoteWorkspaceTaskRequest'
+      responses:
+        '200':
+          description: Price snapshot (settlement_state quoted).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskBillingSnapshotEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          description: Price service unavailable (billing_quote_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/library/folders:
+    get:
+      tags: [WorkspaceLibrary]
+      operationId: listWorkspaceLibraryFolders
+      summary: List workspace library folders with cursor pagination (members only)
+      description: >-
+        Folders return in creation order. Hidden workspaces converge to
+        404 workspace_not_found.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated folder list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedLibraryFolders'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [WorkspaceLibrary]
+      operationId: createWorkspaceLibraryFolder
+      summary: Create a workspace library folder (members only)
+      description: >-
+        Folder names are 1..100 characters and unique per workspace
+        (case-insensitive duplicates render 409). Requires the
+        Idempotency-Key header (scope library:folder-create): key reuse
+        with a different request renders 409
+        library_idempotency_conflict.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLibraryFolderRequest'
+      responses:
+        '201':
+          description: Folder created.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryFolderEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /workspaces/{workspace_id}/library/folders/{folder_id}:
+    patch:
+      tags: [WorkspaceLibrary]
+      operationId: renameWorkspaceLibraryFolder
+      summary: Rename a workspace library folder (members only)
+      description: >-
+        Malformed libf_ shapes (including legacy integer ids, which v1
+        never accepts), unknown ids, and cross-workspace ids converge to
+        404 library_folder_not_found. No Idempotency-Key is required.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/LibraryFolderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenameLibraryFolderRequest'
+      responses:
+        '200':
+          description: Folder renamed.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryFolderEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags: [WorkspaceLibrary]
+      operationId: deleteWorkspaceLibraryFolder
+      summary: Delete a workspace library folder (members only)
+      description: >-
+        Contained assets become unfiled rather than deleted. Requires
+        the Idempotency-Key header (scope library:folder-delete) so
+        replays converge instead of 404ing on the already-deleted
+        folder.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/LibraryFolderId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Folder deleted.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /workspaces/{workspace_id}/library/assets:
+    get:
+      tags: [WorkspaceLibrary]
+      operationId: listWorkspaceLibraryAssets
+      summary: List workspace library assets with cursor pagination (members only)
+      description: >-
+        Assets return in creation order. The optional folder_id query
+        filters to one folder; unknown folder shapes converge to 404
+        library_folder_not_found.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - name: folder_id
+          in: query
+          required: false
+          description: Filter to one libf_ folder.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated asset list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedLibraryAssets'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [WorkspaceLibrary]
+      operationId: saveWorkspaceLibraryAsset
+      summary: Save a provider reference as a workspace library asset (members only)
+      description: >-
+        Assets are saved external references ONLY (provider URL + source
+        metadata, never bytes) behind the provider-allowlist https URL
+        gate. Save is idempotent on (workspace, provider, source_id):
+        re-saving returns the existing asset with 200 instead of 201.
+        Requires the Idempotency-Key header (scope library:asset-save).
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveLibraryAssetRequest'
+      responses:
+        '200':
+          description: Asset already saved (dedup hit returns the existing asset).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryAssetEnvelope'
+        '201':
+          description: Asset saved.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryAssetEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /workspaces/{workspace_id}/library/assets/{asset_id}:
+    patch:
+      tags: [WorkspaceLibrary]
+      operationId: moveWorkspaceLibraryAsset
+      summary: Move a workspace library asset to another folder (members only)
+      description: >-
+        An empty folder_id unfiles the asset. Unknown assets or folders
+        404 with their own codes. No Idempotency-Key is required.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/LibraryAssetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveLibraryAssetRequest'
+      responses:
+        '200':
+          description: Asset moved.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryAssetEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags: [WorkspaceLibrary]
+      operationId: deleteWorkspaceLibraryAsset
+      summary: Delete a workspace library asset (members only)
+      description: >-
+        Drops the saved reference only (the provider original is
+        untouched; materialized media assets are owned by Media).
+        Requires the Idempotency-Key header (scope
+        library:asset-delete).
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/LibraryAssetId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Asset deleted.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /workspaces/{workspace_id}/library/asset-resolutions:
+    post:
+      tags: [WorkspaceLibrary]
+      operationId: resolveWorkspaceLibraryAssets
+      summary: Batch-resolve saved workspace assets by reference (members only, max 20)
+      description: >-
+        Typed batch lookup against saved workspace assets only (by
+        provider + source_id or exact known provider URL) — NOT a
+        general proxy; nothing is fetched and unknown references report
+        unresolved per item. Batches above 20 render 400. No
+        Idempotency-Key is required.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveLibraryAssetsRequest'
+      responses:
+        '200':
+          description: Per-item resolve outcomes.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolveLibraryAssetsEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /workspaces/{workspace_id}/library/materializations:
+    post:
+      tags: [WorkspaceLibrary]
+      operationId: createWorkspaceLibraryMaterialization
+      summary: Materialize an owned library reference into a managed media asset (members only, 202)
+      description: >-
+        Runs server-side quote (SKU library:materialize), credit hold
+        through credits.Commands, job record (pending -> running), media
+        settle, then capture (completed with the asset_ link) or release
+        (failed record). Materializer failures fold into a failed job
+        record so the job stays status-addressable; only billing
+        failures abort with an error response (billing_quote_unavailable
+        503, billing_wallet_restricted 403). Requires the
+        Idempotency-Key header (scope library:materialize).
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLibraryMaterializationRequest'
+      responses:
+        '202':
+          description: Materialization accepted.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryMaterializationEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Restricted wallet (billing_wallet_restricted).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          description: Quote or materialization service unavailable (billing_quote_unavailable, service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/library/materializations/{materialization_id}:
+    get:
+      tags: [WorkspaceLibrary]
+      operationId: getWorkspaceLibraryMaterialization
+      summary: Get a library materialization job snapshot (members only)
+      description: >-
+        Status-addressable job record (pending -> running ->
+        completed|failed); terminal states are immutable. Malformed
+        libm_ shapes and unknown ids converge to 404
+        library_materialization_not_found.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/MaterializationId'
+      responses:
+        '200':
+          description: Materialization snapshot.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryMaterializationEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /workspaces/{workspace_id}/search:
+    get:
+      tags: [WorkspaceSearch]
+      operationId: searchWorkspace
+      summary: Search provider catalogs in a workspace context (members only)
+      description: >-
+        Results carry provider URL + source metadata only (never bytes),
+        mirroring the library asset boundary. Query validation is
+        explicit: blank or over-limit queries render 422
+        validation_failed (details.fields names q), never a silent empty
+        page. The cursor is opaque and bound to (query, providers,
+        page_size): replaying it against a different query, filter set,
+        or page size renders 400 pagination_cursor_invalid. All
+        providers failed renders 503 search_provider_unavailable.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - name: q
+          in: query
+          required: true
+          description: Search keywords (1..200 characters after trimming).
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+        - name: provider
+          in: query
+          required: false
+          description: Provider filter (repeatable). Empty means both catalog providers.
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [unsplash, pexels]
+      responses:
+        '200':
+          description: Paginated search hits.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedWorkspaceSearchResults'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          description: Search providers unavailable (search_provider_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/search/vision-queries:
+    post:
+      tags: [WorkspaceSearch]
+      operationId: createWorkspaceVisionQuery
+      summary: File a vision query from text plus owned library refs (members only)
+      description: >-
+        Inputs reference owned workspace library assets by liba_ id
+        (resolved server-side; unknown, malformed, or cross-workspace
+        refs converge to 404 library_asset_not_found); client bytes
+        never cross this boundary, so there is no multipart surface.
+        Billing settles through credits.Commands against a server-side
+        quote for the ai-search:vision SKU (billing_quote_unavailable
+        503, billing_wallet_restricted 403). Provider extraction
+        failures render 502 search_vision_provider_error (hold
+        refunded); unconfigured vision renders 503
+        search_vision_not_configured. Requires the Idempotency-Key
+        header (scope search:vision): key reuse with a different request
+        renders 409 search_idempotency_conflict.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkspaceVisionQueryRequest'
+      responses:
+        '201':
+          description: Vision query extracted (normalized query returned).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceVisionQueryEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Restricted wallet (billing_wallet_restricted).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '502':
+          description: Vision provider failure (search_vision_provider_error, hold refunded).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Vision unconfigured or quote unavailable (search_vision_not_configured, billing_quote_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 components:
   securitySchemes:
     publicSession:
@@ -1806,6 +2600,34 @@ components:
       schema:
         type: string
         maxLength: 128
+    TaskId:
+      name: task_id
+      in: path
+      required: true
+      description: Opaque task_ identifier (malformed shapes converge to 404 task_not_found).
+      schema:
+        $ref: '#/components/schemas/TaskId'
+    LibraryFolderId:
+      name: folder_id
+      in: path
+      required: true
+      description: Opaque libf_ library folder identifier (malformed shapes, including legacy integer ids, converge to 404 library_folder_not_found).
+      schema:
+        $ref: '#/components/schemas/LibraryFolderId'
+    LibraryAssetId:
+      name: asset_id
+      in: path
+      required: true
+      description: Opaque liba_ library asset identifier (malformed shapes, including legacy integer ids, converge to 404 library_asset_not_found).
+      schema:
+        $ref: '#/components/schemas/LibraryAssetId'
+    MaterializationId:
+      name: materialization_id
+      in: path
+      required: true
+      description: Opaque libm_ materialization job identifier (malformed shapes converge to 404 library_materialization_not_found).
+      schema:
+        $ref: '#/components/schemas/LibraryMaterializationId'
   headers:
     RequestId:
       description: Server-assigned request correlation ID, present on every response.
@@ -3019,3 +3841,634 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/WorkspaceCheckoutSession'
+    LibraryFolderId:
+      type: string
+      pattern: '^libf_[A-Za-z0-9]+$'
+      description: Opaque public library folder identifier.
+    LibraryAssetId:
+      type: string
+      pattern: '^liba_[A-Za-z0-9]+$'
+      description: Opaque public library asset identifier.
+    LibraryMaterializationId:
+      type: string
+      pattern: '^libm_[A-Za-z0-9]+$'
+      description: Opaque public library materialization job identifier.
+    VisionQueryId:
+      type: string
+      pattern: '^visq_[A-Za-z0-9]+$'
+      description: Opaque public vision query operation identifier.
+    WorkflowKind:
+      type: string
+      enum: [generation, inpaint, render, variations, cutout, fusion, upscale, outpaint]
+      description: Registered AI image feature slug.
+    TaskStatus:
+      type: string
+      enum: [pending, running, completed, failed, cancelled]
+      description: Workspace task lifecycle status (cancelled_with_results converges to cancelled).
+    TaskSettlementState:
+      type: string
+      enum: [quoted, free, held, captured, released]
+      description: Task billing settlement state.
+    TaskOutputKind:
+      type: string
+      enum: [asset, remote]
+      description: Task output reference kind.
+    TaskBillingSnapshot:
+      type: object
+      required: [sku, display_name, price_version_id, price_version, output_resolution, unit_credits, quantity, total_credits, quoted_at, settlement_state]
+      additionalProperties: false
+      properties:
+        sku:
+          type: string
+          description: Price SKU (ai-image:<feature>).
+        display_name:
+          type: string
+        price_version_id:
+          type: integer
+          format: int64
+        price_version:
+          type: integer
+          format: int64
+        output_resolution:
+          type: string
+        unit_credits:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Integer minor units.
+        quantity:
+          type: integer
+          format: int64
+          minimum: 1
+        total_credits:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Integer minor units.
+        quoted_at:
+          type: string
+          format: date-time
+        hold_transaction_id:
+          type: string
+          description: Omitted unless held.
+        settlement_state:
+          $ref: '#/components/schemas/TaskSettlementState'
+    TaskBillingSnapshotEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/TaskBillingSnapshot'
+    TaskOutputRef:
+      type: object
+      required: [kind, result_index]
+      additionalProperties: false
+      properties:
+        kind:
+          $ref: '#/components/schemas/TaskOutputKind'
+        asset_id:
+          $ref: '#/components/schemas/MediaAssetId'
+          description: Set for kind=asset (byte-verified ready asset only).
+        url:
+          type: string
+          format: uri
+          description: Set for kind=remote (no storage internals).
+        checksum_sha256:
+          type: string
+          pattern: '^[0-9a-fA-F]{64}$'
+          description: Set for kind=remote.
+        role:
+          type: string
+        result_index:
+          type: integer
+          minimum: 0
+    WorkspaceTask:
+      type: object
+      required: [id, workspace_id, workflow_kind, status, retry_count, billing_snapshot, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/TaskId'
+        workspace_id:
+          $ref: '#/components/schemas/WorkspaceId'
+        workflow_kind:
+          $ref: '#/components/schemas/WorkflowKind'
+        media_asset_ids:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaAssetId'
+          description: asset_... input references (no raw storage URLs).
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        retry_count:
+          type: integer
+          minimum: 0
+        execution_token:
+          type: string
+          description: Opaque retry-fencing token; omitted when empty.
+        output_refs:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskOutputRef'
+        billing_snapshot:
+          $ref: '#/components/schemas/TaskBillingSnapshot'
+        error_msg:
+          type: string
+          description: Omitted unless failed.
+        cancel_reason:
+          type: string
+          description: Omitted unless cancelled.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: RFC3339 UTC timestamp; null unless terminally completed.
+    TaskEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/WorkspaceTask'
+    PaginatedWorkspaceTasks:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceTask'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    CreateWorkspaceTaskRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [workflow_kind]
+          additionalProperties: false
+          properties:
+            workflow_kind:
+              $ref: '#/components/schemas/WorkflowKind'
+            inputs:
+              type: object
+              additionalProperties: false
+              properties:
+                media_asset_ids:
+                  type: array
+                  maxItems: 8
+                  items:
+                    $ref: '#/components/schemas/MediaAssetId'
+            params:
+              type: object
+              description: Feature params object (unknown fields rejected; no storage URLs).
+            quantity:
+              type: integer
+              format: int64
+              minimum: 1
+              default: 1
+            resolution:
+              type: string
+              description: Output resolution; defaults to default when omitted.
+    QuoteWorkspaceTaskRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [workflow_kind]
+          additionalProperties: false
+          properties:
+            workflow_kind:
+              $ref: '#/components/schemas/WorkflowKind'
+            quantity:
+              type: integer
+              format: int64
+              minimum: 1
+              default: 1
+            resolution:
+              type: string
+              description: Output resolution; defaults to default when omitted.
+    CancelWorkspaceTaskRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          properties:
+            reason:
+              type: string
+              maxLength: 500
+              description: Cancel reason; defaults to "user cancel" when omitted.
+    WorkspaceTaskOutputs:
+      type: object
+      required: [task_id, outputs]
+      additionalProperties: false
+      properties:
+        task_id:
+          $ref: '#/components/schemas/TaskId'
+        outputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskOutputRef'
+    WorkspaceTaskOutputsEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/WorkspaceTaskOutputs'
+    LibraryFolder:
+      type: object
+      required: [id, workspace_id, name, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/LibraryFolderId'
+        workspace_id:
+          $ref: '#/components/schemas/WorkspaceId'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    LibraryFolderEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/LibraryFolder'
+    PaginatedLibraryFolders:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/LibraryFolder'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    CreateLibraryFolderRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [name]
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 100
+    RenameLibraryFolderRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [name]
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 100
+    LibraryAssetProvider:
+      type: string
+      enum: [unsplash, pexels]
+      description: Saved reference provider.
+    LibraryAsset:
+      type: object
+      required: [id, workspace_id, provider, source_id, source_url, preview_url, original_url, width, height, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/LibraryAssetId'
+        workspace_id:
+          $ref: '#/components/schemas/WorkspaceId'
+        folder_id:
+          $ref: '#/components/schemas/LibraryFolderId'
+          description: Omitted when unfiled.
+        provider:
+          $ref: '#/components/schemas/LibraryAssetProvider'
+        source_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        source_url:
+          type: string
+          format: uri
+        preview_url:
+          type: string
+          format: uri
+        original_url:
+          type: string
+          format: uri
+        title:
+          type: string
+          maxLength: 255
+        author:
+          type: string
+          maxLength: 255
+        width:
+          type: integer
+          format: int32
+          minimum: 0
+        height:
+          type: integer
+          format: int32
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    LibraryAssetEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/LibraryAsset'
+    PaginatedLibraryAssets:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/LibraryAsset'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    SaveLibraryAssetRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [provider, source_id]
+          additionalProperties: false
+          properties:
+            provider:
+              $ref: '#/components/schemas/LibraryAssetProvider'
+            source_id:
+              type: string
+              minLength: 1
+              maxLength: 128
+            source_url:
+              type: string
+              format: uri
+            preview_url:
+              type: string
+              format: uri
+            original_url:
+              type: string
+              format: uri
+            title:
+              type: string
+              maxLength: 255
+            author:
+              type: string
+              maxLength: 255
+            width:
+              type: integer
+              format: int32
+              minimum: 0
+            height:
+              type: integer
+              format: int32
+              minimum: 0
+            folder_id:
+              $ref: '#/components/schemas/LibraryFolderId'
+    MoveLibraryAssetRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          properties:
+            folder_id:
+              type: string
+              description: Target libf_ folder; empty unfiles the asset.
+    ResolveLibraryAssetItem:
+      type: object
+      required: [provider]
+      additionalProperties: false
+      properties:
+        provider:
+          $ref: '#/components/schemas/LibraryAssetProvider'
+        source_id:
+          type: string
+        source_url:
+          type: string
+          format: uri
+    ResolveLibraryAssetsRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [items]
+          additionalProperties: false
+          properties:
+            items:
+              type: array
+              maxItems: 20
+              items:
+                $ref: '#/components/schemas/ResolveLibraryAssetItem'
+    ResolveLibraryAssetResult:
+      type: object
+      required: [provider, status]
+      additionalProperties: false
+      properties:
+        provider:
+          type: string
+        source_id:
+          type: string
+        status:
+          type: string
+          enum: [resolved, unresolved]
+        asset:
+          $ref: '#/components/schemas/LibraryAsset'
+    ResolveLibraryAssetsResult:
+      type: object
+      required: [items]
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResolveLibraryAssetResult'
+    ResolveLibraryAssetsEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/ResolveLibraryAssetsResult'
+    LibraryMaterializationStatus:
+      type: string
+      enum: [pending, running, completed, failed]
+      description: Durable materialization job status (terminal states immutable).
+    LibraryMaterialization:
+      type: object
+      required: [id, workspace_id, library_asset_id, status, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/LibraryMaterializationId'
+        workspace_id:
+          $ref: '#/components/schemas/WorkspaceId'
+        library_asset_id:
+          $ref: '#/components/schemas/LibraryAssetId'
+        status:
+          $ref: '#/components/schemas/LibraryMaterializationStatus'
+        media_asset_id:
+          $ref: '#/components/schemas/MediaAssetId'
+          description: Set on completed (managed media asset link).
+        error_code:
+          type: string
+          description: Set on failed.
+        error_message:
+          type: string
+          description: Set on failed.
+        replayed:
+          type: boolean
+          description: True when an idempotent replay returned the first job.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    LibraryMaterializationEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/LibraryMaterialization'
+    CreateLibraryMaterializationRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [library_asset_id]
+          additionalProperties: false
+          properties:
+            library_asset_id:
+              $ref: '#/components/schemas/LibraryAssetId'
+    WorkspaceSearchResult:
+      type: object
+      required: [provider, source_id, source_url, preview_url, original_url, width, height]
+      additionalProperties: false
+      properties:
+        provider:
+          $ref: '#/components/schemas/LibraryAssetProvider'
+        source_id:
+          type: string
+        title:
+          type: string
+        author:
+          type: string
+        source_url:
+          type: string
+          format: uri
+        preview_url:
+          type: string
+          format: uri
+        original_url:
+          type: string
+          format: uri
+        width:
+          type: integer
+          minimum: 0
+        height:
+          type: integer
+          minimum: 0
+    PaginatedWorkspaceSearchResults:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceSearchResult'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    CreateWorkspaceVisionQueryRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          properties:
+            user_text:
+              type: string
+              maxLength: 200
+              description: Free text (at least one of user_text/refs is required).
+            library_asset_ids:
+              type: array
+              maxItems: 4
+              items:
+                $ref: '#/components/schemas/LibraryAssetId'
+              description: Owned workspace library references (no client bytes).
+    WorkspaceVisionQuery:
+      type: object
+      required: [operation_id, status, query, created_at]
+      additionalProperties: false
+      properties:
+        operation_id:
+          $ref: '#/components/schemas/VisionQueryId'
+        status:
+          type: string
+          enum: [succeeded]
+        query:
+          type: string
+          description: Normalized extracted query.
+        replayed:
+          type: boolean
+          description: True when an idempotent replay returned the first query.
+        created_at:
+          type: string
+          format: date-time
+    WorkspaceVisionQueryEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/WorkspaceVisionQuery'

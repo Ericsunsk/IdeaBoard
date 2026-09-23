@@ -1,3 +1,7 @@
 export * from './control-billing/control-billing'
+export * from './control-credits/control-credits'
+export * from './control-payments/control-payments'
+export * from './control-platform/control-platform'
+export * from './control-tasks/control-tasks'
 export * from './control-users/control-users'
 export * from './control-workspaces/control-workspaces'

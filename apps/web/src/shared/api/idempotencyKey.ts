@@ -53,3 +53,46 @@ export function workspaceMediaIdempotencyKey(operation: 'archive'): string {
 export function workspaceBillingCheckoutIdempotencyKey(): string {
   return createIdempotencyKey('billing:checkout')
 }
+
+// Workspace library write key per operation (issue #806, `library:<operation>`
+// backend scope bound to principal + workspace). Retries of the SAME
+// attempt must reuse the returned value so the server replays instead
+// of duplicating folders, assets, or materializations.
+export function workspaceLibraryIdempotencyKey(operation: string): string {
+  const normalized = operation.trim() || 'write'
+  return createIdempotencyKey(`library:${normalized}`)
+}
+
+// Workspace vision-query key per attempt (issue #806, `search:vision`
+// backend scope bound to principal + workspace). Retries of the SAME
+// attempt must reuse the returned value; a new vision intent needs a
+// fresh call.
+export function workspaceVisionQueryIdempotencyKey(): string {
+  return createIdempotencyKey('search:vision')
+}
+
+// Workspace task key per operation (issue #805, `task:<operation>`
+// backend scope bound to principal + workspace). Retries of the SAME
+// attempt must reuse the returned value; a new task intent needs a
+// fresh call.
+export function workspaceTaskIdempotencyKey(operation: 'create' | 'cancel'): string {
+  return createIdempotencyKey(`task:${operation}`)
+}
+
+// Control Plane user administration key per operation (issue #808,
+// `control:<operation>` backend scope bound to the operator). Retries of
+// the SAME attempt must reuse the returned value; a new operator intent
+// needs a fresh call.
+export function controlUserIdempotencyKey(
+  operation: 'ban' | 'unban' | 'revoke-sessions' | 'role' | 'delete' | 'impersonate',
+): string {
+  return createIdempotencyKey(`control:users.${operation}`)
+}
+
+// Control Plane credit command key per operation (issue #808,
+// `control:credits.<operation>` backend scope bound to the operator).
+export function controlCreditIdempotencyKey(
+  operation: 'grant' | 'deduct' | 'refund' | 'correct',
+): string {
+  return createIdempotencyKey(`control:credits.${operation}`)
+}

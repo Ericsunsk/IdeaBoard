@@ -1,8 +1,8 @@
 import type {
-  AdminCreditDeductionRequest,
-  AdminCreditGrantRequest,
-  AdminCreditRefundRequest,
-} from '../../../../shared/api/generated-query/model'
+  ControlCreditCommandRequest,
+  ControlCreditCorrectionRequest,
+  ControlCreditRefundRequest,
+} from '../../../../shared/api/generated-query/control/model'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { createUniqueId } from '../../../../shared/utils/ids'
 
@@ -15,13 +15,23 @@ export type AdminCreditCommandDraft = {
 
 export type AdminCreditCommandInput = AdminCreditCommandDraft & {
   kind: AdminCreditCommandKind
+  // Control user id (usr_...). The control ledger resolves it to the
+  // internal wallet; raw numeric ids never cross the boundary.
   userPublicId: string
   chargeTransactionId?: string | undefined
   remainingRefundableCredits?: number | undefined
 }
 
 export type AdminCreditCommandRequest =
-  AdminCreditGrantRequest | AdminCreditDeductionRequest | AdminCreditRefundRequest
+  ControlCreditCommandRequest | ControlCreditRefundRequest | ControlCreditCorrectionRequest
+
+// Built control command: header-only idempotency key travels in transport
+// headers (never in the body); the body carries the operator reason.
+export type BuiltAdminCreditCommand = {
+  body: AdminCreditCommandRequest
+  idempotencyKey: string
+  operatorReason: string
+}
 
 export type CreditCommandValidation = {
   amountError: string
@@ -71,7 +81,7 @@ export function isRefundableCharge(transaction: {
 export function buildAdminCreditCommandRequest(
   input: AdminCreditCommandInput,
   idFactory: () => string = () => createUniqueId(),
-): AdminCreditCommandRequest {
+): BuiltAdminCreditCommand {
   const validation = validateAdminCreditCommand(input)
   if (!validation.valid || input.amountCredits == null) {
     throw new Error(validation.amountError || validation.reasonError || 'Idea操作参数无效')
@@ -81,19 +91,22 @@ export function buildAdminCreditCommandRequest(
     .replace(/[^a-zA-Z0-9_-]/g, '')
     .slice(0, 96)
   if (!operationId) throw new Error('无法生成Idea操作标识')
-  const common = {
-    user_public_id: input.userPublicId,
+  const reason = input.reason.trim()
+  const body: AdminCreditCommandRequest = {
+    user_id: input.userPublicId,
     amount_credits: input.amountCredits,
-    reason: input.reason.trim(),
-    idempotency_key: `admin-ui:${input.kind}:${operationId}`,
-    business_reference_id: `admin-ui:${input.kind}:${operationId}`,
+    business_reference_id: `control-ui:${input.kind}:${operationId}`,
+    reason,
   }
 
   if (input.kind === 'refund') {
-    return {
-      ...common,
-      charge_transaction_id: input.chargeTransactionId as string,
-    }
+    ;(body as ControlCreditRefundRequest).charge_transaction_id =
+      input.chargeTransactionId as string
   }
-  return common
+
+  return {
+    body,
+    idempotencyKey: `control-ui:${input.kind}:${operationId}`,
+    operatorReason: reason,
+  }
 }

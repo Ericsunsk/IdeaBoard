@@ -3,21 +3,47 @@ info:
   title: IdeaBoard Control API
   version: 0.1.0
   description: |
-    Control Plane contract skeleton (issue #800).
-    Canonical prefix is /api/control/v1. This surface has its own OpenAPI
-    contract, authorization middleware, capability checks, rate limits and
+    Control Plane contract (issue #808). Canonical prefix is /api/control/v1,
+    with its own OpenAPI contract, capability authorization, rate limits, and
     mandatory audit records, independent from the Public Data Plane. It must
     never be exposed as ordinary public resources such as /api/v1/platform/*.
-    Stub families carry `x-stub: true` and are filled in by #808. The legacy
-    single-file contract in apps/api/openapi.yaml is untouched.
+
+    Auth: operator session cookie or X-Control-Key; authorization is
+    capability-based (x-capability on every operation), never a role check.
+    Public capabilities never imply control capabilities.
+
+    Mutations: every POST/PUT/PATCH/DELETE requires a header-only
+    Idempotency-Key and an operator reason (reason/operator_note body field
+    or X-Operator-Reason header), else 400. Every guarded call emits a
+    Control AuditRecord (operator, target, capability, request_id,
+    idempotency key, reason, outcome, timestamp); audit records never enter
+    the public event layer.
+
+    Envelope: dedicated handlers render {data, meta?} success and
+    {error: {code, message, request_id}} errors with a Request-Id response
+    header. Routes marked x-control-envelope: legacy proxy the legacy admin
+    handler shape under the same guard until #809 unifies envelopes.
+
+    Capability list (frozen): control:users, control:workspaces,
+    control:billing, control:credits, control:payments, control:platform,
+    control:tasks, plus the control:* wildcard grant.
   x-rate-limit:
     window_seconds: 60
     max_requests: 120
-    description: Control Plane limits are separate from Public limits.
+    description: Control Plane limits are separate from Public limits, per operator.
   x-audit:
     required: true
     fields: [operator, target, capability, request_id, idempotency_key, reason, outcome, occurred_at]
     description: Every high-risk mutation records operator, target, reason and outcome.
+  x-capabilities:
+    - control:users
+    - control:workspaces
+    - control:billing
+    - control:credits
+    - control:payments
+    - control:platform
+    - control:tasks
+    - control:*
 servers:
   - url: /api/control/v1
 security:
@@ -30,13 +56,21 @@ tags:
     description: Workspace administration and membership intervention.
   - name: ControlBilling
     description: Billing accounts, catalog and financial operations.
+  - name: ControlCredits
+    description: Credit grants, deductions, refunds, corrections and reads via credits.Commands.
+  - name: ControlPayments
+    description: Payment order reads, refunds and Stripe configuration.
+  - name: ControlTasks
+    description: Scoped task read/ops (get/list/cancel). No task creation path.
+  - name: ControlPlatform
+    description: Platform settings, provider config and monitor/statistics.
 paths:
   /users:
     get:
       tags: [ControlUsers]
       operationId: listControlUsers
-      summary: List users for platform administration (stub)
-      x-stub: true
+      summary: List users for platform administration
+      x-capability: control:users
       x-audit:
         operator: true
         target: null
@@ -45,6 +79,9 @@ paths:
       parameters:
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/ControlKeyword'
+        - $ref: '#/components/parameters/ControlRole'
+        - $ref: '#/components/parameters/ControlStatus'
       responses:
         '200':
           description: Paginated control user list.
@@ -59,51 +96,455 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
-  /workspaces:
+  /users/{user_id}:
     get:
-      tags: [ControlWorkspaces]
-      operationId: listControlWorkspaces
-      summary: List workspaces for platform administration (stub)
-      x-stub: true
+      tags: [ControlUsers]
+      operationId: getControlUser
+      summary: Get one user for platform administration
+      x-capability: control:users
       x-audit:
         operator: true
-        target: null
+        target: user
         reason: false
         outcome: read
       parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/ControlUserId'
       responses:
         '200':
-          description: Paginated control workspace list.
+          description: Control user detail.
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedControlWorkspaces'
+                $ref: '#/components/schemas/ControlUserEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+    delete:
+      tags: [ControlUsers]
+      operationId: deleteControlUser
+      summary: Delete a user (durable multi-phase deletion via identity seam)
+      x-capability: control:users
+      x-audit:
+        operator: true
+        target: user
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlUserId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      responses:
+        '200':
+          description: Deletion accepted.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAckEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /users/{user_id}/role:
+    put:
+      tags: [ControlUsers]
+      operationId: updateControlUserRole
+      summary: Change a user role (operator reason required)
+      x-capability: control:users
+      x-audit:
+        operator: true
+        target: user
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlUserId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlSetRoleRequest'
+      responses:
+        '200':
+          description: Role updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAckEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /users/{user_id}/ban:
+    post:
+      tags: [ControlUsers]
+      operationId: banControlUser
+      summary: Ban a user (operator reason required)
+      x-capability: control:users
+      x-audit:
+        operator: true
+        target: user
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlUserId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlBanRequest'
+      responses:
+        '200':
+          description: User banned.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAckEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /users/{user_id}/unban:
+    post:
+      tags: [ControlUsers]
+      operationId: unbanControlUser
+      summary: Unban a user (operator reason required)
+      x-capability: control:users
+      x-audit:
+        operator: true
+        target: user
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlUserId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      responses:
+        '200':
+          description: User unbanned.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAckEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /users/{user_id}/sessions:
+    delete:
+      tags: [ControlUsers]
+      operationId: revokeControlUserSessions
+      summary: Revoke all sessions of a user (operator reason required)
+      x-capability: control:users
+      x-audit:
+        operator: true
+        target: user
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlUserId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      responses:
+        '200':
+          description: Sessions revoked.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAckEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /users/{user_id}/impersonation:
+    post:
+      tags: [ControlUsers]
+      operationId: impersonateControlUser
+      summary: Impersonate a user for support (operator reason required; never self or admins)
+      x-capability: control:users
+      x-audit:
+        operator: true
+        target: user
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlUserId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      responses:
+        '200':
+          description: Impersonation session cookies set.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAckEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /workspaces/{workspace_id}:
+    get:
+      tags: [ControlWorkspaces]
+      operationId: getControlWorkspace
+      summary: Get one workspace for platform administration
+      x-capability: control:workspaces
+      x-audit:
+        operator: true
+        target: workspace
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlWorkspaceId'
+      responses:
+        '200':
+          description: Control workspace detail.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlWorkspaceEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+  /workspaces/{workspace_id}/members:
+    get:
+      tags: [ControlWorkspaces]
+      operationId: listControlWorkspaceMembers
+      summary: List workspace members for platform administration
+      x-capability: control:workspaces
+      x-audit:
+        operator: true
+        target: workspace
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlWorkspaceId'
+      responses:
+        '200':
+          description: Workspace member list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedControlWorkspaceMembers'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+    post:
+      tags: [ControlWorkspaces]
+      operationId: addControlWorkspaceMember
+      summary: Override workspace membership (operator reason required)
+      x-capability: control:workspaces
+      x-audit:
+        operator: true
+        target: workspace
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlWorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlWorkspaceMemberRequest'
+      responses:
+        '201':
+          description: Member added.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlWorkspaceMemberEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /workspaces/{workspace_id}/members/{member_id}:
+    patch:
+      tags: [ControlWorkspaces]
+      operationId: updateControlWorkspaceMember
+      summary: Override a workspace member role (operator reason required)
+      x-capability: control:workspaces
+      x-audit:
+        operator: true
+        target: user
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlWorkspaceId'
+        - $ref: '#/components/parameters/ControlMemberId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlWorkspaceMemberRoleRequest'
+      responses:
+        '200':
+          description: Member role updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlWorkspaceMemberEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+    delete:
+      tags: [ControlWorkspaces]
+      operationId: removeControlWorkspaceMember
+      summary: Remove a workspace member (operator reason required)
+      x-capability: control:workspaces
+      x-audit:
+        operator: true
+        target: user
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlWorkspaceId'
+        - $ref: '#/components/parameters/ControlMemberId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      responses:
+        '200':
+          description: Member removed.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAckEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
   /billing/accounts:
     get:
       tags: [ControlBilling]
       operationId: listControlBillingAccounts
-      summary: List billing accounts for financial operations (stub)
-      x-stub: true
+      summary: Resolve the implicit billing account for a workspace
+      x-capability: control:billing
       x-audit:
         operator: true
         target: null
         reason: false
         outcome: read
       parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/PageSize'
+        - name: workspace_id
+          in: query
+          required: true
+          description: Workspace public id (ws_...) owning the account.
+          schema:
+            type: string
+            pattern: '^ws_[A-Za-z0-9_-]+$'
       responses:
         '200':
-          description: Paginated billing account list.
+          description: Billing account for the workspace.
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
@@ -111,10 +552,1907 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedControlBillingAccounts'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /billing/catalog:
+    get:
+      tags: [ControlBilling]
+      operationId: listControlBillingCatalog
+      summary: List the billable pricing catalog
+      x-capability: control:billing
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Catalog items.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlCatalogEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /billing/catalog/{sku}/prices:
+    post:
+      tags: [ControlBilling]
+      operationId: publishControlCatalogPrices
+      summary: Publish SKU prices (operator reason required)
+      x-capability: control:billing
+      x-audit:
+        operator: true
+        target: billing_sku
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlSku'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlPublishPricesRequest'
+      responses:
+        '200':
+          description: Prices published.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAckEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /billing/catalog/{sku}/availability:
+    put:
+      tags: [ControlBilling]
+      operationId: setControlCatalogAvailability
+      summary: Set SKU availability (operator reason required)
+      x-capability: control:billing
+      x-audit:
+        operator: true
+        target: billing_sku
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlSku'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlSetAvailabilityRequest'
+      responses:
+        '200':
+          description: Availability updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAckEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /billing/catalog/{sku}:
+    delete:
+      tags: [ControlBilling]
+      operationId: deleteControlCatalogItem
+      summary: Delete an archived catalog item (operator reason required)
+      x-capability: control:billing
+      x-audit:
+        operator: true
+        target: billing_sku
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlSku'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      responses:
+        '200':
+          description: Catalog item deleted.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAckEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /credits/grants:
+    post:
+      tags: [ControlCredits]
+      operationId: createControlCreditGrant
+      summary: Grant credits via credits.Commands (operator reason required)
+      x-capability: control:credits
+      x-audit:
+        operator: true
+        target: user
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlCreditCommandRequest'
+      responses:
+        '200':
+          description: Grant applied.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlCreditResultEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /credits/deductions:
+    post:
+      tags: [ControlCredits]
+      operationId: createControlCreditDeduction
+      summary: Deduct credits via credits.Commands (operator reason required)
+      x-capability: control:credits
+      x-audit:
+        operator: true
+        target: user
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlCreditCommandRequest'
+      responses:
+        '200':
+          description: Deduction applied.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlCreditResultEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /credits/refunds:
+    post:
+      tags: [ControlCredits]
+      operationId: createControlCreditRefund
+      summary: Refund a charge via credits.Commands (operator reason required)
+      x-capability: control:credits
+      x-audit:
+        operator: true
+        target: user
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlCreditRefundRequest'
+      responses:
+        '200':
+          description: Refund applied.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlCreditResultEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /credits/corrections:
+    post:
+      tags: [ControlCredits]
+      operationId: createControlCreditCorrection
+      summary: Correct a prior transaction via credits.Commands (operator reason required)
+      x-capability: control:credits
+      x-audit:
+        operator: true
+        target: user
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlCreditCorrectionRequest'
+      responses:
+        '200':
+          description: Correction applied.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlCreditResultEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /credits/wallets/{user_id}:
+    get:
+      tags: [ControlCredits]
+      operationId: getControlCreditWallet
+      summary: Read a user credit wallet
+      x-capability: control:credits
+      x-audit:
+        operator: true
+        target: user
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlUserId'
+      responses:
+        '200':
+          description: Wallet detail.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlCreditWalletEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+  /credits/wallets/{user_id}/ledger:
+    get:
+      tags: [ControlCredits]
+      operationId: listControlCreditLedger
+      summary: List wallet ledger transactions
+      x-capability: control:credits
+      x-audit:
+        operator: true
+        target: user
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlUserId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Ledger page.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedControlLedger'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+  /credits/health:
+    get:
+      tags: [ControlCredits]
+      operationId: getControlCreditHealth
+      summary: Read credit health
+      x-capability: control:credits
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Credit health snapshot.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /credits/reconciliation/runs:
+    post:
+      tags: [ControlCredits]
+      operationId: startControlReconciliation
+      summary: Start a manual reconciliation run (operator reason required)
+      x-capability: control:credits
+      x-audit:
+        operator: true
+        target: null
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlReasonRequest'
+      responses:
+        '200':
+          description: Reconciliation run started.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+    get:
+      tags: [ControlCredits]
+      operationId: listControlReconciliationRuns
+      summary: List reconciliation runs
+      x-capability: control:credits
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlLimit'
+        - $ref: '#/components/parameters/ControlBeforeId'
+      responses:
+        '200':
+          description: Reconciliation run page.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /credits/reconciliation/runs/{run_id}:
+    get:
+      tags: [ControlCredits]
+      operationId: getControlReconciliationRun
+      summary: Get one reconciliation run
+      x-capability: control:credits
+      x-audit:
+        operator: true
+        target: reconciliation_run
+        reason: false
+        outcome: read
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Reconciliation run detail.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+  /credits/reconciliation/findings:
+    get:
+      tags: [ControlCredits]
+      operationId: listControlReconciliationFindings
+      summary: List global reconciliation findings
+      x-capability: control:credits
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      parameters:
+        - name: status
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [open, resolved]
+        - $ref: '#/components/parameters/ControlLimit'
+        - $ref: '#/components/parameters/ControlBeforeId'
+      responses:
+        '200':
+          description: Findings page.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /payments/orders:
+    get:
+      tags: [ControlPayments]
+      operationId: listControlPaymentOrders
+      summary: List payment orders
+      x-capability: control:payments
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlPaymentOrderFilters'
+      responses:
+        '200':
+          description: Payment order page.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /payments/orders/{order_number}:
+    get:
+      tags: [ControlPayments]
+      operationId: getControlPaymentOrder
+      summary: Get one payment order
+      x-capability: control:payments
+      x-audit:
+        operator: true
+        target: payment_order
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlOrderNumber'
+      responses:
+        '200':
+          description: Payment order detail.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+  /payments/orders/{order_number}/refunds:
+    post:
+      tags: [ControlPayments]
+      operationId: createControlPaymentRefund
+      summary: Create a payment refund (operator reason required)
+      x-capability: control:payments
+      x-audit:
+        operator: true
+        target: payment_order
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlOrderNumber'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlPaymentRefundRequest'
+      responses:
+        '200':
+          description: Refund created.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /payments/stripe-config:
+    get:
+      tags: [ControlPayments]
+      operationId: getControlStripeConfig
+      summary: Read the Stripe configuration summary
+      x-capability: control:payments
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Stripe configuration summary.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [ControlPayments]
+      operationId: updateControlStripeConfig
+      summary: Update the Stripe configuration (operator reason required)
+      x-capability: control:payments
+      x-audit:
+        operator: true
+        target: null
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlStripeConfigRequest'
+      responses:
+        '200':
+          description: Stripe configuration updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /tasks:
+    get:
+      tags: [ControlTasks]
+      operationId: listControlTasks
+      summary: List tasks for platform operations (scoped read)
+      x-capability: control:tasks
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/ControlTaskStatus'
+        - $ref: '#/components/parameters/ControlKeyword'
+        - $ref: '#/components/parameters/ControlTaskUser'
+      responses:
+        '200':
+          description: Task page.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedControlTasks'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /tasks/{task_id}:
+    get:
+      tags: [ControlTasks]
+      operationId: getControlTask
+      summary: Get one task for platform operations (scoped read)
+      x-capability: control:tasks
+      x-audit:
+        operator: true
+        target: task
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlTaskId'
+      responses:
+        '200':
+          description: Task detail.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlTaskEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+  /tasks/{task_id}/cancel:
+    post:
+      tags: [ControlTasks]
+      operationId: cancelControlTask
+      summary: Cancel a task with operator reason (no creation path exists on control)
+      x-capability: control:tasks
+      x-audit:
+        operator: true
+        target: task
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlTaskId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      responses:
+        '200':
+          description: Task cancelled.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAckEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/settings/registration:
+    get:
+      tags: [ControlPlatform]
+      operationId: getControlRegistrationSetting
+      summary: Read the registration setting
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Registration setting.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [ControlPlatform]
+      operationId: updateControlRegistrationSetting
+      summary: Update the registration setting (operator reason required)
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Registration setting payload (mirrors the runtime settings seam).
+      responses:
+        '200':
+          description: Registration setting updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/settings/rate-limit:
+    get:
+      tags: [ControlPlatform]
+      operationId: getControlRateLimitSetting
+      summary: Read the rate-limit setting
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Rate-limit setting.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [ControlPlatform]
+      operationId: updateControlRateLimitSetting
+      summary: Update the rate-limit setting (operator reason required)
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Rate-limit setting payload (mirrors the runtime settings seam).
+      responses:
+        '200':
+          description: Rate-limit setting updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/settings/branding:
+    get:
+      tags: [ControlPlatform]
+      operationId: getControlBrandingSetting
+      summary: Read the branding setting
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Branding setting.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [ControlPlatform]
+      operationId: updateControlBrandingSetting
+      summary: Update the branding setting (operator reason required)
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Branding setting payload (mirrors the runtime settings seam).
+      responses:
+        '200':
+          description: Branding setting updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/settings/media-upload:
+    get:
+      tags: [ControlPlatform]
+      operationId: getControlMediaUploadSetting
+      summary: Read the media-upload setting
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Media-upload setting.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [ControlPlatform]
+      operationId: updateControlMediaUploadSetting
+      summary: Update the media-upload setting (operator reason required)
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Media-upload setting payload (mirrors the runtime settings seam).
+      responses:
+        '200':
+          description: Media-upload setting updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/settings/outbound-policy:
+    get:
+      tags: [ControlPlatform]
+      operationId: getControlOutboundPolicy
+      summary: Read the outbound policy
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Outbound policy.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [ControlPlatform]
+      operationId: updateControlOutboundPolicy
+      summary: Update the outbound policy (operator reason required)
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlOutboundPolicyRequest'
+      responses:
+        '200':
+          description: Outbound policy updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/ai-gateway:
+    get:
+      tags: [ControlPlatform]
+      operationId: getControlAIGateway
+      summary: Read the AI gateway configuration
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: AI gateway configuration (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [ControlPlatform]
+      operationId: updateControlAIGateway
+      summary: Update the AI gateway configuration (operator reason required)
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: AI gateway update payload (legacy admin shape).
+      responses:
+        '200':
+          description: AI gateway configuration updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/ai-gateway/models:
+    get:
+      tags: [ControlPlatform]
+      operationId: listControlAIGatewayModels
+      summary: List AI gateway feature model mappings
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Model mappings (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /platform/ai-gateway/models/{feature}:
+    put:
+      tags: [ControlPlatform]
+      operationId: saveControlAIGatewayModel
+      summary: Save an AI gateway feature model mapping (operator reason required)
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: ai_gateway_model
+        reason: true
+        outcome: success
+      parameters:
+        - name: feature
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Model mapping payload (legacy admin shape).
+      responses:
+        '200':
+          description: Model mapping saved.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/ai-gateway/catalog:
+    get:
+      tags: [ControlPlatform]
+      operationId: listControlAIGatewayCatalog
+      summary: List the AI gateway model catalog
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Model catalog (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [ControlPlatform]
+      operationId: saveControlAIGatewayCatalog
+      summary: Save the AI gateway model catalog (operator reason required)
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Catalog payload (legacy admin shape).
+      responses:
+        '200':
+          description: Catalog saved.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/ai-gateway/providers:
+    get:
+      tags: [ControlPlatform]
+      operationId: listControlAIGatewayProviders
+      summary: List AI gateway providers
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Providers (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /platform/storage/providers:
+    get:
+      tags: [ControlPlatform]
+      operationId: listControlStorageProviders
+      summary: List storage providers
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Storage providers (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /platform/storage/profiles:
+    get:
+      tags: [ControlPlatform]
+      operationId: listControlStorageProfiles
+      summary: List storage profiles
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Storage profiles (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [ControlPlatform]
+      operationId: createControlStorageProfile
+      summary: Create a storage profile (operator reason required)
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Storage profile payload (legacy admin shape).
+      responses:
+        '200':
+          description: Storage profile created.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/storage/profiles/{id}:
+    put:
+      tags: [ControlPlatform]
+      operationId: updateControlStorageProfile
+      summary: Update a storage profile (operator reason required)
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: storage_profile
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlStorageProfileId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Storage profile payload (legacy admin shape).
+      responses:
+        '200':
+          description: Storage profile updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+    delete:
+      tags: [ControlPlatform]
+      operationId: deleteControlStorageProfile
+      summary: Delete a storage profile (operator reason required)
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: storage_profile
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlStorageProfileId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      responses:
+        '200':
+          description: Storage profile deleted.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/storage/profiles/{id}/apply:
+    post:
+      tags: [ControlPlatform]
+      operationId: applyControlStorageProfile
+      summary: Apply a storage profile (operator reason required)
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: storage_profile
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlStorageProfileId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      responses:
+        '200':
+          description: Storage profile applied.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/storage/profiles/{id}/test:
+    post:
+      tags: [ControlPlatform]
+      operationId: testControlStorageProfile
+      summary: Test a storage profile connection (operator reason required)
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: storage_profile
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlStorageProfileId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      responses:
+        '200':
+          description: Storage profile test result.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/storage/profiles/{id}/bucket-info:
+    get:
+      tags: [ControlPlatform]
+      operationId: getControlStorageBucketInfo
+      summary: Read storage bucket info
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: storage_profile
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlStorageProfileId'
+      responses:
+        '200':
+          description: Bucket info (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /platform/search/providers:
+    get:
+      tags: [ControlPlatform]
+      operationId: listControlSearchProviders
+      summary: List search providers
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Search providers (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /platform/search/providers/{provider}:
+    put:
+      tags: [ControlPlatform]
+      operationId: updateControlSearchProvider
+      summary: Update a search provider (operator reason required)
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: search_provider
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlSearchProvider'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Search provider payload (legacy admin shape).
+      responses:
+        '200':
+          description: Search provider updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/search/providers/{provider}/test:
+    post:
+      tags: [ControlPlatform]
+      operationId: testControlSearchProvider
+      summary: Test a search provider connection (operator reason required)
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: search_provider
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlSearchProvider'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      responses:
+        '200':
+          description: Search provider test result.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/feature-prompts:
+    get:
+      tags: [ControlPlatform]
+      operationId: listControlFeaturePrompts
+      summary: List feature prompt templates
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Feature prompts (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /platform/feature-prompts/{slug}:
+    get:
+      tags: [ControlPlatform]
+      operationId: getControlFeaturePrompt
+      summary: Read one feature prompt template
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: feature_prompt
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlPromptSlug'
+      responses:
+        '200':
+          description: Feature prompt (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [ControlPlatform]
+      operationId: saveControlFeaturePrompt
+      summary: Save a feature prompt template (operator reason required)
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: feature_prompt
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlPromptSlug'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Feature prompt payload (legacy admin shape, prompt field).
+      responses:
+        '200':
+          description: Feature prompt saved.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/monitor:
+    get:
+      tags: [ControlPlatform]
+      operationId: getControlMonitor
+      summary: Read the runtime monitor snapshot
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Monitor snapshot (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /platform/statistics:
+    get:
+      tags: [ControlPlatform]
+      operationId: getControlStatistics
+      summary: Read task statistics
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      parameters:
+        - name: range
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Statistics (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /platform/statistics/backfill:
+    post:
+      tags: [ControlPlatform]
+      operationId: backfillControlStatistics
+      summary: Backfill task statistics (operator reason required)
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Backfill payload (legacy admin shape, range field).
+      responses:
+        '200':
+          description: Backfill result.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
 components:
   securitySchemes:
     controlSession:
@@ -156,6 +2494,139 @@ components:
         type: string
         minLength: 1
         maxLength: 128
+    OperatorReason:
+      name: X-Operator-Reason
+      in: header
+      required: false
+      description: Operator note justifying the high-risk mutation. Required on every mutation via header or reason/operator_note body field.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 1000
+    ControlUserId:
+      name: user_id
+      in: path
+      required: true
+      description: User public id (usr_...).
+      schema:
+        type: string
+        pattern: '^usr_[A-Za-z0-9]+$'
+    ControlWorkspaceId:
+      name: workspace_id
+      in: path
+      required: true
+      description: Workspace public id (ws_...).
+      schema:
+        type: string
+        pattern: '^ws_[A-Za-z0-9_-]+$'
+    ControlMemberId:
+      name: member_id
+      in: path
+      required: true
+      description: Member user public id (usr_...).
+      schema:
+        type: string
+        pattern: '^usr_[A-Za-z0-9]+$'
+    ControlTaskId:
+      name: task_id
+      in: path
+      required: true
+      description: Task public id (task_...).
+      schema:
+        type: string
+        pattern: '^task_[A-Za-z0-9_-]+$'
+    ControlSku:
+      name: sku
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    ControlOrderNumber:
+      name: order_number
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+    ControlStorageProfileId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    ControlSearchProvider:
+      name: provider
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    ControlPromptSlug:
+      name: slug
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    ControlKeyword:
+      name: keyword
+      in: query
+      required: false
+      schema:
+        type: string
+        maxLength: 128
+    ControlRole:
+      name: role
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [admin, user]
+    ControlStatus:
+      name: status
+      in: query
+      required: false
+      schema:
+        type: string
+    ControlTaskStatus:
+      name: status
+      in: query
+      required: false
+      schema:
+        type: string
+    ControlTaskUser:
+      name: user_id
+      in: query
+      required: false
+      description: Filter by user public id (usr_...).
+      schema:
+        type: string
+    ControlLimit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+    ControlBeforeId:
+      name: before_id
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+    ControlPaymentOrderFilters:
+      name: order_number
+      in: query
+      required: false
+      description: Filter by order number. Also accepts user, status, anomaly_only, cursor, limit.
+      schema:
+        type: string
   headers:
     RequestId:
       description: Server-assigned request correlation ID, present on every response.
@@ -166,6 +2637,15 @@ components:
       schema:
         type: integer
   responses:
+    BadRequest:
+      description: Malformed request, missing operator reason, or missing Idempotency-Key.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ControlErrorEnvelope'
     Unauthorized:
       description: Missing operator authentication.
       headers:
@@ -180,6 +2660,44 @@ components:
       headers:
         Request-Id:
           $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ControlErrorEnvelope'
+    ControlNotFound:
+      description: Control resource not found (hidden resources converge here).
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ControlErrorEnvelope'
+    IdempotencyConflict:
+      description: Idempotency-Key reused with a different request.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ControlErrorEnvelope'
+    UnprocessableEntity:
+      description: Semantically invalid control operation.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ControlErrorEnvelope'
+    RateLimited:
+      description: Control rate-limit budget exhausted for this operator.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
       content:
         application/json:
           schema:
@@ -226,7 +2744,7 @@ components:
           properties:
             type:
               type: string
-              enum: [user, service_account]
+              enum: [human_session, internal_worker, service_account, api_key, oauth_app]
             id:
               type: string
         target:
@@ -241,7 +2759,7 @@ components:
               type: string
         capability:
           type: string
-          description: Control capability used, e.g. users.impersonate.
+          description: Control capability used, e.g. control:users.
         request_id:
           type: string
         idempotency_key:
@@ -259,28 +2777,349 @@ components:
           format: date-time
     ControlUser:
       type: object
-      required: [id]
+      required: [id, display_name, role, status, created_at, updated_at]
       additionalProperties: false
       properties:
         id:
           type: string
           pattern: '^usr_[A-Za-z0-9]+$'
+        display_name:
+          type: string
+        email:
+          type: string
+        providers:
+          type: array
+          items:
+            type: string
+        avatar:
+          type: string
+        role:
+          type: string
+          enum: [admin, user]
+        status:
+          type: integer
+        available_credits:
+          type: integer
+        last_login_ip:
+          type: string
+        last_login_country:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
     ControlWorkspace:
       type: object
-      required: [id]
+      required: [id, name, created_at, updated_at]
       additionalProperties: false
       properties:
         id:
           type: string
-          pattern: '^ws_[A-Za-z0-9]+$'
+          pattern: '^ws_[A-Za-z0-9_-]+$'
+        name:
+          type: string
+        organization_id:
+          type: string
+          nullable: true
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ControlWorkspaceMember:
+      type: object
+      required: [user_id, role, created_at]
+      additionalProperties: false
+      properties:
+        user_id:
+          type: string
+          pattern: '^usr_[A-Za-z0-9]+$'
+        role:
+          type: string
+          enum: [owner, admin, member]
+        created_at:
+          type: string
+          format: date-time
     ControlBillingAccount:
       type: object
-      required: [id]
+      required: [workspace_id, created_at, updated_at]
       additionalProperties: false
       properties:
-        id:
+        workspace_id:
           type: string
-          description: Opaque billing account identifier owned by a workspace or organization.
+          description: Workspace public id owning the implicit billing account.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ControlCreditWallet:
+      type: object
+      required: [user_id, display_name, available_credits, reserved_credits, status, active_restrictions]
+      additionalProperties: false
+      properties:
+        user_id:
+          type: string
+          pattern: '^usr_[A-Za-z0-9]+$'
+        display_name:
+          type: string
+        available_credits:
+          type: integer
+        reserved_credits:
+          type: integer
+        status:
+          type: string
+          enum: [active, frozen]
+        active_restrictions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlWalletRestriction'
+    ControlWalletRestriction:
+      type: object
+      required: [restriction_id, user_id, type, source, created_at]
+      additionalProperties: false
+      properties:
+        restriction_id:
+          type: string
+        user_id:
+          type: string
+          pattern: '^usr_[A-Za-z0-9]+$'
+        display_name:
+          type: string
+        type:
+          type: string
+        source:
+          type: string
+        related_object:
+          type: object
+        reason:
+          type: string
+        created_by:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+    ControlCreditResult:
+      type: object
+      required: [transaction_id, command_type, amount_credits, replayed, created_at, wallet]
+      additionalProperties: false
+      properties:
+        transaction_id:
+          type: string
+        command_type:
+          type: string
+        amount_credits:
+          type: integer
+        replayed:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        wallet:
+          $ref: '#/components/schemas/ControlCreditWallet'
+    ControlLedgerTransaction:
+      type: object
+      required: [sequence_id, transaction_id, command_type, amount_credits, created_at]
+      additionalProperties: false
+      properties:
+        sequence_id:
+          type: integer
+        transaction_id:
+          type: string
+        command_type:
+          type: string
+        amount_credits:
+          type: integer
+        available_credits_after:
+          type: integer
+        reserved_credits_after:
+          type: integer
+        related_transaction_id:
+          type: string
+        actor:
+          type: object
+        source:
+          type: string
+        reason:
+          type: string
+        business_reference:
+          type: object
+        charge:
+          type: object
+          required: [amount_credits, refunded_credits, remaining_refundable_credits]
+          properties:
+            amount_credits:
+              type: integer
+            refunded_credits:
+              type: integer
+            remaining_refundable_credits:
+              type: integer
+        created_at:
+          type: string
+          format: date-time
+    ControlTask:
+      type: object
+      required: [task_id]
+      additionalProperties: false
+      properties:
+        task_id:
+          type: string
+          pattern: '^task_[A-Za-z0-9_-]+$'
+        status:
+          type: string
+        feature:
+          type: string
+    ControlSetRoleRequest:
+      type: object
+      required: [role]
+      additionalProperties: false
+      properties:
+        role:
+          type: string
+          enum: [admin, user]
+        reason:
+          type: string
+          description: Operator note (or X-Operator-Reason header).
+    ControlBanRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reason:
+          type: string
+        operator_note:
+          type: string
+        expires_in_days:
+          type: integer
+          minimum: 0
+    ControlReasonRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reason:
+          type: string
+        operator_note:
+          type: string
+    ControlWorkspaceMemberRequest:
+      type: object
+      required: [user_id, role]
+      additionalProperties: false
+      properties:
+        user_id:
+          type: string
+          pattern: '^usr_[A-Za-z0-9]+$'
+        role:
+          type: string
+          enum: [owner, admin, member]
+        reason:
+          type: string
+    ControlWorkspaceMemberRoleRequest:
+      type: object
+      required: [role]
+      additionalProperties: false
+      properties:
+        role:
+          type: string
+          enum: [owner, admin, member]
+        reason:
+          type: string
+    ControlPublishPricesRequest:
+      type: object
+      required: [prices]
+      additionalProperties: false
+      properties:
+        prices:
+          type: object
+          additionalProperties:
+            type: integer
+        reason:
+          type: string
+    ControlSetAvailabilityRequest:
+      type: object
+      required: [enabled]
+      additionalProperties: false
+      properties:
+        enabled:
+          type: boolean
+        reason:
+          type: string
+    ControlCreditCommandRequest:
+      type: object
+      required: [user_id, amount_credits, business_reference_id]
+      additionalProperties: false
+      properties:
+        user_id:
+          type: string
+          pattern: '^usr_[A-Za-z0-9]+$'
+        amount_credits:
+          type: integer
+          minimum: 1
+        business_reference_id:
+          type: string
+        reason:
+          type: string
+        operator_note:
+          type: string
+    ControlCreditRefundRequest:
+      allOf:
+        - $ref: '#/components/schemas/ControlCreditCommandRequest'
+        - type: object
+          required: [charge_transaction_id]
+          properties:
+            charge_transaction_id:
+              type: string
+    ControlCreditCorrectionRequest:
+      allOf:
+        - $ref: '#/components/schemas/ControlCreditCommandRequest'
+        - type: object
+          required: [original_transaction_id]
+          properties:
+            original_transaction_id:
+              type: string
+    ControlPaymentRefundRequest:
+      type: object
+      required: [idea_quantity]
+      additionalProperties: false
+      properties:
+        idea_quantity:
+          type: integer
+          minimum: 1
+        reason:
+          type: string
+        operator_note:
+          type: string
+    ControlStripeConfigRequest:
+      type: object
+      required: [purchases_enabled]
+      additionalProperties: false
+      properties:
+        api_key:
+          type: string
+        payment_method_configuration_id:
+          type: string
+        product_tax_code:
+          type: string
+        purchases_enabled:
+          type: boolean
+        reason:
+          type: string
+    ControlOutboundPolicyRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        allow_hosts:
+          type: array
+          items:
+            type: string
+        reason:
+          type: string
     PaginatedControlUsers:
       type: object
       required: [data, meta]
@@ -303,6 +3142,17 @@ components:
             $ref: '#/components/schemas/ControlWorkspace'
         meta:
           $ref: '#/components/schemas/ControlPaginationMeta'
+    PaginatedControlWorkspaceMembers:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlWorkspaceMember'
+        meta:
+          $ref: '#/components/schemas/ControlPaginationMeta'
     PaginatedControlBillingAccounts:
       type: object
       required: [data, meta]
@@ -314,3 +3164,100 @@ components:
             $ref: '#/components/schemas/ControlBillingAccount'
         meta:
           $ref: '#/components/schemas/ControlPaginationMeta'
+    PaginatedControlLedger:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlLedgerTransaction'
+        meta:
+          $ref: '#/components/schemas/ControlPaginationMeta'
+    PaginatedControlTasks:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlTask'
+        meta:
+          $ref: '#/components/schemas/ControlPaginationMeta'
+    ControlUserEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/ControlUser'
+    ControlWorkspaceEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/ControlWorkspace'
+    ControlWorkspaceMemberEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/ControlWorkspaceMember'
+    ControlTaskEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [task]
+          properties:
+            task:
+              $ref: '#/components/schemas/ControlTask'
+    ControlCreditResultEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/ControlCreditResult'
+    ControlCreditWalletEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/ControlCreditWallet'
+    ControlCatalogEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+    ControlAckEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          description: Mutation acknowledgement flags (updated, banned, revoked, ...).
+    ControlObjectEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          description: Opaque control payload (reconciliation, payments, monitor shapes).

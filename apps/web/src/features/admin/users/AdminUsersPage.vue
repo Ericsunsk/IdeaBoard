@@ -218,7 +218,7 @@
       </AdminColumn>
     </AdminTable>
 
-    <template #footer-label>共 {{ totalUsersLabel }}</template>
+    <template #footer-label>{{ totalUsersLabel }}</template>
   </AdminCollectionPageShell>
 
   <AdminRowActionsPopover

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/principal"
 	derivativedomain "ideaboard/api/internal/media/derivatives/domain"
 	storagedomain "ideaboard/api/internal/media/storage/domain"
@@ -222,6 +223,11 @@ func (h *contractV1Handler) archiveMediaAsset(c *gin.Context) {
 		if archiveErr != nil {
 			return nil, archiveErr
 		}
+		// #807: media.asset_archived AFTER the archive commit (inside
+		// the once-fn: replays never re-emit).
+		h.emitWorkspaceEvent(ctx, identityPrincipal, workspacePublicID, events.EventV1MediaAssetArchived,
+			events.V1Resource{Type: events.V1ResourceMediaAsset, ID: asset.ID},
+			events.V1MediaAssetArchivedData{AssetID: asset.ID})
 		dto := toMediaAssetDTO(workspacePublicID, asset)
 		return &dto, nil
 	})

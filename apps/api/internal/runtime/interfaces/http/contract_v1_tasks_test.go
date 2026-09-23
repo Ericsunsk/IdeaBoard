@@ -1,0 +1,507 @@
+package httpapi
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
+	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/tasking/workspacetasks"
+	"ideaboard/api/internal/tenancy"
+
+	"github.com/gin-gonic/gin"
+)
+
+// Workspace task lifecycle (issue #805). Reuses the shared doV1 helper
+// (envelope + Request-Id), MintPublicID/IsValidPublicID dedup convention,
+// and the ContractV1GroupPath + PublicContractChain pattern. Covers
+// 202+Location, quote/create separation, atomicity rollback proof,
+// cancel, idempotent replay/conflict, retry budget persistence,
+// output refs, and the 404-vs-403 matrix.
+
+type fakeTaskQuoter struct {
+	unitCredits int64
+	calls       int
+	err         error
+}
+
+func (f *fakeTaskQuoter) Quote(ctx context.Context, kind, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
+	f.calls++
+	if f.err != nil {
+		return workspacetasks.BillingSnapshot{}, f.err
+	}
+	if quantity <= 0 {
+		quantity = 1
+	}
+	unit := f.unitCredits
+	if unit == 0 {
+		unit = 10
+	}
+	return workspacetasks.BillingSnapshot{
+		SKU: "ai-image:" + kind, DisplayName: kind, PriceVersionID: 1, PriceVersion: 1,
+		OutputResolution: resolution, UnitCredits: unit, Quantity: quantity,
+		TotalCredits: unit * quantity, QuotedAt: time.Now().UTC(), SettlementState: "held",
+	}, nil
+}
+
+type fakeTaskHolder struct {
+	holds    map[string]int64
+	captured map[string]int64
+	released map[string]int64
+	holdErr  error
+}
+
+func newFakeTaskHolder() *fakeTaskHolder {
+	return &fakeTaskHolder{holds: map[string]int64{}, captured: map[string]int64{}, released: map[string]int64{}}
+}
+
+func (f *fakeTaskHolder) Hold(ctx context.Context, userID int64, amount int64, key, taskID string) (string, error) {
+	if f.holdErr != nil {
+		return "", f.holdErr
+	}
+	holdID := "hold_" + taskID
+	f.holds[holdID] = amount
+	return holdID, nil
+}
+
+func (f *fakeTaskHolder) Capture(ctx context.Context, holdID string, amount int64, taskID string) error {
+	f.captured[holdID] = amount
+	return nil
+}
+
+func (f *fakeTaskHolder) Release(ctx context.Context, holdID string, amount int64, taskID string) error {
+	f.released[holdID] = amount
+	return nil
+}
+
+type fakeTaskQueue struct {
+	enqueued []*workspacetasks.WorkspaceTask
+	failNext error
+}
+
+func (f *fakeTaskQueue) Enqueue(ctx context.Context, task *workspacetasks.WorkspaceTask) error {
+	if f.failNext != nil {
+		err := f.failNext
+		f.failNext = nil
+		return err
+	}
+	f.enqueued = append(f.enqueued, task)
+	return nil
+}
+
+type fakeTaskAssets struct {
+	assets map[string]*workspacetasks.AssetInfo
+}
+
+func (f *fakeTaskAssets) GetAsset(ctx context.Context, workspaceID, assetID string) (*workspacetasks.AssetInfo, error) {
+	info, ok := f.assets[workspaceID+"\x00"+assetID]
+	if !ok {
+		return nil, workspacetasks.ErrMediaNotFound
+	}
+	return info, nil
+}
+
+type v1TaskFixture struct {
+	engine *gin.Engine
+	store  *tenancy.InMemoryStore
+	dir    *staticUserDirectory
+	ws     *tenancy.Workspace
+	tasks  *workspacetasks.InMemoryStore
+	quoter *fakeTaskQuoter
+	holder *fakeTaskHolder
+	queue  *fakeTaskQueue
+	assets *fakeTaskAssets
+}
+
+func newV1TaskFixture(t *testing.T) *v1TaskFixture {
+	t.Helper()
+	ctx := context.Background()
+	store := tenancy.NewInMemoryStoreForTests()
+	dir := newStaticUserDirectory()
+	tasks := workspacetasks.NewInMemoryStoreForTests()
+	quoter := &fakeTaskQuoter{}
+	holder := newFakeTaskHolder()
+	queue := &fakeTaskQueue{}
+	assets := &fakeTaskAssets{assets: map[string]*workspacetasks.AssetInfo{}}
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(ContractRequestIDMiddleware())
+	router.Use(func(c *gin.Context) {
+		raw := strings.TrimSpace(c.GetHeader("X-Test-User"))
+		if raw == "" {
+			c.Next()
+			return
+		}
+		userID, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || userID <= 0 {
+			c.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+		role := strings.TrimSpace(c.GetHeader("X-Test-Role"))
+		if role == "" {
+			role = "user"
+		}
+		id := dir.ensure(userID)
+		identityPrincipal, err := principal.New(userID, id,
+			fmt.Sprintf("auth-%d", userID), fmt.Sprintf("test-user-%d", userID), role)
+		if err != nil || principal.Set(c, identityPrincipal) != nil {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		c.Next()
+	})
+	v1 := router.Group(ContractV1GroupPath)
+	RegisterContractV1Routes(v1, AuthDeps{}, ContractV1Deps{
+		Store: store, Users: dir,
+		Tasks: tasks, TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: assets,
+	})
+	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "tasks", OwnerUserID: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.SeedWorkspaceMember(ws.PublicID, 2, tenancy.RoleAdmin)
+	store.SeedWorkspaceMember(ws.PublicID, 3, tenancy.RoleMember)
+	for _, id := range []int64{1, 2, 3, 9} {
+		dir.ensure(id)
+	}
+	return &v1TaskFixture{engine: router, store: store, dir: dir, ws: ws, tasks: tasks, quoter: quoter, holder: holder, queue: queue, assets: assets}
+}
+
+func v1CreateTaskBodyJSON(kind string) string {
+	return fmt.Sprintf(`{"data":{"workflow_kind":%q,"inputs":{"media_asset_ids":[]},"params":{}}}`, kind)
+}
+
+func TestV1TaskCreateAcceptedWithLocation(t *testing.T) {
+	fx := newV1TaskFixture(t)
+	tasksPath := "/api/v1/workspaces/" + fx.ws.PublicID + "/tasks"
+	status, header, payload := doV1RoundTrip(t, fx.engine, v1Call{
+		method: http.MethodPost, path: tasksPath, userID: 3,
+		body:    v1CreateTaskBodyJSON("render"),
+		headers: map[string]string{contract.IdempotencyKeyHeader: "task-key-1"},
+	}, "test-task-")
+	if status != http.StatusAccepted {
+		t.Fatalf("create = %d %s, want 202", status, payload)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(payload), &parsed); err != nil {
+		t.Fatalf("response is not JSON: %v", err)
+	}
+	data := v1Data(t, parsed)
+	task, _ := data.(map[string]any)
+	taskID, _ := task["id"].(string)
+	if !strings.HasPrefix(taskID, "task_") {
+		t.Fatalf("task id = %q, want task_...", taskID)
+	}
+	if !contract.IsTaskID(taskID) {
+		t.Fatalf("task id shape invalid: %q", taskID)
+	}
+	location := header.Get("Location")
+	wantLocation := "/api/v1/workspaces/" + fx.ws.PublicID + "/tasks/" + taskID
+	if location != wantLocation {
+		t.Fatalf("Location = %q, want %q", location, wantLocation)
+	}
+	if task["status"] != "pending" {
+		t.Fatalf("status = %v, want pending", task["status"])
+	}
+	if task["retry_count"].(float64) != 0 {
+		t.Fatalf("retry_count = %v, want 0", task["retry_count"])
+	}
+	if task["execution_token"] == "" {
+		t.Fatal("execution_token must persist")
+	}
+	snapshot, _ := task["billing_snapshot"].(map[string]any)
+	if snapshot["sku"] != "ai-image:render" {
+		t.Fatalf("sku = %v, want ai-image:render", snapshot["sku"])
+	}
+	if snapshot["settlement_state"] != "held" {
+		t.Fatalf("settlement = %v, want held", snapshot["settlement_state"])
+	}
+}
+
+func TestV1TaskQuoteCreateSeparation(t *testing.T) {
+	fx := newV1TaskFixture(t)
+	quotePath := "/api/v1/workspaces/" + fx.ws.PublicID + "/task-quotes"
+	status, _, quoted := doV1(t, fx.engine, v1Call{
+		method: http.MethodPost, path: quotePath, userID: 3,
+		body: `{"data":{"workflow_kind":"render","quantity":2}}`,
+	})
+	if status != 200 {
+		t.Fatalf("quote = %d %v, want 200", status, quoted)
+	}
+	snapshot := v1Data(t, quoted).(map[string]any)
+	if snapshot["total_credits"].(float64) != 20 {
+		t.Fatalf("total = %v, want 20 (10x2)", snapshot["total_credits"])
+	}
+	if snapshot["settlement_state"] != "quoted" {
+		t.Fatalf("quote state = %v, want quoted (no persistence)", snapshot["settlement_state"])
+	}
+	count, _ := fx.tasks.CountTasks(context.Background(), fx.ws.PublicID)
+	if count != 0 {
+		t.Fatalf("quote persisted %d tasks, want 0", count)
+	}
+	if len(fx.queue.enqueued) != 0 {
+		t.Fatalf("quote enqueued %d jobs, want 0", len(fx.queue.enqueued))
+	}
+	// Authoritative create persists exactly one task + one River job.
+	status, _, created := doV1(t, fx.engine, v1Call{
+		method: http.MethodPost, path: "/api/v1/workspaces/" + fx.ws.PublicID + "/tasks", userID: 3,
+		body:    v1CreateTaskBodyJSON("render"),
+		headers: map[string]string{contract.IdempotencyKeyHeader: "quote-sep-1"},
+	})
+	if status != 202 {
+		t.Fatalf("create = %d %v, want 202", status, created)
+	}
+	count, _ = fx.tasks.CountTasks(context.Background(), fx.ws.PublicID)
+	if count != 1 || len(fx.queue.enqueued) != 1 {
+		t.Fatalf("tasks=%d queue=%d, want 1/1", count, len(fx.queue.enqueued))
+	}
+}
+
+func TestV1TaskAtomicityRollbackProof(t *testing.T) {
+	fx := newV1TaskFixture(t)
+	tasksPath := "/api/v1/workspaces/" + fx.ws.PublicID + "/tasks"
+	fx.queue.failNext = fmt.Errorf("river down")
+	status, _, payload := doV1(t, fx.engine, v1Call{
+		method: http.MethodPost, path: tasksPath, userID: 3,
+		body:    v1CreateTaskBodyJSON("render"),
+		headers: map[string]string{contract.IdempotencyKeyHeader: "atomic-1"},
+	})
+	if status != http.StatusServiceUnavailable {
+		t.Fatalf("failing enqueue = %d %v, want 503", status, payload)
+	}
+	count, _ := fx.tasks.CountTasks(context.Background(), fx.ws.PublicID)
+	if count != 0 {
+		t.Fatalf("tasks = %d, want 0 (enqueue+hold+insert rolled back)", count)
+	}
+	if len(fx.holder.released) == 0 {
+		t.Fatal("hold must be released when enqueue fails (no stranded hold)")
+	}
+}
+
+func TestV1TaskIdempotentReplayAndConflict(t *testing.T) {
+	fx := newV1TaskFixture(t)
+	tasksPath := "/api/v1/workspaces/" + fx.ws.PublicID + "/tasks"
+	post := func(key, body string) (int, map[string]any) {
+		status, _, payload := doV1(t, fx.engine, v1Call{
+			method: http.MethodPost, path: tasksPath, userID: 3,
+			body: body, headers: map[string]string{contract.IdempotencyKeyHeader: key},
+		})
+		return status, payload
+	}
+	status, first := post("idem-1", v1CreateTaskBodyJSON("render"))
+	if status != 202 {
+		t.Fatalf("create = %d %v, want 202", status, first)
+	}
+	firstID := first["data"].(map[string]any)["id"].(string)
+	status, replay := post("idem-1", v1CreateTaskBodyJSON("render"))
+	if status != 202 || replay["data"].(map[string]any)["id"] != firstID {
+		t.Fatalf("replay = %d %v, want same task_id %s", status, replay, firstID)
+	}
+	status, conflict := post("idem-1", v1CreateTaskBodyJSON("upscale"))
+	if status != 409 || v1ErrorCode(t, conflict) != string(contract.CodeTaskIdempotencyConflict) {
+		t.Fatalf("conflict = %d %v, want 409 task_idempotency_conflict", status, conflict)
+	}
+	status, missing := post("", v1CreateTaskBodyJSON("render"))
+	_ = missing
+	if status != 400 {
+		// Missing key renders 400 via requireTaskIdempotencyKey; the
+		// doV1 helper still asserts envelope + Request-Id.
+		t.Fatalf("missing key = %d, want 400", status)
+	}
+}
+
+func TestV1TaskCancel(t *testing.T) {
+	fx := newV1TaskFixture(t)
+	tasksPath := "/api/v1/workspaces/" + fx.ws.PublicID + "/tasks"
+	status, _, created := doV1(t, fx.engine, v1Call{
+		method: http.MethodPost, path: tasksPath, userID: 3,
+		body:    v1CreateTaskBodyJSON("render"),
+		headers: map[string]string{contract.IdempotencyKeyHeader: "cancel-setup"},
+	})
+	if status != 202 {
+		t.Fatalf("create = %d %v", status, created)
+	}
+	taskID := created["data"].(map[string]any)["id"].(string)
+	cancelPath := tasksPath + "/" + taskID + "/cancel"
+	status, _, cancelled := doV1(t, fx.engine, v1Call{
+		method: http.MethodPost, path: cancelPath, userID: 3,
+		body:    `{"data":{"reason":"no longer needed"}}`,
+		headers: map[string]string{contract.IdempotencyKeyHeader: "cancel-1"},
+	})
+	if status != 200 {
+		t.Fatalf("cancel = %d %v, want 200", status, cancelled)
+	}
+	if v1Data(t, cancelled).(map[string]any)["status"] != "cancelled" {
+		t.Fatalf("status = %v, want cancelled", cancelled)
+	}
+	// Replay with same key+hash returns the same cancelled task.
+	status, _, replay := doV1(t, fx.engine, v1Call{
+		method: http.MethodPost, path: cancelPath, userID: 3,
+		body:    `{"data":{"reason":"no longer needed"}}`,
+		headers: map[string]string{contract.IdempotencyKeyHeader: "cancel-1"},
+	})
+	if status != 200 || replay["data"].(map[string]any)["id"] != taskID {
+		t.Fatalf("cancel replay = %d %v, want same task", status, replay)
+	}
+	// Different hash conflicts.
+	status, _, conflict := doV1(t, fx.engine, v1Call{
+		method: http.MethodPost, path: cancelPath, userID: 3,
+		body:    `{"data":{"reason":"different"}}`,
+		headers: map[string]string{contract.IdempotencyKeyHeader: "cancel-1"},
+	})
+	if status != 409 || v1ErrorCode(t, conflict) != string(contract.CodeTaskIdempotencyConflict) {
+		t.Fatalf("cancel conflict = %d %v, want 409", status, conflict)
+	}
+}
+
+func TestV1TaskOutputRefs(t *testing.T) {
+	fx := newV1TaskFixture(t)
+	ctx := context.Background()
+	tasksPath := "/api/v1/workspaces/" + fx.ws.PublicID + "/tasks"
+	status, _, created := doV1(t, fx.engine, v1Call{
+		method: http.MethodPost, path: tasksPath, userID: 3,
+		body:    v1CreateTaskBodyJSON("render"),
+		headers: map[string]string{contract.IdempotencyKeyHeader: "outputs-setup"},
+	})
+	if status != 202 {
+		t.Fatalf("create = %d %v", status, created)
+	}
+	taskID := created["data"].(map[string]any)["id"].(string)
+	// Seed a ready asset + a remote output via the store seam.
+	fx.assets.assets[fx.ws.PublicID+"\x00asset_ready1"] = &workspacetasks.AssetInfo{ID: "asset_ready1", WorkspaceID: fx.ws.PublicID, Status: "ready"}
+	checksum := strings.Repeat("b", 64)
+	_, err := fx.tasks.AddOutputs(ctx, fx.ws.PublicID, taskID, []workspacetasks.OutputRef{
+		{Kind: "asset", AssetID: "asset_ready1", ResultIndex: 0},
+		{Kind: "remote", URL: "https://cdn.example.com/o.png", ChecksumSHA256: checksum, ResultIndex: 1},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, _, outputs := doV1(t, fx.engine, v1Call{
+		method: http.MethodGet, path: tasksPath + "/" + taskID + "/outputs", userID: 3,
+	})
+	if status != 200 {
+		t.Fatalf("outputs = %d %v, want 200", status, outputs)
+	}
+	items := v1Data(t, outputs).(map[string]any)["outputs"].([]any)
+	if len(items) != 2 {
+		t.Fatalf("outputs = %d, want 2", len(items))
+	}
+	first := items[0].(map[string]any)
+	if first["kind"] != "asset" || first["asset_id"] != "asset_ready1" {
+		t.Fatalf("first output = %v, want asset ref", first)
+	}
+	serialized := fmt.Sprintf("%v", outputs)
+	for _, leaked := range []string{"storage_key", "builtin-local", "ws-uploads", "bucket"} {
+		if strings.Contains(serialized, leaked) {
+			t.Fatalf("outputs leak %q: %s", leaked, serialized)
+		}
+	}
+}
+
+func TestV1TaskAuthMatrix(t *testing.T) {
+	fx := newV1TaskFixture(t)
+	tasksPath := "/api/v1/workspaces/" + fx.ws.PublicID + "/tasks"
+	// Member creates a task for the visibility checks below.
+	status, _, created := doV1(t, fx.engine, v1Call{
+		method: http.MethodPost, path: tasksPath, userID: 3,
+		body:    v1CreateTaskBodyJSON("render"),
+		headers: map[string]string{contract.IdempotencyKeyHeader: "auth-setup"},
+	})
+	if status != 202 {
+		t.Fatalf("create = %d %v", status, created)
+	}
+	taskID := created["data"].(map[string]any)["id"].(string)
+	taskPath := tasksPath + "/" + taskID
+
+	// Outsider (no workspace membership) sees 404 task_not_found, never 403.
+	status, _, hidden := doV1(t, fx.engine, v1Call{method: http.MethodGet, path: taskPath, userID: 9})
+	if status != 404 || v1ErrorCode(t, hidden) != string(contract.CodeTaskNotFound) {
+		t.Fatalf("outsider = %d %v, want 404 task_not_found", status, hidden)
+	}
+	// Cross-workspace id is invisible even to its own owner.
+	other, err := fx.store.CreateWorkspace(context.Background(), tenancy.CreateWorkspaceParams{Name: "other", OwnerUserID: 8})
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, _, cross := doV1(t, fx.engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + other.PublicID + "/tasks/" + taskID, userID: 8})
+	if status != 404 || v1ErrorCode(t, cross) != string(contract.CodeTaskNotFound) {
+		t.Fatalf("cross-workspace = %d %v, want 404 task_not_found", status, cross)
+	}
+	// Malformed task_ shape is invisible (404, not 400).
+	status, _, malformed := doV1(t, fx.engine, v1Call{method: http.MethodGet, path: tasksPath + "/nope", userID: 3})
+	if status != 404 || v1ErrorCode(t, malformed) != string(contract.CodeTaskNotFound) {
+		t.Fatalf("malformed = %d %v, want 404 task_not_found", status, malformed)
+	}
+	// Anonymous callers fail closed with 401.
+	status, _, anon := doV1(t, fx.engine, v1Call{method: http.MethodGet, path: taskPath})
+	if status != 401 || v1ErrorCode(t, anon) != string(contract.CodeUnauthorized) {
+		t.Fatalf("anon = %d %v, want 401 unauthorized", status, anon)
+	}
+	// Outputs inherit task visibility.
+	status, _, outHidden := doV1(t, fx.engine, v1Call{method: http.MethodGet, path: taskPath + "/outputs", userID: 9})
+	if status != 404 || v1ErrorCode(t, outHidden) != string(contract.CodeTaskNotFound) {
+		t.Fatalf("outsider outputs = %d %v, want 404 task_not_found", status, outHidden)
+	}
+	// Unknown kind + raw URL + unknown field all 422 with details.fields.
+	for _, tc := range []struct{ name, body, field string }{
+		{"unknown kind", `{"data":{"workflow_kind":"nope","inputs":{"media_asset_ids":[]},"params":{}}}`, "workflow_kind"},
+		{"raw url", `{"data":{"workflow_kind":"render","inputs":{"media_asset_ids":["https://x/y.png"]},"params":{}}}`, "media_asset_ids[0]"},
+		{"unknown params", `{"data":{"workflow_kind":"render","inputs":{"media_asset_ids":[]},"params":{"mystery":1}}}`, "params.mystery"},
+	} {
+		status, _, payload := doV1(t, fx.engine, v1Call{
+			method: http.MethodPost, path: tasksPath, userID: 3,
+			body: tc.body, headers: map[string]string{contract.IdempotencyKeyHeader: "val-" + tc.name},
+		})
+		if status != 422 || v1ErrorCode(t, payload) != string(contract.CodeValidationFailed) {
+			t.Fatalf("%s = %d %v, want 422 validation_failed", tc.name, status, payload)
+		}
+	}
+}
+
+func TestV1TaskStoresNilFailsClosed(t *testing.T) {
+	store := tenancy.NewInMemoryStoreForTests()
+	dir := newStaticUserDirectory()
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(ContractRequestIDMiddleware())
+	router.Use(func(c *gin.Context) {
+		raw := strings.TrimSpace(c.GetHeader("X-Test-User"))
+		if raw == "" {
+			c.Next()
+			return
+		}
+		userID, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || userID <= 0 {
+			c.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+		id := dir.ensure(userID)
+		identityPrincipal, err := principal.New(userID, id, fmt.Sprintf("auth-%d", userID), "t", "user")
+		if err != nil || principal.Set(c, identityPrincipal) != nil {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		c.Next()
+	})
+	v1 := router.Group(ContractV1GroupPath)
+	RegisterContractV1Routes(v1, AuthDeps{}, ContractV1Deps{Store: store, Users: dir})
+	ws, err := store.CreateWorkspace(context.Background(), tenancy.CreateWorkspaceParams{Name: "nil", OwnerUserID: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, _, payload := doV1(t, router, v1Call{
+		method: http.MethodPost, path: "/api/v1/workspaces/" + ws.PublicID + "/tasks", userID: 1,
+		body:    v1CreateTaskBodyJSON("render"),
+		headers: map[string]string{contract.IdempotencyKeyHeader: "nil-key"},
+	})
+	if status != 501 || v1ErrorCode(t, payload) != string(contract.CodeContractNotImplemented) {
+		t.Fatalf("create without stores = %d %v, want 501", status, payload)
+	}
+}

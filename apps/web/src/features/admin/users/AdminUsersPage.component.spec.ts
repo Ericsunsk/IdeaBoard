@@ -12,7 +12,8 @@ const toastMocks = vi.hoisted(() => ({
   warning: vi.fn(),
   error: vi.fn(),
 }))
-const userPublicID = '00000000-0000-0000-0000-000000000012'
+const userPublicID = 'usr_000000000000000000000012'
+const secondUserPublicID = 'usr_000000000000000000000013'
 
 vi.mock('../shared/composables/useAdminConfirm', () => ({
   useAdminConfirm: () => ({ confirm: confirmMock }),
@@ -42,41 +43,32 @@ describe('AdminUsersPage', () => {
     userListRequestCount = 0
     commandRequests = []
     useMswHandlers(
-      http.get('/api/admin/users', () => {
+      http.get('/api/control/v1/users', () => {
         userListRequestCount += 1
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            total: 1,
-            active_count: 1,
-            banned_count: 0,
-            admin_count: 0,
-            list: [
-              {
-                public_id: userPublicID,
-                email: 'admin@example.com',
-                providers: ['email'],
-                display_name: 'admin_balance_user',
-                avatar: '',
-                role: 'user',
-                status: 1,
-                available_credits: 125,
-                last_login_ip: '203.0.113.42',
-                last_login_country: 'US',
-                created_at: '2026-07-24T08:00:00Z',
-                updated_at: '2026-07-24T08:00:00Z',
-              },
-            ],
-          },
+          data: [
+            {
+              id: userPublicID,
+              email: 'admin@example.com',
+              providers: ['email'],
+              display_name: 'admin_balance_user',
+              avatar: '',
+              role: 'user',
+              status: 1,
+              available_credits: 125,
+              last_login_ip: '203.0.113.42',
+              last_login_country: 'US',
+              created_at: '2026-07-24T08:00:00Z',
+              updated_at: '2026-07-24T08:00:00Z',
+            },
+          ],
+          meta: { next_cursor: null, has_more: false },
         })
       }),
-      http.get(`/api/admin/credits/wallets/${userPublicID}`, () =>
+      http.get(`/api/control/v1/credits/wallets/${userPublicID}`, () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
-            public_id: userPublicID,
+            user_id: userPublicID,
             display_name: 'admin_balance_user',
             status: 'active',
             available_credits: 125,
@@ -84,28 +76,29 @@ describe('AdminUsersPage', () => {
             active_restrictions: [
               {
                 restriction_id: 'restriction-1',
+                user_id: userPublicID,
+                display_name: 'admin_balance_user',
                 type: 'ledger_integrity',
                 source: 'reconciliation',
                 reason: '需要人工复核',
                 created_at: '2026-07-24T08:00:00Z',
-                created_by: { type: 'system', id: 'reconciliation' },
+                created_by: { type: 'system' },
                 related_object: { type: 'run', id: 'run-1' },
               },
             ],
           },
         }),
       ),
-      http.get(`/api/admin/credits/wallets/${userPublicID}/ledger`, ({ request }) =>
+      http.get(`/api/control/v1/credits/wallets/${userPublicID}/ledger`, ({ request }) =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data:
-            new URL(request.url).searchParams.get('before_sequence') === '80'
-              ? { transactions: [makeLedgerTransaction('charge-older', 'grant')] }
-              : {
-                  transactions: [makeLedgerTransaction('charge-1', 'capture')],
-                  next_before_sequence: 80,
-                },
+            new URL(request.url).searchParams.get('cursor') === 'cursor-page-2'
+              ? [makeLedgerTransaction('charge-older', 'grant')]
+              : [makeLedgerTransaction('charge-1', 'capture')],
+          meta:
+            new URL(request.url).searchParams.get('cursor') === 'cursor-page-2'
+              ? { next_cursor: null, has_more: false }
+              : { next_cursor: 'cursor-page-2', has_more: true },
         }),
       ),
       http.get('/api/admin/users/oauth-providers/:provider', ({ params }) =>
@@ -126,12 +119,26 @@ describe('AdminUsersPage', () => {
           },
         }),
       ),
-      http.post('/api/admin/credits/grants', async ({ request }) => {
-        commandRequests.push((await request.json()) as Record<string, unknown>)
+      http.post('/api/control/v1/credits/grants', async ({ request }) => {
+        commandRequests.push({
+          body: (await request.json()) as Record<string, unknown>,
+          idempotencyKey: request.headers.get('Idempotency-Key'),
+          operatorReason: request.headers.get('X-Operator-Reason'),
+        })
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: { transaction_id: 'grant-1', replayed: false },
+          data: {
+            transaction_id: 'grant-1',
+            command_type: 'grant',
+            amount_credits: 20,
+            replayed: false,
+            created_at: '2026-07-24T08:00:00Z',
+            wallet: {
+              user_id: userPublicID,
+              display_name: 'admin_balance_user',
+              available_credits: 145,
+              reserved_credits: 10,
+            },
+          },
         })
       }),
     )
@@ -207,35 +214,32 @@ describe('AdminUsersPage', () => {
 
     await waitFor(() =>
       expect(commandRequests[0]).toMatchObject({
-        user_public_id: userPublicID,
-        amount_credits: 20,
-        reason: '运营补偿',
+        body: {
+          user_id: userPublicID,
+          amount_credits: 20,
+          reason: '运营补偿',
+        },
+        operatorReason: '运营补偿',
       }),
     )
+    expect(commandRequests[0] as Record<string, unknown>).toMatchObject({
+      idempotencyKey: expect.stringMatching(/^control-ui:grant:[A-Za-z0-9_-]+$/),
+    })
     await waitFor(() => expect(userListRequestCount).toBeGreaterThan(1))
   })
 
   it('prioritizes frozen status and gives a recovery path when no restriction reason exists', async () => {
     useMswHandlers(
-      http.get('/api/admin/users', () =>
+      http.get('/api/control/v1/users', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            total: 1,
-            active_count: 0,
-            banned_count: 1,
-            admin_count: 0,
-            list: [{ ...makeUser(125), status: 0 }],
-          },
+          data: [{ ...makeUser(125), status: 0 }],
+          meta: { next_cursor: null, has_more: false },
         }),
       ),
-      http.get(`/api/admin/credits/wallets/${userPublicID}`, () =>
+      http.get(`/api/control/v1/credits/wallets/${userPublicID}`, () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
-            public_id: userPublicID,
+            user_id: userPublicID,
             display_name: 'admin_balance_user',
             status: 'frozen',
             available_credits: 125,
@@ -259,28 +263,21 @@ describe('AdminUsersPage', () => {
 
   it('keeps a zero balance actionable', async () => {
     useMswHandlers(
-      http.get('/api/admin/users', () =>
+      http.get('/api/control/v1/users', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            total: 1,
-            active_count: 1,
-            banned_count: 0,
-            admin_count: 0,
-            list: [
-              {
-                public_id: userPublicID,
-                display_name: 'admin_balance_user',
-                avatar: '',
-                role: 'user',
-                status: 1,
-                available_credits: 0,
-                created_at: '2026-07-24T08:00:00Z',
-                updated_at: '2026-07-24T08:00:00Z',
-              },
-            ],
-          },
+          data: [
+            {
+              id: userPublicID,
+              display_name: 'admin_balance_user',
+              avatar: '',
+              role: 'user',
+              status: 1,
+              available_credits: 0,
+              created_at: '2026-07-24T08:00:00Z',
+              updated_at: '2026-07-24T08:00:00Z',
+            },
+          ],
+          meta: { next_cursor: null, has_more: false },
         }),
       ),
     )
@@ -300,25 +297,16 @@ describe('AdminUsersPage', () => {
     let availableCredits = 125
     let hasDeduction = false
     useMswHandlers(
-      http.get('/api/admin/users', () =>
+      http.get('/api/control/v1/users', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            total: 1,
-            active_count: 1,
-            banned_count: 0,
-            admin_count: 0,
-            list: [makeUser(availableCredits)],
-          },
+          data: [makeUser(availableCredits)],
+          meta: { next_cursor: null, has_more: false },
         }),
       ),
-      http.get(`/api/admin/credits/wallets/${userPublicID}`, () =>
+      http.get(`/api/control/v1/credits/wallets/${userPublicID}`, () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
-            public_id: userPublicID,
+            user_id: userPublicID,
             display_name: 'admin_balance_user',
             status: 'active',
             available_credits: availableCredits,
@@ -327,30 +315,39 @@ describe('AdminUsersPage', () => {
           },
         }),
       ),
-      http.get(`/api/admin/credits/wallets/${userPublicID}/ledger`, () =>
+      http.get(`/api/control/v1/credits/wallets/${userPublicID}/ledger`, () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            transactions: hasDeduction
-              ? [makeLedgerTransaction('deduction-1', 'deduction', '运营扣减')]
-              : [makeLedgerTransaction('capture-1', 'capture')],
-          },
+          data: hasDeduction
+            ? [makeLedgerTransaction('deduction-1', 'deduction', '运营扣减')]
+            : [makeLedgerTransaction('capture-1', 'capture')],
+          meta: { next_cursor: null, has_more: false },
         }),
       ),
-      http.post('/api/admin/credits/deductions', async ({ request }) => {
+      http.post('/api/control/v1/credits/deductions', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>
         expect(body).toMatchObject({
-          user_public_id: userPublicID,
+          user_id: userPublicID,
           amount_credits: 25,
           reason: '运营扣减',
         })
+        expect(request.headers.get('Idempotency-Key')).toMatch(/^control-ui:deduction:/)
+        expect(request.headers.get('X-Operator-Reason')).toBe('运营扣减')
         availableCredits = 100
         hasDeduction = true
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: { transaction_id: 'deduction-1', replayed: false },
+          data: {
+            transaction_id: 'deduction-1',
+            command_type: 'deduction',
+            amount_credits: 25,
+            replayed: false,
+            created_at: '2026-07-24T08:00:00Z',
+            wallet: {
+              user_id: userPublicID,
+              display_name: 'admin_balance_user',
+              available_credits: 100,
+              reserved_credits: 0,
+            },
+          },
         })
       }),
     )
@@ -377,8 +374,11 @@ describe('AdminUsersPage', () => {
 
   it('keeps the inline Deduction form and balances unchanged after a typed business failure', async () => {
     useMswHandlers(
-      http.post('/api/admin/credits/deductions', () =>
-        HttpResponse.json({ code: 409, msg: 'wallet restricted' }, { status: 409 }),
+      http.post('/api/control/v1/credits/deductions', () =>
+        HttpResponse.json(
+          { error: { code: 'billing_wallet_restricted', message: 'restricted', request_id: 'r1' } },
+          { status: 403 },
+        ),
       ),
     )
     const { user } = renderPage()
@@ -411,15 +411,25 @@ describe('AdminUsersPage', () => {
     let resolveDeduction: (() => void) | undefined
     let deductionRequests = 0
     useMswHandlers(
-      http.post('/api/admin/credits/deductions', () => {
+      http.post('/api/control/v1/credits/deductions', () => {
         deductionRequests += 1
         return new Promise((resolve) => {
           resolveDeduction = () =>
             resolve(
               HttpResponse.json({
-                code: 0,
-                msg: 'ok',
-                data: { transaction_id: 'deduction-1', replayed: false },
+                data: {
+                  transaction_id: 'deduction-1',
+                  command_type: 'deduction',
+                  amount_credits: 25,
+                  replayed: false,
+                  created_at: '2026-07-24T08:00:00Z',
+                  wallet: {
+                    user_id: userPublicID,
+                    display_name: 'admin_balance_user',
+                    available_credits: 100,
+                    reserved_credits: 0,
+                  },
+                },
               }),
             )
         })
@@ -452,22 +462,19 @@ describe('AdminUsersPage', () => {
   it('only offers Refund for an eligible Charge and validates its remaining amount', async () => {
     let refundRequests = 0
     useMswHandlers(
-      http.get(`/api/admin/credits/wallets/${userPublicID}/ledger`, () =>
+      http.get(`/api/control/v1/credits/wallets/${userPublicID}/ledger`, () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            transactions: [
-              makeLedgerTransaction('charge-eligible', 'capture', '可退款 Charge', 5),
-              makeLedgerTransaction('charge-spent', 'capture', '已退完 Charge', 0),
-              makeLedgerTransaction('grant-1', 'grant'),
-            ],
-          },
+          data: [
+            makeLedgerTransaction('charge-eligible', 'capture', '可退款 Charge', 5),
+            makeLedgerTransaction('charge-spent', 'capture', '已退完 Charge', 0),
+            makeLedgerTransaction('grant-1', 'grant'),
+          ],
+          meta: { next_cursor: null, has_more: false },
         }),
       ),
-      http.post('/api/admin/credits/refunds', () => {
+      http.post('/api/control/v1/credits/refunds', () => {
         refundRequests += 1
-        return HttpResponse.json({ code: 0, msg: 'ok', data: {} })
+        return HttpResponse.json({ data: {} })
       }),
     )
     const { user } = renderPage()
@@ -494,25 +501,16 @@ describe('AdminUsersPage', () => {
     let availableCredits = 125
     let refunded = false
     useMswHandlers(
-      http.get('/api/admin/users', () =>
+      http.get('/api/control/v1/users', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            total: 1,
-            active_count: 1,
-            banned_count: 0,
-            admin_count: 0,
-            list: [makeUser(availableCredits)],
-          },
+          data: [makeUser(availableCredits)],
+          meta: { next_cursor: null, has_more: false },
         }),
       ),
-      http.get(`/api/admin/credits/wallets/${userPublicID}`, () =>
+      http.get(`/api/control/v1/credits/wallets/${userPublicID}`, () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
-            public_id: userPublicID,
+            user_id: userPublicID,
             display_name: 'admin_balance_user',
             status: 'active',
             available_credits: availableCredits,
@@ -521,36 +519,43 @@ describe('AdminUsersPage', () => {
           },
         }),
       ),
-      http.get(`/api/admin/credits/wallets/${userPublicID}/ledger`, () =>
+      http.get(`/api/control/v1/credits/wallets/${userPublicID}/ledger`, () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            transactions: refunded
-              ? [
-                  makeLedgerTransaction('refund-1', 'refund', '任务取消退款'),
-                  makeLedgerTransaction('charge-1', 'capture', 'AI image completed', 15),
-                ]
-              : [makeLedgerTransaction('charge-1', 'capture', 'AI image completed', 25)],
-          },
+          data: refunded
+            ? [
+                makeLedgerTransaction('refund-1', 'refund', '任务取消退款'),
+                makeLedgerTransaction('charge-1', 'capture', 'AI image completed', 15),
+              ]
+            : [makeLedgerTransaction('charge-1', 'capture', 'AI image completed', 25)],
+          meta: { next_cursor: null, has_more: false },
         }),
       ),
-      http.post('/api/admin/credits/refunds', async ({ request }) => {
+      http.post('/api/control/v1/credits/refunds', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>
         expect(body).toMatchObject({
-          user_public_id: userPublicID,
+          user_id: userPublicID,
           charge_transaction_id: 'charge-1',
           amount_credits: 10,
           reason: '任务取消退款',
         })
-        expect(body.idempotency_key).toMatch(/^admin-ui:refund:[A-Za-z0-9_-]+$/)
-        expect(body.business_reference_id).toMatch(/^admin-ui:refund:[A-Za-z0-9_-]+$/)
+        expect(request.headers.get('Idempotency-Key')).toMatch(/^control-ui:refund:/)
+        expect(request.headers.get('X-Operator-Reason')).toBe('任务取消退款')
         availableCredits = 135
         refunded = true
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: { transaction_id: 'refund-1', replayed: false },
+          data: {
+            transaction_id: 'refund-1',
+            command_type: 'refund',
+            amount_credits: 10,
+            replayed: false,
+            created_at: '2026-07-24T08:00:00Z',
+            wallet: {
+              user_id: userPublicID,
+              display_name: 'admin_balance_user',
+              available_credits: 135,
+              reserved_credits: 0,
+            },
+          },
         })
       }),
     )
@@ -581,84 +586,67 @@ describe('AdminUsersPage', () => {
   it('uses a 25-row cursor, appends without duplicates, and resets Ledger state for another user', async () => {
     const ledgerRequests: Array<{
       userId: string
-      beforeSequence: string | null
-      limit: string | null
+      cursor: string | null
+      pageSize: string | null
     }> = []
     useMswHandlers(
-      http.get('/api/admin/users', () =>
+      http.get('/api/control/v1/users', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            total: 2,
-            active_count: 2,
-            banned_count: 0,
-            admin_count: 0,
-            list: [
-              makeUser(125),
-              {
-                ...makeUser(55),
-                public_id: '00000000-0000-0000-0000-000000000013',
-                display_name: 'another_balance_user',
-              },
-            ],
-          },
+          data: [
+            makeUser(125),
+            {
+              ...makeUser(55),
+              id: secondUserPublicID,
+              display_name: 'another_balance_user',
+            },
+          ],
+          meta: { next_cursor: null, has_more: false },
         }),
       ),
-      http.get('/api/admin/credits/wallets/:publicId', ({ params }) =>
+      http.get('/api/control/v1/credits/wallets/:userId', ({ params }) =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
-            public_id:
-              String(params.publicId) === userPublicID
-                ? userPublicID
-                : '00000000-0000-0000-0000-000000000013',
+            user_id: String(params.userId),
             display_name:
-              String(params.publicId) === userPublicID
+              String(params.userId) === userPublicID
                 ? 'admin_balance_user'
                 : 'another_balance_user',
             status: 'active',
-            available_credits: params.publicId === userPublicID ? 125 : 55,
+            available_credits: params.userId === userPublicID ? 125 : 55,
             reserved_credits: 0,
             active_restrictions: [],
           },
         }),
       ),
-      http.get('/api/admin/credits/wallets/:publicId/ledger', ({ params, request }) => {
+      http.get('/api/control/v1/credits/wallets/:userId/ledger', ({ params, request }) => {
         const url = new URL(request.url)
         ledgerRequests.push({
-          userId: String(params.publicId),
-          beforeSequence: url.searchParams.get('before_sequence'),
-          limit: url.searchParams.get('limit'),
+          userId: String(params.userId),
+          cursor: url.searchParams.get('cursor'),
+          pageSize: url.searchParams.get('page_size'),
         })
-        if (params.publicId !== userPublicID) {
+        if (params.userId !== userPublicID) {
           return HttpResponse.json({
-            code: 0,
-            msg: 'ok',
-            data: {
-              transactions: [makeLedgerTransaction('user-13-ledger', 'grant', '第二个用户流水')],
-            },
+            data: [makeLedgerTransaction('user-13-ledger', 'grant', '第二个用户流水')],
+            meta: { next_cursor: null, has_more: false },
           })
         }
+        const cursor = url.searchParams.get('cursor')
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data:
-            url.searchParams.get('before_sequence') === '80'
-              ? {
-                  transactions: [
-                    makeLedgerTransaction('charge-1', 'capture'),
-                    makeLedgerTransaction('charge-older', 'grant', '历史赠送'),
-                  ],
-                }
-              : {
-                  transactions: [
-                    makeLedgerTransaction('charge-1', 'capture'),
-                    makeLedgerTransaction('grant-current', 'grant', '当前赠送'),
-                  ],
-                  next_before_sequence: 80,
-                },
+            cursor === 'ledger-cursor-2'
+              ? [
+                  makeLedgerTransaction('charge-1', 'capture'),
+                  makeLedgerTransaction('charge-older', 'grant', '历史赠送'),
+                ]
+              : [
+                  makeLedgerTransaction('charge-1', 'capture'),
+                  makeLedgerTransaction('grant-current', 'grant', '当前赠送'),
+                ],
+          meta:
+            cursor === 'ledger-cursor-2'
+              ? { next_cursor: null, has_more: false }
+              : { next_cursor: 'ledger-cursor-2', has_more: true },
         })
       }),
     )
@@ -674,7 +662,7 @@ describe('AdminUsersPage', () => {
     expect(
       ledgerRequests
         .filter((request) => request.userId === userPublicID)
-        .every((request) => request.limit === '25'),
+        .every((request) => request.pageSize === '25'),
     ).toBe(true)
     expect(within(firstDialog).getAllByText('AI image completed')).toHaveLength(1)
 
@@ -699,14 +687,15 @@ describe('AdminUsersPage', () => {
   it('shows a recoverable read error and retries wallet and Ledger loading', async () => {
     let shouldFail = true
     useMswHandlers(
-      http.get(`/api/admin/credits/wallets/${userPublicID}`, () =>
+      http.get(`/api/control/v1/credits/wallets/${userPublicID}`, () =>
         shouldFail
-          ? HttpResponse.json({ code: 500, msg: 'wallet unavailable' }, { status: 500 })
+          ? HttpResponse.json(
+              { error: { code: 'service_unavailable', message: 'down', request_id: 'r1' } },
+              { status: 500 },
+            )
           : HttpResponse.json({
-              code: 0,
-              msg: 'ok',
               data: {
-                public_id: userPublicID,
+                user_id: userPublicID,
                 display_name: 'admin_balance_user',
                 status: 'active',
                 available_credits: 125,
@@ -715,15 +704,15 @@ describe('AdminUsersPage', () => {
               },
             }),
       ),
-      http.get(`/api/admin/credits/wallets/${userPublicID}/ledger`, () =>
+      http.get(`/api/control/v1/credits/wallets/${userPublicID}/ledger`, () =>
         shouldFail
-          ? HttpResponse.json({ code: 500, msg: 'ledger unavailable' }, { status: 500 })
+          ? HttpResponse.json(
+              { error: { code: 'service_unavailable', message: 'down', request_id: 'r2' } },
+              { status: 500 },
+            )
           : HttpResponse.json({
-              code: 0,
-              msg: 'ok',
-              data: {
-                transactions: [makeLedgerTransaction('recovered-ledger', 'grant', '恢复后的流水')],
-              },
+              data: [makeLedgerTransaction('recovered-ledger', 'grant', '恢复后的流水')],
+              meta: { next_cursor: null, has_more: false },
             }),
       ),
     )
@@ -747,7 +736,7 @@ describe('AdminUsersPage', () => {
 
 function makeUser(availableCredits: number) {
   return {
-    public_id: userPublicID,
+    id: userPublicID,
     email: 'admin@example.com',
     providers: ['email'],
     display_name: 'admin_balance_user',

@@ -66,20 +66,33 @@ func IsControlCapability(capability string) bool {
 	return trimmed == "control" || trimmed == "control:*" || strings.HasPrefix(trimmed, CapabilityControlPrefix)
 }
 
-// validateCapabilities enforces the anti-implication rule: only
-// internal_worker subjects may hold control:* capabilities. Empty
-// capability names are always rejected.
-func validateCapabilities(subjectType SubjectType, capabilities []string) error {
+// validateCapabilities enforces the anti-implication rule: internal_worker
+// subjects may hold control:* capabilities, as may human_session subjects
+// with the admin business role holding them as an explicit operator grant
+// (issue #808). Every other subject holding a control capability —
+// including non-admin humans — is rejected, and empty capability names
+// are always rejected.
+func validateCapabilities(subjectType SubjectType, role Role, capabilities []string) error {
 	for _, capability := range capabilities {
 		trimmed := strings.TrimSpace(capability)
 		if trimmed == "" {
 			return ErrInvalid
 		}
-		if IsControlCapability(trimmed) && subjectType != SubjectInternalWorker {
+		if IsControlCapability(trimmed) && !isControlCapableSubjectType(subjectType, role) {
 			return ErrInvalid
 		}
 	}
 	return nil
+}
+
+// isControlCapableSubjectType is the construction-time counterpart of
+// isControlCapableSubject: workers always qualify; human sessions
+// qualify only with the admin role (explicit operator grant).
+func isControlCapableSubjectType(subjectType SubjectType, role Role) bool {
+	if subjectType == SubjectInternalWorker {
+		return true
+	}
+	return subjectType == SubjectHumanSession && role == RoleAdmin
 }
 
 var ErrInvalid = errors.New("invalid authenticated principal")
@@ -152,7 +165,7 @@ func NewExtended(userID int64, publicID uuid.UUID, authUserID, displayName, role
 	if tenantScope != "" && !isWorkspaceScopeShape(tenantScope) {
 		return Principal{}, ErrInvalid
 	}
-	if err := validateCapabilities(subjectType, capabilities); err != nil {
+	if err := validateCapabilities(subjectType, parsedRole, capabilities); err != nil {
 		return Principal{}, err
 	}
 	capSet := make(map[string]struct{}, len(capabilities))
@@ -294,11 +307,25 @@ func isValidPrincipal(principal Principal) bool {
 		if trimmed == "" || trimmed != capability {
 			return false
 		}
-		if IsControlCapability(trimmed) && principal.subjectType != "" && principal.subjectType != SubjectInternalWorker {
+		// Control capabilities are valid on internal_worker subjects, and
+		// on human_session subjects with the admin business role holding
+		// the explicit operator role grant (issue #808:
+		// principal.WithControlGrant). Every other subject holding a
+		// control capability is invalid, so public capabilities never
+		// imply control.
+		if IsControlCapability(trimmed) && !isControlCapableSubject(principal) {
 			return false
 		}
 	}
 	return true
+}
+
+// isControlCapableSubject reports whether the principal may validly carry
+// control:* capabilities: internal workers (construction-time minting) or
+// admin-role human sessions (explicit operator role grant via
+// WithControlGrant or NewExtended).
+func isControlCapableSubject(principal Principal) bool {
+	return isControlCapableSubjectType(principal.subjectType, principal.role)
 }
 
 func Set(c *gin.Context, principal Principal) error {

@@ -31,6 +31,7 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tenancy"
@@ -649,8 +650,17 @@ func (h *contractV1Handler) replaceBoardDocument(c *gin.Context) {
 	hash := contract.HashIdempotencyRequest("board:document-replace", workspace.PublicID, board.PublicID,
 		strconv.FormatInt(expectedRevision, 10), string(rawEnvelope))
 	result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "document-replace", key, hash, func() (any, error) {
-		return h.deps.Boards.ReplaceDocument(c.Request.Context(), workspace.PublicID, board.PublicID,
+		updated, replaceErr := h.deps.Boards.ReplaceDocument(c.Request.Context(), workspace.PublicID, board.PublicID,
 			identityPrincipal.UserID(), expectedRevision, schemaVersion, snapshot)
+		if replaceErr != nil {
+			return nil, replaceErr
+		}
+		// #807: board.document_replaced AFTER the revision commit.
+		h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
+			events.EventV1BoardDocumentReplaced,
+			events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
+			events.V1BoardDocumentReplacedData{BoardID: board.PublicID, Revision: updated.Revision})
+		return updated, nil
 	})
 	if !ok {
 		return
@@ -891,7 +901,22 @@ func (h *contractV1Handler) addBoardMember(c *gin.Context) {
 	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
 	hash := contract.HashIdempotencyRequest("board:member-add", workspace.PublicID, board.PublicID, body.Data.UserID, string(targetRole))
 	result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "member-add", key, hash, func() (any, error) {
-		return h.deps.Boards.AddBoardMember(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID, targetRole)
+		added, addErr := h.deps.Boards.AddBoardMember(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID, targetRole)
+		if addErr != nil {
+			return nil, addErr
+		}
+		// #807: board.member_changed AFTER the roster commit.
+		memberExternal := body.Data.UserID
+		if h.deps.Users != nil {
+			if publicID, lookupErr := h.deps.Users.GetUserPublicID(c.Request.Context(), targetUserID); lookupErr == nil {
+				memberExternal = tenancy.FormatUserPublicID(publicID)
+			}
+		}
+		h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
+			events.EventV1BoardMemberChanged,
+			events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
+			events.V1BoardMemberChangedData{BoardID: board.PublicID, MemberID: memberExternal})
+		return added, nil
 	})
 	if !ok {
 		return
@@ -958,6 +983,18 @@ func (h *contractV1Handler) updateBoardMember(c *gin.Context) {
 		renderBoardError(c, err)
 		return
 	}
+	// #807: board.member_changed AFTER the role commit (no idempotency
+	// wrapper on this route; the store commit is the boundary).
+	memberExternal := strings.TrimSpace(c.Param("member_id"))
+	if h.deps.Users != nil {
+		if publicID, lookupErr := h.deps.Users.GetUserPublicID(c.Request.Context(), targetUserID); lookupErr == nil {
+			memberExternal = tenancy.FormatUserPublicID(publicID)
+		}
+	}
+	h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
+		events.EventV1BoardMemberChanged,
+		events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
+		events.V1BoardMemberChangedData{BoardID: board.PublicID, MemberID: memberExternal})
 	dto, ok := h.toBoardMemberDTO(c, updated.UserID, updated.Role, v1FormatTime(updated.CreatedAt))
 	if !ok {
 		return
@@ -996,7 +1033,16 @@ func (h *contractV1Handler) removeBoardMember(c *gin.Context) {
 	targetExternal, _ := h.deps.Users.GetUserPublicID(c.Request.Context(), targetUserID)
 	hash := contract.HashIdempotencyRequest("board:member-remove", workspace.PublicID, board.PublicID, tenancy.FormatUserPublicID(targetExternal))
 	result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "member-remove", key, hash, func() (any, error) {
-		return &v1DeletedDTO{Deleted: true}, h.deps.Boards.RemoveBoardMember(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID)
+		if removeErr := h.deps.Boards.RemoveBoardMember(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID); removeErr != nil {
+			return nil, removeErr
+		}
+		// #807: board.member_changed AFTER the roster commit.
+		memberExternal := tenancy.FormatUserPublicID(targetExternal)
+		h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
+			events.EventV1BoardMemberChanged,
+			events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
+			events.V1BoardMemberChangedData{BoardID: board.PublicID, MemberID: memberExternal})
+		return &v1DeletedDTO{Deleted: true}, nil
 	})
 	if !ok {
 		return
@@ -1174,7 +1220,16 @@ func (h *contractV1Handler) revokeShareToken(c *gin.Context) {
 	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
 	hash := contract.HashIdempotencyRequest("board:share-revoke", workspace.PublicID, board.PublicID, tokenID)
 	result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "share-revoke", key, hash, func() (any, error) {
-		return &v1DeletedDTO{Deleted: true}, h.deps.Boards.RevokeShareToken(c.Request.Context(), workspace.PublicID, board.PublicID, tokenID, identityPrincipal.UserID())
+		if revokeErr := h.deps.Boards.RevokeShareToken(c.Request.Context(), workspace.PublicID, board.PublicID, tokenID, identityPrincipal.UserID()); revokeErr != nil {
+			return nil, revokeErr
+		}
+		// #807: board.share_revoked AFTER the revocation commit (token
+		// id only; the bearer never leaves the server).
+		h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
+			events.EventV1BoardShareRevoked,
+			events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
+			events.V1BoardShareRevokedData{BoardID: board.PublicID, ShareTokenID: tokenID})
+		return &v1DeletedDTO{Deleted: true}, nil
 	})
 	if !ok {
 		return

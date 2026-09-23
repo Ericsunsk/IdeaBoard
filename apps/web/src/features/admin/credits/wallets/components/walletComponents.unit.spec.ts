@@ -69,9 +69,6 @@ describe('Wallet Subcomponents', () => {
         refunded_credits: 0,
         remaining_refundable_credits: 50,
       },
-      postings: [],
-      actor: { type: 'system' },
-      source: 'task',
     }
 
     const { user } = renderWithUser(WalletLedgerTable, {

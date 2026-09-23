@@ -76,6 +76,12 @@ async function prepareGenerationWorkspace(tempRoot: string): Promise<string> {
       path.join(webRoot, 'src/shared/api/orvalMutator.ts'),
       path.join(tempApiSourceRoot, 'orvalMutator.ts'),
     ),
+    // Issue #808: the Control client resolves through its own transport
+    // mutator (control/v1 prefix); the drift workspace needs it too.
+    copyFile(
+      path.join(webRoot, 'src/shared/api/controlMutator.ts'),
+      path.join(tempApiSourceRoot, 'controlMutator.ts'),
+    ),
     symlink(path.join(webRoot, 'node_modules'), path.join(tempWebRoot, 'node_modules'), 'dir'),
   ])
 

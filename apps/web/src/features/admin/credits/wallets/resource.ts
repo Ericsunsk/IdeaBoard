@@ -1,43 +1,43 @@
 import { computed, onScopeDispose, toValue, type MaybeRefOrGetter } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import type {
-  AdminCreditDeductionRequest,
-  AdminCreditGrantRequest,
-  AdminCreditRefundRequest,
-  CreditLedgerTransaction,
-  ListAdminCreditLedgerParams,
-} from '../../../../shared/api/generated-query/model'
+import type { ControlLedgerTransaction } from '../../../../shared/api/generated-query/control/model'
 import { subscribeUserCreditsInvalidation } from '../../../../shared/query/userCreditsInvalidation'
-import { stripUndefined } from '../../../../shared/api/stripUndefined'
 import { adminCreditsBillingApi, type AdminCreditsBillingApi } from '../shared/api'
 import {
   buildAdminCreditCommandRequest,
   type AdminCreditCommandInput,
 } from './creditCommandContract'
 
-const walletQueryRoot = ['admin', 'credits', 'wallets'] as const
+const walletQueryRoot = ['control', 'credits', 'wallets'] as const
 
-export type AdminCreditLedgerTransaction = CreditLedgerTransaction
+export type AdminCreditLedgerTransaction = ControlLedgerTransaction
+
+export const ADMIN_CREDIT_LEDGER_PAGE_SIZE = 25
 
 interface AdminCreditLedgerCriteria {
   userPublicId: string
-  beforeSequence?: number | undefined
+  cursor?: string | undefined
+}
+
+export type AdminCreditCommandResult = {
+  transaction_id: string
+  replayed: boolean
 }
 
 export function useAdminCreditWalletResource(
   userPublicId: MaybeRefOrGetter<string | null>,
-  beforeSequence: MaybeRefOrGetter<number | undefined>,
+  cursor: MaybeRefOrGetter<string | undefined>,
   dependencies: {
     api?: AdminCreditsBillingApi
-    idFactory?: () => string
   } = {},
 ) {
   const api = dependencies.api ?? adminCreditsBillingApi
   const queryClient = useQueryClient()
   const normalizedUserPublicId = computed(() => toValue(userPublicId) ?? '')
+  const normalizedCursor = computed(() => toValue(cursor))
   const ledgerCriteria = computed<AdminCreditLedgerCriteria>(() => ({
     userPublicId: normalizedUserPublicId.value,
-    beforeSequence: toValue(beforeSequence),
+    ...(normalizedCursor.value === undefined ? {} : { cursor: normalizedCursor.value }),
   }))
   const enabled = computed(() => normalizedUserPublicId.value.length > 0)
 
@@ -55,14 +55,15 @@ export function useAdminCreditWalletResource(
     ]),
     queryFn: async ({ queryKey, signal }) => {
       const criteria = queryKey.at(-1) as AdminCreditLedgerCriteria
-      const params: ListAdminCreditLedgerParams = stripUndefined({
-        before_sequence: criteria.beforeSequence,
-        limit: 25,
-      })
-      return {
-        criteria,
-        page: await api.listLedger(criteria.userPublicId, params, { signal }),
-      }
+      const page = await api.listLedger(
+        criteria.userPublicId,
+        {
+          ...(criteria.cursor === undefined ? {} : { cursor: criteria.cursor }),
+          page_size: ADMIN_CREDIT_LEDGER_PAGE_SIZE,
+        },
+        { signal },
+      )
+      return { criteria, page }
     },
     enabled,
     placeholderData: (previous) => previous,
@@ -78,27 +79,67 @@ export function useAdminCreditWalletResource(
   onScopeDispose(unsubscribeCreditsInvalidation)
 
   const grantMutation = useMutation({
-    mutationFn: (request: AdminCreditGrantRequest) => api.grant(request),
+    mutationFn: (
+      input: { body: Parameters<AdminCreditsBillingApi['grant']>[0] } & {
+        idempotencyKey: string
+        operatorReason: string
+      },
+    ) =>
+      api.grant(input.body, {
+        idempotencyKey: input.idempotencyKey,
+        operatorReason: input.operatorReason,
+      }),
     onSuccess: invalidateWallet,
   })
   const deductionMutation = useMutation({
-    mutationFn: (request: AdminCreditDeductionRequest) => api.deduct(request),
+    mutationFn: (
+      input: { body: Parameters<AdminCreditsBillingApi['deduct']>[0] } & {
+        idempotencyKey: string
+        operatorReason: string
+      },
+    ) =>
+      api.deduct(input.body, {
+        idempotencyKey: input.idempotencyKey,
+        operatorReason: input.operatorReason,
+      }),
     onSuccess: invalidateWallet,
   })
   const refundMutation = useMutation({
-    mutationFn: (request: AdminCreditRefundRequest) => api.refund(request),
+    mutationFn: (
+      input: { body: Parameters<AdminCreditsBillingApi['refund']>[0] } & {
+        idempotencyKey: string
+        operatorReason: string
+      },
+    ) =>
+      api.refund(input.body, {
+        idempotencyKey: input.idempotencyKey,
+        operatorReason: input.operatorReason,
+      }),
     onSuccess: invalidateWallet,
   })
 
-  async function executeCommand(input: AdminCreditCommandInput) {
-    const request = buildAdminCreditCommandRequest(input, dependencies.idFactory)
+  async function executeCommand(input: AdminCreditCommandInput): Promise<AdminCreditCommandResult> {
+    const built = buildAdminCreditCommandRequest(input)
+    const options = { idempotencyKey: built.idempotencyKey, operatorReason: built.operatorReason }
     if (input.kind === 'grant') {
-      return grantMutation.mutateAsync(request as AdminCreditGrantRequest)
+      const result = await grantMutation.mutateAsync({
+        body: built.body as Parameters<AdminCreditsBillingApi['grant']>[0],
+        ...options,
+      })
+      return { transaction_id: result.transaction_id, replayed: result.replayed === true }
     }
     if (input.kind === 'deduction') {
-      return deductionMutation.mutateAsync(request as AdminCreditDeductionRequest)
+      const result = await deductionMutation.mutateAsync({
+        body: built.body as Parameters<AdminCreditsBillingApi['deduct']>[0],
+        ...options,
+      })
+      return { transaction_id: result.transaction_id, replayed: result.replayed === true }
     }
-    return refundMutation.mutateAsync(request as AdminCreditRefundRequest)
+    const result = await refundMutation.mutateAsync({
+      body: built.body as Parameters<AdminCreditsBillingApi['refund']>[0],
+      ...options,
+    })
+    return { transaction_id: result.transaction_id, replayed: result.replayed === true }
   }
 
   return {

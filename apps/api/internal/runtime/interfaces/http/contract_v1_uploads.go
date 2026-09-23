@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/media/workspaceuploads"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tenancy"
@@ -308,7 +310,7 @@ func (h *contractV1Handler) completeUploadSession(c *gin.Context) {
 		strconv.FormatInt(body.Data.SizeBytes, 10), strings.TrimSpace(body.Data.MIMEType), strings.TrimSpace(body.Data.MediaKind),
 		strconv.FormatInt(int64(body.Data.Width), 10), strconv.FormatInt(int64(body.Data.Height), 10))
 	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
-		return h.completeUploadOnce(ctx, workspacePublicID, uploadID, v1CompleteFacts{
+		return h.completeUploadOnce(ctx, workspacePublicID, uploadID, identityPrincipal, v1CompleteFacts{
 			checksum:  checksum,
 			sizeBytes: body.Data.SizeBytes,
 			mimeType:  strings.TrimSpace(body.Data.MIMEType),
@@ -346,7 +348,7 @@ type v1CompleteFacts struct {
 	height    int32
 }
 
-func (h *contractV1Handler) completeUploadOnce(ctx context.Context, workspacePublicID, uploadID string, facts v1CompleteFacts) (any, error) {
+func (h *contractV1Handler) completeUploadOnce(ctx context.Context, workspacePublicID, uploadID string, identityPrincipal principal.Principal, facts v1CompleteFacts) (any, error) {
 	session, err := h.deps.UploadSessions.GetSession(ctx, workspacePublicID, uploadID)
 	if err != nil {
 		return nil, err
@@ -378,6 +380,11 @@ func (h *contractV1Handler) completeUploadOnce(ctx context.Context, workspacePub
 	if err != nil {
 		return nil, err
 	}
+	// #807: media.asset_ready AFTER the durable asset row + session
+	// completion commit (inside the once-fn: replays never re-emit).
+	h.emitWorkspaceEvent(ctx, identityPrincipal, workspacePublicID, events.EventV1MediaAssetReady,
+		events.V1Resource{Type: events.V1ResourceMediaAsset, ID: asset.ID},
+		events.V1MediaAssetReadyData{AssetID: asset.ID})
 	uploadDTO := toUploadSessionDTO(completed)
 	dto := &v1CompleteUploadDTO{Upload: uploadDTO, Asset: toMediaAssetDTO(workspacePublicID, asset)}
 	return dto, nil

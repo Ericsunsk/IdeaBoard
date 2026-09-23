@@ -30,3 +30,18 @@ func WriteEvent(c *gin.Context, event string, data interface{}) error {
 	c.Writer.Flush()
 	return nil
 }
+
+// WriteIDEvent writes one SSE frame carrying the Last-Event-ID cursor
+// (the v1 workspace event evt_ id). Native EventSource resumes from it
+// automatically; fetch-based transports read it back explicitly.
+func WriteIDEvent(c *gin.Context, id, event string, data interface{}) error {
+	payload, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(c.Writer, "id: %s\nevent: %s\ndata: %s\n\n", id, event, payload); err != nil {
+		return err
+	}
+	c.Writer.Flush()
+	return nil
+}

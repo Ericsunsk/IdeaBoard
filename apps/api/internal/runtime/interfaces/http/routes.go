@@ -57,6 +57,10 @@ type Dependencies struct {
 	// billing account, credits balance/ledger, billing records, usage,
 	// checkout sessions). Zero value keeps the endpoints fail-closed.
 	ContractV1Billing ContractV1BillingDeps
+	// ContractControl wires the Control Plane administration surface
+	// (issue #808). Zero value keeps every control route fail-closed
+	// with 501/503; legacy /api/admin routes are untouched.
+	ContractControl ContractControlDeps
 	// REDMetrics feeds the per-route latency/error middleware. Nil keeps the
 	// middleware a pass-through; production wires the Prometheus set.
 	REDMetrics *redmetrics.Set
@@ -201,16 +205,20 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, fronte
 	registerAuthenticatedUserRoutes(r, deps.Auth, deps.UserRoutes)
 	registerAuthenticatedAdminRoutes(r, deps.Auth, deps.AdminRoutes)
 	// Contract kernel v1 routes (issue #800 kernel, #801 handlers):
-	// additive /api/v1 real handlers plus the /api/control/v1 placeholder
-	// returning 501. Legacy /api/user, /api/admin, and /api/health routes
-	// above are untouched; removal is #809. Registered before the SPA
-	// fallback so explicit contract routes win over NoRoute.
+	// additive /api/v1 real handlers plus the /api/control/v1 Control
+	// Plane (issue #808: capability auth, separate rate limits, audit).
+	// Legacy /api/user, /api/admin, and /api/health routes above are
+	// untouched; removal is #809. Registered before the SPA fallback so
+	// explicit contract routes win over NoRoute.
 	registerContractV1RoutesOnEngine(r, deps.Auth, deps.ContractV1)
 	// Workspace billing surface (issue #804): implicit per-workspace
 	// billing account + credits/billing/payments read and checkout
 	// contracts. Legacy /api/user billing routes above are untouched.
 	RegisterContractV1BillingRoutesOnEngine(r, deps.Auth, deps.ContractV1Billing)
-	registerContractControlStubRoutes(r)
+	// Control Plane administration (issue #808): separate capability
+	// chain, rate-limit bucket, and mandatory audit. Legacy /api/admin
+	// routes above are untouched; removal is #809.
+	RegisterContractControlRoutesOnEngine(r, deps.Auth, deps.ContractControl)
 
 	RegisterFrontendRoutes(r, frontendFS, frontendOptions)
 }

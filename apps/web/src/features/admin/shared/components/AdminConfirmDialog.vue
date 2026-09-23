@@ -16,6 +16,22 @@
           </AlertDialogDescription>
         </div>
 
+        <label
+          v-if="activeAdminConfirm?.reasonEnabled"
+          for="admin-confirm-reason-textarea"
+          class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+        >
+          <span>{{ activeAdminConfirm?.reasonLabel }}</span>
+          <textarea
+            id="admin-confirm-reason-textarea"
+            :value="activeAdminConfirm?.reason ?? ''"
+            :placeholder="activeAdminConfirm?.reasonPlaceholder"
+            rows="3"
+            class="w-full rounded-lg border border-admin-border bg-white px-3 py-2 text-admin-body text-admin-text-1 placeholder:text-admin-text-3 focus:outline-none"
+            @input="handleReasonInput"
+          />
+        </label>
+
         <div class="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 gap-2 pt-2">
           <button
             type="button"
@@ -33,7 +49,10 @@
                 ? 'bg-admin-danger hover:bg-admin-danger-hover active:bg-admin-danger-pressed'
                 : 'bg-admin-accent hover:bg-admin-accent-hover active:bg-admin-accent-pressed',
             ]"
-            :disabled="activeAdminConfirm?.loading"
+            :disabled="
+              activeAdminConfirm?.loading ||
+              (activeAdminConfirm?.reasonRequired && !activeAdminConfirm?.reason.trim())
+            "
             @click="handleConfirm"
           >
             {{ activeAdminConfirm?.loading ? '处理中...' : activeAdminConfirm?.confirmLabel }}
@@ -57,6 +76,11 @@ import { activeAdminConfirm } from '../composables/useAdminConfirm'
 import { formatAdminDisplayError, useAdminToast } from '../lib/toast'
 
 const toast = useAdminToast()
+
+function handleReasonInput(event: Event) {
+  const target = event.target as HTMLTextAreaElement | null
+  activeAdminConfirm.value?.setReason(target?.value ?? '')
+}
 
 async function handleConfirm() {
   try {

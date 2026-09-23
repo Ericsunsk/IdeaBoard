@@ -18,8 +18,23 @@ describe('admin user commands', () => {
       publicId: 'user-7',
       reason: 'abuse',
       expires_in_days: 7,
+      operatorReason: 'abuse',
     })
     expect(harness.feedback.banSucceeded).toHaveBeenCalledWith('alice')
+  })
+
+  it('refuses ban without an operator reason before calling mutations', async () => {
+    const harness = createHarness()
+    const commands = harness.createCommands()
+
+    commands.openUserActionMenu(makeUser({ publicId: 'user-7', status: 1 }))
+    commands.handleActionSelect('status')
+    commands.banForm.value = { expiresInDays: 0, reason: '   ' }
+    await commands.confirmBanUser()
+
+    expect(harness.mutations.banUser.mutateAsync).not.toHaveBeenCalled()
+    expect(commands.showBanModal.value).toBe(true)
+    expect(harness.feedback.banFailed).toHaveBeenCalledWith(expect.any(Error))
   })
 
   it('blocks status changes for admins before calling mutations', () => {
@@ -45,7 +60,7 @@ describe('admin user commands', () => {
     expect(harness.mutations.deleteUser.mutateAsync).not.toHaveBeenCalled()
   })
 
-  it('confirms unban and reports mutation failures as observable errors', async () => {
+  it('confirms unban with an operator reason and reports mutation failures as observable errors', async () => {
     const harness = createHarness()
     harness.mutations.unbanUser.mutateAsync.mockRejectedValueOnce(new Error('backend denied'))
     const commands = harness.createCommands()
@@ -55,13 +70,20 @@ describe('admin user commands', () => {
     await harness.settleConfirms()
 
     expect(harness.confirm.confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ title: '确认解除封禁', confirmLabel: '确认解封' }),
+      expect.objectContaining({
+        title: '确认解除封禁',
+        confirmLabel: '确认解封',
+        reason: expect.objectContaining({ required: true }),
+      }),
     )
-    expect(harness.mutations.unbanUser.mutateAsync).toHaveBeenCalledWith('user-3')
+    expect(harness.mutations.unbanUser.mutateAsync).toHaveBeenCalledWith({
+      publicId: 'user-3',
+      operatorReason: 'test reason',
+    })
     expect(harness.feedback.unbanFailed).toHaveBeenCalledWith(expect.any(Error))
   })
 
-  it('confirms role toggles with the next role payload', async () => {
+  it('confirms role toggles with the next role payload and operator reason', async () => {
     const harness = createHarness()
     const commands = harness.createCommands()
 
@@ -75,6 +97,7 @@ describe('admin user commands', () => {
     expect(harness.mutations.updateRole.mutateAsync).toHaveBeenCalledWith({
       publicId: 'user-4',
       role: 'admin',
+      operatorReason: 'test reason',
     })
     expect(harness.feedback.roleUpdated).toHaveBeenCalledWith('admin')
   })
@@ -93,11 +116,12 @@ describe('admin user commands', () => {
     expect(harness.mutations.updateRole.mutateAsync).toHaveBeenCalledWith({
       publicId: 'user-8',
       role: 'user',
+      operatorReason: 'test reason',
     })
     expect(harness.feedback.roleUpdated).toHaveBeenCalledWith('user')
   })
 
-  it('confirms session revoke using the public user identity', async () => {
+  it('confirms session revoke with an operator reason using the public user identity', async () => {
     const harness = createHarness()
     const commands = harness.createCommands()
 
@@ -106,19 +130,31 @@ describe('admin user commands', () => {
     await harness.settleConfirms()
 
     expect(harness.feedback.missingAuthUserForSessionRevoke).not.toHaveBeenCalled()
-    expect(harness.mutations.revokeSessions.mutateAsync).toHaveBeenCalledWith('user-5')
+    expect(harness.mutations.revokeSessions.mutateAsync).toHaveBeenCalledWith({
+      publicId: 'user-5',
+      operatorReason: 'test reason',
+    })
   })
 
-  it('delegates impersonation side effects to the session command adapter', async () => {
+  it('confirms impersonation with danger copy and an operator reason', async () => {
     const harness = createHarness()
     const commands = harness.createCommands()
 
     commands.openUserActionMenu(makeUser({ publicId: 'user-6', displayName: 'erin' }))
     commands.handleActionSelect('impersonate')
     await vi.waitFor(() =>
-      expect(harness.sessionCommands.startImpersonation).toHaveBeenCalledWith('user-6'),
+      expect(harness.sessionCommands.startImpersonation).toHaveBeenCalledWith('user-6', {
+        operatorReason: 'test reason',
+      }),
     )
 
+    expect(harness.confirm.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: '确认伪装登录',
+        intent: 'danger',
+        reason: expect.objectContaining({ required: true }),
+      }),
+    )
     expect(harness.feedback.impersonationStarted).toHaveBeenCalledWith('erin')
   })
 
@@ -129,7 +165,9 @@ describe('admin user commands', () => {
     commands.openUserActionMenu(makeUser({ publicId: 'user-9', displayName: 'fran' }))
     commands.handleActionSelect('impersonate')
     await vi.waitFor(() =>
-      expect(harness.sessionCommands.startImpersonation).toHaveBeenCalledWith('user-9'),
+      expect(harness.sessionCommands.startImpersonation).toHaveBeenCalledWith('user-9', {
+        operatorReason: 'test reason',
+      }),
     )
   })
 })
@@ -138,6 +176,7 @@ function createHarness() {
   const feedback = createAdminUsersFeedback()
   const confirm = {
     confirm: vi.fn().mockResolvedValue(true),
+    readReason: vi.fn().mockReturnValue('test reason'),
   }
   const mutations = {
     banUser: { mutateAsync: vi.fn().mockResolvedValue(undefined) },
