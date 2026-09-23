@@ -507,3 +507,24 @@ OpenAPI 已将 `Idempotency-Key` 声明为 Task cancel 的 required header；Use
 ## 第五批补充：完整 workspace checks（5F）
 
 `go tool sqlc generate` 已执行且成功；未在真实数据库执行 migration。当前完整 API 与 Web build/test 通过，但包含 schema DROP/secret purge 的 migration 仍需发布前 backup、Fresh Database replay 和 cutover/rollback 计划。
+
+## 最终闭环：Composition、CI 与遗漏路径复核（8A）
+
+最后一轮集中复核 runtime composition、route registration、readiness/metrics wiring、River 与数据库连接池边界，以及 CI workflow、migration/schema gate 和 OpenAPI breaking gate。重点确认应用事务 pool 与 River enqueue 共用同一 PostgreSQL transaction seam，任务提交仍满足“写入 task 与 enqueue job 同事务”约束；同时检查 admin route 未绕过 feature/resource/adapter 边界，NATS 仍只承担 event layer 职责。
+
+本轮未发现新的 P1/P2。`Library` service 缺失时已 fail-closed 为 `503`，并保留 malformed request 的优先级；OpenAPI gate 的空 label、exact approval label 与相似 label 边界也已覆盖。未执行真实 PostgreSQL migration、部署或外部写入。
+
+### 最终验证
+
+- `cd apps/api && go test ./...` 通过。
+- `cd apps/api && go vet ./...` 通过。
+- `cd apps/web && npm run test:run`：425 个 test files、2333 个 tests 通过，进程退出码为 0；happy-dom teardown 输出 AbortError，但未导致测试失败。
+- `cd apps/web && npm run build` 通过。
+- `cd apps/web && npm run api:check-generated` 通过。
+- `cd apps/api && go tool sqlc generate` 通过。
+- `atlas migrate hash --dir file://internal/db/migrations` 通过。
+- `bash scripts/ci-parity-test.sh`、`git diff --check` 通过。
+
+### 发布边界
+
+代码变更可通过 `git revert` 回滚；包含 `DROP` 与 secret purge 的数据库 migration 不能依赖简单 image rollback。发布前仍需完成 backup、Fresh Database replay、cutover/rollback 演练，并在真实 PostgreSQL 环境执行 migration 验证。
