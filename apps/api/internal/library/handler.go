@@ -83,12 +83,24 @@ type materializedAssetDTO struct {
 
 func NewHandler(service *Service) *Handler { return &Handler{service: service} }
 
+func (h *Handler) requireService(c *gin.Context) (*Service, bool) {
+	if h == nil || h.service == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "素材库服务暂不可用", errors.New("library service is unavailable"))
+		return nil, false
+	}
+	return h.service, true
+}
+
 func (h *Handler) ListFolders(c *gin.Context) {
 	userID, ok := requireUserID(c)
 	if !ok {
 		return
 	}
-	folders, err := h.service.ListFolders(c.Request.Context(), userID)
+	service, ok := h.requireService(c)
+	if !ok {
+		return
+	}
+	folders, err := service.ListFolders(c.Request.Context(), userID)
 	if err != nil {
 		response.InternalError(c, http.StatusInternalServerError, "读取素材文件夹失败", err)
 		return
@@ -110,7 +122,11 @@ func (h *Handler) CreateFolder(c *gin.Context) {
 		writeLibraryError(c, ErrInvalidFolderName)
 		return
 	}
-	folder, err := h.service.CreateFolder(c.Request.Context(), userID, req.Name)
+	service, ok := h.requireService(c)
+	if !ok {
+		return
+	}
+	folder, err := service.CreateFolder(c.Request.Context(), userID, req.Name)
 	if err != nil {
 		writeLibraryError(c, err)
 		return
@@ -133,7 +149,11 @@ func (h *Handler) RenameFolder(c *gin.Context) {
 		writeLibraryError(c, ErrInvalidFolderName)
 		return
 	}
-	folder, err := h.service.RenameFolder(c.Request.Context(), userID, folderID, req.Name)
+	service, ok := h.requireService(c)
+	if !ok {
+		return
+	}
+	folder, err := service.RenameFolder(c.Request.Context(), userID, folderID, req.Name)
 	if err != nil {
 		writeLibraryError(c, err)
 		return
@@ -151,7 +171,11 @@ func (h *Handler) DeleteFolder(c *gin.Context) {
 		writeLibraryError(c, ErrSystemFolderImmutable)
 		return
 	}
-	if err := h.service.DeleteFolder(c.Request.Context(), userID, folderID); err != nil {
+	service, ok := h.requireService(c)
+	if !ok {
+		return
+	}
+	if err := service.DeleteFolder(c.Request.Context(), userID, folderID); err != nil {
 		writeLibraryError(c, err)
 		return
 	}
@@ -173,7 +197,11 @@ func (h *Handler) ListAssets(c *gin.Context) {
 		writeLibraryError(c, err)
 		return
 	}
-	result, err := h.service.ListAssets(c.Request.Context(), userID, selection, c.Query("cursor"), limit)
+	service, ok := h.requireService(c)
+	if !ok {
+		return
+	}
+	result, err := service.ListAssets(c.Request.Context(), userID, selection, c.Query("cursor"), limit)
 	if err != nil {
 		writeLibraryError(c, err)
 		return
@@ -200,7 +228,11 @@ func (h *Handler) SaveAsset(c *gin.Context) {
 		writeLibraryError(c, err)
 		return
 	}
-	asset, err := h.service.SaveAsset(c.Request.Context(), SaveAssetCommand{OwnerUserID: userID, FolderSelection: selection, NewFolderName: req.NewFolderName, Asset: req.Asset})
+	service, ok := h.requireService(c)
+	if !ok {
+		return
+	}
+	asset, err := service.SaveAsset(c.Request.Context(), SaveAssetCommand{OwnerUserID: userID, FolderSelection: selection, NewFolderName: req.NewFolderName, Asset: req.Asset})
 	if err != nil {
 		writeLibraryError(c, err)
 		return
@@ -237,7 +269,11 @@ func (h *Handler) MoveAsset(c *gin.Context) {
 		writeLibraryError(c, ErrInvalidTargetFolder)
 		return
 	}
-	asset, err := h.service.MoveAsset(c.Request.Context(), userID, assetID, req.FolderID)
+	service, ok := h.requireService(c)
+	if !ok {
+		return
+	}
+	asset, err := service.MoveAsset(c.Request.Context(), userID, assetID, req.FolderID)
 	if err != nil {
 		writeLibraryError(c, err)
 		return
@@ -255,7 +291,11 @@ func (h *Handler) DeleteAsset(c *gin.Context) {
 		writeLibraryError(c, ErrAssetNotFound)
 		return
 	}
-	if err := h.service.DeleteAsset(c.Request.Context(), userID, assetID); err != nil {
+	service, ok := h.requireService(c)
+	if !ok {
+		return
+	}
+	if err := service.DeleteAsset(c.Request.Context(), userID, assetID); err != nil {
 		writeLibraryError(c, err)
 		return
 	}
@@ -272,7 +312,11 @@ func (h *Handler) MaterializeAsset(c *gin.Context) {
 		writeLibraryError(c, ErrAssetNotFound)
 		return
 	}
-	materialized, err := h.service.MaterializeAsset(c.Request.Context(), userID, assetID)
+	service, ok := h.requireService(c)
+	if !ok {
+		return
+	}
+	materialized, err := service.MaterializeAsset(c.Request.Context(), userID, assetID)
 	if err != nil {
 		writeLibraryError(c, err)
 		return
@@ -290,7 +334,11 @@ func (h *Handler) LookupAssets(c *gin.Context) {
 		writeLibraryError(c, ErrInvalidSource)
 		return
 	}
-	assets, err := h.service.LookupAssets(c.Request.Context(), userID, req.Keys)
+	service, ok := h.requireService(c)
+	if !ok {
+		return
+	}
+	assets, err := service.LookupAssets(c.Request.Context(), userID, req.Keys)
 	if err != nil {
 		writeLibraryError(c, err)
 		return

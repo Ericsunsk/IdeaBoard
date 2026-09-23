@@ -451,7 +451,7 @@ AcceptedDTO 的 202、numeric code、accepted、request_id 与 data 契约保持
 - `cd apps/api && go test ./internal/library ./internal/platform/pagination -count=1 -race` 通过。
 - `go vet ./internal/library ./internal/platform/pagination` 通过。
 - Library repository/service 同样依赖 PGX/sqlc caller migration，无法从 HEAD 单独 clean-build；不与 Searchcatalog/Billing 混成伪小 commit。
-- residual：Library handler 的 nil service 组合错误仍会在请求路径触发 panic；这是既有 handler-wide dependency guard 缺口，不在本次 pagination contract 中扩大修复范围，后续可与统一 HTTP fail-closed 批次合并。
+- 后续补充修复：Library handler 的 nil service 组合错误已统一 fail-closed 为 `503 Service Unavailable`，并保留请求格式校验优先级；`go test ./internal/library` 与 `go vet ./internal/library` 通过。
 
 ## 第四批补充：Board idempotency audit（5B，暂不提交代码）
 
