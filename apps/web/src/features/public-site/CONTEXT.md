@@ -1,129 +1,75 @@
-# Public Site
+# Public Site Context
+Public Site owns the public product and content surface for unauthenticated visitors, search engines, and answer engines, with a single public canonical URL system.
+It does NOT own Workspace routes, the authenticated app surface, Admin, or Canvas.
 
-Public Site 是 IdeaBoard 面向未登录访客、搜索引擎和 answer engine 的公开产品与内容上下文。它与认证后的 Canvas Workspace 分离，拥有唯一的 public canonical URL 体系。
+## Domain Language
+| Term | Meaning |
+| ---- | ------- |
+| Public Site | Brand, product, and content surface accessible without login and open to discovery and citation; canonical root is `https://ideaboard.art/`. |
+| Public Page | Standalone public content unit with a stable canonical URL. |
+| Workspace Route | App route under `/user/*` for login, Boards, Canvas, and account actions; carries no search-acquisition duty. |
+| Visual Designer | Independent designer, brand visual designer, or small creative team working through image, composition, style, and visual systems; the primary audience. |
+| Pattern Designer | Visual Designer focused on pattern concepts and visual repetition; the first professional sub-segment. |
+| Workspace Activation | Visitor completes auth and first enters a working Canvas Board; the primary conversion (signup/login are only mid-funnel steps). |
+| Use Case | End-to-end creative outcome a Visual Designer wants; the first-level content thread. |
+| Capability Page | Public Page explaining one real executable image capability: inputs, outputs, limits, and fit; supports a Use Case. |
+| Content Cluster | One flagship Use Case plus independently publishable Capability Pages and guides; the first cluster targets Pattern Ideation. |
+| Pattern Ideation | Exploring pattern directions via prompts, visual-option comparison, reference-style fusion, local refinement, and HD export; the current product promise. |
+| Public Language | Canonical content language is English for body, metadata, nav, and CTAs; full Chinese ships later as separate `/zh-CN/*` pages with bidirectional links. |
+| AI Canvas | IdeaBoard product category for Visual Designers; connected image workflows to explore, combine, and iterate visual ideas. |
+| Search Citation Access | Permission for compliant search/answer-engine crawlers to discover, understand, and cite content; not a training license. |
+| Training Crawl Access | Separate permission for model training or improvement data collection; decided by product and rights policy. |
+| Public Rendering Boundary | Public Site routes ship as build-time static HTML; Workspace, Admin, and protected routes stay Vue SPA/CSR; they share facts and brand assets, not rendering responsibility. |
+| Public Fact Registry | Code-owned stable facts verifiable by executable workflow contracts: capability slug, name, inputs, outputs, limits, public status, Use Case links. |
+| Editorial Content | Reviewed English narrative, steps, and design context for Visual Designers; cites the registry without redefining facts or inventing evidence. |
+| Repository-reviewed Publishing | Editorial Content, registry, metadata, structured data, and sitemap ship together through repo review and build, never via a runtime Admin CMS. |
+| Canonical URL Contract | Stable paths on `https://ideaboard.art`, lowercase `kebab-case`, no trailing slash; no content in query or hash; non-canonical variants redirect. |
+| Content Provenance | Public Content is attributed to IdeaBoard or the IdeaBoard Editorial Team with real Published/Last-reviewed dates; no invented authors, ratings, or credentials. |
+| Structured Data Contract | JSON-LD states only visible, verifiable facts: `Organization`/`WebSite` on home, `BreadcrumbList` on nav layers, `Article`/`TechArticle` only for real guides, `SoftwareApplication` only with sufficient product facts. |
+| Public Pricing | Publicly verifiable pricing facts with a clear owner from the registry; the first cluster publishes no pricing and declares no `offers` in structured data. |
+| First-party Organic Measurement | Discovery, crawl, and conversion measured via Search Console, Bing Webmaster Tools, Cloudflare/source logs, and server-side Workspace Activation events; no third-party tracking cookies or content surveillance. |
+| Authenticated App Surface | Protected routes for login, account, Boards, Canvas, Admin, and tokenized shares; excluded from the sitemap and served `noindex`. |
+| Public URL Integrity | Only published, existing Public Pages return `200`; missing, withdrawn, or moved URLs return real `404`, `410`, or explicit `301`; never a shared SPA shell faking success. |
+| Public Content Lifecycle | Only `draft`, `published`, `retired`; builds publish `published` only; `retired` projects to `301` or `410` by replacement. |
+| Initial Product URL Set | First release publishes only `/` and `/use-cases/pattern-ideation`; Pattern Generation, Style Variation, Style Fusion, Partial Editing, and Image Upscaling stay `draft` until credible supporting evidence exists. |
+| Public Page Content Contract | Every published page needs an opening answer, target Visual Designer, real workflow steps, inputs/outputs/limits, related internal links, a Workspace Activation CTA, and Content Provenance, consistent with metadata/JSON-LD. |
+| Content Cluster Link Graph | Pattern Ideation is the first-cluster hub; the first home links only to it; Capability Pages link back to the hub and to adjacent workflow neighbors once published. |
+| Anonymous Public Content | Body, steps, inputs/outputs/limits, and metadata need no login; only the Workspace Activation CTA enters auth. |
+| Intent-Preserving Handoff | Public Page CTAs carry the Use Case/Capability intent into the Workspace start flow without changing the canonical URL or sitemap. |
 
-## Language
+## Public Seams
+- `https://ideaboard.art/` canonical root; all Public Pages use stable lowercase `kebab-case` paths with no trailing slash.
+- `Public Fact Registry` single source for capability facts; Editorial Content cites it and never redefines it.
+- `Repository-reviewed Publishing` content, metadata, structured data, and sitemap ship via repo review and build.
+- `Intent-Preserving Handoff` CTA intent affects only the in-app start flow, never the canonical URL or sitemap.
+- `First-party Organic Measurement` discovery and activation measured without third-party cookies.
 
-**Public Site**:
-IdeaBoard 无需登录即可访问、允许被发现和引用的品牌、产品与内容 surface。`https://ideaboard.art/` 是其 canonical root。
-_Avoid_: Landing SPA, User Home, marketing shell
+## Invariants
+- Public Site and Workspace routes stay separate; Workspace routes carry no acquisition duty.
+- Pattern Ideation is the flagship Use Case; it never promises production-ready seamless repeat or print-production workflow.
+- Pages are English-only at launch; never ship mixed-language pages, partial translations, or machine-translated alternates.
+- Never treat search citation access as training access, or vice versa.
+- Never use one rendering mode for all routes; never serve bot-specific rendering.
+- Registry facts are never sourced from Admin prompts, discovered at runtime, or duplicated across metadata.
+- Never ship generated SEO copy, hidden crawler text, or prompt templates as Editorial Content.
+- Publishing is never driven by a runtime SEO CMS, prompts, or unreviewed copy.
+- Content never lives in query or hash params; duplicate locale roots and trailing-slash variants are not allowed.
+- Never use synthetic authority, anonymous AI copy, or fabricated reviews.
+- JSON-LD facts must be page-visible and verifiable; never hide claims, fabricate ratings, or bait commercial FAQ rich results.
+- First cluster publishes no pricing and no `offers`; never show admin-only, stale, or implied-free pricing.
+- Never use cross-site profiles, session replay, or prompt/content surveillance.
+- Authenticated surfaces stay out of the sitemap with `noindex`; never make workspaces searchable; robots alone is not privacy.
+- Never serve soft 404s, `200` on unknown routes, or blanket SPA fallback.
+- Only `published` pages build; `retired` maps to `301` or `410`; no runtime publish state, scheduled CMS workflow, or stale sitemap entries.
+- First release is `/` plus `/use-cases/pattern-ideation` only; no premature feature sprawl, thin capability pages, or unverified routes.
+- Every published page satisfies the Public Page Content Contract; no metadata-only pages, unsupported claims, or fabricated evidence.
+- First home links only to the Pattern Ideation hub; no orphan pages, indiscriminate cross-linking, vague anchors, or links to unpublished routes.
+- Page bodies are never auth-gated and never client-only SEO bodies; no user-asset previews in public content.
+- Handoff never uses query-shaped canonicals and never loses Use Case context.
 
-**Public Page**:
-Public Site 中拥有稳定 canonical URL 的独立公开内容单元。
-_Avoid_: Auth route, Workspace route, crawler-only page
-
-**Workspace Route**:
-`/user/*` 下承载登录、Boards、Canvas 和账户操作的应用 route，不承担搜索获客职责。
-_Avoid_: Public Page, landing page
-
-**Visual Designer**:
-通过图像、构图、风格和视觉系统完成创意工作的独立设计师、品牌视觉设计师或小型创意团队，是 Public Site 的 primary audience。
-_Avoid_: Everyone who needs AI images, generic AI user
-
-**Pattern Designer**:
-以图案概念和视觉重复为主要创作对象的 Visual Designer，是 Public Site 的首要专业细分人群。Pattern Ideation 是 flagship Use Case，但不代表当前产品覆盖完整的 surface-pattern production workflow。
-_Avoid_: Generic image generator user, complete production-suite customer
-
-**Workspace Activation**:
-访客完成认证并首次进入可工作的 Canvas Board，是 Public Site 的 primary conversion。注册或登录只是 conversion funnel 中的中间步骤。
-_Avoid_: Signup conversion, CTA click
-
-**Use Case**:
-Visual Designer 希望完成的端到端创作结果，是 Public Site 的一级内容主线。
-_Avoid_: Workflow feature, tool list, capability
-
-**Capability Page**:
-解释一项真实可执行图像能力及其输入、输出、限制和适用场景的 Public Page，用于支撑相关 Use Case。
-_Avoid_: Use Case, generic feature list
-
-**Content Cluster**:
-由一个旗舰 Use Case 与后续可独立发布的 Capability Page、指南组成的内容集合。首个 Content Cluster 聚焦 Pattern Ideation，首发不要求 demo 或输出示例。
-_Avoid_: Thin feature-page collection, generated keyword pages
-
-**Pattern Ideation**:
-通过 Prompt、视觉方案比较、参考风格融合、局部精修与高清输出探索图案方向的创作过程，是当前 Pattern Design Content Cluster 的 product promise。
-_Avoid_: Production-ready seamless repeat, print-production workflow
-
-**Public Language**:
-首发 Public Site 的 canonical content language 是 English。页面正文、metadata、导航和 CTA 统一使用 English；未来完整维护 Chinese 内容时使用独立 `/zh-CN/*` 页面并建立双向语言关系。
-_Avoid_: Mixed-language page, partial translation, machine-translated alternate
-
-**AI Canvas**:
-IdeaBoard 面向 Visual Designer 的产品类别；通过 connected image workflows 支持视觉想法的探索、组合与迭代。
-_Avoid_: Generic AI image generator, prompt-only tool
-
-**Search Citation Access**:
-允许合规的 search 与 answer engine crawler 发现、理解和引用 Public Site 内容的访问许可；它不等于训练许可。
-_Avoid_: Training access, user-request access
-
-**Training Crawl Access**:
-允许内容进入模型训练或改进数据收集的独立访问许可，由产品与内容权利策略单独决定。
-_Avoid_: Search indexing, citation access
-
-**Public Rendering Boundary**:
-Public Site routes 以 build-time static HTML 交付，Workspace、Admin 和受保护的应用 routes 继续由 Vue SPA/CSR 交付；两者共享产品事实与品牌资产，但不共享 rendering responsibility。
-_Avoid_: One rendering mode for every route, bot-specific rendering
-
-**Public Fact Registry**:
-由代码拥有、可被 executable workflow contract 验证的 Public Site 稳定事实集合，例如 capability slug、名称、输入、输出、限制、公开状态和 Use Case 关联。
-_Avoid_: Admin Prompt source, runtime-discovered claim, duplicated metadata
-
-**Editorial Content**:
-经过 review、面向 Visual Designer 的 English 页面叙事、步骤和设计语境；它引用 Public Fact Registry，但不重新定义能力事实或虚构示例证据。
-_Avoid_: Generated SEO copy, hidden crawler text, prompt template
-
-**Repository-reviewed Publishing**:
-Editorial Content、Public Fact Registry、metadata、structured data 和 sitemap 通过同一 repo 的 review 与 build 一起发布，而不是由运行时 Admin CMS 修改。
-_Avoid_: Runtime SEO CMS, prompt-driven publishing, unreviewed copy
-
-**Canonical URL Contract**:
-Public Page 使用 `https://ideaboard.art`、lowercase `kebab-case`、无 trailing slash 的稳定路径；内容不通过 query 或 hash 表达，非 canonical 变体统一重定向。
-_Avoid_: Query-shaped content URL, duplicate locale root, trailing-slash variants
-
-**Content Provenance**:
-Public Content 默认由 IdeaBoard 或 IdeaBoard Editorial Team 署名，并提供真实 Published/Last reviewed 日期，不虚构个人作者、评价或资质。
-_Avoid_: Synthetic authority, anonymous AI copy, fabricated review
-
-**Structured Data Contract**:
-JSON-LD 只表达页面可见且可验证的事实；首页使用 `Organization`/`WebSite`，导航层使用 `BreadcrumbList`，真实指南才使用 `Article`/`TechArticle`，产品事实充分时才使用 `SoftwareApplication`。
-_Avoid_: Hidden claims, fabricated rating, commercial FAQ rich-result bait
-
-**Public Pricing**:
-由 Public Fact Registry 拥有、可公开验证且有明确维护者的 pricing facts；首发 Content Cluster 不公开 Pricing，也不在 structured data 中声明 `offers`。
-_Avoid_: Admin-only price, stale offer, implied free pricing
-
-**First-party Organic Measurement**:
-使用 Search Console、Bing Webmaster Tools、Cloudflare/source logs 和 server-side Workspace Activation event 衡量 Public Site 的发现、抓取和转化，不依赖 third-party tracking cookies 或用户内容分析。
-_Avoid_: Cross-site profile, session replay, prompt/content surveillance
-
-**Authenticated App Surface**:
-承载登录、账户、Boards、Canvas、Admin 和 tokenized share 操作的受保护 route 集合；它们不属于 Public Site，不进入 sitemap，并交付 `noindex`。
-_Avoid_: Public Page, searchable workspace, robots-only privacy
-
-**Public URL Integrity**:
-只有已发布且存在的 Public Page 返回 `200`；不存在、撤销或迁移的 URL 分别返回真实 `404`、`410` 或明确的 `301`，不得用统一 SPA shell 伪装成功页面。
-_Avoid_: Soft 404, unknown-route 200, blanket SPA fallback
-
-**Public Content Lifecycle**:
-Public Content 只有 `draft`、`published` 和 `retired` 三个状态；build 只发布 `published` 页面，`retired` 页面按替代关系投影为 `301` 或 `410`。
-_Avoid_: Runtime publish state, scheduled CMS workflow, stale sitemap entry
-
-**Initial Product URL Set**:
-首发只发布 `/` 和 `/use-cases/pattern-ideation`。Pattern Generation、Style Variation、Style Fusion、Partial Editing 和 Image Upscaling 的 Capability Page 保持 `draft`，在具备可信 supporting evidence 前不生成 URL。
-_Avoid_: Premature feature sprawl, thin capability page, unverified route
-
-**Public Page Content Contract**:
-每个 published Public Page 必须有 opening answer、target Visual Designer、真实 workflow steps、输入输出与限制、相关内部链接、Workspace Activation CTA 及 Content Provenance，并与 metadata/JSON-LD 保持一致。
-_Avoid_: Metadata-only page, unsupported claim, fabricated evidence
-
-**Content Cluster Link Graph**:
-Pattern Ideation Use Case 是首发 Content Cluster 的 hub；首发首页只链接该 hub。Capability Page 发布后再链回 hub，并按 workflow 顺序链接相邻能力，不链接尚未发布的 route。
-_Avoid_: Orphan page, indiscriminate cross-linking, vague anchor text
-
-**Anonymous Public Content**:
-Public Page 的正文、workflow steps、输入输出、限制和 metadata 无需登录即可读取；只有 Workspace Activation CTA 进入认证流程。
-_Avoid_: Auth-gated explanation, client-only SEO body, user asset preview
-
-**Intent-Preserving Handoff**:
-Public Page CTA 进入 Workspace 时携带对应 Use Case 或 Capability intent；intent 只影响应用内 start flow，不改变 Public Page canonical URL 或 sitemap。
-_Avoid_: Query-shaped canonical, lost use-case context, forced overwrite
+## Non-goals
+- No User Home, landing SPA, or marketing shell.
+- No generic AI-user targeting; no complete production-suite promise.
+- No signup/CTA-click as the conversion; only Workspace Activation counts.
+- No thin feature-page collections or generated keyword pages.
+- No training-data licensing via citation access.

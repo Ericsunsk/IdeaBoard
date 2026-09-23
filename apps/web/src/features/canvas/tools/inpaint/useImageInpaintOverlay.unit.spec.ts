@@ -1,9 +1,136 @@
 import type { Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
-import { computed, ref, shallowRef } from 'vue'
+import { computed, nextTick, ref, shallowRef } from 'vue'
 import type { Ref } from 'vue'
 import { useRetouchMode } from '../retouch/useRetouchMode'
+import { INPAINT_DEFAULT_BRUSH_SIZE, INPAINT_MAX_BRUSH_SIZE } from './config/constants'
+import type {
+  MaskPainter,
+  MaskPainterClientPoint,
+  MaskPainterViewport,
+} from './fabric/index.ts'
+import type { ImageInpaintCommittedData } from './model.ts'
 import { useImageInpaintOverlay } from './useImageInpaintOverlay'
+
+type RecordedStroke = {
+  mode: 'paint' | 'erase'
+  points: MaskPainterClientPoint[]
+  viewport: MaskPainterViewport
+}
+
+class FakeMaskPainter implements MaskPainter {
+  strokes: RecordedStroke[] = []
+  liveBegins: Array<{ mode: 'paint' | 'erase'; viewport: MaskPainterViewport }> = []
+  appendedBatches: MaskPainterClientPoint[][] = []
+  baselines: Array<string | null> = []
+  brushSize = INPAINT_DEFAULT_BRUSH_SIZE
+  setBrushSizeCalls: number[] = []
+  undoCalls = 0
+  redoCalls = 0
+  clearCalls = 0
+  endCalls = 0
+  cancelCalls = 0
+  disposed = false
+  private livePoints: MaskPainterClientPoint[] = []
+  private painted = false
+  private readonly undoStack: number[] = []
+  private readonly redoStack: number[] = []
+
+  paintStroke(points: readonly MaskPainterClientPoint[], viewport: MaskPainterViewport) {
+    this.strokes.push({ mode: 'paint', points: [...points], viewport: { ...viewport } })
+    this.undoStack.push(1)
+    this.redoStack.length = 0
+    this.painted = true
+  }
+
+  eraseStroke(points: readonly MaskPainterClientPoint[], viewport: MaskPainterViewport) {
+    this.strokes.push({ mode: 'erase', points: [...points], viewport: { ...viewport } })
+    this.undoStack.push(1)
+    this.redoStack.length = 0
+    this.painted = true
+  }
+
+  beginStroke(mode: 'paint' | 'erase', viewport: MaskPainterViewport) {
+    this.liveBegins.push({ mode, viewport: { ...viewport } })
+    this.livePoints = []
+  }
+
+  appendStrokePoints(points: readonly MaskPainterClientPoint[]) {
+    this.appendedBatches.push([...points])
+    this.livePoints.push(...points)
+  }
+
+  endStroke() {
+    this.endCalls += 1
+    if (this.livePoints.length > 0) {
+      this.undoStack.push(1)
+      this.redoStack.length = 0
+      this.painted = true
+    }
+    this.livePoints = []
+  }
+
+  cancelStroke() {
+    this.cancelCalls += 1
+    this.livePoints = []
+  }
+
+  setBaselineImage(dataUrl: string | null) {
+    this.baselines.push(dataUrl)
+  }
+
+  setBrushSize(size: number) {
+    this.setBrushSizeCalls.push(size)
+    this.brushSize = size
+  }
+
+  getBrushSize() {
+    return this.brushSize
+  }
+
+  canUndo() {
+    return this.undoStack.length > 0
+  }
+
+  canRedo() {
+    return this.redoStack.length > 0
+  }
+
+  undo() {
+    this.undoCalls += 1
+    if (this.undoStack.pop() !== undefined) this.redoStack.push(1)
+  }
+
+  redo() {
+    this.redoCalls += 1
+    if (this.redoStack.pop() !== undefined) this.undoStack.push(1)
+  }
+
+  clear() {
+    this.clearCalls += 1
+    if (this.painted) this.undoStack.push(1)
+    this.strokes.length = 0
+    this.livePoints = []
+    this.painted = false
+    this.redoStack.length = 0
+  }
+
+  hasPaint() {
+    return this.painted
+  }
+
+  commit(): ImageInpaintCommittedData | null {
+    if (!this.painted) return null
+    return {
+      executionMaskDataUrl: 'data:image/png;fake-execution',
+      maskDataUrl: 'data:image/png;fake-preview',
+    }
+  }
+
+  dispose() {
+    this.disposed = true
+  }
+}
 
 function createStageElement() {
   const stage = document.createElement('div')
@@ -16,6 +143,15 @@ function createStageElement() {
 
 function createHarness() {
   const stage = createStageElement()
+  const painters: FakeMaskPainter[] = []
+  const createMaskPainter = vi.fn(
+    (host: HTMLCanvasElement): MaskPainter | Promise<MaskPainter> => {
+      void host
+      const painter = new FakeMaskPainter()
+      painters.push(painter)
+      return painter
+    },
+  )
   const nodes: Ref<Node[]> = shallowRef([{ id: 'node-1', data: { kind: 'image' } }] as Node[])
   const editorMode = useRetouchMode({
     nodes,
@@ -29,83 +165,70 @@ function createHarness() {
       return state?.mode === 'inpaint' ? { nodeId: state.nodeId, mode: 'inpaint' as const } : null
     }),
     imageRect: computed(() => ({ left: 40, top: 0, width: stage.clientWidth - 80, height: 240 })),
+    createMaskPainter,
   })
 
-  return { editorMode, overlay }
+  return { editorMode, overlay, painters, createMaskPainter }
 }
 
 function createMaskCanvas() {
   const canvas = document.createElement('canvas')
   canvas.width = 200
   canvas.height = 100
-  const imageData = {
-    width: canvas.width,
-    height: canvas.height,
-    data: new Uint8ClampedArray(canvas.width * canvas.height * 4),
-  } as ImageData
   const ctx = {
     clearRect: vi.fn(),
     drawImage: vi.fn(),
-    getImageData: vi.fn(() => imageData),
+    getImageData: vi.fn(),
     putImageData: vi.fn(),
-    save: vi.fn(),
-    restore: vi.fn(),
-    beginPath: vi.fn(),
-    closePath: vi.fn(),
-    fill: vi.fn(),
-    moveTo: vi.fn(),
-    lineTo: vi.fn(),
-    stroke: vi.fn(),
-    createImageData: vi.fn((width: number, height: number) => ({
-      width,
-      height,
-      data: new Uint8ClampedArray(width * height * 4),
-    })),
-    globalCompositeOperation: 'source-over',
-    fillStyle: '',
-    strokeStyle: '',
-    lineCap: 'round',
-    lineJoin: 'round',
-    lineWidth: 0,
-    canvas,
   } as unknown as CanvasRenderingContext2D
   vi.spyOn(canvas, 'getContext').mockReturnValue(ctx)
-  canvas.hasPointerCapture = vi.fn(() => false)
-  canvas.setPointerCapture = vi.fn()
-  canvas.releasePointerCapture = vi.fn()
   return canvas
 }
 
+async function mountPainter(
+  overlay: ReturnType<typeof useImageInpaintOverlay>,
+  canvas: HTMLCanvasElement,
+) {
+  overlay.setMaskCanvasRef('node-1', canvas)
+  await Promise.resolve()
+  await nextTick()
+}
+
+function pointerDown(init: PointerEventInit = {}) {
+  return new PointerEvent('pointerdown', {
+    button: 0,
+    clientX: 60,
+    clientY: 45,
+    pointerId: 1,
+    pointerType: 'mouse',
+    ...init,
+  })
+}
+
 describe('useImageInpaintOverlay', () => {
-  it('keeps mask editor active when committing without a drawable mask', () => {
+  it('keeps mask editor active when committing without a drawable mask', async () => {
     const { editorMode, overlay } = createHarness()
+    const canvas = createMaskCanvas()
+    canvas.getBoundingClientRect = () =>
+      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
 
     expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
-    expect(overlay.inpaintNodeId.value).toBe('node-1')
-
+    await mountPainter(overlay, canvas)
     expect(overlay.commitMaskDraft()).toBe(false)
 
     expect(editorMode.retouchState.value).not.toBeNull()
     expect(overlay.inpaintNodeId.value).toBe('node-1')
   })
 
-  it('reuses the pointer-down canvas layout while painting', () => {
-    const { editorMode, overlay } = createHarness()
+  it('reuses the pointer-down canvas layout while painting incrementally', async () => {
+    const { editorMode, overlay, painters } = createHarness()
     const canvas = createMaskCanvas()
     const readRect = vi.fn(() => ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect)
     canvas.getBoundingClientRect = readRect
 
     expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
-    overlay.setMaskCanvasRef('node-1', canvas)
-    overlay.onCanvasPointerDown(
-      new PointerEvent('pointerdown', {
-        button: 0,
-        clientX: 60,
-        clientY: 45,
-        pointerId: 1,
-        pointerType: 'mouse',
-      }),
-    )
+    await mountPainter(overlay, canvas)
+    overlay.onCanvasPointerDown(pointerDown())
     window.dispatchEvent(
       new PointerEvent('pointermove', {
         clientX: 70,
@@ -117,5 +240,229 @@ describe('useImageInpaintOverlay', () => {
 
     expect(readRect).toHaveBeenCalledTimes(1)
     window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'mouse' }))
+
+    const painter = painters.at(-1)
+    // Incremental live preview: one begin, per-move appends, one end; the
+    // release path must not replay the buffered points as a second stroke.
+    expect(painter?.liveBegins).toEqual([
+      { mode: 'paint', viewport: { left: 10, top: 20, width: 100, height: 50 } },
+    ])
+    expect(painter?.appendedBatches).toEqual([[{ x: 60, y: 45 }], [{ x: 70, y: 50 }]])
+    expect(painter?.endCalls).toBe(1)
+    expect(painter?.cancelCalls).toBe(0)
+    expect(painter?.strokes).toHaveLength(0)
+    expect(overlay.canUndoMask.value).toBe(true)
+  })
+
+  it('paints a single tap as one live stroke so the seam can render its dot', async () => {
+    const { editorMode, overlay, painters } = createHarness()
+    const canvas = createMaskCanvas()
+    canvas.getBoundingClientRect = () =>
+      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+
+    expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
+    await mountPainter(overlay, canvas)
+    overlay.onCanvasPointerDown(pointerDown())
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'mouse' }))
+
+    // Visual parity with the legacy tap dot: the down sample opens the live
+    // session, so a tap with zero moves still reaches the seam exactly once.
+    const painter = painters.at(-1)
+    expect(painter?.liveBegins).toHaveLength(1)
+    expect(painter?.appendedBatches).toEqual([[{ x: 60, y: 45 }]])
+    expect(painter?.endCalls).toBe(1)
+    expect(painter?.strokes).toHaveLength(0)
+  })
+
+  it('discards the live preview when the drag is cancelled', async () => {
+    const { editorMode, overlay, painters } = createHarness()
+    const canvas = createMaskCanvas()
+    canvas.getBoundingClientRect = () =>
+      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+
+    expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
+    await mountPainter(overlay, canvas)
+    overlay.onCanvasPointerDown(pointerDown())
+    window.dispatchEvent(
+      new PointerEvent('pointermove', {
+        clientX: 70,
+        clientY: 50,
+        pointerId: 1,
+        pointerType: 'mouse',
+      }),
+    )
+    window.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 1, pointerType: 'mouse' }))
+
+    const painter = painters.at(-1)
+    expect(painter?.cancelCalls).toBe(1)
+    expect(painter?.endCalls).toBe(0)
+    expect(painter?.strokes).toHaveLength(0)
+    expect(overlay.canUndoMask.value).toBe(false)
+  })
+
+  it('falls back to one-shot release when the painter loads mid-drag', async () => {
+    const { editorMode, overlay, painters, createMaskPainter } = createHarness()
+    const canvas = createMaskCanvas()
+    canvas.getBoundingClientRect = () =>
+      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+
+    let resolvePainter!: (painter: FakeMaskPainter) => void
+    createMaskPainter.mockImplementationOnce(
+      () =>
+        new Promise<FakeMaskPainter>((resolve) => {
+          resolvePainter = resolve
+        }),
+    )
+
+    expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
+    overlay.setMaskCanvasRef('node-1', canvas)
+    await Promise.resolve()
+    await nextTick()
+    // The painter is still loading: the drag only buffers, no live session.
+    overlay.onCanvasPointerDown(pointerDown())
+    window.dispatchEvent(
+      new PointerEvent('pointermove', {
+        clientX: 70,
+        clientY: 50,
+        pointerId: 1,
+        pointerType: 'mouse',
+      }),
+    )
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'mouse' }))
+
+    const latePainter = new FakeMaskPainter()
+    painters.push(latePainter)
+    resolvePainter(latePainter)
+    await Promise.resolve()
+    await nextTick()
+
+    expect(latePainter.liveBegins).toHaveLength(0)
+    expect(latePainter.strokes).toEqual([
+      {
+        mode: 'paint',
+        points: [
+          { x: 60, y: 45 },
+          { x: 70, y: 50 },
+        ],
+        viewport: { left: 10, top: 20, width: 100, height: 50 },
+      },
+    ])
+  })
+
+  it('drops pointer pressure so strokes render at constant brush width', async () => {
+    const { editorMode, overlay, painters } = createHarness()
+    const canvas = createMaskCanvas()
+    canvas.getBoundingClientRect = () =>
+      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+
+    expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
+    await mountPainter(overlay, canvas)
+    overlay.setBrushSize(24)
+    overlay.onCanvasPointerDown(pointerDown({ pressure: 0.2 }))
+    window.dispatchEvent(
+      new PointerEvent('pointermove', {
+        clientX: 70,
+        clientY: 50,
+        pointerId: 1,
+        pointerType: 'mouse',
+        pressure: 0.9,
+      }),
+    )
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'mouse' }))
+
+    // Legacy parity: the old engine ran with thinning 0 (pressure-invariant
+    // width); the seam receives x/y only and one clamped brush size.
+    const painter = painters.at(-1)
+    expect(painter?.appendedBatches.flat()).toEqual([
+      { x: 60, y: 45 },
+      { x: 70, y: 50 },
+    ])
+    expect(painter?.setBrushSizeCalls.at(-1)).toBe(24)
+  })
+
+  it('routes erase strokes to the seam live path', async () => {
+    const { editorMode, overlay, painters } = createHarness()
+    const canvas = createMaskCanvas()
+    canvas.getBoundingClientRect = () =>
+      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+
+    expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
+    await mountPainter(overlay, canvas)
+    overlay.setDrawMode('erase')
+    overlay.onCanvasPointerDown(pointerDown())
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'mouse' }))
+
+    expect(painters.at(-1)?.liveBegins[0]?.mode).toBe('erase')
+    expect(painters.at(-1)?.endCalls).toBe(1)
+    expect(painters.at(-1)?.strokes).toHaveLength(0)
+  })
+
+  it('restores the committed preview through the seam baseline on remount', async () => {
+    const { editorMode, overlay, painters } = createHarness()
+    const canvas = createMaskCanvas()
+    canvas.getBoundingClientRect = () =>
+      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+
+    expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
+    await mountPainter(overlay, canvas)
+    overlay.onCanvasPointerDown(pointerDown())
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'mouse' }))
+    expect(overlay.commitMaskDraft()).toBe(true)
+
+    overlay.setMaskCanvasRef('node-1', null)
+    overlay.setMaskCanvasRef('node-1', canvas)
+    await Promise.resolve()
+    await nextTick()
+
+    expect(painters.at(-1)?.baselines.at(-1)).toBe('data:image/png;fake-preview')
+  })
+
+  it('delegates undo, redo, clear, and commit to the seam painter', async () => {
+    const { editorMode, overlay, painters } = createHarness()
+    const canvas = createMaskCanvas()
+    canvas.getBoundingClientRect = () =>
+      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+
+    expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
+    await mountPainter(overlay, canvas)
+    overlay.onCanvasPointerDown(pointerDown())
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'mouse' }))
+
+    const painter = painters.at(-1)
+    expect(painter).toBeDefined()
+    expect(overlay.canUndoMask.value).toBe(true)
+    expect(overlay.commitMaskDraft()).toBe(true)
+    expect(overlay.getCommittedMaskData('node-1')).toEqual({
+      executionMaskDataUrl: 'data:image/png;fake-execution',
+      maskDataUrl: 'data:image/png;fake-preview',
+    })
+
+    overlay.undoMask()
+    expect(painter?.undoCalls).toBe(1)
+    expect(overlay.canUndoMask.value).toBe(false)
+    expect(overlay.canRedoMask.value).toBe(true)
+
+    overlay.redoMask()
+    expect(painter?.redoCalls).toBe(1)
+
+    overlay.clearMask()
+    expect(painter?.clearCalls).toBe(1)
+    expect(overlay.commitMaskDraft()).toBe(false)
+  })
+
+  it('clamps brush size through the seam range', async () => {
+    const { editorMode, overlay, painters } = createHarness()
+    const canvas = createMaskCanvas()
+    canvas.getBoundingClientRect = () =>
+      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+
+    expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
+    await mountPainter(overlay, canvas)
+    overlay.setBrushSize(INPAINT_MAX_BRUSH_SIZE + 100)
+    expect(overlay.brushSize.value).toBe(INPAINT_MAX_BRUSH_SIZE)
+
+    overlay.onCanvasPointerDown(pointerDown())
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'mouse' }))
+    expect(painters.at(-1)?.setBrushSizeCalls.at(-1)).toBe(INPAINT_MAX_BRUSH_SIZE)
   })
 })

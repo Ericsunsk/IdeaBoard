@@ -30,6 +30,31 @@ vi.mock('../inpaint/lib/maskPaintingCanvas', async (importOriginal) => {
   }
 })
 
+vi.mock('../inpaint/fabric/loader', () => ({
+  loadFabricMaskPainter: () => ({
+    paintStroke: vi.fn(),
+    eraseStroke: vi.fn(),
+    beginStroke: vi.fn(),
+    appendStrokePoints: vi.fn(),
+    endStroke: vi.fn(),
+    cancelStroke: vi.fn(),
+    setBaselineImage: vi.fn(),
+    setBrushSize: vi.fn(),
+    getBrushSize: () => 18,
+    canUndo: () => false,
+    canRedo: () => false,
+    undo: vi.fn(),
+    redo: vi.fn(),
+    clear: vi.fn(),
+    hasPaint: () => true,
+    commit: () => ({
+      executionMaskDataUrl: 'data:image/png;base64,execution-mask',
+      maskDataUrl: 'data:image/png;base64,preview-mask',
+    }),
+    dispose: vi.fn(),
+  }),
+}))
+
 const renderLayerStackFileMock = vi.mocked(renderRetouchLayerStackFile)
 
 const mediaAssetRequestMock = vi.hoisted(() => vi.fn())

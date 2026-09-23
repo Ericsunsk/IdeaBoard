@@ -22,7 +22,6 @@ export default {
   priceUnavailable: '视觉搜索价格暂不可用',
   loadFailed: '无法搜索灵感',
   visionSearchFailed: '视觉搜索失败',
-  reportImageFailureFailed: '无法报告图片加载失败',
   placeholders: {
     queryDefault: '搜索灵感...',
     queryWithReferences: '以参考图搜索...',

@@ -18,6 +18,7 @@ import type {
   ListAdminTasksParams,
 } from '../../../../shared/api/generated-query/model/index'
 import { createApiDataSelector, resolveApiData } from '../../../../shared/api/apiResponse'
+import { taskCancellationIdempotencyKey } from '../../../../shared/api/idempotencyKey'
 
 export type AdminTaskListQueryParams = ListAdminTasksParams
 export type AdminMonitorDetailModel = AdminMonitorDetail
@@ -63,7 +64,12 @@ export function getAdminMonitorQueryKey() {
 }
 
 export async function cancelAdminTaskByID(taskID: string): Promise<void> {
-  await resolveApiData(cancelAdminTask(taskID), '取消任务失败')
+  await resolveApiData(
+    cancelAdminTask(taskID, {
+      headers: { 'Idempotency-Key': taskCancellationIdempotencyKey(taskID) },
+    }),
+    '取消任务失败',
+  )
 }
 
 type UseAdminTaskDetailResourceOptions = Parameters<

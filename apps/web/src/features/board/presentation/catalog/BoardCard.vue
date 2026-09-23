@@ -30,7 +30,7 @@
         :value="renameDraft"
         type="text"
         :aria-label="t('common.actions.rename')"
-        class="pointer-events-auto h-[30px] w-full rounded-lg border border-board-card-input-border bg-board-card-input-bg px-2 text-[13px] text-board-card-action-hover outline-none"
+        class="pointer-events-auto h-[30px] w-full rounded-lg border border-board-card-input-border bg-board-card-input-bg px-2 text-[13px] text-board-card-action-hover outline-none focus:border-board-primary"
         maxlength="60"
         @click.stop
         @input="onRenameInput"

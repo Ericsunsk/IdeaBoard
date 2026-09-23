@@ -22,7 +22,6 @@ export default {
   priceUnavailable: 'Visual Search pricing is currently unavailable',
   loadFailed: 'Could not search inspiration',
   visionSearchFailed: 'Visual Search failed',
-  reportImageFailureFailed: 'Could not report the image load failure',
   placeholders: {
     queryDefault: 'Search inspiration...',
     queryWithReferences: 'Search with reference image...',

@@ -10,16 +10,26 @@ describe('task monitor resource', () => {
   })
 
   it('cancels one active task through the typed admin task resource seam', async () => {
-    const requests: Array<{ method: string; path: string }> = []
+    const requests: Array<{ method: string; path: string; idempotencyKey: string | null }> = []
     useMswHandlers(
       http.post('/api/admin/tasks/task-a/cancel', ({ request }) => {
-        requests.push({ method: request.method, path: new URL(request.url).pathname })
+        requests.push({
+          method: request.method,
+          path: new URL(request.url).pathname,
+          idempotencyKey: request.headers.get('Idempotency-Key'),
+        })
         return HttpResponse.json({ code: 0, msg: 'ok', data: { message: '取消成功' } })
       }),
     )
 
     await expect(cancelAdminTaskByID('task-a')).resolves.toBeUndefined()
-    expect(requests).toEqual([{ method: 'POST', path: '/api/admin/tasks/task-a/cancel' }])
+    expect(requests).toEqual([
+      {
+        method: 'POST',
+        path: '/api/admin/tasks/task-a/cancel',
+        idempotencyKey: 'task-cancel:task-a',
+      },
+    ])
   })
 
   it('loads the lightweight latest execution projection without execution history through the list resource seam', async () => {

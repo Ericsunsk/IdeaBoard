@@ -24,7 +24,6 @@ export default {
   priceUnavailable: '비전 검색 가격 정보를 현재 사용할 수 없습니다',
   loadFailed: '영감을 검색할 수 없습니다',
   visionSearchFailed: '비전 검색 실패',
-  reportImageFailureFailed: '이미지 로드 실패를 보고할 수 없습니다',
   placeholders: {
     queryDefault: '영감 검색...',
     queryWithReferences: '참조 이미지로 검색...',

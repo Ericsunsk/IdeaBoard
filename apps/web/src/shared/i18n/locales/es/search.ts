@@ -24,7 +24,6 @@ export default {
   priceUnavailable: 'El precio de la Búsqueda Visual no está disponible en este momento',
   loadFailed: 'No se pudo buscar inspiración',
   visionSearchFailed: 'Error en la Búsqueda Visual',
-  reportImageFailureFailed: 'No se pudo informar del error al cargar la imagen',
   placeholders: {
     queryDefault: 'Buscar inspiración...',
     queryWithReferences: 'Buscar con imagen de referencia...',

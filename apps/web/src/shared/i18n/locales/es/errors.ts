@@ -25,11 +25,8 @@ export default {
   vision_search_provider_error: 'Error en la Búsqueda Visual. Inténtelo de nuevo.',
   vision_search_schema_error:
     'La Búsqueda Visual devolvió un resultado no válido. Inténtelo de nuevo.',
-  vision_search_idempotency_key_required:
-    'No se pudo iniciar la Búsqueda Visual. Inténtelo de nuevo.',
-  vision_search_idempotency_conflict: 'Esta Búsqueda Visual ya está en ejecución.',
-  vision_search_pricing_unavailable:
-    'El precio de la Búsqueda Visual no está disponible temporalmente.',
+  idempotency_key_required: 'No se pudo iniciar la solicitud. Inténtelo de nuevo.',
+  idempotency_conflict: 'Esta solicitud ya está en curso.',
   checkout_request_rejected: 'No se pudo iniciar el pago. Inténtelo de nuevo.',
   checkout_session_expired: 'Esta sesión de pago ha expirado. Inicie un nuevo pago.',
   payment_already_completed: 'Este pago ya se ha completado.',

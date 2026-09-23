@@ -1,56 +1,46 @@
-# Library
+# Library Context
+Library owns the user asset collection: external-material (Unsplash/Pexels) saves, Folder management, and shared access plus bridging for Canvas/Search.
+It keeps provider attribution and never copies objects into Media Storage.
+It does NOT own Canvas graph state, Search feed state, or gallery rendering in consuming surfaces.
 
-Library 是用户的个人资产库：外部素材（Unsplash/Pexels）收藏、Folder 管理、Canvas/Search 共享的存取与桥接。不复制对象到 Media Storage，素材保留 provider 归属。
+## Domain Language
 
-## Language
+| Term | Meaning |
+| ---- | ------- |
+| Folder | `{ query_key, is_system, is_virtual, isMutable }`; `all` is a virtual aggregate, `quick-saves` is the system default, numeric ids are user folders; `isMutable = !system && !virtual`. |
+| Asset | `LibraryAsset` (`provider: unsplash\|pexels`, `source_id`, `source` / `preview` / `original_url`, `title` / `author` / `w` / `h`, `folder_id`); URLs are display-only. |
+| Asset Key | `provider:source_id`; identity across Feed, floating island, and bridging. |
+| Search Reference | Same-origin reference state as Asset for passing between vision/search and Canvas; not a persisted asset. |
+| Materialize | Converts a URL asset into a managed Media asset (yields `mediaAssetId`) for Canvas; the sole materialization path from Library to Canvas. |
+| Folder Facts | Identity-level folder collection snapshot (`folders` / `loading` / `load` / `refresh` / `reset` / `dispose` plus revision dedup: `current` / `stale` / `disposed` / `error`); shared by multiple islands. |
+| Mutation Publisher | Broadcasts `save` / `remove` to all subscribers (`asset-saved` / `removed`); drives each surface `galleryEffect` (`none` / `reload-current` / `selection-will-reload`). |
+| Transfer | Drag MIME (`application/x-ideaboard-{search-reference,library-folder-move,canvas-library-import}`) with `copy` / `move` / `none` semantics. |
 
-**Folder**:
-`{ query_key, is_system, is_virtual, isMutable }`。`all` 是虚拟聚合，`quick-saves` 是系统默认，数字 id 为用户文件夹；`isMutable = !system && !virtual`。
-_Avoid_: folder as plain string, mutable system folder
+## Public Seams
 
-**Asset**:
-`LibraryAsset`（`provider: unsplash|pexels`、`source_id`、`source/preview/original_url`、`title/author/w/h`、`folder_id`）。URL 仅用于展示。
-_Avoid_: owned media asset, provider-less asset
+- `features/library` (`index.ts`) — sole public entry: `resource`, `transfer`, `folderFacts`, `confirmations`, `useLibraryWorkspace`, floating-island lazy loader; external features never deep-import internals.
+- `resource.ts` — sole transport boundary: folders/assets pagination, folder create/rename/delete, asset save/move/remove, materialize, key lookup; calls generated `user-library/*`; assembles provider card URLs (`w480`).
+- `createLibraryFolderFacts` plus `createLibraryMutationPublisher` — folder facts and mutation broadcast in `folderFacts.ts`; multiple surfaces share one instance; callers only see `galleryEffect` plus `affectedFolderKeys`.
+- `useLibraryWorkspace.ts` — asset-browsing use case: tabs/pagination/selection/lightbox/delete/edit/move/retry; in `{syncRoute/autoLoad/initialFolder/folderFacts/mutationPublisher}`, out `{folders/assets/selectedFolder/... + commands}`; normalizes `?folder=` (`all` / `quick-saves` / `<id>`).
+- `write` / `read` / `getLibraryDropEffect` / `toCanvasLibraryImportDescriptor` — DnD read/write and effect resolution plus Canvas import descriptors in `transfer.ts`.
+- `deleteFolderConfirmation` / `removeAssetConfirmation` — danger confirmations to `UserConfirmRequest` in `confirmations.ts`; copy and intent checks live here, not in callers.
+- `LibraryFloatingIsland.vue` — island display: open/expanded, reference selection, add-to-canvas; props `{open/folderFacts/mutationPublisher/referenceKeys?/presentation}` plus emits; lazy-loaded via `loadLibraryFloatingIsland`.
 
-**Asset Key**:
-`provider:source_id`，跨 Feed/浮岛/桥接的同一性标识。
-_Avoid_: numeric id as identity, url as identity
+## Invariants
 
-**Search Reference**:
-与 Asset 同源的引用态，用于 vision/search 与 Canvas 之间的传递，不等同于已落库资产。
-_Avoid_: reference as saved asset, saved asset as reference
+- Server (`user-library`, paginated `limit 24 + cursor`) is the folder/asset fact source; `selectedFolder` follows `?folder=` except in routeless cases with internal state.
+- Writes must broadcast via the mutation publisher; surfaces react per `galleryEffect`; never full-reload on every change.
+- Canvas consumption of Library assets must materialize; Search bridging passes only references (`libraryCoordinator`) and never reads/writes gallery directly.
+- Folder deletion requires danger confirmation; deleting the selected folder falls back to `quick-saves`, never dangles.
+- Deleting the selected folder falls back to `quick-saves`; `activeAsset` lightbox stays internal.
+- MIME strings are a cross-surface contract; renames must sync all three ends.
 
-**Materialize**:
-把 URL 资产转成受管 Media 资产（得 `mediaAssetId`）供 Canvas 使用，是 Library 通向 Canvas 的唯一物化口。
-_Avoid_: canvas-direct provider URL, unmaterialized import
+## Non-goals
 
-**Folder Facts**:
-文件夹集合的身份级快照（`folders/loading/load/refresh/reset/dispose` + revision 去重：`current/stale/disposed/error`）。多浮岛共享同一实例。
-_Avoid_: per-island folder fetch, stale facts render
-
-**Mutation Publisher**:
-`save/remove` 后向所有订阅者广播（`asset-saved/removed`），驱动各 surface 的 `galleryEffect`（`none/reload-current/selection-will-reload`）。
-_Avoid_: silent mutation, full reload on every change
-
-**Transfer**:
-拖拽 MIME（`application/x-ideaboard-{search-reference,library-folder-move,canvas-library-import}`）与 `copy/move/none` 语义。
-_Avoid_: untyped drag payload, ambiguous drop effect
-
-## Module Ownership
-
-| Module                      | Responsibility                                                                                                 | Public Interface                                                                                                               | Implementation Detail Boundary                                                          |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| `index.ts`                  | 唯一的公开出口：`resource`、`transfer`、`folderFacts`、`confirmations`、`useLibraryWorkspace` 与浮岛懒加载器。 | 外部 feature 只 import `features/library`；禁止深层相对导入内部模块。                                                          | 内部模块互引保持相对路径，不经 barrel，避免循环。                                       |
-| `resource.ts`               | 唯一的传输边界：folders/assets 分页、建/改名/删 folder、save/move/remove 资产、物化、key 查询。                | 底层调 `generated user-library/*`；上层只认 resource 函数。                                                                    | provider 卡片 URL（`w480`）组装在 resource，不进组件。                                  |
-| `folderFacts.ts`            | 文件夹事实与 mutation 广播。                                                                                   | `createLibraryFolderFacts` + `createLibraryMutationPublisher`（多 surface 共享同一实例）。                                     | revision 去重与 dispose 语义不外泄，调用方只看 `galleryEffect` + `affectedFolderKeys`。 |
-| `useLibraryWorkspace.ts`    | 资产浏览用例：tabs/分页/选中/lightbox/删改/移动/重试。                                                         | 入参 `{syncRoute/autoLoad/initialFolder/folderFacts/mutationPublisher}`；出 `{folders/assets/selectedFolder/... + commands}`。 | `?folder=` 归一（`all/quick-saves/<id>`）；`syncRoute:false` 时 folder 为内部态。       |
-| `transfer.ts`               | DnD 读写与 effect 判定、Canvas 导入描述符。                                                                    | `write/read/getLibraryDropEffect/toCanvasLibraryImportDescriptor`。                                                            | MIME 字符串是跨 surface 契约，改名必须同步三端。                                        |
-| `confirmations.ts`          | 删 folder/删资产的 danger 确认。                                                                               | `deleteFolderConfirmation/removeAssetConfirmation -> UserConfirmRequest`。                                                     | 文案与 intent 判定在此，不在调用方。                                                    |
-| `LibraryFloatingIsland.vue` | 浮岛展示：open/expanded、引用选择、add-to-canvas。                                                             | props `{open/folderFacts/mutationPublisher/referenceKeys?/presentation}` + emits；懒加载经 `loadLibraryFloatingIsland`。       | 删除选中文件夹回落 `quick-saves`；`activeAsset` lightbox 为内部态。                     |
-
-## Rules
-
-- 文件夹与资产的事实主是服务端（`user-library`，分页 `limit 24 + cursor`）；`selectedFolder` 平时走 `?folder=`，无路由场景才用内部态。
-- 写操作必须经 mutation publisher 广播；各 surface 按 `galleryEffect` 响应，禁止每次全量 reload。
-- Canvas 消费 Library 资产必须 materialize；Search 桥接只传引用（`libraryCoordinator`），不直接读写 gallery。
-- Folder 删除是 danger 确认；选中文件夹被删后回落 `quick-saves`，不得悬空。
+- No owned media assets; no provider-less assets.
+- No numeric id or URL as identity; identity is `provider:source_id`.
+- No reference as saved asset; no saved asset as reference.
+- No canvas-direct provider URLs; no unmaterialized imports.
+- No per-island folder fetch; no stale-facts render.
+- No silent mutations; no untyped drag payloads or ambiguous drop effects.
+- No plain-string folders; no mutable system folders.

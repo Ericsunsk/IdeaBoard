@@ -27,6 +27,9 @@ describe('task API boundary', () => {
     await expect(taskApi.checkSubmitReadiness({ prompt: 'test' })).resolves.toBe(readiness)
     await expect(taskApi.get('task-1')).resolves.toEqual({ task })
     await expect(taskApi.cancel('task-1')).resolves.toBeUndefined()
+    expect(mocks.cancelUserTask).toHaveBeenCalledWith('task-1', {
+      headers: { 'Idempotency-Key': 'task-cancel:task-1' },
+    })
   })
 
   it('rejects business failures and malformed successful responses', async () => {

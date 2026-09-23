@@ -1,45 +1,41 @@
-# Workspace
+# Workspace Context
+Workspace owns user-side route assembly, shell layout, global navigation, shell account controls, and the share-join entry flow.
+Public `/user/*` URLs are an external product contract and stay unchanged (not a compat shim).
+It does NOT own business content (owned by submodules like `board`) or identity concept components like `UserAccountMenu` in `shared/components`.
 
-`workspace` 是用户端主要业务界面的路由装配与外壳布局上下文，拥有 workspace routes、layout composition、全局导航、shell controls 与 share-join 入口流程。Public `/user/*` URL 是外部产品契约，保持不变（不是兼容 shim）。
+## Domain Language
 
-## Language
+| Term | Meaning |
+| ---- | ------- |
+| Workspace Layout | Main wrapper for user-side routes (`WorkspaceLayout.vue`): top navigation, global feedback containers (Toast / Confirm Dialog), main content slot. |
+| Workspace Routes | User-side route definitions (`routes/workspaceRoutes.ts`, exports `workspaceRoutes`): `/user/boards`, `/user/join/:share_token`, with `requiresAuth: true` and lazy loading. |
+| Workspace Navigation | Post-login top/main nav (`WorkspaceNavigation.vue`): board entry, inspiration search, Idea balance, avatar, global settings menu. |
+| Workspace Account Controls | Top-level account interaction orchestration (`useWorkspaceAccountControls.ts`): routes clicks to `accountOverlay.open(tab)`, sign-out cleanup (`signOut`), session refresh. |
+| Share Join Page | Collaboration share-join flow (`WorkspaceShareJoinPage.vue`): parses `share_token` from URL, runs the board join workflow, navigates to canvas. |
 
-**Workspace Layout**:
-用户端路由的主包裹容器（`WorkspaceLayout.vue`）。集成顶栏导航、全局反馈容器（Toast / Confirm Dialog）与主内容视图插槽。
-_Avoid_: 业务页面重复声明全局通用容器
+## Public Seams
 
-**Workspace Routes**:
-用户端路由定义（`routes/workspaceRoutes.ts` 导出 `workspaceRoutes`），声明 `/user/boards`、`/user/join/:share_token` 等受保护路由，包含认证元信息（`requiresAuth: true`）与按需懒加载。
-_Avoid_: 强行将非用户私有路由（如公开落地页、管理后台）混入用户端路由表
+- `workspaceRoutes: RouteRecordRaw[]` — full user-side route record array in `routes/workspaceRoutes.ts`; mounted by the global Vue Router with dynamic `import()` lazy loading.
+- `WorkspaceLayout.vue` — page shell in `layout`: injects `WorkspaceNavigation`, manages viewport height/width and scrollbars; no page-specific business state.
+- `WorkspaceShareJoinPage.vue` — collaboration invite landing in `pages`: validates token, shows confirmation, executes join via the `board` domain `joinSharedBoardWorkflow` without building its own transport.
+- `WorkspaceNavigation.vue` — top nav bar in `shell/components`: logo, route highlight, Idea balance widget, avatar and dropdown; collapsed-menu expansion is local interaction state.
+- `useWorkspaceAccountControls.ts` — top-bar user behavior controller in `shell`: `openAccountTab`, `handleSignOut`, `userMenuItems`; aggregates Auth Store and Account Overlay into declarative menu items.
+- `workspace/index.ts` — sole cross-feature entry for workspace.
 
-**Workspace Navigation**:
-用户登录后的顶栏/主导航条（`WorkspaceNavigation.vue`），承载看板入口、灵感搜索、额度余额、用户头像及全局设置菜单。
-_Avoid_: 在具体业务页面中重复实现全局导航栏
+## Invariants
 
-**Workspace Account Controls**:
-由 `useWorkspaceAccountControls.ts` 拥有的顶层账户交互编排：协调将点击事件安全路由到 `accountOverlay.open(tab)`、登出清理（`signOut`）以及会话刷新。
-_Avoid_: 导航组件直接调用底层认证存储进行深层状态修改
+- Every route under `/user/*` requires a login guard; URLs must not be renamed.
+- Business content comes from submodules (e.g. `board`); `workspace` only assembles and shells.
+- The nav bar only raises intents; recharge or billing must go through `accountOverlay`, never inline billing DOM.
+- Sign-out must clear sensitive local caches and redirect to the landing or login page.
+- Nav items render dynamically by current user role, including the admin entry.
+- Never duplicate global containers or the global nav bar in business pages.
+- Never mix non-user-private routes (public landing, admin) into the user-side route table.
+- Never call deep auth-store mutations directly from nav components.
+- Never scatter collaboration-join logic across generic pages.
 
-**Share Join Page**:
-协同分享加入流程（`WorkspaceShareJoinPage.vue`）：解析 URL 中的 `share_token`，完成看板加入工作流并引导跳转至画布。
-_Avoid_: 在通用页面中无序散落协作加入逻辑
+## Non-goals
 
-## Module Ownership
-
-| Module                                     | Responsibility                                                                | Public Interface                                     | Implementation Detail Boundary                             |
-| :----------------------------------------- | :---------------------------------------------------------------------------- | :--------------------------------------------------- | :--------------------------------------------------------- |
-| `routes/workspaceRoutes.ts`                | 导出用户端所有路由记录数组（`workspaceRoutes`），供全局 Vue Router 统一挂载。 | `workspaceRoutes: RouteRecordRaw[]`。                | 内部使用动态 `import()` 懒加载对应页面。                   |
-| `layout/WorkspaceLayout.vue`               | 页面外壳：注入 `WorkspaceNavigation`，管理主要内容区域的视口高宽与滚动条。    | 默认布局组件。                                       | 纯布局结构，不承载特定页面的业务状态。                     |
-| `pages/WorkspaceShareJoinPage.vue`         | 协同邀请落脚点：校验 Token、展示确认界面并执行加入。                          | 路由页面。                                           | 调用 `board` 域的 `joinSharedBoardWorkflow`，不自建传输。  |
-| `shell/components/WorkspaceNavigation.vue` | 顶栏导航条：Logo、路由高亮、Idea 余额挂件、用户头像与下拉菜单。               | 全局布局壳组件，无外部复杂传参。                     | 折叠菜单展开态属于本地交互态。                             |
-| `shell/useWorkspaceAccountControls.ts`     | 顶栏用户行为控制器：打开 Account 对话框特定标签页、退出登录。                 | `openAccountTab`、`handleSignOut`、`userMenuItems`。 | 聚合 Auth Store 与 Account Overlay，提供声明式操作菜单项。 |
-
-跨 feature 经 root `workspace/index.ts` 消费。`shared/components` 的 `UserAccountMenu` 等身份概念组件不属于本 boundary。
-
-## Rules
-
-- 所有 `/user/*` 下的路由均必须具备登录态守卫校验；URL 不得更名。
-- 业务内容由子模块（如 `board`）提供，`workspace` 只负责装配与外壳。
-- 导航条只负责发起意图（Intent），如需打开充值或账单，必须通过 `accountOverlay` 唤起，不得直接内联账单 DOM。
-- 登出后必须清理敏感本地缓存，并重定向至落地页或登录页。
-- 导航项根据当前用户角色动态呈现后台管理入口。
+- No business state in layout; no page-owned data facts.
+- No direct billing DOM in navigation.
+- No ownership of `shared/components` identity components.

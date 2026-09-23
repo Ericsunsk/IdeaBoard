@@ -1,41 +1,37 @@
-# Account & Billing Surface
+# Account Context
+Account owns the user-side surface for credentials, credit wallet, recharge checkout, usage details, reward redemption, and security settings, in strict DDD layers (`domain`, `application`, `infrastructure`, `presentation`).
+It does NOT own the server-side ledger, the Stripe gateway itself, or pricing policy.
 
-Account 是用户端管理个人凭据、额度钱包、充值收银台、用量统计明细、兑换码兑换与安全设置的垂直域。遵循严格的 DDD 分层结构（`domain`、`application`、`infrastructure`、`presentation`）。
+## Domain Language
+| Term | Meaning |
+| ---- | ------- |
+| Idea / Credit | User-visible copy is always `Idea`/`Ideas`; code, domain models, schemas, and transport stay `Credit`/`credits`. |
+| Wallet Balance | Credit account state (`balance`, `held`, `available = balance - held`); source of truth is the server PostgreSQL ledger, synced via `fetchCreditWallet` / `creditsQueryKeys` in `infrastructure/credits/resource.ts`. |
+| Recharge Session | Stripe recharge state machine: pick a package (`PurchaseCard`) -> start checkout (Stripe Checkout Session) -> external redirect -> return polling (`ReturnStatus`). |
+| Reward Redemption | Reward-code flow via `redeemRewardCode` with instance- and IP-level rate limits; safe to retry on 409. |
+| Account Overlay | Global dialog host singleton in `accountOverlay.ts` for tabs (`profile` / `recharge` / `usage` / `billing` / `rewards` / `security`), rendered by `AccountDialogHost.vue`. |
 
-## Language
+## Public Seams
+- `domain/index.ts` pure math, `centsToDollars`, `createUsageChartConfig`, `accountTabs`; display via `formatIdeaAmount` in `shared/i18n/userIdeaCurrency.ts`.
+- `infrastructure/index.ts` unified export for `credits`, `payments`, `rewards`, `usage`, `billing` transport resources.
+- `application/index.ts` use-case hooks: `useRecharge`, `useCreditWallet`, `useCreditsSync`, `useRewardRedemption`, `useUsage`, `useAvatarUpload`, `accountOverlay`.
+- `presentation/index.ts` view layer: `RechargePane`, `UsagePane`, `RewardsPane`, `SecurityPane`, `BillingPane`, and `AccountDialogHost`.
+- `accountOverlay.open(tab?)` the only entry to open the account dialog.
 
-**Idea / Credit**:
-用户端统一展示文案为 `Idea / Ideas`；内部代码、领域模型、schema 与传输层保持使用 `Credit / credits`。
-_Avoid_: 用户可见文案直露 `Credit`，领域层随意改名 `Idea`
+## Invariants
+- External callers open the dialog only via `accountOverlay.open(tab?)`; never instantiate `AccountDialog` locally per page.
+- Balance display follows the source of truth: after recharge or redemption success, explicitly call `invalidateCreditWallet()`.
+- Never compute a permanent balance by local add/subtract; never optimistically mutate without a server round-trip.
+- `domain/` never imports Vue or transport DTOs; it stays deterministic with full unit coverage.
+- All money is stored and computed as integers (minor units); only `presentation` formats to currency strings.
+- Amount display uses the shared `formatIdeaAmount` formatter.
+- Transport normalization (snake_case to camelCase) happens in adapter/resource layers.
+- `application` coordinates loading, error feedback, and Query Cache invalidation; it never renders UI templates.
+- `presentation` is display plus event dispatch; all async work delegates to `application`.
+- Recharge returns must always handle a terminal state; never mark an order successful before it is persisted.
+- Redemption always respects rate limits and refreshes the wallet on success; no unbounded retries.
 
-**Wallet Balance**:
-用户的额度账户状态（`balance`、`held`、`available = balance - held`）。事实源为服务端 PostgreSQL 账本，前端通过 `fetchCreditWallet` / `creditsQueryKeys`（`infrastructure/credits/resource.ts`）轮询与事件同步。
-_Avoid_: 客户端本地自行加减计算永久余额，无服务端回包时乐观修改
-
-**Recharge Session**:
-Stripe 充值流程的状态机：选择面额套餐（PurchaseCard）-> 发起支付结账（Stripe Checkout Session）-> 外部网关重定向 -> 回跳轮询结果（ReturnStatus）。
-_Avoid_: 缺少回跳终态处理，未落库订单提前标记成功
-
-**Reward Redemption**:
-兑换码兑换流程（`redeemRewardCode`），遵循实例级与 IP 级防刷频控，409 重试安全。
-_Avoid_: 无频控重试，兑换成功后不同步刷新额度钱包
-
-**Account Overlay**:
-由 `accountOverlay.ts` 单例控制的全局弹窗宿主，支持激活特定 Tab（`profile / recharge / usage / billing / rewards / security`），由 `AccountDialogHost.vue` 挂载渲染。
-_Avoid_: 各路由分散自建 AccountDialog 实例
-
-## Module Ownership
-
-| Layer / Module    | Responsibility                                                                                                                                     | Public Interface                                                                                                                                           | Implementation Detail Boundary                                |
-| :---------------- | :------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------ |
-| `domain/`         | 纯数学计算、金额格式化（`formatCurrencyMinor`）、用量图表数据整形、Tab 注册表。                                                                    | `domain/index.ts`（`centsToDollars`、`createUsageChartConfig`、`accountTabs`）；金额显示统一使用 `shared/i18n/userIdeaCurrency.ts` 的 `formatIdeaAmount`。 | 零 Vue 响应式与网络传输依赖，全量 deterministic 单测覆盖。    |
-| `infrastructure/` | 传输适配层：封装 `credits`、`payments`、`rewards`、`usage`、`billing` 等子领域的资源传输。                                                         | 各子目录下的 `resource.ts`（经 `infrastructure/index.ts` 统一导出）。                                                                                      | 隔离 generated DTO，完成 snake_case 到 camelCase 的归一化。   |
-| `application/`    | 用例编排 Composables：`useRecharge`、`useCreditWallet`、`useCreditsSync`、`useRewardRedemption`、`useUsage`、`useAvatarUpload`、`accountOverlay`。 | `application/index.ts` 导出各用例 Hook。                                                                                                                   | 协调加载态、错误反馈与 Query Cache 失效，不负责 UI 模板渲染。 |
-| `presentation/`   | 视图呈现层：各 Tab Pane（`RechargePane`、`UsagePane`、`RewardsPane`、`SecurityPane`、`BillingPane`）及全局 `AccountDialogHost`。                   | `presentation/index.ts` 导出 `AccountDialogHost` 与组件。                                                                                                  | 纯展示与事件分发，所有异步动作委派给 `application`。          |
-
-## Rules
-
-- 外部调用该域弹窗必须统一走 `accountOverlay.open(tab?)`，严禁在页面中直接局部实例化 `AccountDialog`。
-- 额度显示遵循事实源：充值成功或兑换码兑换成功后，必须显式触发 `invalidateCreditWallet()` 刷新余额缓存。
-- 领域层 `domain/` 严禁引入任何 Vue 依赖或网络传输 DTO。
-- 任何金额处理均在领域模型中以整数（分 / minor unit）存储与计算，仅在 presentation 层通过格式化器转为货币字符串展示。
+## Non-goals
+- No user-visible `Credit` copy; no `Idea` renaming inside the domain layer.
+- No per-route `AccountDialog` instances.
+- No Vue reactivity or network dependencies in `domain/`.

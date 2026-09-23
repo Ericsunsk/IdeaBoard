@@ -1,63 +1,52 @@
-# Shared
+# Shared Context
+Shared is the only horizontal dependency layer: HTTP exit, transport contracts, presentational components, cross-feature primitives, and theme.
+It does NOT depend on any concrete feature module at runtime (except 3 contract-spec source reads for token checks).
 
-Shared 是前端唯一的横向依赖层：HTTP 出口、传输契约、纯展示组件、跨 feature 原语与主题。它不得依赖任何具体 feature 模块（运行时；contract spec 读源码做 token 校验的 3 处除外）。
+## Domain Language
+| Term | Meaning |
+| ---- | ------- |
+| API Boundary | `Vue UI -> application use case -> resource/adapter -> generated API`; `orvalMutator` is the sole fetcher for all generated files; features call via `shared/api/*` wrappers or their own `*Resource.ts`; generated code is never hand-edited. |
+| Error Catalog | Stable-`code` errors go through `shared/errors/errorCatalog.ts` (`userFacingErrorCopy`); no prose matching or scattered copy; only backend `msg` marked `message_safe` is shown through. |
+| Query Client | The single TanStack Query singleton (`stale 5s` / `gc 10m` / `retry 1` / no refocus); identity change clears all via `clearAuthScopedQueryCache`; features never build their own `QueryClient`. |
+| MediaRef | Canonical media fact (`assetId + tier + format`); URLs are runtime-delivery details via `buildMediaBrowserURL` and are never persisted; Canvas facts never store URLs. |
+| Control State | Interactive control quad-state (`idle` / `selected` / `disabled` / `loading` + `aria-busy` / `aria-pressed`), resolved by `shared/interaction`; styles consume, never define. |
+| Theme Contract | Single source for standard UI primitives and CSS tokens (`src/components/ui` + `shared/theme`); overlay/dialog/round-control styles must consume tokens; contract specs reverse-check canvas/search/board/library/workspace usage. |
+| Locale Parity | `en` resident, `zh` lazy; `en` / `zh-CN` / `es` / `ko` keys must match (`localeParity` contract); locale switch atomically updates i18n + `<html lang>` + storage, and writes nothing on failure. |
 
-## Language
+## Public Seams
+- `shared/api` sole HTTP exit (same-origin ofetch to `/api`, 10s timeout, converged auth failure), `resolveApiData`/`Ok`, task/upload/media dispatch, SSE user stream, `stripUndefined`; never depends on `features/*`.
+- `shared/auth` Better Auth singleton, safe-redirect policy (`normalizeSafeInternalRedirectPath` against `//`, `\`, `%5c`, `..`), password and OAuth provider policy; never depends on feature route components.
+- `shared/components` pure display components (account menu, balance button, confirm box, language picker, table frame, chart card); balance numbers are injected, never self-fetched; never depends on feature stores/resources.
+- `shared/composables` `useAppToast`, `useAsyncAction` (pending count + lifecycle hooks), confirm box, overlay lifecycle, brand, logout redirect; never depends on feature composables.
+- `shared/config` `API_BASE_URL` (production forces `/api`), `AUTH_BASE_URL` derivation, asset/upload ref normalization; never depends on business constants.
+- `shared/constants` single source for route paths, legal links, media constants; never depends on i18n copy.
+- `shared/domain` workflow dictionary (8 slugs), generation primitives (`outputCount` 1-4 strictly rejects, never clamps), `outputResolution`; never depends on backend SKU/pricing.
+- `shared/errors` error-code convergence and user-facing copy; never depends on scattered `t('...')` error copy.
+- `shared/i18n` i18n singleton, atomic locale switch, `"N Idea(s)"` currency format; never conflicts with feature-private keys.
+- `shared/interaction` quad-state resolution; never depends on concrete component styles.
+- `shared/lib` dependency-free pure functions (brand, page chrome, chart primitives); never depends on DOM/Query.
+- `shared/media` MediaRef and upload pipeline (magic-byte sniffing, HEIC-to-JPEG, compression thresholds, fail-back-to-original); never stores URLs in Canvas facts.
+- `shared/motion` duration/easing tokens plus dialog/popover/chart presets (`motionPolicyGuard.spec` guards hard-codes); never depends on business logic.
+- `shared/query` queryClient singleton, task-result normalization (only `role=image + asset_id`), user-credits invalidation pub/sub; credits invalidation must use this channel.
+- `shared/theme` PT single source + CSS tokens; never depends on feature-authored overlay/dialog styles.
+- `shared/utils` client identity single source (`get`/`set`/`clearStoredAuth` with Query clear), error-copy scrubbing, date/form/upload helpers; `localStorage['user']` only via `shared/utils/auth.ts`.
+- `shared/seo` route SEO meta and static HTML; never depends on business data.
+- `shared/assets` provider/storage/oauth pure static assets; never referenced except by code import.
 
-**API Boundary**:
-`Vue UI -> application use case -> resource/adapter -> generated API`。`orvalMutator` 是所有 generated 文件的唯一 fetcher；feature 必须经 `shared/api/*` wrapper 或自家 `*Resource.ts` 调用；generated 代码禁手改。
-_Avoid_: page-direct generated call, hand-edited wrapper, second fetcher
+## Invariants
+- Prove three or more callers before adding a shared module; no generic layers for speculative reuse.
+- Global state is limited to: queryClient singleton, identity store, media delivery cache, SSE singleton, i18n bundle cache, composable-local machines; no Pinia.
+- Transport-DTO to feature-model translation happens in adapter/resource layers; domain code never imports Vue, router, Query, or generated DTOs.
+- Auth, retry, correlation, and error classification live centrally in `shared/api` and `shared/auth`; features never roll their own.
+- Never call generated APIs from pages directly; never hand-edit wrappers; never add a second fetcher.
+- Never match errors by string; never leak unsafe messages.
+- Never build per-feature clients; never cache session identity.
+- Never persist provider URLs; never use tier-less asset refs.
+- Never define per-component disabled logic; never ship controls without busy semantics.
+- Never hand-author overlay CSS; never hard-code motion durations.
+- Never ship partial translations or half-switched locales.
 
-**Error Catalog**:
-有稳定 `code` 的错误必须走 `shared/errors/errorCatalog.ts`（`userFacingErrorCopy`），禁止 prose 匹配与散写文案；只有 `message_safe` 的后端 `msg` 才可透出。
-_Avoid_: string-matched errors, leaked unsafe messages
-
-**Query Client**:
-唯一的 TanStack Query 单例（`stale 5s / gc 10m / retry 1 / no refocus`）。身份变更走 `clearAuthScopedQueryCache` 全清；feature 禁止私建 `QueryClient`。
-_Avoid_: per-feature client, cached session identity
-
-**MediaRef**:
-Canonical media 事实（`assetId + tier + format`）。URL 只是运行时分发细节（`buildMediaBrowserURL`），永不持久化；Canvas facts 禁止存 URL。
-_Avoid_: persisted provider URL, tier-less asset ref
-
-**Control State**:
-交互控件四态（`idle/selected/disabled/loading` + `aria-busy/aria-pressed`），由 `shared/interaction` 统一解析，样式只消费不定义。
-_Avoid_: per-component disabled logic, missing busy semantics
-
-**Theme Contract**:
-标准 UI primitives 与 CSS token 的单源（`src/components/ui` + `shared/theme`）。overlay/dialog/round-control 等样式必须消费 token；contract spec 反向校验 canvas/search/board/library/workspace 的消费。
-_Avoid_: hand-authored overlay CSS, hardcoded motion durations
-
-**Locale Parity**:
-`en` 常驻、`zh` 懒载；`en/zh-CN/es/ko` key 必须一致（`localeParity` 契约）；locale 切换原子更新 i18n + `<html lang>` + 存储，失败不写存储。
-_Avoid_: partial translation, half-switched locale
-
-## Module Ownership
-
-| Module               | Responsibility                                                                                                                                 | Must Never Depend On                                                    |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `shared/api`         | 唯一 HTTP 出口（ofetch 同源 `/api`、10s 超时、auth 失败收敛）、`resolveApiData/Ok`、task/upload/media 分发、SSE 用户事件流、`stripUndefined`。 | 具体 `features/*`。                                                     |
-| `shared/auth`        | Better Auth 单例、重定向安全策略（`normalizeSafeInternalRedirectPath`，防 `//`/`\`/`%5c`/`..`）、密码与 OAuth 提供商策略。                     | feature 路由组件；`localStorage USER_KEY` 只经 `shared/utils/auth.ts`。 |
-| `shared/components`  | 纯展示组件（账户菜单、余额按钮、确认框、语言选择、表格框、图表卡）。余额数字由调用方注入，组件不自取数。                                       | 任何 feature store/resource。                                           |
-| `shared/composables` | `useAppToast`、`useAsyncAction`（pending 计数 + 生命周期钩子）、确认框、overlay 生命周期、品牌、登出重定向。                                   | 具体 feature composable。                                               |
-| `shared/config`      | `API_BASE_URL`（生产强制 `/api`）、`AUTH_BASE_URL` 派生、asset/上传引用归一。                                                                  | 任何业务常量。                                                          |
-| `shared/constants`   | 路由路径单源、法务链接、媒体常量。                                                                                                             | i18n 文案。                                                             |
-| `shared/domain`      | 工作流词典（8 slugs）、generation primitives（outputCount 1–4 严格拒绝非 clamp）、outputResolution。                                           | 后端 SKU/价格（定价显示归 account/admin）。                             |
-| `shared/errors`      | 错误码收敛与用户面文案。                                                                                                                       | 散写 `t('...')` 错误文案。                                              |
-| `shared/i18n`        | i18n 单例、locale 原子切换、`"N Idea(s)"` 货币格式。                                                                                           | feature 私有 key 冲突。                                                 |
-| `shared/interaction` | 控件四态解析。                                                                                                                                 | 具体组件样式。                                                          |
-| `shared/lib`         | 无依赖纯函数（品牌、页面铬、图表基元）。                                                                                                       | DOM/Query。                                                             |
-| `shared/media`       | MediaRef、上传管线（魔数嗅探、HEIC→JPEG、压缩阈值、失败回退原图）。                                                                            | Canvas facts 存 URL；压缩参数散改。                                     |
-| `shared/motion`      | 动效时长/缓动 token 与 dialog/popover/chart 预设（`motionPolicyGuard.spec` 约束硬编码）。                                                      | 业务逻辑。                                                              |
-| `shared/query`       | queryClient 单例、task 结果归一（只认 `role=image + asset_id`）、用户 credits 失效 pub/sub。                                                   | feature 私建 client；credits 失效必须走此通道。                         |
-| `shared/theme`       | PT 单源 + CSS token。                                                                                                                          | feature 自造 overlay/dialog 样式。                                      |
-| `shared/utils`       | 客户端身份单源（`get/set/clearStoredAuth` 含清 Query）、错误文案清洗、日期/表单/上传小工具。                                                   | feature 直读写 `localStorage['user']`。                                 |
-| `shared/seo`         | 路由 SEO meta 与静态 HTML。                                                                                                                    | 业务数据。                                                              |
-| `shared/assets`      | provider/storage/oauth 纯静态资源。                                                                                                            | 代码 import 以外的引用。                                                |
-
-## Rules
-
-- 新增 shared 模块前先证明三个以上调用方；禁止为凑复用而建通用层。
-- 全局状态只允许：queryClient 单例、身份存储、media 分发缓存、SSE 单例、i18n bundle 缓存、composable 局部机。无 Pinia。
-- transport DTO 到 feature model 的翻译发生在 adapter/resource 层；domain 代码不得 import Vue、router、Query 或 generated DTO。
-- 认证/重试/关联/错误分类集中在 `shared/api` 与 `shared/auth`，feature 不得各搞一套。
+## Non-goals
+- No feature-to-feature coupling through shared; shared never imports concrete features.
+- No Pinia or extra global stores.
+- No backend SKU/pricing knowledge in `shared/domain`.

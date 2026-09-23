@@ -6,27 +6,26 @@ import type {
   ImageInpaintCommittedData,
   InpaintInteractionKey,
 } from './model.ts'
-import { buildMaskCommitResult, drawMaskRasterPreviewToCanvas } from './lib/maskPaintingCanvas'
-import {
-  maskStrokeEngine,
-  type MaskStrokePoint,
-  type MaskStrokeRenderOptions,
-} from './lib/maskBrushEngine'
-import {
-  createMaskCanvasPointerProjection,
-  type MaskCanvasPointerProjection,
-} from './lib/maskCanvasGeometry'
-import {
-  clampMaskBrushSize,
-  INPAINT_DEFAULT_BRUSH_SIZE,
-  INPAINT_HISTORY_LIMIT,
-} from './config/constants'
+import { drawMaskRasterPreviewToCanvas } from './lib/maskPaintingCanvas'
+import { clampMaskBrushSize, INPAINT_DEFAULT_BRUSH_SIZE } from './config/constants'
+import type {
+  MaskPainter,
+  MaskPainterClientPoint,
+  MaskPainterOptions,
+  MaskPainterViewport,
+} from './fabric/index.ts'
+import { loadFabricMaskPainter } from './fabric/index.ts'
 import type { RetouchImageRect } from '../retouch'
 
-type MaskHistoryEntry = {
-  width: number
-  height: number
-  imageData: ImageData
+type MaskPainterFactory = (
+  host: HTMLCanvasElement,
+  options: MaskPainterOptions,
+) => MaskPainter | Promise<MaskPainter>
+
+type PendingInpaintStroke = {
+  drawMode: ImageMaskDrawMode
+  points: MaskPainterClientPoint[]
+  viewport: MaskPainterViewport
 }
 
 type ImageInpaintModeState = {
@@ -39,31 +38,37 @@ type UseImageInpaintOverlayOptions = {
   imageRect: Ref<RetouchImageRect | null>
   startCanvasInteraction?: (key: InpaintInteractionKey) => void
   stopCanvasInteraction?: (key: InpaintInteractionKey) => void
+  /**
+   * Injectable painter factory. Production defaults to the lazy Fabric
+   * loader (dynamic import, own chunk); specs inject a fake painter so
+   * happy-dom never constructs a real Fabric canvas.
+   */
+  createMaskPainter?: MaskPainterFactory
 }
 
 export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
+  const createMaskPainter = options.createMaskPainter ?? loadFabricMaskPainter
   const drawMode = ref<ImageMaskDrawMode>('paint')
   const brushSize = ref(INPAINT_DEFAULT_BRUSH_SIZE)
   const canUndoMask = ref(false)
   const canRedoMask = ref(false)
   const canvasRefs = new Map<string, HTMLCanvasElement>()
+  const paintersByNodeId = new Map<string, MaskPainter>()
+  const pendingStrokesByNodeId = new Map<string, PendingInpaintStroke[]>()
   const committedMaskDataMap = new Map<string, ImageInpaintCommittedData>()
-  const undoStacksByNodeId = new Map<string, MaskHistoryEntry[]>()
-  const redoStacksByNodeId = new Map<string, MaskHistoryEntry[]>()
 
   let paintingNodeId: string | null = null
-  let paintingCanvas: HTMLCanvasElement | null = null
   let paintingPointerId: number | null = null
-  let paintingPoints: MaskStrokePoint[] = []
-  let paintingStrokeOptions: Omit<MaskStrokeRenderOptions, 'last'> | null = null
-  let paintingBeforeEntry: MaskHistoryEntry | null = null
-  let paintingPointProjection: MaskCanvasPointerProjection | null = null
+  let paintingClientPoints: MaskPainterClientPoint[] = []
+  let paintingViewport: MaskPainterViewport | null = null
+  let paintingDrawMode: ImageMaskDrawMode = 'paint'
+  let liveStrokeNodeId: string | null = null
   let interactionActive = false
 
   const pointerDragSession = usePointerDragSession<void>({
     onMove: ({ event }) => onPointerMove(event),
-    onEnd: finishPainting,
-    onCancel: finishPainting,
+    onEnd: () => finishPainting(false),
+    onCancel: () => finishPainting(true),
   })
 
   const inpaintNodeId = computed(() => options.inpaintEditorState.value?.nodeId ?? null)
@@ -90,79 +95,88 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
     options.stopCanvasInteraction?.(INPAINT_INTERACTION_KEY)
   }
 
-  function captureMaskHistoryEntry(canvas: HTMLCanvasElement): MaskHistoryEntry | null {
-    const ctx = canvas.getContext('2d', { willReadFrequently: true })
-    if (!ctx || !canvas.width || !canvas.height) return null
-    return {
-      width: canvas.width,
-      height: canvas.height,
-      imageData: ctx.getImageData(0, 0, canvas.width, canvas.height),
-    }
-  }
-
-  function restoreMaskHistoryEntry(canvas: HTMLCanvasElement, entry: MaskHistoryEntry) {
-    const ctx = canvas.getContext('2d', { willReadFrequently: true })
-    if (!ctx) return
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    if (canvas.width === entry.width && canvas.height === entry.height) {
-      ctx.putImageData(entry.imageData, 0, 0)
-      return
-    }
-    const sourceCanvas = document.createElement('canvas')
-    sourceCanvas.width = entry.width
-    sourceCanvas.height = entry.height
-    const sourceCtx = sourceCanvas.getContext('2d')
-    if (!sourceCtx) return
-    sourceCtx.putImageData(entry.imageData, 0, 0)
-    ctx.drawImage(sourceCanvas, 0, 0, canvas.width, canvas.height)
-  }
-
-  function readUndoStack(nodeId: string) {
-    return undoStacksByNodeId.get(nodeId) ?? []
-  }
-
-  function readRedoStack(nodeId: string) {
-    return redoStacksByNodeId.get(nodeId) ?? []
-  }
-
-  function areMaskHistoryEntriesEqual(a: MaskHistoryEntry | null, b: MaskHistoryEntry | null) {
-    if (!a || !b) return false
-    if (a.width !== b.width || a.height !== b.height) return false
-    const aData = a.imageData.data
-    const bData = b.imageData.data
-    if (aData.length !== bData.length) return false
-    for (let idx = 0; idx < aData.length; idx += 1) {
-      if (aData[idx] !== bData[idx]) return false
-    }
-    return true
+  function disposePainterForNode(nodeId: string) {
+    const painter = paintersByNodeId.get(nodeId)
+    if (!painter) return
+    paintersByNodeId.delete(nodeId)
+    painter.dispose()
   }
 
   function updateHistoryAvailability(nodeId = inpaintNodeId.value) {
-    canUndoMask.value = nodeId ? readUndoStack(nodeId).length > 0 : false
-    canRedoMask.value = nodeId ? readRedoStack(nodeId).length > 0 : false
+    const painter = nodeId ? paintersByNodeId.get(nodeId) : undefined
+    canUndoMask.value = painter?.canUndo() ?? false
+    canRedoMask.value = painter?.canRedo() ?? false
   }
 
-  function pushUndoHistory(nodeId: string, entry: MaskHistoryEntry | null) {
-    if (!entry) return false
-    const undoStack = readUndoStack(nodeId).slice()
-    undoStack.push(entry)
-    undoStacksByNodeId.set(nodeId, undoStack.slice(-INPAINT_HISTORY_LIMIT))
-    redoStacksByNodeId.set(nodeId, [])
-    updateHistoryAvailability(nodeId)
-    return true
-  }
-
-  function commitUndoHistoryIfChanged(
-    nodeId: string,
-    before: MaskHistoryEntry | null,
-    canvas: HTMLCanvasElement,
-  ) {
-    const after = captureMaskHistoryEntry(canvas)
-    if (areMaskHistoryEntriesEqual(before, after)) {
+  function applyStroke(nodeId: string, stroke: PendingInpaintStroke) {
+    const painter = paintersByNodeId.get(nodeId)
+    if (!painter) {
+      // Fabric still loading: buffer the stroke instead of dropping it; it
+      // flushes once the painter for this host resolves.
+      if (canvasRefs.has(nodeId)) {
+        const pending = pendingStrokesByNodeId.get(nodeId) ?? []
+        pending.push(stroke)
+        pendingStrokesByNodeId.set(nodeId, pending)
+      }
       updateHistoryAvailability(nodeId)
-      return false
+      return
     }
-    return pushUndoHistory(nodeId, before)
+    painter.setBrushSize(brushSize.value)
+    if (stroke.drawMode === 'erase') painter.eraseStroke(stroke.points, stroke.viewport)
+    else painter.paintStroke(stroke.points, stroke.viewport)
+    updateHistoryAvailability(nodeId)
+  }
+
+  function flushPendingStrokes(nodeId: string) {
+    const pending = pendingStrokesByNodeId.get(nodeId)
+    if (!pending || pending.length === 0) return
+    pendingStrokesByNodeId.delete(nodeId)
+    for (const stroke of pending) applyStroke(nodeId, stroke)
+  }
+
+  function attachPainterForNode(
+    nodeId: string,
+    canvas: HTMLCanvasElement,
+    painter: MaskPainter,
+    restorePreview: boolean,
+  ) {
+    if (canvasRefs.get(nodeId) !== canvas) {
+      painter.dispose()
+      return
+    }
+    paintersByNodeId.set(nodeId, painter)
+    // Baseline preview first, then strokes painted while Fabric loaded.
+    if (restorePreview) drawCommittedMask(nodeId)
+    flushPendingStrokes(nodeId)
+    updateHistoryAvailability(nodeId)
+  }
+
+  function createPainterForNode(
+    nodeId: string,
+    canvas: HTMLCanvasElement,
+    restorePreview: boolean,
+  ) {
+    let created: MaskPainter | Promise<MaskPainter>
+    try {
+      created = createMaskPainter(canvas, {
+        width: canvas.width,
+        height: canvas.height,
+        brushSize: brushSize.value,
+      })
+    } catch {
+      // Fabric stays lazy-optional: a failed load leaves history unavailable
+      // and commit returns false, which the chrome surfaces as a warning.
+      updateHistoryAvailability(nodeId)
+      return
+    }
+    if (created instanceof Promise) {
+      void created.then(
+        (painter) => attachPainterForNode(nodeId, canvas, painter, restorePreview),
+        () => updateHistoryAvailability(nodeId),
+      )
+      return
+    }
+    attachPainterForNode(nodeId, canvas, created, restorePreview)
   }
 
   function getCommittedMaskData(nodeId: string) {
@@ -170,8 +184,16 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
   }
 
   function drawCommittedMask(nodeId: string) {
-    const canvas = canvasRefs.get(nodeId)
     const committed = committedMaskDataMap.get(nodeId)
+    const painter = paintersByNodeId.get(nodeId)
+    if (painter) {
+      // Object-safe baseline: the seam attaches the committed preview as the
+      // Fabric background so later stroke renders preserve it. A direct pixel
+      // write here would be wiped by the next Fabric render (T3 object fix).
+      painter.setBaselineImage(committed?.maskDataUrl ?? null)
+      return
+    }
+    const canvas = canvasRefs.get(nodeId)
     if (!canvas) return
     const ctx = canvas.getContext('2d', { willReadFrequently: true })
     if (!ctx) return
@@ -181,46 +203,68 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
     image.onload = () => {
       const latest = canvasRefs.get(nodeId)
       if (!latest) return
+      // The painter is still absent (loading or failed): a pixel preview is
+      // safe because no Fabric render can wipe it yet. `attachPainterForNode`
+      // re-baselines through the seam once the painter resolves.
+      if (paintersByNodeId.has(nodeId)) return
       drawMaskRasterPreviewToCanvas(image, latest)
       updateHistoryAvailability(nodeId)
     }
     image.src = committed.maskDataUrl
   }
 
-  function finishPainting() {
+  function finishPainting(cancelled = false) {
     const nodeId = paintingNodeId
-    const canvas = paintingCanvas
-    if (canvas && paintingStrokeOptions && paintingPoints.length > 0) {
-      maskStrokeEngine.draw(canvas, paintingPoints, {
-        ...paintingStrokeOptions,
-        last: true,
-      })
-    }
-    stopInteraction()
-    if (nodeId && canvas && paintingBeforeEntry) {
-      commitUndoHistoryIfChanged(nodeId, paintingBeforeEntry, canvas)
-    } else if (nodeId) {
-      updateHistoryAvailability(nodeId)
-    }
+    const stroke: PendingInpaintStroke | null =
+      nodeId && paintingClientPoints.length > 0 && paintingViewport
+        ? {
+            drawMode: paintingDrawMode,
+            points: paintingClientPoints,
+            viewport: paintingViewport,
+          }
+        : null
+    const liveNodeId = liveStrokeNodeId
     paintingNodeId = null
-    paintingCanvas = null
     paintingPointerId = null
-    paintingPoints = []
-    paintingStrokeOptions = null
-    paintingBeforeEntry = null
-    paintingPointProjection = null
+    paintingClientPoints = []
+    paintingViewport = null
+    liveStrokeNodeId = null
+    stopInteraction()
+    if (!nodeId) return
+    if (liveNodeId === nodeId) {
+      // The drag rendered incrementally through the live session: ending it
+      // records exactly one history entry (cancelling discards the preview).
+      // The buffered points must not be replayed as a second one-shot.
+      const painter = paintersByNodeId.get(nodeId)
+      if (cancelled) painter?.cancelStroke()
+      else painter?.endStroke()
+      updateHistoryAvailability(nodeId)
+      return
+    }
+    // No live session (the painter was missing during the drag): strokes
+    // materialize once per drag session as a one-shot release.
+    // The Fabric seam turns a single tap into a dot internally.
+    if (!stroke) {
+      updateHistoryAvailability(nodeId)
+      return
+    }
+    applyStroke(nodeId, stroke)
   }
 
   function stopPainting() {
     const stoppedDragSession = pointerDragSession.endDrag()
-    if (!stoppedDragSession) finishPainting()
+    // `endDrag` without an event clears listeners silently, so finalize here:
+    // an aborted drag (save/remount/node switch mid-drag) discards its
+    // partial live preview, matching the old release-on-stroke drop.
+    if (stoppedDragSession) finishPainting(true)
+    else finishPainting(false)
   }
 
   function saveMaskDraftForNode(nodeId: string): boolean {
     stopPainting()
-    const canvas = canvasRefs.get(nodeId)
-    if (!canvas) return false
-    const committed = buildMaskCommitResult(canvas)
+    const painter = paintersByNodeId.get(nodeId)
+    if (!painter) return false
+    const committed = painter.commit()
     if (!committed) {
       committedMaskDataMap.delete(nodeId)
       return false
@@ -235,20 +279,18 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
   }
 
   function onPointerMove(event: PointerEvent) {
-    if (!paintingNodeId || !paintingCanvas) return
+    if (!paintingNodeId) return
     if (paintingPointerId != null && event.pointerId !== paintingPointerId) return
-    if (!paintingPointProjection) return
-    const point = paintingPointProjection(event.clientX, event.clientY)
-    paintingPoints.push({
-      x: point.x,
-      y: point.y,
-      pressure: event.pressure > 0 ? event.pressure : 0.5,
-    })
-    if (!paintingStrokeOptions) return
-    maskStrokeEngine.draw(paintingCanvas, paintingPoints, {
-      ...paintingStrokeOptions,
-      last: false,
-    })
+    // Raw client samples only: projection and pressure handling belong to
+    // the Fabric seam (constant-width brushes ignore pressure by design).
+    const point = { x: event.clientX, y: event.clientY }
+    paintingClientPoints.push(point)
+    if (liveStrokeNodeId === paintingNodeId) {
+      // Incremental live preview: the seam renders this sample immediately
+      // without replaying the buffered stroke, so the release path below
+      // must not apply these points a second time.
+      paintersByNodeId.get(paintingNodeId)?.appendStrokePoints([point])
+    }
   }
 
   function onCanvasPointerDown(event: PointerEvent) {
@@ -260,90 +302,76 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
     event.preventDefault()
     event.stopPropagation()
     stopPainting()
-    const pointProjection = createMaskCanvasPointerProjection(canvas)
-    const point = pointProjection(event.clientX, event.clientY)
+    // Capture the overlay layout once per stroke; the seam projects every
+    // point of the stroke against this viewport (no per-move re-read).
+    const rect = canvas.getBoundingClientRect()
     paintingNodeId = editorState.nodeId
-    paintingCanvas = canvas
     paintingPointerId = event.pointerId
-    paintingPoints = [
-      {
-        x: point.x,
-        y: point.y,
-        pressure: event.pressure > 0 ? event.pressure : 0.5,
-      },
-    ]
-    paintingStrokeOptions = {
-      brushSize: brushSize.value,
-      drawMode: drawMode.value,
-    }
-    paintingBeforeEntry = captureMaskHistoryEntry(canvas)
-    paintingPointProjection = pointProjection
+    paintingDrawMode = drawMode.value
+    paintingViewport = { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+    paintingClientPoints = [{ x: event.clientX, y: event.clientY }]
     startInteraction()
+    const painter = paintersByNodeId.get(editorState.nodeId)
+    if (painter) {
+      // Live incremental session when the painter is ready; otherwise the
+      // drag only buffers and the release path applies it as one shot.
+      // The down sample opens the session so taps (no moves) still dot.
+      painter.setBrushSize(brushSize.value)
+      painter.beginStroke(paintingDrawMode, paintingViewport)
+      liveStrokeNodeId = editorState.nodeId
+      painter.appendStrokePoints([{ x: event.clientX, y: event.clientY }])
+    }
     pointerDragSession.beginDrag(event, undefined, { target: canvas })
-    maskStrokeEngine.draw(canvas, paintingPoints, {
-      ...paintingStrokeOptions,
-      last: false,
-    })
   }
 
   function setMaskCanvasRef(nodeId: string, element: Element | null) {
     const canvas = element instanceof HTMLCanvasElement ? element : null
     if (!canvas) {
-      canvasRefs.delete(nodeId)
       if (paintingNodeId === nodeId) stopPainting()
+      disposePainterForNode(nodeId)
+      canvasRefs.delete(nodeId)
+      pendingStrokesByNodeId.delete(nodeId)
       return
     }
+    if (paintingNodeId === nodeId) stopPainting()
+    disposePainterForNode(nodeId)
     canvasRefs.set(nodeId, canvas)
-    drawCommittedMask(nodeId)
+    pendingStrokesByNodeId.delete(nodeId)
     updateHistoryAvailability(nodeId)
+    void createPainterForNode(nodeId, canvas, true)
   }
 
   function clearMask() {
     const nodeId = inpaintNodeId.value
     if (!nodeId) return
-    const canvas = canvasRefs.get(nodeId)
-    const ctx = canvas?.getContext('2d', { willReadFrequently: true })
-    if (!canvas || !ctx) return
-    const before = captureMaskHistoryEntry(canvas)
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    commitUndoHistoryIfChanged(nodeId, before, canvas)
+    pendingStrokesByNodeId.delete(nodeId)
+    paintersByNodeId.get(nodeId)?.clear()
+    updateHistoryAvailability(nodeId)
   }
 
   function undoMask() {
     const nodeId = inpaintNodeId.value
     if (!nodeId) return
-    const canvas = canvasRefs.get(nodeId)
-    if (!canvas) return
-    const undoStack = readUndoStack(nodeId).slice()
-    const previous = undoStack.pop()
-    if (!previous) return
-    const current = captureMaskHistoryEntry(canvas)
-    if (current) {
-      const redoStack = readRedoStack(nodeId).slice()
-      redoStack.push(current)
-      redoStacksByNodeId.set(nodeId, redoStack.slice(-INPAINT_HISTORY_LIMIT))
+    const pending = pendingStrokesByNodeId.get(nodeId)
+    if (pending && pending.length > 0) {
+      // Unflushed strokes never reached the painter: drop the newest instead.
+      pending.pop()
+      if (pending.length === 0) pendingStrokesByNodeId.delete(nodeId)
+      updateHistoryAvailability(nodeId)
+      return
     }
-    undoStacksByNodeId.set(nodeId, undoStack)
-    restoreMaskHistoryEntry(canvas, previous)
+    paintersByNodeId.get(nodeId)?.undo()
     updateHistoryAvailability(nodeId)
   }
 
   function redoMask() {
     const nodeId = inpaintNodeId.value
     if (!nodeId) return
-    const canvas = canvasRefs.get(nodeId)
-    if (!canvas) return
-    const redoStack = readRedoStack(nodeId).slice()
-    const next = redoStack.pop()
-    if (!next) return
-    const current = captureMaskHistoryEntry(canvas)
-    if (current) {
-      const undoStack = readUndoStack(nodeId).slice()
-      undoStack.push(current)
-      undoStacksByNodeId.set(nodeId, undoStack.slice(-INPAINT_HISTORY_LIMIT))
+    if (pendingStrokesByNodeId.has(nodeId)) {
+      updateHistoryAvailability(nodeId)
+      return
     }
-    redoStacksByNodeId.set(nodeId, redoStack)
-    restoreMaskHistoryEntry(canvas, next)
+    paintersByNodeId.get(nodeId)?.redo()
     updateHistoryAvailability(nodeId)
   }
 
@@ -355,8 +383,12 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
 
   function clearCommittedMaskData(nodeId: string) {
     committedMaskDataMap.delete(nodeId)
-    undoStacksByNodeId.delete(nodeId)
-    redoStacksByNodeId.delete(nodeId)
+    // Reset seam history so discarded edits cannot resurface via undo; host
+    // pixels stay untouched and no committed preview is restored.
+    pendingStrokesByNodeId.delete(nodeId)
+    const canvas = canvasRefs.get(nodeId)
+    disposePainterForNode(nodeId)
+    if (canvas) void createPainterForNode(nodeId, canvas, false)
     updateHistoryAvailability()
   }
 
@@ -377,9 +409,9 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
 
   onBeforeUnmount(() => {
     stopPainting()
+    for (const nodeId of paintersByNodeId.keys()) disposePainterForNode(nodeId)
     canvasRefs.clear()
-    undoStacksByNodeId.clear()
-    redoStacksByNodeId.clear()
+    pendingStrokesByNodeId.clear()
   })
 
   return {

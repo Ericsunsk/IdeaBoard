@@ -1,55 +1,49 @@
-# Search
+# Search Context
+Search owns the public image-text Feed, paid image-based search, Library bridging, anonymous conversion gate, and post-login continuation.
+It does NOT own the Library gallery, Canvas, or auth overlay UI.
 
-Search 是公共图文 Feed 与付费以图搜图的上下文，拥有分页 Feed、视觉引用、Library 桥接、匿名转化门与登录续跑。
+## Domain Language
+| Term | Meaning |
+| ---- | ------- |
+| Search Feed | Feed fact owner in `application/createSearchFeed`: `results`, `nextCursor`, `hasMore`, `loading`, `loadingMore`, `hasError`, `savedKeys`, `failedImages`; stale requests cancelled in order via `AbortController` + `generation`. |
+| Submitted Query | `route.query.q`, the single source of truth for search; `useSearchSession` drives `feed.load(true)` through an `immediate` watcher. |
+| Vision Reference | Image-search input reference: library asset ID or external reference plus optional `File`/`blob` preview; only the serializable part is persisted. |
+| Library Bridge / Coordinator | Pure mapping between Feed and Library (`SearchResult`/`LibraryAssetView` <-> `VisionReference`) plus pub/sub that writes saved state back to the feed. |
+| Auth Continuation | Pending intent resumed after login for anonymous actions (search, save, open Library); `vision-search` intent stays memory-only, others may use `sessionStorage`. |
+| Scope | Storage isolation key `userPublicID ?? anonymous`; post-login scope switch migrates only vision references and disposes the old scope. |
 
-## Language
+## Public Seams
+- `features/search/index.ts` unified public export: exports domain models (`SearchResult`, `SearchPage`) and intent-continuation API (`clearPendingSearchAuthAction`).
+- `SearchPage` the only route page (`meta.public`); pure assembly, lazy-loaded by `workspaceRoutes` via `useSearchScreenRuntime`.
+- Search viewport components virtualized masonry viewport, save dialog, batch dock; callback props only (`load-next-page`, `scroll-position`), no data ownership.
+- `application/createSearchFeed` feed factory; `reload` keeps cards via `keepResultsOnNextLoad`.
+- `infrastructure/resource.ts` sole generated-API caller for inspiration search and vision extraction; `inFlightRequests` dedup, query capped at 200 rune.
+- `infrastructure/visionBillingResource.ts` quote-only pricing display with `sku=ai-search:vision`.
+- `requireLogin` sets the pending intent and opens the overlay; `resumePendingAction` resumes it after login.
+- `infrastructure/libraryBridge` pure mapping; `infrastructure/libraryCoordinator` pub/sub over `provide/inject search:library-coordinator`.
+- `infrastructure/browserPersistence` scope-isolated `sessionStorage` primitives via `searchScopedStorageKey(:scope)`; `anonymous-query-gate` dedups by query with a cap of 5.
 
-**Search Feed**:
-Feed 事实主（`application/createSearchFeed`）：`results/nextCursor/hasMore/loading/loadingMore/hasError/savedKeys/failedImages`，`AbortController + generation` 排序取消旧请求。
-_Avoid_: useQuery-cached feed, uncancelled pagination
+## Invariants
+- `?q` is the single source of truth: draft is input-box only, submit writes the URL via `router.replace`, feed reacts only to the URL.
+- Never use `useQuery` for feed or server-derived state; `savedKeys` manual backfill must carry `savedMutationRevision` against stale overwrites.
+- Never cache the feed with `useQuery`; never leave pagination uncancelled.
+- Never treat draft as source of truth; never duplicate query refs.
+- Vision references: max 4 refs, single file 10MB, batch max 8; `File`/`blob` never enters storage; `blob:` URL revoke is owned by the reference set.
+- Feed snapshot has 30min TTL plus scroll position; snapshot writes defer to idle; SWR hydrates the old snapshot as first-screen skeleton.
+- `savedKeys` rollback on error: with cache, roll back cursor/`hasMore` to keep one page consistent; empty results show the retry panel; `AbortError` is ignored.
+- Feed pagination: `idle` -> `load(reset)` aborts old requests -> `idle` (`hasMore = cursor`); `load(false)` with `hasMore && !loadingMore` -> `loadingMore` with bottom spinner.
+- Vision flow: `idle` -> `submit` (refs present + logged in, fingerprint dedup) -> `extracting` -> `ready` (extracted terms written back to `submittedQuery` and results loaded).
+- Vision failure (stillProcessing, empty result, throw) -> `idle + error` toast; deleting a ref -> `markStale` (keep results) or clearing all -> `reset` and write back `?q`.
+- Auth continuation: anonymous `submit`/`save`/`openLibrary` -> same-query dedup (over 5 new queries is blocked) -> `requireLogin` (set pending + open overlay) -> on login with scope switch -> `resumePendingAction`.
+- Resume policy: text intent writes `?q` then consumes; vision consumes only when resumed to ready; save consumes only after every item succeeds; open-library sets `island.open = true`; overlay close runs `clearPending`.
+- Cross-feature touches only `auth/authOverlay` (`requireLogin`) and the `features/library` public export via the bridge; it never owns the gallery and never touches Canvas.
+- Never keep feed-owned library state; never mutate the gallery directly.
+- Never lose post-login intent; never leak anonymous state across scopes; never read cross-user cache; never bypass the anonymous query gate.
+- Lifecycle isolation uses per-user `effectScope`; the old scope must be disposed.
+- Underlying writes go through the `features/library` public export; the bridge only projects and writes back.
+- `hold`/`capture` is never shown on the search side; it only enters the admin ledger.
 
-**Submitted Query**:
-`route.query.q`，是搜索的唯一真源。`useSearchSession` 用 `immediate` watcher 驱动 `feed.load(true)`；提交与清空只经 `router.replace` 写 URL。
-_Avoid_: duplicated query refs, draft as source of truth
-
-**Vision Reference**:
-以图搜图的输入引用（library 资产 ID 或外部引用 + 可选 `File/blob` 预览）。只有可序列化部分落盘，`File/blob` 永不持久化。
-_Avoid_: persisted blob URL, oversized reference set
-
-**Library Bridge / Coordinator**:
-Feed 与 Library 之间的纯映射（`SearchResult/LibraryAssetView <-> VisionReference`）与发布订阅（`save/remove` 经 `libraryResource`，再 `publishMutation` 回写 feed 的 saved 态）。桥接不拥有 gallery。
-_Avoid_: feed-owned library state, direct gallery mutation
-
-**Auth Continuation**:
-匿名动作（搜索/收藏/开 Library）在登录后 silicone 续跑的 pending 意图。`vision-search` 意图只放内存，其余可进 `sessionStorage`。
-_Avoid_: lost post-login intent, anonymous state leak across scopes
-
-**Scope**:
-`userPublicID ?? anonymous` 的存储隔离键。登录后 scope 切换只迁移 vision 引用并 dispose 旧 scope。
-_Avoid_: cross-user cache read, anonymous query gate bypass
-
-## Module Ownership
-
-| Module       | Responsibility                                                                                                          | Public Interface                                                                                                               | Implementation Detail Boundary                                  |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| `index.ts`   | 统一公开出口：对外导出领域模型（`SearchResult`、`SearchPage` 等）与意图续行接口（`clearPendingSearchAuthAction` 等）。  | `features/search/index.ts`。                                                                                                   | 封装内部分层细节，禁止外部模块深层依赖 infrastructure。         |
-| `pages`      | 唯一的路由页 `SearchPage`（`meta.public`），纯装配。                                                                    | 被 `workspaceRoutes` 懒加载；`useSearchScreenRuntime` 组装一切。                                                               | Page 不得直调 resource 或 feed。                                |
-| `components` | 结果视口（虚拟化 masonry）、收藏弹窗、批量 dock。                                                                       | 回调式 props（`load-next-page/scroll-position`），不拥有数据。                                                                 | 滚动位置与 active anchor 由 feed 拥有，viewport 只上报。        |
-| feed core    | `application/feed.ts` + `infrastructure/feedPersistence.ts`（30min TTL 快照 + scroll，快照写延后到 idle）。             | `application/createSearchFeed`；`reload` 用 `keepResultsOnNextLoad` 保卡。                                                     | `savedKeys` 手动回填必须带 `savedMutationRevision` 防旧写覆盖。 |
-| resource     | 唯一的 generated 调用处：灵感搜索、视觉抽取、失败上报、计费询价；`inFlightRequests` 去重，query 限 200 rune。           | `infrastructure/resource.ts` / `infrastructure/visionBillingResource.ts`（`sku=ai-search:vision` 纯询价展示）。                | `hold/capture` 不在 search 侧展示，只进 admin 账本。            |
-| lifecycle    | 会话装配（`application/useSearchSession`/`presentation/useSearchScreenRuntime`）、vision 生命周期、lightbox、引用集合。 | `requireLogin`（设 pending + 开 overlay）、`resumePendingAction`。                                                             | `effectScope` 按 user 会话隔离；旧 scope 必须 dispose。         |
-| bridge       | Library 存/删与引用转换。                                                                                               | `infrastructure/libraryBridge`（纯映射）、`infrastructure/libraryCoordinator`（`provide/inject search:library-coordinator`）。 | 底层写经 `features/library` 公开出口，桥接只做投影与回写。      |
-| persistence  | scope 隔离的 sessionStorage 原语、feed/island/vision/continuation 各自键。                                              | `infrastructure/browserPersistence` (`searchScopedStorageKey(:scope)`)；`anonymous-query-gate` 同 query 去重、上限 5。         | vision 意图与 `File/blob` 只放内存，不得进 storage。            |
-
-## Rules
-
-- `?q` 是唯一真源：draft 只用于输入框，提交即写 URL，feed 只响应 URL。
-- 不用 `useQuery` 存 feed/server 派生；`savedKeys` 手动回填且必须过 revision。
-- 视觉引用上限 4、单文件 10MB、batch 上限 8；`blob:` URL revoke 责任在引用集合。
-- 跨 feature 只碰 `auth/authOverlay`（`requireLogin`）与 `features/library` 公开出口（桥接），不拥有 gallery，不碰 Canvas。
-
-## State Machines and Invariants
-
-- **Feed**: `idle` → `load(reset)`（abort 旧请求，首屏骨架/SWR hydrate 旧快照）→ `idle`（`hasMore = cursor`）；`load(false)`（`hasMore && !loadingMore`）→ `loadingMore`（底部 spinner）。`AbortError` 忽略；`error` 进 `hasError`（有缓存则回滚 cursor/hasMore 保一页一致，空结果显示重试 panel）。
-- **Vision**: `idle` → `submit`（有引用 + 已登录，fingerprint 去重）→ `extracting` → `ready`（抽取词写回 `submittedQuery` 并加载结果）；stillProcessing/空结果/抛错 → `idle + error` toast。删引用 → `markStale`（保结果）或清空 → `reset` 并回写 `?q`。
-- **Auth continuation**：匿名 `submit/save/openLibrary` → 同 query 去重（超 5 个新 query 则拦截）→ `requireLogin`（设 pending + 开 overlay）→ 登录成功且 scope 切换 → `resumePendingAction`（文本→写 `?q` 并 consume；vision→resume 到 ready 才 consume；save→逐个全成功才 consume；open-library→`island.open = true`）。overlay 关闭 → `clearPending`。
+## Non-goals
+- No gallery ownership; no Canvas editing.
+- No second fetcher or hand-edited generated wrappers.
+- No persisted `blob:` URLs or oversized reference sets.

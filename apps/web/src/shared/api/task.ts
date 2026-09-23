@@ -6,6 +6,7 @@ import {
   submitUserTask,
 } from './generated-query/tasks/tasks'
 import { resolveApiData, resolveApiOk } from './apiResponse'
+import { taskCancellationIdempotencyKey } from './idempotencyKey'
 import { i18n } from '../i18n'
 import type { ApiResponseTaskSubmitReadinessData } from './generated-query/model'
 
@@ -51,8 +52,13 @@ async function get(...args: Parameters<typeof getUserTask>) {
   return data
 }
 
-async function cancel(...args: Parameters<typeof cancelUserTask>) {
-  await resolveApiOk(cancelUserTask(...args), i18n.global.t('common.errors.taskCancelFailed'))
+async function cancel(taskID: string) {
+  await resolveApiOk(
+    cancelUserTask(taskID, {
+      headers: { 'Idempotency-Key': taskCancellationIdempotencyKey(taskID) },
+    }),
+    i18n.global.t('common.errors.taskCancelFailed'),
+  )
 }
 
 export const taskApi = {
